@@ -1,0 +1,1 @@
+cd etl && sbt run
