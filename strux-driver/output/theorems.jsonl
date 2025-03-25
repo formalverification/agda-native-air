@@ -1,0 +1,1487 @@
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"_↠_","body":"Σ[ h ∈ (setoid X ⟶ 𝔻[ 𝑨 ])] IsSurjective h"}
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"myA","body":"record  { Carrier = ⊤"}
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"myAlg","body":"record { Domain = myA ; Interp = _ }"}
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"contradiction","body":"ex falso"}
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"","body":"h1 ⊥ myAlg"}
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"","body":"∥ h ∥"}
+{"file":"ContraX.agda","module":"Demos.ContraX","name":"","body":"a"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"fst"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"snd"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"𝑖𝑑","body":"record { to = id ; cong = id }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"a"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"sym p"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Injective _≈ᴬ_ _≈ᴮ_ (_⟨$⟩_ f)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∀ {y} → Image F ∋ y"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Inv f (fonto {b})"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"finj ∘ ginj"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Goal where"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"η fonto where"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"eq a (trans p (cong g q))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"mp gonto"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Carrier 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = id ; cong = cong f }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = λ x → f ⟨$⟩ x ; cong = id }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"id"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"eq _ (reflˢ 𝑩)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"𝔻[_]","body":"Domain 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"𝕌[_]","body":"Carrier (Domain 𝑨)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"_̂_","body":"λ a → (Interp 𝑨) ⟨$⟩ (f , a)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"Lift-Alg","body":"Lift-Algʳ (Lift-Algˡ 𝑨 ℓ₀) ℓ₁"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∀ {a} → h ⟨$⟩ (f ̂ 𝑨) a ≈ (f ̂ 𝑩) λ x → h ⟨$⟩ (a x)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∀ {f} → compatible-map-op h f"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ (𝔻[ 𝑨 ] ⟶ 𝔻[ 𝑩 ]) IsHom"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"h , isHom"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ (𝔻[ 𝑨 ] ⟶ 𝔻[ 𝑩 ]) IsMon"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"h , isHom"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ (𝔻[ 𝑨 ] ⟶ 𝔻[ 𝑩 ]) IsEpi"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"(hh , isHom hhM) , isInjective hhM"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"(hh , isHom hhE) , isSurjective hhE"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"mkhom c where"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"trans (cong h (compatible ghom)) (compatible hhom)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"(g ⟨∘⟩ h) , ∘-is-hom hhom ghom"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"(g ⟨∘⟩ h) , ∘-is-epi hepi gepi"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"𝒾𝒹","body":"𝑨} =  𝑖𝑑 , mkhom (reflexive ≡.refl)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = lift ; cong = id } , mkhom (reflexive ≡.refl)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = lower ; cong = id } , mkhom reflˡ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"refl₁"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"refl₁"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = id ; cong = lift } , mkhom (lift (reflexive ≡.refl))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = id ; cong = lower } , mkhom reflˡ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"lift refl₁"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"refl₁"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∘-hom ToLiftˡ ToLiftʳ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∘-hom FromLiftʳ FromLiftˡ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"lift refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"h , hhom where  h : 𝔻[ 𝑨 ] ⟶ 𝔻[ ⨅ ℬ ]"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"λ i → ∣ 𝒽 i ∣ ⟨$⟩ a"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"λ i → compatible ∥ 𝒽 i ∥"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"trans (sym (from∼to x)) (trans ξ (from∼to y))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"cong ∣ from ∣ xy"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"eq (∣ to ∣ ⟨$⟩ x) (sym (from∼to x))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"≅-refl","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"≅-sym","body":"mkiso (from φ) (to φ) (from∼to φ) (to∼from φ)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"≅-trans","body":"ρᶜ}{𝑨}{𝑩}{𝑪} ab bc = mkiso f g τ ν where"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∘-hom (to ab) (to bc)  ;  g = ∘-hom (from bc) (from ab)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"transᶜ (cong ∣ to bc ∣ (to∼from ab (∣ from bc ∣ ⟨$⟩ b))) (to∼from bc b)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"trans (cong ∣ from ab ∣ (from∼to bc (∣ to ab ∣ ⟨$⟩ a))) (from∼to ab a)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"ov","body":"𝓞 ⊔ 𝓥 ⊔ suc α"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"_IsHomImageOf_","body":"Σ[ φ ∈ hom 𝑨 𝑩 ] IsSurjective ∣ φ ∣"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"IdHomImage","body":"α}{𝑨 = 𝑨} = 𝒾𝒹 , λ {y} → Image_∋_.eq y refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Im ∣ h ∣"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"toIm ∣ h ∣ , mkhom (reflˢ 𝔻[ 𝑩 ])"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"fromIm ∣ h ∣ , mkhom (IsHom.compatible ∥ h ∥)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"mkiso ToLiftˡ FromLiftˡ (ToFromLiftˡ{𝑨 = 𝑨}) (FromToLiftˡ{𝑨 = 𝑨}{ℓ})"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"mkiso ToLiftʳ FromLiftʳ (ToFromLiftʳ{𝑨 = 𝑨}) (FromToLiftʳ{𝑨 = 𝑨}{ℓ})"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"Lift-≅","body":"≅-trans Lift-≅ˡ Lift-≅ʳ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"_≤_","body":"Σ[ h ∈ hom 𝑨 𝑩 ] IsInjective ∣ h ∣"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"≤-reflexive","body":"𝒾𝒹 , id"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"mon→≤","body":"𝑨}{𝑩} x = mon→intohom 𝑨 𝑩 x"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"rfl ≡.refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"rfl (≡.sym x)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"rfl (≡.trans x y)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { refl = ≃-isRefl ; sym = ≃-isSym ; trans = ≃-isTrans }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"TermSetoid","body":"record { Carrier = Term X ; _≈_ = _≃_ ; isEquivalence = ≃-isEquiv }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"𝑻","body":"TermSetoid X"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record  { Carrier = X → 𝕌[ 𝑨 ]"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record  { refl   = λ _      → refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"ρ x"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"X} s t = ∀ (ρ : Carrier (Env X)) → ⟦ s ⟧ ⟨$⟩ ρ ≈ ⟦ t ⟧ ⟨$⟩ ρ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"λ _ → refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"λ _        → refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"λ ρ i  → ≃→Equal (𝒜 i) (ℊ x) (ℊ x) ≃-isRefl λ _ → (ρ x) i"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Equal p q where open Environment 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∀ 𝑨 → 𝒦 𝑨 → 𝑨 ⊧ p ≈ q"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∀ {p q} → (p , q) ∈ ℰ → Equal p q where open Environment 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"begin"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"Th","body":"λ (p , q) → 𝒦 ⊫ p ≈ q"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"Mod","body":"∀ {p q} → (p , q) ∈ ℰ → Equal p q where open Environment 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ[ 𝑨 ∈ Algebra α ρᵃ ] 𝑨 ∈ 𝒦 × 𝑩 IsHomImageOf 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ[ 𝑨 ∈ Algebra α ρᵃ ] 𝑨 ∈ 𝒦 × 𝑩 ≤ 𝑨"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ[ I ∈ Type ι ] (Σ[ 𝒜 ∈ (I → Algebra α ρᵃ) ] (∀ i → 𝒜 i ∈ 𝒦) × (𝑩 ≅ ⨅ 𝒜))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"begin"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"SurjInv ∣ φh ∣ φE"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∥ B≤A ∥"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"begin"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ; b = β ⊔ ρᵇ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"H{γ}{ρᶜ}{δ}{ρᵈ} (a ⊔ b ⊔ ℓ ⊔ ι) (S{β}{ρᵇ} (a ⊔ ℓ ⊔ ι) (P ℓ ι 𝒦))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α}{ρᵃ}ℓ 𝒦 ⊫ p ≈ q"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⊧-H-invar{p = p}{q} (σ 𝑨 kA) BimgA"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⊧-S-invar{p = p}{q} (σ 𝑨 kA) B≤A"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Spq 𝑨 (𝑨 , (kA , ≤-reflexive))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⊧-I-invar 𝑨 p q IH (≅-sym A≅⨅A) where"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⊧-P-invar 𝒜 {p}{q} λ i → σ (𝒜 i) (kA i)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ⊔ ℓ ⊔ ι"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":""}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⨅A , (p⨅A , A≤⨅A)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"S-id1{ℓ = aℓι}{p = p}{q} (P-id1{ℓ = ℓ} {𝒦 = 𝒦}{p = p}{q} σ)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"h x"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"free-lift x"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"reflexiveᴬ (≡.cong h x)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"free-lift-func ,"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"refl"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ; ι = ov c ⊔ ℓ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"Σ[ 𝑨 ∈ Algebra α ρᵃ ] 𝑨 ∈ 𝒦 × (X → 𝕌[ 𝑨 ])"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⨅ {I = ℑ X} ∣_∣"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"⨅-hom-co _ (λ i → lift-hom (snd ∥ i ∥))"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"HomIm (homC X)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ; ι = ov c ⊔ ℓ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∣ toHomIm (homC X) ∣ , record  { isHom = ∥ toHomIm (homC X) ∥"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"IsEpi.HomReduct ∥ epiF[ X ] ∥"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ⊔ ℓ ; ι = ov c"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"φ , isEpi where"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"free-lift{𝑨 = 𝑨} id"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"begin"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"begin"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { isHom = mkhom refl ; isSurjective = eq (ℊ _) refl }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"F-ModTh-epi λ {p}{q} → Goal {p}{q}"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"A∈ModThVK{p}{q} (V-id1 ℓ {p = p}{q} x) ρ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∘-epi (F-ModThV-epi λ {p q} → A∈ModThK{p = p}{q} ) ToLift-epi"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"𝑨}kA = 𝑨 , (𝑨 , (⊤ , (λ _ → 𝑨), (λ _ → kA), Goal), ≤-reflexive), IdHomImage"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = λ x _ → x   ; cong = λ xy _ → xy }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"record { to = λ x → x tt  ; cong = λ xy → xy tt }"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"mkiso (to⨅ , mkhom refl⨅) (from⨅ , mkhom refl) (λ _ _ → refl) (λ _ → refl)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"Mod{α = ℓ}{ℓ}{X} ℰ     -- an arbitrary equational class"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"V-id1 ℓ {𝒦} {p} {q} (λ _ x τ → x pℰq τ) 𝑨 vA ρ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ⊔ ℓ ; ι = ov c"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"𝑨} vA {p} {q} x ρ = x 𝑨 vA ρ"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"fromHomIm (homC X)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∣ homFC ∣ , record { isHom = ∥ homFC ∥"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"mon→≤ monFC"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"𝑪 X , ((ℑ X) , (∣_∣ , ((λ i → fst ∥ i ∥) , ≅-refl))) ,  F≤C"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"module","body":"α ⊔ ρᵃ ⊔ ℓ ; ι = ov c"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"𝔽[ 𝕌[ 𝑨 ] ] , (SPF{ℓ = ℓ} 𝒦 , Aim)"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"F-ModTh-epi-lift{ℓ = ℓ} λ {p q} → ModThA{p = p}{q}"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"epi→ontohom 𝔽[ 𝕌[ 𝑨 ] ] (Lift-Alg 𝑨 ι ι) epiFlA"}
+{"file":"HSP.agda","module":"Demos.HSP","name":"","body":"∘-hom ∣ φ ∣(from Lift-≅), ∘-IsSurjective _ _ ∥ φ ∥(fromIsSurjective(Lift-≅{𝑨 = 𝑨}))"}
+{"file":"Products.agda","module":"Base.Algebras.Products","name":"⨅'","body":"record  { carrier = ∀ i → carrier (𝒜 i)                         -- domain"}
+{"file":"Products.agda","module":"Base.Algebras.Products","name":"ov","body":"𝓞 ⊔ 𝓥 ⊔ suc α"}
+{"file":"Products.agda","module":"Base.Algebras.Products","name":"","body":"Σ[ 𝑨 ∈ Algebra α ] 𝑨 ∈ 𝒦"}
+{"file":"Products.agda","module":"Base.Algebras.Products","name":"","body":"∣ i ∣"}
+{"file":"Products.agda","module":"Base.Algebras.Products","name":"","body":"⨅ 𝔄"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Algebra","body":"Σ[ A ∈ Type α ]                 -- the domain"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"algebra→Algebra","body":"(carrier 𝑨 , opsymbol 𝑨)"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Algebra→algebra","body":"mkalg ∣ 𝑨 ∣ ∥ 𝑨 ∥"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"_̂_","body":"λ 𝑎 → (∥ 𝑨 ∥ 𝑓) 𝑎"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Level-of-Alg","body":"α} _ = 𝓞 ⊔ 𝓥 ⊔ suc α"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Level-of-Carrier","body":"α} _ = α"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Lift-alg-op","body":"λ x → lift (f (λ i → lower (x i)))"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Lift-Alg","body":"Lift β ∣ 𝑨 ∣ , (λ (𝑓 : ∣ 𝑆 ∣) → Lift-alg-op (𝑓 ̂ 𝑨) β)"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"Lift-algebra","body":"mkalg (Lift β (carrier 𝑨)) (λ (f : ∣ 𝑆 ∣)"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"compatible","body":"∀ 𝑓 → (𝑓 ̂ 𝑨) |: R"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"compatible-pred","body":"∀ 𝑓 → (𝑓 ̂ 𝑨) |:pred P"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"","body":"∀ (𝑓 : ∣ 𝑆 ∣ ) →  compatible-Rel (𝑓 ̂ 𝑨) R"}
+{"file":"Basic.agda","module":"Base.Algebras.Basic","name":"","body":"∀ ( 𝑓 : ∣ 𝑆 ∣ ) →  compatible-REL (λ i → 𝑓 ̂ (𝒜 i)) R"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"Con","body":"Σ[ θ ∈ ( BinRel ∣ 𝑨 ∣ ρ ) ] IsCongruence 𝑨 θ"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"IsCongruence→Con","body":"θ , p"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"Con→IsCongruence","body":"∥ θ ∥"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"0[_]Compatible","body":"lift γ"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"","body":"wd (𝑓 ̂ 𝑨) i j (lower ∘ ptws0)"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"0Con[_]","body":"let  0eq = 0[ ∣ 𝑨 ∣ ]Equivalence{ρ}  in"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"_╱_","body":"(∣ 𝑨 ∣ / ∣ θ ∣)  ,                              -- domain of quotient algebra"}
+{"file":"Congruences.agda","module":"Base.Algebras.Congruences","name":"𝟘[_╱_]","body":"λ u v → u ≡ v"}
+{"file":"EquationalLogic.agda","module":"Base.Structures.EquationalLogic","name":"_⊧_≈_","body":"𝑨 ⟦ p ⟧ ≈ 𝑨 ⟦ q ⟧"}
+{"file":"EquationalLogic.agda","module":"Base.Structures.EquationalLogic","name":"_⊧_≋_","body":"∀{𝑨 : structure _ _} → 𝒦 𝑨 → 𝑨 ⊧ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Base.Structures.EquationalLogic","name":"Th","body":"λ (p , q) → 𝒦 ⊧ p ≋ q"}
+{"file":"EquationalLogic.agda","module":"Base.Structures.EquationalLogic","name":"Mod","body":"λ 𝑨 → ∀ p q → (p , q) ∈ ℰ → 𝑨 ⊧ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Base.Structures.EquationalLogic","name":"fMod","body":"λ 𝑨 → ∀ i → 𝑨 ⊧ fst (ℰ i) ≈ snd (ℰ i)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∀ a → ((rel 𝑨) 𝑟 a) → ((rel 𝑩) 𝑟) (h ∘ a)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∀ (r : symbol 𝑅) → preserves r h"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∀ a → h (((op 𝑨) f) a) ≡ ((op 𝑩) f) (h ∘ a)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∀ f → comm-op h f"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"is-hom-rel h × is-hom-op h"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"Σ[ h ∈ (A → B) ] is-hom h"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"end","body":"hom 𝑨 𝑨"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∘-is-hom-rel f g ∣ fhro ∣ ∣ ghro ∣"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∘-is-hom-op f g ∥ fhro ∥ ∥ ghro ∥"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"g ∘ f , ∘-is-hom f g fh gh"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝒾𝒹","body":"id , (λ _ _ z → z)  , (λ _ _ → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"is-hom 𝑨 𝑩 g × IsInjective g"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"Σ[ g ∈ (A → B) ] is-mon g"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∣ ϕ ∣ , fst ∥ ϕ ∥"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"is-hom 𝑨 𝑩 g × IsSurjective g"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"Σ[ g ∈ (A → B) ] is-epi g"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"∣ ϕ ∣ , fst ∥ ϕ ∥"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝓁𝒾𝒻𝓉ˡ","body":"lift , (λ _ _ x → x) , λ _ _ → refl"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝓁𝒾𝒻𝓉ʳ","body":"id , (λ _ _ x → lift x) , λ _ _ → refl"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝓁𝒾𝒻𝓉","body":"lift , ((λ _ _ x → lift x) , λ _ _ → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝓁ℴ𝓌ℯ𝓇ˡ","body":"lower , (λ _ _ x → x) , (λ _ _ → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝓁ℴ𝓌ℯ𝓇ʳ","body":"id , ((λ _ _ x → lower x) , λ _ _ → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"𝓁ℴ𝓌ℯ𝓇","body":"lower , (λ _ _ x → lower x) , (λ _ _ → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"h (op 𝑨 f u)     ≡⟨ ∥ hhom ∥ f u ⟩"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"((λ x y → Lift (α ⊔ ρᵃ) (h x ≡ h y)) , goal)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"record  { refl = lift refl"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"(λ a → ⟪ a ⟫ {fst ∣ θ ∣}) , (γrel , (λ _ _ → refl)) , cπ-is-epic"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"x"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"eq a refl"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"epi→hom {𝑨 = 𝑨} {𝑩 = (𝑨 ╱ θ)} (πepi θ)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"𝑨} {𝑩 = (ker[_⇒_]{ρᵃ = ρᵃ} 𝑨 𝑩 h {wd})}"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"(λ a i → ∣ h i ∣ a)"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"(λ a i → ∣ h i ∣ (a i))"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"λ x → (λ z → z x) , (λ R a z → z x)  , λ f a → refl"}
+{"file":"Homs.agda","module":"Base.Structures.Homs","name":"","body":"Σ[ h ∈ ((carrier 𝑨) → (carrier 𝑩)) ] is-hom-op 𝑨 𝑩 h"}
+{"file":"Terms.agda","module":"Base.Structures.Terms","name":"_⟦_⟧","body":"λ a → a x"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"(arity 𝑅) 𝑟"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"Gr","body":"record { carrier = carrier 𝑨 ; op = λ () ; rel = split }"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"Lift α (rel 𝑨 𝑟 arg)"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"h , (i , ii)"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"lift (∣ hhom ∣ 𝑟 a (lower x))"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"∥ hhom ∥ 𝑓 (a ∘ inl)"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"op 𝑩 𝑓 (h ∘ (a ∘ inl))  ≡⟨ ≡.sym homop ⟩"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"λ ()"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"h , (i , ii)"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"lower (∣ hhom ∣ (inl R) a (lift x))"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"goal"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"a x"}
+{"file":"Graphs.agda","module":"Base.Structures.Graphs","name":"","body":"≡.sym (lower (∣ hhom ∣ (inr f) split (lift ≡.refl)))"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"∀ f a → Im a ⊆ B → (f ᵒ 𝑨) a ∈ B"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"app"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"sgIsSmallest B B≤A G⊆B (SgGa i)"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"B≤A f a IH"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"app"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"var Ba"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"sgIsSmallest  (TermImage B)"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"hom-unique wd G g h σ (a x) (SgGa x)"}
+{"file":"Substructures.agda","module":"Base.Structures.Substructures","name":"","body":"∣ g ∣ ((f ᵒ 𝑨) a)    ≡⟨ snd ∥ g ∥ f a ⟩"}
+{"file":"Products.agda","module":"Base.Structures.Products","name":"⨅","body":"ℑ} 𝒜 ="}
+{"file":"Products.agda","module":"Base.Structures.Products","name":"","body":"suc (α ⊔ ρ) ⊔ ℓ"}
+{"file":"Products.agda","module":"Base.Structures.Products","name":"","body":"Σ[ 𝑨 ∈ structure 𝐹 𝑅  {α}{ρ}] 𝑨 ∈ 𝒦"}
+{"file":"Products.agda","module":"Base.Structures.Products","name":"","body":"∣ 𝔦 ∣"}
+{"file":"Products.agda","module":"Base.Structures.Products","name":"","body":"⨅ 𝔄"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"𝑩} ∣"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"𝑨} ∣"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"mkiso 𝒾𝒹 𝒾𝒹 (λ _ → ≡.refl) (λ _ → ≡.refl)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"mkiso (from φ) (to φ) (from∼to φ) (to∼from φ)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"mkiso f g τ ν"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"∘-hom {𝑨 = 𝑨}{𝑩}{𝑪} (to φab) (to φbc)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"∘-hom {𝑨 = 𝑪}{𝑩}{𝑨} (from φbc) (from φab)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"( ≡.cong ∣ to φbc ∣ (to∼from φab (∣ from φbc ∣ x)) ) ∙ (to∼from φbc) x"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"( ≡.cong ∣ from φab ∣ (from∼to φbc (∣ to φab ∣ x)) ) ∙ (from∼to φab) x"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"record  { to = 𝓁𝒾𝒻𝓉ˡ"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"record  { to = 𝓁𝒾𝒻𝓉ʳ"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"record  { to = 𝓁𝒾𝒻𝓉"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"≅-trans ( ≅-trans (≅-sym Lift-≅ˡ) A≅B ) Lift-≅ˡ"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"≅-sym Lift-≅ˡ"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"≅-sym Lift-≅ʳ"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"≅-sym Lift-≅"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"∣ to (AB i) ∣ (a i)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"( λ r a x 𝔦 → fst ∥ to (AB 𝔦) ∥ r (λ z → a z 𝔦) (x 𝔦))"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"∣ from (AB i) ∣ (b i)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"( λ r a x 𝔦 → fst ∥ from (AB 𝔦) ∥ r (λ z → a z 𝔦) (x 𝔦))"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"fiw λ i → (to∼from (AB i)) (𝒃 i)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"fiu λ i → (from∼to (AB i)) (a i)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"∣ to (AB (lower i)) ∣ (a (lower i))"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"( λ r a x i → fst ∥ to (AB (lower i)) ∥ r (λ x₁ → a x₁ (lower i)) (x (lower i)))"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"∣ from (AB i) ∣ (b (lift i))"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"( λ r a x i → fst ∥ from (AB i) ∥ r (λ x₁ → a x₁ (lift i)) (x (lift i)))"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"fizw λ i → to∼from (AB (lower i)) (b i)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"fiu λ i → from∼to (AB i) (a i)"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"mkiso (ϕ , ϕhom) (ψ , ψhom) ϕ~ψ ψ~ϕ"}
+{"file":"Isos.agda","module":"Base.Structures.Isos","name":"","body":"≅-trans (≅-sym Lift-≅ˡ) A≅B"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"(arity 𝑅) 𝑟"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"Gr","body":"record { carrier = carrier 𝑨 ; op = λ () ; rel = split }"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"rel 𝑨 𝑟 arg"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"h , (i , ii)"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"∣ hhom ∣ 𝑟 a x"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"∥ hhom ∥ 𝑓 (a ∘ inl)"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"op 𝑩 𝑓 (h ∘ (a ∘ inl))  ≡⟨ sym homop ⟩"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"λ ()"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"h , (i , ii)"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"∣ hhom ∣ (inl R) a x"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"goal"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"a x"}
+{"file":"Graphs0.agda","module":"Base.Structures.Graphs0","name":"","body":"sym (∣ hhom ∣ (inr f) split refl)"}
+{"file":"Basic.agda","module":"Base.Structures.Basic","name":"siglˡ","body":"𝓞"}
+{"file":"Basic.agda","module":"Base.Structures.Basic","name":"siglʳ","body":"𝓥"}
+{"file":"Basic.agda","module":"Base.Structures.Basic","name":"sigl","body":"𝓞 ⊔ 𝓥"}
+{"file":"Basic.agda","module":"Base.Structures.Basic","name":"","body":"carrier"}
+{"file":"Basic.agda","module":"Base.Structures.Basic","name":"","body":"Lift ℓ ∘ r ʳ 𝑨"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∀ a → ((r ʳ 𝑨) a) → ((r ʳ 𝑩) (h ∘ a))"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∀ r →  preserves r h"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∀ a → h ((f ᵒ 𝑨) a) ≡ (f ᵒ 𝑩) (h ∘ a)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∀ f → comp-op f h"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"is-hom-rel h × is-hom-op h"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"Σ[ h ∈ (∣ 𝑨 ∣ → ∣ 𝑩 ∣) ] is-hom h"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∘-is-hom-rel {f}{g} (fst fhro) (fst ghro)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∘-is-hom-op {f}{g} (snd fhro) (snd ghro)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"g ∘ f , ∘-is-hom {f}{g} fh gh"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"id , (λ R a z → z)  , (λ f a → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"is-hom 𝑨 𝑩 g × IsInjective g"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"Σ[ g ∈ (∣ 𝑨 ∣ → ∣ 𝑩 ∣) ] is-mon g"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"is-hom 𝑨 𝑩 g × IsSurjective g"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"Σ[ g ∈ (∣ 𝑨 ∣ → ∣ 𝑩 ∣) ] is-epi g"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"(fst ϕ) , fst (snd ϕ )"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"(fst ϕ) , fst (snd ϕ)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"λ ℓ ρ 𝑨 → lift , ( (λ R a x → lift x) , λ f a → refl )"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"λ ℓ ρ 𝑨 → lower , (λ R a x → lower x) , (λ f a → refl)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"lift ∘ h ∘ lower , Goal"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∘-is-hom{𝑅 = 𝑅}{𝐹} (Lift-Struc ℓ ρ 𝑨) 𝑩{lower}{h} ((λ R a x → lower x) , (λ f a → refl)) hhom"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"∘-is-hom  {𝑅 = 𝑅}{𝐹} (Lift-Struc ℓ ρ 𝑨) (Lift-Struc ℓ' ρ' 𝑩)"}
+{"file":"Homs.agda","module":"Base.Structures.Sigma.Homs","name":"","body":"(∣ h ∣ ((f ᵒ 𝑨) u))   ≡⟨(snd ∥ h ∥) f u ⟩"}
+{"file":"Products.agda","module":"Base.Structures.Sigma.Products","name":"⨅","body":"ℑ} 𝒜 =  Π[ 𝔦 ∈ ℑ ] ∣ 𝒜 𝔦 ∣                         -- domain of the product structure"}
+{"file":"Products.agda","module":"Base.Structures.Sigma.Products","name":"","body":"lsuc (α ⊔ ρ) ⊔ τ"}
+{"file":"Products.agda","module":"Base.Structures.Sigma.Products","name":"","body":"Σ[ 𝑨 ∈ Structure 𝑅 𝐹 ] (𝑨 ∈ 𝒦)"}
+{"file":"Products.agda","module":"Base.Structures.Sigma.Products","name":"","body":"∣ 𝔦 ∣"}
+{"file":"Products.agda","module":"Base.Structures.Sigma.Products","name":"","body":"⨅ 𝔖"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"𝑨} ="}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"to ab"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"to bc"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"∘-hom 𝑨 𝑪 f1 f2"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"from bc"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"from ab"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"∘-hom 𝑪 𝑨 g1 g2"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"(cong ∣ f2 ∣(to∼from ab (∣ g1 ∣ x)))∙(to∼from bc) x"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"(cong ∣ g2 ∣(from∼to bc (∣ f1 ∣ x)))∙(from∼to ab) x"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"record  { to = 𝓁𝒾𝒻𝓉 ℓ ρ 𝑨"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"∣ to (AB i) ∣ (a i)"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"( λ r a x 𝔦 → fst ∥ to (AB 𝔦) ∥ r (λ z → a z 𝔦) (x 𝔦))"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"∣ from (AB i) ∣ (b i)"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"( λ r a x 𝔦 → fst ∥ from (AB 𝔦) ∥ r (λ z → a z 𝔦) (x 𝔦))"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"fiw λ i → (to∼from (AB i)) (𝒃 i)"}
+{"file":"Isos.agda","module":"Base.Structures.Sigma.Isos","name":"","body":"fiu λ i → (from∼to (AB i)) (a i)"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"Signature","body":"Σ[ F ∈ Type ℓ₀ ] (F → Type ℓ₀)  -- and ar the arity of s."}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"Structure","body":""}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"RStructure","body":"Σ[ A ∈ Type α ] ∀(r : ∣ 𝑅 ∣) → Rel A (snd 𝑅 r) {ρ}"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"AStructure","body":"Σ[ A ∈ Type α ] ∀ (f : ∣ 𝐹 ∣) → Op A (snd 𝐹 f)"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"A , ℛ"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"A , ℱ"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ a → (fst ∥ 𝒜 ∥ 𝑟) a"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ a → (snd ∥ 𝒜 ∥ 𝑓) a"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ a → (𝒜 ⟦ 𝑟 ⟧ᵣ) a"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ a → (𝒜 ⟦ 𝑓 ⟧ₒ) a"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"∀ 𝑓 → (𝑓 ᵒ 𝑨) |: r"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"∀ 𝑓 → (𝑓 ᵒ 𝑨) preserves r"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ x → lift (f (λ i → lower (x i)))"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"r (λ i → lower (x i))"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"Lift ℓ ∣ 𝑨 ∣ , (lrel , lop )"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ x → ((r ʳ 𝑨) (λ i → lower (x i)))"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ x → lift ((f ᵒ 𝑨)( λ i → lower (x i)))"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"∣ 𝑨 ∣ , lrel , snd ∥ 𝑨 ∥"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"λ x → Lift ℓ ((r ʳ 𝑨) x) -- λ x → ((r ʳ 𝑨) (λ i → lower (x i)))"}
+{"file":"Basic.agda","module":"Base.Structures.Sigma.Basic","name":"","body":"Lift-Strucʳ ℓʳ (Lift-Strucˡ ℓˡ 𝑨)"}
+{"file":"Congruences.agda","module":"Base.Structures.Sigma.Congruences","name":"","body":"Σ[ θ ∈ Equivalence ∣ 𝑨 ∣{α ⊔ ρ} ] (Compatible 𝑨 ∣ θ ∣)"}
+{"file":"Congruences.agda","module":"Base.Structures.Sigma.Congruences","name":"","body":"wd (𝑓 ᵒ 𝑨) i j (lower ∘ ptws0)"}
+{"file":"Congruences.agda","module":"Base.Structures.Sigma.Congruences","name":"","body":"0[ ∣ 𝑨 ∣ ]Equivalence , 0[ 𝑨 ]Compatible wd"}
+{"file":"Congruences.agda","module":"Base.Structures.Congruences","name":"con","body":"α}{ρ} 𝑨 = Σ[ θ ∈ Equivalence (carrier 𝑨){α ⊔ ρ} ] (compatible 𝑨 ∣ θ ∣)"}
+{"file":"Congruences.agda","module":"Base.Structures.Congruences","name":"","body":"wd ((op 𝑨) 𝑓) i j (lower ∘ ptws0)"}
+{"file":"Congruences.agda","module":"Base.Structures.Congruences","name":"0con[_]","body":"0[ carrier 𝑨 ]Equivalence , 0[ 𝑨 ]compatible wd"}
+{"file":"Congruences.agda","module":"Base.Structures.Congruences","name":"","body":""}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Σ[ φ ∈ hom 𝑨 𝑩 ] IsSurjective ∣ φ ∣"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Σ[ 𝑩 ∈ Algebra β ] 𝑩 IsHomImageOf 𝑨"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"𝒦} 𝑩 = Σ[ 𝑨 ∈ Algebra α ] ((𝑨 ∈ 𝒦) × (𝑩 IsHomImageOf 𝑨))"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Σ[ 𝑩 ∈ Algebra α ] IsHomImageOfClass{𝒦} 𝑩"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Lift-hom ℓᵃ {𝑩} ℓᵇ h"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"hepi (lower y)"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Inv ∣ h ∣ ζ"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"≡.cong (λ - → lift (∣ h ∣ (- a))) (lower∼lift {Level-of-Carrier 𝑨}{β})"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"y                ≡⟨ (≡.cong-app lift∼lower) y              ⟩"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Lift-hom ℓᵃ {𝑩} ℓᵇ (φ , φhom)"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"Lift-epi-is-epi ℓᵃ {𝑩} ℓᵇ (φ , φhom) φepic"}
+{"file":"HomomorphicImages.agda","module":"Base.Homomorphisms.HomomorphicImages","name":"","body":"lφ , lφepic"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"≅-refl","body":"mkiso (𝒾𝒹 𝑨) (𝒾𝒹 𝑨) (λ _ → ≡.refl) λ _ → ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"≅-sym","body":"mkiso (from φ) (to φ) (from∼to φ) (to∼from φ)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"≅-trans","body":"ℓ}{𝑨}{𝑩}{𝑪} ab bc = mkiso f g τ ν"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"∘-hom 𝑨 𝑪 (to ab) (to bc)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"∘-hom 𝑪 𝑨 (from bc) (from ab)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"(≡.cong ∣ to bc ∣(to∼from ab (∣ from bc ∣ x)))∙(to∼from bc) x"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"(≡.cong ∣ from ab ∣(from∼to bc (∣ to ab ∣ x)))∙(from∼to ab) x"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"Lift-≅","body":"b}{𝑨 = 𝑨} = record  { to = 𝓁𝒾𝒻𝓉 𝑨"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"≅-sym Lift-≅"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"∣ to (AB i) ∣ (a i)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fiw (λ i → ∥ to (AB i) ∥ 𝑓 (λ x → a x i))"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"∣ from (AB i) ∣ (b i)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fiu (λ i → ∥ from (AB i) ∥ 𝑓 (λ x → 𝒃 x i))"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fiw λ i → to∼from (AB i) (𝒃 i)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fiu λ i → from∼to (AB i)(a i)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"∣ to (AB  (lower i)) ∣ (a (lower i))"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fizw (λ i → (∥ to (AB (lower i)) ∥) 𝑓 (λ x → a x (lower i)))"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"∣ from (AB i) ∣ (b (lift i))"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fiu (λ i → ∥ from (AB i) ∥ 𝑓 (λ x → 𝒃 x (lift i)))"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fizw λ i → to∼from (AB (lower i)) (𝒃 i)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"fiu λ i → from∼to (AB i) (a i)"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"record { to = ϕ , ϕhom ; from = ψ , ψhom ; to∼from = ϕ∼ψ ; from∼to = ψ∼ϕ }"}
+{"file":"Isomorphisms.agda","module":"Base.Homomorphisms.Isomorphisms","name":"","body":"≅-trans (≅-sym Lift-≅) A≅B"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"kercon fe{𝑩} h"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"IsCongruence.is-equivalence ∥ θ ∥"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"∣ h ∣ ⌞ a ⌟"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"∣ h ∣ ( (𝑓 ̂ 𝑨) (λ x → ⌞ a x ⌟) )  ≡⟨ ∥ h ∥ 𝑓 (λ x → ⌞ a x ⌟)  ⟩"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"block-ext|uip pe buip ξ φuv"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"monic-is-embedding|Set φ Bset φmon"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"fst ∣ FHT ∣"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"snd ∣ FHT ∣"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"Goal where"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"SurjInv ∣ h ∣ hE b"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"((SurjInvIsInverseʳ ∣ h ∣ hE) b)⁻¹"}
+{"file":"Noether.agda","module":"Base.Homomorphisms.Noether","name":"","body":"Image_∋_.eq ⟪ a ⟫ bfa"}
+{"file":"Kernels.agda","module":"Base.Homomorphisms.Kernels","name":"","body":"ker ∣ h ∣ , mkcon (ker-IsEquivalence ∣ h ∣)(homker-comp wd {𝑩} h)"}
+{"file":"Kernels.agda","module":"Base.Homomorphisms.Kernels","name":"","body":"𝑨 ╱ (kercon wd {𝑩} h)"}
+{"file":"Kernels.agda","module":"Base.Homomorphisms.Kernels","name":"","body":"(λ a → ⟪ a ⟫) , (λ _ _ → refl) , cπ-is-epic  where"}
+{"file":"Kernels.agda","module":"Base.Homomorphisms.Kernels","name":"","body":"Image_∋_.eq a refl"}
+{"file":"Kernels.agda","module":"Base.Homomorphisms.Kernels","name":"","body":"epi→hom (𝑨 ╱ θ) (πepi θ)"}
+{"file":"Properties.agda","module":"Base.Homomorphisms.Properties","name":"","body":"h ∘ g , Goal where"}
+{"file":"Properties.agda","module":"Base.Homomorphisms.Properties","name":"","body":"(h ∘ g)((𝑓 ̂ 𝑨) a)  ≡⟨ ≡.cong h ( ghom 𝑓 a )  ⟩"}
+{"file":"Properties.agda","module":"Base.Homomorphisms.Properties","name":"","body":"∘-is-hom (Lift-Alg 𝑨 ℓᵃ) 𝑩 {lower}{f} (λ _ _ → ≡.refl) fhom"}
+{"file":"Properties.agda","module":"Base.Homomorphisms.Properties","name":"","body":"∘-is-hom  (Lift-Alg 𝑨 ℓᵃ) (Lift-Alg 𝑩 ℓᵇ)"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"SurjInv ∣ ν ∣ νE"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"SurjInvIsInverseʳ ∣ ν ∣ νE c"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"∣ τ ∣ ∘ νInv"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"(η (∣ ν ∣ a))⁻¹"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"λ x → Kντ (ξ x)"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":""}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"≡.cong φ (wd (𝑓 ̂ 𝑪) c (∣ ν ∣ ∘ (νInv ∘ c)) λ i → (η (c i))⁻¹)"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"HomFactor wd 𝑩 τ ν kerincl νe"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"∣ τ ∣ ∘ (SurjInv ∣ ν ∣ νe)"}
+{"file":"Factor.agda","module":"Base.Homomorphisms.Factor","name":"","body":"epic-factor ∣ τ ∣ ∣ ν ∣ φ ∥ φF ∥ τe"}
+{"file":"Products.agda","module":"Base.Homomorphisms.Products","name":"","body":"λ x → (λ z → z x) , λ _ _ → refl"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"","body":"∀ 𝑎 → h ((𝑓 ̂ 𝑨) 𝑎) ≡ (𝑓 ̂ 𝑩) (h ∘ 𝑎)"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"","body":"∀ 𝑓  →  compatible-op-map 𝑓 g"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"","body":"Σ (∣ 𝑨 ∣ → ∣ 𝑩 ∣) is-homomorphism"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"𝒾𝒹","body":"id , λ 𝑓 𝑎 → refl"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"𝓁𝒾𝒻𝓉","body":"lift , λ 𝑓 𝑎 → refl"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"𝓁ℴ𝓌ℯ𝓇","body":"lower , λ 𝑓 𝑎 → refl"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"is-monomorphism","body":"is-homomorphism 𝑨 𝑩 g × IsInjective g"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"mon","body":"Σ[ g ∈ (∣ 𝑨 ∣ → ∣ 𝑩 ∣) ] is-monomorphism 𝑨 𝑩 g"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"is-epimorphism","body":"is-homomorphism 𝑨 𝑩 g × IsSurjective g"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"epi","body":"Σ[ g ∈ (∣ 𝑨 ∣ → ∣ 𝑩 ∣) ] is-epimorphism 𝑨 𝑩 g"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"mon→hom","body":"∣ ϕ ∣ , fst ∥ ϕ ∥"}
+{"file":"Basic.agda","module":"Base.Homomorphisms.Basic","name":"epi→hom","body":"∣ ϕ ∣ , fst ∥ ϕ ∥"}
+{"file":"Properties.agda","module":"Base.Terms.Properties","name":"free-lift","body":"h x"}
+{"file":"Properties.agda","module":"Base.Terms.Properties","name":"lift-hom","body":"free-lift 𝑨 h , λ f a → ≡.cong (f ̂ 𝑨) ≡.refl"}
+{"file":"Properties.agda","module":"Base.Terms.Properties","name":"","body":"wd (𝑓 ̂ 𝑨)(∣ g ∣ ∘ 𝑡)(∣ h ∣ ∘ 𝑡)(λ i → free-unique wd 𝑨 g h p (𝑡 i))"}
+{"file":"Properties.agda","module":"Base.Terms.Properties","name":"","body":"(InvIsInverseʳ (hE y))⁻¹"}
+{"file":"Properties.agda","module":"Base.Terms.Properties","name":"","body":"eq (ℊ h₀⁻¹y) η"}
+{"file":"Basic.agda","module":"Base.Terms.Basic","name":"𝑻","body":"Term X , node"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"_⟦_⟧","body":"λ η → η x"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"term-agreement","body":"∥ term-gen wd p ∥ ∙ (term-gen-agreement wd p)⁻¹"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"λ x → (⨅ 𝒜 ⟦ t x ⟧) a"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"λ x i → (𝒜 i ⟦ t x ⟧)(λ j → a j i)"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"λ x → interp-prod (t x) 𝒜 a"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"λ x → (⨅ 𝒜 ⟦ t x ⟧) a"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"λ x i → (𝒜 i ⟦ t x ⟧)(λ z → (a z) i)"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"λ x → interp-prod (t x) 𝒜 a"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"p x"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"","body":"(is-compatible ∥ θ ∥) f λ x → ((t x) ∣: θ) p"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"_[_]","body":"ℊ (σ y)"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"Substerm","body":"(y : Y) → Term X"}
+{"file":"Operations.agda","module":"Base.Terms.Operations","name":"_[_]t","body":"σ y"}
+{"file":"Functors.agda","module":"Base.Categories.Functors","name":"[_]₀","body":"B"}
+{"file":"Functors.agda","module":"Base.Categories.Functors","name":"[_]_","body":"B"}
+{"file":"Functors.agda","module":"Base.Categories.Functors","name":"L","body":"Const ⊤ ⊕ (Const A ⊗ Id)"}
+{"file":"Functors.agda","module":"Base.Categories.Functors","name":"List","body":"μ (L A)"}
+{"file":"Functors.agda","module":"Base.Categories.Functors","name":"_[_]","body":"none"}
+{"file":"Functors.agda","module":"Base.Categories.Functors","name":"_⟦_⟧","body":"none"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"Subuniverses","body":"(𝑓 : ∣ 𝑆 ∣)(𝑎 : ∥ 𝑆 ∥ 𝑓 → ∣ 𝑨 ∣) → Im 𝑎 ⊆ B → (𝑓 ̂ 𝑨) 𝑎 ∈ B"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"sgIsSub","body":"app"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"","body":"sgIsSmallest 𝑨 Y YsubA XinY (SgXa i)"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"","body":"YsubA f a IH"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"TermImageIsSub","body":"app"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"Y-onlyif-TermImageY","body":"var Ya"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"SgY-onlyif-TermImageY","body":"sgIsSmallest 𝑨 (TermImage 𝑨 Y) TermImageIsSub Y-onlyif-TermImageY"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"","body":"hom-unique wd{𝑨}{𝑩} X g h σ (a x) (ν x)"}
+{"file":"Subuniverses.agda","module":"Base.Subalgebras.Subuniverses","name":"","body":"∣ g ∣ ((𝑓 ̂ 𝑨) a)    ≡⟨ ∥ g ∥ 𝑓 a ⟩"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"Σ[ h ∈ hom 𝑨 𝑩 ] IsInjective ∣ h ∣"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"Σ[ h ∈ hom 𝑩 𝑨 ] IsInjective ∣ h ∣"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"Subalgebra","body":"Σ[ 𝑩 ∈ (Algebra β) ] 𝑩 ≤ 𝑨"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"ϕhom , ϕinj"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"∣ hh ∣"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"∣ snd ∥ hh ∥ ∣"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"FirstHomCorollary|Set{α = ov 𝓧}(𝑻 X) 𝑩 h pe fe Bset buip"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"Σ[ 𝑨 ∈ Algebra α ]"}
+{"file":"Subalgebras.agda","module":"Base.Subalgebras.Subalgebras","name":"","body":"Σ[ 𝑩 ∈ Algebra β ] 𝑩 IsSubalgebraOfClass 𝒦"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"≤-refl","body":"(to φ) , ≅toInjective φ"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"≥-refl","body":"(from φ) , ≅fromInjective φ"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"≤-reflexive","body":"(id , λ 𝑓 𝑎 → ≡.refl) , Injection.injective id-is-injective"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"record { refl = ≅-refl ; sym = ≅-sym ; trans = ≅-trans }"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"record { refl = ≅-refl ; sym = ≅-sym ; trans = ≅-trans }"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"∼-respˡ-≈ ≥-preorder  -- (p : 𝑩 ≅ 𝑪) (q : 𝑨 ≤ 𝑩) → (≤-resp-≅ p q) : 𝑨 ≤ 𝑪"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"∼-respˡ-≈ ≤-preorder {𝑨}"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"≤-resp-≅"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"≥-resp-≅ {𝑨}"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"≤-trans 𝑨 𝑪 a<b (≤-refl bc)"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"≤-trans 𝑪 𝑨 (≤-refl (≅-sym ac)) a<b"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"≥-RESP-≅{𝑨 = 𝑪} b<c (≅-sym ab)"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"≤-RESP-≅ b<c (≅-sym ab)"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"","body":"𝑨 , sa , KA , ≅-trans (≅-sym Lift-≅) B≅sa"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"≤-Lift","body":"≤-RESP-≅{𝑩 = 𝑩} a<b Lift-≅"}
+{"file":"Properties.agda","module":"Base.Subalgebras.Properties","name":"≥-Lift","body":"≥-RESP-≅{𝑨 = 𝑨} a>b Lift-≅"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"_⊧_≈_","body":"𝑨 ⟦ p ⟧ ≈ 𝑨 ⟦ q ⟧"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"_⊫_≈_","body":"{𝑨 : Algebra _} → 𝒦 𝑨 → 𝑨 ⊧ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"Th","body":"λ (p , q) → 𝒦 ⊫ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"","body":"Σ[ (p , q) ∈ (Term X × Term X) ] 𝒦 ⊫ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"","body":"(p , q)"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"Mod","body":"λ 𝑨 → ∀ p q → (p , q) ∈ ℰ → 𝑨 ⊧ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Base.Varieties.EquationalLogic","name":"Modᵗ","body":"λ 𝑨 → ∀ i → 𝑨 ⊧ (fst (ℰ i)) ≈ (snd (ℰ i))"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"𝓕","body":"ov α"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"∀(𝑨 : Algebra α)(sA : 𝑨 ∈ S{α}{α} 𝒦)(h : X → ∣ 𝑨 ∣ )"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ψ (p , q)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"γ"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"lift-hom 𝑨 h"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"record  { refl = λ 𝑨 sA h → ≡.refl"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ψRel , mkcon ψIsEquivalence (ψcompatible wd)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"⨅ 𝔄'"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"⨅-hom-co 𝔄' (fe 𝓕 α){𝓕}(𝑻 X) λ i → lift-hom (𝔄' i)(snd ∥ i ∥)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ker[ 𝑻 X ⇒ ℭ ] homℭ ↾ (wd 𝓥 (ov α))"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"πker (wd 𝓥 (ov α)) {ℭ} homℭ"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"epi→hom 𝔽 epi𝔽"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"snd ∥ epi𝔽 ∥"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"≡.cong-app phomℭq (𝑨 , sA , h)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ker-in-con {α = (ov α)}{ov α}{𝑻 X}{wd 𝓥 (suc (ov α))}(kercon (wd 𝓥 (ov α)) {ℭ} homℭ) {p}{q} x"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"((ψlemma0 p q) ν) 𝑨 skA h"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"fst(HomFactor (wd 𝓥 (suc (ov α)))  𝑨 (lift-hom 𝑨 h) hom𝔽 (ψlemma0-ap skA) hom𝔽-is-epic)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"⟪ ℊ x ⟫ -- (the implicit relation here is  ⟨ kercon (fe 𝓥 𝓕) ℭ homℭ ⟩ )"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"lift-hom 𝔽 X↪𝔽"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"≡.refl"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"γ"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"𝔽-lift-hom 𝑨 sA h"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"∘-hom (𝑻 X) 𝑨 𝔑 f"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"free-unique (wd 𝓥 α) 𝑨 h' φ (λ x → ≡.refl) t"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"∣ φ ∣ p             ≡⟨ (h≡φ p)⁻¹ ⟩"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ψlemma1 {p , q} γ"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"(hom𝔽-is-lift-hom p) ∙ x ∙ (hom𝔽-is-lift-hom q)⁻¹"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"goal"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"(𝑨 ⟦ p ⟧) h       ≡⟨ free-lift-interp (wd 𝓥 α) 𝑨 h p ⟩"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ψlemma3 p q (ψlemma2 x)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"V{α = α}{β = 𝓕⁺} 𝒦"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"(class-ids-⇒ fe wd p q (class-models-kernel p q pKq))"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"class-ids fe wd p q (class-models-kernel p q pKq) vkA x"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"Σ[ h ∈ (X → ∣ 𝑨 ∣) ] IsSurjective h"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"goal"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"lift-hom 𝑨 η"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"lift-of-epi-is-epi 𝑨 ηE"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"λ x → AinMTV p q (kernel-in-theory z) x"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"∣ φ ∣ p      ≡⟨ (free-lift-interp (wd 𝓥 𝓕⁺) 𝑨 η p)⁻¹ ⟩"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"fst (HomFactorEpi (wd 𝓥 (suc (ov α))) 𝑨 φ hom𝔽 kerincl hom𝔽-is-epic φE)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"FirstHomCorollary|Set (𝑻 X) ℭ homℭ pe (wd 𝓥 (ov α)) Cset kuip"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"ssub (class-prod-s-∈-sp hfe) 𝔽≤ℭ"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"SP⊆V' {α}{fe 𝓕 α}{fe 𝓕⁺ 𝓕⁺}{fe 𝓕 𝓕}{𝒦} (𝔽∈SP hfe)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"vhimg{𝑩 = 𝑨} (𝔽∈𝕍 hfe) (𝑨 , epi→hom 𝑨 φE , snd ∥ φE ∥)"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"𝔽-ModTh-epi 𝑨 (𝕏 𝑨) α"}
+{"file":"FreeAlgebras.agda","module":"Base.Varieties.FreeAlgebras","name":"","body":"pThq α"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"wd χ β (𝑩 ⟦ t ⟧) x (∣ f ∣ ∘ ∣ g ∣ ∘ x) λ i → ( f∼g (x i))⁻¹"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"⊧-I-invar wd (Lift-Alg 𝑨 _) p q Apq Lift-≅"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"⊧-I-invar wd 𝑨 p q lApq (≅-sym Lift-≅)"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"∣ B≤A ∣"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"∣ h ∣((𝑩 ⟦ p ⟧) b)    ≡⟨ comm-hom-term (wd 𝓥 𝓤) 𝑨 h p b ⟩"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"∘-hom 𝑩 𝑨 (to B≅SA) ∣ snd SA ∣"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"∘-injective (iso→injective B≅SA) ∥ snd SA ∥"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"goal"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"fe β α λ i → 𝒜pq i (λ x → (a x) i)"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"(⨅ 𝒜 ⟦ p ⟧) a                      ≡⟨ interp-prod (wd 𝓥 (α ⊔ β)) p 𝒜 a ⟩"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"⊧-P-invar p q Aipq"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"⊧-lower-invar wd p q (α i)"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"cong ∣ φ ∣(term-agreement(wd 𝓥 (ov χ)) t)"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"comm-hom-term (wd 𝓥 α) 𝑨 φ t ℊ"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"∣ φ ∣ ((𝑻 X ⟦ p ⟧) a)  ≡⟨ comm-hom-term (wd 𝓥 α) 𝑨 φ p a ⟩"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"lift-hom 𝑨 a"}
+{"file":"Properties.agda","module":"Base.Varieties.Properties","name":"","body":"(𝑨 ⟦ p ⟧)(∣ φ a ∣ ∘ ℊ)     ≡⟨(comm-hom-term (wd 𝓥 α) 𝑨 (φ a) p ℊ)⁻¹ ⟩"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"is-variety","body":"V{α}{α} 𝒱 ⊆ 𝒱"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"variety","body":"Σ[ 𝒱 ∈ (Pred (Algebra α)(ov α)) ] is-variety 𝒱"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"ssub sA B≤A"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"≅-RESP-≤ {𝑪 = 𝑨} B≅C C≤A"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"sbase KA"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"siso slAu (≅-sym Lift-≅)"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"𝑩 , ((𝑩 , (≤-refl ≅-refl)) , x , ≅-sym Lift-≅)"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"S→subalgebra x"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"fst ∥ BS ∥"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"∥ snd ∥ BS ∥ ∥"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"S→subalgebra sA"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"fst ∥ AS ∥"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"≤-RESP-≅ B≤A (∥ snd ∥ AS ∥ ∥)"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"≤-trans 𝑩 ∣ AS ∣ B≤SA ∥ SA ∥"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"S→subalgebra sA"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"fst ∥ AS ∥"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"snd ∥ snd AS ∥"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"P-expa","body":"pisow {𝑩 = 𝑨} (pbase KA) (≅-sym Lift-≅)"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg 𝑨 (α ⊔ β)"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-≤-Lift α {𝑨} (α ⊔ β) C≤A"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"pliftw pA"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg 𝑩 β"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-≤-Lift β {𝑩} β C≤B"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"pliftu pB"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg ∣ hB ∣ (suc (ov α))"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"(Lift-Alg-hom-image (suc (ov(α))) {∣ hB ∣} (suc (ov(α))) ∥ hB ∥)"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift (suc (ov α)) I"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg (𝒜 (lower i)) (suc (ov α))"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"vlift (x (lower i))"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-≅"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg-⨅≅  {fizw = fe₁}{fiu = fe₀} iso-components"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift (suc (ov α)) I"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg (𝒜 (lower i)) (suc (ov α))"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"VlA (x (lower i))"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-≅"}
+{"file":"Closure.agda","module":"Base.Varieties.Closure","name":"","body":"Lift-Alg-⨅≅ {fizw = fe₁}{fiu = fe₂} iso-components"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg (Lift-Alg 𝑨 β) (α ⊔ β)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"sbase{α ⊔ β}{α ⊔ β} (pbase x)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S⊆SP{α}{α} 𝒦 x"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S→subalgebra{α}{P{α}{α} 𝒦}{𝑨} splAu"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg-subP' Asc"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg 𝑨 β"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S⊆SP{α}{α} 𝒦 sA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S→subalgebra{α}{P{α}{α} 𝒦}{𝑨} splAu"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg-subP' Asc"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg 𝑨 β"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg-subP' (S→subalgebra{α}{P{α}{α} 𝒦}{𝑨} (S⊆SP 𝒦 sA))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"subalgebra→S{α ⊔ β}{α ⊔ β}{P{α}{β} 𝒦}{lA} lAsc"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"≅-trans (≅-sym Lift-≅) A≅B"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ i → ∣ B≤K i ∣"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ i → ∣ fst ∥ B≤K i ∥ ∣"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ i → ∥ snd ∥ B≤K i ∥ ∥"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ i → snd ∣ ∥ B≤K i ∥ ∣"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ i → fst ∣ SA≤𝒜 i ∣"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ i → snd (snd ∣ ∥ B≤K i ∥ ∣)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ x i → (h i) (x i)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ 𝑓 𝒂 → fwu λ i → (snd ∣ SA≤𝒜 i ∣) 𝑓 (λ x → 𝒂 x i)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"fwu λ i → (hinj i)(≡.cong-app σxσy i)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"(σ , ν) , σinj"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"produ (λ i → P-expa (∣ snd ∥ B≤K i ∥ ∣))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S→subalgebra (PS⊆SP hfe (x i))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"lemPS⊆SP hfe fovu {I} {𝒜} ξ"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S→subalgebra (PS⊆SP hfe (x i))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"lemPS⊆SP hfe fovu  {I} {𝒜} ξ"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"visow (VlA (SP⊆V (sbase x))) (≅-sym (Lift-Alg-assoc _ _{𝑨}))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"≤-Lift 𝑨 B≤A"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"≅-trans (≅-sym Lift-≅) A≅B"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Σ[ 𝑨 ∈ (Algebra α) ] ((𝑨 ∈ S{α}{α} 𝒦) × (X → ∣ 𝑨 ∣))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"λ (i : ℑ') → ∣ i ∣"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⨅ 𝔄'"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"pisow psPllA (⨅≅ {fiu = fe₂}{fiw = fe𝓕α} llA≅A)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Lift-Alg (𝔄 i) (ov α)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"siso (fst ∥ i ∥) Lift-≅"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"pbase (slA i)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"produ psllA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"≅-trans (≅-sym Lift-≅)(≅-sym Lift-≅)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"PS⊆SP {fovu = fe₂} hfe class-prod-s-∈-ps"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-Lift-invar wd p q (σ x)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"(H-id1 p q σ) HA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Inv φ (φE (b x))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"InvIsInverseʳ (φE (b x))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"(𝑩 ⟦ p ⟧) b           ≡⟨ wd 𝓧 α (𝑩 ⟦ p ⟧) b (φ ∘ preim )(λ i → (ζ i)⁻¹)⟩"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-lower-invar wd p q (Hpq (hbase KA))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-Lift-invar wd p q (σ x)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"S-id1 p q σ sA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"τ"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"σ x"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-lower-invar wd p q (Spq (sbase KA))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-Lift-invar wd  p q ((P-id1 p q σ) (x i))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-Lift-invar wd  p q ((P-id1 p q σ) (x i))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-lower-invar wd p q (PKpq (pbase KA))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-Lift-invar wd p q (σ x)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V-id1 p q σ VA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Inv φ (φE (b x))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"InvIsInverseʳ (φE (b x))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"(𝑩 ⟦ p ⟧) b           ≡⟨ wd 𝓧 α (𝑩 ⟦ p ⟧) b (φ ∘ preim )(λ i → (ζ i)⁻¹)⟩"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V-id1 p q σ VA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"IH"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"σ x"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-Lift-invar wd p q (σ x)"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V-id1' p q σ VA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"Inv φ (φE (b x))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"InvIsInverseʳ (φE (b x))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"(𝑩 ⟦ p ⟧) b           ≡⟨ wd 𝓧 _ (𝑩 ⟦ p ⟧) b (φ ∘ preim )(λ i → (ζ i)⁻¹)⟩"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"ov α"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V{α}{lovu} 𝒦"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V{β = ovu} 𝒦"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V-id1' p q pKq VCloA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"V-id1' p q pKq VCloA"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-lower-invar wd p q (Thpq (vbase KA))"}
+{"file":"Preservation.agda","module":"Base.Varieties.Preservation","name":"","body":"⊧-lower-invar wd p q (Vpq (vbase KA))"}
+{"file":"Invariants.agda","module":"Base.Varieties.Invariants","name":"AlgebraicInvariant","body":"∀ 𝑨 𝑩 → P 𝑨 → 𝑨 ≅ 𝑩 → P 𝑩"}
+{"file":"CSP.agda","module":"Base.Complexity.CSP","name":"","body":"rel (f ∘ scope)      -- *satisfies* the constraint 𝐶 = (σ , 𝑅) provided"}
+{"file":"CSP.agda","module":"Base.Complexity.CSP","name":"","body":"∀ i → (Constraint.satisfies (cs i)) f  -- if it satisfies all the constraints."}
+{"file":"Injective.agda","module":"Base.Functions.Injective","name":"id-is-injective","body":"A} = ↣-id A"}
+{"file":"Injective.agda","module":"Base.Functions.Injective","name":"","body":"Injective _≡_ _≡_ f"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"∃[ a ∈ A ] (f a) ≡ b"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"Σ[ b ∈ B ] ∃[ a ∈ A ](f a) ≡ b"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"a , (sym x)"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"eq a (sym x)"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"eq _ refl"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"(f a) , (a , refl)"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"a"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"a"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"sym p"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"(_ , (_ , p))} = p"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"refl"}
+{"file":"Inverses.agda","module":"Base.Functions.Inverses","name":"","body":"refl"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"∀ y → Image f ∋ y"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"Σ (A → B) IsSurjective"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"x , sym p"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"fst (imgfy→A $ fE y) , λ z≡fst → trans (cong f z≡fst) $ snd (imgfy→A $ fE y)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"Inv f ∘ fE"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"SurjInv f fe"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"sym (SurjInvIsInverseʳ f fe y)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"ζ ∙ compId (finv y)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"eq (g (finv y)) η"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"SurjInv f fe"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"SurjInvIsInverseʳ f fe y"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"(cong-app (sym compId)(finv y)) ∙ ζ"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"eq (g (finv y)) (sym η)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"xs j"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"transport B (sym x) b"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"cong (λ x → transport B x b)(≡-irrelevant (sym p) refl)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"bs , λ x → trans (cong (λ u → proj j u) x) pf"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"update bs₀ (j , b) i (i ≟ j)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"update-id (j ≟ j)"}
+{"file":"Surjective.agda","module":"Base.Functions.Surjective","name":"","body":"Surjective→IsSurjective (proj j) proj-is-onto"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"∣_∣=∣_∣","body":"∣ B ∣ = Bijection A B"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"∣_∣≈∣_∣","body":"PointwiseBijection A B"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"uncurry₀","body":"x , y"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f (uncurry₀ x y)"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f x y"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"record  { to = Curry ; from = Uncurry"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"x"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"u z , u (s z)"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"x"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"u"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"x"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"u z"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f (A→A→Fin2A x y)"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f (u z) (u (s z))"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"A} f x₁ x₂ x₃ = f u"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"x₁"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f (u z) (u (s z)) (u (s (s z)))"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f ∘ A×A→Fin2A"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"f ∘ Fin2A→A×A"}
+{"file":"Transformers.agda","module":"Base.Functions.Transformers","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"welldef","body":"cong f"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"swelldef","body":"∀ {I : Type ι}{A : Type α}(f : Op A I)(u v : I → A)"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"funext→swelldef","body":"welldef f u v (fe ptweq)"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"SwellDef","body":"(α β : Level) → swelldef α β"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"swelldef'","body":"∀ {I : Type ι} {A : Type α} {B : Type β}"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"funext'","body":"∀ {A : Type α } {B : Type β } {f g : A → B} → f ≈ g → f ≡ g"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"funext'→swelldef'","body":"cong f (fe ptweq)"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"swelldef'→funext'","body":"wd _$_ ptweq"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"(A×A→B-to-Fin2A→B f) u  ≡⟨ refl ⟩"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"(UncurryFin2 f) u  ≡⟨ refl ⟩"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"(UncurryFin3 f) u                ≡⟨ refl ⟩"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"refl"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"f [ a ]"}
+{"file":"Welldefined.agda","module":"Base.Equality.Welldefined","name":"","body":"f [ a ]"}
+{"file":"Extensionality.agda","module":"Base.Equality.Extensionality","name":"DFunExt","body":"(𝓤 𝓥 : Level) → funext 𝓤 𝓥"}
+{"file":"Extensionality.agda","module":"Base.Equality.Extensionality","name":"_≐_","body":"(P ⊆ Q) ∧ (Q ⊆ P)"}
+{"file":"Extensionality.agda","module":"Base.Equality.Extensionality","name":"pred-ext","body":"∀ {A : Type α}{P Q : Pred A β } → P ⊆ Q → Q ⊆ P → P ≡ Q"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-center","body":"(x : A) → c ≡ x"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-singleton","body":"Σ A (is-center A)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-prop","body":"(x y : A) → x ≡ y"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-prop-valued","body":"∀ x y → is-prop (x ≈ y)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"singleton-is-prop","body":"x ≡⟨ (φ x)⁻¹ ⟩ c ≡⟨ φ y ⟩ y ∎"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"fiber","body":"Σ[ x ∈ A ] f x ≡ y"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-equiv","body":"∀ y → is-singleton (fiber f y)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"hfunext","body":"{A : Type α}{B : A → Type β} (f g : (x : A) → B x) → is-equiv (≡.cong-app{f = f}{g})"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-set","body":"is-prop-valued{A = A} _≡_"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"≡.refl"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"is-embedding","body":"∀ b → is-prop (fiber f b)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"singleton-type","body":"Σ[ y ∈ A ] y ≡ x"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"Σ[ g ∈ (B → A) ] ((g ∘ f ≈ id) × (f ∘ g ≈ id))"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"singleton-is-prop (fiber f y) (i y)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"monic-is-embedding|Set","body":"γ"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"≡.trans fu≡b (fv≡b ⁻¹)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"fmon fuv"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"uv , Bset (f v) b (transport (λ a → f a ≡ b) uv fu≡b) fv≡b"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"to-Σ-≡ arg1"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"blk-uip","body":"∀ (C : Pred A _) → is-prop (IsBlock C {R})"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"∀ (b : (I → B)) → is-prop (P b)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"Σ[ P ∈ Rel A I{ρ} ] IsRelProp A P"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"{P Q : RelProp A ρ } → ∣ P ∣ ⊆ ∣ Q ∣ → ∣ Q ∣ ⊆ ∣ P ∣ → P ≡ Q"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"∀ (a : ((i : I) → 𝒜 i)) → is-prop (P a)"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"Σ[ P ∈ REL I 𝒜 {ρ} ] IsRELProp 𝒜 P"}
+{"file":"Truncation.agda","module":"Base.Equality.Truncation","name":"","body":"{P Q : RELProp 𝒜 ρ} → ∣ P ∣ ⊆ ∣ Q ∣ → ∣ Q ∣ ⊆ ∣ P ∣ → P ≡ Q"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"λ b → A ⊆ (λ a → R a b)"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"λ a → B ⊆ R a"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"b p"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"a p"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"p (λ z → z a)"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"p (λ z → z b)"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"A}{R} = R ⃖ (A ⃗ R) ⊆ A"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"B}{R} = (R ⃖ B) ⃗ R ⊆ B"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"(P ⊆ Q) × (Q ⊆ P)"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"id , id"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"Pred 𝒜 ρ"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"PosetOfSubsets ℓ 𝒜"}
+{"file":"Galois.agda","module":"Base.Adjunction.Galois","name":"","body":"record  { F = _⃗ R"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"Extensive","body":"∀{x} → x ≤ C x"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"∀ {I : Type ℓ}{c : I → Pred X ℓ} → (∀ i → (c i) ∈ C) → ⋂ I c ∈ C"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"Σ[ C ∈ Pred (Pred X ℓ) ρ ] IntersectClosed C"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"begin"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"begin"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"(from ∘₂ hyp) _ _ refl"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"(to ∘₂ hyp) _ _ (trans u e)"}
+{"file":"Closure.agda","module":"Base.Adjunction.Closure","name":"","body":"antisym ((to ∘₂ hyp) _ _ refl) ((from ∘₂ hyp) _ _ refl)"}
+{"file":"Residuation.agda","module":"Base.Adjunction.Residuation","name":"","body":"antisym B lt gt"}
+{"file":"Residuation.agda","module":"Base.Adjunction.Residuation","name":"","body":"fg≤id R (𝑓 a)"}
+{"file":"Residuation.agda","module":"Base.Adjunction.Residuation","name":"","body":"fhom R (gf≥id R a)"}
+{"file":"Residuation.agda","module":"Base.Adjunction.Residuation","name":"","body":"antisym A lt gt"}
+{"file":"Residuation.agda","module":"Base.Adjunction.Residuation","name":"","body":"ghom R (fg≤id R b)"}
+{"file":"Residuation.agda","module":"Base.Adjunction.Residuation","name":"","body":"gf≥id R (𝑔 b)"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"B} _≋_ = λ (f g : A → B) → ∀ x → f x ≋ g x"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"B} _≋_ = λ (f g : (a : A) → B a) → ∀ x → f x ≋ g x"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"∀ x → f x ∈ S"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"A"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"ℓ"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"g x ≡ g y"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"g x ≈ g y"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"g x ≈ g y"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"Lift ρ (g x ≡ g y)"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"g ∘ x ≡ g ∘ y"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"g x ≡ g y"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"0[_]","body":"λ x y → Lift ρ (x ≡ y)"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"∀ x y → P x y → Q x y"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"λ _ _ z → z"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"Q⊑R x y (P⊑Q x y Pxy)"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"eval-rel","body":"∀ i → R (u i) (v i)"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"eval-pred","body":"∀ i → (u i , v i) ∈ P"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"_preserves_","body":"∀ u v → (eval-rel R) u v → R (f u) (f v)"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"_|","body":"(eval-rel R) =[ f ]⇒ R"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"_preserves-pred_","body":"∀ u v → (eval-pred P) u v → (f u , f v) ∈ P"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"_|","body":"(eval-pred P) =[ f ]⇒ λ x y → (x , y) ∈ P"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"c x y Rxy"}
+{"file":"Discrete.agda","module":"Base.Relations.Discrete","name":"","body":"λ u v x → c x"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"curry","body":"(x , y) ∈ P"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"uncurry","body":"a ≈ b"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Reflexive","body":"∀ {x} → (x , x) ∈ P"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Sym","body":"∀ {x y} → (x , y) ∈ P → (y , x) ∈ Q"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Symmetric","body":"Sym P P"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Trans","body":"∀ {i j k} → P (i , j) → Q (j , k) → R (i , k)"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"TransFlip","body":"∀ {i j k} → Q (j , k) → P (i , j) → R (i , k)"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Transitive","body":"Trans P P P"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Antisym","body":"∀ {i j} → R (i , j) → S (j , i) → E (i , j)"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Antisymmetric","body":"Antisym P P (uncurry _≈_)"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Irreflexive","body":"∀ {x y} → x ≈ y → (x , y) ∉ P"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Asymmetric","body":"∀ {x y} → (x , y) ∈ P → (y , x) ∉ P"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Connex","body":"∀ x y → (x , y) ∈ P ⊎ (y , x) ∈ Q"}
+{"file":"Properties.agda","module":"Base.Relations.Properties","name":"Total","body":"Connex P P"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"Equivalence","body":"Σ[ r ∈ BinRel A ρ ] IsEquivalence r"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"","body":"refl"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"ker-IsEquivalence","body":"record  { refl = PE.refl"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"[_]","body":"R u      -- (the R-block containing u : A)"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"[_/_]","body":"∣ R ∣ u"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"Block","body":"∣ R ∣ u"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"Quotient","body":"Σ[ P ∈ Pred A _ ] IsBlock P {∣ R ∣}"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"_/_","body":"Σ[ P ∈ Pred A _ ] IsBlock P {R}"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"⟪_⟫","body":"[ a ] R , mkblk a PE.refl"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"⌞_⌟","body":"a"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"","body":"IsEquivalence.trans (snd R) (IsEquivalence.sym (snd R) Rxy) Rxz"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"","body":"IsEquivalence.trans (snd R) Rxy Ryz"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"","body":"IsEquivalence.sym (snd R) (xy (IsEquivalence.refl (snd R)))"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"","body":"yx (IsEquivalence.refl (snd R))"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"0[_]IsEquivalence","body":"record  { refl = lift PE.refl"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"0[_]Equivalence","body":"0[ A ] {ρ} , 0[ A ]IsEquivalence"}
+{"file":"Quotients.agda","module":"Base.Relations.Quotients","name":"≡→⊆","body":"Qx"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"Type 𝓥"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"(I → A) → Type ρ"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"Rel A I {ρ}"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"((i : I) → 𝒜 i) → Type ρ"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"REL I 𝒜 {ρ}"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"∀ (j : J) → R λ i → t i j"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"∀ t → eval-Rel R arity[ f ] t → R λ i → f (t i)"}
+{"file":"Continuous.agda","module":"Base.Relations.Continuous","name":"","body":"(J → 𝒜 i) → 𝒜 i"}
+{"file":"Products.agda","module":"Setoid.Algebras.Products","name":"","body":"Σ[ 𝑨 ∈ (Algebra α ρ) ] 𝑨 ∈ 𝒦"}
+{"file":"Products.agda","module":"Setoid.Algebras.Products","name":"","body":"∣ i ∣"}
+{"file":"Products.agda","module":"Setoid.Algebras.Products","name":"","body":"⨅ 𝔄"}
+{"file":"Products.agda","module":"Setoid.Algebras.Products","name":"module","body":"I} _≡_}  -- with decidable equality"}
+{"file":"Products.agda","module":"Setoid.Algebras.Products","name":"","body":"(proj _≟_ 𝒜I i) , projIsOnto _≟_ 𝒜I"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"ov","body":"𝓞 ⊔ 𝓥 ⊔ lsuc α"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"⟨_⟩","body":"Σ[ f ∈ ∣ 𝑆 ∣ ] (∥ 𝑆 ∥ f → ξ .Carrier)"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"","body":"Setoid.refl Domain"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"𝔻[_]","body":"Domain 𝑨"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"𝕌[_]","body":"Carrier 𝔻[ 𝑨 ]"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"Level-of-Alg","body":"α}{ρ}{𝓞}{𝓥} _ = 𝓞 ⊔ 𝓥 ⊔ lsuc (α ⊔ ρ)"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"Level-of-Carrier","body":"α} _ = α"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"","body":"record  { Carrier = Lift ℓ ∣A∣"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"","body":"record  { Carrier = ∣A∣"}
+{"file":"Basic.agda","module":"Setoid.Algebras.Basic","name":"Lift-Alg","body":"Lift-Algʳ (Lift-Algˡ 𝑨 ℓ₀)"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"_∣≈_","body":"∀ 𝑓 → (𝑓 ̂ 𝑨) |: R"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"","body":"θ , is-equivalence"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"","body":"Σ[ θ ∈ ( BinRel 𝕌[ 𝑨 ] ℓ ) ] IsCongruence θ"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"IsCongruence→Con","body":"θ , p"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"Con→IsCongruence","body":"∥ θ ∥"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"_╱_","body":"𝕌[ 𝑨 ] / (Eqv ∥ θ ∥)"}
+{"file":"Congruences.agda","module":"Setoid.Algebras.Congruences","name":"","body":"a"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"_IsHomImageOf_","body":"Σ[ φ ∈ hom 𝑨 𝑩 ] IsSurjective ∣ φ ∣"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"HomImages","body":"β}{ρᵇ = ρᵇ} 𝑨 = Σ[ 𝑩 ∈ Algebra β ρᵇ ] 𝑩 IsHomImageOf 𝑨"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"IdHomImage","body":"α}{𝑨 = 𝑨} = 𝒾𝒹 , λ {y} → Image_∋_.eq y refl"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":""}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"(𝑓 ̂ 𝑩)((∣ h ∣ image)∘ x)        -- b : the image in ∣B∣"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"Goal"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"cong InterpB (≡.refl , EqA )"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"goal"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"IsHomImageOfClass","body":"𝒦} 𝑩 = Σ[ 𝑨 ∈ Algebra _ _ ] ((𝑨 ∈ 𝒦) ∧ (𝑩 IsHomImageOf 𝑨))"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"HomImageOfClass","body":"Σ[ 𝑩 ∈ Algebra _ _ ] IsHomImageOfClass {𝒦 = 𝒦} 𝑩"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"𝑨}{𝑩} h ℓᵃ ℓᵇ ∣"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"Inv ∣ h ∣ hepi"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"lift∼lower {𝑨 = B} b"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"sym  (InvIsInverseʳ hepi)"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"cong{From = B} ∣ ToLiftˡ{𝑨 = 𝑩}{ℓᵇ} ∣ lem2'"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"lift-hom-lemma h a ℓᵃ ℓᵇ"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"trans lem1 (trans lem2 lem3)"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"Image_∋_.eq (lift a) η"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"Lift-homˡ {𝑨 = 𝑨}{𝑩} (φ , φhom) ℓᵃ ℓᵇ"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"Lift-epi-is-epiˡ (φ , φhom) ℓᵃ ℓᵇ φepic"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"lφ , lφepic"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"⊙-hom ∣ φ ∣ (from Lift-≅) ,"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"⊙-hom ∣ φ ∣ (to A≅B) , ⊙-IsSurjective ∥ φ ∥ (toIsSurjective A≅B)"}
+{"file":"HomomorphicImages.agda","module":"Setoid.Homomorphisms.HomomorphicImages","name":"","body":"(⊙-hom (from A'≅B) ∣ φ ∣) , ⊙-IsSurjective (fromIsSurjective A'≅B) ∥ φ ∥"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"eq (∣ from ∣ ⟨$⟩ y) (sym₂ (to∼from y))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"Goal"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"cong ∣ from ∣ xy"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"trans (sym (from∼to x)) (trans ξ (from∼to y))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"eq (∣ to ∣ ⟨$⟩ y) (sym (from∼to y))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"Goal"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"cong ∣ to ∣ xy"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"trans₂ (sym₂ (to∼from x)) (trans₂ ξ (to∼from y))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"≅-refl","body":"mkiso 𝒾𝒹 𝒾𝒹 (λ b → refl) λ a → refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"≅-sym","body":"mkiso (from φ) (to φ) (from∼to φ) (to∼from φ)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"≅-trans","body":"ρᶜ}{𝑨}{𝑩}{𝑪} ab bc = mkiso f g τ ν"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"⊙-hom (to ab) (to bc)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"⊙-hom (from bc) (from ab)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"trans₃ (cong ∣ to bc ∣ (to∼from ab (∣ from bc ∣ ⟨$⟩ b))) (to∼from bc b)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"trans₁ (cong ∣ from ab ∣ (from∼to bc (∣ to ab ∣ ⟨$⟩ a))) (from∼to ab a)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"Goal"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"sym (g∼f a₀)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"cong g fafb"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"g∼f a₁"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"trans lem1 (trans lem2 lem3)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso ToLiftˡ FromLiftˡ (ToFromLiftˡ{𝑨 = 𝑨}) (FromToLiftˡ{𝑨 = 𝑨}{ℓ})"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso ToLiftʳ FromLiftʳ (ToFromLiftʳ{𝑨 = 𝑨}) (FromToLiftʳ{𝑨 = 𝑨}{ℓ})"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"Lift-≅","body":"≅-trans Lift-≅ˡ Lift-≅ʳ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"≅-trans (≅-trans (≅-sym Lift-≅ˡ ) A≅B) Lift-≅ˡ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"≅-trans (≅-trans (≅-sym Lift-≅ʳ ) A≅B) Lift-≅ʳ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"≅-trans (≅-trans (≅-sym Lift-≅ˡ) Lift-≅ˡ) Lift-≅ˡ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"≅-trans (≅-trans (≅-sym Lift-≅ʳ) Lift-≅ʳ) Lift-≅ʳ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso (ϕ , ϕhom) (ψ , ψhom) ϕ∼ψ ψ∼ϕ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record  { to = λ a i → ∣ to (AB i) ∣ ⟨$⟩ (a i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record { compatible = λ i → compatible ∥ to (AB i) ∥ }"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record  { to = λ b i → ∣ from (AB i) ∣ ⟨$⟩ (b i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record { compatible = λ i → compatible ∥ from (AB i) ∥ }"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ i → to∼from (AB i) (b i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ i → from∼to (AB i)(a i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"≅-trans (≅-sym Lift-≅ˡ) A≅B"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record  { to = λ a i → ∣ to (AB (lower i)) ∣ ⟨$⟩ (a (lower i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record { compatible = λ i → compatible ∥ to (AB (lower i)) ∥ }"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record  { to = λ b i → ∣ from (AB i) ∣ ⟨$⟩ (b (lift i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"record { compatible = λ i → compatible ∥ from (AB i) ∥ }"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ i → to∼from (AB (lower i)) (b i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ i → from∼to (AB i)(a i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso (ϕ , ϕhom) (ψ , ψhom) ϕ∼ψ ψ∼ϕ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso (φ , φhom) (ψ , ψhom) φ∼ψ ψ∼φ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"⨅ (λ i → Lift-Alg (𝒜 (lower{ℓ = ℓ} i)) ℓ ℓ)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift (x (lower i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lower (x (lift i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift (reflexive ≡.refl)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"(reflexive ≡.refl)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso φ ψ φ∼ψ ψ∼φ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift (x i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"φfunc , φhom"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lower (x i)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"ψfunc , ψhom"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"reflexive ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"reflexive ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso φ ψ φ∼ψ ψ∼φ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift (x (lower i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"φfunc , φhom"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lower (x (lift i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"ψfunc , ψhom"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"reflexive ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"reflexive ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"mkiso (φ , φhom) (ψ , ψhom) φ∼ψ ψ∼φ -- φ∼ψ ψ∼φ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"Lift-Alg (⨅ 𝒜) ℓ ℓ"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"⨅ (λ i → Lift-Alg (𝒜 (lower{ℓ = ℓ} i)) ℓ ℓ)"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift ((lower x)(lower i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"lift λ i → lower (x (lift i))"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"reflexive ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"reflexive ≡.refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"x"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"x ∗"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ _ → refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"to𝟙 , to𝟙IsHom"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ _ → x"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"x tt"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"λ _ → refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"refl"}
+{"file":"Isomorphisms.agda","module":"Setoid.Homomorphisms.Isomorphisms","name":"","body":"to⊤ , to⊤IsHom"}
+{"file":"Noether.agda","module":"Setoid.Homomorphisms.Noether","name":"","body":"h"}
+{"file":"Noether.agda","module":"Setoid.Homomorphisms.Noether","name":"","body":"trans (compatible ∥ hh ∥) (cong Interp (≡.refl , (λ _ → refl)))"}
+{"file":"Noether.agda","module":"Setoid.Homomorphisms.Noether","name":"","body":"id"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"Goal"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"cong Interp (≡.refl , kuv)"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"IsHom.compatible ∥ hh ∥"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"sym (IsHom.compatible ∥ hh ∥)"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"trans lem1 (trans fhuv lem2)"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"kerRel _≈₂_ h ,"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"𝑨 ╱ kercon"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"ker[_⇒_]_","body":"kerquo h"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"p , pepi"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"record { to = id ; cong = reflexive ∥ θ ∥ }"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"record  { isHom = record { compatible = sym (compatible ∥ 𝒾𝒹 ∥) }"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"epi→hom 𝑨 (𝑨 ╱ θ) (πepi θ)"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"πepi (kercon h)"}
+{"file":"Kernels.agda","module":"Setoid.Homomorphisms.Kernels","name":"","body":"id"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"trans lemg lemh"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"cong h (compatible ghom)"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"compatible hhom"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"(g ⊙ h) , ⊙-is-hom hhom ghom"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"(g ⊙ h) , ⊙-is-epi hepi gepi"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"𝑖𝑑 , record { compatible = reflexive ≡.refl }"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"record { to = lift ; cong = id } ,"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"record { to = lower ; cong = id } , record { compatible = reflˡ }"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"refl₁"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"refl₁"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"record { to = id ; cong = lift } ,"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"record { to = id ; cong = lower } , record { compatible = reflˡ }"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"lift refl₁"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"refl₁"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-hom ToLiftˡ ToLiftʳ"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-hom FromLiftʳ FromLiftˡ"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"lift refl"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"∣ ToLift ∣ ,"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"ϕ , ⊙-is-hom lABh (snd ToLiftˡ)"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"Lift-Algˡ 𝑨 ℓᵃ"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"f ⟨$⟩ (lower x)"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-is-hom (snd FromLiftˡ) fhom"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"lift (f ⟨$⟩ (lower x))"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"ϕ , Goal"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"Lift-Algʳ 𝑨 rᵃ"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"f ⟨$⟩ x"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-is-hom (snd FromLiftʳ) fhom"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"f ⟨$⟩ x"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-is-hom lABh (snd ToLiftʳ)"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-hom FromLift φ"}
+{"file":"Properties.agda","module":"Setoid.Homomorphisms.Properties","name":"","body":"⊙-hom φ ToLift"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"Khg hyp"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"SurjInv hfunc hE"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"SurjInvIsInverseʳ hfunc hE"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"sym₃ η"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"trans η (trans xy (sym₃ η))"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"g ∘ h⁻¹"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"Khg ξ"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":""}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"φcomp"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"HomFactor Khg hE"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"fst ∣ homfactor ∣"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"snd homfactor -- Khg ξ"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"snd ∣ homfactor ∣"}
+{"file":"Factor.agda","module":"Setoid.Homomorphisms.Factor","name":"","body":"record  { isHom = φhom"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"h , hhom"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"∣ 𝒽 i ∣ ⟨$⟩ a"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"λ i → compatible ∥ 𝒽 i ∥"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"F , isHom"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"∣ 𝒽 i ∣ ⟨$⟩ x i"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"compatible ∥ 𝒽 i ∥"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"F , isHom"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"x i"}
+{"file":"Products.agda","module":"Setoid.Homomorphisms.Products","name":"","body":"reflᵢ"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"∀ {a}"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"∀ {f} → compatible-map-op h f"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"Σ (A ⟶ B) IsHom"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"h , isHom"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"Σ (A ⟶ B) IsMon"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"IsMon.HomReduct ∥ h ∥"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"h , isHom"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"Σ (A ⟶ B) IsEpi"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"IsEpi.HomReduct ∥ h ∥"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"(hh , isHom hhM) , isInjective hhM"}
+{"file":"Basic.agda","module":"Setoid.Homomorphisms.Basic","name":"","body":"(hh , isHom hhE) , isSurjective hhE"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"h x"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"TX}{𝑩 = A} free-lift"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"hE"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"eq (ℊ a) x"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"free-lift x"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"reflexive (≡.cong h x)"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"free-lift-func , hhom"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"free-lift-func"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"cong Interp (≡.refl , (λ i → (cong free-lift-func){a i} ≐-isRefl))"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"record { compatible = λ{f}{a} → hcomp{f}{a} }"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"isSurj→IsSurjective free-lift-func (free-lift-of-surj-isSurj hE)"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"p x"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"free-unique p (t i)"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"cong Interp (_≡_.refl , lem2)"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"compatible ∥ gh ∥"}
+{"file":"Properties.agda","module":"Setoid.Terms.Properties","name":"","body":"compatible ∥ hh ∥"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"rfl ≡.refl"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"rfl (≡.sym x)"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"rfl (≡.trans x y)"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"record { refl = ≐-isRefl ; sym = ≐-isSym ; trans = ≐-isTrans }"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"TermSetoid","body":"record { Carrier = Term X ; _≈_ = _≐_ ; isEquivalence = ≐-isEquiv }"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"𝑻","body":"TermSetoid X"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"Sub","body":"(y : Y) → Term X"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"_[_]","body":"σ x"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"record  { Carrier = X → ∣A∣"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"record  { refl = λ _ → refl"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"Env X"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"ρ x"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"X} s t = ∀ (ρ : ∣ Env X ∣) →  ⟦ s ⟧ ⟨$⟩ ρ ≈ₐ ⟦ t ⟧ ⟨$⟩ ρ"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"λ _ → refl"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"λ _ → refl"}
+{"file":"Basic.agda","module":"Setoid.Terms.Basic","name":"","body":"⟦ σ x ⟧ ⟨$⟩ ρ"}
+{"file":"Operations.agda","module":"Setoid.Terms.Operations","name":"","body":"𝑨} η) p"}
+{"file":"Operations.agda","module":"Setoid.Terms.Operations","name":"","body":"refl"}
+{"file":"Operations.agda","module":"Setoid.Terms.Operations","name":"","body":"begin"}
+{"file":"Operations.agda","module":"Setoid.Terms.Operations","name":"_[_]s","body":"ℊ (σ y)"}
+{"file":"Operations.agda","module":"Setoid.Terms.Operations","name":"Substerm","body":"(y : Y) → Term X"}
+{"file":"Operations.agda","module":"Setoid.Terms.Operations","name":"_[_]t","body":"σ y"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"module","body":"𝕌[ 𝑨 ] -- the forgetful functor"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"∀ f a → Im a ⊆ B → (f ̂ 𝑨) a ∈ B"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"app"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"sgIsSmallest B B≤A G⊆B (SgGa i)"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"B≤A f a IH"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"module","body":"𝕌[ 𝑨 ]"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"module","body":"𝕌[ 𝑨 ]"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"app"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"var Ba"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"sgIsSmallest 𝑨 (TermImage B) TermImageIsSub B-onlyif-TermImageB"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"sym (hom-unique G σ (a i) (SgGa i))"}
+{"file":"Subuniverses.agda","module":"Setoid.Subalgebras.Subuniverses","name":"","body":"begin"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"","body":"Σ[ h ∈ hom 𝑩 𝑨 ] IsInjective ∣ h ∣"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"","body":"Σ[ h ∈ hom 𝑨 𝑩 ] IsInjective ∣ h ∣"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"mon→≤","body":"𝑨}{𝑩} x = mon→intohom 𝑨 𝑩 x"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"Subalgebra","body":"Σ[ 𝑩 ∈ (Algebra β ρᵇ) ] 𝑩 ≤ 𝑨"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"IsSubalgebraREL","body":"∀ {𝑨 : Algebra α ρᵃ}{𝑩 : Algebra β ρᵇ} → 𝑨 ≤ 𝑩"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"","body":"Σ[ 𝑨 ∈ Algebra _ _ ] ((𝑨 ∈ 𝒦) ∧ (𝑩 ≤ 𝑨))"}
+{"file":"Subalgebras.agda","module":"Setoid.Subalgebras.Subalgebras","name":"SubalgebrasOfClass","body":"Σ[ 𝑩 ∈ Algebra β ρᵇ ] 𝑩 ≤c 𝒦"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"≅→≤","body":"(to φ) , ≅toInjective φ"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"≅→≥","body":"(from φ) , ≅fromInjective φ"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"≤-refl","body":"𝑨}{𝑩} A≅B = ≅→≤ A≅B"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"≥-refl","body":"𝑨}{𝑩} A≅B = ≅→≤ (≅-sym A≅B)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"≤-reflexive","body":"𝑨} = 𝒾𝒹 , id-is-injective{𝑨 = Algebra.Domain 𝑨}"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"(⊙-hom f g) , ⊙-injective ∣ f ∣ ∣ g ∣ finj ginj"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"⊙-hom h (to B≅C) ,"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"⊙-hom (to A≅B) h ,"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"≤-trans B≥C A≥B"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"record { refl = ≅-refl ; sym = ≅-sym ; trans = ≅-trans }"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"≥-trans A≥B (≅→≥ B≅C)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"≤-trans  A≤B (≅→≤ B≅C)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"≤-trans (≅→≤ A≅B) B≤C"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":""}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"𝑨 , (KA , A≥B×B≅C→A≥C {𝑨 = 𝑨}{𝑩} B≤A Lift-≅ˡ)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"A≤B×B≅C→A≤C A≤B Lift-≅ˡ"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"A≤B×B≅C→A≤C A≤B Lift-≅ʳ"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"A≤B×B≅C→A≤C  A≤B Lift-≅"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"A≥B×B≅C→A≥C A≥B Lift-≅ˡ"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"A≥B×B≅C→A≥C A≥B Lift-≅ʳ"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"A≥B×B≅C→A≥C A≥B Lift-≅"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"≥-Liftˡ (≤-Liftˡ A≤B)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"≥-Liftʳ (≤-Liftʳ A≤B)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"h , hM"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"hfunc , hhom"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"∣ B≤A i ∣"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"∣ hi i ∣ ⟨$⟩ (x i)"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"λ i → compatible ∥ hi i ∥"}
+{"file":"Properties.agda","module":"Setoid.Subalgebras.Properties","name":"","body":"λ xy i → ∥ B≤A i ∥ (xy i)"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"∀ (ρ : ∣ Env X ∣) → ⟦ p ⟧ ⟨$⟩ ρ ≈ ⟦ q ⟧ ⟨$⟩ ρ"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"{𝑨 : Algebra _ _} → 𝒦 𝑨 → 𝑨 ⊧ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"λ (p , q) → 𝒦 ⊫ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"Σ[ (p , q) ∈ (Term X × Term X) ] 𝒦 ⊫ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"(p , q)"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"λ 𝑨 → ∀ p q → (p , q) ∈ ℰ → 𝑨 ⊧ p ≈ q"}
+{"file":"EquationalLogic.agda","module":"Setoid.Varieties.EquationalLogic","name":"","body":"λ 𝑨 → ∀ i → 𝑨 ⊧ fst (ℰ i) ≈ snd (ℰ i)"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"Σ[ eq ∈ Eq{χ} ] 𝒦 ⊫ ((lhs eq) ≈̇ (rhs eq))"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"eqv"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"sound (λ i ρ → ∥ i ∥ 𝑨 kA ρ) x"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"h , hepi"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"reflF"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"record { to = id ; cong = c }"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"cong h reflT"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"epi→hom (𝑻 X) 𝔽[ X ] epi𝔽[ X ]"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"IsEpi.isSurjective (snd (epi𝔽[ X ]))"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"X}{p}{q} pKq = ℰ⊢[ X ]▹Th𝒦 pKq"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"X} {p , q} pKq vkA x ="}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"p}{q} x = S-id1{ℓ = ℓ}{p = p}{q} (ℰ⊢[ X ]▹Th𝒦 x) 𝑨 sA"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"p} {q} pKq = hyp ((p ≈̇ q) , pKq) where open _⊢_▹_≈_ using (hyp)"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"module","body":"ov(α ⊔ ρᵃ ⊔ ℓ)"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"φ , isEpi"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"free-lift{𝑨 = 𝑨} id"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"cong Interp (≡.refl , (λ _ → refl))"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"φ , isEpi"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"free-lift{𝑨 = 𝑨} id"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"cong Interp (≡.refl , (λ _ → refl))"}
+{"file":"FreeAlgebras.agda","module":"Setoid.Varieties.FreeAlgebras","name":"","body":"⊙-epi (𝔽-ModTh-epi (λ {p q} → A∈ModThK{p = p}{q})) ToLift-epi"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"trans i $ trans ii $ trans iii $ trans iv v"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"sym $ cong ⟦ p ⟧₂ (f∼g ∘ ρ)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"sym $ comm-hom-term fh p (g ∘ ρ)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"cong ∣ fh ∣ $ Apq (g ∘ ρ)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"comm-hom-term fh q (g ∘ ρ)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"cong ⟦ q ⟧₂ (f∼g ∘ ρ)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"⊧-I-invar (Lift-Algˡ 𝑨 _) p q Apq Lift-≅ˡ"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"⊧-I-invar 𝑨 p q lApq (≅-sym Lift-≅ˡ)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":""}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"SurjInv ∣ φh ∣ φE"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"goal"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"∣ B≤A ∣"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"begin"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"∥ B≤A ∥ (ξ b)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"goal"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"λ i → 𝒜pq i (λ x → (a x) i)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"begin"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"⊧-P-invar Aipq"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":"⊧-lower-invar{𝑨 = (𝒜 i)} p q (α i)"}
+{"file":"Properties.agda","module":"Setoid.Varieties.Properties","name":"","body":""}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Σ[ 𝑨 ∈ Algebra α ρᵃ ]  (𝑨 ∈ 𝒦)  ∧  𝑨 ≅ 𝑩"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"module","body":"α ⊔ ρᵃ ; b = β ⊔ ρᵇ"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Σ[ 𝑨 ∈ Algebra α ρᵃ ] 𝑨 ∈ 𝒦 ∧ 𝑩 IsHomImageOf 𝑨"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Σ[ 𝑨 ∈ Algebra α ρᵃ ] 𝑨 ∈ 𝒦 ∧ 𝑩 ≤ 𝑨"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Σ[ I ∈ Type ι ] (Σ[ 𝒜 ∈ (I → Algebra α ρᵃ) ] (∀ i → 𝒜 i ∈ 𝒦) ∧ (𝑩 ≅ ⨅ 𝒜))"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"module","body":"α ⊔ ρᵃ ; b = β ⊔ ρᵇ"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"S{α}{ρᵃ} (a ⊔ ℓ ⊔ ι) (P ℓ ι 𝒦)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"module","body":"α ⊔ ρᵃ ; b = β ⊔ ρᵇ ; c = γ ⊔ ρᶜ ; d = δ ⊔ ρᵈ"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"H{γ}{ρᶜ}{δ}{ρᵈ} (a ⊔ b ⊔ ℓ ⊔ ι) (S{β}{ρᵇ} (a ⊔ ℓ ⊔ ι) (P ℓ ι 𝒦))"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"V{β = α}{ρᵇ = ρᵃ}{γ = α}{ρᶜ = ρᵃ} ℓ ι 𝒱 ⊆ 𝒱"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Σ[ 𝒱 ∈ (Pred (Algebra α ρᵃ) (α ⊔ ρᵃ ⊔ ov ℓ)) ] is-variety 𝒱"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"α}{ρᵃ} ℓ 𝒦 ⊆ S ℓ 𝒦'"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"γ}{ρᶜ} (a ⊔ ℓ) (S{β = β}{ρᵇ} ℓ 𝒦) ⊆ S{β = γ}{ρᶜ} ℓ 𝒦"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"𝑨 , kA , IdHomImage"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"𝑨 , (kA , ≤-reflexive)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"α}{ρᵃ} ℓ ι 𝒦 ⊆ P ℓ ι 𝒦'"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"⊤ , (λ x → 𝑨) , ((λ i → kA) , Goal)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"λ _ → x"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"refl⨅"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"x tt"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"refl"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"to⨅ , to⨅IsHom"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"H-expa {a ⊔ ℓ ⊔ ι} (S-expa {a ⊔ ℓ ⊔ ι} (P-expa {ℓ}{ι} x) )"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"lA' , (lklA' , B≤lA')"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Lift-Alg 𝑨' β ρᵇ"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Lift-closed ℓ kA'"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"≤-trans-≅ A≤A' Lift-≅"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"≅-trans-≤ (≅-sym A≅B) subgoal"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"𝑨' , spA' , HomImage-≅ AimgA' A≅B"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"ov(α ⊔ ρᵃ ⊔ ℓ)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"𝑨' , (spA' , AimgA')"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Lift-HomImage-lemma lAimgA'"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"P{β = α}{ρᵃ} ℓ ι 𝒦"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"S{β = α}{ρᵃ} (α ⊔ ρᵃ ⊔ ℓ ⊔ ι) (P{β = α}{ρᵃ} ℓ ι 𝒦)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"H{β = α}{ρᵃ}(α ⊔ ρᵃ ⊔ ℓ ⊔ ι) (S{β = α}{ρᵃ}(α ⊔ ρᵃ ⊔ ℓ ⊔ ι) (P{β = α}{ρᵃ}ℓ ι 𝒦))"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"S ℓ 𝒦"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Level-closure{α}{ρᵃ} ℓ 𝒦"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"module","body":"α ⊔ ρᵃ ; b = β ⊔ ρᵇ ; c = γ ⊔ ρᶜ"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Level-closure{β}{ρᵇ} (a ⊔ ℓ) (S ℓ 𝒦)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"S{α ⊔ γ}{ρᵃ ⊔ ρᶜ}(a ⊔ ℓ) (Level-closure ℓ 𝒦)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":""}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"≤-Lift B≤A"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"≅-trans-≤ (≅-sym B≅C) B≤lA"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"α}{ρᵃ} ℓ ι 𝒦"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":""}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"Lift-closed ℓ (kA i)"}
+{"file":"Closure.agda","module":"Setoid.Varieties.Closure","name":"","body":"≅-trans (≅-sym Lift-≅) (≅-trans A≅⨅𝒜 (⨅≅⨅ℓρ{ℓ = γ}{ρ = ρᶜ}))"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"𝑨 , (pA , B≤A)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⊤ , (λ _ → 𝑨) , (λ _ → kA) , ≅⨅⁺-refl"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"S-expa{ℓ = a ⊔ ℓ ⊔ ι} x"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"α}{ρᵃ}(a ⊔ ℓ ⊔ ι) (P {β = α}{ρᵃ}ℓ ι 𝒦))"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"P⊆HSP"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"H-expa{ℓ = a ⊔ ℓ ⊔ ι} x"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"Goal"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"∣ sA i ∣"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"fst ∥ sA i ∥"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⨅-≤ λ i → snd ∥ sA i ∥"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⨅ ℬ , (I , (ℬ , (kB , ≅-refl))) , (≅-trans-≤ B≅⨅A ⨅A≤⨅B)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⊧-H-invar{p = p}{q} (σ 𝑨 kA) BimgA"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"Hpq 𝑨 (𝑨 , (kA , IdHomImage))"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⊧-S-invar{p = p}{q} (σ 𝑨 kA) B≤A"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"Spq 𝑨 (𝑨 , (kA , ≤-reflexive))"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⊧-I-invar 𝑨 p q IH (≅-sym A≅⨅A)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"σ (𝒜 i) (kA i)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⊧-P-invar {p = p}{q} 𝒜 ih"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"PKpq 𝑨 (P-expa {ℓ = ℓ}{ι} kA)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":""}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⨅A , (p⨅A , A≤⨅A)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"S-id1{ℓ = aℓι}{p = p}{q} (P-id1{ℓ = ℓ} {𝒦 = 𝒦}{p = p}{q} σ)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"Vpq 𝑨 (V-expa ℓ ι kA)"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"Goal"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"⊧-I-invar 𝑨 p q (pKq 𝑩 kB) B≅A ρ"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"V-id1 pKq 𝑨"}
+{"file":"Preservation.agda","module":"Setoid.Varieties.Preservation","name":"","body":"V-id2 Thpq 𝑨 kA"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"Σ[ 𝑨 ∈ (Algebra α ρᵃ) ] (𝑨 ∈ S ℓ 𝒦) × (Carrier (Env 𝑨 X))"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"∣ i ∣"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"⨅ 𝔄⁺"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"⟦ p ⟧ ⟨$⟩ snd ∥ i ∥ ≈ ⟦ q ⟧ ⟨$⟩ snd ∥ i ∥"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"x (𝑨 , sA , ρ)"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"𝒦⊫→ℰ⊢ (S-id2{ℓ = ℓ}{p = p}{q} S𝒦⊫pq)"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"⨅-hom-co 𝔄⁺ h"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"lift-hom (snd ∥ i ∥)"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"Goal"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"free-lift-interp {𝑨 = 𝑨} ρ t"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"ker𝔽⊆Equal{𝑨 = 𝑨}{sA} pKq ρ"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"trans (sym (fl p)) (trans subgoal (fl q))"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"∣ HomFactor ℭ homℭ hom𝔽[ X ] ker𝔽⊆kerℭ hom𝔽[ X ]-is-epic ∣"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"E⊢pq"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"goal"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"trans  (free-lift-interp{𝑨 = ∣ i ∣}(snd ∥ i ∥) p)"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"AllEqual⊆ker𝔽 pqEqual"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"∣ hom𝔽ℭ ∣ , isMon"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"∥ hom𝔽ℭ ∥"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"mon→≤ mon𝔽ℭ"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"S-idem SSP𝔽"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"ℑ⁺ , (𝔄⁺ , ((λ i → fst ∥ i ∥) , ≅-refl))"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"PS⊆SP {ℓ = ℓ} PSℭ"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"ℭ , (SPℭ , 𝔽≤ℭ)"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"module","body":"ov(α ⊔ ρᵃ ⊔ ℓ)"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"V-≅-lc{α}{ρᵃ}{ℓ} 𝒦 𝑨 VlA"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"SP𝔽{ℓ = ℓ} 𝒦"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"𝔽-ModTh-epi-lift{ℓ = ℓ} (λ {p q} → ModThA{p = p}{q})"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"epi→ontohom 𝔽[ ∣A∣ ] (Lift-Alg 𝑨 ι ι) epi𝔽lA"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"𝔽[ ∣A∣ ] , sp𝔽A , lAimg𝔽A"}
+{"file":"HSP.agda","module":"Setoid.Varieties.HSP","name":"","body":"pThq 𝑨 vA"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"_⊧_","body":"Equal p q where open Environment 𝑨"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"_⊫_","body":"∀ 𝑨 → 𝒦 𝑨 → 𝑨 ⊧ eq                    -- (type \\||= to get ⊫)"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"_⊨_","body":"∀ i → Equal (lhs (ℰ i))(rhs (ℰ i)) where open Environment 𝑨  --   (type \\|= to get ⊨)"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"_∥≈_","body":"∀ i → 𝒦 ⊫ ℰ i"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"ModTuple","body":"_⊨ ℰ"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"∀ {p q} → (p , q) ∈ ℰ → Equal p q where open Environment 𝑨"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"λ (p , q) → 𝒦 ⊫ (p ≈̇ q)"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"Σ[ p ∈ (Term _ × Term _) ] p ∈ P"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"λ i → fst ∣ i ∣ ≈̇ snd ∣ i ∣"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"(M : Algebra α ρᵃ) → M ⊨ E → M ⊧ eq"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"E i in E ⊢ _ ▹ p ≈ q"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"record { refl = refl ; sym = sym ; trans = trans }"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"V i"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"record  { Carrier       = Term X"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"node f ts"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"FreeDomain X"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"ℊ x"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"refl"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":"refl"}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":""}
+{"file":"SoundAndComplete.agda","module":"Setoid.Varieties.SoundAndComplete","name":"","body":""}
+{"file":"Injective.agda","module":"Setoid.Functions.Injective","name":"","body":"Injective _≈₁_ _≈₂_ (_⟨$⟩_ f)"}
+{"file":"Injective.agda","module":"Setoid.Functions.Injective","name":"","body":"trans (sym x₀) (trans bb x₁)"}
+{"file":"Injective.agda","module":"Setoid.Functions.Injective","name":"","body":"injective F fa₀≈fa₁"}
+{"file":"Injective.agda","module":"Setoid.Functions.Injective","name":"","body":"record"}
+{"file":"Injective.agda","module":"Setoid.Functions.Injective","name":"id-is-injective","body":"id"}
+{"file":"Basic.agda","module":"Setoid.Functions.Basic","name":"𝑖𝑑","body":"record { to = id ; cong = id }"}
+{"file":"Basic.agda","module":"Setoid.Functions.Basic","name":"","body":"record  { Carrier = Lift ℓ A"}
+{"file":"Basic.agda","module":"Setoid.Functions.Basic","name":"","body":"reflₐ"}
+{"file":"Basic.agda","module":"Setoid.Functions.Basic","name":"","body":"reflₐ"}
+{"file":"Basic.agda","module":"Setoid.Functions.Basic","name":"","body":"record { to = lift ; cong = id }"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"∃[ a ∈ A ] (F ⟨$⟩ a) ≈₂ b"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"a , (sym₂ x)"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"eq a (sym₂ x)"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"eq _ refl₂"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"Σ[ b ∈ B ] ∃[ a ∈ A ](F ⟨$⟩ a) ≈₂ b"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"b"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"a"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"(F ⟨$⟩ a) , (a , refl₂)"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"f∈range{F} a"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"record  { Carrier = F range"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"record  { Carrier = F range"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"p"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"record  { Carrier = A"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"a"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"a"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"a"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"F preimage"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"record"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"sym₂ p"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"sym₂ p"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"(_ , (_ , p))} = p"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"refl₁"}
+{"file":"Inverses.agda","module":"Setoid.Functions.Inverses","name":"","body":"refl₁"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"∀ {y} → Img_∋_ {𝑨 = 𝑨}{𝑩 = 𝑩} f y"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"∀ {y} → Image F ∋ y"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"hyp isSurjF"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"eq a x"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"g , gE"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"(record { to = _⟨$⟩_ s ; cong = cong s })"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"eq ∣ (surjective s) y ∣ (sym (snd (surjective s y) (IsEquivalence.refl isEqA)))"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"g , gE"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"record { to = _⟨$⟩_ s ; cong = cong s }"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"record  { cong = cong g"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"Inv f (fE {b})"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"η gE"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"eq a $ trans p $ cong H q"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"mp hE"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"h ⟨$⟩_ ∘ g ⟨$⟩_"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"SurjInv f fE"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"sym $ SurjInvIsInverseʳ f fE"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"trans ζ $ compId $ finv y"}
+{"file":"Surjective.agda","module":"Setoid.Functions.Surjective","name":"","body":"eq (g ⟨$⟩ (finv y)) η"}
+{"file":"Bijective.agda","module":"Setoid.Functions.Bijective","name":"IsBijective","body":"IsInjective f × IsSurjective f"}
+{"file":"Bijective.agda","module":"Setoid.Functions.Bijective","name":"BijInv","body":"record { to = finv ; cong = c }"}
+{"file":"Bijective.agda","module":"Setoid.Functions.Bijective","name":"","body":"Inv f fE"}
+{"file":"Bijective.agda","module":"Setoid.Functions.Bijective","name":"","body":"handler fE fE b₀≈b₁"}
+{"file":"Discrete.agda","module":"Setoid.Relations.Discrete","name":"","body":"∀ x → f ⟨$⟩ x ≈₂ g ⟨$⟩ x"}
+{"file":"Discrete.agda","module":"Setoid.Relations.Discrete","name":"","body":"∀ x → f ⟨$⟩ x ∈ S"}
+{"file":"Discrete.agda","module":"Setoid.Relations.Discrete","name":"","body":"g ⟨$⟩ x ≈₂ g ⟨$⟩ y"}
+{"file":"Discrete.agda","module":"Setoid.Relations.Discrete","name":"","body":"g ⟨$⟩ x ≈₂ g ⟨$⟩ y"}
+{"file":"Discrete.agda","module":"Setoid.Relations.Discrete","name":"","body":"Lift ℓ (g ⟨$⟩ x ≈₂ g ⟨$⟩ y)"}
+{"file":"Discrete.agda","module":"Setoid.Relations.Discrete","name":"","body":"λ x y → Lift ℓ (x ≈₁ y)"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"","body":"cong f refl"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"Quotient","body":"Σ[ P ∈ Pred A _ ] IsBlock P {∣ R ∣}"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"_/_","body":"record { Carrier = A ; _≈_ = ∣ R ∣ ; isEquivalence = ∥ R ∥ }"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"⟪_⟫","body":"a"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"","body":"id"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"","body":"id"}
+{"file":"Quotients.agda","module":"Setoid.Relations.Quotients","name":"≡→⊆","body":"Qx"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S∅","body":"record { symbol = 𝟘 ; arity = λ () }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S1","body":"record { symbol = 𝟙 ; arity = λ _ → 𝟘 }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S01","body":"record { symbol = 𝟙 ; arity = λ _ → 𝟙 }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S001","body":"record { symbol = 𝟙 ; arity = λ _ → 𝟚 }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S0001","body":"record { symbol = 𝟙 ; arity = λ _ → 𝟛 }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S021","body":"record { symbol = 𝟛 ; arity = λ{ 𝟛.𝟎 → 𝟚 ; 𝟛.𝟏 → 𝟙 ; 𝟛.𝟐 → 𝟙 } }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S101","body":"record { symbol = 𝟚 ; arity = λ{ 𝟚.𝟎 → 𝟘 ; 𝟚.𝟏 → 𝟚 } }"}
+{"file":"Signatures.agda","module":"Examples.Structures.Signatures","name":"S111","body":"record { symbol = 𝟛 ; arity = λ{ 𝟛.𝟎 → 𝟘 ; 𝟛.𝟏 → 𝟙 ; 𝟛.𝟐 → 𝟚 } }"}
+{"file":"Basic.agda","module":"Examples.Structures.Basic","name":"","body":"𝟛.𝟎"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₀","body":"inn (inl (Level.lift 𝟎))"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₀","body":"[]"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₁","body":"inn (inr (3 , L₀))"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₁","body":"3 ∷ l₀"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₃","body":"inn (inr (1 , (inn (inr (2 , L₀)))))"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₃","body":"1 ∷ (2 ∷ l₁)"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₀≡none","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₀≡none","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₁[0]≡some3","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₁⟦0⟧≡some3","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₁[n>0]≡none","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₁⟦n>0⟧≡none","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₃[0]≡some1","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₃⟦0⟧≡some1","body":"refl"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"L₃[0]≢some2","body":"λ ()"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"l₃[0]≢some2","body":"λ ()"}
+{"file":"Functors.agda","module":"Examples.Categories.Functors","name":"ℓ₁","body":"lsuc ℓ₀"}
+{"file":"Signatures.agda","module":"Overture.Signatures","name":"Signature","body":"Σ[ F ∈ Type 𝓞 ] (F → Type 𝓥)"}
+{"file":"Signatures.agda","module":"Overture.Signatures","name":"Level-of-Signature","body":"suc (𝓞 ⊔ 𝓥)"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"ℓ₁","body":"suc ℓ₀"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"","body":"fst"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"","body":"snd"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"_⁻¹","body":"sym p"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"_∙_","body":"trans p q"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"𝑖𝑑","body":"λ x → x"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"∃-syntax","body":"∃"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"Π","body":"A} B = (x : A) → B x"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"Π-syntax","body":"Π B"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"lift∼lower","body":"refl"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"lower∼lift","body":"refl"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"","body":"∀ x → f x ≡ g x"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"","body":"λ _ → refl"}
+{"file":"Basic.agda","module":"Overture.Basic","name":"transport","body":"id"}
+{"file":"Operations.agda","module":"Overture.Operations","name":"Op","body":"(I → A) → A"}
+{"file":"Operations.agda","module":"Overture.Operations","name":"π","body":"λ x → x i"}
+{"file":"Operations.agda","module":"Overture.Operations","name":"arity[_]","body":"I} f = I"}
+{"file":"FiniteCSP.agda","module":"Exercises.Complexity.FiniteCSP","name":"","body":"(λ x → 𝟚.𝟎) , (λ _ _ _ → r1) , λ ()"}
+{"file":"FiniteCSP.agda","module":"Exercises.Complexity.FiniteCSP","name":"","body":"((x 𝟚.𝟎) , (x 𝟚.𝟏)) ∈ Rᵃ"}
