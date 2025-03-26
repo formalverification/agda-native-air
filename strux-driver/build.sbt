@@ -1,5 +1,12 @@
 ThisBuild / scalaVersion := "2.13.12"
 
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test
+
+libraryDependencies ++= Seq(
+  "com.lihaoyi" %% "upickle" % "3.1.3",
+  "org.scalatest" %% "scalatest" % "3.2.18" % Test
+)
+
 lazy val root = (project in file("."))
   .settings(
     name := "AgdaExtractor",
