@@ -17,13 +17,11 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import java.io.PrintWriter
 import scala.util.Using
-// import upickle.default.{ReadWriter, macroRW}
 import upickle.default._
 
 case class TheoremData(file: String, module: Option[String], name: String, body: String)
 
 object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }
-
 
 object AgdaExtractor {
 
@@ -44,18 +42,35 @@ object AgdaExtractor {
         line.trim.stripPrefix("module").trim.split("\\s+").headOption
     }.flatten
 
-  // Alternative check for `module` lines.
-/*   def extractModuleNameAlt(lines: List[String]): String =
+  def extractModuleNameOLD(lines: List[String]): String =
     lines.collectFirst {
       case line if line.trim.startsWith("module ") =>
         line.trim.split("\\s+").lift(1).getOrElse("UnknownModule")
     }.getOrElse("UnknownModule")
- */
-  def extractModuleNameAlt(lines: List[String]): String =
-    lines.collectFirst {
-      case line if line.trim.startsWith("module ") =>
-        line.trim.split("\\s+").lift(1).getOrElse("UnknownModule")
-    }.getOrElse("UnknownModule")
+
+  // 2.1. Comment Removal
+  def removeComments(lines: List[String]): List[String] = {
+    val blockStart = "{-"
+    val blockEnd   = "-}"
+
+    val buffer = scala.collection.mutable.ListBuffer[String]()
+    var inBlock = false
+
+    for (line <- lines) {
+      val trimmed = line.trim
+      if (!inBlock && trimmed.contains(blockStart)) {
+        inBlock = true
+      }
+      if (!inBlock && !trimmed.startsWith("--")) {
+        buffer += line
+      }
+      if (inBlock && trimmed.contains(blockEnd)) {
+        inBlock = false
+      }
+    }
+    buffer.toList
+  }
+
 
   // 3. ✂️ Block-Based Parsing:  a state machine-style parser that tracks
   //    whether we are:
@@ -123,8 +138,9 @@ object AgdaExtractor {
     val buffer = scala.collection.mutable.ListBuffer.empty[(String, String)]
     val current = scala.collection.mutable.ListBuffer.empty[String]
     var name = ""
+    val cleanedLines = removeComments(lines)
 
-    lines.foreach { line =>
+    cleanedLines.foreach { line =>
       if (isTheoremLike(line)) {
         if (current.nonEmpty) {
           buffer += ((name, current.mkString(" ")))
@@ -133,14 +149,10 @@ object AgdaExtractor {
         val split = line.split("\\s+").toList
         name = split.headOption.getOrElse("")
         current += line
-      } else if (current.nonEmpty) {
-        current += line
-      }
+      } else if (current.nonEmpty) current += line
     }
 
-    if (current.nonEmpty) {
-      buffer += ((name, current.mkString(" ")))
-    }
+    if (current.nonEmpty) buffer += ((name, current.mkString(" ")))
 
     buffer.toList
   }
@@ -154,9 +166,9 @@ object AgdaExtractor {
     }
   }
 
-  def processFileAlt(path: Path): List[(String, String, String, String)] = {
+  def parseFileOLD(path: Path): List[(String, String, String, String)] = {
     val lines = Files.readAllLines(path).asScala.toList
-    val module = extractModuleNameAlt(lines)
+    val module = extractModuleNameOLD(lines)
     extractBlocks(lines).map {
       case (name, body) => (path.getFileName.toString, module, name, body.mkString("\n"))
     }
@@ -192,14 +204,14 @@ object AgdaExtractor {
 
   // 8. 🧩 Putting It All Together
   def main(args: Array[String]): Unit = {
+
     val userArgs = args.dropWhile(_ == "--")
     val root = if (userArgs.nonEmpty) userArgs(0) else {
       println("Usage: AgdaExtractor <path-to-agda-lib>")
       sys.exit(1)
     }
-
     val extracted = getAgdaFiles(Paths.get(root)).flatMap(parseFile)
-
     writeAsJsonl(extracted, Paths.get("output/theorems.jsonl"))
+
   }
 }
