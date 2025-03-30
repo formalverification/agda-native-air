@@ -2,8 +2,8 @@ package proofparser
 
 import org.scalatest.funsuite.AnyFunSuite
 import upickle.default._
-import proofparser.AgdaExtractor._
-// import AgdaExtractor // or wherever you defined it
+
+import proofparser.AgdaExtractor._ // or wherever you defined it
 
 class AgdaExtractorSpec extends AnyFunSuite {
 

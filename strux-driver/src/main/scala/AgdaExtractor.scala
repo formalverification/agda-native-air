@@ -1,59 +1,13 @@
 package proofparser
 
-/* 🎯 GOALS:
-  + Parse `.agda` files in a given directory recursively.
-  + Extract named definitions: functions, theorems, records, data types, etc.
-  + Support multi-line definitions.
-  + Capture their file of origin, module, name, and body.
-  + Output in a line-delimited JSON format (e.g., `theorems.jsonl`).
-*/
-
-/* Logic for Pairing Theorem Statements and Proofs
-
-1.  Data Representation
-    +  Replace the current `TheoremData` with a more comprehensive case 
-       class called `AgdaData`:
-       ```scala
-       case class AgdaData( file: String
-                          , module: Option[String]
-                          , name: String
-                          , `type`: String
-                          , proof: String )
-       ```
-   
-2.  Extraction Logic
-    +  Use a `Map[String, (String, Option[String])]` to temporarily store 
-       the name, type, and proof as they are collected.
-    +  First, collect the theorem/type declarations as we did before.
-    +  When encountering a proof (i.e., `name = ...`), pair it with the 
-       already collected type from the map.
-    +  If no matching type is found, store the proof separately for later 
-       reconciliation.
-
-3.  Merging Rules
-    +  If the map already has a type but no proof for a given name, 
-       update the entry with the proof.
-    +  If both the type and proof are available, create an `AgdaData` 
-       instance and store it in the result list.
-    +  Handle edge cases where a proof is encountered without a 
-       preceding type or vice versa.
-*/
-
+// import io.circe.generic.auto._
+// import io.circe.syntax._
 import java.nio.file.{Files, Paths, Path}
-import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters._
-import scala.jdk.StreamConverters._
-import io.circe.generic.auto._
-import io.circe.syntax._
-import java.io.PrintWriter
+// import scala.jdk.StreamConverters._
 import scala.util.Using
-import upickle.default._
+// import ujson._
 
-case class TheoremData(file: String, module: Option[String], name: String, body: String)
-object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }
-
-case class AgdaData(file: String, module: Option[String], name: String, `type`: String, proof: String)
-object AgdaData { implicit val rw: ReadWriter[AgdaData] = macroRW }
 
 object AgdaExtractor {
 
@@ -281,7 +235,7 @@ object AgdaExtractor {
   def writeAsJsonl[T: upickle.default.Writer](entries: Seq[T], out: Path): Unit = {
     Using(Files.newBufferedWriter(out)) { writer =>
       entries.foreach { thm =>
-        writer.write(write(thm))
+        writer.write(upickle.default.write(thm))
         writer.newLine()
       }
     }.get
