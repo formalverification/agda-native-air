@@ -2,23 +2,24 @@ package proofparser
 
 import org.scalatest.funsuite.AnyFunSuite
 import upickle.default._
+import proofparser.AgdaExtractor._
 // import AgdaExtractor // or wherever you defined it
 
 class AgdaExtractorSpec extends AnyFunSuite {
 
   test("extractModule should find the correct module name") {
-    val result = AgdaExtractor.extractModuleName(List("module My.Module.Name where"))
+    val result = extractModuleName(List("module My.Module.Name where"))
     assert(result.contains("My.Module.Name"))
   }
 
   test("isTheoremLike should detect a theorem line correctly") {
     val theoremLine = "myTheorem : A -> B"
-    assert(AgdaExtractor.isTheoremLike(theoremLine))
+    assert(isTheoremLike(theoremLine))
   }
 
   test("isTheoremLike should reject irrelevant lines") {
     val nonTheoremLine = "open import Something"
-    assert(!AgdaExtractor.isTheoremLike(nonTheoremLine))
+    assert(!isTheoremLike(nonTheoremLine))
   }
 
   test("collectTheorems should extract single-line theorem definitions") {
@@ -31,7 +32,7 @@ class AgdaExtractorSpec extends AnyFunSuite {
     )
   // def collectTheorems(lines: List[String]): List[(String, String)] = {
 
-    val theorems = AgdaExtractor.collectTheorems(lines.toList)
+    val theorems = collectTheorems(lines.toList)
     assert(theorems.exists(_._1 == "myThm"))
     assert(theorems.exists(_._2.contains("A -> B")))
   }
@@ -43,7 +44,7 @@ class AgdaExtractorSpec extends AnyFunSuite {
       "prop2 : B -> B",
       "prop2 = ...",
     )
-    val theorems = AgdaExtractor.collectTheorems(lines.toList)
+    val theorems = collectTheorems(lines.toList)
     assert(theorems.map(_._1).toSet == Set("prop1", "prop2"))
   }
 
@@ -54,7 +55,46 @@ class AgdaExtractorSpec extends AnyFunSuite {
       "module Example where",
       "someValue = 42"
     )
-    val theorems = AgdaExtractor.collectTheorems(lines.toList)
+    val theorems = collectTheorems(lines.toList)
     assert(theorems.map(_._1).toSet == Set("someValue"))
+  }
+
+  test("Declaration followed by proof.") {
+   val lines = Seq(
+     "Thm1 : A → B",
+     "Thm1 = f x"
+   )
+   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm1", "A → B", "f x"))
+   assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
+  }
+
+  test("Proof without preceding declaration.") {
+   val lines = Seq(
+     "Thm1 = f x"
+   )
+   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm1", "", "f x"))
+   assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
+  }
+
+  test("Test 3: Declaration without proof.") {
+   val lines = Seq(
+     "Thm2 : X × Y"
+   )
+   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm2", "X × Y", ""))
+   assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
+  }
+
+  test("Test 4: Multiple theorems") {
+   val lines = Seq(
+     "Thm1 : A → B",
+     "Thm1 = f x",
+     "Thm2 : X × Y",
+     "Thm2 = pair x y"
+   )
+   val expected = Seq(
+     AgdaData("file.agda", Some("TestModule"), "Thm1", "A → B", "f x"),
+     AgdaData("file.agda", Some("TestModule"), "Thm2", "X × Y", "pair x y")
+   )
+   assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
   }
 }

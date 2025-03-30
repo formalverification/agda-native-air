@@ -1,12 +1,42 @@
 package proofparser
 
-/*
-  🎯 GOALS:
-+ Parse `.agda` files in a given directory recursively.
-+ Extract **named** definitions: functions, theorems, records, data types, etc.
-+ Support **multi-line** definitions.
-+ Capture their file of origin, module, name, and body.
-+ Output in a line-delimited JSON format (e.g., `theorems.jsonl`).
+/* 🎯 GOALS:
+  + Parse `.agda` files in a given directory recursively.
+  + Extract named definitions: functions, theorems, records, data types, etc.
+  + Support multi-line definitions.
+  + Capture their file of origin, module, name, and body.
+  + Output in a line-delimited JSON format (e.g., `theorems.jsonl`).
+*/
+
+/* Logic for Pairing Theorem Statements and Proofs
+
+1.  Data Representation
+    +  Replace the current `TheoremData` with a more comprehensive case 
+       class called `AgdaData`:
+       ```scala
+       case class AgdaData( file: String
+                          , module: Option[String]
+                          , name: String
+                          , `type`: String
+                          , proof: String )
+       ```
+   
+2.  Extraction Logic
+    +  Use a `Map[String, (String, Option[String])]` to temporarily store 
+       the name, type, and proof as they are collected.
+    +  First, collect the theorem/type declarations as we did before.
+    +  When encountering a proof (i.e., `name = ...`), pair it with the 
+       already collected type from the map.
+    +  If no matching type is found, store the proof separately for later 
+       reconciliation.
+
+3.  Merging Rules
+    +  If the map already has a type but no proof for a given name, 
+       update the entry with the proof.
+    +  If both the type and proof are available, create an `AgdaData` 
+       instance and store it in the result list.
+    +  Handle edge cases where a proof is encountered without a 
+       preceding type or vice versa.
 */
 
 import java.nio.file.{Files, Paths, Path}
@@ -20,21 +50,21 @@ import scala.util.Using
 import upickle.default._
 
 case class TheoremData(file: String, module: Option[String], name: String, body: String)
-
 object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }
+
+case class AgdaData(file: String, module: Option[String], name: String, `type`: String, proof: String)
+object AgdaData { implicit val rw: ReadWriter[AgdaData] = macroRW }
 
 object AgdaExtractor {
 
-// 🧠 Core Design: Step-by-Step Parsing Logic
-
-  // 1. File Collection
+  // 📂 File Collection
   def getAgdaFiles(dir: Path): List[Path] = Files.walk(dir)
     .iterator()
     .asScala
     .filter(p => p.toString.endsWith(".agda"))
     .toList
 
-  // 2. Module Detection:
+  // Module Detection
   // A simple check for `module` lines.
   def extractModuleName(lines: List[String]): Option[String] =
     lines.collectFirst {
@@ -42,13 +72,116 @@ object AgdaExtractor {
         line.trim.stripPrefix("module").trim.split("\\s+").headOption
     }.flatten
 
-  def extractModuleNameOLD(lines: List[String]): String =
-    lines.collectFirst {
-      case line if line.trim.startsWith("module ") =>
-        line.trim.split("\\s+").lift(1).getOrElse("UnknownModule")
-    }.getOrElse("UnknownModule")
+  // 📚 Theorem Extraction
 
-  // 2.1. Comment Removal
+  // extractTheorems
+  // @param lines The lines of the Agda file.
+  // @param fileName The name of the file being processed.
+  // @param moduleName The name of the module being processed.
+  // @return A sequence of `AgdaData` objects containing the file name,
+  // module name, theorem name, type, and proof.
+  //
+  // @description This function extracts theorems from a list of lines.
+  // It uses a mutable map to keep track of theorem names and their types.
+  // It also uses a mutable list to store the results.
+  // The function iterates through the lines, checking for theorem-like
+  // definitions and proof-like lines.
+  // When it finds a theorem definition, it stores the name and type in the map.
+  // When it finds a proof-like line, it checks if the name exists in the map.
+  // If it does, it creates an `AgdaData` object with the file name, module name,
+  // theorem name, type, and proof, and adds it to the results list.
+  // If the name does not exist in the map, it updates the map with the proof.
+  // Finally, it returns the results list as a sequence of `AgdaData` objects.
+  //
+  // @example
+  // val lines = Seq(
+  //   "myTheorem : A -> B",
+  //   "myTheorem = ...",
+  //   "anotherTheorem : C -> D",
+  //   "anotherTheorem = ..."
+  // )
+  // val fileName = "example.agda"
+  // val moduleName = Some("MyModule")
+  // val theorems = extractTheorems(lines, fileName, moduleName)
+  // theorems.foreach { theorem =>
+  //   println(s"File: ${theorem.file}, Module: ${theorem.module.getOrElse("N/A")}, Name: ${theorem.name}, Type: ${theorem.`type`}, Proof: ${theorem.proof}")
+  // }
+  // 
+  // @note This function is designed to handle both single-line and multi-line
+  // theorem definitions.
+  def extractTheorems(lines: Seq[String], fileName: String, moduleName: Option[String]): Seq[AgdaData] = {
+    var theoremMap = scala.collection.mutable.Map[String, (String, Option[String])]()
+    var results = scala.collection.mutable.ListBuffer[AgdaData]()
+
+    lines.foreach { line =>
+      val trimmed = line.trim
+
+      if (isTheoremLike(trimmed)) {
+        val parts = trimmed.split(":", 2)
+        if (parts.length == 2) {
+          val name = parts(0).trim
+          val typ = parts(1).trim
+          theoremMap.update(name, (typ, None))
+        }
+      } else if (isProofLike(trimmed)) {
+        val parts = trimmed.split("=", 2)
+        if (parts.length == 2) {
+          val name = parts(0).trim
+          val proof = parts(1).trim
+          if (theoremMap.contains(name)) {
+            val (typ, _) = theoremMap(name)
+            results += AgdaData(fileName, moduleName, name, typ, proof)
+            theoremMap.remove(name)
+          } else {
+            theoremMap.update(name, ("", Some(proof)))
+          }
+        }
+      }
+    }
+
+    // Add any leftover declarations without proofs
+    theoremMap.foreach { case (name, (typ, proofOpt)) =>
+      val proof = proofOpt.getOrElse("")
+      results += AgdaData(fileName, moduleName, name, typ, proof)
+    }
+
+    results.toSeq
+  }
+
+  // 📚 Theorem Detection
+  def isTheoremLike(line: String): Boolean =
+    line.trim.nonEmpty && !line.trim.startsWith("--") && line.contains(" : ")
+
+  // ✍️ Proof Detection
+  def isProofLike(line: String): Boolean =
+    line.trim.nonEmpty && !line.trim.startsWith("--") && line.contains(" = ")
+
+  // 📚 Theorem Collection
+  def collectTheorems(lines: List[String]): List[(String, String)] = {
+    val buffer = scala.collection.mutable.ListBuffer.empty[(String, String)]
+    val current = scala.collection.mutable.ListBuffer.empty[String]
+    var name = ""
+    val cleanedLines = removeComments(lines)
+
+    cleanedLines.foreach { line =>
+      if (isTheoremLike(line)) {
+        if (current.nonEmpty) {
+          buffer += ((name, current.mkString(" ")))
+          current.clear()
+        }
+        val split = line.split("\\s+").toList
+        name = split.headOption.getOrElse("")
+        current += line
+      } else if (current.nonEmpty) current += line
+    }
+
+    if (current.nonEmpty) buffer += ((name, current.mkString(" ")))
+
+    buffer.toList
+  }
+
+
+  // Comment Removal
   def removeComments(lines: List[String]): List[String] = {
     val blockStart = "{-"
     val blockEnd   = "-}"
@@ -72,7 +205,7 @@ object AgdaExtractor {
   }
 
 
-  // 3. ✂️ Block-Based Parsing:  a state machine-style parser that tracks
+  // ✂️ Block-Based Parsing:  a state machine-style parser that tracks
   //    whether we are:
   //    - Outside a block (`state = None`)
   //    - Inside a block (`state = Some((name, lines))`)
@@ -93,7 +226,7 @@ object AgdaExtractor {
     line.startsWith(" ") || line.startsWith("\t")
 
 
-  // 4. 🧱 Block Parser
+  // 🧱 Block Parser
   def extractBlocks(lines: List[String]): List[(String, List[String])] = {
     @annotation.tailrec
     def loop( remaining: List[String]
@@ -128,36 +261,8 @@ object AgdaExtractor {
   }
 
 
-  // 5. 📚 Theorem Parser
-  def isTheoremLike(line: String): Boolean =
-    line.trim.nonEmpty &&
-    !line.trim.startsWith("--") &&
-    (line.contains(" : ") || line.contains(" = "))
 
-  def collectTheorems(lines: List[String]): List[(String, String)] = {
-    val buffer = scala.collection.mutable.ListBuffer.empty[(String, String)]
-    val current = scala.collection.mutable.ListBuffer.empty[String]
-    var name = ""
-    val cleanedLines = removeComments(lines)
-
-    cleanedLines.foreach { line =>
-      if (isTheoremLike(line)) {
-        if (current.nonEmpty) {
-          buffer += ((name, current.mkString(" ")))
-          current.clear()
-        }
-        val split = line.split("\\s+").toList
-        name = split.headOption.getOrElse("")
-        current += line
-      } else if (current.nonEmpty) current += line
-    }
-
-    if (current.nonEmpty) buffer += ((name, current.mkString(" ")))
-
-    buffer.toList
-  }
-
-  // 6. 📂 File Processing
+  // 📂 File Processing
   def parseFile(path: java.nio.file.Path): List[TheoremData] = {
     val lines = Files.readAllLines(path).toArray(new Array[String](0)).toList
     val module = extractModuleName(lines)
@@ -166,17 +271,14 @@ object AgdaExtractor {
     }
   }
 
-  def parseFileOLD(path: Path): List[(String, String, String, String)] = {
-    val lines = Files.readAllLines(path).asScala.toList
-    val module = extractModuleNameOLD(lines)
-    extractBlocks(lines).map {
-      case (name, body) => (path.getFileName.toString, module, name, body.mkString("\n"))
-    }
+  def parseAgdaFile(path: java.nio.file.Path): Seq[AgdaData] = {
+    val lines = Files.readAllLines(path).toArray(new Array[String](0)).toList
+    val module = extractModuleName(lines)
+    extractTheorems(lines, path.getFileName.toString, module)
   }
 
-
-  // 7. 📤 JSON Output
-  def writeAsJsonl(entries: List[TheoremData], out: Path): Unit = {
+  // 📤 JSON Output
+  def writeAsJsonl[T: upickle.default.Writer](entries: Seq[T], out: Path): Unit = {
     Using(Files.newBufferedWriter(out)) { writer =>
       entries.foreach { thm =>
         writer.write(write(thm))
@@ -202,7 +304,7 @@ object AgdaExtractor {
   }
 
 
-  // 8. 🧩 Putting It All Together
+  // 🧩 Putting It All Together
   def main(args: Array[String]): Unit = {
 
     val userArgs = args.dropWhile(_ == "--")
@@ -210,7 +312,8 @@ object AgdaExtractor {
       println("Usage: AgdaExtractor <path-to-agda-lib>")
       sys.exit(1)
     }
-    val extracted = getAgdaFiles(Paths.get(root)).flatMap(parseFile)
+    //val extracted = getAgdaFiles(Paths.get(root)).flatMap(parseFile)
+    val extracted = getAgdaFiles(Paths.get(root)).flatMap(parseAgdaFile)
     writeAsJsonl(extracted, Paths.get("output/theorems.jsonl"))
 
   }
