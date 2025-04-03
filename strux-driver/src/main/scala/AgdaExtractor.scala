@@ -259,7 +259,7 @@ object AgdaExtractor {
 
 
   // 🧩 Putting It All Together
-  def main(args: Array[String]): Unit = {
+  def oldMain(args: Array[String]): Unit = {
 
     val userArgs = args.dropWhile(_ == "--")
     val root = if (userArgs.nonEmpty) userArgs(0) else {

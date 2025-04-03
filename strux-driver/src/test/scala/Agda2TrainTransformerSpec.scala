@@ -10,23 +10,30 @@ object Agda2TrainTransformerSpec extends TestSuite {
 
     test("Extract Agda Data from JSON") {
       // Test with a sample JSON file path
-      val jsonPath = "./src/test/resources/sample.json"
+      val jsonPath = "./src/test/resources/agda-example.json"
 
       // Expected result
       val expected = Seq(
         AgdaData(
-          file = "Noether.agda",
-          module = Some("Base.Homomorphisms.Noether"),
-          name = "Thm1",
-          typ = "Type1",
-          proof = "Proof content"
+          file = "agda-example.agda",
+          module = Some("agda-example"),
+          name = "+-comm",
+          typ = "(m n : ℕ) → m + n ≡ n + m",
+          proof = "+-comm zero     zero     = refl"
+                + "+-comm zero     (suc n)  = cong suc (+-comm zero n)"
+                + "+-comm (suc m)  zero     = cong suc (+-comm m zero)"
+                + "+-comm (suc m)  (suc n)  = cong suc (trans (+-suc m n) (+-comm (suc m) n))"
+                + "where +-suc : ∀ m n → m + suc n ≡ suc (m + n)"
+                + "+-suc zero     n = refl"
+                + "+-suc (suc m)  n = cong suc (+-suc m n)"
         ),
         AgdaData(
-          file = "Noether.agda",
-          module = Some("Base.Homomorphisms.Noether"),
-          name = "Thm2",
-          typ = "Type2",
-          proof = "Another proof"
+          file = "agda-example.agda",
+          module = Some("agda-example"),
+          name = "_+_",
+          typ = "ℕ → ℕ → ℕ",
+          proof = "zero   + n = n"
+                + "suc m  + n = suc (m + n)"
         )
       )
 
