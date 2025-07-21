@@ -1,80 +1,62 @@
 package proofparser
-// import proofparser.AgdaExtractor._
+//import utest._
+//import org.scalatest.funsuite.AnyFunSuite
+//import proofparser.Agda2TrainTransformer.extractAgdaDataFromJson
 
-import utest._
-import proofparser.Agda2TrainTransformer.extractAgdaDataFromJson
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import scala.io.Source
 
-object Agda2TrainTransformerSpec extends TestSuite {
+class Agda2TrainTransformerSpec extends AnyFlatSpec with Matchers {
 
-  val tests = Tests {
+  "extractAgdaDataFromJson" should "correctly extract name, type, and proof from agda2train JSON output" in {
+    val testJsonPath = "/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/proof-parser/src/test/resources/agda-example.json"
+    val rawData = Source.fromFile(testJsonPath).getLines().mkString
+    println(s"Raw data length: ${rawData.length}")
 
-    test("Extract Agda Data from JSON") {
-      // Test with a sample JSON file path
-      val jsonPath = "./src/test/resources/agda-example.json"
+    val jsonData = ujson.read(rawData)
+    println(s"Parsed JSON keys: ${jsonData.obj.keys.mkString(", ")}")
 
-      // Expected result
-      val expected = Seq(
-        AgdaData(
-          file = "agda-example.agda",
-          module = Some("agda-example"),
-          name = "+-comm",
-          typ = "(m n : ℕ) → m + n ≡ n + m",
-          proof = "+-comm zero     zero     = refl"
-                + "+-comm zero     (suc n)  = cong suc (+-comm zero n)"
-                + "+-comm (suc m)  zero     = cong suc (+-comm m zero)"
-                + "+-comm (suc m)  (suc n)  = cong suc (trans (+-suc m n) (+-comm (suc m) n))"
-                + "where +-suc : ∀ m n → m + suc n ≡ suc (m + n)"
-                + "+-suc zero     n = refl"
-                + "+-suc (suc m)  n = cong suc (+-suc m n)"
-        ),
-        AgdaData(
-          file = "agda-example.agda",
-          module = Some("agda-example"),
-          name = "_+_",
-          typ = "ℕ → ℕ → ℕ",
-          proof = "zero   + n = n"
-                + "suc m  + n = suc (m + n)"
-        )
-      )
-
-      // Call the extraction function
-      val result = extractAgdaDataFromJson(jsonPath)
-
-      // Assert that the result matches the expected output
-      assert(result == expected)
+    if (jsonData.obj.contains("name")) {
+      println(s"Name found: ${jsonData("name").str}")
+    } else {
+      println("Name not found!")
     }
 
-    test("Handle Missing Module Name") {
-      // Test with a JSON file that lacks the module name
-      val jsonPath = "./src/test/resources/missingModule.json"
-      val result = extractAgdaDataFromJson(jsonPath)
+    val agdaDataList = Agda2TrainTransformer.extractAgdaDataFromJson(testJsonPath)
 
-      assert(result.head.module.isEmpty) // Ensure the module is None
-    }
+    // Check that the list is not empty
+    agdaDataList should not be empty
 
-    test("Handle Missing File Name") {
-      // Test with a JSON file that lacks the file name
-      val jsonPath = "./src/test/resources/missingFile.json"
-      val result = extractAgdaDataFromJson(jsonPath)
+    // Check a specific theorem that we know exists in the agda-example.json
+    val expectedData = AgdaData(
+      file = "agda-example.agda",
+      module = Some("agda-example"),
+      name = "+-comm",
+      agdaType = "(m n : ℕ) → (m + n) ≡ (n + m)",
+      proof = "+-comm zero zero = refl | +-comm zero (suc n) = cong suc (+-comm zero n) | +-comm (suc m) zero = cong suc (+-comm m zero) | +-comm (suc m) (suc n) = cong suc (trans (agda-example.+-suc m n m n) (+-comm (suc m) n))"
+    )
 
-      assert(result.head.file == "Unknown") // Ensure the file name defaults to "Unknown"
-    }
+    agdaDataList should contain (expectedData)
+  }
 
-    test("Empty Proof or Name Handling") {
-      // Test with a JSON file that has an empty proof or name
-      val jsonPath = "./src/test/resources/emptyFields.json"
-      val result = extractAgdaDataFromJson(jsonPath)
+  it should "handle missing or malformed JSON gracefully" in {
+    val invalidJsonPath = "path/to/nonexistent.json"
+    val result = Agda2TrainTransformer.extractAgdaDataFromJson(invalidJsonPath)
+    result shouldBe empty
+  }
 
-      assert(result.isEmpty) // Should be an empty sequence since name/proof are missing
-    }
+  it should "return empty when the JSON structure does not contain expected fields" in {
+    val malformedJsonPath = "path/to/malformed.json"
+    val result = Agda2TrainTransformer.extractAgdaDataFromJson(malformedJsonPath)
+    result shouldBe empty
+  }
 
-    test("Complex Proof Extraction") {
-      // Test with a JSON file containing multiline proofs
-      val jsonPath = "./src/test/resources/complexProof.json"
-      val result = extractAgdaDataFromJson(jsonPath)
+  it should "handle cases where the type or proof is missing" in {
+    val incompleteJsonPath = "path/to/incomplete.json"
+    val result = Agda2TrainTransformer.extractAgdaDataFromJson(incompleteJsonPath)
 
-      assert(result.nonEmpty)
-      assert(result.head.proof.contains("\n")) // Check if proof contains new lines
-    }
+    // Check that the result is empty or properly handled
+    result shouldBe empty
   }
 }

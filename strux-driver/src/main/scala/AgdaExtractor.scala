@@ -6,7 +6,7 @@ import java.nio.file.{Files, Paths, Path}
 import scala.jdk.CollectionConverters._
 // import scala.jdk.StreamConverters._
 import scala.util.Using
-// import ujson._
+import upickle.default._
 
 
 object AgdaExtractor {
@@ -60,12 +60,22 @@ object AgdaExtractor {
   // theorems.foreach { theorem =>
   //   println(s"File: ${theorem.file}, Module: ${theorem.module.getOrElse("N/A")}, Name: ${theorem.name}, Type: ${theorem.`type`}, Proof: ${theorem.proof}")
   // }
-  // 
+  //
+  case class AgdaDataOld(
+  file      : String,
+  module    : Option[String],
+  name      : String,
+  agdaType  : String,
+  proof     : String
+)
+object AgdaDataOld { implicit val rw: ReadWriter[AgdaDataOld] = macroRW }
+
+
   // @note This function is designed to handle both single-line and multi-line
   // theorem definitions.
-  def extractTheorems(lines: Seq[String], fileName: String, moduleName: Option[String]): Seq[AgdaData] = {
+  def extractTheorems(lines: Seq[String], fileName: String, moduleName: Option[String]): Seq[AgdaDataOld] = {
     var theoremMap = scala.collection.mutable.Map[String, (String, Option[String])]()
-    var results = scala.collection.mutable.ListBuffer[AgdaData]()
+    var results = scala.collection.mutable.ListBuffer[AgdaDataOld]()
 
     lines.foreach { line =>
       val trimmed = line.trim
@@ -84,7 +94,7 @@ object AgdaExtractor {
           val proof = parts(1).trim
           if (theoremMap.contains(name)) {
             val (typ, _) = theoremMap(name)
-            results += AgdaData(fileName, moduleName, name, typ, proof)
+            results += AgdaDataOld(fileName, moduleName, name, typ, proof)
             theoremMap.remove(name)
           } else {
             theoremMap.update(name, ("", Some(proof)))
@@ -96,7 +106,7 @@ object AgdaExtractor {
     // Add any leftover declarations without proofs
     theoremMap.foreach { case (name, (typ, proofOpt)) =>
       val proof = proofOpt.getOrElse("")
-      results += AgdaData(fileName, moduleName, name, typ, proof)
+      results += AgdaDataOld(fileName, moduleName, name, typ, proof)
     }
 
     results.toSeq
@@ -185,10 +195,10 @@ object AgdaExtractor {
     @annotation.tailrec
     def loop( remaining: List[String]
             , current: Option[(String, List[String])]
-            , acc: List[(String, List[String])]): List[(String, List[String])] = 
+            , acc: List[(String, List[String])]): List[(String, List[String])] =
       remaining match {
         case Nil => current.map(acc :+ _).getOrElse(acc)
-        case line :: rest => 
+        case line :: rest =>
           if (isBlockStart(line)) {
             current match {
               case Some(block) =>
@@ -225,7 +235,7 @@ object AgdaExtractor {
     }
   }
 
-  def parseAgdaFile(path: java.nio.file.Path): Seq[AgdaData] = {
+  def parseAgdaFile(path: java.nio.file.Path): Seq[AgdaDataOld] = {
     val lines = Files.readAllLines(path).toArray(new Array[String](0)).toList
     val module = extractModuleName(lines)
     extractTheorems(lines, path.getFileName.toString, module)
