@@ -1,0 +1,17 @@
+{
+  "title": "AgdaJangGoalExample",
+  "type": "object",
+  "required": ["file", "module", "goal_range", "context", "goal_type", "solution_term"],
+  "properties": {
+    "file":        {"type": "string"},
+    "module":      {"type": "string"},
+    "goal_range":  {"type": "object", "properties": {"start": {"line": "number", "col": "number"}, "end": {"line": "number", "col": "number"}}},
+    "context":     {"type": "array", "items": {"type": "object", "properties": {"name":{"type":"string"}, "type":{"type":"string"}}}},
+    "goal_type":   {"type": "string"},
+    "solution_term":{"type":"string"},
+    "imports":     {"type": "array", "items":{"type":"string"}},
+    "timestamp":   {"type": "string", "format":"date-time"},
+    "agda_version":{"type":"string"},
+    "notes":       {"type":"string"}
+  }
+}
