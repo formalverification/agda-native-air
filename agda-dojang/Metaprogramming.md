@@ -1,4 +1,86 @@
-# Metaprogramming & the TC monad in Agda: a practical intro
+# Metaprogramming & the TC monad in Agda: a practical intro (AgdaJang edition)
+
+## Quick setup checklist
+
+1. **Verify Agda**
+
+   ```bash
+   agda --version
+   ```
+2. **Type-check the core modules** (from the repo root; ensure the `agda/` dir is on the include path):
+
+   ```bash
+   agda -i agda agda/AgdaJang/Compat.agda
+   agda -i agda agda/AgdaJang/Refine.agda
+   agda -i agda agda/AgdaJang/Debug.agda
+   agda -i agda agda/AgdaJang/Apply.agda
+   ```
+3. **Sanity-check macros with a hole.** Create `Scratch.agda`:
+
+   ```agda
+   module Scratch where
+   open import Agda.Builtin.Nat
+   open import AgdaJang.Debug
+
+   demo : Nat
+   demo = {! showGoalType !}
+   ```
+
+   Then run:
+
+   ```bash
+   agda -i agda Scratch.agda
+   ```
+
+   You should see a `GOAL TYPE:` message and typechecking will stop intentionally.
+4. **Probe a candidate via the CLI.**
+
+   ```bash
+   python3 tools/jang_try.py --goal Nat --candidate zero \
+     --imports "open import Agda.Builtin.Nat"
+   ```
+
+   Expect `OK`. Try a failing case:
+
+   ```bash
+   python3 tools/jang_try.py --goal Nat --candidate true \
+     --imports "open import Agda.Builtin.Nat
+   ```
+
+open import Agda.Builtin.Bool"
+
+````
+Expect `FAIL`.
+5. **Try the apply helper.** Create `ApplyDemo.agda`:
+```agda
+module ApplyDemo where
+open import Agda.Builtin.Nat
+open import AgdaJang.Apply
+
+ex₁ : Nat
+ex₁ = refineApp⟨ suc zero ⟩
+````
+
+Then:
+
+```bash
+agda -i agda ApplyDemo.agda
+```
+
+6. **Optional:** if your Agda exports a real `whnf`, update `AgdaJang/Compat.agda` to use it instead of the alias.
+
+**Tips**
+
+* If you hit a “module name doesn’t match file name” error, ensure `module Foo` lives in `Foo.agda` under a directory listed with `-i`.
+* Clear stale interfaces with `git clean -fdX` or remove local `.agdai` files if things act strangely.
+
+> **Version notes**
+>
+> * Some Agda builds do **not** export `whnf` from `Agda.Builtin.Reflection`. In **AgdaJang** we provide `AgdaJang.Compat.whnf = reduce` as a portable alias. Swap it to the real `whnf` if your Agda exports it.
+> * `catchTC` differs across versions. In our environment it accepts a **fallback computation** (not a handler function). We therefore use the two-branch form: `catchTC successBranch fallbackBranch`.
+> * We prefer **Kleisli style** (`_>>=_`) over `do`-notation; both are fine.
+
+---
 
 ## Big picture
 
@@ -29,9 +111,18 @@
 
 +  `typeError parts : TC α` abort with a structured message; useful for debugging
 
-+  `catchTC m k : TC α` try/catch in TC; handy to probe "would this typecheck?"
++ `catchTC m h : TC A` — run `m`; on failure, run `h` (two-branch form we use here).
 
 There are many more, but these get us very far.
+
+
+**Kleisli reminder:**
+
+```
+(do x ← m; y ← n x; k y)  ≡  m >>= (λ x → n x >>= (λ y → k y))
+```
+
+---
 
 ## Examples
 
@@ -48,7 +139,7 @@ There are many more, but these get us very far.
         goalTy ← inferType hole
         _      ← checkType cand goalTy
         unify hole cand
-        return tt
+        unit tt     -- `unit` is aka `return`
     ```
 
     **Usage**.
@@ -63,28 +154,34 @@ There are many more, but these get us very far.
 
 2.  **"Try" macro**.  Test a candidate *without* solving.
 
-    ```agda
-    module AgdaJang.Try where
-    open import Agda.Builtin.Unit using (⊤)
-    open import Agda.Builtin.Reflection
+    We signal via `typeError`, so a CLI can scrape `AGDAJANG_TRY:OK/FAIL` from Agda’s output.
 
-    macro
-      try⟨_⟩ : Term → Term → TC ⊤
-      try⟨ cand ⟩ hole =
-        catchTC
-          (do goalTy ← inferType hole
-              _      ← checkType cand goalTy
-              typeError (strErr "AGDAJANG_TRY:OK" ∷ []))
-          (λ _ → typeError (strErr "AGDAJANG_TRY:FAIL" ∷ []))
-    ```
+```agda
+module AgdaJang.Try where
 
-    **Usage**.
+open import Agda.Builtin.Unit using (⊤)
+open import Agda.Builtin.Reflection
+
+macro
+  try⟨_⟩ : Term → Term → TC ⊤
+  try⟨ cand ⟩ hole =
+    catchTC
+      (do goalTy ← inferType hole
+          _      ← checkType cand goalTy
+          typeError (strErr "AGDAJANG_TRY:OK" ∷ []))
+      ( typeError (strErr "AGDAJANG_TRY:FAIL" ∷ []) )
+```
+
+ **Usage**.
 
     Put `try⟨ candidate ⟩` in a goal; Agda will emit `AGDAJANG_TRY:OK` or `…FAIL` and
     our CLI will parse that.
 
+---
 
 3.  **Debugging macros**. Print the goal type or a `Name`.
+
+    **Goal type printer**
 
     ```agda
     module AgdaJang.Debug where
@@ -98,20 +195,55 @@ There are many more, but these get us very far.
     ```
 
     Drop `showGoalType` in a hole to inspect the elaborated type Agda sees there.
+**NF vs WHNF printer**
 
+```agda
+module AgdaJang.Debug where
+
+open import AgdaJang.Compat
+open import Agda.Builtin.List using (_∷_; [])
+
+macro
+  showTypeNFvsWHNF : Term → TC ⊤
+  showTypeNFvsWHNF hole = do
+    A   ← inferType hole
+    A'  ← whnf A
+    A'' ← normalise A
+    typeError
+      ( strErr "TYPE:  " ∷ termErr A
+      ∷ strErr "\nWHNF: " ∷ termErr A'
+      ∷ strErr "\nNF:   " ∷ termErr A''
+      ∷ [] )
+```
+
+**How to use (holes):** create a hole with `{! … !}` and place the macro inside.
+
+```agda
+module Scratch where
+open import Agda.Builtin.Nat
+open import AgdaJang.Debug
+
+demo : Nat
+demo = {! showGoalType !}
+```
+
+Load/check the file. Agda stops and prints `GOAL TYPE: …`.
+
+---
 
 4.  **Normalization matters**
 
     Often `checkType` succeeds only after unfolding, so we may want to pre-normalize
     the goal.
+```agda
+goalTy₀ ← inferType hole
+goalTy  ← whnf goalTy₀      -- Compat.whnf aliases to 'reduce' if 'whnf' is absent
+_       ← checkType cand goalTy
+```
 
-    ```agda
-        goalTy₀ ← inferType hole
-        goalTy  ← whnf goalTy₀    -- or normalise/reduce
-        _       ← checkType cand goalTy
-    ```
+---
 
-5.  **"Apply lemma" (outline)**
+5.  **"Apply lemma" (outline)** and a concrete stopgap
 
     An "apply" macro builds an application term (e.g., `f _ _ x`) with fresh metas
     for the implicit arguments, checks it against the goal, unifies, and leaves
@@ -119,15 +251,52 @@ There are many more, but these get us very far.
     version-sensitive, so we'll implement this in the repo with a tiny compatibility
     layer, but conceptually:
 
-    +  Given a Name `f`, build a Term `def f args`
+    +  Given a Name `f`, build a Term `def f args`.
     +  For implicit args, insert fresh metas; for explicit args pass user-supplied terms
     + `checkType` the application against the goal type (possibly after `whnf`)
-    + `unify hole app`
+    + `unify` to solve, leaving subgoals for remaining metas.
 
     This is the basis for an Agda "tactic" that chains lemmas.
 
+**Concrete today:** use a surface application with `refineApp⟨_⟩` as a stopgap.
+
+```agda
+module AgdaJang.Apply where
+
+open import AgdaJang.Compat
+open import Agda.Builtin.List using (List; []; _∷_)
+
+-- Accept any surface term 'app' that Agda can elaborate.
+macro
+  refineApp⟨_⟩ : Term → Term → TC ⊤
+  refineApp⟨ app ⟩ hole =
+    inferType hole      >>= λ goalTy →
+    checkType app goalTy >>= λ _ →
+    unify hole app       >>= λ _ →
+    unit tt
+```
+
+**Usage**
+
+```agda
+module ApplyDemo where
+open import Agda.Builtin.Nat
+open import AgdaJang.Apply
+
+ex₁ : Nat
+ex₁ = refineApp⟨ suc zero ⟩
+```
+
+> We’ll add a version-safe helper that inserts metas for implicits (so you can programmatically build `def f [...]` without writing the surface term).
+
+---
+
 ## Common gotchas
 
+* **Implicit arguments:** don’t compare raw `Term`s for equality; instead rely on `checkType` + `unify` to elaborate implicits and fill metas.
+* **Normalization:** many goals line up only after a light `whnf`/`reduce` (or full `normalise` when needed).
+* **Macros abort on purpose:** we often use `typeError` as a “printf.” Put such macros in scratch modules or behind flags.
+* **APIs move:** keep a thin `AgdaJang.Compat` layer for shims (e.g., `whnf`, arg builders, etc.).
 +  **Contexts/implicits**.
 
    Agda inserts implicits during `checkType`. If we compare raw `Term`s directly
@@ -146,21 +315,15 @@ There are many more, but these get us very far.
 
 ## Deeper Dive: the TC monad
 
-### Mathematical view (category-theoretic "monad")
+A monad is an *endofunctor* `T` with unit `η : Id ⇒ T` and
+multiplication (Kleisli bind) `μ : T ∘ T ⇒ T`, satisfying left identity, right
+identity, and associativity. For Agda’s `TC`:
 
-A monad on a category `C` (here, think Sets/Types) is an endofunctor `T : C → C` with two natural transformations:
-
-+  **unit** `η : Id ⇒ T` (here: `returnTC`)
-
-+  **bind/multiplication** `μ : T ∘ T ⇒ T` (here it's the *Kleisli arrow*, denoted `_>>=_`)
-   satisfying the three monad laws (left identity, right identity, associativity).
-
-For the `TC` functor,
-
-+  objects are Agda types (`A : Set a`);
-+  the functor maps `A` to `TC A`;
-+  the unit is `returnTC : A → TC A`;
-+  the Kleisli arrow is `_>>=_ : TC A → (A → TC B) → TC B`.
++  **objects**. Agda types, like `A : Set a`;
++  **endofunctor**. `TC` maps `A` to `TC A`;
++  **unit**. `η : Id ⇒ T`; here `returnTC : A → TC A`, but we'll rename it to `unit`;
++  **bind**. `μ : T ∘ T ⇒ T`; here the *Kleisli arrow*, `_>>=_ : TC A → (A → TC B) → TC B`;
+   it satisfies the three monad laws: left identity, right identity, associativity.
 
 Agda does **not** (and cannot) *prove* the laws for `TC` inside Agda, because `TC`
 exposes effects of the type checker (state, failures, meta-variable solving,
@@ -226,6 +389,46 @@ things, and (if successful) produces an `A`." You sequence those computations wi
     ```
 
 ---
+
+**Practically:** you compose type-checker computations like `inferType`, `checkType`, `unify`, and normalization steps. Remember the desugaring:
+
+```
+(do x ← m; y ← n x; k y)  ≡  m >>= (λ x → n x >>= (λ y → k y))
+```
+
+…and that we use `catchTC m fallback` when you want to attempt `m` and on failure signal/branch via `fallback`.
+
+---
+
+## Trying things quickly
+
+* **Holes:** create `{! … !}` and drop `showGoalType` or `showTypeNFvsWHNF` inside to inspect what Agda sees.
+* **CLI probe:** our `tools/jang_try.py` writes a scratch module and scrapes `AGDAJANG_TRY:OK/FAIL`.
+
+Example command from the repo root:
+
+```bash
+python3 tools/jang_try.py --goal Nat --candidate zero \
+  --imports "open import Agda.Builtin.Nat"
+```
+
+Expect `OK` if `zero : Nat` elaborates; otherwise `FAIL`.
+
+---
+
+## Version compatibility
+
+We keep a conservative shim---the `AgdaJang.Compat` module---so code type-checks across Agda versions.
+
+---
+
+## Next steps
+
+* Add **implicit-meta insertion** helpers and an `apply⟨_⟩` macro that introduces subgoals.
+* Finish the **JSON interaction driver** to extract (context, goal) → term examples at scale.
+* Build the **LLM-in-the-loop** that proposes candidate terms, verifies in Agda, and logs positives.
+
+
 
 ## What is `whnf`
 

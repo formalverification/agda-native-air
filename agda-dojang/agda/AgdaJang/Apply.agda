@@ -32,7 +32,7 @@ macro
     inferType hole     >>= λ goalTy →
     checkType app goalTy >>= λ _ →
     unify hole app       >>= λ _ →
-    return tt
+    unit tt
 
 -- TODO (next pass):
 -- - mkDefAppWithImplicits : Name → List Term → TC Term

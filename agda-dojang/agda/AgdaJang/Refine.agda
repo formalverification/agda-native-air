@@ -1,6 +1,6 @@
 -- agda/AgdaJang/Refine.agda
 --
--- **Notes**
+-- NOTES
 --
 -- + `refine⟨_⟩` is the fast, reliable building block. If Agda accepts the candidate
 --    term, it unifies the hole.
@@ -8,7 +8,9 @@
 -- +  `try⟨_⟩` uses `catchTC` to signal OK/FAIL without committing the solution.
 --    For v0 we use a `typeError` message as a signaling channel; the CLI looks
 --    for `AGDADOJO_TRY:OK`/`FAIL` in Agda's JSON.
-
+--
+--  USAGE
+--
 module AgdaJang.Refine where
 
 open import AgdaJang.Compat              -- <<—— use our shim
@@ -30,7 +32,7 @@ macro
     goalTy ← inferType hole               -- type of the current goal
     _      ← checkType cand goalTy        -- ensure cand : goalTy
     unify hole cand                       -- solve the hole by cand
-    return tt
+    unit tt
 
 -- v0: a "try" macro that *doesn't* solve the goal, only reports whether cand would
 -- typecheck.
@@ -46,14 +48,6 @@ macro
         checkType cand goalTy >>= λ _ →
         typeError (strErr "AGDAJANG_TRY:OK" ∷ []) )
       ( typeError (strErr "AGDAJANG_TRY:FAIL" ∷ []))
--- macro
---   try⟨_⟩ : Term → Term → TC ⊤
---   try⟨ cand ⟩ hole =
---     catchTC {A = ⊤}
---       (do goalTy ← inferType hole
---           _      ← checkType cand goalTy
---           typeError (strErr "AGDAJANG_TRY:OK" ∷ []))
---       (λ _ → typeError (strErr "AGDAJANG_TRY:FAIL" ∷ []))
 
 -- Notes.
 -- `catchTC` has type: `∀ {A} → TC A → (Error → TC A) → TC A`
