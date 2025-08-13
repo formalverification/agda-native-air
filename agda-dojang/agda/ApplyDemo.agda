@@ -1,6 +1,6 @@
 -- agda/ApplyDemo.agda
 module ApplyDemo where
-open import Agda.Builtin.Nat
+open import AgdaJang.Prelude
 open import AgdaJang.Apply
 
 -- Succeeds: fills the goal with a surface term
@@ -11,3 +11,6 @@ ex₁ = refineApp⟨ suc zero ⟩    -- checks suc zero : Nat, then fills the go
 ex₂ : Nat
 ex₂ = apply⟨ suc ⟩  -- creates an application with one subgoal (meta) for the arg
                     -- leaves a subgoal ?0 : Nat
+
+ex₃ : Nat
+ex₃ = applyWith⟨ _+_ , zero ∷ [] ⟩

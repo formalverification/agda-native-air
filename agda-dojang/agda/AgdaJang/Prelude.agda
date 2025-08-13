@@ -49,3 +49,8 @@ whnf = reduce
 
 
 -- open import AgdaJang.Refine public
+
+
+macro
+  term⟨_⟩ : Term → Term → TC ⊤
+  term⟨ t ⟩ hole = unify hole t

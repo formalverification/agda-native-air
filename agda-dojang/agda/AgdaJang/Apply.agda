@@ -5,11 +5,14 @@
 --
 -- USAGE
 --
---   for fully explicit functions:
+--   Example 1. Fully explicit functions
+--     Inside some module where 'suc' is in scope and args are explicit:
+--     _ : Term → Term → Set -- pseudo, illustrative only
+--     _ = refineApp⟨ mkDefApp (quote suc) (vArg (R.lit (R.nat 0)) ∷ []) ⟩
 --
---     -- inside some module where 'suc' is in scope and args are explicit:
---     example : R.Term → R.Term → Set -- pseudo, illustrative only
---     example = refineApp⟨ mkDefApp (quote suc) (vArg (R.lit (R.nat 0)) ∷ []) ⟩
+--   Example 2. Fill first binder with zero; leave subgoal for second operand.
+--     _ : Nat
+--     _ = applyWith⟨ _+_ , [ zero ] ⟩
 --
 -- We'll make this nicer once we add implicit-meta insertion.
 -- For now, `Apply.agda` is a staging area for those helpers.
@@ -177,3 +180,40 @@ hArg t = arg (arg-info hidden (modality relevant quantity-ω)) t
 
 iArg : Term → Arg Term
 iArg t = arg (arg-info instance′ (modality relevant quantity-ω)) t
+
+
+
+------------------------------------------------------------------------
+-- Tactic: applyWith⟨ f , [t₁ , … , tₖ] ⟩
+-- Fill the first k *visible* binders with the given terms.
+------------------------------------------------------------------------
+
+-- Pure helper: consume explicit terms across a binder spine
+-- Visible binders consume an argument from the list; hidden/instance do not.
+fillVisible : List Term → List (Arg Term) → List (Arg Term)
+fillVisible []         slots                           = slots
+fillVisible ts         []                              = []
+fillVisible (t ∷ ts)   (arg (arg-info visible   m) _ ∷ rest) =
+  arg (arg-info visible   m) t       ∷ fillVisible ts rest
+fillVisible ts         (arg (arg-info hidden    m) _ ∷ rest) =
+  arg (arg-info hidden    m) unknown ∷ fillVisible ts rest
+fillVisible ts         (arg (arg-info instance′ m) _ ∷ rest) =
+  arg (arg-info instance′ m) unknown ∷ fillVisible ts rest
+
+macro
+  -- applyWith⟨_,_⟩: explicit args for visible binders
+  --   This fills the first `k` visible binders with the user's terms, leaves
+  --   `unknown` for the rest, and preserves hidden/instance binders as `unknown`.
+  --   This matches how humans use "apply": supply some explicit arguments and
+  --   let implicits stay metas.
+  applyWith⟨_,_⟩ : Term → List Term → Term → TC ⊤
+  applyWith⟨ fTerm , vs ⟩ hole =
+    headZero fTerm          >>= λ f0     →
+    inferType f0            >>= λ fty    →
+    collectUnknownArgs fty  >>= λ slots  →
+    let args = fillVisible vs slots in
+    headApp fTerm args      >>= λ app    →
+    inferType hole          >>= λ goal   →
+    checkType app goal      >>= λ _      →
+    unify hole app          >>= λ _      →
+    unit tt
