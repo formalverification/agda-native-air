@@ -5,7 +5,7 @@ module AgdaJang.Compat where
 open import Agda.Builtin.Unit using (⊤; tt) public
 
 -- Reflection API; re-export the things we need
-open import Agda.Builtin.Reflection public
+open import Agda.Builtin.Reflection as R public
   using ( Term; TC; Name
         ; inferType; checkType; unify; catchTC
         ; typeError; strErr; termErr
