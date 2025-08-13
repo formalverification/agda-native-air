@@ -13,11 +13,9 @@
 --
 module AgdaJang.Refine where
 
-open import AgdaJang.Compat              -- <<—— use our shim
--- open import Agda.Primitive using (Level; lzero; lsuc)
+open import AgdaJang.Prelude
 open import Agda.Builtin.Unit using (⊤; tt)
 open import Agda.Builtin.List using (List; []; _∷_)
--- open import Agda.Builtin.Reflection
 
 -- v0: a tiny "refine" macro. If `cand` checks against the goal type, fill the goal
 -- with `cand`.

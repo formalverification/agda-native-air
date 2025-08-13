@@ -1,6 +1,6 @@
 module AgdaJang.Debug where
 
-open import AgdaJang.Compat
+open import AgdaJang.Prelude
 open import Agda.Builtin.List using (_∷_; [])
 
 -- Print the type of the current goal (elaborated).
@@ -10,7 +10,7 @@ macro
     inferType hole >>= λ ty →
     typeError (strErr "GOAL TYPE: " ∷ termErr ty ∷ [])
 
--- Compare the raw type, its 'whnf' (Compat alias), and full 'normalise'.
+-- Compare the raw type, its 'whnf' (alias defined in Prelude), and full 'normalise'.
 macro
   showTypeNFvsWHNF : Term → TC ⊤
   showTypeNFvsWHNF hole =
