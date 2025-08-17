@@ -12,7 +12,7 @@
 --
 --   Example 2. Fill first binder with zero; leave subgoal for second operand.
 --     _ : Nat
---     _ = applyWith⟨ _+_ , [ zero ] ⟩
+--     _ = applyWith⟨ _+_ , zero ⟩
 --
 -- We'll make this nicer once we add implicit-meta insertion.
 -- For now, `Apply.agda` is a staging area for those helpers.
@@ -172,17 +172,6 @@ macro
     inferType f0           >>= λ fty  →
     collectBinderTypes fty >>= λ bs   → typeError (get_subgoals bs)
 
-vArg : Term → Arg Term
-vArg t = arg (arg-info visible (modality relevant quantity-ω)) t
-
-hArg : Term → Arg Term
-hArg t = arg (arg-info hidden (modality relevant quantity-ω)) t
-
-iArg : Term → Arg Term
-iArg t = arg (arg-info instance′ (modality relevant quantity-ω)) t
-
-
-
 ------------------------------------------------------------------------
 -- Tactic: applyWith⟨ f , [t₁ , … , tₖ] ⟩
 -- Fill the first k *visible* binders with the given terms.
@@ -202,7 +191,7 @@ fillVisible ts         (arg (arg-info instance′ m) _ ∷ rest) =
 
 macro
   -- applyWith⟨_,_⟩: explicit args for visible binders
-  --   This fills the first `k` visible binders with the user's terms, leaves
+  --   This fills the first k visible binder with the user's terms, leaves
   --   `unknown` for the rest, and preserves hidden/instance binders as `unknown`.
   --   This matches how humans use "apply": supply some explicit arguments and
   --   let implicits stay metas.
@@ -216,4 +205,40 @@ macro
     inferType hole          >>= λ goal   →
     checkType app goal      >>= λ _      →
     unify hole app          >>= λ _      →
+    unit tt
+
+
+------------------------------------------------------------------------
+-- Tactic: applyWith⟨ f , t ⟩
+-- Fill the first *visible* binder with the given term.
+------------------------------------------------------------------------
+
+
+-- Fill the *first* visible binder with v1; metas for the rest.
+fillFirstVisible : Term → List (Arg Term) → List (Arg Term)
+fillFirstVisible v [] = []
+fillFirstVisible v (arg (arg-info visible   m) _ ∷ rest) =
+  arg (arg-info visible   m) v       ∷ rest
+fillFirstVisible v (arg (arg-info hidden    m) _ ∷ rest) =
+  arg (arg-info hidden    m) unknown ∷ fillFirstVisible v rest
+fillFirstVisible v (arg (arg-info instance′ m) _ ∷ rest) =
+  arg (arg-info instance′ m) unknown ∷ fillFirstVisible v rest
+
+
+macro
+  -- applyWith1⟨_,_⟩: explicit args for visible binders
+  --   This fills the first visible binder with the user's term, leaves
+  --   `unknown` for the rest, and preserves hidden/instance binders as `unknown`.
+  --   This matches how humans use "apply": supply some explicit arguments and
+  --   let implicits stay metas.
+  applyWith1⟨_,_⟩ : Term → Term → Term → TC ⊤
+  applyWith1⟨ fTerm , v1 ⟩ hole =
+    headZero fTerm         >>= λ f0    →
+    inferType f0           >>= λ fty   →
+    collectUnknownArgs fty >>= λ slots →
+    let args = fillFirstVisible v1 slots in
+    headApp fTerm args     >>= λ app   →
+    inferType hole         >>= λ goal  →
+    checkType app goal     >>= λ _     →
+    unify hole app         >>= λ _     →
     unit tt

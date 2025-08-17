@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# src/tools/agda-jang_try.py
+# src/tools/jang_try.py
 """
 AgdaJang probe & tactics runner (typed, functional style).
 
@@ -42,6 +42,17 @@ CLI
       [FAIL] true
 
 
+
+agda-ai-prover/agda-jang on  main [!?]
+✦2 ❯ python3 tools/jang_try.py --goal Nat \
+  --tactic 'applyWith:_+_:[zero]' \
+  --imports "open import Agda.Builtin.Nat" --show-errors
+
+[OK] tactic applyWith:_+_:[zero]
+Subgoals: (present, count unknown)
+
+
+
   TACTICS
   -------
     python3 tools/jang_try.py --goal Nat --tactic apply:suc \
@@ -53,6 +64,25 @@ CLI
     python3 tools/jang_try.py --goal Nat --tactic applyReport:suc \
       --imports "open import Agda.Builtin.Nat" --format text
 
+    python3 tools/jang_try.py --goal Nat --tactic 'applyReport:_+_' \
+      --imports "open import Agda.Builtin.Nat"
+
+    # Expected output:
+
+      [OK] tactic applyReport:_+_
+      Subgoals:
+        - AGDAJANG_GOAL:0:visible: Nat
+        - AGDAJANG_GOAL:1:visible: Nat
+
+    python3 tools/jang_try.py --goal Nat --tactic 'applyWith:_+_:[zero]' \
+      --imports "open import Agda.Builtin.Nat" --show-errors
+
+    # Expected output:
+
+      [OK] tactic applyWith:_+_:[zero]
+      Subgoals: (present, count unknown)
+
+
 
   JSON (for logging)
   ------------------
@@ -61,7 +91,7 @@ CLI
       --imports "open import Agda.Builtin.Bool" \
       --format json
 
-    OUTPUT
+    # Expected output:
       [
         {
           "candidate": "zero",
@@ -85,7 +115,7 @@ CLI
        --imports "open import Agda.Builtin.Bool" \
        --show-errors --timeout 10
 
-     OUTPUT
+    # Expected output:
        [FAIL] true
        ---- Agda ----
        Checking TrySandbox (/tmp/tmpws1yzzp4/TrySandbox.agda).
@@ -132,6 +162,7 @@ class RunConfig:
     goal: str
     imports: List[str]
     agda_dir: str
+    agda_bin: str
     timeout: Optional[float]
     keep_scratch: bool
 
@@ -183,8 +214,12 @@ def render_body_for_tactic(tactic: str) -> str:
     if tactic.startswith("applyWith:"):
         spec = tactic[len("applyWith:"):].strip()
         lemma, args = parse_apply_with(spec)
-        args_list = ", ".join(args)
-        return f"applyWith⟨ {lemma} , [{args_list}] ⟩"
+        if len(args) == 1:
+            return f"applyWith1⟨ {lemma} , {args[0]} ⟩"
+        wrapped = [f"term⟨ {a} ⟩" for a in args]
+        return f"applyWith⟨ {lemma} , [{', '.join(wrapped)}] ⟩"
+        # args_list = ", ".join(args)
+        # return f"applyWith⟨ {lemma} , [{args_list}] ⟩"
     if tactic.startswith("applyReport:"):
         lemma = tactic[len("applyReport:"):].strip()
         return f"applyReport⟨ {lemma} ⟩"
@@ -212,33 +247,40 @@ def render_module(goal: str, imports: List[str], body: str) -> str:
     extra_imports = "\n".join(imports)
     return MODULE_TEMPLATE.format(extra_imports=extra_imports, goal=goal, body=body)
 
-def run_agda(path: pathlib.Path, include_dirs: Sequence[str], timeout: Optional[float]) -> Tuple[int, str]:
-    cmd: List[str] = ["agda"]
+def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: Sequence[str], timeout: Optional[float]) -> Tuple[int, str]:
+    cmd: List[str] = [cfg.agda_bin]
     for d in include_dirs:
         cmd.extend(["-i", d])
     cmd.append(str(path))
+
+    # line-buffered stdout; single stream (stderr→stdout)
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
     # Exception-free timeout: poll loop
     deadline: Optional[float] = (time.monotonic() + timeout) if timeout else None
     out_chunks: List[str] = []
+
     while True:
         rc = p.poll()
         chunk = p.stdout.readline() if p.stdout else ""
         if chunk:
             out_chunks.append(chunk)
         if rc is not None:
-            break
-        if deadline is not None and time.monotonic() >= deadline:
-            p.kill()
-            rc = 124
-            # Drain remaining output
+            # >>> Drain any remaining buffered output before we break <<<
             if p.stdout:
                 out_chunks.extend(p.stdout.readlines())
             break
+        if deadline is not None and time.monotonic() >= deadline:
+            p.kill()
+            #rc = 124
+            # Drain remaining output
+            if p.stdout:
+                out_chunks.extend(p.stdout.readlines())
+            return 124, "".join(out_chunks)
         # tiny sleep to avoid busy spin
         time.sleep(0.01)
-    return rc if rc is not None else 1, "".join(out_chunks)
+
+    return (rc if rc is not None else 1), "".join(out_chunks)
 
 def try_candidate(cfg: RunConfig, candidate: str) -> TryResult:
     body = render_body_for_candidate(candidate)
@@ -254,7 +296,7 @@ def try_candidate(cfg: RunConfig, candidate: str) -> TryResult:
 
     path = tmpdir / "TrySandbox.agda"
     path.write_text(src, encoding="utf-8")
-    rc, out = run_agda(path, [cfg.agda_dir, str(tmpdir)], cfg.timeout)
+    rc, out = run_agda(cfg, path, [cfg.agda_dir, str(tmpdir)], cfg.timeout)
     ok = (rc == 0)
     if not cfg.keep_scratch:
         try:
@@ -281,7 +323,7 @@ def run_tactic(cfg: RunConfig, tactic: str) -> TacticResult:
     tmpdir.mkdir(parents=True, exist_ok=True)
     path = tmpdir / "TrySandbox.agda"
     path.write_text(src, encoding="utf-8")
-    rc, out = run_agda(path, [cfg.agda_dir, str(tmpdir)], cfg.timeout)
+    rc, out = run_agda(cfg, path, [cfg.agda_dir, str(tmpdir)], cfg.timeout)
     subs_struct = parse_structured_goals(out)
     subs_plain  = parse_subgoals(out)
     subs = subs_struct or subs_plain
@@ -325,6 +367,7 @@ def main() -> None:
     ap.add_argument("--tactic", help="e.g., apply:suc (lemma must be in scope via imports)")
     ap.add_argument("--imports", action="append", default=[], help="Repeatable; e.g., 'open import Agda.Builtin.Nat'")
     ap.add_argument("--agda-dir", default="agda", help="Path to repo Agda sources (default: ./agda)")
+    ap.add_argument("--agda-bin", default="agda", help="Path to Agda binary")
     ap.add_argument("--format", choices=["text", "json", "csv"], default="text")
     ap.add_argument("--show-errors", action="store_true", help="Include Agda diagnostics for failures")
     ap.add_argument("--timeout", type=float, default=None, help="Per-run timeout (seconds)")
@@ -332,7 +375,7 @@ def main() -> None:
     args = ap.parse_args()
 
     imports = unique(normalize_lines(args.imports))
-    cfg = RunConfig(goal=args.goal, imports=imports, agda_dir=args.agda_dir,
+    cfg = RunConfig(goal=args.goal, imports=imports, agda_dir=args.agda_dir, agda_bin=args.agda_bin,
                     timeout=args.timeout, keep_scratch=args.keep_scratch)
 
     if args.tactic:

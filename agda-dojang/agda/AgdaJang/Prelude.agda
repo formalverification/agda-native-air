@@ -21,7 +21,7 @@ open import Agda.Builtin.Reflection as R public
         ; ErrorPart
         ; hidden
         ; instance′; inferType
-        ; modality
+        ; Modality; modality
         ; Name; normalise
         ; pi
         ; Quantity; quantity-ω
@@ -48,7 +48,15 @@ whnf = reduce
 -- For Agda versions without 'whnf', 'reduce' is a reasonable stand-in.
 
 
--- open import AgdaJang.Refine public
+-- ergonomic arg builders
+vArg : Term → Arg Term
+vArg t = arg (arg-info visible (modality relevant quantity-ω)) t
+
+hArg : Term → Arg Term
+hArg t = arg (arg-info hidden (modality relevant quantity-ω)) t
+
+iArg : Term → Arg Term
+iArg t = arg (arg-info instance′ (modality relevant quantity-ω)) t
 
 
 macro
