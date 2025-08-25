@@ -14,3 +14,7 @@ ex₂ = apply⟨ suc ⟩  -- creates an application with one subgoal (meta) for 
 
 ex₃ : Nat
 ex₃ = applyWith1⟨ _+_ , term⟨ zero ⟩ ⟩
+
+ex₄ : Nat
+ex₄ = applyWith⟨ _+_ , term⟨ zero ⟩ ∷ [] ⟩
+-- applyWith⟨ _+_ , [ term⟨ zero ⟩ ] ⟩

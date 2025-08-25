@@ -20,7 +20,7 @@
 module AgdaJang.Apply where
 
 open import AgdaJang.Prelude
-
+open import Data.List.Base
 ------------------------------------------------------------------------
 -- Convenience: refine any surface term against the current goal.
 ------------------------------------------------------------------------
@@ -33,6 +33,7 @@ macro
     checkType app goalTy >>= λ _ →
     unify hole app       >>= λ _ →
     unit tt
+------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 -- Termination-friendly Π-binder collection
@@ -80,12 +81,12 @@ peel' (suc n) t0 =
 -- Collect Π-binders as Arg Type (preserve ArgInfo + domain types)
 collectBinderTypes : Term → TC (List (Arg Term))
 collectBinderTypes ty = peel' (piDepth ty + FUEL) ty
+------------------------------------------------------------------------
 
 
 ------------------------------------------------------------------------
 -- Head resolution helpers: pick def/con from a *term* (no 'quote' needed)
 ------------------------------------------------------------------------
-
 -- Build a zero-argument head term to query its type.
 headZero : Term → TC Term
 headZero fTerm =
@@ -107,12 +108,12 @@ headApp fTerm args =
     _ → typeError
           ( strErr "AGDAJANG_APPLY: expected a bare name (e.g., suc, _+_, proj₁)"
           ∷ termErr t′ ∷ [] )
+------------------------------------------------------------------------
 
 
 --------------------------------------------------------------------------
 -- Tactic: apply⟨ f ⟩ where f is a *term*, e.g. apply⟨ suc ⟩, apply⟨ _+_ ⟩
 --------------------------------------------------------------------------
-
 -- Build (def f [unknown,…,unknown]) from the Π-shape of f's type,
 -- check against the goal, and unify. Leaves metas/subgoals for args
 -- Agda cannot infer or that remain unspecified.
@@ -127,6 +128,7 @@ macro
     checkType app goal    >>= λ _     →
     unify hole app        >>= λ _     →
     unit tt
+------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 -- Tactic: report subgoals for applying f (no solving)
@@ -141,8 +143,8 @@ macro
 --    `visible/hidden/instance`.
 -- +  We wrap the list with `AGDAJANG_SUBGOALS_BEGIN` / `..._END` markers
 --    so the parser can be simple and robust.
--- +  This macro **doesn't** attempt to solve; it only reports (so it will
---    exit non-zero—your runner should expect that when using report mode).
+-- +  This macro does NOT attempt to solve; it only reports (so it will
+--    exit non-zero; our runner should expect that when using report mode).
 
 -- Convert Visibility to a short string
 visTag : Visibility → String
@@ -171,12 +173,12 @@ macro
     headZero fTerm         >>= λ f0   →
     inferType f0           >>= λ fty  →
     collectBinderTypes fty >>= λ bs   → typeError (get_subgoals bs)
+------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 -- Tactic: applyWith⟨ f , [t₁ , … , tₖ] ⟩
 -- Fill the first k *visible* binders with the given terms.
 ------------------------------------------------------------------------
-
 -- Pure helper: consume explicit terms across a binder spine
 -- Visible binders consume an argument from the list; hidden/instance do not.
 fillVisible : List Term → List (Arg Term) → List (Arg Term)
@@ -206,14 +208,13 @@ macro
     checkType app goal      >>= λ _      →
     unify hole app          >>= λ _      →
     unit tt
+------------------------------------------------------------------------
 
 
 ------------------------------------------------------------------------
 -- Tactic: applyWith⟨ f , t ⟩
 -- Fill the first *visible* binder with the given term.
 ------------------------------------------------------------------------
-
-
 -- Fill the *first* visible binder with v1; metas for the rest.
 fillFirstVisible : Term → List (Arg Term) → List (Arg Term)
 fillFirstVisible v [] = []
@@ -223,7 +224,6 @@ fillFirstVisible v (arg (arg-info hidden    m) _ ∷ rest) =
   arg (arg-info hidden    m) unknown ∷ fillFirstVisible v rest
 fillFirstVisible v (arg (arg-info instance′ m) _ ∷ rest) =
   arg (arg-info instance′ m) unknown ∷ fillFirstVisible v rest
-
 
 macro
   -- applyWith1⟨_,_⟩: explicit args for visible binders
@@ -242,3 +242,75 @@ macro
     checkType app goal     >>= λ _     →
     unify hole app         >>= λ _     →
     unit tt
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+-- Tactic: applySolveReport⟨ f ⟩
+-- Apply f against the current goal (so unification runs), then print the
+-- instantiated types of any remaining meta arguments as AGDAJANG_GOAL lines.
+------------------------------------------------------------------------
+macro
+  applySolveReport⟨_⟩ : Term → Term → TC ⊤
+  applySolveReport⟨ fTerm ⟩ hole =
+    headZero fTerm          >>= λ f0   →
+    inferType f0            >>= λ fty  →
+    collectUnknownArgs fty  >>= λ slots →
+    headApp fTerm slots     >>= λ app  →
+    inferType hole          >>= λ goal →
+    checkType app goal      >>= λ app′ →
+    unify hole app′         >>= λ _    →
+    -- Extract meta-typed arguments from the head app′ and print their types
+    let
+      gather : Term → List Term
+      gather (def _ args) = map (
+        λ where (arg _ t) → t ) args
+      gather (con _ args) = map (
+        λ where (arg _ t) → t ) args
+      gather _            = []
+
+      metas : List Term
+      metas = gather app′
+
+      -- Build tagged lines for each arg that still infers to some type
+      mkParts : Nat → List Term → TC (List ErrorPart)
+      mkParts _ [] = unit (strErr "AGDAJANG_SUBGOALS_END" ∷ [])
+      mkParts i (t ∷ ts) =
+        inferType t >>= λ A →
+        (unit ( strErr "AGDAJANG_GOAL:" ∷ strErr (primShowNat i) ∷ strErr ":?arg: " ∷ termErr A ∷ strErr "\n" ∷ [] )) >>= λ here →
+        mkParts (suc i) ts >>= λ rest →
+        unit (here ++ rest)
+    in
+          -- Extract meta-typed arguments from the head app′ and print their types
+      typeError (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ []) >>= λ _ →
+      (mkParts 0 metas >>= λ parts → typeError parts)
+--
+-- Notes: `applySolveReport` uses the *elaborated* application `app′` from
+-- `checkType` so metas are real; we infer each arg's type to print post-unification
+-- obligations. The visibility tag is `?arg` here (we can improve by threading
+-- `ArgInfo` alongside).
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+-- Tactic: intro
+-- If the goal is a Π/→, introduce a λ-abstraction and leave the codomain.
+-- No argument; use a default binder name.
+------------------------------------------------------------------------
+open Term using (lam)
+macro
+  intro : Term → TC ⊤
+  intro hole =
+    inferType hole >>= λ ty →
+    whnf ty        >>= λ t  →
+    case t of λ where
+      (pi (arg (arg-info v m) A) (abs s B)) →
+        let nm   = if s == "" then "x" else s
+            body = abs nm unknown
+            lamT = lam v body
+        in checkType lamT ty >>= λ lam′ → unify hole lam′
+      _ → typeError (strErr "AGDAJANG_INTRO: goal is not a function/Π-type" ∷ [])
+
+-- Notes: `intro` is nullary for ergonomics: write simply `intro` in a goal to
+-- lambda-intro.
+------------------------------------------------------------------------

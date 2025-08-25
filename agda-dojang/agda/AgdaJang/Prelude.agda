@@ -8,8 +8,11 @@ open import Agda.Builtin.List using (List; []; _∷_) public
 open import Agda.Builtin.Nat  using (Nat; zero; suc; _+_) public
 open import Agda.Builtin.String using (String; primShowNat) public
 open import Agda.Builtin.Unit using (⊤; tt) public
-
+open import Data.Bool using (if_then_else_) public
+open import Data.String.Properties using (_==_) public
 open import Function.Base using (case_of_) public
+open import Relation.Binary.PropositionalEquality.Core public
+  using (_≡_) -- ; _≢_; refl; cong; cong₂; sym; _≗_; trans; ≢-sym; subst₂;
 
 
 -- Reflection API; re-export the things we need
@@ -62,3 +65,8 @@ iArg t = arg (arg-info instance′ (modality relevant quantity-ω)) t
 macro
   term⟨_⟩ : Term → Term → TC ⊤
   term⟨ t ⟩ hole = unify hole t
+  -- The `term⟨_⟩` macro allows us to write, e.g.,
+  --    ex₃ : Nat
+  --    ex₃ = applyWith⟨ _+_ , term⟨ zero ⟩ ∷ [] ⟩
+  -- or
+  --    ex₃ = applyWith⟨ _+_ , [ term⟨ zero ⟩ ] ⟩

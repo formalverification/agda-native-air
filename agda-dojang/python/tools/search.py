@@ -4,15 +4,21 @@
 """
 AgdaJang search loop skeleton (BFS/beam), v0.2
 
-Design goals
+DESIGN GOALS
 ------------
-- *Pure driver* that calls the existing `tools/jang_try.py` as an oracle.
-- Functional style, explicit dataclasses & types, tiny helpers.
-- Robust subgoal discovery:
-  - Prefer structured binders from `applyReport:<lemma>` (AGDAJANG_GOAL tags).
-  - Heuristically support `applyWith:<lemma>:[args…]` by dropping the first K
-    *visible* binders from that report.
-- Beam/BFS over a tiny action set (Nat-focused to start).
+
+  This is a pure driver that calls the existing `tools/jang_try.py` as an oracle.
+
+  Some features of this program:
+
+    -  Functional style, explicit dataclasses & types, tiny helpers.
+
+    -  Robust subgoal discovery:
+       -  Prefer structured binders from `applyReport:<lemma>` (AGDAJANG_GOAL tags).
+       -  Heuristically support `applyWith:<lemma>:[args…]` by dropping the first K
+          *visible* binders from that report.
+
+    - Beam/BFS over a tiny action set (Nat-focused to start).
 
 Usage Examples
 --------------
@@ -20,7 +26,7 @@ Usage Examples
 # Nat demo: should succeed with zero
 python3 tools/search.py --goal Nat --imports "open import Agda.Builtin.Nat"
 
-# Turn on beam/depth if you add more tactics later
+# Turn on beam/depth if we add more tactics later
 python3 tools/search.py --goal Nat --beam 8 --max-depth 3 \
   --imports "open import Agda.Builtin.Nat"
 

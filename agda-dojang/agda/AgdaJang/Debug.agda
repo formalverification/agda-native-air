@@ -3,6 +3,11 @@ module AgdaJang.Debug where
 open import AgdaJang.Prelude
 open import Agda.Builtin.List using (_∷_; [])
 
+macro
+  showGoal : Term → TC ⊤
+  showGoal hole =
+    typeError (strErr "GOAL HOLE TERM (raw): " ∷ termErr hole ∷ [])
+
 -- Print the type of the current goal (elaborated).
 macro
   showGoalType : Term → TC ⊤

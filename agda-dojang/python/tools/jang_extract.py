@@ -14,9 +14,8 @@
 #    +  Request **goals/metas** and **constraints**.
 #
 #    +  If a goal is already solved (e.g., after `C-c C-a`), we can reconstruct the
-#       term by asking Agda for the definition of the name or by parsing the file
-#       region. In v0, we focus on *holes you fill during a session* and capture
-#       *final gives*.
+#       term by asking Agda for the definition of the name or by parsing the file region.
+#       In v0, we focus on *holes filled during a session* and capture *final gives*.
 #
 #    +  Record `(context, goal_type, solution_term)` when a goal gets solved via `give`.
 #
@@ -68,7 +67,7 @@ def main():
             load_file(p, agda, inc)
             # TODO: ask for metas, contexts, etc.
             # Pseudocode: send(p, {"command":"metas"}); parse; later hook into "give" events.
-            # In v0, you can instrument your workflow to use `--log-json` and scrape successful 'give' messages.
+            # In v0, we can instrument our workflow to use `--log-json` and scrape successful 'give' messages.
     finally:
         p.terminate()
         out.close()

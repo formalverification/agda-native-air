@@ -3,4 +3,4 @@ open import Agda.Builtin.Nat
 open import AgdaJang.Debug
 
 demo : Nat
-demo = {! showGoalType !}
+demo = {! showGoal !}

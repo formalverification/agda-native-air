@@ -5,107 +5,166 @@ AgdaJang probe & tactics runner (typed, functional style).
 
 WHAT IT DOES
 ------------
-Generates a scratch Agda module with your imports and goal, then:
 
-+  Candidate mode: uses `refine⟨ <candidate> ⟩` to check/solve the goal.
-     - Agda exit 0 ⇒ OK; else FAIL.
+Generates a scratch Agda module with your imports and goal.
 
-+  Tactic mode: runs one of:
-     - `apply:<lemma>`           : build `lemma ? ? …` (metas for all binders),
-                                   check vs goal, unify; typically leaves subgoals.
-     - `applyWith:<lemma>:[…]`   : fill first k *visible* binders with given terms,
-                                   metas for the rest (hidden/instance untouched).
-     - `applyReport:<lemma>`     : print structured subgoal info (binder types/visibility)
-                                   in stable `AGDAJANG_GOAL:` lines.
+There are two modes:
 
-+  Parses Agda output to:
+(1) CANDIDATE MODE
 
-   +  Return OK/FAIL (candidate), or
-   +  Report subgoals from `AGDAJANG_GOAL:` tags or fall back to heuristics.
+    Uses `refine⟨ <candidate> ⟩` to check/solve the goal.
 
-CLI
----
+    You pass the candidate term on the CLI; e.g.
+
+      $ python3 tools/jang_try.py \
+          --goal Nat \
+          --candidate "suc zero" \
+          --imports "open import Agda.Builtin.Nat"
+
+    We embed `test = refine⟨ <candidate> ⟩`.
+    Agda elaborates `<candidate>` against the goal.
+    If it type-checks (Agda exit 0), the goal is solved (⇒ OK), else FAIL.
+    The example above returns `[OK] suc zero` because `suc zero : Nat`.
+
+    Another example (will fail):
+
+      $ python3 tools/jang_try.py \
+          --goal Nat \
+          --candidate true \
+          --imports "open import Agda.Builtin.Nat" \
+          --imports "open import Agda.Builtin.Bool"
+
+    returns `[FAIL] true` because `true : Bool` does not inhabit `Nat`.
+
+(2) TACTIC MODE
+
+    We embed one tactic application as `test = …` and call Agda.
+
+    The runner parses Agda output to:
+
+       +  Return OK/FAIL (candidate), or
+       +  Report subgoals from `AGDAJANG_GOAL:` tags or fall back to heuristics.
+
+    Supported tactics (so far):
+
+      • `apply:<lemma>`
+          Build `lemma ? ? …` (metas for binders), check vs goal, unify. Usually
+          leaves unresolved metas = **subgoals**.
+
+      • `applyWith:<lemma>:[args]`
+          Same as `apply:` but fills the first k **visible** arguments with the
+          provided terms and leaves metas for the rest.
+
+      • `applyReport:<lemma>`
+          Does **not** solve. It prints structured lines that describe the
+          binder domains and visibilities of `<lemma>` with stable tags like:
+
+            AGDAJANG_GOAL:<index>:<visibility>: <type>
+
+          The runner parses those lines and returns them as `subgoals`.
+
+    Example:
+
+      $ python3 tools/jang_try.py \
+          --goal Nat \
+          --tactic applyReport:_+_ \
+          --imports "open import Agda.Builtin.Nat"
+
+      Output:  [OK] tactic applyReport:_+_
+               → Subgoals:
+                   AGDAJANG_GOAL:0:visible: Nat
+                   AGDAJANG_GOAL:1:visible: Nat
+
+In short: **you never edit your modules to put `refine⟨ _ ⟩` manually**—the runner
+creates a .
+
+N.B. You do NOT edit your own Agda files to use these probes. The runner generates
+an ephemeral scratch file each call, including an Agda module that:
+  • imports whatever modules you pass via --imports,
+  • declares `GoalTy = <goal>`,
+  • and sets `test : GoalTy` to either a candidate or a tactic call.
+Then it calls `agda` on that scratch file and interprets the result.
+
+
+
+CLI EXAMPLES
+------------
 
   CANDIDATES
   ----------
     python3 tools/jang_try.py --goal Nat --candidate "suc zero" \
       --imports "open import Agda.Builtin.Nat"
 
+    OUTPUT:  [OK] suc zero
+
     python3 tools/jang_try.py --goal Nat \
       --candidates "zero; suc zero; true" \
       --imports "open import Agda.Builtin.Nat" \
       --imports "open import Agda.Builtin.Bool"
 
-    OUTPUT
-      [OK] zero
-      [OK] suc zero
-      [FAIL] true
-
-
-
-agda-ai-prover/agda-jang on  main [!?]
-✦2 ❯ python3 tools/jang_try.py --goal Nat \
-  --tactic 'applyWith:_+_:[zero]' \
-  --imports "open import Agda.Builtin.Nat" --show-errors
-
-[OK] tactic applyWith:_+_:[zero]
-Subgoals: (present, count unknown)
-
-
+    OUTPUT:  [OK] zero
+             [OK] suc zero
+             [FAIL] true
 
   TACTICS
   -------
-    python3 tools/jang_try.py --goal Nat --tactic apply:suc \
-      --imports "open import Agda.Builtin.Nat" --show-errors
+  1.  `apply:`
 
-    python3 tools/jang_try.py --goal Nat --tactic 'applyWith:_+_:zero∷[]' \
-      --imports "open import Agda.Builtin.Nat"
+      python3 tools/jang_try.py --goal Nat --tactic apply:suc \
+        --imports "open import Agda.Builtin.Nat" --show-errors
 
-    python3 tools/jang_try.py --goal Nat --tactic applyReport:suc \
-      --imports "open import Agda.Builtin.Nat" --format text
+      OUTPUT:  [OK] tactic apply:suc
+               Subgoals: (present, count unknown)
 
-    python3 tools/jang_try.py --goal Nat --tactic 'applyReport:_+_' \
-      --imports "open import Agda.Builtin.Nat"
+  2.  `applyWith:` with args
 
-    # Expected output:
+       python3 tools/jang_try.py --goal Nat --tactic 'applyWith:_+_:[zero]' \
+         --imports "open import Agda.Builtin.Nat"
 
-      [OK] tactic applyReport:_+_
-      Subgoals:
-        - AGDAJANG_GOAL:0:visible: Nat
-        - AGDAJANG_GOAL:1:visible: Nat
+       OUTPUT:  [OK] tactic applyWith:_+_:[zero]
+                Subgoals: (present, count unknown)
 
-    python3 tools/jang_try.py --goal Nat --tactic 'applyWith:_+_:[zero]' \
-      --imports "open import Agda.Builtin.Nat" --show-errors
+  3.  `applyReport:` with structured subgoals
 
-    # Expected output:
+      python3 tools/jang_try.py --goal Nat --tactic applyReport:suc \
+        --imports "open import Agda.Builtin.Nat" --format text
 
-      [OK] tactic applyWith:_+_:[zero]
-      Subgoals: (present, count unknown)
+      OUTPUT:  [OK] tactic applyReport:suc
+               Subgoals:
+                 - AGDAJANG_GOAL:0:visible: Nat
 
+  4.  `applyReport:` with multiple subgoals
 
+      python3 tools/jang_try.py --goal Nat --tactic 'applyReport:_+_' \
+        --imports "open import Agda.Builtin.Nat"
+
+      OUTPUT:  [OK] tactic applyReport:_+_
+                  Subgoals:
+                      - AGDAJANG_GOAL:0:visible: Nat
+                      - AGDAJANG_GOAL:1:visible: Nat
 
   JSON (for logging)
   ------------------
+
     python3 tools/jang_try.py --goal Nat --candidates "zero; true" \
       --imports "open import Agda.Builtin.Nat" \
       --imports "open import Agda.Builtin.Bool" \
       --format json
 
-    # Expected output:
-      [
-        {
-          "candidate": "zero",
-          "ok": true,
-          "rc": 0,
-          "agda_output": "Checking TrySandbox (/tmp/tmpa1a9q12j/TrySandbox.agda).\n"
-        },
-        {
-          "candidate": "true",
-          "ok": false,
-          "rc": 42,
-          "agda_output": "Checking TrySandbox (/tmp/tmpes3tsttp/TrySandbox.agda).\n/tmp/tmpes3tsttp/TrySandbox.agda:12.8-22: error: [UnequalTerms]\nBool !=< Nat\n"
-        }
-      ]
+    OUTPUT:  [
+               {
+                 "candidate": "zero",
+                 "ok": true,
+                 "rc": 0,
+                 "agda_output": "Checking TrySandbox (/tmp/tmpa1a9q12j/TrySandbox.agda).\n"
+               },
+               {
+                 "candidate": "true",
+                 "ok": false,
+                 "rc": 42,
+                 "agda_output": "Checking TrySandbox (/tmp/tmpes3tsttp/TrySandbox.agda).\n/tmp/tmpes3tsttp/TrySandbox.agda:12.8-22: error: [UnequalTerms]\nBool !=< Nat\n"
+               }
+             ]
 
 
    TIMEOUT and ERRORS
@@ -115,13 +174,13 @@ Subgoals: (present, count unknown)
        --imports "open import Agda.Builtin.Bool" \
        --show-errors --timeout 10
 
-    # Expected output:
-       [FAIL] true
-       ---- Agda ----
-       Checking TrySandbox (/tmp/tmpws1yzzp4/TrySandbox.agda).
-       /tmp/tmpws1yzzp4/TrySandbox.agda:12.8-22: error: [UnequalTerms]
-       Bool !=< Nat
-       --------------
+    OUTPUT:  [FAIL] true
+             ---- Agda ----
+             Checking TrySandbox (./agda-ai-prover/agda-jang/.tmp_1756066729604/TrySandbox.agda).
+             ./agda-ai-prover/agda-jang/.tmp_1756066729604/TrySandbox.agda:13.8-22: error: [UnequalTerms]
+             Bool !=< Nat
+             when checking that the expression true has type GoalTy
+             --------------
 
 OPTIONS
 -------
@@ -137,10 +196,12 @@ NOTES
 """
 
 from __future__ import annotations
-import argparse, subprocess, sys, pathlib, time, json, csv, re
-# import argparse, subprocess, tempfile, textwrap, sys, os, pathlib, json
+import argparse, subprocess, sys, pathlib, time, json, csv, re #, tempfile, textwrap, os
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple, Optional, Iterable, Dict
+
+from utils.file_ops import scratch_module
+from utils.command_runner import run as run_cmd
 
 MODULE_TEMPLATE = """\
 module TrySandbox where
@@ -211,37 +272,22 @@ def render_body_for_tactic(tactic: str) -> str:
     #   applyWith⟨ {lemma} , [{args_list}] ⟩
     #   applyReport:<lemma>
     #   apply:<lemma>
+    # N.B. the lemma should be in scope via imports.
     if tactic.startswith("applyWith:"):
         spec = tactic[len("applyWith:"):].strip()
         lemma, args = parse_apply_with(spec)
         if len(args) == 1:
             return f"applyWith1⟨ {lemma} , {args[0]} ⟩"
         wrapped = [f"term⟨ {a} ⟩" for a in args]
-        return f"applyWith⟨ {lemma} , [{', '.join(wrapped)}] ⟩"
-        # args_list = ", ".join(args)
-        # return f"applyWith⟨ {lemma} , [{args_list}] ⟩"
+        args_list = ", ".join(wrapped)
+        return f"applyWith⟨ {lemma} , [{args_list}] ⟩"
     if tactic.startswith("applyReport:"):
         lemma = tactic[len("applyReport:"):].strip()
         return f"applyReport⟨ {lemma} ⟩"
     if tactic.startswith("apply:"):
         lemma = tactic[len("apply:"):].strip()
-        # We rely on the lemma being in scope via imports; quote resolves it.
         return f"apply⟨ {lemma} ⟩"
     return 'typeError (strErr "AGDAJANG_BAD_TACTIC" ∷ [])'  # force failure
-
-# a tiny parser to extract lines for `render_body_for_tactic`
-def parse_structured_goals(out: str) -> List[str]:
-    lines = []
-    in_block = False
-    for line in out.splitlines():
-        if "AGDAJANG_SUBGOALS_BEGIN" in line:
-            in_block = True
-            continue
-        if "AGDAJANG_SUBGOALS_END" in line:
-            break
-        if in_block and line.startswith("AGDAJANG_GOAL:"):
-            lines.append(line.strip())
-    return lines
 
 def render_module(goal: str, imports: List[str], body: str) -> str:
     extra_imports = "\n".join(imports)
@@ -316,29 +362,30 @@ def parse_subgoals(out: str) -> List[str]:
             goals.append(line)
     return goals
 
+# a tiny parser to extract lines for `render_body_for_tactic`
+def parse_structured_goals(out: str) -> List[str]:
+    lines = []
+    in_block = False
+    for line in out.splitlines():
+        if "AGDAJANG_SUBGOALS_BEGIN" in line:
+            in_block = True
+            continue
+        if "AGDAJANG_SUBGOALS_END" in line:
+            break
+        if in_block and line.startswith("AGDAJANG_GOAL:"):
+            lines.append(line.strip())
+    return lines
+
 def run_tactic(cfg: RunConfig, tactic: str) -> TacticResult:
     body = render_body_for_tactic(tactic)
-    src = render_module(cfg.goal, cfg.imports, body)
-    tmpdir = pathlib.Path(".scratch_tactic") if cfg.keep_scratch else pathlib.Path.cwd() / f".tmp_{int(time.time()*1000)}"
-    tmpdir.mkdir(parents=True, exist_ok=True)
-    path = tmpdir / "TrySandbox.agda"
-    path.write_text(src, encoding="utf-8")
-    rc, out = run_agda(cfg, path, [cfg.agda_dir, str(tmpdir)], cfg.timeout)
-    subs_struct = parse_structured_goals(out)
-    subs_plain  = parse_subgoals(out)
-    subs = subs_struct or subs_plain
-    has_unsolved = ("[UnsolvedMetaVariables]" in out) or ("Unsolved metas" in out)
-    ok = (rc == 0) or has_unsolved or (len(subs) > 0)
-    # has_unsolved = "[UnsolvedMetaVariables]" in out or "Unsolved metas" in out
-    # subs = parse_subgoals(out)
-    # ok = (rc == 0) or has_unsolved or (len(subs) > 0) # treat "has subgoals" as partial success
-    if not cfg.keep_scratch:
-        try:
-            for f in tmpdir.glob("*"):
-                f.unlink()
-            tmpdir.rmdir()
-        except Exception:
-            pass
+    src  = render_module(cfg.goal, cfg.imports, body)
+
+    with scratch_module("tactic", cfg.keep_scratch) as sc:
+        sc.path.write_text(src, encoding="utf-8")
+        rc, out = run_agda(cfg, sc.path, [cfg.agda_dir, str(sc.root)], cfg.timeout)
+
+    subs = parse_structured_goals(out) or parse_subgoals(out)
+    ok   = (rc == 0) or bool(subs) or ("[UnsolvedMetaVariables]" in out) or ("Unsolved metas" in out)
     return TacticResult(tactic=tactic, ok=ok, rc=rc, subgoals=subs, agda_output=out)
 
 def parse_apply_with(spec: str) -> Tuple[str, List[str]]:
