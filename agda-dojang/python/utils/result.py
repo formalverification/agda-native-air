@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-# python/utils/result.py — tiny Result type
+# file: python/utils/result.py
+"""
+description: tiny Result type
+"""
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar, Callable

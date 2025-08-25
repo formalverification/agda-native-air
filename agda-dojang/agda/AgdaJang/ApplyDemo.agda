@@ -1,4 +1,4 @@
--- agda/ApplyDemo.agda
+-- agda/AgdaJang/ApplyDemo.agda
 module ApplyDemo where
 open import Agda.Builtin.Nat
 open import AgdaJang.Apply

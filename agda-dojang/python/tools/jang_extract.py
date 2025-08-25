@@ -1,42 +1,42 @@
 #!/usr/bin/env python3
-# src/tools/agdajang_extract.py
-#
-# AgdaJang Trace extractor (v0)
-#
-# (implement with `agda --interaction-json`)
-#
-# +  Walk `--root` for `.agda` files.
-#
-# +  For each file:
-#
-#    +  Send a `load` command to Agda's JSON interaction.
-#
-#    +  Request **goals/metas** and **constraints**.
-#
-#    +  If a goal is already solved (e.g., after `C-c C-a`), we can reconstruct the
-#       term by asking Agda for the definition of the name or by parsing the file region.
-#       In v0, we focus on *holes filled during a session* and capture *final gives*.
-#
-#    +  Record `(context, goal_type, solution_term)` when a goal gets solved via `give`.
-#
-# NOTES
-#
-#   Agda's JSON protocol provides:
-#
-#   +  Interaction points (metas),
-#   +  "Give" results (when a hole is filled),
-#   +  Goal types and contexts.
-#
-#   For a tight first pass, we can also extract examples offline by scanning Agda
-#   repo for patterns like:
-#
-#       _ : (context) → goalType
-#       _ = refine⟨ CANDIDATE ⟩
-#
-#   where we (or the LLM) replaced holes via `refine⟨_⟩`.  Then the extractor just
-#   parses the file to read `CANDIDATE` and the goal type around it. That's the
-#   quickest "walking skeleton."
-#
+# file: python/tools/jang_extract.py
+"""
+AgdaJang Trace extractor (v0)
+
+(implement with `agda --interaction-json`)
+
++  Walk `--root` for `.agda` files.
+
++  For each file:
+
+   +  Send a `load` command to Agda's JSON interaction.
+
+   +  Request **goals/metas** and **constraints**.
+
+   +  If a goal is already solved (e.g., after `C-c C-a`), we can reconstruct the
+      term by asking Agda for the definition of the name or by parsing the file region.
+      In v0, we focus on *holes filled during a session* and capture *final gives*.
+
+   +  Record `(context, goal_type, solution_term)` when a goal gets solved via `give`.
+
+NOTES
+
+  Agda's JSON protocol provides:
+
+  +  Interaction points (metas),
+  +  "Give" results (when a hole is filled),
+  +  Goal types and contexts.
+
+  For a tight first pass, we can also extract examples offline by scanning Agda
+  repo for patterns like:
+
+      _ : (context) → goalType
+      _ = refine⟨ CANDIDATE ⟩
+
+  where we (or the LLM) replaced holes via `refine⟨_⟩`.  Then the extractor just
+  parses the file to read `CANDIDATE` and the goal type around it. That's the
+  quickest "walking skeleton."
+"""
 import json, subprocess, pathlib, sys, time, re
 from datetime import datetime
 

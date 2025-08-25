@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# src/tools/jang_try.py
+# file: python/tools/jang_try.py
 """
 AgdaJang probe & tactics runner (typed, functional style).
 

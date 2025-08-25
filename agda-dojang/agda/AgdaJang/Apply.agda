@@ -250,6 +250,7 @@ macro
 -- Apply f against the current goal (so unification runs), then print the
 -- instantiated types of any remaining meta arguments as AGDAJANG_GOAL lines.
 ------------------------------------------------------------------------
+-- agda/AgdaJang/Apply.agda  (replace your applySolveReport⟨_⟩ with this)
 macro
   applySolveReport⟨_⟩ : Term → Term → TC ⊤
   applySolveReport⟨ fTerm ⟩ hole =
@@ -260,31 +261,25 @@ macro
     inferType hole          >>= λ goal →
     checkType app goal      >>= λ app′ →
     unify hole app′         >>= λ _    →
-    -- Extract meta-typed arguments from the head app′ and print their types
-    let
-      gather : Term → List Term
-      gather (def _ args) = map (
-        λ where (arg _ t) → t ) args
-      gather (con _ args) = map (
-        λ where (arg _ t) → t ) args
-      gather _            = []
+    -- report (post–unification)
+    typeError (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ []) >>= λ _ →
+    mkParts 0 (gather app′) >>= λ parts →
+    typeError parts
+      where
+        gather : Term → List Term
+        gather (def _ args) = map (λ { (arg _ t) → t }) args
+        gather (con _ args) = map (λ { (arg _ t) → t }) args
+        gather _            = []
 
-      metas : List Term
-      metas = gather app′
-
-      -- Build tagged lines for each arg that still infers to some type
-      mkParts : Nat → List Term → TC (List ErrorPart)
-      mkParts _ [] = unit (strErr "AGDAJANG_SUBGOALS_END" ∷ [])
-      mkParts i (t ∷ ts) =
-        inferType t >>= λ A →
-        (unit ( strErr "AGDAJANG_GOAL:" ∷ strErr (primShowNat i) ∷ strErr ":?arg: " ∷ termErr A ∷ strErr "\n" ∷ [] )) >>= λ here →
-        mkParts (suc i) ts >>= λ rest →
-        unit (here ++ rest)
-    in
-          -- Extract meta-typed arguments from the head app′ and print their types
-      typeError (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ []) >>= λ _ →
-      (mkParts 0 metas >>= λ parts → typeError parts)
---
+        mkParts : Nat → List Term → TC (List ErrorPart)
+        mkParts _ []       = unit (strErr "AGDAJANG_SUBGOALS_END" ∷ [])
+        mkParts i (t ∷ ts) =
+          inferType t >>= λ A →
+          unit ( strErr "AGDAJANG_GOAL:" ∷ strErr (primShowNat i)
+               ∷ strErr ":?arg: "         ∷ termErr A ∷ strErr "\n" ∷ [] )
+            >>= λ here →
+          mkParts (suc i) ts >>= λ rest →
+          unit (here ++ rest)
 -- Notes: `applySolveReport` uses the *elaborated* application `app′` from
 -- `checkType` so metas are real; we infer each arg's type to print post-unification
 -- obligations. The visibility tag is `?arg` here (we can improve by threading
