@@ -1,7 +1,7 @@
 ##
-# AgdaJang
+# AgdaJang Makefile
 #
-# @file Makefile
+# @file ./agda-jang/Makefile
 # @version 0.1
 
 AGDA ?= agda

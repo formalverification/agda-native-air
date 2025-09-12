@@ -261,14 +261,19 @@ macro
     inferType hole          >>= λ goal →
     checkType app goal      >>= λ app′ →
     unify hole app′         >>= λ _    →
-    -- report (post–unification)
+    -- post-unification reporting (instantiated metas)
     typeError (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ []) >>= λ _ →
     mkParts 0 (gather app′) >>= λ parts →
     typeError parts
       where
+        -- Gather arguments from a head application without using polymorphic map
+        gatherArgs : List (Arg Term) → List Term
+        gatherArgs []                  = []
+        gatherArgs (arg _ t ∷ rest)    = t ∷ gatherArgs rest
+
         gather : Term → List Term
-        gather (def _ args) = map (λ { (arg _ t) → t }) args
-        gather (con _ args) = map (λ { (arg _ t) → t }) args
+        gather (def _ args) = gatherArgs args
+        gather (con _ args) = gatherArgs args
         gather _            = []
 
         mkParts : Nat → List Term → TC (List ErrorPart)
