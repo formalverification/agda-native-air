@@ -1,3 +1,5 @@
+<!-- agda-ai-prover/proof-parser/README.md -->
+
 # Proof Parser
 
 The **proof-parser** module extracts structured data from Agda sources.  
