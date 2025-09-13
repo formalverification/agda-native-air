@@ -1,4 +1,4 @@
--- agda/AgdaJang/Apply.agda
+-- agda-jang/agda/AgdaJang/Apply.agda
 -- We don't try to invent metas yet (that's version-sensitive);
 -- we just give ergonomic builders for *explicit* applications.
 -- We'll extend it to implicit-meta insertion later.
@@ -250,7 +250,6 @@ macro
 -- Apply f against the current goal (so unification runs), then print the
 -- instantiated types of any remaining meta arguments as AGDAJANG_GOAL lines.
 ------------------------------------------------------------------------
--- agda/AgdaJang/Apply.agda  (replace your applySolveReport⟨_⟩ with this)
 macro
   applySolveReport⟨_⟩ : Term → Term → TC ⊤
   applySolveReport⟨ fTerm ⟩ hole =
@@ -262,29 +261,36 @@ macro
     checkType app goal      >>= λ app′ →
     unify hole app′         >>= λ _    →
     -- post-unification reporting (instantiated metas)
-    typeError (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ []) >>= λ _ →
+    -- build the lines, then emit once
     mkParts 0 (gather app′) >>= λ parts →
-    typeError parts
-      where
-        -- Gather arguments from a head application without using polymorphic map
-        gatherArgs : List (Arg Term) → List Term
-        gatherArgs []                  = []
-        gatherArgs (arg _ t ∷ rest)    = t ∷ gatherArgs rest
+    emit (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ parts)
 
-        gather : Term → List Term
-        gather (def _ args) = gatherArgs args
-        gather (con _ args) = gatherArgs args
-        gather _            = []
+    where
+    -- Force typeError to a concrete result type (`TC ⊤`)
+    emit : List ErrorPart → TC ⊤
+    emit es = typeError {A = ⊤} es
 
-        mkParts : Nat → List Term → TC (List ErrorPart)
-        mkParts _ []       = unit (strErr "AGDAJANG_SUBGOALS_END" ∷ [])
-        mkParts i (t ∷ ts) =
-          inferType t >>= λ A →
-          unit ( strErr "AGDAJANG_GOAL:" ∷ strErr (primShowNat i)
-               ∷ strErr ":?arg: "         ∷ termErr A ∷ strErr "\n" ∷ [] )
-            >>= λ here →
-          mkParts (suc i) ts >>= λ rest →
-          unit (here ++ rest)
+    -- Gather arguments from a head application (no polymorphic map)
+    gatherArgs : List (Arg Term) → List Term
+    gatherArgs []                = []
+    gatherArgs (arg _ t ∷ rest)  = t ∷ gatherArgs rest
+
+    gather : Term → List Term
+    gather (def _ args) = gatherArgs args
+    gather (con _ args) = gatherArgs args
+    gather _            = []
+
+    -- Build tagged lines; avoid (++) and just cons the 5 parts in front of the tail
+    mkParts : Nat → List Term → TC (List ErrorPart)
+    mkParts _ []       = unit (strErr "AGDAJANG_SUBGOALS_END" ∷ [])
+    mkParts i (t ∷ ts) =
+      inferType t >>= λ A →
+      mkParts (suc i) ts >>= λ tail →
+      unit (  strErr "AGDAJANG_GOAL:" ∷ strErr (primShowNat i)
+            ∷ strErr ":?arg: "        ∷ termErr A
+            ∷ strErr "\n"             ∷ tail )
+
+
 -- Notes: `applySolveReport` uses the *elaborated* application `app′` from
 -- `checkType` so metas are real; we infer each arg's type to print post-unification
 -- obligations. The visibility tag is `?arg` here (we can improve by threading

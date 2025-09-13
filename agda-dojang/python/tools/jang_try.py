@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # file: python/tools/jang_try.py
+
 """
 AgdaJang probe & tactics runner (typed, functional style).
 
@@ -195,10 +196,13 @@ NOTES
 + All functions have explicit types; data flows through small immutable dataclasses.
 """
 
-from __future__ import annotations
-import argparse, subprocess, sys, pathlib, time, json, csv, re #, tempfile, textwrap, os
+from __future__  import annotations
+from typing      import List, Sequence, Tuple, Optional, Iterable, Dict
 from dataclasses import dataclass
-from typing import List, Sequence, Tuple, Optional, Iterable, Dict
+
+import argparse, subprocess, sys, pathlib, time, json, csv, re #, tempfile, textwrap, os
+
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))  # adds "<repo>/python"
 
 from utils.file_ops import scratch_module
 from utils.command_runner import run as run_cmd

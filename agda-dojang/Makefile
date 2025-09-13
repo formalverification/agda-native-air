@@ -6,11 +6,18 @@
 
 AGDA ?= agda
 AGDA_DIR := agda
+AGDA_FLAGS ?= -l agda-jang
+#AGDA_FLAGS ?= -l standard-library -i agda
+
+export PYTHONPATH := python
+
 PYTHON_DIR := python
 PYTHON := python3
-JANG_TRY := $(PYTHON_DIR)/tools/jang_try.py
+PYTHON_TOOLS := python/tools
+JANG_TRY := $(PYTHON_TOOLS)/jang_try.py
 DEMO1 := --goal Nat --candidate "suc zero" --imports "open import Agda.Builtin.Nat"
 DEMO2 := --goal Nat --tactic applyReport:_+_ --imports "open import Agda.Builtin.Nat"
+
 
 .PHONY: check demo clean
 

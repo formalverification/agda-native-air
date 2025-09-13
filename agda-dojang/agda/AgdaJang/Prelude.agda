@@ -37,6 +37,9 @@ open import Agda.Builtin.Reflection as R public
 
 -- Bring the monad ops for TC into scope so '>>=' works.
 infixl 1 _>>=_ _>>_
+
+-- Give an explicit signature, so monadic plumbing carries concrete universes.
+_>>=_ : ∀ {a b} {A : Set a} {B : Set b} → TC A → (A → TC B) → TC B
 _>>=_ = bindTC
 
 _>>_ : ∀ {a b} {A : Set a} {B : Set b} → TC A → TC B → TC B

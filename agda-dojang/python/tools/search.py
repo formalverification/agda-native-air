@@ -25,9 +25,11 @@ Notes
   (post-unification subgoals) and fall back to `applyReport⟨_⟩` automatically.
 """
 from __future__ import annotations
+
+from dataclasses  import dataclass, field
+from typing       import Dict, Iterable, List, Optional, Sequence, Tuple
+
 import argparse, hashlib, json, re, subprocess, sys
-from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 # ========= Core types =========
 
