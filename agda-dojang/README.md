@@ -1,3 +1,5 @@
+<!-- agda-ai-prover/agda-jang/README.md -->
+
 # AgdaJang: AI-Assisted Proof Dojo
 
 **AgdaJang** is the interactive proving component of `agda-ai-prover`.  
@@ -96,6 +98,3 @@ agda-jang/
 * Add more tactics (`rewrite`, smarter `introN`).
 * JSON logging for subgoal traces (dataset prep).
 * Integration with trained LLM policies.
-
-
-
