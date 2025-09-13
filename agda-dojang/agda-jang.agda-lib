@@ -1,3 +1,6 @@
 name: agda-jang
+-- Paths are relative to this file:
 include: agda
+-- Declare stdlib here by name (our nix flake ensures it's registered):
 depend: standard-library
+-- N.B. Give any Agda subproject its own `.agda-lib` file in its subdirectory.
