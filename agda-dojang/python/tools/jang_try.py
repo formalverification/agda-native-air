@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
-# file: python/tools/jang_try.py
-
 """
-AgdaJang probe & tactics runner (typed, functional style).
+file: python/tools/jang_try.py
+description: AgdaJang probe & tactics runner (typed, functional style).
+copyright: 2025 Thmpr
 
 WHAT IT DOES
 ------------
@@ -195,17 +194,18 @@ NOTES
 
 + All functions have explicit types; data flows through small immutable dataclasses.
 """
+import shlex
+from itertools import chain
 
-from __future__  import annotations
-from typing      import List, Sequence, Tuple, Optional, Iterable, Dict
-from dataclasses import dataclass
+from utils.types import RunConfig, TryResult, CommandResult, PipelineError
+from utils.result import Ok, Err, Result
+from utils.file_ops import temp_dir, write_text_atomic
+from utils.rendering import (
+    render_module, render_body_for_candidate, render_body_for_tactic
+)
+from tools.report_parser import has_markers, parse_marked_report
+from utils.command_runner import run_command
 
-import argparse, subprocess, sys, pathlib, time, json, csv, re #, tempfile, textwrap, os
-
-sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))  # adds "<repo>/python"
-
-from utils.file_ops import scratch_module
-from utils.command_runner import run as run_cmd
 
 MODULE_TEMPLATE = """\
 module TrySandbox where
@@ -221,30 +221,6 @@ GoalTy = {goal}
 test : GoalTy
 test = {body}
 """
-
-@dataclass(frozen=True)
-class RunConfig:
-    goal: str
-    imports: List[str]
-    agda_dir: str
-    agda_bin: str
-    timeout: Optional[float]
-    keep_scratch: bool
-
-@dataclass(frozen=True)
-class TryResult:
-    candidate: str
-    ok: bool
-    rc: int
-    agda_output: str
-
-@dataclass(frozen=True)
-class TacticResult:
-    tactic: str
-    ok: bool
-    rc: int
-    subgoals: List[str]
-    agda_output: str
 
 def normalize_lines(chunks: Optional[Sequence[str]]) -> List[str]:
     lines: List[str] = []
@@ -297,65 +273,43 @@ def render_module(goal: str, imports: List[str], body: str) -> str:
     extra_imports = "\n".join(imports)
     return MODULE_TEMPLATE.format(extra_imports=extra_imports, goal=goal, body=body)
 
-def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: Sequence[str], timeout: Optional[float]) -> Tuple[int, str]:
-    cmd: List[str] = [cfg.agda_bin]
-    for d in include_dirs:
-        cmd.extend(["-i", d])
-    cmd.append(str(path))
+def split_flags(s: str) -> list[str]:
+    return shlex.split(s) if s else []
 
-    # line-buffered stdout; single stream (stderr→stdout)
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-
-    # Exception-free timeout: poll loop
-    deadline: Optional[float] = (time.monotonic() + timeout) if timeout else None
-    out_chunks: List[str] = []
-
-    while True:
-        rc = p.poll()
-        chunk = p.stdout.readline() if p.stdout else ""
-        if chunk:
-            out_chunks.append(chunk)
-        if rc is not None:
-            # >>> Drain any remaining buffered output before we break <<<
-            if p.stdout:
-                out_chunks.extend(p.stdout.readlines())
-            break
-        if deadline is not None and time.monotonic() >= deadline:
-            p.kill()
-            #rc = 124
-            # Drain remaining output
-            if p.stdout:
-                out_chunks.extend(p.stdout.readlines())
-            return 124, "".join(out_chunks)
-        # tiny sleep to avoid busy spin
-        time.sleep(0.01)
-
-    return (rc if rc is not None else 1), "".join(out_chunks)
+def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: list[str]) -> Result[CommandResult, PipelineError]:
+    inc = list(chain.from_iterable(("-i", d) for d in include_dirs))
+    cmd = [cfg.agda_bin] + split_flags(cfg.agda_flags) + inc + [str(path)]
+    return run_command(cmd, timeout=cfg.timeout, merge_stderr=True)
 
 def try_candidate(cfg: RunConfig, candidate: str) -> TryResult:
     body = render_body_for_candidate(candidate)
-    src = render_module(cfg.goal, cfg.imports, body)
-    tmpdir = pathlib.Path.cwd() if cfg.keep_scratch else pathlib.Path.cwd()  # placeholder
-    # Always create a fresh temp dir unless keeping scratch
-    if cfg.keep_scratch:
-        tmpdir = pathlib.Path(".scratch_try")
-        tmpdir.mkdir(exist_ok=True)
-    else:
-        tmpdir = pathlib.Path(pathlib.Path.cwd() / f".tmp_{int(time.time()*1000)}")
-        tmpdir.mkdir(parents=True, exist_ok=True)
+    src  = render_module(cfg.goal, cfg.imports, body)
+    with temp_dir(cfg.keep_scratch) as d:
+        path = d / "TrySandbox.agda"
+        write_text_atomic(path, src)
+        res = run_agda(cfg, path, [cfg.agda_dir, str(d)])
+        if isinstance(res, Ok):
+            rc, out = res.value.rc, res.value.stdout
+            return TryResult(candidate=candidate, tactic=None, ok=(rc == 0), rc=rc, agda_output=out)
+        else:
+            err = res.error
+            out = (err.stdout or "") + (("\n" + err.stderr) if err.stderr else "")
+            return TryResult(candidate=candidate, tactic=None, ok=False, rc=err.rc, agda_output=out)
 
-    path = tmpdir / "TrySandbox.agda"
-    path.write_text(src, encoding="utf-8")
-    rc, out = run_agda(cfg, path, [cfg.agda_dir, str(tmpdir)], cfg.timeout)
-    ok = (rc == 0)
-    if not cfg.keep_scratch:
-        try:
-            for f in tmpdir.glob("*"):
-                f.unlink()
-            tmpdir.rmdir()
-        except Exception:
-            pass  # best effort cleanup without polluting
-    return TryResult(candidate=candidate, ok=ok, rc=rc, agda_output=out)
+def try_tactic(cfg: RunConfig, tactic: str) -> TryResult:
+    body = render_body_for_tactic(tactic)
+    src  = render_module(cfg.goal, cfg.imports, body)
+    with temp_dir(cfg.keep_scratch) as d:
+        path = d / "TrySandbox.agda"
+        write_text_atomic(path, src)
+        res = run_agda(cfg, path, [cfg.agda_dir, str(d)])
+        if isinstance(res, Ok):
+            rc, out = res.value.rc, res.value.stdout
+            return TryResult(candidate=None, tactic=tactic, ok=(rc == 0), rc=rc, agda_output=out)
+        else:
+            err = res.error
+            out = (err.stdout or "") + (("\n" + err.stderr) if err.stderr else "")
+            return TryResult(candidate=None, tactic=tactic, ok=False, rc=err.rc, agda_output=out)
 
 def parse_subgoals(out: str) -> List[str]:
     # Heuristic: collect lines like "?n : TYPE" after Agda prints unsolved metas
@@ -419,6 +373,7 @@ def main() -> None:
     ap.add_argument("--imports", action="append", default=[], help="Repeatable; e.g., 'open import Agda.Builtin.Nat'")
     ap.add_argument("--agda-dir", default="agda", help="Path to repo Agda sources (default: ./agda)")
     ap.add_argument("--agda-bin", default="agda", help="Path to Agda binary")
+    ap.add_argument("--agda-flags", default="", help="Extra flags to pass to Agda (e.g., \'-l agda-jang\')")
     ap.add_argument("--format", choices=["text", "json", "csv"], default="text")
     ap.add_argument("--show-errors", action="store_true", help="Include Agda diagnostics for failures")
     ap.add_argument("--timeout", type=float, default=None, help="Per-run timeout (seconds)")
@@ -427,11 +382,31 @@ def main() -> None:
 
     imports = unique(normalize_lines(args.imports))
     cfg = RunConfig(goal=args.goal, imports=imports, agda_dir=args.agda_dir, agda_bin=args.agda_bin,
-                    timeout=args.timeout, keep_scratch=args.keep_scratch)
+                    timeout=args.timeout, keep_scratch=args.keep_scratch, agda_flags=args.agda_flags)
 
     if args.tactic:
         t = args.tactic.strip()
         res = run_tactic(cfg, t)
+
+        # First: if markers are present, treat as success and emit structured JSON if requested
+        if has_markers(res.agda_output):
+            source = "applySolveReport" if ":?arg:" in res.agda_output else "applyReport"
+            rep = parse_marked_report(res.agda_output, source)
+            if args.format == "json":
+                print(json.dumps({"ok": True, **rep}, ensure_ascii=False, indent=2))
+            elif args.format == "csv":
+                w = csv.writer(sys.stdout)
+                w.writerow(["index", "visibility", "type"])
+                for g in rep["goals"]:
+                    w.writerow([g["index"], g["visibility"], g["type"]])
+            else:
+                print(f"[OK] tactic {t}")
+                print("Subgoals:")
+                for g in rep["goals"]:
+                    print(f"  - AGDAJANG_GOAL:{g['index']}:{g['visibility']}: {g['type']}")
+            sys.exit(0)
+
+        # Otherwise fall back to your existing rendering:
         if args.format == "json":
             print(json.dumps({
                 "tactic": res.tactic,
