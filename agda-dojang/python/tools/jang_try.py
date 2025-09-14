@@ -243,35 +243,6 @@ def unique(seq: Iterable[str]) -> List[str]:
             out.append(s)
     return out
 
-def render_body_for_candidate(candidate: str) -> str:
-    # Succeeds iff candidate solves the goal → exit code 0
-    return f"refine⟨ {candidate} ⟩"
-
-def render_body_for_tactic(tactic: str) -> str:
-    # Supported Tactics:
-    #   applyWith⟨ {lemma} , [{args_list}] ⟩
-    #   applyReport:<lemma>
-    #   apply:<lemma>
-    # N.B. the lemma should be in scope via imports.
-    if tactic.startswith("applyWith:"):
-        spec = tactic[len("applyWith:"):].strip()
-        lemma, args = parse_apply_with(spec)
-        if len(args) == 1:
-            return f"applyWith1⟨ {lemma} , {args[0]} ⟩"
-        wrapped = [f"term⟨ {a} ⟩" for a in args]
-        args_list = ", ".join(wrapped)
-        return f"applyWith⟨ {lemma} , [{args_list}] ⟩"
-    if tactic.startswith("applyReport:"):
-        lemma = tactic[len("applyReport:"):].strip()
-        return f"applyReport⟨ {lemma} ⟩"
-    if tactic.startswith("apply:"):
-        lemma = tactic[len("apply:"):].strip()
-        return f"apply⟨ {lemma} ⟩"
-    return 'typeError (strErr "AGDAJANG_BAD_TACTIC" ∷ [])'  # force failure
-
-def render_module(goal: str, imports: List[str], body: str) -> str:
-    extra_imports = "\n".join(imports)
-    return MODULE_TEMPLATE.format(extra_imports=extra_imports, goal=goal, body=body)
 
 def split_flags(s: str) -> list[str]:
     return shlex.split(s) if s else []
@@ -297,6 +268,7 @@ def try_candidate(cfg: RunConfig, candidate: str) -> TryResult:
             return TryResult(candidate=candidate, tactic=None, ok=False, rc=err.rc, agda_output=out)
 
 def try_tactic(cfg: RunConfig, tactic: str) -> TryResult:
+    # Render the proof body from a tactic string (macro call)
     body = render_body_for_tactic(tactic)
     src  = render_module(cfg.goal, cfg.imports, body)
     with temp_dir(cfg.keep_scratch) as d:

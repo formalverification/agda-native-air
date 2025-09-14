@@ -43,6 +43,17 @@ def temp_dir(keep: bool, prefix: str = "agda-jang_") -> Iterator[Path]:
         except Exception:
             pass
 
+def _mk_tmpdir(keep: bool, tag: str) -> pathlib.Path:
+    return pathlib.Path(".scratch_try") if keep else (pathlib.Path.cwd() / f".tmp_{tag}")
+
+def _cleanup_tmpdir(p: pathlib.Path, keep: bool) -> None:
+    if keep:
+        return
+    try:
+        shutil.rmtree(p)
+    except Exception:
+        pass
+
 def write_text_atomic(path: Path, content: str, encoding: str = "utf-8") -> None:
     """
     Atomic write (POSIX): write to a temp sibling then os.replace().
