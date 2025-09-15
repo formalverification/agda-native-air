@@ -206,8 +206,6 @@ from tools.report_parser import has_markers, parse_marked_report
 from utils.result import Ok, Err, Result
 from utils.types import RunConfig, TryResult, CommandResult, PipelineError
 
-
-
 def normalize_lines(chunks: Optional[Sequence[str]]) -> List[str]:
     lines: List[str] = []
     if not chunks:
@@ -230,17 +228,13 @@ def unique(seq: Iterable[str]) -> List[str]:
     return out
 
 
-# def split_flags(s: str) -> list[str]:
-#     return shlex.split(s) if s else []
-
-# def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: list[str]) -> Result[CommandResult, PipelineError]:
-#     inc = list(chain.from_iterable(("-i", d) for d in include_dirs))
-#     cmd = [cfg.agda_bin] + split_flags(cfg.agda_flags) + inc + [str(path)]
-#     return run_command(cmd, timeout=cfg.timeout, merge_stderr=True)
-
-
 def split_flags(s: str) -> list[str]:
-    return [tok for tok in (s or "").split() if tok]
+    import shlex
+    toks = shlex.split(s) if s else []
+    # drop a dangling "-l" to avoid Agda parse error
+    if toks and toks[-1] == "-l":
+        toks = toks[:-1]
+    return toks
 
 def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: Sequence[str]):
     """

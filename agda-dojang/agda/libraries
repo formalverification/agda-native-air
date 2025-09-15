@@ -1,3 +1,2 @@
--- ./agda-jang/agda/libraries
-~/git/AI/PROJECTS/agda-ai-prover/agda-jang/agda-jang.agda-lib
-~/git/LANG/AGDA/agda-stdlib-2.2/standard-library.agda-lib
+/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/agda-jang/agda-jang.agda-lib
+/nix/store/ap6qpqz2zpzf6c9pggcgfx209ladmd86-standard-library-2.3/standard-library.agda-lib
