@@ -4,28 +4,12 @@ description: functional command execution utilities for the build pipeline.
 copyright: 2025 Thmpr
 """
 from __future__ import annotations
-from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict
 import subprocess, os
 
 from .result import Ok, Err, Result
-
-@dataclass(frozen=True)
-class CommandResult:
-    cmd: List[str]
-    rc: int
-    stdout: str
-    stderr: str
-
-@dataclass(frozen=True)
-class PipelineError:
-    kind: str                 # "Timeout" | "OSError" | "NonZeroExit"
-    cmd: List[str]
-    rc: int                   # -1 for non-spawn errors
-    stdout: str
-    stderr: str
-    message: str
+from .types import CommandResult, PipelineError
 
 def run_command(
     command: List[str],
@@ -51,22 +35,19 @@ def run_command(
             return Ok(CommandResult(command, 0, stdout, stderr))
         else:
             return Err(PipelineError(
-                kind="NonZeroExit",
-                cmd=command, rc=p.returncode,
+                kind="NonZeroExit", cmd=command, rc=p.returncode,
                 stdout=stdout, stderr=stderr,
                 message=f"command exited with {p.returncode}",
             ))
     except subprocess.TimeoutExpired as e:
         return Err(PipelineError(
-            kind="Timeout",
-            cmd=command, rc=124,
+            kind="Timeout", cmd=command, rc=124,
             stdout=(e.stdout or ""), stderr=(e.stderr or ""),
             message="command timed out",
         ))
     except OSError as e:
         return Err(PipelineError(
-            kind="OSError",
-            cmd=command, rc=-1,
+            kind="OSError", cmd=command, rc=-1,
             stdout="", stderr="",
             message=str(e),
         ))

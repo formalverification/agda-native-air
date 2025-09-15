@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 
-# Configuration for a run
+# --- High-level config passed around the runner ---
 @dataclass(frozen=True)
 class RunConfig:
     goal: str
@@ -18,6 +18,14 @@ class RunConfig:
     keep_scratch: bool
     agda_flags: str
 
+# --- Normalized subprocess results & errors ---
+@dataclass(frozen=True)
+class CommandResult:
+    cmd: List[str]
+    rc: int
+    stdout: str
+    stderr: str
+
 @dataclass(frozen=True)
 class PipelineError:
     kind: str           # "Timeout" | "OSError" | "NonZeroExit"
@@ -27,15 +35,7 @@ class PipelineError:
     stderr: str
     message: str
 
-# Subprocess results (normalized)
-@dataclass(frozen=True)
-class CommandResult:
-    cmd: List[str]
-    rc: int
-    stdout: str
-    stderr: str
-
-# High-level attempt result (uniform for candidate/tactic)
+# --- Result output for a single attempt (uniform for candidate/tactic) ---
 @dataclass(frozen=True)
 class TryResult:
     candidate: Optional[str]   # None for tactic runs
@@ -44,15 +44,7 @@ class TryResult:
     rc: int
     agda_output: str           # merged stdout+stderr
 
-@dataclass(frozen=True)
-class TacticResult:
-    tactic: str
-    ok: bool
-    rc: int
-    subgoals: List[str]
-    agda_output: str
-
-# Structured subgoal report (JSON-friendly)
+# --- Structured subgoal report (JSON-friendly) ---
 @dataclass(frozen=True)
 class Subgoal:
     index: int

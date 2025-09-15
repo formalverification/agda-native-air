@@ -194,33 +194,19 @@ NOTES
 
 + All functions have explicit types; data flows through small immutable dataclasses.
 """
+import argparse, json, csv, sys, pathlib, re, time
+from typing import Optional, Sequence, List, Dict, Iterable
 import shlex
 from itertools import chain
 
-from utils.types import RunConfig, TryResult, CommandResult, PipelineError
-from utils.result import Ok, Err, Result
-from utils.file_ops import temp_dir, write_text_atomic
-from utils.rendering import (
-    render_module, render_body_for_candidate, render_body_for_tactic
-)
-from tools.report_parser import has_markers, parse_marked_report
 from utils.command_runner import run_command
+from utils.file_ops import temp_dir, write_text_atomic
+from utils.rendering import (render_module, render_body_for_candidate, render_body_for_tactic)
+from tools.report_parser import has_markers, parse_marked_report
+from utils.result import Ok, Err, Result
+from utils.types import RunConfig, TryResult, CommandResult, PipelineError
 
 
-MODULE_TEMPLATE = """\
-module TrySandbox where
-
-open import AgdaJang.Prelude
-open import AgdaJang.Refine
-open import AgdaJang.Apply
-{extra_imports}
-
-GoalTy : Set
-GoalTy = {goal}
-
-test : GoalTy
-test = {body}
-"""
 
 def normalize_lines(chunks: Optional[Sequence[str]]) -> List[str]:
     lines: List[str] = []
@@ -244,13 +230,32 @@ def unique(seq: Iterable[str]) -> List[str]:
     return out
 
 
-def split_flags(s: str) -> list[str]:
-    return shlex.split(s) if s else []
+# def split_flags(s: str) -> list[str]:
+#     return shlex.split(s) if s else []
 
-def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: list[str]) -> Result[CommandResult, PipelineError]:
+# def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: list[str]) -> Result[CommandResult, PipelineError]:
+#     inc = list(chain.from_iterable(("-i", d) for d in include_dirs))
+#     cmd = [cfg.agda_bin] + split_flags(cfg.agda_flags) + inc + [str(path)]
+#     return run_command(cmd, timeout=cfg.timeout, merge_stderr=True)
+
+
+def split_flags(s: str) -> list[str]:
+    return [tok for tok in (s or "").split() if tok]
+
+def run_agda(cfg: RunConfig, path: pathlib.Path, include_dirs: Sequence[str]):
+    """
+    Build a single-Agda-invocation:
+      agda <flags> -i <dir> ... <path.agda>
+    Returns Ok(CommandSuccess) | Err(CommandError)
+    """
     inc = list(chain.from_iterable(("-i", d) for d in include_dirs))
-    cmd = [cfg.agda_bin] + split_flags(cfg.agda_flags) + inc + [str(path)]
-    return run_command(cmd, timeout=cfg.timeout, merge_stderr=True)
+    cmd = [cfg.agda_bin, *split_flags(cfg.agda_flags), *inc, str(path)]
+
+    # DEBUG: uncomment to see the exact command string
+    # print("AGDA CMD:", shlex.join(cmd), file=sys.stderr)
+
+    return run_command(cmd, timeout=cfg.timeout)
+
 
 def try_candidate(cfg: RunConfig, candidate: str) -> TryResult:
     body = render_body_for_candidate(candidate)
@@ -283,57 +288,6 @@ def try_tactic(cfg: RunConfig, tactic: str) -> TryResult:
             out = (err.stdout or "") + (("\n" + err.stderr) if err.stderr else "")
             return TryResult(candidate=None, tactic=tactic, ok=False, rc=err.rc, agda_output=out)
 
-def parse_subgoals(out: str) -> List[str]:
-    # Heuristic: collect lines like "?n : TYPE" after Agda prints unsolved metas
-    goals: List[str] = []
-    for line in out.splitlines():
-        line = line.strip()
-        if line.startswith("?") and " : " in line:
-            goals.append(line)
-    return goals
-
-# a tiny parser to extract lines for `render_body_for_tactic`
-def parse_structured_goals(out: str) -> List[str]:
-    lines = []
-    in_block = False
-    for line in out.splitlines():
-        if "AGDAJANG_SUBGOALS_BEGIN" in line:
-            in_block = True
-            continue
-        if "AGDAJANG_SUBGOALS_END" in line:
-            break
-        if in_block and line.startswith("AGDAJANG_GOAL:"):
-            lines.append(line.strip())
-    return lines
-
-def run_tactic(cfg: RunConfig, tactic: str) -> TacticResult:
-    body = render_body_for_tactic(tactic)
-    src  = render_module(cfg.goal, cfg.imports, body)
-
-    with scratch_module("tactic", cfg.keep_scratch) as sc:
-        sc.path.write_text(src, encoding="utf-8")
-        rc, out = run_agda(cfg, sc.path, [cfg.agda_dir, str(sc.root)], cfg.timeout)
-
-    subs = parse_structured_goals(out) or parse_subgoals(out)
-    ok   = (rc == 0) or bool(subs) or ("[UnsolvedMetaVariables]" in out) or ("Unsolved metas" in out)
-    return TacticResult(tactic=tactic, ok=ok, rc=rc, subgoals=subs, agda_output=out)
-
-def parse_apply_with(spec: str) -> Tuple[str, List[str]]:
-    # spec like: "_+_:[zero; suc zero]" or "suc:[]"
-    if ":" not in spec:
-        return spec.strip(), []
-    lemma, rest = spec.split(":", 1)
-    lemma = lemma.strip()
-    args: List[str] = []
-    m = re.match(r"\s*\[(.*)\]\s*$", rest)
-    if m:
-        inner = m.group(1)
-        for piece in inner.replace("\r", "\n").split("\n"):
-            for sub in re.split(r"[;,]", piece):
-                s = sub.strip()
-                if s:
-                    args.append(s)
-    return lemma, args
 
 
 def main() -> None:
@@ -358,9 +312,9 @@ def main() -> None:
 
     if args.tactic:
         t = args.tactic.strip()
-        res = run_tactic(cfg, t)
+        res = try_tactic(cfg, t)
 
-        # First: if markers are present, treat as success and emit structured JSON if requested
+        # Marker-aware success (applyReport / applySolveReport)
         if has_markers(res.agda_output):
             source = "applySolveReport" if ":?arg:" in res.agda_output else "applyReport"
             rep = parse_marked_report(res.agda_output, source)
@@ -378,27 +332,20 @@ def main() -> None:
                     print(f"  - AGDAJANG_GOAL:{g['index']}:{g['visibility']}: {g['type']}")
             sys.exit(0)
 
-        # Otherwise fall back to your existing rendering:
+        # Fallback: ordinary success/failure report
         if args.format == "json":
             print(json.dumps({
-                "tactic": res.tactic,
+                "tactic": t,
                 "ok": res.ok,
                 "rc": res.rc,
-                "subgoals": res.subgoals,
-            }, indent=2))
+                "agda_output": res.agda_output,
+            }, ensure_ascii=False))
         elif args.format == "csv":
             w = csv.writer(sys.stdout)
-            w.writerow(["tactic", "ok", "rc", "num_subgoals"])
-            w.writerow([res.tactic, "OK" if res.ok else "FAIL", res.rc, len(res.subgoals)])
+            w.writerow(["tactic", "ok", "rc"])
+            w.writerow([t, "OK" if res.ok else "FAIL", res.rc])
         else:
-            status = "OK" if res.ok else "FAIL"
-            print(f"[{status}] tactic {res.tactic}")
-            if res.subgoals:
-                print("Subgoals:")
-                for g in res.subgoals:
-                    print(f"  - {g}")
-            elif ("[UnsolvedMetaVariables]" in res.agda_output) or ("Unsolved metas" in res.agda_output):
-                print("Subgoals: (present, count unknown)")
+            print(f"[{'OK' if res.ok else 'FAIL'}] tactic {t}")
             if args.show_errors and not res.ok:
                 print("---- Agda ----")
                 print(res.agda_output.rstrip())

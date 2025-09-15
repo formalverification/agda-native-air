@@ -1,7 +1,7 @@
 ##
 # AgdaJang Makefile
 #
-# @file ./agda-jang/Makefile
+# @file ./agda-ai-prover/agda-jang/Makefile
 # @version 0.2
 # @copyright 2025 Thmpr
 # WHY this exists:
@@ -10,6 +10,15 @@
 #     (3) Try tiny solving passes / search    →  (4) Log + Benchmark
 #   These targets give you muscle-memory switches to run the loop end-to-end
 #   on a toy example before we scale up to full libraries + models.
+#
+#   tl;dr
+#     Build a tiny, repeatable loop:
+#     (1) Extract → (2) Transform → (3) Solve/Report → (4) Benchmark/Log
+#     These targets give fast feedback on the whole pipeline.
+#
+# Notes:
+#   - We route Agda interface files into _build/agda so sources stay clean.
+#   - Cleaning is split into small, safe targets and a "wipe" for full reset.
 #
 # LAYOUT assumptions:
 #   - This file lives in: agda-ai-prover/agda-jang/Makefile
@@ -25,14 +34,17 @@
 # ------------------------------------------------------------------------------
 
 # --- Tools / flags (overridable via environment) ---
-AGDA        ?= agda
-AGDA_FLAGS  ?= -l agda-jang        # Provided by flake shell; resolves stdlib + this project
+AGDA ?= agda
+# Centralize interfaces + stdlib name; also centralize interface output:
+AGDA_IFACE_DIR ?= _build/agda
+AGDA_STD       ?= standard-library   # try 'standard-library-2.0' if env requires it
+PYTHON         ?= python3
+SBT            ?= sbt
 
-PYTHON      ?= python3
-SBT         ?= sbt
-
-# --- Project paths (relative to this Makefile in agda-jang/) ---
+# --- Project paths (relative to this Makefile) ---
 AGDA_DIR        := agda
+# Default flags for commands that compile our own sources:
+AGDA_FLAGS      := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-jang
 PYTHON_DIR      := python
 PYTHONPATH      := $(PYTHON_DIR)
 PYTHON_TOOLS    := $(PYTHON_DIR)/tools
@@ -40,8 +52,7 @@ PYTHON_TOOLS    := $(PYTHON_DIR)/tools
 # Primary runner used by demos / solve
 JANG_TRY        ?= $(PYTHON_TOOLS)/jang_try.py
 
-# If your extractor/search scripts still live at the repo root,
-# set these to "../jang_extract.py", "../search.py", etc.
+# Extract / search scripts
 EXTRACT_SCRIPT  ?= $(PYTHON_TOOLS)/jang_extract.py
 SEARCH_SCRIPT   ?= $(PYTHON_TOOLS)/search.py
 
@@ -55,17 +66,28 @@ DATA_DIR    := $(REPO_ROOT)/data
 EXAMPLE_AGDA:= $(DATA_DIR)/agda-example.agda
 RAW_JSON    := $(DATA_DIR)/agda-example.json
 TRAIN_JSONL := $(DATA_DIR)/train.jsonl
+SOLVE_JSONL := $(DATA_DIR)/solve_report.jsonl
 
 # Scala transformer runs from the proof-parser project directory
 TRANSFORM_DIR := $(REPO_ROOT)/proof-parser
 
-# ------------------------------------------------------------------------------
+# --- Housekeeping globs (only within this subproject) ---
+SCRATCH_GLOBS   := .tmp_* .scratch_*
+PYCACHE_GLOBS   := __pycache__ */__pycache__ $(PYTHON_DIR)/**/__pycache__
+AGDAI_FIND_PATH := $(AGDA_DIR)
 
-.PHONY: check clean demo demo1 demo2 extract help solve test transform
+# Nice clean tree: hide transient/build stuff
+TREE_IGNORE := '_build|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache'
+
+.PHONY: help check demo demo1 demo2 extract transform solve test \
+        clean clean-scratch clean-pycache clean-agda clean-build clean-data \
+        wipe tree
+
+# ------------------------------------------------------------------------------
 
 test:
 	@echo ">> Running Python unit tests (rendering)"
-	PYTHONPATH=python pytest -q
+	PYTHONPATH=$(PYTHONPATH) pytest -q
 
 help:
 	@echo ""
@@ -77,12 +99,15 @@ help:
 	@echo "End-to-end loop (toy example):"
 	@echo "  make extract      - Agda → JSON (AGDA2TRAIN-style) at $(RAW_JSON)"
 	@echo "  make transform    - JSON → JSONL (ML-ready) at $(TRAIN_JSONL)"
-	@echo "  make solve        - Tiny benchmark run (uses search/runner)"
+	@echo "  make solve        - Tiny benchmark run → $(SOLVE_JSONL) (uses search/runner)"
 	@echo ""
 	@echo "Utilities:"
-	@echo "  make clean        - Remove temp scratch dirs and __pycache__"
+	@echo "  make clean        - Remove scratch, __pycache__, stray .agdai"
+	@echo "  make wipe         - HARD reset: also _build + generated data"
+	@echo "  make tree         - Pretty tree view (ignores build/cache/junk)"
 	@echo ""
-	@echo "Tips: run inside 'nix develop' at repo root; override vars like AGDA_FLAGS if needed."
+	@echo "Tips: run inside 'nix develop'; override AGDA_FLAGS if needed."
+	@echo "      Current AGDA_FLAGS: '$(AGDA_FLAGS)'"
 
 # ------------------------------------------------------------------------------
 
@@ -94,10 +119,10 @@ check:
 demo: demo1 demo2
 
 demo1:
-	$(PYTHON) $(JANG_TRY) $(DEMO1) --agda-flags "$(AGDA_FLAGS)"
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(JANG_TRY) $(DEMO1) --agda-flags "$(AGDA_FLAGS)"
 
 demo2:
-	$(PYTHON) $(JANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(JANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
 
 # ------------------------------------------------------------------------------
 
@@ -116,7 +141,7 @@ extract: | $(DATA_DIR)
 	  echo "ERROR: EXTRACT_SCRIPT '$(EXTRACT_SCRIPT)' not found. Update the path (e.g., to $(PYTHON_TOOLS)/jang_extract.py)."; \
 	  exit 1; \
 	fi
-	$(PYTHON) $(EXTRACT_SCRIPT) \
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(EXTRACT_SCRIPT) \
 	  --input  "$(EXAMPLE_AGDA)" \
 	  --output "$(RAW_JSON)"
 	@echo "✅ Wrote $(RAW_JSON)"
@@ -149,15 +174,67 @@ solve:
 	  echo "ERROR: $(EXAMPLE_AGDA) not found. Put a sample there or update EXAMPLE_AGDA."; \
 	  exit 1; \
 	fi
-	$(PYTHON) $(SEARCH_SCRIPT) \
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(SEARCH_SCRIPT) \
 	  --suite  "$(EXAMPLE_AGDA)" \
-	  --report "$(DATA_DIR)/solve_report.jsonl" \
+	  --report "$(SOLVE_JSONL)" \
 	  --agda-flags "$(AGDA_FLAGS)"
-	@echo "✅ Solve report at $(DATA_DIR)/solve_report.jsonl"
+	@echo "✅ Solve report at $(SOLVE_JSONL)"
+
+# 6) Pretty-print a *clean* directory tree for this subproject.
+#    Uses the 'tree' utility if available; otherwise falls back to a portable renderer.
+tree:
+	@echo ">> Clean directory tree (excluding: $(TREE_IGNORE))"
+	@if command -v tree >/dev/null 2>&1; then \
+	  tree -a -I "$(TREE_IGNORE)" -F; \
+	else \
+	  echo "(hint: install 'tree' for nicer output)"; \
+	  find . \
+	    -path "./_build" -prune -o \
+	    -path "./agda/share" -prune -o \
+	    -path "*/__pycache__" -prune -o \
+	    -name ".tmp_*" -prune -o \
+	    -name ".scratch_*" -prune -o \
+	    -name "*.agdai" -prune -o \
+	    -name ".git" -prune -o \
+	    -name ".direnv" -prune -o \
+	    -name ".venv" -prune -o \
+	    -name ".mypy_cache" -prune -o \
+	    -name ".pytest_cache" -prune -o \
+	    -print \
+	    | sed -e 's|^\./||' \
+	    | awk -F/ '{ \
+	        indent=\"\"; \
+	        for (i=1;i<NF;i++) indent=indent\"  \"; \
+	        print indent \"└─ \" $$NF \
+	      }'; \
+	fi
 
 # ------------------------------------------------------------------------------
 
-# Clean up scratch dirs (jang_try.py creates .tmp_* or .scratch_*), plus py caches
-clean:
-	rm -rf .tmp_* .scratch_* __pycache__ */__pycache__
-# end
+# Cleaning (small brooms)
+clean: clean-scratch clean-pycache clean-agda
+	@echo "✅ Cleaned scratch, pycache, and stray .agdai"
+
+clean-scratch:
+	rm -rf $(SCRATCH_GLOBS)
+
+clean-pycache:
+	# Local pycaches only (don’t touch outside this subproject)
+	find . -type d -name '__pycache__' -prune -exec rm -rf {} +
+
+clean-agda:
+	# If you centralized interfaces, this is a no-op except _build
+	@if [ -d "$(AGDA_IFACE_DIR)" ]; then rm -rf "$(AGDA_IFACE_DIR)"; fi
+	# Also delete any stray .agdai beside sources (defensive)
+	@if [ -d "$(AGDAI_FIND_PATH)" ]; then find "$(AGDAI_FIND_PATH)" -name '*.agdai' -delete; fi
+
+# Big broom: also remove build dir + generated data
+wipe: clean
+	# Remove build dir(s) and local share cache if present
+	rm -rf _build
+	@if [ -d "agda/share" ]; then rm -rf agda/share; fi
+	# Generated data artifacts (safe to regenerate)
+	@if [ -f "$(RAW_JSON)"     ]; then rm -f "$(RAW_JSON)";     fi
+	@if [ -f "$(TRAIN_JSONL)"  ]; then rm -f "$(TRAIN_JSONL)";  fi
+	@if [ -f "$(SOLVE_JSONL)"  ]; then rm -f "$(SOLVE_JSONL)";  fi
+	@echo "🧹 wipe complete"

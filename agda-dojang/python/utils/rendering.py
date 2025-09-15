@@ -43,33 +43,6 @@ def render_body_for_tactic(tactic: str) -> str:
     # Wrap into macro-call syntax if needed.
     return normalize_tactic_syntax(tactic)
 
-def render_body_for_tactic(tactic: str) -> str:
-    # Supported Tactics:
-    #   applyWith⟨ {lemma} , [{args_list}] ⟩
-    #   applyReport:<lemma>
-    #   apply:<lemma>
-    # N.B. the lemma should be in scope via imports.
-    if tactic.startswith("applyWith:"):
-        spec = tactic[len("applyWith:"):].strip()
-        lemma, args = parse_apply_with(spec)
-        if len(args) == 1:
-            return f"applyWith1⟨ {lemma} , {args[0]} ⟩"
-        wrapped = [f"term⟨ {a} ⟩" for a in args]
-        args_list = ", ".join(wrapped)
-        return f"applyWith⟨ {lemma} , [{args_list}] ⟩"
-    if tactic.startswith("applyReport:"):
-        lemma = tactic[len("applyReport:"):].strip()
-        return f"applyReport⟨ {lemma} ⟩"
-    if tactic.startswith("apply:"):
-        lemma = tactic[len("apply:"):].strip()
-        return f"apply⟨ {lemma} ⟩"
-    return 'typeError (strErr "AGDAJANG_BAD_TACTIC" ∷ [])'  # force failure
-
-def render_module(goal: str, imports: List[str], body: str) -> str:
-    extra_imports = "\n".join(imports)
-    return MODULE_TEMPLATE.format(extra_imports=extra_imports, goal=goal, body=body)
-
-
 # ---------- Whole scratch module ----------
 
 def render_module(goal: str, user_imports: List[str], body_term: str) -> str:
