@@ -195,14 +195,14 @@ NOTES
 + All functions have explicit types; data flows through small immutable dataclasses.
 """
 import argparse, json, csv, sys, pathlib, re, time
-from typing import Optional, Sequence, List, Dict, Iterable
 import shlex
 from itertools import chain
+from typing import Optional, Sequence, List, Dict, Iterable
 
+from tools.report_parser import has_markers, parse_marked_report
 from utils.command_runner import run_command
 from utils.file_ops import temp_dir, write_text_atomic
-from utils.rendering import (render_module, render_body_for_candidate, render_body_for_tactic)
-from tools.report_parser import has_markers, parse_marked_report
+from utils.rendering import render_module, render_body_for_candidate, render_body_for_tactic
 from utils.result import Ok, Err, Result
 from utils.types import RunConfig, TryResult, CommandResult, PipelineError
 
@@ -229,7 +229,6 @@ def unique(seq: Iterable[str]) -> List[str]:
 
 
 def split_flags(s: str) -> list[str]:
-    import shlex
     toks = shlex.split(s) if s else []
     # drop a dangling "-l" to avoid Agda parse error
     if toks and toks[-1] == "-l":

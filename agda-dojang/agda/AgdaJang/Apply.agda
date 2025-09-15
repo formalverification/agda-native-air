@@ -290,11 +290,10 @@ macro
             ∷ strErr ":?arg: "        ∷ termErr A
             ∷ strErr "\n"             ∷ tail )
 
-
--- Notes: `applySolveReport` uses the *elaborated* application `app′` from
--- `checkType` so metas are real; we infer each arg's type to print post-unification
--- obligations. The visibility tag is `?arg` here (we can improve by threading
--- `ArgInfo` alongside).
+-- Notes:
+-- `applySolveReport` uses the *elaborated* application `app′` from `checkType` so
+-- metas are real; we infer each arg's type to print post-unification obligations.
+-- The visibility tag is `?arg` here (we can improve by threading `ArgInfo` alongside).
 ------------------------------------------------------------------------
 
 
@@ -317,6 +316,91 @@ macro
         in checkType lamT ty >>= λ lam′ → unify hole lam′
       _ → typeError (strErr "AGDAJANG_INTRO: goal is not a function/Π-type" ∷ [])
 
--- Notes: `intro` is nullary for ergonomics: write simply `intro` in a goal to
--- lambda-intro.
+-- Notes:
+-- `intro` is nullary for ergonomics: write simply `intro` in a goal to lambda-intro.
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+-- Multi-intros: intro₂ and intros⟨ n ⟩ via a TC-worker (no nested macro calls)
+--  * `intro₂` introduces exactly two λs (or errors if there aren’t two Πs).
+--  * `intros⟨ n ⟩` builds n nested λs, preserving binder visibility/names.
+--     If there are fewer than n Π-binders, we error with a clear message.
+------------------------------------------------------------------------
+-- Build n nested lambdas from a Π-type spine; innermost body is `unknown`.
+mkNLams : Nat → Term → TC Term
+mkNLams zero    ty = unit unknown
+mkNLams (suc n) ty =
+  whnf ty >>= λ t →
+  case t of λ where
+    (pi (arg (arg-info v m) A) (abs s B)) →
+      mkNLams n B >>= λ bod →
+      let nm = if s == "" then "x" else s in
+      unit (lam v (abs nm bod))
+    _ → typeError (strErr "AGDAJANG_INTROS: not enough Π-binders in goal type" ∷ [])
+
+-- Plain TC worker to avoid nested macro expansion (which can cause de Bruijn issues).
+introsWorker : Nat → Term → TC ⊤
+introsWorker n hole =
+  inferType hole >>= λ ty →
+  mkNLams n ty  >>= λ lamT →
+  checkType lamT ty >>= λ lam′ →
+  unify hole lam′
+
+macro
+  intros⟨_⟩ : Nat → Term → TC ⊤
+  intros⟨ n ⟩ hole = introsWorker n hole
+
+macro
+  intro₂ : Term → TC ⊤
+  intro₂ hole = introsWorker 2 hole
+
+-- Notes:
+-- `intros⟨ n ⟩` builds nested lambdas in one shot, so it doesn’t depend on
+-- follow-up interactive invocations.
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+-- Minimal "rewrite" for definitional equality
+--  rewriteDef⟨ t ⟩ : if t checks against the WHNF of the goal type,
+--  we, in effect, "convert" by def-equality and solve with t.
+--  (This is *not* propositional `rewrite` by a proof; it's a safe local
+--   convert that leans on the typechecker + normalization.)
+------------------------------------------------------------------------
+macro
+  rewriteDef⟨_⟩ : Term → Term → TC ⊤
+  rewriteDef⟨ t ⟩ hole =
+    inferType hole >>= λ goal →
+    whnf goal      >>= λ goal′ →
+    checkType t goal′ >>= λ t′ →
+    unify hole t′     >>= λ _  →
+    unit tt
+
+-- Notes:
+-- `rewriteDef⟨_⟩` is a conservative “convert-by-defeq”: it normalizes the goal type
+-- to WHNF and checks the given term against that. No propositional equality
+-- plumbing---just a safe local convert.
+------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------
+-- Small convenience: applyWith2⟨ f , v₁ , v₂ ⟩
+--  Like applyWith, but avoids list syntax on the call site.
+------------------------------------------------------------------------
+macro
+  applyWith2⟨_,_,_⟩ : Term → Term → Term → Term → TC ⊤
+  applyWith2⟨ fTerm , v1 , v2 ⟩ hole =
+    headZero fTerm          >>= λ f0     →
+    inferType f0            >>= λ fty    →
+    collectUnknownArgs fty  >>= λ slots  →
+    let args = fillVisible (v1 ∷ v2 ∷ []) slots in
+    headApp fTerm args      >>= λ app    →
+    inferType hole          >>= λ goal   →
+    checkType app goal      >>= λ _      →
+    unify hole app          >>= λ _      →
+    unit tt
+
+--  Notes:
+--  `applyWith2⟨_,_,_⟩` makes it easy to supply two visible binders without list
+-- literal syntax (which can be finicky in macro arguments).
 ------------------------------------------------------------------------

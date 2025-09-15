@@ -34,23 +34,18 @@
 # ------------------------------------------------------------------------------
 
 # --- Tools / flags (overridable via environment) ---
-AGDA ?= agda
-# Centralize interfaces + stdlib name; also centralize interface output:
-AGDA_IFACE_DIR ?= _build/agda
-AGDA_STD       ?= standard-library   # try 'standard-library-2.0' if env requires it
-PYTHON         ?= python3
-SBT            ?= sbt
-
-# --- Project paths (relative to this Makefile) ---
+AGDA            ?= agda
 AGDA_DIR        := agda
-# Default flags for commands that compile our own sources:
-AGDA_FLAGS      := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-jang
+HAVE_IFACE_DIR  := $(shell agda --help 2>/dev/null | grep -q -- '--interface-dir' && echo yes || echo no)
+AGDA_IFACE_DIR  ?= _build/agda    #  ^^^^^^^  detect support for --interface-dir  ^^^^^^^^
+BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-jang
+AGDA_FLAGS      := $(BASE_AGDA_FLAGS) $(if $(filter $(HAVE_IFACE_DIR),yes),--interface-dir=$(AGDA_IFACE_DIR),)
+PYTHON          ?= python3
+SBT             ?= sbt
 PYTHON_DIR      := python
 PYTHONPATH      := $(PYTHON_DIR)
 PYTHON_TOOLS    := $(PYTHON_DIR)/tools
-
-# Primary runner used by demos / solve
-JANG_TRY        ?= $(PYTHON_TOOLS)/jang_try.py
+JANG_TRY        ?= $(PYTHON_TOOLS)/jang_try.py  # primary runner used by demos / solve
 
 # Extract / search scripts
 EXTRACT_SCRIPT  ?= $(PYTHON_TOOLS)/jang_extract.py
@@ -78,6 +73,9 @@ AGDAI_FIND_PATH := $(AGDA_DIR)
 
 # Nice clean tree: hide transient/build stuff
 TREE_IGNORE := '_build|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache'
+
+ROWS_IN  := $(REPO_ROOT)/data/tasks.jsonl
+ROWS_OUT := $(REPO_ROOT)/data/rows.jsonl
 
 .PHONY: help check demo demo1 demo2 extract transform solve test \
         clean clean-scratch clean-pycache clean-agda clean-build clean-data \
@@ -208,6 +206,22 @@ tree:
 	        print indent \"└─ \" $$NF \
 	      }'; \
 	fi
+
+# 7) Generate baseline rows from a tiny seed tasks.jsonl (if missing)
+rows:
+	@command -v $(PYTHON) >/dev/null || { echo "Python not found"; exit 1; }
+	@if [ ! -f "$(ROWS_IN)" ]; then \
+	  echo 'Creating a tiny seed tasks.jsonl...'; \
+	  mkdir -p $(DATA_DIR); \
+	  printf '{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "candidate":"suc zero"}\n' > $(ROWS_IN); \
+	  printf '{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "tactic":"applyReport:_+_"}\n' >> $(ROWS_IN); \
+	  printf '{"imports":["open import Agda.Builtin.Nat","open import Agda.Builtin.Bool"], "goal":"Nat", "candidate":"true"}\n' >> $(ROWS_IN); \
+	fi
+	$(PYTHON) $(PYTHON_TOOLS)/prompt_baseline.py \
+	  $(ROWS_IN) $(ROWS_OUT) \
+	  --agda-flags "$(AGDA_FLAGS)"
+	@echo "✅ Wrote $(ROWS_OUT)"
+
 
 # ------------------------------------------------------------------------------
 
