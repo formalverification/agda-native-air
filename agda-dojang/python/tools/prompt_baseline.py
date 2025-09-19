@@ -3,8 +3,10 @@
 prompt_baseline.py
 ==================
 
+File: agda-ai-prover/agda-jang/python/tools/prompt_baseline.py
+
 What:
-  Tiny “prompting baseline” that turns a list of tasks (JSONL) into a list of
+  Tiny "prompting baseline" that turns a list of tasks (JSONL) into a list of
   (context, goal, completion) attempts (JSONL), by invoking `jang_try.py` and
   recording Agda’s verdict.
 
@@ -14,12 +16,16 @@ Why:
 
 Input (tasks.jsonl):
   One JSON object per line. Each object MUST contain:
+    - "imports": [str,...]      e.g., ["open import Agda.Builtin.Nat", "open import Agda.Builtin.Bool"]
     - "goal": str               e.g., "Nat"
-    - "imports": [str,...]      e.g., ["open import Agda.Builtin.Nat"]
   And EITHER:
     - "candidate": str          e.g., "suc zero"
     - OR "tactic": str          e.g., "applyReport:_+_"
   If neither is provided, we fallback to a trivial baseline candidate.
+
+  Example line:
+
+  {"imports":["open import Agda.Builtin.Nat","open import Agda.Builtin.Bool"], "goal":"Nat", "candidate":"true"}
 
 Output (rows.jsonl):
   One or more JSON objects per input task (more than one if `jang_try.py`
@@ -31,9 +37,24 @@ Output (rows.jsonl):
     - "agda": object            (verbatim parsed JSON from jang_try or element)
 
 Usage:
+  The following commands will create a tiny seed `tasks.jsonl` file and run this script on it.
+
+  ```bash
+  cd agda-ai-prover
+  nix develop
+  cd agda-jang
+  make rows
+  ```
+
+  Alternatively, use the example `tasks.json` file provided in the repository, or
+  create your own, and run this script manually, from inside `nix develop` shell, in
+  the `agda-jang` directory, as follows:
+
+  ```bash
   PYTHONPATH=python python3 python/tools/prompt_baseline.py \
     data/tasks.jsonl data/rows.jsonl \
     --agda-flags "-i agda --library-file=agda/libraries -l agda-jang"
+  ```
 
 Tip:
   Use `make rows` to create a tiny seed tasks.jsonl and run this script.

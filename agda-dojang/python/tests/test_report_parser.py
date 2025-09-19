@@ -10,12 +10,15 @@ What:
 
 Why:
   - This is the backbone of dataset creation and CLI UX: we rely on a stable
-    parse to turn Agda’s subgoal report into machine-readable JSON.
-  - Guard against regressions if we tweak markers or whitespace.
+    parse to turn Agda's subgoal report into machine-readable JSON.
+  - It also guards against regressions if we tweak markers or whitespace.
 
 How to run:
-  From repo root (or agda-jang/), inside `nix develop`:
-      PYTHONPATH=python pytest -q
+  ```bash
+  nix develop
+  cd agda-jang
+  PYTHONPATH=python pytest -q
+  ```
 
 Expected:
   - `has_markers` detects BEGIN/END.
