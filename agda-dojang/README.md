@@ -24,9 +24,22 @@ It provides a small, safe tactic vocabulary inside Agda and Python tooling to pr
 
 -  **Makefile Shortcuts:**
 
-   - `make check` → type-checks all Agda macros
-   - `make demo1` → runs `jang_try.py` with `suc zero : Nat`
-   - `make demo2` → runs `jang_try.py` with `applyReport:_+_`
+   -  `make check` → type-checks all Agda macros
+
+   -  `make demo1` → runs `jang_try.py` with `suc zero : Nat`
+
+      expected output: `[OK] suc zero`
+
+   -  `make demo2` → runs `jang_try.py` with `applyReport:_+_`
+
+       expected output:  
+       ```
+       [OK] tactic applyReport:_+_
+       Subgoals:
+         - AGDAJANG_GOAL:0:visible: Nat
+         - AGDAJANG_GOAL:1:visible: Nat
+      ```
+
 
 ---
 

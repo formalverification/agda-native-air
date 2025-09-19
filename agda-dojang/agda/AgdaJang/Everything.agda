@@ -1,4 +1,4 @@
--- agda/AgdaJang/Everything.agda
+-- agda-jang/agda/AgdaJang/Everything.agda
 module AgdaJang.Everything where
 
 open import AgdaJang.Prelude

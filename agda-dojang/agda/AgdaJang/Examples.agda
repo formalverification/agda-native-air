@@ -36,7 +36,7 @@ ex-rewriteDef = rewriteDef⟨ id (suc zero) ⟩
 -- Uncomment locally to try in an editor:
 --
 _ : Nat → Nat → Nat
-_ = {! intro₂ !}
+_ =  {! intro₂ !}
 --
 -- _ : Nat → Nat → Nat → ⊤
 -- _ = {! intros⟨ 3 ⟩ !}
