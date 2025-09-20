@@ -22,7 +22,7 @@ lazy val root = (project in file("."))
     ),
 
     // Main class setting (updated syntax)
-    Compile / run / mainClass := Some("proofparser.Agda2TrainTransformer"),
+    Compile / run / mainClass := Some("proofparser.AgdaExtractorMain")
 
     // Assembly plugin settings
     assembly / mainClass := Some("proofparser.Agda2TrainTransformer")
