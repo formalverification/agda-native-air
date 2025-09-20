@@ -1,3 +1,30 @@
+/**
+ * Preprocess.scala
+ *
+ * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/Preprocess.scala
+ *
+ * A simple ETL pipeline using Apache Spark to preprocess data.
+ *
+ * Description:
+ *   Reads a CSV file, cleans the data, and splits it into training and
+ *   testing datasets.
+ *
+ * Input:
+ *  CSV file with columns: feature1, feature2, label
+ *
+ * Output:
+ *   Parquet files for training and testing datasets.
+ *
+ * Usage:
+ *   spark-submit --class Preprocess your-jar-file.jar
+ *
+ * Assumes input file is located at ../data/raw/data.csv relative to the
+ * working directory.  Outputs Parquet files to features/train.parquet and
+ * features/test.parquet.
+ *
+ * Copyright (c) 2025 Thmpr.
+ */
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
