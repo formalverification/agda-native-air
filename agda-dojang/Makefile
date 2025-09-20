@@ -63,6 +63,11 @@ RAW_JSON    := $(DATA_DIR)/agda-example.json
 TRAIN_JSONL := $(DATA_DIR)/train.jsonl
 SOLVE_JSONL := $(DATA_DIR)/solve_report.jsonl
 
+# Absolute paths for safety (don’t rely on cwd)
+EXAMPLE_AGDA_ABS := $(abspath $(EXAMPLE_AGDA))
+RAW_JSON_ABS     := $(abspath $(RAW_JSON))
+
+
 # Scala transformer runs from the proof-parser project directory
 TRANSFORM_DIR := $(REPO_ROOT)/proof-parser
 
@@ -79,7 +84,8 @@ ROWS_OUT := $(REPO_ROOT)/data/rows.jsonl
 
 .PHONY: help check demo demo1 demo2 extract transform solve test \
         clean clean-scratch clean-pycache clean-agda clean-build clean-data \
-        wipe tree
+        wipe tree peek-extract
+
 
 # ------------------------------------------------------------------------------
 
@@ -131,18 +137,34 @@ $(DATA_DIR):
 
 extract: | $(DATA_DIR)
 	@command -v $(PYTHON) >/dev/null || { echo "Python not found"; exit 1; }
-	@if [ ! -f "$(EXAMPLE_AGDA)" ]; then \
-	  echo "ERROR: $(EXAMPLE_AGDA) not found. Put a sample there or update EXAMPLE_AGDA."; \
+	@if [ ! -f "$(EXAMPLE_AGDA_ABS)" ]; then \
+	  echo "ERROR: $(EXAMPLE_AGDA_ABS) not found. Put a sample there or update EXAMPLE_AGDA."; \
+	  exit 1; \
+	fi
+	@if [ ! -s "$(EXAMPLE_AGDA_ABS)" ]; then \
+	  echo "ERROR: $(EXAMPLE_AGDA_ABS) exists but is empty; add content."; \
 	  exit 1; \
 	fi
 	@if [ ! -f "$(EXTRACT_SCRIPT)" ]; then \
 	  echo "ERROR: EXTRACT_SCRIPT '$(EXTRACT_SCRIPT)' not found. Update the path (e.g., to $(PYTHON_TOOLS)/jang_extract.py)."; \
 	  exit 1; \
 	fi
+	@echo ">> CWD           : $$(pwd)"
+	@echo ">> INPUT (Agda)  : $(EXAMPLE_AGDA_ABS)"
+	@echo ">> OUTPUT (JSON) : $(RAW_JSON_ABS)"
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(EXTRACT_SCRIPT) \
-	  --input  "$(EXAMPLE_AGDA)" \
-	  --output "$(RAW_JSON)"
-	@echo "✅ Wrote $(RAW_JSON)"
+	  --input  "$(EXAMPLE_AGDA_ABS)" \
+	  --output "$(RAW_JSON_ABS)"
+	@[ -s "$(RAW_JSON_ABS)" ] || { \
+	   echo "❌ Extractor returned but $(RAW_JSON_ABS) is missing or empty."; \
+	   exit 1; \
+	}
+	@echo "✅ Wrote $(RAW_JSON_ABS)"
+
+# a tiny "peek" target to verify content
+peek-extract:
+	@echo ">> head of $(RAW_JSON_ABS)"; head -n 40 "$(RAW_JSON_ABS)" || true
+
 
 # 4) Transform: run Scala transformer to emit ML-ready JSONL
 #    WHY: Freeze the training-row schema (e.g., file/module/name/agdaType/proof/premises).

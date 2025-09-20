@@ -1,23 +1,31 @@
 #!/usr/bin/env python3
-# file: python/tools/jang_extract.py
 """
-AgdaJang Trace extractor (v0)
+AgdaJang Trace extractor (v0, safe CLI)
+=======================================
 
-(implement with `agda --interaction-json`)
+FILE: python/tools/jang_extract.py
 
-+  Walk `--root` for `.agda` files.
+DESCRIPTION
 
-+  For each file:
+  +  Walk `--root` for `.agda` files.
 
-   +  Send a `load` command to Agda's JSON interaction.
+  +  For each file:
 
-   +  Request **goals/metas** and **constraints**.
+     +  Send a `load` command to Agda's JSON interaction.
 
-   +  If a goal is already solved (e.g., after `C-c C-a`), we can reconstruct the
-      term by asking Agda for the definition of the name or by parsing the file region.
-      In v0, we focus on *holes filled during a session* and capture *final gives*.
+     +  Request **goals/metas** and **constraints**.
 
-   +  Record `(context, goal_type, solution_term)` when a goal gets solved via `give`.
+     +  If a goal is already solved (e.g., after `C-c C-a`), we can reconstruct the
+        term by asking Agda for the definition of the name or by parsing the file region.
+        In v0, we focus on *holes filled during a session* and capture *final gives*.
+
+     +  Record `(context, goal_type, solution_term)` when a goal gets solved via `give`.
+
+FEATURES
+
+  + Non-destructive: never opens the input for writing.
+  + Flagged CLI: --input <.agda>  --output <.json>
+  + Emits a minimal JSON object we can grow iteratively.
 
 NOTES
 
@@ -36,44 +44,74 @@ NOTES
   where we (or the LLM) replaced holes via `refine⟨_⟩`.  Then the extractor just
   parses the file to read `CANDIDATE` and the goal type around it. That's the
   quickest "walking skeleton."
+
+SCHEMA (v0)
+
+  {
+    "version": "agda-jang-extract-v0",
+    "timestamp": "...",
+    "file": "/abs/path/to/file.agda",
+    "module": "agda-example" | null,
+    "size_bytes": 1234,
+    "num_lines": 42,
+    "raw": "<verbatim source text>"
+  }
+
+
+
 """
-import json, subprocess, pathlib, sys, time, re
+import argparse, json, sys, re
+from pathlib import Path
 from datetime import datetime
 
-AGDA_BIN = "agda"  # ensure on PATH (or set via env)
+def parse_args():
+    p = argparse.ArgumentParser(description="Extract minimal info from an Agda file.")
+    p.add_argument("--input",  required=True, help="Path to a single .agda file")
+    p.add_argument("--output", required=True, help="Path to JSON output file")
+    p.add_argument("--agda-bin", default="agda", help="Agda binary (unused in v0)")
+    p.add_argument("--include", action="append", default=[], help="Extra include paths (unused in v0)")
+    return p.parse_args()
 
-def agda_proc():
-    return subprocess.Popen([AGDA_BIN, "--interaction-json"],
-                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
-
-def send(p, obj):
-    p.stdin.write(json.dumps(obj) + "\n"); p.stdin.flush()
-
-def recv(p):
-    line = p.stdout.readline()
-    return json.loads(line) if line else None
-
-def load_file(p, path, include_paths):
-    send(p, {"command":"load", "filepath":str(path), "includePaths":include_paths, "options":["--ignore-interfaces"]})
-    # Read until we get a "done" or "status" event; in practice parse all until queue empties or timeout.
+MODULE_RE = re.compile(r'^\s*module\s+([A-Za-z0-9_.\-]+)\s+where\b', re.UNICODE | re.MULTILINE)
 
 def main():
-    root = pathlib.Path(sys.argv[1])
-    out  = open(sys.argv[2], "w")
-    inc  = [str(root)]
-    p = agda_proc()
-    try:
-        for agda in root.rglob("*.agda"):
-            load_file(p, agda, inc)
-            # TODO: ask for metas, contexts, etc.
-            # Pseudocode: send(p, {"command":"metas"}); parse; later hook into "give" events.
-            # In v0, we can instrument our workflow to use `--log-json` and scrape successful 'give' messages.
-    finally:
-        p.terminate()
-        out.close()
+    args = parse_args()
+    inp = Path(args.input).resolve()
+    out = Path(args.output).resolve()
+
+    # Safety rails
+    if not inp.exists():
+        print(f"ERROR: input file not found: {inp}", file=sys.stderr); sys.exit(1)
+    if inp.suffix.lower() != ".agda":
+        print(f"ERROR: expected a .agda file, got: {inp}", file=sys.stderr); sys.exit(1)
+    if inp == out:
+        print("ERROR: input and output paths are identical (would overwrite input!).", file=sys.stderr)
+        sys.exit(1)
+
+    text = inp.read_text(encoding="utf-8", errors="strict")
+    if not text.strip():
+        print(f"ERROR: input file exists but is empty: {inp}", file=sys.stderr); sys.exit(2)
+
+    m = MODULE_RE.search(text)
+    module_name = m.group(1) if m else None
+    num_lines = text.count("\n") + (0 if text.endswith("\n") else 1)
+    size_bytes = len(text.encode("utf-8", errors="strict"))
+
+    payload = {
+        "version":   "agda-jang-extract-v0",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "file":      str(inp),
+        "module":    module_name,
+        "size_bytes": size_bytes,
+        "num_lines":  num_lines,
+        "raw":       text,
+    }
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    print(f"✅ wrote {out} (module={module_name!r}, lines={num_lines}, bytes={size_bytes})")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("usage: agdadojo_extract.py <root> <out.jsonl>")
-        sys.exit(1)
     main()
