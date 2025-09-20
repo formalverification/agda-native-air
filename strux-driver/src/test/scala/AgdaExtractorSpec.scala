@@ -1,3 +1,5 @@
+// file: agda-ai-prover/proof-parser/src/test/scala/AgdaExtractorSpec.scala
+
 package proofparser
 
 import org.scalatest.funsuite.AnyFunSuite

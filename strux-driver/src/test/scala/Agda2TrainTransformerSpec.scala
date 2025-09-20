@@ -1,7 +1,6 @@
+// file: agda-ai-prover/proof-parser/src/test/scala/Agda2TrainTransformerSpec.scala
+
 package proofparser
-//import utest._
-//import org.scalatest.funsuite.AnyFunSuite
-//import proofparser.Agda2TrainTransformer.extractAgdaDataFromJson
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

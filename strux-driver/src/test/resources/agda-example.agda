@@ -2,8 +2,6 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; tran
 
 module agda-example where
 
-
-
 data ℕ : Set where
   zero  : ℕ
   suc   : ℕ → ℕ
