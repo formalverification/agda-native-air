@@ -28,3 +28,5 @@ ThisBuild / javaOptions ++= Seq(
 )
 
 Global / excludeLintKeys += classLoaderLayeringStrategy
+
+Compile / mainClass := Some("PreprocessAgda")
