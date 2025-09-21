@@ -60,15 +60,14 @@ make serve
 
 ## 🧼 Tips
 
-- Always activate your venv before working:
-  ```bash
-  source ~/venvs/mlpipeline/bin/activate
-  ```
++  Always activate a `venv` before working.
 
-- To deactivate:
-  ```bash
-  deactivate
-  ```
+    ```bash
+    source ~/venvs/mlpipeline/bin/activate
+    ```
+
++  Deactivate with the command `deactivate`.
+    ```
 
 ---
 
