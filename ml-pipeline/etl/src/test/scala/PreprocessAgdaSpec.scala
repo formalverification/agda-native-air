@@ -22,6 +22,8 @@
  * Copyright (c) 2024 Thmpr.
  */
 
+package etl
+
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import java.io.File
