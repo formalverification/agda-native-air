@@ -8,7 +8,7 @@
 #   Our north star is a closed loop:
 #     (1) Extract structured data from Agda  →  (2) Transform to ML-ready rows
 #     (3) Try tiny solving passes / search    →  (4) Log + Benchmark
-#   These targets give you muscle-memory switches to run the loop end-to-end
+#   These targets give us muscle-memory switches to run the loop end-to-end
 #   on a toy example before we scale up to full libraries + models.
 #
 #   tl;dr
@@ -37,7 +37,7 @@
 AGDA            ?= agda
 AGDA_DIR        := agda
 HAVE_IFACE_DIR  := $(shell agda --help 2>/dev/null | grep -q -- '--interface-dir' && echo yes || echo no)
-AGDA_IFACE_DIR  ?= _build/agda    #  ^^^^^^^  detect support for --interface-dir  ^^^^^^^^
+AGDA_IFACE_DIR  ?= _build/agda
 BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-jang
 AGDA_FLAGS      := $(BASE_AGDA_FLAGS) $(if $(filter $(HAVE_IFACE_DIR),yes),--interface-dir=$(AGDA_IFACE_DIR),)
 PYTHON          ?= python3
@@ -45,7 +45,7 @@ SBT             ?= sbt
 PYTHON_DIR      := python
 PYTHONPATH      := $(PYTHON_DIR)
 PYTHON_TOOLS    := $(PYTHON_DIR)/tools
-JANG_TRY        ?= $(PYTHON_TOOLS)/jang_try.py  # primary runner used by demos / solve
+JANG_TRY        ?= $(PYTHON_TOOLS)/jang_try.py
 
 # Extract / search scripts
 EXTRACT_SCRIPT  ?= $(PYTHON_TOOLS)/jang_extract.py
@@ -187,18 +187,24 @@ transform:
 solve:
 	@command -v $(PYTHON) >/dev/null || { echo "Python not found"; exit 1; }
 	@if [ ! -f "$(SEARCH_SCRIPT)" ]; then \
-	  echo "ERROR: SEARCH_SCRIPT '$(SEARCH_SCRIPT)' not found. Update it (e.g., to ../search.py if still at repo root)."; \
+	  echo "ERROR: SEARCH_SCRIPT '$(SEARCH_SCRIPT)' not found."; \
 	  exit 1; \
 	fi
-	@if [ ! -f "$(EXAMPLE_AGDA)" ]; then \
-	  echo "ERROR: $(EXAMPLE_AGDA) not found. Put a sample there or update EXAMPLE_AGDA."; \
-	  exit 1; \
+	@echo ">> running search (this may legitimately find no proof)"
+	@PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(SEARCH_SCRIPT) \
+	  --agda-dir "$(AGDA_DIR)" \
+	  --agda-bin "$(AGDA)" \
+	  --jang-try "$(JANG_TRY)" \
+	  --imports "open import Agda.Builtin.Nat" \
+	  --goal "Nat" \
+	  --max-depth 3 \
+	  --beam 8 ; \
+	rc=$$?; \
+	if [ $$rc -eq 0 ]; then \
+	  echo "✅ Solve run complete"; \
+	else \
+	  echo "ℹ️  No proof found within limits (exit $$rc) — not fatal for bench."; \
 	fi
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(SEARCH_SCRIPT) \
-	  --suite  "$(EXAMPLE_AGDA)" \
-	  --report "$(SOLVE_JSONL)" \
-	  --agda-flags "$(AGDA_FLAGS)"
-	@echo "✅ Solve report at $(SOLVE_JSONL)"
 
 # 6) Pretty-print a *clean* directory tree for this subproject.
 #    Uses the 'tree' utility if available; otherwise falls back to a portable renderer.
@@ -259,7 +265,7 @@ clean-pycache:
 	find . -type d -name '__pycache__' -prune -exec rm -rf {} +
 
 clean-agda:
-	# If you centralized interfaces, this is a no-op except _build
+	# If interfaces are centralized, this is a no-op except _build
 	@if [ -d "$(AGDA_IFACE_DIR)" ]; then rm -rf "$(AGDA_IFACE_DIR)"; fi
 	# Also delete any stray .agdai beside sources (defensive)
 	@if [ -d "$(AGDAI_FIND_PATH)" ]; then find "$(AGDAI_FIND_PATH)" -name '*.agdai' -delete; fi

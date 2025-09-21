@@ -26,7 +26,7 @@ def is_err(r: Result[Any, Any]) -> bool:
     return isinstance(r, Err)
 
 def map_result(fn: Callable[[T], U], r: Result[T, E]) -> Result[U, E]:
-    return Ok(fn(r.value)) if isinstance(r, Ok) else r  # keeps your original
+    return Ok(fn(r.value)) if isinstance(r, Ok) else r  # keeps our original
 
 def and_then(fn: Callable[[T], Result[U, E]], r: Result[T, E]) -> Result[U, E]:
     return fn(r.value) if isinstance(r, Ok) else r

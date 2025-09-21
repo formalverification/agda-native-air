@@ -6,7 +6,7 @@ copyright: 2025 Thmpr
 WHAT IT DOES
 ------------
 
-Generates a scratch Agda module with your imports and goal.
+Generates a scratch Agda module with imports and goal.
 
 There are two modes:
 
@@ -14,14 +14,14 @@ There are two modes:
 
     Uses `refine⟨ <candidate> ⟩` to check/solve the goal.
 
-    You pass the candidate term on the CLI; e.g.
+    Pass the candidate term on the CLI; e.g.
 
       $ python3 tools/jang_try.py \
           --goal Nat \
           --candidate "suc zero" \
           --imports "open import Agda.Builtin.Nat"
 
-    We embed `test = refine⟨ <candidate> ⟩`.
+    Embed `test = refine⟨ <candidate> ⟩`.
     Agda elaborates `<candidate>` against the goal.
     If it type-checks (Agda exit 0), the goal is solved (⇒ OK), else FAIL.
     The example above returns `[OK] suc zero` because `suc zero : Nat`.
@@ -75,12 +75,9 @@ There are two modes:
                    AGDAJANG_GOAL:0:visible: Nat
                    AGDAJANG_GOAL:1:visible: Nat
 
-In short: **you never edit your modules to put `refine⟨ _ ⟩` manually**—the runner
-creates a .
-
-N.B. You do NOT edit your own Agda files to use these probes. The runner generates
+N.B. We do NOT edit our own Agda files to use these probes. The runner generates
 an ephemeral scratch file each call, including an Agda module that:
-  • imports whatever modules you pass via --imports,
+  • imports whatever modules we pass via --imports,
   • declares `GoalTy = <goal>`,
   • and sets `test : GoalTy` to either a candidate or a tactic call.
 Then it calls `agda` on that scratch file and interprets the result.

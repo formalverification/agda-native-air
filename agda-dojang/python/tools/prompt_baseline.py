@@ -47,7 +47,7 @@ Usage:
   ```
 
   Alternatively, use the example `tasks.json` file provided in the repository, or
-  create your own, and run this script manually, from inside `nix develop` shell, in
+  create one and run this script manually, from inside `nix develop` shell, in
   the `agda-jang` directory, as follows:
 
   ```bash

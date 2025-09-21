@@ -21,7 +21,7 @@ Notes
 -----
 - The recorded script contains only **real actions** (candidates / apply / applyWith).
   Report-actions are used internally to peek and are not recorded.
-- If you add the Agda macro `applySolveReport⟨_⟩`, this driver will try it first
+- If we add the Agda macro `applySolveReport⟨_⟩`, this driver will try it first
   (post-unification subgoals) and fall back to `applyReport⟨_⟩` automatically.
 """
 from __future__ import annotations
@@ -55,7 +55,7 @@ class OracleCfg:
 class StepResult:
     ok: bool
     subgoals: Tuple[str, ...] = field(default_factory=tuple)
-    diag: str = ""  # raw stdout if you want to log
+    diag: str = ""  # raw stdout if we want to log
 
 # ========= Small helpers =========
 

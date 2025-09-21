@@ -54,7 +54,7 @@ cd agda-ai-prover
 nix develop
 ```
 
-If this runs to successful completion, it will provide you with
+If this runs to successful completion, it will provide
 
 + `agda` with the stdlib registered,
 + `python3` (with venv support),
@@ -80,7 +80,7 @@ include: agda
 depend: standard-library
 ```
 
-This ensures `-l agda-jang` makes your macros available in any Agda file.
+This ensures `-l agda-jang` makes our macros available in any Agda file.
 
 ---
 

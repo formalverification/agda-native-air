@@ -67,7 +67,7 @@ Then:
 agda -i agda ApplyDemo.agda
 ```
 
-6. **Optional:** if your Agda exports a real `whnf`, update `AgdaJang/Compat.agda` to use it instead of the alias.
+6. **Optional:** if your Agda version exports a real `whnf`, update `AgdaJang/Compat.agda` to use it instead of the alias.
 
 **Tips**
 
