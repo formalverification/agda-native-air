@@ -9,56 +9,144 @@ File: agda-ai-prover/ml-pipeline/python/model/train.py
 Copyright (c) 2025 Thmpr.
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Tuple
+import argparse
+import os
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-import pandas as pd
-import pyarrow.parquet as pq
-import argparse, os
 
-def parse_args():
+import pyarrow.parquet as pq
+
+
+# ---------- CLI ----------
+
+def default_paths() -> Tuple[Path, Path]:
+    """Compute default --input and --out paths relative to this file."""
+    repo_root = Path(__file__).resolve().parents[2]  # .../ml-pipeline
+    default_in = repo_root / "features" / "train.parquet"
+    default_out = repo_root / "models" / "model.pt"
+    return default_in, default_out
+
+
+def parse_args() -> argparse.Namespace:
+    din, dout = default_paths()
     p = argparse.ArgumentParser()
-    p.add_argument("--train", default=os.path.join(os.path.dirname(__file__), "..", "features", "train.parquet"))
+    p.add_argument("--input", type=Path, default=din,
+                   help="Parquet features (default: ml-pipeline/features/train.parquet)")
+    p.add_argument("--out", type=Path, default=dout,
+                   help="Model checkpoint path (default: ml-pipeline/models/model.pt)")
+    p.add_argument("--epochs", type=int, default=10)
+    p.add_argument("--batch-size", type=int, default=32)
+    p.add_argument("--lr", type=float, default=1e-2)
     return p.parse_args()
 
+
+# ---------- Data ----------
+
 def load_data(path: Path) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Load Parquet into (X, y) tensors."""
     table = pq.read_table(path)
     df = table.to_pandas()
-    X = df[['feature1', 'feature2']].values
-    y = df['label'].values
-    return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.long)
+    X = df[["feature1", "feature2"]].to_numpy()
+    y = df["label"].to_numpy()
+    X_t = torch.tensor(X, dtype=torch.float32)
+    y_t = torch.tensor(y, dtype=torch.long)
+    return X_t, y_t
+
+
+def make_loader(X: torch.Tensor, y: torch.Tensor, batch_size: int) -> DataLoader:
+    """Create a DataLoader without hidden side-effects."""
+    ds = TensorDataset(X, y)
+    return DataLoader(ds, batch_size=batch_size, shuffle=True)
+
+
+# ---------- Model ----------
 
 class SimpleMLP(nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(2, 16),
             nn.ReLU(),
-            nn.Linear(16, 2)
+            nn.Linear(16, 2),
         )
-    def forward(self, x):
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
-def train(X_train: torch.Tensor, y_train: torch.Tensor) -> None:
-    dataset = TensorDataset(X_train, y_train)
-    loader = DataLoader(dataset, batch_size=32, shuffle=True)
 
-    model = SimpleMLP()
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+def build_model() -> nn.Module:
+    return SimpleMLP()
 
-    for epoch in range(10):
-        for X_batch, y_batch in loader:
-            preds = model(X_batch)
-            loss = criterion(preds, y_batch)
-            optimizer.zero_grad()
+
+# ---------- Training ----------
+
+@torch.no_grad()
+def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> float:
+    """Return accuracy on a loader."""
+    model.eval()
+    correct = 0
+    total = 0
+    for Xb, yb in loader:
+        Xb = Xb.to(device)
+        yb = yb.to(device)
+        logits = model(Xb)
+        pred = logits.argmax(dim=1)
+        correct += (pred == yb).sum().item()
+        total += yb.numel()
+    return (correct / total) if total else 0.0
+
+
+def train(
+    model: nn.Module,
+    loader: DataLoader,
+    epochs: int,
+    lr: float,
+    device: torch.device,
+) -> nn.Module:
+    """Pure(ish): returns the trained model (no globals)."""
+    model.to(device)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.CrossEntropyLoss()
+
+    for ep in range(epochs):
+        model.train()
+        last_loss = 0.0
+        for Xb, yb in loader:
+            Xb = Xb.to(device)
+            yb = yb.to(device)
+            opt.zero_grad()
+            logits = model(Xb)
+            loss = loss_fn(logits, yb)
             loss.backward()
-            optimizer.step()
-        print(f"Epoch {epoch+1} Loss: {loss.item():.4f}")
+            opt.step()
+            last_loss = float(loss.item())
+        print(f"epoch {ep+1}/{epochs}  loss={last_loss:.4f}")
 
-    torch.save(model.state_dict(), "models/model.pt")
+    return model
+
+
+# ---------- Main ----------
+
+def main() -> None:
+    args = parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+
+    X, y = load_data(args.input)
+    loader = make_loader(X, y, args.batch_size)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = build_model()
+    model = train(model, loader, epochs=args.epochs, lr=args.lr, device=device)
+
+    torch.save(model.state_dict(), args.out)
+    print(f"✅ saved model to {args.out}")
+
 
 if __name__ == "__main__":
-    args = parse_args()
-    X_train, y_train = load_data(args.train)
-    train()
+    main()

@@ -8,42 +8,46 @@
  *
  * Copyright (c) 2024 Thmpr.
  */
+// File: ml-pipeline/build.sbt
+
 name := "ml-pipeline"
 version := "0.1"
 
 ThisBuild / scalaVersion := "2.12.18"
 
-lazy val etl = project.in(file("etl"))
-  .settings(
-    name := "ETL",
-    Compile / mainClass := Some("PreprocessAgda"),
+lazy val etl = project.in(file("etl")).settings(
+  name := "ETL",
+  Compile / mainClass := Some("PreprocessAgda"),
 
-    // These apply to `sbt run` (which our `make etl` uses):
-    Compile / run / fork := true
-      Compile / run / javaOptions ++= Seq(
-        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-        "--add-opens=java.base/java.nio=ALL-UNNAMED"
-      )
-
-    // Spark dependencies
-    libraryDependencies ++= Seq(
-      "org.apache.spark" %% "spark-sql" % "3.5.1",
-      "org.scalatest"    %% "scalatest" % "3.2.19" % Test
+  // Spark deps + test
+  libraryDependencies ++= Seq(
+    "org.apache.spark" %% "spark-sql" % "3.5.1",
+    "org.scalatest"    %% "scalatest" % "3.2.19" % Test
       // "org.apache.spark" %% "spark-core" % "3.4.1", // % "provided",
       // "org.apache.spark" %% "spark-sql"  % "3.4.1" // % "provided"
-    ),
-    scalacOptions ++= Seq("-deprecation", "-feature"),
-    Test / parallelExecution := false,
-    fork := true
+  ),
+
+  // Nice defaults
+  scalacOptions ++= Seq("-deprecation", "-feature"),
+  Test / parallelExecution := false,
+
+  // We fork java and grant JDK21 module opens for Spark (Run + Test)
+  fork := true,
+  // These apply to `sbt run` (which our `make etl` uses):
+  Compile / run / fork := true,
+  Compile / run / javaOptions ++= Seq(
+    "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED"
+  ),
     // ---------- IMPORTANT for Java 17/21 ----------
     // Fixes "IllegalAccessError: sun.nio.ch.DirectBuffer" when running Spark under Java 17+.
     // These apply to `sbt test` (Spark inside tests).
     // If we ever switch dev shell to JDK 17, we can remove these flags.
-    Test / javaOptions ++= Seq(
-      "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-      "--add-opens=java.base/java.nio=ALL-UNNAMED"
-    )
+  Test / javaOptions ++= Seq(
+    "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED"
   )
+)
 
 lazy val root = (project in file("."))
   .aggregate(etl)
@@ -52,6 +56,7 @@ lazy val root = (project in file("."))
     // keep test output readable
     Test / parallelExecution := false
   )
+
 
 
 // // Correctly typed override

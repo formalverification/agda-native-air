@@ -1,19 +1,19 @@
 # ML Pipeline Project
 
-This project combines Scala Spark ETL with PyTorch model training and FastAPI serving.
+This project combines a Scala/Spark ETL with PyTorch model training and FastAPI serving.
 
 ## 🚀 Project Structure
 
 ```
-ml_pipeline/
-├── etl/          # Scala Spark job
-├── model/        # PyTorch training + export
-├── api/          # FastAPI model server
-├── features/     # Processed data
-├── models/       # Trained/exported models
-├── scripts/      # Shell helpers
-├── Makefile      # Unified CLI
-└── .github/      # CI/CD workflow
+ml-pipeline/
+├── etl/            # Scala Spark (sbt project)
+├── python/
+│   ├── api/        # FastAPI model server
+│   └── model/      # PyTorch training/inference + export
+├── data/
+├── features/       # Processed data
+├── models/         # Trained/exported models
+└── scripts/        # Shell helpers
 ```
 
 ## 🛠️ Setup Instructions (Ubuntu 24.04+)
