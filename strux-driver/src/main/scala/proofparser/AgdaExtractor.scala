@@ -1,10 +1,34 @@
+/**
+ * AgdaExtractor.scala
+ *
+ * A Scala utility to extract theorem-like definitions and their proofs
+ * from Agda source files. It scans a specified directory for `.agda` files,
+ * parses them to identify theorems and proofs, and outputs the results
+ * in JSON Lines format.
+ *
+ * File: agda-ai-prover/proof-parser/src/main/scala/proofparser/AgdaExtractor.scala
+ *
+ * Features:
+ * - Recursively searches for `.agda` files in a given directory.
+ * - Identifies module names, theorem definitions, and associated proofs.
+ * - Handles multi-line definitions and comments.
+ * - Outputs extracted data in a structured JSON Lines format.
+ *
+ * Usage:
+ *   scala AgdaExtractor.scala <path-to-agda-lib>
+ *
+ * Output:
+ *   The extracted theorems and proofs are saved in `output/theorems.jsonl`.
+ *
+ * Note:
+ *   This utility requires Scala 2.13+ and the uPickle library for JSON handling.
+ *
+ * Copyright (c) 2025 Thmpr.
+ */
 package proofparser
 
-// import io.circe.generic.auto._
-// import io.circe.syntax._
 import java.nio.file.{Files, Paths, Path}
 import scala.jdk.CollectionConverters._
-// import scala.jdk.StreamConverters._
 import scala.util.Using
 import upickle.default._
 

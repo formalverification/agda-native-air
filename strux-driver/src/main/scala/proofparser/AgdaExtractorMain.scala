@@ -36,22 +36,12 @@ package proofparser
 import java.nio.file.{Files, Paths, Path}
 import scala.util.Using
 import upickle.default._
+import proofparser.AgdaData
 
 object AgdaExtractorMain {
 
-  // Reuse your existing AgdaExtractor helpers.
+  // Reuse our existing AgdaExtractor helpers.
   import AgdaExtractor._
-
-  // Bridge from your AgdaDataOld to the canonical AgdaData
-  case class AgdaData(
-    file: String,
-    module: Option[String],
-    name: String,
-    agdaType: String,
-    proof: String,
-    premises: List[String] = Nil
-  )
-  object AgdaData { implicit val rw: ReadWriter[AgdaData] = macroRW }
 
   def main(args: Array[String]): Unit = {
     if (args.length != 2) {

@@ -1,4 +1,10 @@
-// file: agda-ai-prover/proof-parser/src/test/scala/Agda2TrainTransformerSpec.scala
+/**
+ * Unit tests for Agda2TrainTransformer
+ *
+ * File: agda-ai-prover/proof-parser/src/test/scala/proofparser/Agda2TrainTransformerSpec.scala
+ *
+ * Copyright (c) 2024 Thmpr.
+ */
 
 package proofparser
 

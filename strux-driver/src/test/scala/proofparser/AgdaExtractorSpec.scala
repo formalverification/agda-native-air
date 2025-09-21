@@ -5,7 +5,7 @@ package proofparser
 import org.scalatest.funsuite.AnyFunSuite
 import upickle.default._
 
-import proofparser.AgdaExtractor._ // or wherever you defined it
+import proofparser.AgdaExtractor._
 
 class AgdaExtractorSpec extends AnyFunSuite {
 
@@ -66,7 +66,7 @@ class AgdaExtractorSpec extends AnyFunSuite {
      "Thm1 : A → B",
      "Thm1 = f x"
    )
-   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm1", "A → B", "f x"))
+   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm1", "A → B", "f x", premises = Nil))
    assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
   }
 
@@ -74,7 +74,7 @@ class AgdaExtractorSpec extends AnyFunSuite {
    val lines = Seq(
      "Thm1 = f x"
    )
-   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm1", "", "f x"))
+   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm1", "", "f x", premises = Nil))
    assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
   }
 
@@ -82,7 +82,7 @@ class AgdaExtractorSpec extends AnyFunSuite {
    val lines = Seq(
      "Thm2 : X × Y"
    )
-   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm2", "X × Y", ""))
+   val expected = Seq(AgdaData("file.agda", Some("TestModule"), "Thm2", "X × Y", "", premises = Nil))
    assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
   }
 
@@ -94,8 +94,8 @@ class AgdaExtractorSpec extends AnyFunSuite {
      "Thm2 = pair x y"
    )
    val expected = Seq(
-     AgdaData("file.agda", Some("TestModule"), "Thm1", "A → B", "f x"),
-     AgdaData("file.agda", Some("TestModule"), "Thm2", "X × Y", "pair x y")
+     AgdaData("file.agda", Some("TestModule"), "Thm1", "A → B", "f x", premises = Nil),
+     AgdaData("file.agda", Some("TestModule"), "Thm2", "X × Y", "pair x y", premises = Nil)
    )
    assert(extractTheorems(lines, "file.agda", Some("TestModule")) == expected)
   }

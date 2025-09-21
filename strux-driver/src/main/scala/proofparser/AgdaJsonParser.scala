@@ -1,3 +1,18 @@
+/**
+ * AgdaJsonParser.scala
+ *
+ * Description:
+ *   A Scala program to parse Agda JSON output files and extract theorem information.
+ *   The extracted data is saved in a JSONL format for further processing.
+ *
+ * File: agda-ai-prover/proof-parser/src/main/scala/proofparser/AgdaJsonParser.scala
+ *
+ * Usage:
+ *   scala AgdaJsonParser <input_json_file> <output_jsonl_file>
+ *
+ * Copyright (c) 2024 Thmpr.
+ */
+
 package proofparser
 
 import java.io.{File, PrintWriter}

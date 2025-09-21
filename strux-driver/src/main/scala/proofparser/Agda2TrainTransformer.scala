@@ -1,3 +1,22 @@
+/**
+ * Agda2TrainTransformer.scala
+ *
+ * A Scala program to parse Agda JSON output files and extract named definitions,
+ * including functions, theorems, records, and data types. The program captures
+ * their file of origin, module, name, type, premises, and body, and outputs the
+ * results in a line-delimited JSON format.
+ *
+ * File: agda-ai-prover/proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
+ *
+ * Usage:
+ *   scala Agda2TrainTransformer.scala <input-json-file> <output-jsonl-file>
+ *
+ * Example:
+ *   scala Agda2TrainTransformer.scala agda-output.json theorems.jsonl
+ *
+ * Copyright (c) 2024 Thmpr.
+ */
+
 package proofparser
 
 /* 🎯 GOALS:
@@ -47,20 +66,10 @@ import org.json4s.native.JsonMethods._
 import scala.io.Source
 import scala.util.{Try, Success, Failure}
 import upickle.default._
+import proofparser.AgdaData
 
 case class TheoremData(file: String, module: Option[String], name: String, body: String)
 object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }
-
-// Define the case class for our custom structure
-case class AgdaData(
-  file      : String,
-  module    : String,
-  name      : String,
-  agdaType  : String,
-  proof     : String,
-  premises  : List[String]
-)
-object AgdaData { implicit val rw: ReadWriter[AgdaData] = macroRW }
 
 object Agda2TrainTransformer {
   // Set up JSON parsing with the correct implicit formats
@@ -144,9 +153,10 @@ object Agda2TrainTransformer {
            }.toSet.toList // Remove duplicates
 
           val nameParts = processName(name)
+          val moduleStr = nameParts.lift(1).getOrElse("")
           AgdaData(
-            file = nameParts(0),
-            module = nameParts(1),
+            file = nameParts.headOption.getOrElse(""),
+            module = Option(moduleStr).filter(_.nonEmpty), // <-- Option
             name = nameParts.lastOption.getOrElse(""),
             agdaType = typePretty,
             proof = defPretty,
