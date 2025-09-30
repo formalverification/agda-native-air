@@ -9,18 +9,26 @@ It converts `.agda` code into JSON/JSONL datasets suitable for ML tasks such as 
 
 ## 📦 Components
 
-- **`AgdaExtractor.scala`**  
-  Scans `.agda` files for definitions and theorem-like constructs, producing `(name, type, proof)` triples.
++  **`AgdaExtractor.scala`**  
+   Scans `.agda` files for definitions and theorem-like constructs, producing `(name,
+   type, proof)` triples.
 
-- **`AgdaJsonParser.scala`**  
-  Reads Agda’s JSON interaction output (agda2train/QUILL-style) and normalizes it.
++  **`AgdaExtractorMain.scala`**  
+   Main program to extract proofs from Agda files and output them in JSONL format.
+   Writes output to files `data/train.jsonl` **and** `data/train.manifest.json`.
 
-- **`Agda2TrainTransformer.scala`**  
-  Transforms JSON into a clean ML-ready JSONL format with fields:
-  - `file`, `module`, `name`
-  - `agdaType`
-  - `proof`
-  - `premises` (lemma names used inside the proof)
++  **`AgdaJsonParser.scala`**  
+   Reads Agda's JSON interaction output (agda2train/QUILL-style) and normalizes it.
+
++  **`Agda2TrainTransformer.scala`**  
+   Transforms JSON into a clean ML-ready JSONL format with fields:
+   - `file`, `module`, `name`
+   - `agdaType`
+   - `proof`
+   - `premises` (lemma names used inside the proof)
+
++  **`Model.scala`**  
+   Data model for Agda theorem extraction
 
 ---
 
@@ -30,8 +38,10 @@ It converts `.agda` code into JSON/JSONL datasets suitable for ML tasks such as 
 proof-parser/
 ├── src/main/scala/proofparser/
 │   ├── AgdaExtractor.scala
+│   ├── AgdaExtractorMain.scala
 │   ├── AgdaJsonParser.scala
-│   └── Agda2TrainTransformer.scala
+│   ├── Agda2TrainTransformer.scala
+│   └── Model.scala
 ├── src/test/scala/proofparser/
 │   ├── AgdaExtractorSpec.scala
 │   └── Agda2TrainTransformerSpec.scala
