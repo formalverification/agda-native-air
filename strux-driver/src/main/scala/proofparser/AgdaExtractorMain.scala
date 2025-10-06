@@ -1,34 +1,40 @@
 /**
  * AgdaExtractorMain.scala
  *
- * File: agda-ai-prover/proof-parser/src/main/scala/AgdaExtractorMain.scala
+ * File: proof-parser/src/main/scala/proofparser/AgdaExtractorMain.scala
  *
- * Decription:
- *   Main program to extract proofs from Agda files and output them in JSONL format.
- *   The input can be a single .agda file or a directory containing multiple .agda files.
- *   The output will be a JSONL file where each line is a JSON object representing an extracted proof.
+ * Description: CLI entrypoint for the regex-based extractor; writes JSONL of
+ *              AgdaData/TrainRecord.  The input can be a single .agda file or a
+ *              directory containing multiple .agda files.  The output will be a
+ *              JSONL file where each line is a JSON object representing an extracted
+ *              proof.
+ *
+ * Usage:
+ *   sbt "project proof-parser" "runMain proofparser.AgdaExtractorMain <in.agda|dir> <out.jsonl>"
+ *
+ * Examples:
+ *   sbt "project proof-parser" "runMain proofparser.AgdaExtractorMain src/test/resources/agda-example.agda target/example.jsonl"
+ *
+ * Notes:
+ *   - Uses AgdaExtractor (heuristic). Prefer Agda2Train* tools for correctness on complex code.
+ *   - Accepts a single file or a directory; filters *.agda files.
+ *   - Each JSON object has the following fields:
+ *     - file: The name of the Agda file.
+ *     - module: The module name (if any).
+ *     - name: The name of the proof.
+ *     - agdaType: The type of the proof in Agda syntax.
+ *     - proof: The proof term in Agda syntax.
+ *     - premises: A list of premises (currently empty, can be populated as needed).
+ *
+ * Example output line:
+ *   {"file":"Example.agda","module":"ExampleModule","name":"myProof","agdaType":"A -> B","proof":"myProofTerm","premises":[]}
  *
  * Why:
  *   This lets the root `make extract` produce `train.jsonl` directly from `.agda`
  *   sources (no agda2train JSON required). (We keep `Agda2TrainTransformer.scala`
  *   around for future compatibility with agda2train.)
  *
- * Usage:
- *   sbt "runMain proofparser.AgdaExtractorMain <input.agda or dir> <output.jsonl>"
- *
- * Notes:
- *   Each JSON object has the following fields:
- *   - file: The name of the Agda file.
- *   - module: The module name (if any).
- *   - name: The name of the proof.
- *   - agdaType: The type of the proof in Agda syntax.
- *   - proof: The proof term in Agda syntax.
- *   - premises: A list of premises (currently empty, can be populated as needed).
- *
- * Example output line:
- *   {"file":"Example.agda","module":"ExampleModule","name":"myProof","agdaType":"A -> B","proof":"myProofTerm","premises":[]}
- *
- * Copyright (c) 2025 Thmpr.
+ * (c) 2025 Thmpr Lab, LLC.
  */
 
 package proofparser

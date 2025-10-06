@@ -1,15 +1,27 @@
 /**
  * Model.scala
  *
- * Description: Data model for Agda theorem extraction.
+ * File: proof-parser/src/main/scala/proofparser/Model.scala
  *
- * This file defines the `AgdaData` case class used to represent
- * theorems extracted from Agda files, including their names,
- * types, proofs, and associated metadata.
+ * Description:
+ *   Defines the `AgdaData` case class used to represent theorems extracted from Agda
+ *   files, including their names, types, proofs, and associated metadata;
+ *   provides a canonical data model for simplified training rows
+ *   (AgdaData/TrainRecord/etc).  Kept small and human-readable to aid iteration,
+ *   inspection and inference.
  *
- * File: agda-ai-prover/proof-parser/src/main/scala/proofparser/Model.scala
+ * Usage:
+ *   import proofparser.{AgdaData, TrainRecord, CtxVar, Range}
  *
- * Copyright (c) 2024 Thmpr.
+ * Examples:
+ *   val rec = TrainRecord(file="Foo.agda", module="Foo", decl="Foo.bar",
+ *                         context=Nil, goalType="A → B", solution=None)
+ *
+ * Notes:
+ *   - Please add new fields conservatively; prefer Option[...] for backwards compatibility.
+ *   - Serialization uses upickle; keep RW codecs in companion objects.
+ *
+ * (c) 2025 Thmpr Lab, LLC.
  */
 package proofparser
 

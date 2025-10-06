@@ -3,7 +3,7 @@
  *
  * File: agda-ai-prover/proof-parser/src/test/scala/proofparser/Agda2TrainTransformerSpec.scala
  *
- * Copyright (c) 2024 Thmpr.
+ * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
 package proofparser

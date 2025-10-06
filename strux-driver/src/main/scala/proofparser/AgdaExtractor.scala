@@ -1,12 +1,12 @@
 /**
  * AgdaExtractor.scala
  *
- * A Scala utility to extract theorem-like definitions and their proofs
- * from Agda source files. It scans a specified directory for `.agda` files,
- * parses them to identify theorems and proofs, and outputs the results
- * in JSON Lines format.
+ * File: proof-parser/src/main/scala/proofparser/AgdaExtractor.scala
  *
- * File: agda-ai-prover/proof-parser/src/main/scala/proofparser/AgdaExtractor.scala
+ * Description: Lightweight, regex-based extractor for Agda files (no Agda process).
+ *              Useful as a fast baseline on solved files: infers
+ *              module/name/type/body heuristically and outputs the results
+ *              in JSON Lines format.
  *
  * Features:
  * - Recursively searches for `.agda` files in a given directory.
@@ -15,16 +15,21 @@
  * - Outputs extracted data in a structured JSON Lines format.
  *
  * Usage:
- *   scala AgdaExtractor.scala <path-to-agda-lib>
+ *   import proofparser.AgdaExtractor
+ *   val rows: List[AgdaData] = AgdaExtractor.extract(Paths.get("path/to/file.agda"))
  *
- * Output:
- *   The extracted theorems and proofs are saved in `output/theorems.jsonl`.
+ * Examples:
+ *   // See AgdaExtractorMain for CLI usage that writes JSONL.
  *
- * Note:
- *   This utility requires Scala 2.13+ and the uPickle library for JSON handling.
+ * Notes:
+ *   - Heuristic by design; use Agda2Train-based tools for authoritative data.
+ *   - Good for smoke tests and CI when Agda is unavailable.
+ *   - This utility requires Scala 2.13+ and the uPickle library for JSON handling.
  *
- * Copyright (c) 2025 Thmpr.
+ * (c) 2025 Thmpr Lab, LLC.
  */
+
+
 package proofparser
 
 import java.nio.file.{Files, Paths, Path}

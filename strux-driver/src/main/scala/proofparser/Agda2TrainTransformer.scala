@@ -1,63 +1,32 @@
 /**
  * Agda2TrainTransformer.scala
  *
- * A Scala program to parse Agda JSON output files and extract named definitions,
- * including functions, theorems, records, and data types. The program captures
- * their file of origin, module, name, type, premises, and body, and outputs the
- * results in a line-delimited JSON format.
+ * File: proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
  *
- * File: agda-ai-prover/proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
- *
+ * Description: Transforms Agda2Train-style JSON into the project’s canonical AgdaData/TrainRecord
+ *              rows for downstream training or inspection.
  * Usage:
+ *   sbt "project proof-parser" \
+ *       "runMain proofparser.Agda2TrainTransformer <in.json|jsonl> <out.jsonl>"
+ *
  *   scala Agda2TrainTransformer.scala <input-json-file> <output-jsonl-file>
  *
- * Example:
+ * Examples:
+ *   sbt "project proof-parser" \
+ *       "runMain proofparser.Agda2TrainTransformer proof-parser/src/test/resources/agda-example.json target/a2t.jsonl"
+ *
  *   scala Agda2TrainTransformer.scala agda-output.json theorems.jsonl
  *
- * Copyright (c) 2024 Thmpr.
+ * Notes:
+ *   - Ensure only the canonical AgdaData from Model.scala is used (remove duplicate type defs).
+ *   - Prefer pretty-printed terms/types from the dump; normalize module/file names.
+ *   - Complements Agda2TrainReducer: this file may expose richer fields or a different mapping.
+ *
+ * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
+
 package proofparser
-
-/* 🎯 GOALS:
-  + Parse `.agda` files in a given directory recursively.
-  + Extract named definitions: functions, theorems, records, data types, etc.
-  + Support multi-line definitions.
-  + Capture their file of origin, module, name, and body.
-  + Output in a line-delimited JSON format (e.g., `theorems.jsonl`).
-*/
-
-/* Logic for Pairing Theorem Statements and Proofs
-
-1.  Data Representation
-    +  Replace the current `TheoremData` with a more comprehensive case
-       class called `AgdaData`:
-       ```scala
-       case class AgdaData( file: String
-                          , module: String
-                          , name: String
-                          , agdaType: String
-                          , premises: List[String]
-                          , proof: String )
-       ```
-
-2.  Extraction Logic
-    +  Use a `Map[String, (String, Option[String])]` to temporarily store
-       the name, type, and proof as they are collected.
-    +  First, collect the theorem/type declarations as we did before.
-    +  When encountering a proof (i.e., `name = ...`), pair it with the
-       already collected type from the map.
-    +  If no matching type is found, store the proof separately for later
-       reconciliation.
-
-3.  Merging Rules
-    +  If the map already has a type but no proof for a given name,
-       update the entry with the proof.
-    +  If both the type and proof are available, create an `AgdaData`
-       instance and store it in the result list.
-    +  Handle edge cases where a proof is encountered without a
-       preceding type or vice versa.
-*/
 
 import java.io.{File, PrintWriter}
 import org.json4s._
