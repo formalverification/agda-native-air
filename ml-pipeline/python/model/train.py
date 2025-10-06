@@ -6,7 +6,7 @@ Assumes the Parquet file has columns 'feature1', 'feature2', and 'label'.
 
 File: agda-ai-prover/ml-pipeline/python/model/train.py
 
-Copyright (c) 2025 Thmpr.
+Copyright (c) 2025 Thmpr Lab, LLC.
 """
 
 from __future__ import annotations

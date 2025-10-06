@@ -6,9 +6,8 @@
  *
  * File: agda-ai-prover/ml-pipeline/build.sbt
  *
- * Copyright (c) 2024 Thmpr.
+ * Copyright (c) 2025 Thmpr Lab, LLC.
  */
-// File: ml-pipeline/build.sbt
 
 name := "ml-pipeline"
 version := "0.1"

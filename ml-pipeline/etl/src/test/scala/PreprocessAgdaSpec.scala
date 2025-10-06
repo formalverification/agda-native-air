@@ -19,7 +19,7 @@
  *
  * File: agda-ai-prover/ml-pipeline/etl/src/test/scala/PreprocessAgdaSpec.scala
  *
- * Copyright (c) 2024 Thmpr.
+ * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
 package etl

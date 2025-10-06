@@ -16,7 +16,7 @@
  *   sbt "run"       # uses defaults: repo-root/data -> ml-pipeline/features
  *   sbt "run /abs/in/train.jsonl /abs/out/dir"
  *
- * Copyright (c) 2025 Thmpr.
+ * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
 import org.apache.spark.sql.SparkSession

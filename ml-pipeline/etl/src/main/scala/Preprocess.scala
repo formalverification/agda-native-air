@@ -22,7 +22,7 @@
  * working directory.  Outputs Parquet files to features/train.parquet and
  * features/test.parquet.
  *
- * Copyright (c) 2025 Thmpr.
+ * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
 import org.apache.spark.sql.SparkSession
