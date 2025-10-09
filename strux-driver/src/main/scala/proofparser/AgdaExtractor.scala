@@ -40,12 +40,9 @@ import upickle.default._
 
 object AgdaExtractor {
 
-  // 📂 File Collection
-  def getAgdaFiles(dir: Path): List[Path] = Files.walk(dir)
-    .iterator()
-    .asScala
-    .filter(p => p.toString.endsWith(".agda"))
-    .toList
+  // 📂 File Collection and Discovery ----------
+  def getAgdaFiles(dir: Path): List[Path] =
+    Files.walk(dir).iterator.asScala.filter(_.toString.endsWith(".agda")).toList
 
   // Module Detection
   // A simple check for `module` lines.
@@ -96,8 +93,8 @@ object AgdaExtractor {
   name      : String,
   agdaType  : String,
   proof     : String
-)
-object AgdaDataOld { implicit val rw: ReadWriter[AgdaDataOld] = macroRW }
+  )
+  object AgdaDataOld { implicit val rw: ReadWriter[AgdaDataOld] = macroRW }
 
 
   // @note This function is designed to handle both single-line and multi-line

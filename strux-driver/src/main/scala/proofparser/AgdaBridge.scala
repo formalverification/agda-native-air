@@ -1,17 +1,22 @@
 /**
  * AgdaBridge.scala
  *
- * Description: Minimal bridge for `agda --interaction-json`. Starts the process,
- *              sends IOTCM commands, and reads JSON messages line-by-line.
+ * Description: Minimal bridge for `agda --interaction-json`. Starts the Agda process,
+ *              writes interaction (IOTCM) commands, and reads JSON lines from stdout.
  *
- * File: proof-parser/src/main/scala/proofparser/AgdaBridge.scala
+  * File: proof-parser/src/main/scala/proofparser/AgdaBridge.scala
  *
- * Usage:
- *   val agda = new AgdaBridge() ; agda.start()
- *   agda.send(AgdaIOTCM.load(file = "Foo.agda", include = Seq("."), libs = Seq("standard-library")))
- *   var msg = agda.readLine()
- *   // ... handle messages ...
- *   agda.stop()
+ * Usages:
+ *   1.  val agda = new AgdaBridge() ; agda.start()
+ *       agda.send(AgdaIOTCM.load(file = "Foo.agda", include = Seq("."), libs = Seq("standard-library")))
+ *       var msg = agda.readLine()
+ *       // ... handle messages ...
+ *       agda.stop()
+ *
+ *   2.  val agda = new AgdaBridge() ; agda.start()
+ *       agda.send("""{"command":"SomeIOTCM"}""")
+ *       val line: Option[String] = agda.readLine()
+ *       agda.stop()
  *
  * Examples:
  *   // See AgdaSimplifiedExtractor for end-to-end usage that collects goal info.
@@ -19,6 +24,8 @@
  * Notes:
  *   - Only a tiny subset of the protocol is implemented; add recognizers as needed.
  *   - Keep process lifecycle well-scoped to avoid zombie processes.
+ *   - Uses java.lang.ProcessBuilder (avoid scala.sys.process.* here).
+ *   - Redirects stderr → stdout so we only need one reader.
  *
  * (c) 2025 Thmpr Lab, LLC.
  */
@@ -26,9 +33,8 @@
 package proofparser
 
 import java.io._
-import scala.sys.process._
-import scala.util.control.NonFatal
-import upickle.default._
+import java.nio.charset.StandardCharsets
+import java.lang.ProcessBuilder.Redirect
 
 /** Minimal bridge for `agda --interaction-json`.
   * We only handle enough of the protocol to:
@@ -39,35 +45,43 @@ import upickle.default._
 final class AgdaBridge(
   agdaCmd: Seq[String] = Seq("agda", "--interaction-json")
 ) {
-  private val pb = new ProcessBuilder(agdaCmd: _*)
-  private var proc: Process = _
+
+  private var pb: java.lang.ProcessBuilder = _
+  private var proc: java.lang.Process = _
   private var in: BufferedWriter = _
   private var out: BufferedReader = _
 
   def start(): Unit = {
+    require(proc == null, "AgdaBridge already started")
+
+    pb = new java.lang.ProcessBuilder(agdaCmd: _*)
+    pb.redirectErrorStream(true) // merge stderr into stdout for simplicity
     proc = pb.start()
-    in  = new BufferedWriter(new OutputStreamWriter(proc.getOutputStream, "UTF-8"))
-    out = new BufferedReader(new InputStreamReader(proc.getInputStream, "UTF-8"))
+
+    in  = new BufferedWriter(new OutputStreamWriter(proc.getOutputStream, StandardCharsets.UTF_8))
+    out = new BufferedReader(new InputStreamReader(proc.getInputStream, StandardCharsets.UTF_8))
   }
 
-  def stop(): Unit = {
-    try in.close() catch { case _: Throwable => () }
-    try out.close() catch { case _: Throwable => () }
-    if (proc != null) proc.destroy()
-  }
-
-  /** Send one JSON command line (no final newline required; we add it). */
-  def send(obj: ujson.Value): Unit = {
-    val s = obj.render()
-    in.write(s)
+  /** Send a line to Agda (adds newline, flushes). */
+  def send(line: String): Unit = {
+    require(in != null, "AgdaBridge not started")
+    in.write(line)
     in.write("\n")
     in.flush()
   }
 
-  /** Read next JSON line from Agda (blocking). Returns None on EOF. */
-  def readLine(): Option[ujson.Value] = {
+  /** Read a single line from Agda (None on EOF). */
+  def readLine(): Option[String] = {
+    require(out != null, "AgdaBridge not started")
     val s = out.readLine()
-    if (s == null) None else Some(ujson.read(s))
+    if (s == null) None else Some(s)
+  }
+
+  def stop(): Unit = {
+    try if (in != null) in.close() catch { case _: Throwable => () }
+    try if (out != null) out.close() catch { case _: Throwable => () }
+    try if (proc != null) proc.destroy() catch { case _: Throwable => () }
+    in = null; out = null; proc = null; pb = null
   }
 }
 
