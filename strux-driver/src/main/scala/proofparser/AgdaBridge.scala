@@ -8,17 +8,17 @@
  *
  * Usages:
  *   1.  val agda = new AgdaBridge() ; agda.start()
+ *       agda.send("""{"command":"SomeIOTCM"}""")
+ *       val line: Option[String] = agda.readLine()
+ *       agda.stop()
+ *
+ *   2.  val agda = new AgdaBridge() ; agda.start()
  *       agda.send(AgdaIOTCM.load(file = "Foo.agda", include = Seq("."), libs = Seq("standard-library")))
  *       var msg = agda.readLine()
  *       // ... handle messages ...
  *       agda.stop()
  *
- *   2.  val agda = new AgdaBridge() ; agda.start()
- *       agda.send("""{"command":"SomeIOTCM"}""")
- *       val line: Option[String] = agda.readLine()
- *       agda.stop()
- *
- * Examples:
+  * Examples:
  *   // See AgdaSimplifiedExtractor for end-to-end usage that collects goal info.
  *
  * Notes:
@@ -30,18 +30,13 @@
  * (c) 2025 Thmpr Lab, LLC.
  */
 
+
 package proofparser
 
 import java.io._
 import java.nio.charset.StandardCharsets
 import java.lang.ProcessBuilder.Redirect
 
-/** Minimal bridge for `agda --interaction-json`.
-  * We only handle enough of the protocol to:
-  *  - load a file
-  *  - observe metas/goals/constraints
-  *  - observe "give/solve" messages if present
-  */
 final class AgdaBridge(
   agdaCmd: Seq[String] = Seq("agda", "--interaction-json")
 ) {
@@ -84,7 +79,6 @@ final class AgdaBridge(
     in = null; out = null; proc = null; pb = null
   }
 }
-
 /** Helpers to build Agda IOTCM commands.
   * Agda’s protocol is documented in the code & editor backends. We use a tiny subset:
  *   { "command": "IOTCM"

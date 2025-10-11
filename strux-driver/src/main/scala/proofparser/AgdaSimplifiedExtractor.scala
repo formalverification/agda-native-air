@@ -30,6 +30,7 @@ import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import upickle.default._
 
+
 object AgdaSimplifiedExtractor {
 
   private def agdaFiles(root: Path): List[Path] =
@@ -98,7 +99,8 @@ object AgdaSimplifiedExtractor {
     val bridge = new AgdaBridge()
     try {
       bridge.start()
-      bridge.send(AgdaIOTCM.load(file.toString, include, libs))
+      // bridge.send(AgdaIOTCM.load(file.toString, include, libs))
+      bridge.send(AgdaIOTCM.load(file.toString, include, libs).toString)
 
       val mod = moduleName(file)
       var out: List[TrainRecord] = Nil
@@ -112,6 +114,7 @@ object AgdaSimplifiedExtractor {
             keepReading = false
 
           case Some(msg) =>
+            // if (AgdaMsgs.isAllGoals(msg)) {
             if (AgdaMsgs.isAllGoals(msg)) {
               val pairs = extractGoalsPretty(msg)
               // We don’t know decl name reliably from this message alone; use file stem for MVP.

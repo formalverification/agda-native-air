@@ -33,7 +33,7 @@ import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.native.JsonMethods._
 import scala.io.Source
-import scala.util.{Try, Success, Failure}
+import scala.util.{Try, Success, Failure, Using}
 import upickle.default._
 import proofparser.AgdaData
 
@@ -50,11 +50,34 @@ object Agda2TrainTransformer {
       jValue.extractOpt[T].getOrElse(default)
   }
 
+  private def mkBaseFile(f: String): String =
+    if (f.endsWith(".agda")) f.stripSuffix(".agda") else f
+
+  private def mkIdVariants(r: AgdaData): List[String] = {
+    val base = mkBaseFile(r.file)
+    val withMod =
+      r.module.filter(_.nonEmpty).map(m => s"$base.$m.${r.name}").getOrElse(s"$base.${r.name}")
+    // Include a variant without module (some dumps omit it), and with .agda (legacy)
+    val noMod = s"$base.${r.name}"
+    val withExt = s"${base}.agda.${r.name}"
+    val withExtMod = r.module.filter(_.nonEmpty).map(m => s"${base}.agda.$m.${r.name}")
+    List(withMod, noMod, withExt) ++ withExtMod
+  }
+
+  private def isSelfPremise(r: AgdaData, p: String): Boolean = {
+    val pats = mkIdVariants(r).map { v =>
+      // Match exact ID or ID with trailing angle-suffixed index like <22>
+      ("^" + java.util.regex.Pattern.quote(v) + "(<\\d+>)?$").r
+    }
+    pats.exists(_.pattern.matcher(p).matches)
+  }
+
   def writeToJsonl(records: List[AgdaData], outputPath: String): Unit = {
       // Write records to JSONL file
       val writer = new PrintWriter(new File(outputPath))
       try {
-        records.foreach { record =>
+        records.foreach { rec0 =>
+          val record = rec0.copy(premises = rec0.premises.filterNot(p => isSelfPremise(rec0, p)))
           val recordJson =
             ("file" -> record.file) ~
             ("module" -> record.module) ~
@@ -90,7 +113,9 @@ object Agda2TrainTransformer {
   def extractAgdaDataFromJson(inputPath: String): List[AgdaData] = {
     try {
       // Read the input file
-      val jsonString = Source.fromFile(inputPath).mkString
+      // val jsonString = Source.fromFile(inputPath).mkString
+      // Read the input file (close reliably)
+      val jsonString = Using.resource(Source.fromFile(inputPath))(_.mkString)
 
       // Parse the JSON
       val json = parse(jsonString)
@@ -124,7 +149,8 @@ object Agda2TrainTransformer {
           val nameParts = processName(name)
           val moduleStr = nameParts.lift(1).getOrElse("")
           AgdaData(
-            file = nameParts.headOption.getOrElse(""),
+            // file = nameParts.headOption.getOrElse(""),
+            file = mkBaseFile(nameParts.headOption.getOrElse("")),
             module = Option(moduleStr).filter(_.nonEmpty), // <-- Option
             name = nameParts.lastOption.getOrElse(""),
             agdaType = typePretty,

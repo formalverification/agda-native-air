@@ -72,7 +72,8 @@ object Agda2TrainReducer {
   private def readAnyJson(path: Path): List[ujson.Value] = {
     val s = slurp(path)
     if (isLikelyJsonl(s)) {
-      s.linesIterator.filter(_.trim.nonEmpty).map(ujson.read).toList
+      // s.linesIterator.filter(_.trim.nonEmpty).map(ujson.read).toList
+      s.linesIterator.filter(_.trim.nonEmpty).map(line => ujson.read(line)).toList
     } else {
       tryArr(ujson.read(s))
     }
