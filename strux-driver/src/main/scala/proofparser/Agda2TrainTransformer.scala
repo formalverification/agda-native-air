@@ -50,26 +50,30 @@ object Agda2TrainTransformer {
       jValue.extractOpt[T].getOrElse(default)
   }
 
+  private def stripAngle(s: String): String =
+    s.replaceAll("<\\d+>$","")
+
   private def mkBaseFile(f: String): String =
     if (f.endsWith(".agda")) f.stripSuffix(".agda") else f
 
   private def mkIdVariants(r: AgdaData): List[String] = {
     val base = mkBaseFile(r.file)
-    val withMod =
-      r.module.filter(_.nonEmpty).map(m => s"$base.$m.${r.name}").getOrElse(s"$base.${r.name}")
+    val nm = stripAngle(r.name)
+    val noMod   = s"$base.$nm"
+    val withMod = r.module.filter(_.nonEmpty).map(m => s"$base.$m.$nm").getOrElse(noMod)
     // Include a variant without module (some dumps omit it), and with .agda (legacy)
-    val noMod = s"$base.${r.name}"
-    val withExt = s"${base}.agda.${r.name}"
-    val withExtMod = r.module.filter(_.nonEmpty).map(m => s"${base}.agda.$m.${r.name}")
+    val withExt = s"$base.agda.$nm"
+    val withExtMod = r.module.filter(_.nonEmpty).map(m => s"$base.agda.$m.$nm")
     List(withMod, noMod, withExt) ++ withExtMod
   }
 
+  private def normalizePath(s: String): String = {
+    stripAngle(s).replace("._.", ".").replace(".agda.", ".")
+  }
+
   private def isSelfPremise(r: AgdaData, p: String): Boolean = {
-    val pats = mkIdVariants(r).map { v =>
-      // Match exact ID or ID with trailing angle-suffixed index like <22>
-      ("^" + java.util.regex.Pattern.quote(v) + "(<\\d+>)?$").r
-    }
-    pats.exists(_.pattern.matcher(p).matches)
+    val pN = normalizePath(p)
+    mkIdVariants(r).exists(id => normalizePath(id) == pN)
   }
 
   def writeToJsonl(records: List[AgdaData], outputPath: String): Unit = {
@@ -84,7 +88,7 @@ object Agda2TrainTransformer {
             ("name" -> record.name) ~
             ("agdaType" -> record.agdaType) ~
             ("proof" -> record.proof) ~
-            ("premises" -> record.premises)
+            ("premises" -> record.premises.filterNot(p => isSelfPremise(record, p)))
           // Convert to JSON and write to file.
           // Serialize the record
           //   - could use upickle: writer.println(write(record)),

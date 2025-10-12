@@ -95,12 +95,19 @@ object AgdaSimplifiedExtractor {
   }
 
   /** Entry: run Agda on a single file and harvest training records. */
-  def runOnFile(file: Path, include: Seq[String], libs: Seq[String]): List[TrainRecord] = {
-    val bridge = new AgdaBridge()
+  def runOnFile(file: Path, include: Seq[String], libs: Seq[String], libraryFile: Option[String]): List[TrainRecord] = {
+    val bridge = libraryFile match {
+      case Some(path) => new AgdaBridge(Seq("agda", "--interaction-json", "--library-file", path))
+      case None       => new AgdaBridge()
+    }
+    // val bridge = new AgdaBridge()
     try {
       bridge.start()
-      // bridge.send(AgdaIOTCM.load(file.toString, include, libs))
-      bridge.send(AgdaIOTCM.load(file.toString, include, libs).toString)
+      // Build and send a JSON command line to Agda
+      val cmd = AgdaIOTCM.load(file.toString, include, libs)
+      val jsonLine = ujson.write(cmd)
+      System.err.println(s"[send] $jsonLine")
+      bridge.send(jsonLine)
 
       val mod = moduleName(file)
       var out: List[TrainRecord] = Nil
@@ -113,27 +120,34 @@ object AgdaSimplifiedExtractor {
           case None =>
             keepReading = false
 
-          case Some(msg) =>
-            // if (AgdaMsgs.isAllGoals(msg)) {
-            if (AgdaMsgs.isAllGoals(msg)) {
-              val pairs = extractGoalsPretty(msg)
-              // We don’t know decl name reliably from this message alone; use file stem for MVP.
-              val decl = file.getFileName.toString.stripSuffix(".agda")
-              val recs = pairs.map { case (ctx, gty) =>
-                TrainRecord(
-                  file = file.getFileName.toString,
-                  module = mod,
-                  decl = decl,
-                  context = ctx,
-                  goalType = gty,
-                  solution = None,
-                  range = None,
-                  imports = Nil
-                )
+          case Some(line) =>
+            // Accept only proper JSON top-levels.
+            if (line.nonEmpty && (line.head == '{' || line.head == '[')) {
+              val msgJson = ujson.read(line)
+              if (AgdaMsgs.isAllGoals(msgJson)) {
+                val pairs = extractGoalsPretty(msgJson)
+               // We don’t know decl name reliably from this message alone; use file stem for MVP.
+                val decl  = file.getFileName.toString.stripSuffix(".agda")
+                val recs  = pairs.map { case (ctx, gty) =>
+                  TrainRecord(
+                    file     = file.getFileName.toString,
+                    module   = mod,
+                    decl     = decl,
+                    context  = ctx,
+                    goalType = gty,
+                    solution = None,
+                    range    = None,
+                    imports  = Nil
+                  )
+                }
+                out = out ++ recs
               }
-              out = out ++ recs
+            } else {
+              // It’s a prompt / diagnostic like "JSON> cannot read: {...}"
+              System.err.println(s"[agda-out] $line")
             }
         }
+        out
       }
       out
     } catch {
@@ -156,11 +170,11 @@ object AgdaSimplifiedExtractor {
   }
 
   /** CLI:
-    *   runMain proofparser.AgdaSimplifiedExtractor <agda-root> <out.jsonl> [--include path]* [--lib stdlib]*
+    *   runMain proofparser.AgdaSimplifiedExtractor <agda-root> <out.jsonl> [--include DIR]* [--lib LIB]* [--library-file FILE]
     */
   def main(args: Array[String]): Unit = {
     if (args.length < 2) {
-      Console.err.println("Usage: AgdaSimplifiedExtractor <root> <out.jsonl> [--include DIR]* [--lib LIB]*")
+      Console.err.println("Usage: AgdaSimplifiedExtractor <root> <out.jsonl> [--include DIR]* [--lib LIB]* [--library-file FILE]")
       sys.exit(1)
     }
     val root = Paths.get(args(0))
@@ -169,19 +183,27 @@ object AgdaSimplifiedExtractor {
     // collect options
     var inc: List[String] = Nil
     var libs: List[String] = Nil
+    var libraryFile: Option[String] = None
     var i = 2
     while (i < args.length) {
       args(i) match {
         case "--include" if i+1 < args.length => inc = inc :+ args(i+1); i += 2
         case "--lib"     if i+1 < args.length => libs = libs :+ args(i+1); i += 2
+        case "--library-file" if i+1 < args.length =>
+          libraryFile = Some(Paths.get(args(i+1)).toAbsolutePath.normalize().toString); i += 2
         case other =>
           Console.err.println(s"Unrecognized option: $other")
           i += 1
       }
     }
 
-    val files = agdaFiles(root)
-    val recs  = files.flatMap(p => runOnFile(p, inc, libs))
+    val files =
+      if (Files.isDirectory(root)) agdaFiles(root)
+      else if (Files.isRegularFile(root)) List(root)
+      else {
+        Console.err.println(s"Not found: $root"); sys.exit(1); List.empty[Path]
+      }
+    val recs  = files.flatMap(p => runOnFile(p, inc, libs, libraryFile))
     writeJsonl(recs, out)
     println(s"wrote ${recs.size} examples to $out")
   }
