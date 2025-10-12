@@ -1,194 +1,311 @@
-/**
- * Agda2TrainTransformer.scala
+/** =============================================================================
+ *  Agda2TrainTransformer.scala
+ *  ----------------------------------------------------------------------------
  *
- * File: proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
+ *  FILE proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
  *
- * Description: Transforms Agda2Train-style JSON into the project’s canonical AgdaData/TrainRecord
- *              rows for downstream training or inspection.
- * Usage:
- *   sbt "project proof-parser" \
- *       "runMain proofparser.Agda2TrainTransformer <in.json|jsonl> <out.jsonl>"
+ *  PURPOSE
+ *    Transform an Agda2train-style JSON dump (our simplified Agda AST
+ *    snapshot) into the project’s canonical AgdaData/TrainRecord rows for
+ *    downstream training or inspection.  The canonical, line-oriented training
+ *    format used across the agda-ai-prover project is one JSON object per line
+ *    with fields; specifically,
  *
- *   scala Agda2TrainTransformer.scala <input-json-file> <output-jsonl-file>
+ *      { file, module?, name, agdaType, proof, premises[] }
  *
- * Examples:
- *   sbt "project proof-parser" \
- *       "runMain proofparser.Agda2TrainTransformer proof-parser/src/test/resources/agda-example.json target/a2t.jsonl"
+ *    This is the data contract that downstream ETL and training code expect.
  *
- *   scala Agda2TrainTransformer.scala agda-output.json theorems.jsonl
+ *  CONTEXT IN PROJECT
+ *    - Upstream:
+ *        * `AgdaExtractorMain` (Scala) or other tools produce a single JSON
+ *          dump per Agda module (e.g., `agda-example.json`).
+ *    - This transformer:
+ *        * consumes that JSON (or a JSON Lines file of many such JSON blobs),
+ *        * extracts definitions that look like theorems/lemmas/defs,
+ *        * normalizes names and premises,
+ *        * writes a single JSONL file of `AgdaData` rows.
+ *    - Downstream:
+ *        * Spark ETL (`PreprocessAgda`) or Python loaders produce features
+ *          and feed trainers.
  *
- * Notes:
+ *  DESIGN GOALS
+ *    - **Consistency**: use the same JSON stack (`ujson`/`upickle`) as the
+ *      bridge/extractor tools to keep the project uniform.
+ *    - **Purity** at the edges: most helpers are total/pure functions; I/O is
+ *      localized to two small functions (read whole file, write JSONL).
+ *    - **Robust premise filtering**: drop “self-premises” even when spelled
+ *      differently (angle suffixes like `<40>`, hidden-module `._.`, or stray
+ *      `.agda.` segments).
+ *    - **Friendly errors**: if the input is malformed, fail with context.
+ *
+ *  INPUT SHAPE (what we read)
+ *    A single JSON object (or JSONL of such objects) with keys like:
+ *
+ *      {
+ *        "name": "agda-example",
+ *        "scope-local":   [ <items> ],
+ *        "scope-private": [ <items> ]
+ *      }
+ *
+ *    where each item often has:
+ *      - "name": "agda-example.properties.+-suc<40>"
+ *      - "type": { "pretty": "..." }
+ *      - "definition": { "pretty": "..." }
+ *      - "holes": [ { "premises": ["agda-example._+_<8>", ...] }, ... ]
+ *
+ *  OUTPUT SHAPE (what we write)
+ *    One JSON object per line conforming to `AgdaData` from `Model.scala`:
+ *      {
+ *        "file": "agda-example",
+ *        "module": "properties",   // optional
+ *        "name": "+-suc<40>",
+ *        "agdaType": "…",
+ *        "proof": "…",
+ *        "premises": [ "qual.id", ... ]
+ *      }
+ *
+ *  CLI
+ *    sbt "project proof-parser" \
+ *        "runMain proofparser.Agda2TrainTransformer <in.json|jsonl> <out.jsonl>"
+ *
+ *  EXAMPLES
+ *    sbt "project proof-parser" \
+ *        "runMain proofparser.Agda2TrainTransformer proof-parser/src/test/resources/agda-example.json target/a2t.jsonl"
+ *
+ *  TESTING TIPS
+ *    - Unit-test the pure helpers (`parseOne`, `normalizePremise`, `isSelfPremise`)
+ *      with small JSON snippets.
+ *    - Run on `src/test/resources/agda-example.json` and inspect the JSONL.
+ *
+ *  NOTES
  *   - Ensure only the canonical AgdaData from Model.scala is used (remove duplicate type defs).
  *   - Prefer pretty-printed terms/types from the dump; normalize module/file names.
  *   - Complements Agda2TrainReducer: this file may expose richer fields or a different mapping.
  *
- * Copyright (c) 2025 Thmpr Lab, LLC.
+ *  COPYRIGHT (c) 2025 Thmpr Lab, LLC.
+ *
+ * =============================================================================
  */
 
 
 package proofparser
 
 import java.io.{File, PrintWriter}
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.native.JsonMethods._
+import java.nio.file.{Files, Paths}
 import scala.io.Source
-import scala.util.{Try, Success, Failure, Using}
+import scala.util.{Try, Success, Failure}
 import upickle.default._
-import proofparser.AgdaData
+import ujson._
+
 
 case class TheoremData(file: String, module: Option[String], name: String, body: String)
 object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }
 
-object Agda2TrainTransformer {
-  // Set up JSON parsing with the correct implicit formats
-  implicit val formats: Formats = DefaultFormats
+// Canonical training record (defined in Model.scala). We import and write it out.
+//   case class AgdaData(file: String, module: Option[String], name: String,
+//                       agdaType: String, proof: String, premises: List[String])
+import proofparser.AgdaData
 
-  // Helper extension method for safer extraction
-  implicit class RichJValue(val jValue: JValue) extends AnyVal {
-    def extractOrElse[T](default: T)(implicit formats: Formats, mf: Manifest[T]): T =
-      jValue.extractOpt[T].getOrElse(default)
+object Agda2TrainTransformer {
+
+  // ------------------------------------------------------------
+  // Small JSON helpers (ujson is dynamically typed)
+  // ------------------------------------------------------------
+
+  private def strOpt(obj: Value, key: String): Option[String] =
+    obj.obj.get(key).flatMap(_.strOpt)
+
+  private def objOpt(obj: Value, key: String): Option[Obj] =
+    obj.obj.get(key).flatMap(_.objOpt)
+
+  private def arrOpt(obj: Value, key: String): Option[Arr] =
+    obj.obj.get(key).flatMap(_.arrOpt)
+
+  private def getPretty(obj: Obj, key: String): Option[String] =
+    obj.get(key).flatMap(_.objOpt).flatMap(_.get("pretty")).flatMap(_.strOpt)
+
+  // ------------------------------------------------------------
+  // Name normalization & self-premise filtering
+  // ------------------------------------------------------------
+
+  /** Strip a trailing `<number>` suffix, e.g., "+-suc<40>" -> "+-suc". */
+  private def stripAngle(s: String): String =
+    s.replaceAll("<\\d+>$", "")
+
+  /** Remove a single `.agda` extension from the middle or end of a path fragment. */
+  private def stripAgdaDot(path: String): String =
+    path.replace(".agda.", ".").stripSuffix(".agda")
+
+  /** Collapse hidden-module separator `._.` into `.`. */
+  private def collapseHidden(path: String): String =
+    path.replace("._.", ".")
+
+  /** Normalize a fully-qualified premise id for robust equality checks. */
+  private def normalizePremise(p: String): String = {
+    val noAngle  = stripAngle(p)
+    val noHidden = collapseHidden(noAngle)
+    stripAgdaDot(noHidden)
   }
 
-  private def stripAngle(s: String): String =
-    s.replaceAll("<\\d+>$","")
-
-  private def mkBaseFile(f: String): String =
+  /** Base file name without .agda, e.g., "agda-example.agda" -> "agda-example". */
+  private def baseFile(f: String): String =
     if (f.endsWith(".agda")) f.stripSuffix(".agda") else f
 
-  private def mkIdVariants(r: AgdaData): List[String] = {
-    val base = mkBaseFile(r.file)
-    val nm = stripAngle(r.name)
-    val noMod   = s"$base.$nm"
-    val withMod = r.module.filter(_.nonEmpty).map(m => s"$base.$m.$nm").getOrElse(noMod)
-    // Include a variant without module (some dumps omit it), and with .agda (legacy)
-    val withExt = s"$base.agda.$nm"
-    val withExtMod = r.module.filter(_.nonEmpty).map(m => s"$base.agda.$m.$nm")
-    List(withMod, noMod, withExt) ++ withExtMod
+  /** Produce possible qualified ids for this record, normalized. */
+  private def idVariants(rec: AgdaData): List[String] = {
+    val b  = baseFile(rec.file)
+    val nm = stripAngle(rec.name)
+    val vNoMod   = s"$b.$nm"
+    val vWithMod = rec.module.filter(_.nonEmpty).map(m => s"$b.$m.$nm").getOrElse(vNoMod)
+    val vWithExt = s"$b.agda.$nm"
+    val vWithExtMod = rec.module.filter(_.nonEmpty).map(m => s"$b.agda.$m.$nm")
+    List(vWithMod, vNoMod, vWithExt) ++ vWithExtMod
+  }.map(normalizePremise)
+
+  /** True if a premise points back to the record itself (under any spelling). */
+  private def isSelfPremise(rec: AgdaData, premise: String): Boolean = {
+    val pN = normalizePremise(premise)
+    idVariants(rec).exists(_ == pN)
   }
 
-  private def normalizePath(s: String): String = {
-    stripAngle(s).replace("._.", ".").replace(".agda.", ".")
+  // ------------------------------------------------------------
+  // Parsing one “agda2train” JSON object into AgdaData rows
+  // ------------------------------------------------------------
+
+  private def processName(qualified: String): (String, Option[String], String) = {
+    // Split on dots. Examples:
+    //   "agda-example.properties.+-suc<40>"  -> file="agda-example", module="properties", name="+-suc<40>"
+    //   "agda-example._+_<8>"                -> file="agda-example", module=None, name="_+_<8>"
+    val parts = qualified.split('.').toList
+    val file             = parts.headOption.getOrElse("")
+    val moduleAndName    = parts.drop(1)
+    val (moduleOpt,name) = moduleAndName match {
+      case Nil         => (None, "")
+      case only :: Nil => (None, only)
+      case many        => (Some(many.init.mkString(".")), many.last)
+    }
+    (file, moduleOpt.filter(_.nonEmpty), name)
   }
 
-  private def isSelfPremise(r: AgdaData, p: String): Boolean = {
-    val pN = normalizePath(p)
-    mkIdVariants(r).exists(id => normalizePath(id) == pN)
+  /** Extract premises from `holes[*].premises[]`, deduped. */
+  private def collectPremises(item: Obj): List[String] = {
+    objOpt(Value(item), "holes")
+      .toList // None or Some(obj) -> List(obj) for easy flatMap
+      .flatMap(_.value.values) // holes array (if present)
+      .flatMap(_.arrOpt.map(_.value).getOrElse(Nil)) // safe array unwrap
+      .flatMap(_.objOpt.toList) // each hole as Obj
+      .flatMap { h =>
+        arrOpt(Value(h), "premises").toList.flatMap(_.value).flatMap(_.strOpt)
+      }
+      .distinct
   }
 
-  def writeToJsonl(records: List[AgdaData], outputPath: String): Unit = {
-      // Write records to JSONL file
-      val writer = new PrintWriter(new File(outputPath))
+  /** Parse a single item into an AgdaData (if it has minimal shape). */
+  private def parseItem(item: Obj): Option[AgdaData] = {
+    val nameOpt  = item.value.get("name").flatMap(_.strOpt)
+    val typeStr  = getPretty(item, "type")
+    val defStr   = getPretty(item, "definition")
+    (nameOpt, typeStr, defStr) match {
+      case (Some(qname), Some(tp), Some(df)) =>
+        val (file, module, shortName) = processName(qname)
+        val premises = collectPremises(item)
+        Some(AgdaData(
+          file     = file,
+          module   = module,
+          name     = shortName,
+          agdaType = tp,
+          proof    = df,
+          premises = premises
+        ))
+      case _ => None
+    }
+  }
+
+  /** Parse one whole agda2train JSON object into many AgdaData rows. */
+  private def parseOne(json: Value): List[AgdaData] = {
+    val locals  = arrOpt(json, "scope-local").map(_.value).getOrElse(Nil)
+    val privs   = arrOpt(json, "scope-private").map(_.value).getOrElse(Nil)
+    val all     = locals ++ privs
+    all.flatMap(_.objOpt.flatMap(parseItem))
+  }
+
+  // ------------------------------------------------------------
+  // I/O helpers
+  // ------------------------------------------------------------
+
+  private def readWhole(path: String): Either[String, String] =
+    Try(Source.fromFile(path, "UTF-8").mkString).toEither.left.map(_.getMessage)
+
+  private def writeJsonl(records: List[AgdaData], outputPath: String): Either[String, Unit] =
+    Try {
+      val parent = Paths.get(outputPath).toAbsolutePath.getParent
+      if (parent != null) Files.createDirectories(parent)
+      val pw = new PrintWriter(new File(outputPath), "UTF-8")
       try {
-        records.foreach { rec0 =>
-          val record = rec0.copy(premises = rec0.premises.filterNot(p => isSelfPremise(rec0, p)))
-          val recordJson =
-            ("file" -> record.file) ~
-            ("module" -> record.module) ~
-            ("name" -> record.name) ~
-            ("agdaType" -> record.agdaType) ~
-            ("proof" -> record.proof) ~
-            ("premises" -> record.premises.filterNot(p => isSelfPremise(record, p)))
-          // Convert to JSON and write to file.
-          // Serialize the record
-          //   - could use upickle: writer.println(write(record)),
-          //   - we'll use json4s:
-          writer.println(compact(render(recordJson)))
-          // Use compact to avoid pretty printing and ensure single line
+        records.foreach { r =>
+          // filter self-premises on the way out
+          val cleaned = r.copy(premises = r.premises.filterNot(p => isSelfPremise(r, p)))
+          pw.println(write(cleaned))
         }
-        println(s"Successfully processed ${records.size} records to $outputPath")
-      } finally {
-        writer.close()
-      }
+        pw.flush()
+      } finally pw.close()
+    }.toEither.left.map(_.getMessage)
 
-  }
-  def processName(name: String): List[String] = {
-    // Process the name to remove unwanted characters
-    val names = name.split('.').toList
-    val fileName = names(0)
-    val defName = names.lastOption.getOrElse("")
-    if (names.length > 2) {
-      List(fileName, names(1), defName)
+  // ------------------------------------------------------------
+  // Top-level: support both a single JSON file or a JSONL of many JSON blobs
+  // ------------------------------------------------------------
+
+  private def parseInput(text: String): Either[String, List[AgdaData]] = {
+    // Heuristic: if the file contains multiple top-level JSON objects split by newlines,
+    // treat it as JSONL; otherwise parse as one JSON object.
+    val trimmed = text.dropWhile(_.isWhitespace)
+    if (trimmed.isEmpty) Right(Nil)
+    else if (trimmed.head == '{' || trimmed.head == '[') {
+      // Single JSON value (object expected)
+      Try(ujson.read(text)).toEither.left.map(_.getMessage).map(parseOne)
     } else {
-      List(fileName, "", defName)
+      // JSONL: each line should be one JSON object
+      val rows = text.linesIterator.toList.filter(_.trim.nonEmpty)
+      val parsed = rows.map { line =>
+        Try(ujson.read(line)).toEither.left.map(_.getMessage).map(parseOne)
+      }
+      val (errs, oks) = parsed.partitionMap(identity)
+      if (errs.nonEmpty) Left("Failed to parse some JSONL lines: " + errs.mkString("; "))
+      else Right(oks.flatten)
     }
   }
 
-  def extractAgdaDataFromJson(inputPath: String): List[AgdaData] = {
-    try {
-      // Read the input file
-      // val jsonString = Source.fromFile(inputPath).mkString
-      // Read the input file (close reliably)
-      val jsonString = Using.resource(Source.fromFile(inputPath))(_.mkString)
+  // ------------------------------------------------------------
+  // CLI
+  // ------------------------------------------------------------
 
-      // Parse the JSON
-      val json = parse(jsonString)
+  private def usage: String =
+    "Usage: Agda2TrainTransformer <input-json-or-jsonl> <output-jsonl>"
 
-      // Extract the top-level name (file name)
-      val fileName : String = (json \ "name").extractOpt[String].getOrElse("")
-
-      // Extract local scope items
-      val scopeLocal : List[JValue] = (json \ "scope-local").extract[List[JValue]]
-
-      // Extract private scope items
-      val scopePrivate : List[JValue] = (json \ "scope-private").extract[List[JValue]]
-
-      // Process each item in scope-local
-
-      (scopeLocal ++ scopePrivate).flatMap { item =>
-        for {
-          name <- (item \ "name").extractOpt[String]
-          typeObj <- (item \ "type").extractOpt[JValue]
-          typePretty <- (typeObj \ "pretty").extractOpt[String]
-          defObj <- (item \ "definition").extractOpt[JValue]
-          defPretty <- (defObj \ "pretty").extractOpt[String]
-          // premisesObj <- (item \ "premises").extractOpt[List[String]]
-          // Check if the item is a theorem-like definition
-          // if premises.isDefined && premises.get.nonEmpty
-        } yield {
-          val premises = (item \ "holes").extractOpt[List[JValue]].getOrElse(List()).flatMap { hole =>
-             (hole \ "premises").extractOpt[List[String]].getOrElse(List())
-           }.toSet.toList // Remove duplicates
-
-          val nameParts = processName(name)
-          val moduleStr = nameParts.lift(1).getOrElse("")
-          AgdaData(
-            // file = nameParts.headOption.getOrElse(""),
-            file = mkBaseFile(nameParts.headOption.getOrElse("")),
-            module = Option(moduleStr).filter(_.nonEmpty), // <-- Option
-            name = nameParts.lastOption.getOrElse(""),
-            agdaType = typePretty,
-            proof = defPretty,
-            premises = premises
-          )
-        }
-      }
-     } catch {
-      case e: Exception =>
-        println(s"Error processing file: ${e.getMessage}")
-        e.printStackTrace()
-        List.empty[AgdaData]
-    }
-   }
-
-  /**
-    * Main entry point for the Agda2TrainExtractor application.
-    *
-    * @param args Command-line arguments: input JSON file and output JSONL file.
-    */
   def main(args: Array[String]): Unit = {
     if (args.length != 2) {
-      println("Usage: Agda2TrainExtractor <input-json-file> <output-jsonl-file>")
+      Console.err.println(usage)
       sys.exit(1)
     }
 
-    val inputFile = args(0)
-    val outputFile = args(1)
+    val in  = args(0)
+    val out = args(1)
 
-    val records = extractAgdaDataFromJson(inputFile)
-    writeToJsonl(records, outputFile)
-    println(s"Extracted ${records.length} theorem/proof pairs to $outputFile")
+    val result =
+      for {
+        text    <- readWhole(in)
+        records <- parseInput(text)
+        _        = println(s"Successfully processed ${records.size} records to $out")
+        _       <- writeJsonl(records, out)
+      } yield {
+        println(s"Extracted ${records.length} theorem/proof pairs to $out")
+      }
+
+    result match {
+      case Left(err) =>
+        Console.err.println(s"[Agda2TrainTransformer] ERROR: $err")
+        sys.exit(2)
+      case Right(_)  => () // success
+    }
   }
-
 }
-

@@ -1,28 +1,38 @@
-/**
- * # AgdaBridge
+/** ============================================================================
+ *  AgdaBridge.scala
+ *  --------------------------------------------------------------------------
  *
- * A tiny process bridge to `agda --interaction-json` with:
- * - lifecycle control (start/stop)
- * - line-based send/receive
- * - JSON helpers (send JSON values as a single line)
- * - explicit, typed errors (`Either[String, A]`) instead of exceptions
+ *  FILE proof-parser/src/main/scala/proofparser/AgdaBridge.scala
  *
- * ## Design
- * - This class owns exactly one Agda child process.
- * - All I/O is UTF-8, line-oriented. We never block forever (callers implement timeouts).
- * - We DO NOT interpret Agda’s JSON protocol here; we just read/write lines.
- *   Higher layers (extractors) decide what to send and how to parse.
  *
- * ## Typical usage
- * {{{
- * val bridge = new AgdaBridge() // or new AgdaBridge(Seq("agda","--interaction-json","--library-file", "/path/to/libraries"))
- * for {
- *   _ <- bridge.start()
- *   _ <- bridge.sendJson(ujson.Obj("command" -> "IOTCM", "payload" -> ...))
- *   ln <- bridge.readLine() // Option[String]
- * } yield ()
- * bridge.stop()
- * }}}
+ *  PURPOSE
+ *    A tiny process bridge to `agda --interaction-json` with:
+ *
+ *      +  lifecycle control (start/stop)
+ *      +  line-based send/receive
+ *      +  JSON helpers (send JSON values as a single line)
+ *      +  explicit, typed errors (`Either[String, A]`) instead of exceptions
+ *
+ *  DESIGN
+ *
+ *    +  This class owns exactly one Agda child process.
+ *    +  All I/O is UTF-8, line-oriented. We never block forever (callers implement timeouts).
+ *    +  We DO NOT interpret Agda’s JSON protocol here; we just read/write lines.
+ *       Higher layers (extractors) decide what to send and how to parse.
+ *
+ *  TYPICAL USAGE
+ *
+ *    {{{
+ *    val bridge = new AgdaBridge() // or new AgdaBridge(Seq("agda","--interaction-json","--library-file", "/path/to/libraries"))
+ *    for {
+ *      _ <- bridge.start()
+ *      _ <- bridge.sendJson(ujson.Obj("command" -> "IOTCM", "payload" -> ...))
+ *      ln <- bridge.readLine() // Option[String]
+ *    } yield ()
+ *    bridge.stop()
+ *    }}}
+ *
+ *  COPYRIGHT (c) 2025 ThmprLab.
  */
 
 package proofparser
