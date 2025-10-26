@@ -17,6 +17,7 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "upickle"    % "3.1.2",
       "org.scalatest" %% "scalatest" % "3.2.19" % Test,
+      "org.scalacheck" %% "scalacheck" % "1.17.0"  % Test,
       "org.json4s" %% "json4s-native" % "4.0.6",
     )
     // Old dependencies:
