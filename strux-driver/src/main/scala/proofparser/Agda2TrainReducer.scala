@@ -117,6 +117,10 @@ object Agda2TrainReducer {
     e <- v.obj.get("end").flatMap(readPos)
   } yield Range(s, e)
 
+  // Convert a Range to a compact "l1:c1-l2:c2" string for TrainRecord.range (Option[String]).
+  private def showRange(r: Range): String = r match {
+    case Range(Pos(sl, sc), Pos(el, ec)) => s"$sl:$sc-$el:$ec"
+  }
   // ---- reduction logic ------------------------------------------------------
 
   /** A tolerant walker that tries to recognize “declaration-like” objects:

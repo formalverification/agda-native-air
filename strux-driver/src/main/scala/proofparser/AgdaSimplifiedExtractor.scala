@@ -123,20 +123,20 @@ private final case class Logger(verbose: Boolean) {
  * -----------------------------
  * Keep this tiny and stable; downstream code depends on it.
  */
-final case class CtxVar(name: String, tpe: String)
-object CtxVar { implicit val rw: ReadWriter[CtxVar] = macroRW }
+// final case class CtxVar(name: String, tpe: String)
+// object CtxVar { implicit val rw: ReadWriter[CtxVar] = macroRW }
 
-final case class TrainRecord(
-  file:     String,               // e.g., "ApplyDemo.agda"
-  module:   String,               // best-effort module name (or file base)
-  decl:     String,               // top-level declaration (best-effort for now)
-  context:  List[CtxVar],         // telescope: x : A, ...
-  goalType: String,               // pretty goal type
-  solution: Option[String],       // unused in this extractor (future: solved terms)
-  range:    Option[String],       // unused (future: source spans)
-  imports:  List[String]          // unused (future: visible imports)
-)
-object TrainRecord { implicit val rw: ReadWriter[TrainRecord] = macroRW }
+// final case class TrainRecord(
+//   file:     String,               // e.g., "ApplyDemo.agda"
+//   module:   String,               // best-effort module name (or file base)
+//   decl:     String,               // top-level declaration (best-effort for now)
+//   context:  List[CtxVar],         // telescope: x : A, ...
+//   goalType: String,               // pretty goal type
+//   solution: Option[String],       // unused in this extractor (future: solved terms)
+//   range:    Option[String],       // unused (future: source spans)
+//   imports:  List[String]          // unused (future: visible imports)
+// )
+// object TrainRecord { implicit val rw: ReadWriter[TrainRecord] = macroRW }
 
 
 /* -----------------------------

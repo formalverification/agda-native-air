@@ -111,18 +111,24 @@ object Agda2TrainTransformer {
   // ------------------------------------------------------------
   // Small JSON helpers (ujson is dynamically typed)
   // ------------------------------------------------------------
+  private type JObject = upickle.core.LinkedHashMap[String, ujson.Value]
+  private type JArray  = scala.collection.mutable.ArrayBuffer[ujson.Value]
 
-  private def strOpt(obj: Value, key: String): Option[String] =
-    obj.obj.get(key).flatMap(_.strOpt)
+  private def asObj(v: ujson.Value): Option[JObject] = v match {
+    case ujson.Obj(o) => Some(o)
+    case _            => None
+  }
+  private def asArr(v: ujson.Value): Option[JArray] = v match {
+    case ujson.Arr(a) => Some(a)
+    case _            => None
+  }
 
-  private def objOpt(obj: Value, key: String): Option[Obj] =
-    obj.obj.get(key).flatMap(_.objOpt)
+  private def field(o: JObject, k: String): Option[ujson.Value] = o.get(k)
+  private def str(o: JObject, k: String): Option[String]        = field(o, k).flatMap(_.strOpt)
 
-  private def arrOpt(obj: Value, key: String): Option[Arr] =
-    obj.obj.get(key).flatMap(_.arrOpt)
-
-  private def getPretty(obj: Obj, key: String): Option[String] =
-    obj.get(key).flatMap(_.objOpt).flatMap(_.get("pretty")).flatMap(_.strOpt)
+  /** Find `obj[key].pretty` as a String, if present. */
+  private def getPretty(o: JObject, key: String): Option[String] =
+    field(o, key).flatMap(asObj).flatMap(_.get("pretty")).flatMap(_.strOpt)
 
   // ------------------------------------------------------------
   // Name normalization & self-premise filtering
@@ -187,7 +193,7 @@ object Agda2TrainTransformer {
     (file, moduleOpt.filter(_.nonEmpty), name)
   }
 
-  /** Extract premises from `holes[*].premises[]`, deduped. */
+  /** Extract premises from `holes[*].premises[]`, deduped.
   private def collectPremises(item: Obj): List[String] = {
     objOpt(Value(item), "holes")
       .toList // None or Some(obj) -> List(obj) for easy flatMap
@@ -199,16 +205,31 @@ object Agda2TrainTransformer {
       }
       .distinct
   }
+  */
+  /** Parse a single item object into AgdaData (if minimally well-formed). */
+  private def parseItem(item: JObject): Option[AgdaData] = {
+    val nameOpt = str(item, "name")
+    val typeStr = getPretty(item, "type")
+    val defStr  = getPretty(item, "definition")
 
-  /** Parse a single item into an AgdaData (if it has minimal shape). */
-  private def parseItem(item: Obj): Option[AgdaData] = {
-    val nameOpt  = item.value.get("name").flatMap(_.strOpt)
-    val typeStr  = getPretty(item, "type")
-    val defStr   = getPretty(item, "definition")
+    // Collect premises from holes[*].premises[]
+    val premises: List[String] =
+      field(item, "holes").toList
+        .flatMap(asArr)               // holes array
+        .flatMap(_.toList)            // values inside
+        .flatMap {
+          case ujson.Obj(h) =>
+            h.get("premises").toList
+              .flatMap(asArr)
+              .flatMap(_.toList)
+              .flatMap(_.strOpt)
+          case _ => Nil
+        }
+        .distinct
+
     (nameOpt, typeStr, defStr) match {
       case (Some(qname), Some(tp), Some(df)) =>
         val (file, module, shortName) = processName(qname)
-        val premises = collectPremises(item)
         Some(AgdaData(
           file     = file,
           module   = module,
@@ -221,12 +242,20 @@ object Agda2TrainTransformer {
     }
   }
 
-  /** Parse one whole agda2train JSON object into many AgdaData rows. */
-  private def parseOne(json: Value): List[AgdaData] = {
-    val locals  = arrOpt(json, "scope-local").map(_.value).getOrElse(Nil)
-    val privs   = arrOpt(json, "scope-private").map(_.value).getOrElse(Nil)
-    val all     = locals ++ privs
-    all.flatMap(_.objOpt.flatMap(parseItem))
+  /** Parse one agda2train JSON object into multiple AgdaData rows. */
+  private def parseOne(json: ujson.Value): List[AgdaData] = {
+    val locals = json.obj.get("scope-local").toList
+      .flatMap(asArr).flatMap(_.toList)
+
+    val privs  = json.obj.get("scope-private").toList
+      .flatMap(asArr).flatMap(_.toList)
+
+    val all = locals ++ privs
+
+    all.flatMap {
+      case ujson.Obj(o) => parseItem(o).toList
+      case _            => Nil
+    }
   }
 
   // ------------------------------------------------------------
@@ -245,7 +274,7 @@ object Agda2TrainTransformer {
         records.foreach { r =>
           // filter self-premises on the way out
           val cleaned = r.copy(premises = r.premises.filterNot(p => isSelfPremise(r, p)))
-          pw.println(write(cleaned))
+          pw.println(upickle.default.write(cleaned))
         }
         pw.flush()
       } finally pw.close()
