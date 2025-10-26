@@ -35,8 +35,8 @@ package proofparser
 import java.nio.file.{Files, Paths, Path}
 import scala.jdk.CollectionConverters._
 import scala.util.Using
+import scala.util.matching.Regex
 import upickle.default._
-
 
 object AgdaExtractor {
 
@@ -44,13 +44,19 @@ object AgdaExtractor {
   def getAgdaFiles(dir: Path): List[Path] =
     Files.walk(dir).iterator.asScala.filter(_.toString.endsWith(".agda")).toList
 
+  // ------------------------------------------------------------
+  // Module/header parsing
+  // ------------------------------------------------------------
+
   // Module Detection
   // A simple check for `module` lines.
-  def extractModuleName(lines: List[String]): Option[String] =
+  /** Extract `module Foo.Bar where` → Some("Foo.Bar"), else None. */
+  def extractModuleName(lines: List[String]): Option[String] = {
+    val ModuleDecl: Regex = """^\s*module\s+([A-Za-z_][A-Za-z0-9_\.]*)\s+where\s*$""".r
     lines.collectFirst {
-      case line if line.trim.startsWith("module ") =>
-        line.trim.stripPrefix("module").trim.split("\\s+").headOption
-    }.flatten
+      case ModuleDecl(name) => name
+    }
+  }
 
   // 📚 Theorem Extraction
 
@@ -138,36 +144,62 @@ object AgdaExtractor {
     results.toSeq
   }
 
+  // ------------------------------------------------------------
+  // “Theorem-like” declarations
+  // ------------------------------------------------------------
+
+  // A (very) small token list we do NOT consider “theorem-like”.
+  // (We want lemma/theorem-style bindings:  `name : Type`)
+  private val ForbiddenFirstToken: Set[String] = Set(
+    "postulate", "open", "import", "module",
+    "data", "record", "mutual", "where",
+    "infix", "infixl", "infixr", "syntax", "pragma", "private"
+  )
+
+  // Greedy but useful: a name, a colon, then the rest is the type string.
+  private val Decl: Regex = """^\s*([^\s:]+)\s*:\s*(.+)$""".r
+
+  // Quick comment/whitespace recognizers
+  private def isLineComment(s: String): Boolean = s.trim.startsWith("--")
+  private def isBlockCommentStart(s: String): Boolean = s.trim.startsWith("{-")
+  private def isEmpty(s: String): Boolean = s.trim.isEmpty
+
   // 📚 Theorem Detection
-  def isTheoremLike(line: String): Boolean =
-    line.trim.nonEmpty && !line.trim.startsWith("--") && line.contains(" : ")
+  /** Returns true iff the line looks like an Agda theorem/lemma type declaration. */
+  def isTheoremLike(line: String): Boolean = {
+    if (isEmpty(line) || isLineComment(line) || isBlockCommentStart(line)) return false
+    line match {
+      case Decl(name, _) =>
+        val firstTok = line.trim.takeWhile(!_.isWhitespace)
+        // Filter out known non-theorem forms:
+        !ForbiddenFirstToken.contains(firstTok)
+      case _ => false
+    }
+  }
 
   // ✍️ Proof Detection
   def isProofLike(line: String): Boolean =
     line.trim.nonEmpty && !line.trim.startsWith("--") && line.contains(" = ")
 
   // 📚 Theorem Collection
+  // ------------------------------------------------------------
+  // Collect (name, type) pairs from a text buffer
+  // ------------------------------------------------------------
+
+  /** Collect simple `(name, type)` pairs from lines containing `name : Type`.
+    * We ignore comments, noise, and orphan proofs (lines with `=` but no `:`).
+    * This is intentionally conservative: just the declarations.
+    */
   def collectTheorems(lines: List[String]): List[(String, String)] = {
-    val buffer = scala.collection.mutable.ListBuffer.empty[(String, String)]
-    val current = scala.collection.mutable.ListBuffer.empty[String]
-    var name = ""
-    val cleanedLines = removeComments(lines)
-
-    cleanedLines.foreach { line =>
-      if (isTheoremLike(line)) {
-        if (current.nonEmpty) {
-          buffer += ((name, current.mkString(" ")))
-          current.clear()
-        }
-        val split = line.split("\\s+").toList
-        name = split.headOption.getOrElse("")
-        current += line
-      } else if (current.nonEmpty) current += line
-    }
-
-    if (current.nonEmpty) buffer += ((name, current.mkString(" ")))
-
-    buffer.toList
+    lines.iterator
+      .filterNot(s => isEmpty(s) || isLineComment(s) || isBlockCommentStart(s))
+      .flatMap {
+        case Decl(name, tpe) if isTheoremLike(name + " : " + tpe) =>
+          Some(name -> tpe.trim)
+        case _ =>
+          None
+      }
+      .toList
   }
 
 
