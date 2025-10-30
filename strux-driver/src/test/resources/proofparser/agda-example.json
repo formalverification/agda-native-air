@@ -1,0 +1,5202 @@
+{
+  "name": "agda-example",
+  "scope-global": [],
+  "scope-local": [
+    {
+      "name": "agda-example.ℕ<2>",
+      "type": {
+        "pretty": "Set",
+        "dependency-level": 0,
+        "tag": "Sort",
+        "sort": "Set"
+      },
+      "definition": {
+        "pretty": "(zero : ℕ) | (suc : ℕ → ℕ)",
+        "tag": "ADT",
+        "variants": [
+          {
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          {
+            "dependency-level": 0,
+            "tag": "Pi",
+            "bound-name": "_",
+            "domain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            },
+            "codomain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            }
+          }
+        ]
+      },
+      "holes": []
+    },
+    {
+      "name": "agda-example.ℕ.zero<4>",
+      "type": {
+        "pretty": "ℕ",
+        "dependency-level": 0,
+        "tag": "ScopeReference",
+        "ref-name": "agda-example.ℕ<2>"
+      },
+      "definition": {
+        "pretty": "ℕ@0",
+        "tag": "Constructor",
+        "reference": "agda-example.ℕ",
+        "variant": 0
+      },
+      "holes": []
+    },
+    {
+      "name": "agda-example.ℕ.suc<6>",
+      "type": {
+        "pretty": "ℕ → ℕ",
+        "dependency-level": 0,
+        "tag": "Pi",
+        "bound-name": "_",
+        "domain": {
+          "tag": "ScopeReference",
+          "ref-name": "agda-example.ℕ<2>"
+        },
+        "codomain": {
+          "tag": "ScopeReference",
+          "ref-name": "agda-example.ℕ<2>"
+        }
+      },
+      "definition": {
+        "pretty": "ℕ@1",
+        "tag": "Constructor",
+        "reference": "agda-example.ℕ",
+        "variant": 1
+      },
+      "holes": []
+    },
+    {
+      "name": "agda-example._+_<8>",
+      "type": {
+        "pretty": "ℕ → ℕ → ℕ",
+        "dependency-level": 0,
+        "tag": "Pi",
+        "bound-name": "_",
+        "domain": {
+          "tag": "ScopeReference",
+          "ref-name": "agda-example.ℕ<2>"
+        },
+        "codomain": {
+          "tag": "Pi",
+          "bound-name": "_",
+          "domain": {
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "codomain": {
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          }
+        }
+      },
+      "definition": {
+        "pretty": "zero + n = n | suc m + n = suc (m + n)",
+        "tag": "Function",
+        "clauses": [
+          {
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero"
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ],
+            "body": {
+              "tag": "DeBruijn",
+              "index": 0
+            }
+          },
+          {
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ],
+            "body": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.suc<6>"
+              },
+              "arguments": [
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "holes": [
+        {
+          "ctx": {
+            "pretty": "(m : ℕ) (n : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc (m + n)",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>",
+            "agda-example._+_<8>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "m + n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>"
+          ]
+        }
+      ]
+    }
+  ],
+  "scope-private": [
+    {
+      "name": "agda-example.properties._.+-suc<40>",
+      "type": {
+        "pretty": "ℕ → ℕ → (m n : ℕ) → (m + suc n) ≡ suc (m + n)",
+        "dependency-level": 4,
+        "tag": "Pi",
+        "bound-name": "m",
+        "domain": {
+          "tag": "ScopeReference",
+          "ref-name": "agda-example.ℕ<2>"
+        },
+        "codomain": {
+          "tag": "Pi",
+          "bound-name": "n",
+          "domain": {
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "codomain": {
+            "tag": "Pi",
+            "bound-name": "m",
+            "domain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            },
+            "codomain": {
+              "tag": "Pi",
+              "bound-name": "n",
+              "domain": {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              "codomain": {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "Agda.Builtin.Equality._≡_<12>"
+                },
+                "arguments": [
+                  {
+                    "tag": "Level",
+                    "level": "lzero"
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ<2>"
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example._+_<8>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "Application",
+                        "head": {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.suc<6>"
+                        },
+                        "arguments": [
+                          {
+                            "tag": "DeBruijn",
+                            "index": 0
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "Application",
+                        "head": {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example._+_<8>"
+                        },
+                        "arguments": [
+                          {
+                            "tag": "DeBruijn",
+                            "index": 1
+                          },
+                          {
+                            "tag": "DeBruijn",
+                            "index": 0
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "definition": {
+        "pretty": "agda-example.properties.+-suc zero n = refl | agda-example.properties.+-suc (suc m) n = cong suc (agda-example.properties.+-suc m₁ n₁ m n)",
+        "tag": "Function",
+        "clauses": [
+          {
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "DeBruijn",
+                "index": 2
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero"
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ],
+            "body": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_.refl<20>"
+            }
+          },
+          {
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "DeBruijn",
+                "index": 3
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 2
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ],
+            "body": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.properties._.+-suc<40>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 3
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 2
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "holes": [
+        {
+          "ctx": {
+            "pretty": "(m : ℕ) (n : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(zero + suc n) ≡ suc (zero + n)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.zero<4>"
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "refl",
+            "tag": "ScopeReference",
+            "ref-name": "Agda.Builtin.Equality._≡_.refl<20>"
+          },
+          "premises": [
+            "Agda.Builtin.Equality._≡_.refl<20>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m : ℕ) (n : ℕ) (m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(suc m + suc n) ≡ suc (suc m + n)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 1
+                            }
+                          ]
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 0
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example._+_<8>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 1
+                            },
+                            {
+                              "tag": "DeBruijn",
+                              "index": 0
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "cong suc (agda-example.properties.+-suc m₁ n₁ m n)",
+            "original": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.properties._.+-suc<40>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 3
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 2
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.properties._.+-suc<40>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 3
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 2
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "premises": [
+            "Relation.Binary.PropositionalEquality.Core.cong<54>",
+            "agda-example.ℕ<2>",
+            "agda-example.ℕ.suc<6>",
+            "agda-example._+_<8>",
+            "agda-example.properties._.+-suc<40>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ → ℕ",
+            "dependency-level": 0,
+            "tag": "Pi",
+            "bound-name": "_",
+            "domain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            },
+            "codomain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            }
+          },
+          "term": {
+            "pretty": "suc",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.suc<6>"
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "m + suc n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc m + n",
+            "original": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example._+_<8>"
+              },
+              "arguments": [
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    }
+                  ]
+                },
+                {
+                  "tag": "DeBruijn",
+                  "index": 0
+                }
+              ]
+            },
+            "simplified": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.suc<6>"
+              },
+              "arguments": [
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc m",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₂ : ℕ) (n₂ : ℕ) (m₃ : ℕ) (n₃ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(m + suc n) ≡ (suc m + n)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "agda-example.properties.+-suc m₁ n₁ m n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.properties._.+-suc<40>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 3
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 2
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.properties._.+-suc<40>"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agda-example.properties.+-comm<22>",
+      "type": {
+        "pretty": "(m n : ℕ) → (m + n) ≡ (n + m)",
+        "dependency-level": 4,
+        "tag": "Pi",
+        "bound-name": "m",
+        "domain": {
+          "tag": "ScopeReference",
+          "ref-name": "agda-example.ℕ<2>"
+        },
+        "codomain": {
+          "tag": "Pi",
+          "bound-name": "n",
+          "domain": {
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "codomain": {
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_<12>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "definition": {
+        "pretty": "properties.+-comm zero zero = refl | properties.+-comm zero (suc n) = cong suc (properties.+-comm zero n) | properties.+-comm (suc m) zero = cong suc (properties.+-comm m zero) | properties.+-comm (suc m) (suc n) = cong suc (trans (agda-example.properties.+-suc m n m n) (properties.+-comm (suc m) n))",
+        "tag": "Function",
+        "clauses": [
+          {
+            "telescope": [],
+            "patterns": [
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero"
+              }
+            ],
+            "body": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_.refl<20>"
+            }
+          },
+          {
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ],
+            "body": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                {
+                  "tag": "DeBruijn",
+                  "index": 0
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.properties.+-comm<22>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    },
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero"
+              }
+            ],
+            "body": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                },
+                {
+                  "tag": "DeBruijn",
+                  "index": 0
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.properties.+-comm<22>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ],
+            "patterns": [
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ],
+            "body": {
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 1
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "Relation.Binary.PropositionalEquality.Core.trans<110>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Level",
+                      "level": "lzero"
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ<2>"
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 0
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example._+_<8>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 1
+                            },
+                            {
+                              "tag": "DeBruijn",
+                              "index": 0
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        },
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 1
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.properties._.+-suc<40>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.properties.+-comm<22>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 1
+                            }
+                          ]
+                        },
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "holes": [
+        {
+          "ctx": {
+            "pretty": "",
+            "telescope": []
+          },
+          "goal": {
+            "pretty": "(zero + zero) ≡ (zero + zero)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.zero<4>"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.zero<4>"
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "refl",
+            "tag": "ScopeReference",
+            "ref-name": "Agda.Builtin.Equality._≡_.refl<20>"
+          },
+          "premises": [
+            "Agda.Builtin.Equality._≡_.refl<20>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(zero + suc n) ≡ (suc n + zero)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        },
+                        {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.zero<4>"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "cong suc (properties.+-comm zero n)",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.suc<6>"
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.zero<4>"
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.properties.+-comm<22>"
+                },
+                "arguments": [
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.zero<4>"
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "Relation.Binary.PropositionalEquality.Core.cong<54>",
+            "agda-example.ℕ<2>",
+            "agda-example.ℕ.suc<6>",
+            "agda-example._+_<8>",
+            "agda-example.ℕ.zero<4>",
+            "agda-example.properties.+-comm<22>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ → ℕ",
+            "dependency-level": 0,
+            "tag": "Pi",
+            "bound-name": "_",
+            "domain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            },
+            "codomain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            }
+          },
+          "term": {
+            "pretty": "suc",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.suc<6>"
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "n + zero",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero<4>"
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "zero",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.zero<4>"
+          },
+          "premises": [
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "n ≡ (n + zero)",
+            "dependency-level": 0,
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_<12>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.zero<4>"
+                  }
+                ]
+              }
+            ]
+          },
+          "term": {
+            "pretty": "properties.+-comm zero n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.properties.+-comm<22>"
+            },
+            "arguments": [
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero<4>"
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.properties.+-comm<22>",
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "zero",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.zero<4>"
+          },
+          "premises": [
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(suc m + zero) ≡ (zero + suc m)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.zero<4>"
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        },
+                        {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.zero<4>"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "DeBruijn",
+                      "index": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "cong suc (properties.+-comm m zero)",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.suc<6>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.zero<4>"
+                  }
+                ]
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.properties.+-comm<22>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.zero<4>"
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "Relation.Binary.PropositionalEquality.Core.cong<54>",
+            "agda-example.ℕ<2>",
+            "agda-example.ℕ.suc<6>",
+            "agda-example._+_<8>",
+            "agda-example.ℕ.zero<4>",
+            "agda-example.properties.+-comm<22>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ → ℕ",
+            "dependency-level": 0,
+            "tag": "Pi",
+            "bound-name": "_",
+            "domain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            },
+            "codomain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            }
+          },
+          "term": {
+            "pretty": "suc",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.suc<6>"
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "m + zero",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero<4>"
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "zero",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.zero<4>"
+          },
+          "premises": [
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(m + zero) ≡ m",
+            "dependency-level": 0,
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_<12>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.zero<4>"
+                  }
+                ]
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "term": {
+            "pretty": "properties.+-comm m zero",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.properties.+-comm<22>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.zero<4>"
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.properties.+-comm<22>",
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "zero",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.zero<4>"
+          },
+          "premises": [
+            "agda-example.ℕ.zero<4>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m : ℕ) (n : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(suc m + suc n) ≡ (suc n + suc m)",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example._+_<8>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example.ℕ.suc<6>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Application",
+              "head": {
+                "tag": "ScopeReference",
+                "ref-name": "Agda.Builtin.Equality._≡_<12>"
+              },
+              "arguments": [
+                {
+                  "tag": "Level",
+                  "level": "lzero"
+                },
+                {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ<2>"
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 1
+                        },
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 0
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "Application",
+                  "head": {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ.suc<6>"
+                  },
+                  "arguments": [
+                    {
+                      "tag": "Application",
+                      "head": {
+                        "tag": "ScopeReference",
+                        "ref-name": "agda-example._+_<8>"
+                      },
+                      "arguments": [
+                        {
+                          "tag": "DeBruijn",
+                          "index": 0
+                        },
+                        {
+                          "tag": "Application",
+                          "head": {
+                            "tag": "ScopeReference",
+                            "ref-name": "agda-example.ℕ.suc<6>"
+                          },
+                          "arguments": [
+                            {
+                              "tag": "DeBruijn",
+                              "index": 1
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "term": {
+            "pretty": "cong suc (trans (agda-example.properties.+-suc m n m n) (properties.+-comm (suc m) n))",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Relation.Binary.PropositionalEquality.Core.cong<54>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ.suc<6>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "Relation.Binary.PropositionalEquality.Core.trans<110>"
+                },
+                "arguments": [
+                  {
+                    "tag": "Level",
+                    "level": "lzero"
+                  },
+                  {
+                    "tag": "ScopeReference",
+                    "ref-name": "agda-example.ℕ<2>"
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example._+_<8>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "Application",
+                        "head": {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.suc<6>"
+                        },
+                        "arguments": [
+                          {
+                            "tag": "DeBruijn",
+                            "index": 0
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "Application",
+                        "head": {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example._+_<8>"
+                        },
+                        "arguments": [
+                          {
+                            "tag": "DeBruijn",
+                            "index": 1
+                          },
+                          {
+                            "tag": "DeBruijn",
+                            "index": 0
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example._+_<8>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      },
+                      {
+                        "tag": "Application",
+                        "head": {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.suc<6>"
+                        },
+                        "arguments": [
+                          {
+                            "tag": "DeBruijn",
+                            "index": 1
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.properties._.+-suc<40>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.properties.+-comm<22>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "Application",
+                        "head": {
+                          "tag": "ScopeReference",
+                          "ref-name": "agda-example.ℕ.suc<6>"
+                        },
+                        "arguments": [
+                          {
+                            "tag": "DeBruijn",
+                            "index": 1
+                          }
+                        ]
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "Relation.Binary.PropositionalEquality.Core.cong<54>",
+            "agda-example.ℕ<2>",
+            "agda-example.ℕ.suc<6>",
+            "agda-example._+_<8>",
+            "Relation.Binary.PropositionalEquality.Core.trans<110>",
+            "agda-example.properties._.+-suc<40>",
+            "agda-example.properties.+-comm<22>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ → ℕ",
+            "dependency-level": 0,
+            "tag": "Pi",
+            "bound-name": "_",
+            "domain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            },
+            "codomain": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ<2>"
+            }
+          },
+          "term": {
+            "pretty": "suc",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ.suc<6>"
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "m + suc n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "n + suc m",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc m",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(m + suc n) ≡ (n + suc m)",
+            "dependency-level": 0,
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_<12>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "term": {
+            "pretty": "trans (agda-example.properties.+-suc m n m n) (properties.+-comm (suc m) n)",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Relation.Binary.PropositionalEquality.Core.trans<110>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example._+_<8>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.properties._.+-suc<40>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.properties.+-comm<22>"
+                },
+                "arguments": [
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "Relation.Binary.PropositionalEquality.Core.trans<110>",
+            "agda-example.ℕ<2>",
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>",
+            "agda-example.properties._.+-suc<40>",
+            "agda-example.properties.+-comm<22>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "Set",
+            "original": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set lzero"
+            },
+            "simplified": {
+              "dependency-level": 0,
+              "tag": "Sort",
+              "sort": "Set"
+            }
+          },
+          "term": {
+            "pretty": "ℕ",
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "premises": [
+            "agda-example.ℕ<2>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "m + suc n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc (m + n)",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>",
+            "agda-example._+_<8>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "m + n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "n + suc m",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example._+_<8>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "premises": [
+            "agda-example._+_<8>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc m",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "(m + suc n) ≡ suc (m + n)",
+            "dependency-level": 0,
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_<12>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example._+_<8>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "term": {
+            "pretty": "agda-example.properties.+-suc m n m n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.properties._.+-suc<40>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.properties._.+-suc<40>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "suc (m + n) ≡ (n + suc m)",
+            "dependency-level": 0,
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "Agda.Builtin.Equality._≡_<12>"
+            },
+            "arguments": [
+              {
+                "tag": "Level",
+                "level": "lzero"
+              },
+              {
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example._+_<8>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      },
+                      {
+                        "tag": "DeBruijn",
+                        "index": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example._+_<8>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 0
+                  },
+                  {
+                    "tag": "Application",
+                    "head": {
+                      "tag": "ScopeReference",
+                      "ref-name": "agda-example.ℕ.suc<6>"
+                    },
+                    "arguments": [
+                      {
+                        "tag": "DeBruijn",
+                        "index": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "term": {
+            "pretty": "properties.+-comm (suc m) n",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.properties.+-comm<22>"
+            },
+            "arguments": [
+              {
+                "tag": "Application",
+                "head": {
+                  "tag": "ScopeReference",
+                  "ref-name": "agda-example.ℕ.suc<6>"
+                },
+                "arguments": [
+                  {
+                    "tag": "DeBruijn",
+                    "index": 1
+                  }
+                ]
+              },
+              {
+                "tag": "DeBruijn",
+                "index": 0
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.properties.+-comm<22>",
+            "agda-example.ℕ.suc<6>"
+          ]
+        },
+        {
+          "ctx": {
+            "pretty": "(m₁ : ℕ) (n₁ : ℕ)",
+            "telescope": [
+              {
+                "pretty": "(m : ℕ)",
+                "name": "m",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              },
+              {
+                "pretty": "(n : ℕ)",
+                "name": "n",
+                "dependency-level": 0,
+                "tag": "ScopeReference",
+                "ref-name": "agda-example.ℕ<2>"
+              }
+            ]
+          },
+          "goal": {
+            "pretty": "ℕ",
+            "dependency-level": 0,
+            "tag": "ScopeReference",
+            "ref-name": "agda-example.ℕ<2>"
+          },
+          "term": {
+            "pretty": "suc m",
+            "tag": "Application",
+            "head": {
+              "tag": "ScopeReference",
+              "ref-name": "agda-example.ℕ.suc<6>"
+            },
+            "arguments": [
+              {
+                "tag": "DeBruijn",
+                "index": 1
+              }
+            ]
+          },
+          "premises": [
+            "agda-example.ℕ.suc<6>"
+          ]
+        }
+      ]
+    }
+  ]
+}
