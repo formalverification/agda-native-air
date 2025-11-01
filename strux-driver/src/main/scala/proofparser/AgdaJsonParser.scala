@@ -44,6 +44,9 @@ object AgdaJsonParser {
     proof: String
   )
 
+  def optStr(v: ujson.Value, key: String): Option[String] =
+    v.obj.get(key).flatMap(_.strOpt)
+
   /** Try several common pretty fields Agda2Train/Agda-JSON use. */
   def pickPretty(v: ujson.Value): Option[String] =
     v.strOpt

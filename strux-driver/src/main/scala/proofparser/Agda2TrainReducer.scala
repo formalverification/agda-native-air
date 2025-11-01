@@ -33,6 +33,7 @@ import java.nio.file.{Files, Paths, Path}
 import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters._
 import upickle.default._
+import proofparser.AgdaJsonParser._
 
 /** Reduce Agda2Train JSON → compact, human-friendly TrainRecord JSONL.
   *
@@ -79,9 +80,6 @@ object Agda2TrainReducer {
       tryArr(ujson.read(s))
     }
   }
-
-  private def optStr(v: ujson.Value, key: String): Option[String] =
-    v.obj.get(key).flatMap(_.strOpt)
 
   private def objOpt(v: ujson.Value, key: String): Option[ujson.Value] =
     v.obj.get(key)
