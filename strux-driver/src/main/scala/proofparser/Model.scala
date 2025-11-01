@@ -33,6 +33,12 @@
  *     - enforce baseFile(file),
  *     - (optionally) stripAngle from names to choose a canonical name policy.
  *
+ * NOTES
+ *   -  `name` is *kept as parsed* (may include `<n>`); producers may choose to strip
+ *      via a policy toggle.
+ *   -  `premises` should be stored **post-normalization** (callers can pass raw
+ *      inputs; `normalize` will cleanse and drop self-premises).
+ *
  * (c) 2025 Thmpr Lab, LLC.
  */
 package proofparser
@@ -63,8 +69,12 @@ object AgdaDataOps {
   def collapseHidden(path: String): String =
     path.replace("._.", ".")
 
+  /** Remove any trailing '.' (one or more). */
+  def stripTrailingDots(s: String): String =
+    s.replaceAll("\\.+$", "")
+
   def normalizePremise(p: String): String =
-    stripAgdaDot(collapseHidden(stripAngle(p)))
+    stripTrailingDots(stripAgdaDot(collapseHidden(stripAngle(p))))
 
   def selfIdVariants(file: String, module: Option[String], name: String): List[String] = {
     val f  = baseFile(file)

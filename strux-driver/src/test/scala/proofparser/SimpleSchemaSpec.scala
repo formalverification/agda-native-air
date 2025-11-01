@@ -6,6 +6,7 @@ import upickle.default._
 
 final class SimpleSchemaSpec extends AnyFunSuite with Matchers {
   test("TrainRecord round-trip and normalization") {
+    // Test TrainRecordOps
     val rec = TrainRecord(
       file = "Foo.agda",
       module = "Foo._.properties.agda.",
@@ -19,7 +20,16 @@ final class SimpleSchemaSpec extends AnyFunSuite with Matchers {
     val norm = TrainRecordOps.normalize(rec)
     norm.module shouldBe "Foo.properties"
     norm.decl   shouldBe "lem"
+
+    // Test serialization
     val json = write(norm)
     read[TrainRecord](json) shouldBe norm
+
+    // Additional normalization cases
+    val norm2 = TrainRecordOps.normalize(
+      TrainRecord("X.agda", "A._.B.agda.", "n<1>", Nil, "T")
+    )
+    norm2.module shouldBe "A.B"
+
   }
 }

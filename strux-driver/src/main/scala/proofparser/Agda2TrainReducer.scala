@@ -33,7 +33,7 @@ import java.nio.file.{Files, Paths, Path}
 import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters._
 import upickle.default._
-import proofparser.AgdaJsonParser._
+import proofparser.AgdaJsonParser.JsonUtil.{optStr, pickPretty, pickStringArray}
 
 /** Reduce Agda2Train JSON → compact, human-friendly TrainRecord JSONL.
   *
