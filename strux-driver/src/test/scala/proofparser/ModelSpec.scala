@@ -1,12 +1,15 @@
 /**
- * File: ModelSpec.scala
+ * ModelSpec.scala
+ *
+ * FILE
+ *   proof-parser/src/test/scala/proofparser/ModelSpec.scala
  *
  * DESCRIPTION
  *   Unit tests for AgdaData and AgdaDataOps.
  *   Specifically tests the normalization function to ensure it removes
  *   self-premises correctly.
  *
- * Copyright (c) 2025 Thmpr Lab, LLC.
+ * (c) 2025 Thmpr Lab, LLC.
  */
 
 package proofparser

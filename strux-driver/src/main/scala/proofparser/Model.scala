@@ -1,30 +1,40 @@
 /**
-  * MODEL — canonical training row types for agda-ai-prover.
-  *
-  * File: proof-parser/src/main/scala/proofparser/Model.scala
-  *
-  * PURPOSE
-  *   `AgdaData` is the single contract our downstream ETL/training expects.
-  *
-  * FIELDS & INVARIANTS
-  *   - file:      base module file name WITHOUT extension when possible (e.g., "agda-example")
-  *                Rationale: stable ID stems shouldn’t depend on extensions.
-  *   - module:    optional fully-qualified module string or segments (decide here; see TODO).
-  *   - name:      local identifier; may include a disambiguator suffix like `<40>`.
-  *   - agdaType:  pretty-printed type.
-  *   - proof:     pretty-printed definition body.
-  *   - premises:  fully-qualified references used in proof; must be normalized (see Normalization).
-  *
-  * NORMALIZATION
-  *   We centralize:
-  *     - stripAngle("<n>")              // remove trailing disambiguators
-  *     - stripAgdaDot("x.agda.y")       // collapse ".agda." and suffix ".agda"
-  *     - collapseHidden("._.")          // collapse hidden module segments
-  *     - isSelfPremise(record, premise) // membership test after normalization
-  *
-  * USAGE
-  *   All producers should call `AgdaData.normalize(record)` to cleanse fields & premises.
-  */
+ * Model.scala -- Canonical declaration/proof row types for agda-ai-prover.
+ *
+ * FILE
+ *   proof-parser/src/main/scala/proofparser/Model.scala
+ *
+ * PURPOSE
+ *   `AgdaData` is the single contract downstream ETL/training expects for
+ *   declaration/proof rows (not goal snapshots).
+ *
+ * FIELDS & INVARIANTS
+ *   - file:      base module file name WITHOUT extension when possible (e.g., "agda-example").
+ *                Rationale: stable ID stems shouldn’t depend on extensions.
+ *   - module:    Option[String] — fully-qualified, dot-separated module name (e.g., "Data.Nat.Properties"),
+ *                or None if unknown.
+ *   - name:      local identifier; may include an Agda disambiguator suffix like "<40>" in raw inputs.
+ *   - agdaType:  pretty-printed type.
+ *   - proof:     pretty-printed definition body.
+ *   - premises:  fully-qualified references used in the proof; normalized (see NORMALIZATION).
+ *
+ * NORMALIZATION
+ *   Centralized here to keep producers/consumers consistent:
+ *     - baseFile("Foo.agda")           => "Foo"
+ *     - stripAngle("+-suc<40>")        => "+-suc"
+ *     - stripAgdaDot("x.agda.y")       => "x.y" and strip suffix ".agda"
+ *     - collapseHidden("Foo._.Bar")    => "Foo.Bar"
+ *     - normalizePremise(s)            => collapseHidden(stripAgdaDot(stripAngle(s)))
+ *     - isSelfPremise(record, prem)    => membership test after normalization
+ *
+ * USAGE
+ *   All producers should call `AgdaDataOps.normalize(record)` to:
+ *     - drop self-premises,
+ *     - enforce baseFile(file),
+ *     - (optionally) stripAngle from names to choose a canonical name policy.
+ *
+ * (c) 2025 Thmpr Lab, LLC.
+ */
 package proofparser
 
 import upickle.default._

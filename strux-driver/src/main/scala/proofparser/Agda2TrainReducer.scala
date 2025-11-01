@@ -1,23 +1,24 @@
 /**
  * Agda2TrainReducer.scala
  *
- * File: proof-parser/src/main/scala/proofparser/Agda2TrainReducer.scala
+ * FILE
+ *   proof-parser/src/main/scala/proofparser/Agda2TrainReducer.scala
  *
- * Description:
+ * DESCRIPTION
  *   Reduces Agda2Train JSON dumps into compact, human-readable JSONL training rows
  *   (TrainRecord). Focuses on file/module/decl, pretty types/terms, optional ranges,
  *   and imports; leaves context empty for v1.
  *
- * Usage:
+ * USAGE
  *   sbt "project proof-parser" \
  *       "runMain proofparser.Agda2TrainReducer <in.json|jsonl> <out.jsonl>"
  *
- * Examples:
+ * EXAMPLES
  *   sbt "project proof-parser" \
  *       "runMain proofparser.Agda2TrainReducer proof-parser/src/test/resources/agda-example.json target/a2t.simple.jsonl"
  *   # Output: one JSONL line per declaration with fields: file, module, decl, goalType, solution, imports, (range?)
  *
- * Notes:
+ * NOTES
  *   - Input can be a single JSON object/array or JSONL.
  *   - v1: context (telescope) is not filled; v2 will map binders → CtxVar.
  *   - Safe against minor schema drift by probing multiple common keys.
@@ -88,24 +89,7 @@ object Agda2TrainReducer {
   private def arrOpt(v: ujson.Value, key: String): List[ujson.Value] =
     v.obj.get(key).collect { case a: ujson.Arr => a.value.toList }.getOrElse(Nil)
 
-  /** Try several common pretty fields Agda2Train/Agda-JSON use. */
-  private def pickPretty(v: ujson.Value): Option[String] =
-    v.strOpt
-      .orElse(optStr(v, "pretty"))
-      .orElse(optStr(v, "pp"))
-      .orElse(optStr(v, "rendered"))
-      .orElse(optStr(v, "shown"))
-
-  /** Collect strings from an array under one of several keys. */
-  private def pickStringArray(v: ujson.Value, keys: String*): List[String] =
-    keys.toList.flatMap { k =>
-      v.obj.get(k) match {
-        case Some(a: ujson.Arr) => a.value.toList.flatMap(_.strOpt)
-        case _                  => Nil
-      }
-    }.distinct
-
-  // ---- model adapters to your SimpleSchema.scala ----------------------------
+  // ---- model adapters to SimpleSchema.scala ----------------------------
 
   private def readPos(v: ujson.Value): Option[Pos] = for {
     l <- v.obj.get("line").flatMap(_.numOpt).map(_.toInt)
@@ -117,10 +101,6 @@ object Agda2TrainReducer {
     e <- v.obj.get("end").flatMap(readPos)
   } yield Range(s, e)
 
-  // Convert a Range to a compact "l1:c1-l2:c2" string for TrainRecord.range (Option[String]).
-  private def showRange(r: Range): String = r match {
-    case Range(Pos(sl, sc), Pos(el, ec)) => s"$sl:$sc-$el:$ec"
-  }
   // ---- reduction logic ------------------------------------------------------
 
   /** A tolerant walker that tries to recognize “declaration-like” objects:
@@ -182,24 +162,24 @@ object Agda2TrainReducer {
 
         if (isDecl) {
           val modName = module.getOrElse("")
-          val fqDecl  = if (modName.nonEmpty) s"$modName.${name.get}" else name.get
+          val localDecl = name.get  // keep local; module carries the qualifier
 
           val solutionPretty = (rhsPretty.toList ++ (if (clauseStrings.nonEmpty) List(clauseStrings.mkString("\n")) else Nil)) match {
             case Nil    => None
             case single => Some(single.mkString("\n"))
           }
 
-          val rec = TrainRecord(
+          val rec0 = TrainRecord(
             file     = file.getOrElse(""),
             module   = modName,
-            decl     = fqDecl,
+            decl     = localDecl,
             context  = Nil, // v1: leave empty; v2 will map telescope binders here
             goalType = typePretty.getOrElse(""),
             solution = solutionPretty,
             range    = range,
             imports  = imports
           )
-          buf += rec
+          buf += TrainRecordOps.normalize(rec0)
         }
 
         // Continue scanning children: be generous and scan all values
