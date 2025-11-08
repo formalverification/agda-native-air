@@ -95,16 +95,21 @@ object PremiseEval {
     if (rows.isEmpty) { println(s"No rows in $in"); return }
 
     val (train, test) = hashSplit(rows, pct)
-    println(s"train: ${train.size}  test: ${test.size}  (split=${pct}%)")
+    // Ensure we always have at least 1 test when dataset is non-empty.
+    val (train1, test1) =
+      if (rows.nonEmpty && test.isEmpty && train.nonEmpty) (train.dropRight(1), train.takeRight(1))
+      else (train, test)
+    println(s"train: ${train1.size}  test: ${test1.size}  (split=${pct}%)")
+    if (test1.isEmpty) println("hint: try --split 50 or a larger dataset")
 
-    val global = new GlobalFreq(train)
-    val perMod = new PerModuleFreq(train)
+    val global = new GlobalFreq(train1)
+    val perMod = new PerModuleFreq(train1)
 
     println("\n=== GlobalFreq baseline ===")
-    printReport(evaluate(global, test, k, label = s"GlobalFreq@$k"))
+    printReport(evaluate(global, test1, k, label = s"GlobalFreq@$k"))
 
     println("\n=== PerModuleFreq baseline ===")
-    printReport(evaluate(perMod, test, k, label = s"PerModuleFreq@$k"))
+    printReport(evaluate(perMod, test1, k, label = s"PerModuleFreq@$k"))
   }
 
   // --------- Mode 2: two-file retrieval (TF dot-product) ---------

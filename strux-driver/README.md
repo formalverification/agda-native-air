@@ -120,6 +120,9 @@ make help
 make dataset-stats DATASET=path/to/train.jsonl TOP=20
 
 # 2a) Fast micro-benchmark (smaller K, same split)
+make gen-sample
+make -C proof-parser premise-eval-quick DATASET=../data/sample.jsonl
+# OR
 make premise-eval-quick DATASET=path/to/train.jsonl K=5 SPLIT=90
 
 # 2b) Full micro-benchmark (both baselines at K=10, 90/10 hash split)
