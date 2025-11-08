@@ -74,6 +74,8 @@ Notes:
    This is a lighter-weight “mapper” that takes raw extractor JSON and reduces it to
    a simpler subset (used when we want fewer fields). (Subset of the transformer.)
 
+
+
 ### Parsers and Extractors
 
 *  **AgdaJsonParser.scala**.  Utility functions to parse Agda-specific JSON
@@ -94,6 +96,54 @@ extractors co-exist:
 
 + **ExtractorMain** for batch/offline processing of pre-dumped JSON,
 + **SimplifiedExtractor** for running Agda and harvesting goals interactively.
+
+
+
+### Tests and Benchmarks
+
+#### Dataset stats & premise-selection micro-benchmark
+
+These utilities help sanity-check extracted Agda training rows (JSONL) and give a tiny, deterministic baseline for premise selection.
+
++  `DatasetStats.scala`: a tidy stats tool (row counts, length summaries, top premises/modules, premises-per-row histogram).
+
++  `PremiseEval.scala`: a small, deterministic premise-selection benchmark (hash split, global/per-module frequency baselines, Precision@K / Recall@K / F1, coverage).
+
+
+**Quick start**
+
+```bash
+# Show top-level help
+make help
+
+# 1) Summarize a dataset (row counts, length stats, histograms)
+make dataset-stats DATASET=path/to/train.jsonl TOP=20
+
+# 2a) Fast micro-benchmark (smaller K, same split)
+make premise-eval-quick DATASET=path/to/train.jsonl K=5 SPLIT=90
+
+# 2b) Full micro-benchmark (both baselines at K=10, 90/10 hash split)
+make premise-eval DATASET=path/to/train.jsonl K=10 SPLIT=90
+```
+
+**Interpreting outputs**
+
+* `DatasetStats`: prints
+
+  * corpus summary (#rows, non-empty fields),
+  * char-length stats for `agdaType` and `proof` (min/p50/p90/p99/max/avg),
+  * top-K `premises` and `module` histograms,
+  * distribution of “premises per row”.
+
+* `PremiseEval`: runs two trivial baselines
+
+  * **GlobalFreq**: ranks premises by overall training frequency,
+  * **PerModuleFreq**: ranks by per-module frequency with global fallback.
+    Reports **Precision@K**, **Recall@K**, **F1@K**, and **coverage** (fraction of test rows with ≥1 correct prediction). The split is stable (hash of `(file,module,name)`), so repeated runs are identical.
+
+**Pro tip:** Use `make smoke` to quickly check that essential targets still run after refactors (see below). Customize which targets are checked via `SMOKE_TARGETS=...`.
+
+
 
 ---
 
