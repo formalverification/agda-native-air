@@ -99,7 +99,7 @@ object DatasetStats {
     Using.resource(Source.fromFile(path)) { src =>
       src.getLines().iterator
         .map(_.trim).filter(_.nonEmpty)
-        .map(read[A])
+        .map(s => read[A](s))
         .toVector
     }
 

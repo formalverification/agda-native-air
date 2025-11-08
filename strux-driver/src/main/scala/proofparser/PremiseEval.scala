@@ -38,7 +38,7 @@ object PremiseEval {
   // --------- Shared helpers ---------
   private def readJsonlVec[A: Reader](path: String): Vector[A] =
     Using.resource(Source.fromFile(path)) { src =>
-      src.getLines().iterator.map(_.trim).filter(_.nonEmpty).map(read[A]).toVector
+      src.getLines().iterator.map(_.trim).filter(_.nonEmpty).map(s => read[A](s)).toVector
     }
 
   // --------- Mode 1 schema (single file) ---------
