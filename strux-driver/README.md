@@ -2,178 +2,122 @@
 
 # Proof Parser
 
-The **proof-parser** module extracts structured data from Agda sources; it converts
-`.agda` code into JSON/JSONL datasets suitable for ML tasks such as premise
-selection, proof synthesis, or theorem classification.
+The **proof-parser** module extracts structured data from Agda sources.
+
+It converts `.agda` code into JSON/JSONL datasets suitable for ML tasks such as
+premise selection, proof synthesis, or theorem classification.
+
+It supports **offline** extraction from `.agda`, **interactive** extraction via
+`agda --interaction-json`, and  **transformation** of `agda2train` JSON dumps.
 
 ---
 
-## Quickstart: JSON → JSONL (Transformer)
+## 📦 Data Models
 
-Use this path if you already have an Agda-to-JSON dump (e.g., from `AgdaExtractor` or prior tooling).
+### Canonical (static) row — `AgdaData`  *(src/main/scala/proofparser/Model.scala)*
+
+```scala
+final case class AgdaData(
+  file: String,
+  module: Option[String],
+  name: String,
+  agdaType: String,
+  proof: String,
+  premises: List[String] = Nil
+)
+```
+
+### Live goal snapshot — `TrainRecord`  *(src/main/scala/proofparser/SimpleSchema.scala)*
+
+```scala
+final case class TrainRecord(
+  file: String,
+  module: String,
+  decl: String,
+  context: List[CtxVar],
+  goalType: String,
+  solution: Option[String] = None,
+  range: Option[Range] = None,
+  imports: List[String] = Nil
+)
+```
+
+Use **`AgdaData`** for training datasets of finished declarations/proofs;
+use **`TrainRecord`** for interactive goals + contexts.
+
+---
+
+## 🛠️ Tools & Entry Points
+
+| Tool                          | Input                       | Output              | Purpose                                                            |
+| ----------------------------- | --------------------------- | ------------------- | ------------------------------------------------------------------ |
+| **`AgdaExtractorMain`**       | `.agda` files / dir         | `AgdaData` JSONL    | Fast offline extractor (regex-based).                              |
+| **`Agda2TrainTransformer`**   | `agda2train` JSON           | `AgdaData` JSONL    | Canonical transformer (normalizes, removes self-premises).         |
+| **`Agda2TrainReducer`**       | `agda2train` JSON/JSONL     | `TrainRecord` JSONL | Simplified reducer; tolerant to upstream schema drift.             |
+| **`AgdaSimplifiedExtractor`** | Agda (`--interaction-json`) | `TrainRecord` JSONL | Live goals + contexts using `AgdaBridge`, `AgdaIOTCM`, `AgdaMsgs`. |
+
+---
+
+## 🚀 How to Run (two equivalent ways)
+
+### A. From repo root (preferred)
+
+Use `make` targets that live in the **top-level** `Makefile` in the
+main `$PROJECT_ROOT` (`agda-ai-prover`) directory .  They call into this subproject.
 
 ```bash
-# Example: transform one JSON file into JSONL rows for training
-# Run the following command from the `agda-ai-prover/proof-parser` directory:
-sbt "runMain proofparser.Agda2TrainTransformer \
-  src/test/resources/agda-example.json \
-  ../target/a2t.simple.jsonl"
+# Offline extraction (.agda → data/train.jsonl)
+make extract EXTRACT_INPUT=proof-parser/src/test/resources/proofparser/agda-example.agda
+
+# Transform a dump → JSONL
+make transform \
+  A2T_JSON=proof-parser/src/test/resources/proofparser/agda-example.json \
+  A2T_OUT=target/a2t.simple.jsonl
 ```
 
-**Output format (per line):**
+### B. From this directory (`proof-parser/`)
 
-```json
-{
-  "file": "agda-example",              // base file/module root (no extension)
-  "module": "properties",              // optional, e.g., submodule
-  "name": "+-comm",                    // local def/theorem name
-  "agdaType": "(m n : ℕ) → ...",
-  "proof": "…",
-  "premises": ["agda-example._+_", "..."]
-}
-```
+Use `sbt runMain …` to execute the programs directly.
 
-Notes:
+1.  `AgdaExtractorMain`: `.agda` → AgdaData JSONL offline extractor
 
-* We normalize `file` to a base name without `.agda`.
-* We drop any self-references from `premises`.
-* External references (e.g., stdlib) may appear verbatim.
+    ```bash
+    # Extract JSONL training data from a .agda file.
+    sbt "runMain proofparser.AgdaExtractorMain \
+      ../data/agda-example.agda \
+      ../data/train.jsonl"
+    ```
+
+2.  `Agda2TrainTransformer`: JSON → AgdaData JSONL Transformer
+
+    Use this once you already have an Agda-to-JSON dump (e.g., from `AgdaExtractor` or prior tooling).
+
+    ```bash
+    # Transform a JSON file into JSONL rows for training.
+    sbt "runMain proofparser.Agda2TrainTransformer \
+      src/test/resources/agda-example.json \
+      ../target/a2t.simple.jsonl"
+    ```
+
+3.  `AgdaSimplifiedExtractor`: interactive Agda → TrainRecord JSONL extractor with goals
+
+    ``` bash
+    sbt "runMain proofparser.AgdaSimplifiedExtractor \
+      ../agda-jang/agda/ApplyDemo.agda \
+      ../proof-parser/output/goals.jsonl \
+      --include ../agda-jang/agda \
+      --lib standard-library \
+      --library-file ../agda-jang/agda/libraries"
+    ```
+
+**Notes**
+
+* `--include` adds Agda import paths; `--lib` uses a registered library (e.g., `standard-library`); `--library-file` points to a custom `libraries` index.
+* The interactive extractor emits **goals + contexts**, not completed proofs.
 
 ---
 
-## Programs in the `proof-parser` Package
-
-### Models and Schemas
-
-+  **Model.scala / SimpleSchema.scala**: central data contracts + (optionally) small
-   validators.
-
-   +  **Model.scala** defines canonical data classes used across the package
-      (`AgdaData`, maybe `Goal`, etc.). This is the “single source of truth” for the
-      training-row schema.
-
-   +  **SimpleSchema.scala**. A minimal, explicit schema for reading/writing rows.
-      Sometimes used to validate input data or encode/decode within Spark/ETL.
-
-+  **AgdaBridge.scala**: byte-pipe to `agda --interaction-json`. No project deps.
-
-### Transformers and Reducer
-
-+  **Agda2TrainTransformer.scala**
-
-   The richer path that yields `AgdaData`.
-
-   This turns *offline* Agda dumps into canonical `AgdaData` rows.  No dependency on
-   the bridge/extractor.
-
-+  **Agda2TrainReducer.scala**
-
-   The “human-readable” subset CLI. It’s fast to run during development and nice for
-   spot-checks.
-
-   This is a lighter-weight “mapper” that takes raw extractor JSON and reduces it to
-   a simpler subset (used when we want fewer fields). (Subset of the transformer.)
-
-
-
-### Parsers and Extractors
-
-*  **AgdaJsonParser.scala**.  Utility functions to parse Agda-specific JSON
-   structures. Good candidate to centralize traversal helpers so multiple modules
-   don’t re-implement small walkers.
-
-+  **AgdaExtractor.scala / AgdaExtractorMain.scala**
-
-   An earlier (richer) extractor for batch/offline processing; it runs on
-   Agda-produced JSON dumps (not via IOTCM).  `AgdaExtractorMain` is the
-   CLI entrypoint.
-
-+  **AgdaSimplifiedExtractor.scala** *uses* the bridge, builds/sends `IOTCM` “load”,
-   parses incoming JSON, emits training-ready goal rows (JSONL); also standalone.
-
-With the new `AgdaSimplifiedExtractor`, we’ve got the live Agda path; the two
-extractors co-exist:
-
-+ **ExtractorMain** for batch/offline processing of pre-dumped JSON,
-+ **SimplifiedExtractor** for running Agda and harvesting goals interactively.
-
-
-
-### Tests and Benchmarks
-
-#### Dataset stats & premise-selection micro-benchmark
-
-These utilities help sanity-check extracted Agda training rows (JSONL) and give a tiny, deterministic baseline for premise selection.
-
-+  `DatasetStats.scala`: a tidy stats tool (row counts, length summaries, top premises/modules, premises-per-row histogram).
-
-+  `PremiseEval.scala`: a small, deterministic premise-selection benchmark (hash split, global/per-module frequency baselines, Precision@K / Recall@K / F1, coverage).
-
-
-**Quick start**
-
-```bash
-# Show top-level help
-make help
-
-# 1) Summarize a dataset (row counts, length stats, histograms)
-make dataset-stats DATASET=path/to/train.jsonl TOP=20
-
-# 2a) Fast micro-benchmark (smaller K, same split)
-make gen-sample
-make -C proof-parser premise-eval-quick DATASET=../data/sample.jsonl
-# OR
-make premise-eval-quick DATASET=path/to/train.jsonl K=5 SPLIT=90
-
-# 2b) Full micro-benchmark (both baselines at K=10, 90/10 hash split)
-make premise-eval DATASET=path/to/train.jsonl K=10 SPLIT=90
-```
-
-**Interpreting outputs**
-
-* `DatasetStats`: prints
-
-  * corpus summary (#rows, non-empty fields),
-  * char-length stats for `agdaType` and `proof` (min/p50/p90/p99/max/avg),
-  * top-K `premises` and `module` histograms,
-  * distribution of “premises per row”.
-
-* `PremiseEval`: runs two trivial baselines
-
-  * **GlobalFreq**: ranks premises by overall training frequency,
-  * **PerModuleFreq**: ranks by per-module frequency with global fallback.
-    Reports **Precision@K**, **Recall@K**, **F1@K**, and **coverage** (fraction of test rows with ≥1 correct prediction). The split is stable (hash of `(file,module,name)`), so repeated runs are identical.
-
-**Pro tip:** Use `make smoke` to quickly check that essential targets still run after refactors (see below). Customize which targets are checked via `SMOKE_TARGETS=...`.
-
-
-
----
-
-## Test Harness for the `proof-parser` Package
-
-### Layout
-
-```
-proof-parser/
-  src/test/scala/proofparser/
-    TestKit.scala                         // small helpers (resource loading, gens)
-    Agda2TrainTransformerSpec.scala       // parsing + self-premise tests (unit)
-    AgdaSimplifiedExtractorSpec.scala     // pure parts only: iotcmLoad/moduleName/goals (unit)
-  src/test/resources/proofparser/
-    agda-example.json                     // copy of your sample JSON for tests
-```
-
-+  **TestKit.scala**: small utility to load test resources and define arbitrary generators.
-+  **Agda2TrainTransformerSpec.scala**: deterministic tests for parsing and self-premise filtering.
-+  **AgdaSimplifiedExtractorSpec.scala**: tests the *pure bits* (e.g., `iotcmLoad` shape, `moduleName`, and `extractGoalsPretty` using canned JSON). We don’t spin up Agda in unit tests; integration with Agda will be a separate “it” or `IT` suite later.
-
-
----
-
-## Extract directly from Agda (IOTCM bridge)
-
-This path asks Agda to scope-check/type-check your file and emits training rows from goals/pretty text.
+## Batch Processing from Agda Libraries (IOTCM bridge)
 
 **Prereqs:**
 
@@ -200,116 +144,189 @@ Flags:
 
 > Tip: Agda doesn’t have `--library-path`; use `--library-file=PATH/TO/libraries` to point at a custom libraries file, or just `--lib standard-library` if it’s already registered.
 
+
 ---
 
-## 📦 Components
+## 📊 Dataset Utilities (stats & micro-benchmark)
 
-+  **`AgdaExtractor.scala`**
+These utilities help sanity-check extracted Agda training rows (JSONL) and give a
+deterministic baseline for premise selection.
 
-   Scans `.agda` files for definitions and theorem-like constructs, producing `(name,
-   type, proof)` triples.
++  `DatasetStats.scala`: a tidy stats tool (row counts, length summaries, top premises/modules, premises-per-row histogram).
 
-+  **`AgdaExtractorMain.scala`**
++  `PremiseEval.scala`: a small, deterministic premise-selection benchmark (hash split, global/per-module frequency baselines, Precision@K / Recall@K / F1, coverage).
 
-   Main program to extract proofs from Agda files and output them in JSONL format.
-   Writes output to files `data/train.jsonl` **and** `data/train.manifest.json`.
 
-+  **`AgdaJsonParser.scala`**
+### 🚀 How to Run (two equivalent ways)
 
-   Reads Agda's JSON interaction output (agda2train/QUILL-style) and normalizes it.
+#### A. From repo root (preferred)
 
-+  **`Agda2TrainTransformer.scala`**
-   Transforms JSON into a clean ML-ready JSONL format with fields:
+Use `make` targets that live in the **top-level** `Makefile` in the
+main `$PROJECT_ROOT` (`agda-ai-prover`) directory .  They call into this subproject.
+
+```bash
+# Show top-level help
+make help
+
+# Summarize a dataset (row counts, length stats, histograms)
+make dataset-stats DATASET=../data/train.jsonl TOP=20
+
+# Fast micro-benchmark (smaller K, same split)
+make gen-sample
+make -C proof-parser premise-eval-quick DATASET=../data/sample.jsonl
+# OR
+make premise-eval-quick DATASET=../data/train.jsonl K=5 SPLIT=90
+
+# Full micro-benchmark (both baselines at K=10, 90/10 hash split)
+make premise-eval DATASET=../data/train.jsonl K=10 SPLIT=90
+```
+
+#### B. From this directory (`proof-parser/`)
+
+Use `sbt runMain …` to execute the programs directly.
+
+```bash
+# same as above but direct sbt
+sbt -error -no-colors "runMain proofparser.DatasetStats data/train.jsonl --top 20"
+sbt -error -no-colors "runMain proofparser.PremiseEval  data/train.jsonl --k 10 --split 90"
+```
+
+### Interpreting outputs
+
+* `DatasetStats` prints
+
+  * corpus summary (#rows, non-empty fields),
+  * char-length stats for `agdaType` and `proof` (min/p50/p90/p99/max/avg),
+  * top-K `premises` and `module` histograms,
+  * distribution of “premises per row”.
+
+* `PremiseEval` runs two trivial baselines
+
+  * **GlobalFreq** ranks premises by overall training frequency,
+  * **PerModuleFreq** ranks by per-module frequency with global fallback.
+    Reports **Precision@K**, **Recall@K**, **F1@K**, and **coverage** (fraction of test rows with ≥1 correct prediction). The split is stable (hash of `(file,module,name)`), so repeated runs are identical.
+
+
+#### What the reports mean
+
++  **Precision@K** — among the **top K** predicted premises, the fraction that actually appear in the proof’s used-premise set.
++  **Recall@K** — among the premises actually used by that proof, the fraction found within the **top K** predictions.
++  **F1@K** — harmonic mean of Precision@K and Recall@K.
++  **Coverage** — fraction of test rows where **≥1 correct** premise appears among predictions.
++  **Baselines**:
+
+   + **Global-frequency**: same universal ranking for everyone, based on training counts.
+   + **Per-module-frequency**: ranking per module; if a module is sparse, fall back to global.
+
++  **Split** — A **stable** train/test split (hash of `(file,module,name)`), so runs are reproducible.
+
+---
+
+## 🧪 Tests & Smoke
+
+From **proof-parser/**:
+
+```bash
+make test                   # unit tests
+make smoke                  # compile + quick eval
+make gen-sample N=16        # create data/sample.jsonl
+make smoke-sample           # sample-based smoke run
+```
+
+---
+
+## 🔎 More Details
+
+
+### 📂 Directory Layout
+
+```
+proof-parser/
+├── src/main/scala/proofparser/
+│                  ├── AgdaExtractor*.scala
+│                  ├── Agda2Train*.scala
+│                  ├── AgdaSimplifiedExtractor.scala
+│                  ├── AgdaBridge.scala
+│                  ├── AgdaJsonParser.scala
+│                  ├── DatasetStats.scala
+│                  ├── PremiseEval.scala
+│                  ├── Model.scala
+│                  └── SimpleSchema.scala
+└── src/test/
+        ├── scala/proofparser/
+        │         ├── *Spec.scala
+        │         └── TestKit.scala
+        └── resources/
+            ├── agda-example.agda
+            └── proofparser/
+                └── agda-example.json
+```
+
+
+### 📦 Components
+
+Here are some more details about each program in the  `proof-parser` package.
+
+#### Models and Schemas
+
++  **Model.scala / SimpleSchema.scala**: central data contracts + (optionally) small
+   validators.
+
+   +  **Model.scala** defines canonical data classes used across the package
+      (`AgdaData`, maybe `Goal`, etc.). This is the “single source of truth” for the
+      training-row schema.
+
+   +  **SimpleSchema.scala**. A minimal, explicit schema for reading/writing rows.
+      Sometimes used to validate input data or encode/decode within Spark/ETL.
+
++  **AgdaBridge.scala**: byte-pipe to `agda --interaction-json`. No project deps.
+
+#### Transformers and Reducer
+
++  **Agda2TrainTransformer.scala**
+
+   Transforms *offline* Agda JSON dumps into clean ML-ready JSONL `AgdaData` rows with fields:
    - `file`, `module`, `name`
    - `agdaType`
    - `proof`
    - `premises` (lemma names used inside the proof)
 
-+  **`Model.scala`**
-   Data model for Agda theorem extraction
+   (No dependency on the bridge/extractor.)
+
++  **Agda2TrainReducer.scala**
+
+   The “human-readable” subset CLI. It’s fast to run during development and nice for
+   spot-checks.
+
+   This is a lighter-weight “mapper” that takes raw extractor JSON and reduces it to
+   a simpler subset (used when we want fewer fields). (Subset of the transformer.)
+
+
+
+#### Parsers and Extractors
+
+*  **AgdaJsonParser.scala**.  Utility functions to parse Agda-specific JSON
+   structures. Reads Agda's JSON interaction output (agda2train/QUILL-style) and normalizes it.
+   Good candidate to centralize traversal helpers so multiple modules don’t re-implement small walkers.
+
++  **AgdaExtractor.scala / AgdaExtractorMain.scala**
+
+   An earlier (richer) extractor for batch/offline processing; it runs on
+   Agda-produced JSON dumps (not via IOTCM).  `AgdaExtractorMain` is the
+   CLI entrypoint.
+
++  **AgdaSimplifiedExtractor.scala** *uses* the bridge, builds/sends `IOTCM` “load”,
+   parses incoming JSON, emits training-ready goal rows (JSONL); also standalone.
+
+With the new `AgdaSimplifiedExtractor`, we’ve got the live Agda path; the two
+extractors co-exist:
+
++ **ExtractorMain** for batch/offline processing of pre-dumped JSON,
++ **SimplifiedExtractor** for running Agda and harvesting goals interactively.
+
 
 ---
 
-## 📂 Directory Layout
-
-```
-proof-parser/
-├── build.sbt
-├── README.md
-└── src/
-    ├── main/
-    │   └── scala/
-    │       └── proofparser/
-    │           ├── Agda2TrainReducer.scala
-    │           ├── Agda2TrainTransformer.scala
-    │           ├── AgdaBridge.scala
-    │           ├── AgdaExtractorMain.scala
-    │           ├── AgdaExtractor.scala
-    │           ├── AgdaJsonParser.scala
-    │           ├── AgdaSimplifiedExtractor.scala
-    │           ├── Model.scala
-    │           └── SimpleSchema.scala
-    └── test/
-        ├── resources/
-        │   ├── agda-example.agda
-        │   └── proofparser/
-        │       └── agda-example.json
-        └── scala/
-            └── proofparser/
-                ├── Agda2TrainTransformerSpec.scala
-                ├── AgdaExtractorSpec.scala
-                ├── AgdaSimplifiedExtractorSpec.scala
-                ├── ModelSpec.scala
-                ├── SimpleSchemaSpec.scala
-                └── TestKit.scala
-```
-
----
-
-## 🛠️ Setup
-
-### With sbt
-
-```bash
-cd proof-parser
-sbt compile
-sbt test
-```
-
----
-
-## 🧪 Usage
-
-### ✅ Extract theorems directly from `.agda`
-
-```bash
-sbt "run /absolute/path/to/agda-example.agda"
-```
-
-Produces `theorems.jsonl` with raw name/type/proof triples.
-
----
-
-### ✅ Convert JSON → JSONL
-
-```bash
-sbt "runMain proofparser.Agda2TrainTransformer ../data/agda-example.json ../data/agda-example.jsonl"
-```
-
-Fields:
-
-```json
-{
-  "file": "agda-example.agda",
-  "module": "Example",
-  "name": "+-comm",
-  "agdaType": "(m n : ℕ) → (m + n) ≡ (n + m)",
-  "proof": "...",
-  "premises": ["cong", "trans", "+-suc", "+-comm"]
-}
-```
-
----
 
 ## 📚 References
 
@@ -317,9 +334,3 @@ Fields:
 * [agda2train Dataset Generator](https://github.com/omelkonian/agda2train)
 
 ---
-
-## 🚧 Roadmap
-
-* Batch mode for large library extraction (Agda stdlib, ualib).
-* Richer JSON schema (contexts, metas, tactics).
-* Integration with ML pipeline for end-to-end training.
