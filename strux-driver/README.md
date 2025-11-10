@@ -2,19 +2,28 @@
 
 # Proof Parser
 
-The **proof-parser** module extracts structured data from Agda sources.
+The **proof-parser** module converts Agda sources and intermediate dumps into
+structured JSON/JSONL datasets for machine learning tasks such as **premise
+selection**, **proof synthesis**, and **theorem classification**.
 
-It converts `.agda` code into JSON/JSONL datasets suitable for ML tasks such as
-premise selection, proof synthesis, or theorem classification.
+It extracts structured data from Agda sources, converting Agda source code
+into JSONL with structured `AgdaData` rows.
 
 It supports **offline** extraction from `.agda`, **interactive** extraction via
 `agda --interaction-json`, and  **transformation** of `agda2train` JSON dumps.
 
 ---
 
-## 📦 Data Models
+## 🧩 Data Models
 
-### Canonical (static) row — `AgdaData`  *(src/main/scala/proofparser/Model.scala)*
+The two schema we use to model Agda data are `AgdaData` and `TrainRecord`.
+
++  **`AgdaData`** is for representing type and proofs that are **complete** (no holes);
+
++  **`TrainRecord`** is for representing **interactive** goals and contexts.
+
+### `AgdaData` — Static Declarations / Proofs
+Defined in [`Model.scala`](src/main/scala/proofparser/Model.scala):
 
 ```scala
 final case class AgdaData(
@@ -27,7 +36,14 @@ final case class AgdaData(
 )
 ```
 
-### Live goal snapshot — `TrainRecord`  *(src/main/scala/proofparser/SimpleSchema.scala)*
+* Represents a theorem or definition after type-checking.
+* Used for static datasets (premise selection, theorem classification).
+* Normalized via `AgdaDataOps.normalize()`.
+
+
+### `TrainRecord` — Interactive Goal Snapshots
+
+Defined in [`SimpleSchema.scala`](src/main/scala/proofparser/SimpleSchema.scala):
 
 ```scala
 final case class TrainRecord(
@@ -42,21 +58,24 @@ final case class TrainRecord(
 )
 ```
 
-Use **`AgdaData`** for training datasets of finished declarations/proofs;
-use **`TrainRecord`** for interactive goals + contexts.
+* Represents a live goal and context emitted by Agda (`--interaction-json`).
+* Used for supervised learning on incomplete proofs.
+
 
 ---
 
-## 🛠️ Tools & Entry Points
+## 🛠️ Extraction and Transformation Tools
 
-| Tool                          | Input                       | Output              | Purpose                                                            |
-| ----------------------------- | --------------------------- | ------------------- | ------------------------------------------------------------------ |
-| **`AgdaExtractorMain`**       | `.agda` files / dir         | `AgdaData` JSONL    | Fast offline extractor (regex-based).                              |
-| **`Agda2TrainTransformer`**   | `agda2train` JSON           | `AgdaData` JSONL    | Canonical transformer (normalizes, removes self-premises).         |
-| **`Agda2TrainReducer`**       | `agda2train` JSON/JSONL     | `TrainRecord` JSONL | Simplified reducer; tolerant to upstream schema drift.             |
-| **`AgdaSimplifiedExtractor`** | Agda (`--interaction-json`) | `TrainRecord` JSONL | Live goals + contexts using `AgdaBridge`, `AgdaIOTCM`, `AgdaMsgs`. |
+| Tool                          | Input                                    | Output                 | Description                                                        |
+| ----------------------------- | ---------------------------------------- | ---------------------- | ------------------------------------------------------------------ |
+| **`AgdaExtractorMain`**       | `.agda` source files                     | JSONL of `AgdaData`    | Fast, regex-based static extractor (no Agda process).              |
+| **`Agda2TrainTransformer`**   | Agda2Train JSON dumps                    | JSONL of `AgdaData`    | Canonical transformer for structured dumps; filters self-premises. |
+| **`Agda2TrainReducer`**       | Agda2Train JSON/JSONL                    | JSONL of `TrainRecord` | Tolerant reducer for lightweight schema.                           |
+| **`AgdaSimplifiedExtractor`** | Live Agda session (`--interaction-json`) | JSONL of `TrainRecord` | Interactive extractor using `AgdaBridge`.                          |
+
 
 ---
+
 
 ## 🚀 How to Run (two equivalent ways)
 
@@ -152,44 +171,58 @@ Flags:
 These utilities help sanity-check extracted Agda training rows (JSONL) and give a
 deterministic baseline for premise selection.
 
-+  `DatasetStats.scala`: a tidy stats tool (row counts, length summaries, top premises/modules, premises-per-row histogram).
+### `DatasetStats.scala`
 
-+  `PremiseEval.scala`: a small, deterministic premise-selection benchmark (hash split, global/per-module frequency baselines, Precision@K / Recall@K / F1, coverage).
+This is a tidy stats tool (row counts, length summaries, top premises/modules,
+premises-per-row histogram).
 
+**Summarize a dataset** (row counts, length stats, histograms):
 
-### 🚀 How to Run (two equivalent ways)
-
-#### A. From repo root (preferred)
-
-Use `make` targets that live in the **top-level** `Makefile` in the
-main `$PROJECT_ROOT` (`agda-ai-prover`) directory .  They call into this subproject.
-
-```bash
-# Show top-level help
-make help
-
-# Summarize a dataset (row counts, length stats, histograms)
+``` bash
+# From main `$PROJECT_ROOT` directory
 make dataset-stats DATASET=../data/train.jsonl TOP=20
+# or directly, from `agda-ai-prover/proof-parser`
+cd proof-parser
+sbt "runMain proofparser.DatasetStats data/train.jsonl --top 20"
+```
 
-# Fast micro-benchmark (smaller K, same split)
+**Outputs**
+
++  Row and field counts
++  Length stats (`agdaType` / `proof`)
++  Top-K premises and modules
++  Premises-per-row histogram
+
+
+### `PremiseEval.scala`
+
+This is a small, deterministic premise-selection benchmark (hash split, global/per-module frequency baselines, Precision@K / Recall@K / F1, coverage).
+
+**Fast micro-benchmark** (smaller K, same split):
+
+From main `$PROJECT_ROOT` directory,
+
+``` bash
 make gen-sample
 make -C proof-parser premise-eval-quick DATASET=../data/sample.jsonl
 # OR
 make premise-eval-quick DATASET=../data/train.jsonl K=5 SPLIT=90
+```
 
-# Full micro-benchmark (both baselines at K=10, 90/10 hash split)
+**Full micro-benchmark** (both baselines at K=10, 90/10 hash split):
+
+From main `$PROJECT_ROOT` directory,
+
+``` bash
 make premise-eval DATASET=../data/train.jsonl K=10 SPLIT=90
 ```
 
-#### B. From this directory (`proof-parser/`)
-
-Use `sbt runMain …` to execute the programs directly.
+or directly, from `agda-ai-prover/proof-parser`
 
 ```bash
-# same as above but direct sbt
-sbt -error -no-colors "runMain proofparser.DatasetStats data/train.jsonl --top 20"
 sbt -error -no-colors "runMain proofparser.PremiseEval  data/train.jsonl --k 10 --split 90"
 ```
+
 
 ### Interpreting outputs
 
