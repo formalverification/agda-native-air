@@ -1,3 +1,11 @@
+##
+# ml-pipeline — subproject Makefile
+#
+# @file agda-ai-prover/ml-pipeline/Makefile
+# @version 0.1
+# Focus: Scala/Spark ETL, Python ML model training and API serving
+##
+
 SHELL := /bin/bash
 ETL_DIR=etl
 MODEL_DIR=model
