@@ -67,7 +67,7 @@ main `$PROJECT_ROOT` (`agda-ai-prover`) directory .  They call into this subproj
 
 ```bash
 # Offline extraction (.agda → data/train.jsonl)
-make extract EXTRACT_INPUT=proof-parser/src/test/resources/proofparser/agda-example.agda
+make extract EXTRACT_INPUT=proof-parser/src/test/resources/agda-example.agda
 
 # Transform a dump → JSONL
 make transform \
@@ -95,7 +95,7 @@ Use `sbt runMain …` to execute the programs directly.
     ```bash
     # Transform a JSON file into JSONL rows for training.
     sbt "runMain proofparser.Agda2TrainTransformer \
-      src/test/resources/agda-example.json \
+      src/test/resources/proofparser/agda-example.json \
       ../target/a2t.simple.jsonl"
     ```
 
