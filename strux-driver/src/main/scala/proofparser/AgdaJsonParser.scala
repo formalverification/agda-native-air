@@ -45,16 +45,22 @@ object AgdaJsonParser {
   )
 
   object JsonUtil {
-    def optStr(v: ujson.Value, key: String): Option[String] = v.obj.get(key).flatMap(_.strOpt)
+    def optStr(v: ujson.Value, key: String): Option[String] = v match {
+      case o: ujson.Obj => o.value.get(key).flatMap(_.strOpt)
+      case _            => None
+    }
+
     /** Try several common pretty fields Agda2Train/Agda-JSON use. */
-
-    def pickPretty(v: ujson.Value): Option[String] =
-      v.strOpt
-       .orElse(optStr(v, "pretty"))
-       .orElse(optStr(v, "pp"))
-       .orElse(optStr(v, "rendered"))
-       .orElse(optStr(v, "shown"))
-
+    def pickPretty(v: ujson.Value): Option[String] = v.strOpt orElse {
+      v match {
+        case o: ujson.Obj =>
+          o.value.get("pretty").flatMap(_.strOpt)
+            .orElse(o.value.get("pp").flatMap(_.strOpt))
+            .orElse(o.value.get("rendered").flatMap(_.strOpt))
+            .orElse(o.value.get("shown").flatMap(_.strOpt))
+        case _ => None
+      }
+    }
     /** Collect strings from an array under one of several keys. */
     def pickStringArray(v: ujson.Value, keys: String*): List[String] =
       keys.toList.flatMap { k =>
