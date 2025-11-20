@@ -135,9 +135,7 @@ Use `sbt runMain …` to execute the programs directly.
     +  `--lib NAME`: use a registered library, e.g., `standard-library`;
     +  `--library-file FILE`: location of Agda library index file.
 
-    **Notes**
-
-    The interactive extractor emits **goals + contexts**, not completed proofs.
+    **Note**.  The interactive extractor emits **goals + contexts**, not completed proofs.
 
 ---
 
@@ -200,24 +198,38 @@ From main `$PROJECT_ROOT` directory,
 
 ``` bash
 make gen-sample
+make -C proof-parser smoke-sample
+```
+
+**End-to-end smoke**
+
+``` bash
+make smoke
+```
+
+**Tests on tiny real data**
+
+```bash
 make -C proof-parser premise-eval-quick DATASET=../data/sample.jsonl
-# OR
+```
+
+
+```bash
 make premise-eval-quick DATASET=../data/train.jsonl K=5 SPLIT=90
 ```
 
-**Full micro-benchmark** (both baselines at K=10, 90/10 hash split):
-
-From main `$PROJECT_ROOT` directory,
+**Full micro-benchmark** (both baselines at K=10, 90/10 hash split)
 
 ``` bash
 make premise-eval DATASET=../data/train.jsonl K=10 SPLIT=90
 ```
 
-or directly, from `agda-ai-prover/proof-parser`
+or directly, from inside the `agda-ai-prover/proof-parser` directory
 
 ```bash
 sbt -error -no-colors "runMain proofparser.PremiseEval  data/train.jsonl --k 10 --split 90"
 ```
+
 
 
 ### Interpreting outputs
