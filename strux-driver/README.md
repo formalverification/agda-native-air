@@ -192,12 +192,13 @@ sbt "runMain proofparser.DatasetStats data/train.jsonl --top 20"
 
 This is a small, deterministic premise-selection benchmark (hash split, global/per-module frequency baselines, Precision@K / Recall@K / F1, coverage).
 
-**Fast micro-benchmark** (smaller K, same split):
-
 From main `$PROJECT_ROOT` directory,
 
 ``` bash
 make gen-sample
+```
+
+``` bash
 make -C proof-parser smoke-sample
 ```
 
@@ -213,6 +214,7 @@ make smoke
 make -C proof-parser premise-eval-quick DATASET=../data/sample.jsonl
 ```
 
+**Fast micro-benchmark** (smaller K, same split):
 
 ```bash
 make premise-eval-quick DATASET=../data/train.jsonl K=5 SPLIT=90
