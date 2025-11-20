@@ -18,7 +18,7 @@ It supports **offline** extraction from `.agda`, **interactive** extraction via
 
 The two schema we use to model Agda data are `AgdaData` and `TrainRecord`.
 
-+  **`AgdaData`** is for representing type and proofs that are **complete** (no holes);
++  **`AgdaData`** is for representing types and proofs that are complete (no holes);
 
 +  **`TrainRecord`** is for representing **interactive** goals and contexts.
 
@@ -129,10 +129,15 @@ Use `sbt runMain …` to execute the programs directly.
       --library-file ../agda-jang/agda/libraries"
     ```
 
-**Notes**
+    **Flags**
 
-* `--include` adds Agda import paths; `--lib` uses a registered library (e.g., `standard-library`); `--library-file` points to a custom `libraries` index.
-* The interactive extractor emits **goals + contexts**, not completed proofs.
+    +  `--include DIR` (repeatable): add import search paths;
+    +  `--lib NAME`: use a registered library, e.g., `standard-library`;
+    +  `--library-file FILE`: location of Agda library index file.
+
+    **Notes**
+
+    The interactive extractor emits **goals + contexts**, not completed proofs.
 
 ---
 
@@ -140,7 +145,7 @@ Use `sbt runMain …` to execute the programs directly.
 
 **Prereqs:**
 
-* Agda ≥ 2.7 (you’re on 2.8.0 ✅)
+* Agda ≥ 2.7
 * Standard library registered (or provide a libraries file)
 
 **Run:**
@@ -154,15 +159,6 @@ sbt "runMain proofparser.AgdaSimplifiedExtractor \
   --lib standard-library \
   --library-file ../agda-jang/agda/libraries"
 ```
-
-Flags:
-
-* `--include DIR` (repeatable): add import search paths (Agda’s `-i`).
-* `--lib NAME`: use a registered library (Agda’s `-l`), e.g., `standard-library`.
-* `--libraries-file FILE`: alternate libraries index file (Agda’s `--library-file`).
-
-> Tip: Agda doesn’t have `--library-path`; use `--library-file=PATH/TO/libraries` to point at a custom libraries file, or just `--lib standard-library` if it’s already registered.
-
 
 ---
 
