@@ -15,12 +15,12 @@ from pathlib import Path
 from typing import Tuple
 import argparse
 import os
-
+import pandas as pd
+import pyarrow.parquet as pq
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-import pyarrow.parquet as pq
 
 
 # ---------- CLI ----------
@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
 
 # ---------- Data ----------
 
-def load_data(path: Path) -> Tuple[torch.Tensor, torch.Tensor]:
+def load_data_old(path: Path) -> Tuple[torch.Tensor, torch.Tensor]:
     """Load Parquet into (X, y) tensors."""
     table = pq.read_table(path)
     df = table.to_pandas()
@@ -57,6 +57,28 @@ def load_data(path: Path) -> Tuple[torch.Tensor, torch.Tensor]:
     X_t = torch.tensor(X, dtype=torch.float32)
     y_t = torch.tensor(y, dtype=torch.long)
     return X_t, y_t
+
+
+def load_data(path: str) -> Tuple[torch.Tensor, torch.Tensor]:
+    # JSONL input (what make train uses right now)
+    df = pd.read_json(path, lines=True)
+
+    # Fallback: if our toy columns aren't present, synthesize them
+    if not {"feature1", "feature2"} <= set(df.columns):
+        # Be defensive; missing columns just become 0
+        def length_col(col):
+            if col in df.columns:
+                return df[col].fillna("").astype(str).str.len()
+            else:
+                return 0
+
+        df["feature1"] = length_col("agdaType")
+        df["feature2"] = length_col("proof")
+
+    X = df[["feature1", "feature2"]].to_numpy()
+    # Whatever your target is:
+    y = df.get("label", pd.Series([0] * len(df))).to_numpy()
+    return X, y
 
 
 def make_loader(X: torch.Tensor, y: torch.Tensor, batch_size: int) -> DataLoader:
