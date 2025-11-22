@@ -12,6 +12,15 @@
 #
 #   -  Local smoke tests
 ##
+##
+# proof-parser — Scala tools Makefile
+#
+# Focus:
+#   - Extract / transform / reduce Agda JSON
+#   - Dataset stats + premise-selection baselines
+#   - Local smoke tests
+##
+
 SBT          ?= sbt
 PKG          ?= proofparser
 MAIN_STATS   ?= $(PKG).DatasetStats
