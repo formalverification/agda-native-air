@@ -59,25 +59,40 @@ def load_data_old(path: Path) -> Tuple[torch.Tensor, torch.Tensor]:
     return X_t, y_t
 
 
-def load_data(path: str) -> Tuple[torch.Tensor, torch.Tensor]:
-    # JSONL input (what make train uses right now)
+def load_data(path) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Load JSONL dataset into (X, y) **tensors**.
+
+    If 'feature1'/'feature2' are absent, synthesize them from the
+    lengths of 'agdaType' and 'proof' strings so we always have
+    a 2D numeric feature space.
+    """
+    # Pandas happily accepts a Path or string here
     df = pd.read_json(path, lines=True)
 
-    # Fallback: if our toy columns aren't present, synthesize them
+    # If our toy feature columns are missing, synthesize them
     if not {"feature1", "feature2"} <= set(df.columns):
-        # Be defensive; missing columns just become 0
-        def length_col(col):
+        def length_col(col: str):
             if col in df.columns:
-                return df[col].fillna("").astype(str).str.len()
+                return (
+                    df[col]
+                    .fillna("")        # avoid NaNs
+                    .astype(str)       # ensure strings
+                    .str.len()         # length in characters
+                )
             else:
-                return 0
+                # Column missing altogether: just zeros
+                return pd.Series([0] * len(df), index=df.index)
 
         df["feature1"] = length_col("agdaType")
         df["feature2"] = length_col("proof")
 
-    X = df[["feature1", "feature2"]].to_numpy()
-    # Whatever your target is:
-    y = df.get("label", pd.Series([0] * len(df))).to_numpy()
+    X_np = df[["feature1", "feature2"]].to_numpy()
+    y_np = df.get("label", pd.Series([0] * len(df), index=df.index)).to_numpy()
+
+    X = torch.tensor(X_np, dtype=torch.float32)
+    y = torch.tensor(y_np, dtype=torch.long)
+
     return X, y
 
 
