@@ -12,15 +12,6 @@
 #
 #   -  Local smoke tests
 ##
-##
-# proof-parser — Scala tools Makefile
-#
-# Focus:
-#   - Extract / transform / reduce Agda JSON
-#   - Dataset stats + premise-selection baselines
-#   - Local smoke tests
-##
-
 SBT          ?= sbt
 PKG          ?= proofparser
 MAIN_STATS   ?= $(PKG).DatasetStats
@@ -124,7 +115,7 @@ endef
 .PHONY: dataset-stats
 dataset-stats:
 	$(call _require_dataset)
-	@echo "→ DatasetStats on $(DATASET) (TOP=$(TOP))"
+	@echo "📊 DatasetStats on $(DATASET) (TOP=$(TOP))"
 	@$(SBT) $(SBT_FLAGS) "runMain $(MAIN_STATS) $(DATASET) --top $(TOP)"
 
 .PHONY: premise-eval
