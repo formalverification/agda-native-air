@@ -1,6 +1,9 @@
 ##
 # ml-pipeline — subproject Makefile
 #
+# [DEPRECATED]
+# Top-level Makefile is canonical; this file is kept for old experiments and will be removed later.
+#
 # @file agda-ai-prover/ml-pipeline/Makefile
 # @version 0.1
 # Focus: Scala/Spark ETL, Python ML model training and API serving
@@ -12,6 +15,11 @@ MODEL_DIR=model
 API_DIR=api
 
 .PHONY: etl train export_onnx export_script serve test ci all
+
+.PHONY: help
+help:
+	@echo "This ml-pipeline Makefile is deprecated."
+	@echo "Use the top-level agda-ai-prover/Makefile (e.g. 'make train-stdlib')."
 
 seed:
 	mkdir -p data/raw
