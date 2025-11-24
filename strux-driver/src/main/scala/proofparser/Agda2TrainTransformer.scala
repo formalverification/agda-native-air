@@ -2,9 +2,12 @@
  *  Agda2TrainTransformer.scala
  *  ----------------------------------------------------------------------------
  *
- *  FILE proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
+ *  File: proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
+ *  Package: proofparser
  *
- *  PURPOSE
+ *  Purpose
+ *  -------
  *    Transform an Agda2train-style JSON dump (our simplified Agda AST
  *    snapshot) into the project’s canonical AgdaData/TrainRecord rows for
  *    downstream training or inspection.  The canonical, line-oriented training
@@ -15,7 +18,8 @@
  *
  *    This is the data contract that downstream ETL and training code expect.
  *
- *  CONTEXT IN PROJECT
+ *  Context in Project
+ *  ------------------
  *    - Upstream:
  *        * `AgdaExtractorMain` (Scala) or other tools produce a single JSON
  *          dump per Agda module (e.g., `agda-example.json`).
@@ -28,7 +32,8 @@
  *        * Spark ETL (`PreprocessAgda`) or Python loaders produce features
  *          and feed trainers.
  *
- *  DESIGN GOALS
+ *  Design Goals
+ *  ------------
  *    - **Consistency**: use the same JSON stack (`ujson`/`upickle`) as the
  *      bridge/extractor tools to keep the project uniform.
  *    - **Purity** at the edges: most helpers are total/pure functions; I/O is
@@ -38,7 +43,8 @@
  *      `.agda.` segments).
  *    - **Friendly errors**: if the input is malformed, fail with context.
  *
- *  INPUT SHAPE (what we read)
+ *  Input Shape (what we read)
+ *  --------------------------
  *    A single JSON object (or JSONL of such objects) with keys like:
  *
  *      {
@@ -53,7 +59,8 @@
  *      - "definition": { "pretty": "..." }
  *      - "holes": [ { "premises": ["agda-example._+_<8>", ...] }, ... ]
  *
- *  OUTPUT SHAPE (what we write)
+ *  Output Shape (what we write)
+ *  ----------------------------
  *    One JSON object per line conforming to `AgdaData` from `Model.scala`:
  *      {
  *        "file": "agda-example",
@@ -65,29 +72,29 @@
  *      }
  *
  *  CLI
+ *  ---
  *    sbt "project proof-parser" \
  *        "runMain proofparser.Agda2TrainTransformer <in.json|jsonl> <out.jsonl>"
  *
- *  EXAMPLES
+ *  Examples
+ *  --------
  *    sbt "project proof-parser" \
  *        "runMain proofparser.Agda2TrainTransformer proof-parser/src/test/resources/agda-example.json target/a2t.jsonl"
  *
- *  TESTING TIPS
+ *  Testing Tips
+ *  ------------
  *    - Unit-test the pure helpers (`parseOne`, `normalizePremise`, `isSelfPremise`)
  *      with small JSON snippets.
  *    - Run on `src/test/resources/agda-example.json` and inspect the JSONL.
  *
- *  NOTES
+ *  Notes
+ *  -----
  *   - Ensure only the canonical AgdaData from Model.scala is used (remove duplicate type defs).
  *   - Prefer pretty-printed terms/types from the dump; normalize module/file names.
  *   - Complements Agda2TrainReducer: this file may expose richer fields or a different mapping.
  *
- *  COPYRIGHT (c) 2025 Thmpr Lab, LLC.
- *
- * =============================================================================
+ *  =============================================================================
  */
-
-
 package proofparser
 
 import java.io.{File, PrintWriter}
@@ -96,7 +103,6 @@ import scala.io.Source
 import scala.util.{Try, Success, Failure}
 import upickle.default._
 import ujson._
-
 
 case class TheoremData(file: String, module: Option[String], name: String, body: String)
 object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }

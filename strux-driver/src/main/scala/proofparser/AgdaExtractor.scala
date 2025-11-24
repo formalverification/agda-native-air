@@ -1,34 +1,41 @@
-/**
- * AgdaExtractor.scala
+/** ============================================================================
+ *  AgdaExtractor.scala
+ *  ----------------------------------------------------------------------------
  *
- * File: proof-parser/src/main/scala/proofparser/AgdaExtractor.scala
+ *  File: proof-parser/src/main/scala/proofparser/AgdaExtractor.scala
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
+ *  Package: proofparser
  *
- * Description: Lightweight, regex-based extractor for Agda files (no Agda process).
- *              Useful as a fast baseline on solved files: infers
- *              module/name/type/body heuristically and outputs the results
- *              in JSON Lines format.
+ *  Description
+ *  -----------
+ *  Lightweight, regex-based extractor for Agda files (no Agda process).
+ *  Useful as a fast baseline on solved files: infers module/name/type/body
+ *  heuristically and outputs the results in JSON Lines format.
  *
- * Features:
- * - Recursively searches for `.agda` files in a given directory.
- * - Identifies module names, theorem definitions, and associated proofs.
- * - Handles multi-line definitions and comments.
- * - Outputs extracted data in a structured JSON Lines format.
+ *  Features
+ *  --------
+ *  - Recursively searches for `.agda` files in a given directory.
+ *  - Identifies module names, theorem definitions, and associated proofs.
+ *  - Handles multi-line definitions and comments.
+ *  - Outputs extracted data in a structured JSON Lines format.
  *
- * Usage:
- *   import proofparser.AgdaExtractor
- *   val rows: List[AgdaData] = AgdaExtractor.extract(Paths.get("path/to/file.agda"))
+ *  Usage
+ *  -----
+ *    import proofparser.AgdaExtractor
+ *    val rows: List[AgdaData] = AgdaExtractor.extract(Paths.get("path/to/file.agda"))
  *
- * Examples:
- *   // See AgdaExtractorMain for CLI usage that writes JSONL.
+ *  Examples
+ *  --------
+ *    // See AgdaExtractorMain for CLI usage that writes JSONL.
  *
- * Notes:
- *   - Heuristic by design; use Agda2Train-based tools for authoritative data.
- *   - Good for smoke tests and CI when Agda is unavailable.
- *   - This utility requires Scala 2.13+ and the uPickle library for JSON handling.
+ *  Notes
+ *  -----
+ *    - Heuristic by design; use Agda2Train-based tools for authoritative data.
+ *    - Good for smoke tests and CI when Agda is unavailable.
+ *    - This utility requires Scala 2.13+ and the uPickle library for JSON handling.
  *
- * (c) 2025 Thmpr Lab, LLC.
+ *  ============================================================================
  */
-
 
 package proofparser
 

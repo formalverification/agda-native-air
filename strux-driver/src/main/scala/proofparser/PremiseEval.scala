@@ -1,33 +1,48 @@
-// ============================================================================
-// File: src/main/scala/proofparser/PremiseEval.scala
-// Package: proofparser
-// ----------------------------------------------------------------------------
-// Overview
-//   A unified micro-benchmark for premise selection with two modes:
-//     1) Single-file mode (default): one JSONL of training rows where
-//        `premises` are the gold labels. Train/test split is hash-based.
-//     2) Two-file mode (retrieval): <agda-data.jsonl> <goals.jsonl> —
-//        builds a TF bag-of-words index over (agdaType \n proof), retrieves
-//        nearest neighbors for each goal, unions their premises, and evaluates
-//        recall@K against the goal's imports (gold premises).
-//
-// Key traits
-//   - Deterministic: no RNG; split uses FNV-1a hash on (file,module,name)
-//   - Fast baselines: Global/PerModule frequency rankers (mode 1)
-//   - Lightweight retrieval: integer TF + dot-product (mode 2)
-//   - Metrics: macro Precision@K, Recall@K, F1@K, Coverage
-//
-// Usage
-//   # Mode 1 (single-file, default)
-//   sbt "runMain proofparser.PremiseEval data/train.jsonl --k 10 --split 90"
-//
-//   # Mode 2 (two-file retrieval)
-//   sbt "runMain proofparser.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
-//
-// Notes
-//   - Case classes here mirror only the fields we need; they are intentionally
-//     decoupled from any shared model file to stay robust across refactors.
-// ----------------------------------------------------------------------------
+/** ============================================================================
+ *  PremiseEval.scala
+ *  ----------------------------------------------------------------------------
+ *
+ *  File: proof-parser/src/main/scala/proofparser/PremiseEval.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *
+ *  Description
+ *  ----------
+ *  A unified micro-benchmark for premise selection with two modes:
+ *  1.  Single-file mode (default): one JSONL of training rows where
+ *      `premises` are the gold labels. Train/test split is hash-based.
+ *  2.  Two-file mode (retrieval): <agda-data.jsonl> <goals.jsonl> —
+ *      builds a TF bag-of-words index over (agdaType \n proof), retrieves
+ *      nearest neighbors for each goal, unions their premises, and evaluates
+ *      recall@K against the goal's imports (gold premises).
+ *
+ *  Key traits
+ *  ----------
+ *  - Deterministic: no RNG; split uses FNV-1a hash on (file,module,name)
+ *  - Fast baselines: Global/PerModule frequency rankers (mode 1)
+ *  - Lightweight retrieval: integer TF + dot-product (mode 2)
+ *  - Metrics: macro Precision@K, Recall@K, F1@K, Coverage
+ *
+ *  Usage
+ *  -----
+ *     # Mode 1 (single-file, default)
+ *     sbt "runMain proofparser.PremiseEval data/train.jsonl --k 10 --split 90"
+ *
+ *     # Mode 2 (two-file retrieval)
+ *     sbt "runMain proofparser.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
+ *
+ *  Notes
+ *  -----
+ *  -  Case classes here mirror only the fields we need; they are intentionally
+ *     decoupled from any shared model file to stay robust across refactors.
+ *  -  Mode 1 split is stable across runs and machines via hash-based partitioning.
+ *  -  Mode 2 uses a simple bag-of-words TF representation for speed; more advanced
+ *     embeddings can be slotted in later.
+ *  -  Keep the schemas stable to avoid breaking existing corpora.
+ *
+ *  ============================================================================
+ */
+
 package proofparser
 
 import scala.io.Source

@@ -1,15 +1,49 @@
+/** ============================================================================
+ *  DatasetStats.scala
+ *  -----------------------------------------------------------------------------
+ *
+ *  File: src/main/scala/proofparser/DatasetStats.scala
+ *  Copyright: (c) 2024-2025 Thmpr Lab, LLC.
+ *  Package: proofparser
+ *
+ *  Description
+ *  -----------
+ *  Dataset statistics tool for JSONL proof datasets.
+ *  This tool reads a JSONL file containing proof dataset rows and computes
+ *  various statistics, including distinct name counts, length distributions,
+ *  and histograms of premises and modules.
+ *
+ *  It combines:
+ *
+ *  - Streaming + resource-safe IO (no "Stream Closed"),
+ *  - Minimal local schema (decoupled from Model.scala),
+ *  - Codepoint-aware length stats (handles surrogate pairs),
+ *  - Distinct name counts and basic invariants,
+ *  - Actionable histograms (premises, modules, premises-per-row),
+ *  - Small, friendly CLI: DatasetStats <in.jsonl> [--top K].
+ *
+ *
+ *  Usage
+ *  -----
+ *      sbt "runMain proofparser.DatasetStats path/to/train.jsonl --top 20"
+ *
+ *  Options
+ *  -------
+ *      --top K : Display the top K entries in the premises and modules histograms.
+ *
+ *  Notes
+ *  -----
+ *  The tool is designed to be resource-safe and handles Unicode codepoints
+ *  correctly when computing string lengths.
+ *
+ *  ============================================================================
+ */
+
+
 // ============================================================================
-// File: src/main/scala/proofparser/DatasetStats.scala
-// Package: proofparser
 // ----------------------------------------------------------------------------
 // Overview
 //   "Best-of-both-worlds" DatasetStats that combines:
-//     - Streaming + resource-safe IO (no "Stream Closed"),
-//     - Minimal local schema (decoupled from Model.scala),
-//     - Codepoint-aware length stats (handles surrogate pairs),
-//     - Distinct name counts and basic invariants,
-//     - Actionable histograms (premises, modules, premises-per-row),
-//     - Small, friendly CLI: DatasetStats <in.jsonl> [--top K].
 //
 // Why the previous version failed with "Stream Closed"
 //   Returning an Iterator from a Using.resource block closes the source before

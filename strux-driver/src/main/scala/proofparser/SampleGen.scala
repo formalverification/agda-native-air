@@ -1,14 +1,23 @@
-// ============================================================================
-// File: src/main/scala/proofparser/SampleGen.scala
-// Package: proofparser
-// ----------------------------------------------------------------------------
-// Overview
-//   Tiny synthetic generator for a 16-row JSONL dataset compatible with
-//   DatasetStats and PremiseEval (mode 1). Useful for smoke tests.
-//
-// Usage
-//   sbt "runMain proofparser.SampleGen out.jsonl --n 16"
-// ----------------------------------------------------------------------------
+/** ============================================================================
+ *  SampleGen.scala
+ *  ----------------------------------------------------------------------------
+ *
+ *  File: proof-parser/src/main/scala/proofparser/SampleGen.scala
+ *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *  Package: proofparser
+ *
+ *  Description
+ *  ----------
+ *  Tiny synthetic generator for a 16-row JSONL dataset compatible with
+ *  DatasetStats and PremiseEval (mode 1). Useful for smoke tests.
+ *
+ *  Usage
+ *  -----
+ *      sbt "runMain proofparser.SampleGen out.jsonl --n 16"
+ *
+ *  ============================================================================
+ */
+
 package proofparser
 
 import upickle.default._

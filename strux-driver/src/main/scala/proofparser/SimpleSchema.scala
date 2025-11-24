@@ -1,48 +1,47 @@
-/**
- * SimpleSchema.scala
+/** ============================================================================
+ *  SimpleSchema.scala
+ *  ----------------------------------------------------------------------------
  *
- * FILE
- *   proof-parser/src/main/scala/proofparser/SimpleSchema.scala
+ *  File: proof-parser/src/main/scala/proofparser/SimpleSchema.scala
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
+ *  Package: proofparser
  *
- * DESCRIPTION
- *   Minimal schema for training examples: Pos/Range, CtxVar, TrainRecord,
- *   with upickle codecs. Designed for JSONL emission and quick eyeballing.
+ *  Description
+ *  -----------
+ *  Minimal schema for training examples: Pos/Range, CtxVar, TrainRecord,
+ *  with upickle codecs. Designed for JSONL emission and quick eyeballing.
  *
- * USAGE
- *   import proofparser.{TrainRecord, CtxVar, Range, Pos}
- *   val json = upickle.default.write(TrainRecord(...))
+ *  Usage
+ *  -----
+ *      import proofparser.{TrainRecord, CtxVar, Range, Pos}
+ *      val json = upickle.default.write(TrainRecord(...))
  *
- * EXAMPLES
- *   // See Agda2TrainReducer and AgdaExtractorMain for writers.
+ *  Examples
+ *  --------
+ *    // See Agda2TrainReducer and AgdaExtractorMain for writers.
  *
- * NOTES
- *   - Keep types stable; only append optional fields to avoid breaking old corpora.
- *   - goalType/solution are pretty-printed Agda strings by design.
+ *  Invariants
+ *  ----------
+ *  - file:    base filename (keep extension here; this is used by live extractor)
+ *  - module:  fully-qualified module string, or "" if unknown.
+ *  - decl:    local identifier (no module prefix).
+ *  - goalType/solution/context/imports: pretty-printed strings as surfaced by Agda.
  *
- * (c) 2025 Thmpr Lab, LLC.
+ *  Serialization
+ *  -------------
+ *  upickle (see companion implicits).
+ *
+ *  Notes
+ *  -----
+ *  - Keep types stable; only append optional fields to avoid breaking old corpora.
+ *  - goalType/solution are pretty-printed Agda strings by design.
+ *
+ *  ============================================================================
  */
 
 package proofparser
-
 import upickle.default._
 
-/**
- * SimpleSchema (goal-centric training rows)
- *
- * PURPOSE
- *   `TrainRecord` represents individual goal/context snapshots (e.g., from
- *   AllGoalsWarnings), which is intentionally distinct from `AgdaData`
- *   (declaration/proof rows). Keep them separate to avoid field drift.
- *
- * INVARIANTS
- *   - file:    base filename (keep extension here; this is used by live extractor)
- *   - module:  fully-qualified module string, or "" if unknown.
- *   - decl:    local identifier (no module prefix).
- *   - goalType/solution/context/imports: pretty-printed strings as surfaced by Agda.
- *
- * SERIALIZATION
- *   upickle (see companion implicits).
- */
 final case class Pos(line: Int, col: Int)
 object Pos { implicit val rw: ReadWriter[Pos] = macroRW }
 
@@ -52,6 +51,11 @@ object Range { implicit val rw: ReadWriter[Range] = macroRW }
 final case class CtxVar(name: String, `type`: String)
 object CtxVar { implicit val rw: ReadWriter[CtxVar] = macroRW }
 
+/**
+ * TrainRecord represents individual goal/context snapshots (e.g., from
+ * AllGoalsWarnings), which is intentionally distinct from `AgdaData`
+ * (declaration/proof rows). Keep them separate to avoid field drift.
+ */
 final case class TrainRecord(
   file: String,
   module: String,
