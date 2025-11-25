@@ -18,16 +18,12 @@ package proofparser.schema
  *   • TrainRecord     – ML-ready training row
  *   • TrainGoal       – goal/query for premise selection evaluation
  *   • TheoremData     – intermediate summary representation
- *   • Row alias       – canonical default row type (AgdaData)
- *
+  *
  *  This module enforces:
  *
  *   • consistent JSON serialization (uPickle)
  *   • consistent normalization and cleaning of names, modules, premises
  *   • referentially transparent, functional helpers
- *
- *  Downstream modules should import from here rather than define their
- *  own copies of Row/AgdaData/etc.
  *
  * ===========================================================================
  */
@@ -115,12 +111,6 @@ final case class AgdaData(
 )
 object AgdaData { implicit val rw: ReadWriter[AgdaData] = macroRW }
 
-/** ------------------------------------------------------
-  *  "Row" – legacy alias for AgdaData
-  * ------------------------------------------------------ */
-object RowAlias {
-  type Row = AgdaData
-}
 
 /** ------------------------------------------------------
   *  TrainRecord – final ML-ready training item
