@@ -2,8 +2,8 @@
  *  AgdaSimplifiedExtractor.scala
  *  --------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/AgdaSimplifiedExtractor.scala
- *  Package: proofparser
+ *  File: proof-parser/src/main/scala/proofparser/extract/AgdaSimplifiedExtractor.scala
+ *  Package: proofparser.extract
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Purpose
@@ -105,7 +105,7 @@
  * ==========================================================================
  */
 
-package proofparser
+package proofparser.extract
 
 import java.nio.file.{Files, Path, Paths}
 import java.time.{Duration, Instant}

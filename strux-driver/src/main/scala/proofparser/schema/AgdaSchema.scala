@@ -111,6 +111,9 @@ object AgdaDataOps {
   private def stripWhitespace(s: String): String =
     s.replaceAll("\\s+", " ").trim
 
+  private def stripWhitespaceOpt(os: Option[String]): Option[String] =
+    os.map(stripWhitespace).filter(_.nonEmpty)
+
   /**
     * Normalize premise list:
     *   - strip whitespace from each name,
@@ -133,8 +136,8 @@ object AgdaDataOps {
       file     = r.file.trim,
       module   = r.module.map(_.trim).filter(_.nonEmpty),
       name     = r.name.trim,
-      agdaType = stripWhitespace(r.agdaType),
-      proof    = stripWhitespace(r.proof),
+      agdaType = stripWhitespaceOpt(r.agdaType),
+      proof    = stripWhitespaceOpt(r.proof),
       premises = canonicalPremises(r.premises)
     )
 }
@@ -178,8 +181,8 @@ object OldRow {
     OldRow(
       name      = d.name,
       module    = d.module.getOrElse("<none>"),
-      agdaType  = d.agdaType,
-      proof     = d.proof,
+      agdaType  = d.agdaType.getOrElse(""),
+      proof     = d.proof.getOrElse(""),
       premises  = d.premises.toVector
     )
 }
@@ -283,8 +286,8 @@ object TrainRecord {
     TrainRecord(
       module   = moduleString,
       name     = d.name,
-      agdaType = d.agdaType,
-      proof    = d.proof,
+      agdaType = d.agdaType.getOrElse(""),
+      proof    = d.proof.getOrElse(""),
       premises = premisesStr
     )
   }
