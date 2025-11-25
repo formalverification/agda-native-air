@@ -56,7 +56,7 @@ import scala.io.Source
 import scala.util.{Try, Using}
 
 import upickle.default._
-import proofparser.schema.{Row, AgdaData, TrainGoal}
+import proofparser.schema.{ AgdaData, TrainGoal}
 
 object PremiseEval {
 

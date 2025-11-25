@@ -26,7 +26,7 @@ package proofparser.transform
 
 import proofparser.schema._
 import proofparser.schema.AgdaDataOps._
-import proofparser.schema.{DeclKind, SemanticInfo,S,TheoremData}
+import proofparser.schema.{DeclKind, SemanticInfo,TheoremData}
 
 import upickle.default._
 import ujson._

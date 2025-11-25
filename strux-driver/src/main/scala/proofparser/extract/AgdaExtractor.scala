@@ -324,7 +324,7 @@ object AgdaExtractor {
   /** Parse one `.agda` file into canonical `AgdaData` rows. */
   def parseAgdaFile(path: Path): Vector[AgdaData] = {
     val lines: List[String] =
-      Files.readAllLines(path).toArray(new Array).toList
+      Files.readAllLines(path).asScala.toList
     val module = extractModuleName(lines)
     extractTheorems(lines, path.getFileName.toString, module)
   }
