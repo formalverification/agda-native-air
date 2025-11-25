@@ -2,9 +2,9 @@
  *  PremiseEval.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/PremiseEval.scala
- *  Package: proofparser
- *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *  File: proof-parser/src/main/scala/proofparser/util/PremiseEval.scala
+ *  Package: proofparser.util
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  ----------
@@ -26,15 +26,15 @@
  *  Usage
  *  -----
  *     # Mode 1 (single-file, default)
- *     sbt "runMain proofparser.PremiseEval data/train.jsonl --k 10 --split 90"
+ *     sbt "runMain proofparser.util.PremiseEval data/train.jsonl --k 10 --split 90"
  *
  *     # Mode 2 (two-file retrieval)
- *     sbt "runMain proofparser.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
+ *     sbt "runMain proofparser.util.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
  *
  *  Notes
  *  -----
- *  -  Case classes here mirror only the fields we need; they are intentionally
- *     decoupled from any shared model file to stay robust across refactors.
+ *  -  Row, AgdaData, and TrainGoal come from `proofparser.schema`.
+ *     This keeps the schemas shared and avoids duplication.
  *  -  Mode 1 split is stable across runs and machines via hash-based partitioning.
  *  -  Mode 2 uses a simple bag-of-words TF representation for speed; more advanced
  *     embeddings can be slotted in later.
@@ -43,64 +43,44 @@
  *  ============================================================================
  */
 
-package proofparser
+package proofparser.util
 
 import scala.io.Source
 import scala.util.Using
 import upickle.default._
+import proofparser.schema.{Row, AgdaData, TrainGoal}
 
 object PremiseEval {
   // --------- Shared helpers ---------
   private def readJsonlVec[A: Reader](path: String): Vector[A] =
     Using.resource(Source.fromFile(path)) { src =>
-      src.getLines().iterator.map(_.trim).filter(_.nonEmpty).map(s => read[A](s)).toVector
+      src.getLines().iterator
+        .map(_.trim)
+        .filter(_.nonEmpty)
+        .map(s => read[A](s))
+        .toVector
     }
-
-  // --------- Mode 1 schema (single file) ---------
-  final case class Row(
-    file: String,
-    module: Option[String],
-    name: String,
-    agdaType: String,
-    proof: String,
-    premises: List[String] = Nil
-  )
-  object Row { implicit val rw: ReadWriter[Row] = macroRW }
-
-  // --------- Mode 2 schema (two files) ---------
-  final case class AgdaData(
-    file: String,
-    module: Option[String],
-    name: String,
-    agdaType: String,
-    proof: String,
-    premises: List[String] = Nil
-  )
-  object AgdaData { implicit val rw: ReadWriter[AgdaData] = macroRW }
-
-  final case class TrainGoal(
-    module: Option[String],
-    goalType: String,
-    imports: List[String] = Nil
-  )
-  object TrainGoal { implicit val rw: ReadWriter[TrainGoal] = macroRW }
 
   // --------- CLI ---------
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) {
-      Console.err.println("Usage: PremiseEval <in.jsonl> [--k K] [--split PCT]  |  PremiseEval <agda.jsonl> <goals.jsonl> [--k K]");
+      Console.err.println(
+        "Usage: PremiseEval <in.jsonl> [--k K] [--split PCT]  |  PremiseEval <agda.jsonl> <goals.jsonl> [--k K]"
+      )
       sys.exit(1)
     }
 
-    val kArg   = args.sliding(2,1).collectFirst{case Array("--k",n)=>n.toInt}.getOrElse(10)
-    val splitP = args.sliding(2,1).collectFirst{case Array("--split",p)=>p.toInt}.getOrElse(90)
+    val kArg   = args.sliding(2,1).collectFirst { case Array("--k", n)     => n.toInt }.getOrElse(10)
+    val splitP = args.sliding(2,1).collectFirst { case Array("--split", p) => p.toInt }.getOrElse(90)
 
     // Detect mode by arity before flags
     val dataArgs = args.takeWhile(!_.startsWith("--"))
     dataArgs.length match {
       case 1 => runSingleFile(dataArgs(0), kArg, splitP)
       case 2 => runTwoFile(dataArgs(0), dataArgs(1), kArg)
-      case _ => Console.err.println("Bad arguments."); sys.exit(1)
+      case _ =>
+        Console.err.println("Bad arguments.")
+        sys.exit(1)
     }
   }
 
@@ -114,6 +94,7 @@ object PremiseEval {
     val (train1, test1) =
       if (rows.nonEmpty && test.isEmpty && train.nonEmpty) (train.dropRight(1), train.takeRight(1))
       else (train, test)
+
     println(s"train: ${train1.size}  test: ${test1.size}  (split=${pct}%)")
     if (test1.isEmpty) println("hint: try --split 50 or a larger dataset")
 
@@ -138,7 +119,7 @@ object PremiseEval {
       (g, tfv)
     }
 
-    val support = goals.count{ case (g, _) => g.imports.nonEmpty }
+    val support = goals.count { case (g, _) => g.imports.nonEmpty }
     var hits = 0
 
     goals.foreach { case (qg, qtf) =>
@@ -183,9 +164,11 @@ object PremiseEval {
     private val ranking: Vector[String] =
       train.iterator.flatMap(_.premises).toVector
         .groupBy(identity).view.mapValues(_.size).toVector
-        .sortBy{ case (_,c) => -c }
+        .sortBy { case (_, c) => -c }
         .map(_._1).toVector
-    def predict(row: Row, k: Int): List[String] = ranking.take(k).toList
+
+    def predict(row: Row, k: Int): List[String] =
+      ranking.take(k).toList
   }
 
   final class PerModuleFreq(train: Seq[Row]) extends Predictor {
@@ -195,15 +178,28 @@ object PremiseEval {
       grouped.view.mapValues { rs =>
         rs.iterator.flatMap(_.premises).toVector
           .groupBy(identity).view.mapValues(_.size).toVector
-          .sortBy{ case (_,c) => -c }.map(_._1).toVector
+          .sortBy { case (_, c) => -c }
+          .map(_._1).toVector
       }.toMap
     }
+
     def predict(row: Row, k: Int): List[String] =
-      byMod.getOrElse(row.module.getOrElse("<none>"), global.predict(row, Int.MaxValue).toVector).take(k).toList
+      byMod.getOrElse(
+        row.module.getOrElse("<none>"),
+        global.predict(row, Int.MaxValue).toVector
+      ).take(k).toList
   }
 
   // --------- Metrics (mode 1) ---------
-  final case class Report(label: String, k: Int, precision: Double, recall: Double, f1: Double, coverage: Double, support: Int)
+  final case class Report(
+    label: String,
+    k: Int,
+    precision: Double,
+    recall: Double,
+    f1: Double,
+    coverage: Double,
+    support: Int
+  )
 
   private def evaluate(model: Predictor, test: Seq[Row], k: Int, label: String): Report = {
     var precSum = 0.0
@@ -233,11 +229,20 @@ object PremiseEval {
   }
 
   private def tokens(s: String): Array[String] =
-    s.toLowerCase.replaceAll("[^\\p{L}0-9]+", " ").trim.split("\\s+").filter(_.nonEmpty)
-  private def tf(toks: Array[String]): Map[String, Int] = toks.groupBy(identity).view.mapValues(_.length).toMap
+    s.toLowerCase
+      .replaceAll("[^\\p{L}0-9]+", " ")
+      .trim
+      .split("\\s+")
+      .filter(_.nonEmpty)
+
+  private def tf(toks: Array[String]): Map[String, Int] =
+    toks.groupBy(identity).view.mapValues(_.length).toMap
+
   private def dot(a: Map[String, Int], b: Map[String, Int]): Int =
-    if (a.size < b.size) a.iterator.map{ case (k,v) => v * b.getOrElse(k,0) }.sum
-    else                 b.iterator.map{ case (k,v) => v * a.getOrElse(k,0) }.sum
+    if (a.size < b.size)
+      a.iterator.map { case (k, v) => v * b.getOrElse(k, 0) }.sum
+    else
+      b.iterator.map { case (k, v) => v * a.getOrElse(k, 0) }.sum
 
   private implicit class ExistsAny[A](as: Iterable[A]) {
     def exists(set: Set[A]): Boolean = as.exists(set.contains)

@@ -2,9 +2,9 @@
  *  Agda2TrainTransformer.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/Agda2TrainTransformer.scala
+ *  File: proof-parser/src/main/scala/proofparser/transform/Agda2TrainTransformer.scala
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
- *  Package: proofparser
+ *  Package: proofparser.transform
  *
  *  Purpose
  *  -------
@@ -95,7 +95,7 @@
  *
  *  =============================================================================
  */
-package proofparser
+package proofparser.transform
 
 import java.io.{File, PrintWriter}
 import java.nio.file.{Files, Paths}

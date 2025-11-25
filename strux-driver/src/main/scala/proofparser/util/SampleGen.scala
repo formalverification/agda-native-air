@@ -2,9 +2,9 @@
  *  SampleGen.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/SampleGen.scala
+ *  File: proof-parser/src/main/scala/proofparser/util/SampleGen.scala
+ *  Package: proofparser.util
  *  Copyright: (c) 2024 Thmpr Lab, LLC.
- *  Package: proofparser
  *
  *  Description
  *  ----------
@@ -18,7 +18,7 @@
  *  ============================================================================
  */
 
-package proofparser
+package proofparser.util
 
 import upickle.default._
 

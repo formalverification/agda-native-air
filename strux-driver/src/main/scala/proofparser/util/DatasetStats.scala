@@ -2,9 +2,9 @@
  *  DatasetStats.scala
  *  -----------------------------------------------------------------------------
  *
- *  File: src/main/scala/proofparser/DatasetStats.scala
+ *  File: src/main/scala/proofparser/util/DatasetStats.scala
+ *  Package: proofparser.util
  *  Copyright: (c) 2024-2025 Thmpr Lab, LLC.
- *  Package: proofparser
  *
  *  Description
  *  -----------
@@ -39,20 +39,7 @@
  *  ============================================================================
  */
 
-
-// ============================================================================
-// ----------------------------------------------------------------------------
-// Overview
-//   "Best-of-both-worlds" DatasetStats that combines:
-//
-// Why the previous version failed with "Stream Closed"
-//   Returning an Iterator from a Using.resource block closes the source before
-//   materialization. We now materialize to a Vector inside Using, then proceed.
-//
-// Usage
-//   sbt "runMain proofparser.DatasetStats path/to/train.jsonl --top 20"
-// ----------------------------------------------------------------------------
-package proofparser
+package proofparser.util
 
 import scala.io.Source
 import scala.util.Using

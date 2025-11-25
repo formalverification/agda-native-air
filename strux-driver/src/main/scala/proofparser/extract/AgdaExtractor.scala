@@ -2,9 +2,9 @@
  *  AgdaExtractor.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/AgdaExtractor.scala
+ *  File: proof-parser/src/main/scala/proofparser/extract/AgdaExtractor.scala
+ *  Package: proofparser.extract
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
- *  Package: proofparser
  *
  *  Description
  *  -----------
@@ -37,13 +37,16 @@
  *  ============================================================================
  */
 
-package proofparser
+package proofparser.extract
 
 import java.nio.file.{Files, Paths, Path}
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 import scala.util.matching.Regex
 import upickle.default._
+
+import proofparser.schema.{AgdaData, Semantic, SemanticInfo, DeclKind}
+
 
 object AgdaExtractor {
 

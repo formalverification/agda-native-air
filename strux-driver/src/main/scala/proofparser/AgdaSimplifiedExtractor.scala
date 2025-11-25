@@ -1,44 +1,50 @@
-/* ============================================================================
+/** ============================================================================
  *  AgdaSimplifiedExtractor.scala
  *  --------------------------------------------------------------------------
  *
- *  FILE proof-parser/src/main/scala/proofparser/AgdaSimplifiedExtractor.scala
+ *  File: proof-parser/src/main/scala/proofparser/AgdaSimplifiedExtractor.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
- *  PURPOSE
- *    A small, robust, CLI-friendly program that:
+ *  Purpose
+ *  -------
+ *  A small, robust, CLI-friendly program that:
  *
- *      1) Launches `agda --interaction-json` (via AgdaBridge)
- *      2) Sends a "load" command (IOTCM / Cmd_load) for one or more `.agda` files
- *      3) Listens for JSON messages and harvests "AllGoalsWarnings" to produce
- *         training examples (goal type + local context) as JSONL rows.
+ *  1.  Launches `agda --interaction-json` (via AgdaBridge)
+ *  2.  Sends a "load" command (IOTCM / Cmd_load) for one or more `.agda` files
+ *  3.  Listens for JSON messages and harvests "AllGoalsWarnings" to produce
+ *      training examples (goal type + local context) as JSONL rows.
  *
- *  CONTEXT IN PROJECT
- *    - Lives in the `proofparser` package alongside:
- *        * AgdaBridge.scala        : process I/O (line-in/line-out) for Agda
- *        * AgdaJsonParser.scala    : (not required here) shared parsing helpers
- *        * Agda2TrainTransformer   : transforms other JSON into training rows
- *        * Model.scala / SimpleSchema.scala : data models + schema helpers
- *    - The extractor emits `TrainRecord` rows---a compact, line-oriented format
- *      that downstream ETL/training code can consume directly (e.g., Spark or
- *      Python trainers). This keeps the end-to-end ML pipeline observable and
- *      diffable in git.
+ *  Context in Project
+ *  ------------------
+ *  -  Lives in the `proofparser` package alongside:
+ *     * AgdaBridge.scala        : process I/O (line-in/line-out) for Agda
+ *     * AgdaJsonParser.scala    : (not required here) shared parsing helpers
+ *     * Agda2TrainTransformer   : transforms other JSON into training rows
+ *     * Model.scala / SimpleSchema.scala : data models + schema helpers
+ *  -  The extractor emits `TrainRecord` rows---a compact, line-oriented format
+ *     that downstream ETL/training code can consume directly (e.g., Spark or
+ *     Python trainers). This keeps the end-to-end ML pipeline observable and
+ *     diffable in git.
  *
- *  DESIGN GOALS
- *    - **Observability**: optional verbose logging (`--verbose`) prints what we
- *      send and what we receive (JSON vs non-JSON), so debugging is fast.
- *    - **Robustness**: tolerate non-JSON lines (e.g., "JSON> ...") without
- *      crashing; use timeouts to avoid indefinite hangs; on the happy path,
- *      we do not throw stuff---we return `Either[String, A]` instead.
- *    - **Protocol agility**: small CLI toggles (`--mode`, `--empty-is-null`)
- *      let us probe protocol shape differences across Agda builds (2.6–2.8+)
- *      without rewriting code. If local Agda expects slightly different IOTCM
- *      payloads, we can tweak the builder in one place.
- *    - **Modularity**: each step is a small helper---easy to test in isolation.
- *    - **No hidden global state**: all state lives in local vals; side effects
- *      (I/O) are explicit.
+ *  Design Goals
+ *  ------------
+ *  -  **Observability**: optional verbose logging (`--verbose`) prints what we
+ *     send and what we receive (JSON vs non-JSON), so debugging is fast.
+ *  -  **Robustness**: tolerate non-JSON lines (e.g., "JSON> ...") without
+ *     crashing; use timeouts to avoid indefinite hangs; on the happy path,
+ *     we do not throw stuff---we return `Either[String, A]` instead.
+ *  -  **Protocol agility**: small CLI toggles (`--mode`, `--empty-is-null`)
+ *     let us probe protocol shape differences across Agda builds (2.6–2.8+)
+ *     without rewriting code. If local Agda expects slightly different IOTCM
+ *     payloads, we can tweak the builder in one place.
+ *  -  **Modularity**: each step is a small helper---easy to test in isolation.
+ *  -  **No hidden global state**: all state lives in local vals; side effects
+ *     (I/O) are explicit.
  *
- *  JSON PROTOCOL NOTES (Agda --interaction-json)
- *    - Many Agda builds accept a load of the form:
+ *  JSON Protocol Notes (Agda --interaction-json)
+ *  -----------------------
+ *  -  Many Agda builds accept a load of the form:
  *
  *        { "command":"IOTCM"
  *        , "payload":[ "", [], "NonInteractive"
@@ -46,23 +52,25 @@
  *            , "file":".../Foo.agda"
  *            , "args":["-i","/path/include","-l","standard-library"] } ] }
  *
- *      Some builds are picky about the **first payload cell** (empty string vs
- *      null) and/or **mode** ("NonInteractive" vs "Direct"). We expose both via
- *      flags so we can try variants without editing code.
+ *     Some builds are picky about the **first payload cell** (empty string vs
+ *     null) and/or **mode** ("NonInteractive" vs "Direct"). We expose both via
+ *     flags so we can try variants without editing code.
  *
- *    - Library resolution:
- *        * `--library-file PATH` must be passed to the **Agda process**, not
- *          inside `Cmd_load`. We therefore attach it when starting the bridge.
- *          (This matches Agda’s CLI contract.)
+ *  -  Library resolution:
  *
- *  CLI
- *    Usage:
+ *     *  `--library-file PATH` must be passed to the **Agda process**, not
+ *        inside `Cmd_load`. We therefore attach it when starting the bridge.
+ *        (This matches Agda’s CLI contract.)
+ *
+ *  Usage
+ *  -----
  *      runMain proofparser.AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl>
  *         [--include DIR]* [--lib LIB]* [--library-file FILE]
  *         [--mode NonInteractive|Direct] [--empty-is-null]
  *         [--verbose] [--timeout-ms N]
  *
- *    Examples (from proof-parser/):
+ *  Examples (from proof-parser/)
+ *  --------
  *      sbt "runMain proofparser.AgdaSimplifiedExtractor \
  *           ../agda-jang/agda/ApplyDemo.agda \
  *           ../proof-parser/output/goals.jsonl \
@@ -76,24 +84,26 @@
  *      sbt "runMain proofparser.AgdaSimplifiedExtractor ... --empty-is-null --verbose"
  *      sbt "runMain proofparser.AgdaSimplifiedExtractor ... --mode Direct --empty-is-null --verbose"
  *
- *  ERROR HANDLING PHILOSOPHY
- *    - Prefer `Either[String, A]` over throwing. The main aggregates errors and
- *      prints actionable messages.
- *    - Only the CLI `main` uses `sys.exit(code)` after printing a single line.
+ *  Error Handling Philosophy
+ *  -------------------------
+ *  -  Prefer `Either[String, A]` over throwing. The main aggregates errors and
+ *     prints actionable messages.
+ *  -  Only the CLI `main` uses `sys.exit(code)` after printing a single line.
  *
- *  TESTING TIPS
- *    - Unit test the pure helpers (`moduleName`, `iotcmLoad`, `extractGoalsPretty`)
- *      with canned inputs.
- *    - Use `--verbose` and small timeouts in integration tests to keep runs fast.
+ *  Testing Tips
+ *  ------------
+ *  -  Unit test the pure helpers (`moduleName`, `iotcmLoad`, `extractGoalsPretty`)
+ *     with canned inputs.
+ *  -  Use `--verbose` and small timeouts in integration tests to keep runs fast.
  *
- *  EXTENSION POINTS
- *    - Want decl-specific records? Thread the declaration name into records
- *      when Agda exposes it in messages (or parse from pretty text heuristically).
- *    - Need more message kinds (e.g., solved metas)? Add recognizers to AgdaMsgs.
+ *  Extension Points
+ *  ----------------
+ *  -  Want decl-specific records? Thread the declaration name into records
+ *     when Agda exposes it in messages (or parse from pretty text heuristically).
+ *  -  Need more message kinds (e.g., solved metas)? Add recognizers to AgdaMsgs.
  *
- *  COPYRIGHT (c) 2025 ThmprLab.
- *
- * ========================================================================== */
+ * ==========================================================================
+ */
 
 package proofparser
 

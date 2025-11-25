@@ -1,26 +1,33 @@
-/**
- * AgdaJsonParser.scala
+/** ============================================================================
+ *  AgdaJsonParser.scala
+ *  ----------------------------------------------------------------------------
  *
- * File: proof-parser/src/main/scala/proofparser/AgdaJsonParser.scala
+ *  File: proof-parser/src/main/scala/proofparser/AgdaJsonParser.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
- * Description:
- *   Helpers for parsing/decoding Agda/Agda2Train JSON (ujson/upickle wrappers,
- *   small adapters and field pickers).  Extracts theorem information and saves it
- *   in our JSONL format for further processing.
+ *  Description
+ *  -----------
+ *  Helpers for parsing/decoding Agda/Agda2Train JSON (ujson/upickle wrappers,
+ *  small adapters and field pickers).  Extracts theorem information and saves it
+ *  in our JSONL format for further processing.
  *
- * Usages:
- *   1. import proofparser.AgdaJsonParser // (as needed by transformers/extractors)
- *   2. scala AgdaJsonParser <input_json_file> <output_jsonl_file>
+ *  Usage
+ *  -----
+ *  1. import proofparser.AgdaJsonParser // (as needed by transformers/extractors)
+ *  2. scala AgdaJsonParser <input_json_file> <output_jsonl_file>
  *
- * Examples:
- *   // Typically used internally by Agda2TrainTransformer / Agda2TrainReducer;
- *   // not a CLI by itself.
+ *  Examples
+ *  --------
+ *  Typically used internally by Agda2TrainTransformer / Agda2TrainReducer;
+ *  not a CLI by itself.
  *
- * Notes:
- *   - Keep tolerant to schema drift (use Option/try-pick patterns).
- *   - Centralize JSON utilities here to avoid duplication between tools.
+ *  Notes
+ *  -----
+ *  - Keep tolerant to schema drift (use Option/try-pick patterns).
+ *  - Centralize JSON utilities here to avoid duplication between tools.
  *
- * (c) 2025 Thmpr Lab, LLC.
+ * =============================================================================
  */
 
 package proofparser

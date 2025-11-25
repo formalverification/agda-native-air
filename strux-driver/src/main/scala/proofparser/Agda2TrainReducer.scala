@@ -1,29 +1,35 @@
-/**
- * Agda2TrainReducer.scala
+/** ======================================================================
+ *  Agda2TrainReducer.scala
+ *  ----------------------------------------------------------------------
  *
- * FILE
- *   proof-parser/src/main/scala/proofparser/Agda2TrainReducer.scala
+ *  File: proof-parser/src/main/scala/proofparser/Agda2TrainReducer.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
- * DESCRIPTION
- *   Reduces Agda2Train JSON dumps into compact, human-readable JSONL training rows
- *   (TrainRecord). Focuses on file/module/decl, pretty types/terms, optional ranges,
- *   and imports; leaves context empty for v1.
+ *  Description
+ *  -----------
+ *  Reduces Agda2Train JSON dumps into compact, human-readable JSONL training rows
+ *  (TrainRecord). Focuses on file/module/decl, pretty types/terms, optional ranges,
+ *  and imports; leaves context empty for v1.
  *
- * USAGE
- *   sbt "project proof-parser" \
- *       "runMain proofparser.Agda2TrainReducer <in.json|jsonl> <out.jsonl>"
+ *  Usage
+ *  -----
+ *      sbt "project proof-parser" \
+ *          "runMain proofparser.Agda2TrainReducer <in.json|jsonl> <out.jsonl>"
  *
- * EXAMPLES
- *   sbt "project proof-parser" \
- *       "runMain proofparser.Agda2TrainReducer proof-parser/src/test/resources/agda-example.json target/a2t.simple.jsonl"
- *   # Output: one JSONL line per declaration with fields: file, module, decl, goalType, solution, imports, (range?)
+ *  Examples
+ *  --------
+ *      sbt "project proof-parser" \
+ *          "runMain proofparser.Agda2TrainReducer proof-parser/src/test/resources/agda-example.json target/a2t.simple.jsonl"
+ *      # Output: one JSONL line per declaration with fields: file, module, decl, goalType, solution, imports, (range?)
  *
- * NOTES
- *   - Input can be a single JSON object/array or JSONL.
- *   - v1: context (telescope) is not filled; v2 will map binders → CtxVar.
- *   - Safe against minor schema drift by probing multiple common keys.
+ *  Notes
+ *  -----
+ *  - Input can be a single JSON object/array or JSONL.
+ *  - v1: context (telescope) is not filled; v2 will map binders → CtxVar.
+ *  - Safe against minor schema drift by probing multiple common keys.
  *
- * (c) 2025 Thmpr Lab, LLC.
+ * ======================================================================
  */
 
 package proofparser

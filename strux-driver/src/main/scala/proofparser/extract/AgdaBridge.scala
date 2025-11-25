@@ -1,26 +1,29 @@
 /** ============================================================================
  *  AgdaBridge.scala
- *  --------------------------------------------------------------------------
+ *  ----------------------------------------------------------------------------
  *
- *  FILE proof-parser/src/main/scala/proofparser/AgdaBridge.scala
+ *  File: proof-parser/src/main/scala/proofparser/extract/AgdaBridge.scala
+ *  Package: proofparser.extract
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
+ *  Purpose
+ *  -------
+ *  A tiny process bridge to `agda --interaction-json` with:
  *
- *  PURPOSE
- *    A tiny process bridge to `agda --interaction-json` with:
+ *    +  lifecycle control (start/stop)
+ *    +  line-based send/receive
+ *    +  JSON helpers (send JSON values as a single line)
+ *    +  explicit, typed errors (`Either[String, A]`) instead of exceptions
  *
- *      +  lifecycle control (start/stop)
- *      +  line-based send/receive
- *      +  JSON helpers (send JSON values as a single line)
- *      +  explicit, typed errors (`Either[String, A]`) instead of exceptions
+ *  Design
+ *  ------
+ *  +  This class owns exactly one Agda child process.
+ *  +  All I/O is UTF-8, line-oriented. We never block forever (callers implement timeouts).
+ *  +  We DO NOT interpret Agda’s JSON protocol here; we just read/write lines.
+ *     Higher layers (extractors) decide what to send and how to parse.
  *
- *  DESIGN
- *
- *    +  This class owns exactly one Agda child process.
- *    +  All I/O is UTF-8, line-oriented. We never block forever (callers implement timeouts).
- *    +  We DO NOT interpret Agda’s JSON protocol here; we just read/write lines.
- *       Higher layers (extractors) decide what to send and how to parse.
- *
- *  TYPICAL USAGE
+ *  Typical Usage
+ *  -------------
  *
  *    {{{
  *    val bridge = new AgdaBridge() // or new AgdaBridge(Seq("agda","--interaction-json","--library-file", "/path/to/libraries"))
@@ -32,10 +35,10 @@
  *    bridge.stop()
  *    }}}
  *
- *  COPYRIGHT (c) 2025 ThmprLab.
+ *  ============================================================================
  */
 
-package proofparser
+package proofparser.extract
 
 import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter, PrintWriter}
 import java.nio.charset.StandardCharsets
