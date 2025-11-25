@@ -110,9 +110,9 @@ object TheoremData { implicit val rw: ReadWriter[TheoremData] = macroRW }
 // Canonical training record (defined in Model.scala). We import and write it out.
 //   case class AgdaData(file: String, module: Option[String], name: String,
 //                       agdaType: String, proof: String, premises: List[String])
-import proofparser.AgdaData
+import proofparser.schema.AgdaData
 
-object Agda2TrainTransformer {
+object Agda2TrainTransformerAlt {
 
   // ------------------------------------------------------------
   // Small JSON helpers (ujson is dynamically typed)

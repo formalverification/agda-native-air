@@ -31,65 +31,6 @@ package proofparser.schema
 
 import upickle.default.{ReadWriter, macroRW}
 
-/**
- * DeclKind
- * --------
- * A lightweight classification of the *kind* of declaration.
- *
- * This starts syntactic (based on name/module/type) but is meant
- * to be refined using Agda reflection/elaboration in AgdaExtractor.
- */
-sealed trait DeclKind {
-  def asString: String
-}
-
-object DeclKind {
-  case object Definition  extends DeclKind { val asString = "definition"  }
-  case object Postulate   extends DeclKind { val asString = "postulate"   }
-  case object Data        extends DeclKind { val asString = "data"        }
-  case object Record      extends DeclKind { val asString = "record"      }
-  case object Module      extends DeclKind { val asString = "module"      }
-  case object Constructor extends DeclKind { val asString = "constructor" }
-  case object Projection  extends DeclKind { val asString = "projection"  }
-  case object Lemma       extends DeclKind { val asString = "lemma"       }
-  case object Theorem     extends DeclKind { val asString = "theorem"     }
-  case object Axiom       extends DeclKind { val asString = "axiom"       }
-  case object Unknown     extends DeclKind { val asString = "unknown"     }
-
-  val all: List[DeclKind] =
-    List(Definition, Postulate, Data, Record, Module,
-      Constructor, Projection, Lemma, Theorem, Axiom, Unknown)
-
-  def fromString(s: String): DeclKind =
-    all.find(_.asString == s).getOrElse(Unknown)
-
-  implicit val rw: ReadWriter[DeclKind] = upickle.default.readwriter[ujson.Value].bimap[DeclKind](
-    dk => dk.asString,
-    js => fromString(js.str)
-  )
-}
-
-/**
- * SemanticInfo
- * ------------
- * Bundle of lightweight semantic signals per declaration.
- *
- * For now we only track:
- *   - kind       : coarse declaration kind (Definition / Lemma / Data / ...)
- *   - astSize    : cheap "complexity" estimate based on type+proof text
- *
- * In future we can add:
- *   - scope, visibility, universe level, etc.
- *   - fully elaborated core size
- */
-final case class SemanticInfo(
-  kind: DeclKind,
-  astSize: Int
-)
-
-object SemanticInfo {
-  implicit val rw: ReadWriter[SemanticInfo] = macroRW
-}
 
 /**
  * Semantic
