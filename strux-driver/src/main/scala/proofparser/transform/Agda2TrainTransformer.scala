@@ -27,6 +27,7 @@ package proofparser.transform
 import proofparser.schema._
 import proofparser.schema.AgdaDataOps._
 import proofparser.schema.{DeclKind, SemanticInfo,TheoremData}
+import proofparser.util.EitherUtil
 
 import upickle.default._
 import ujson._
@@ -103,24 +104,24 @@ object Agda2TrainTransformer {
   /** Parse entire JSON file into rows. */
   private def parseJson(json: ujson.Value): List[AgdaData] =
     json.arrOpt
-      .map(_.toList.flatMap(_.objOpt.flatMap(parseItem)))
+      .map(_.toList.flatMap(_.objOpt.map(ujson.Obj(_)).flatMap(parseItem)))
       .getOrElse(Nil)
 
   /** Write JSONL in a referentially transparent way. */
   private def writeJsonl(rows: List[AgdaData], outPath: String): Either[String, Unit] =
-    Either.catchNonFatal {
+    EitherUtil.catchNonFatal {
       val parent = Paths.get(outPath).toAbsolutePath.getParent
       if (parent != null) Files.createDirectories(parent)
 
       val pw = new PrintWriter(outPath, "UTF-8")
-      try rows.foreach(r => pw.println(write(r)))
+      try rows.foreach(r => pw.println(upickle.default.write(r)))
       finally pw.close()
-    }.left.map(_.getMessage)
+    }
 
   /** Entry point: transform Agda reflection JSON → canonical rows. */
   def transform(inputJson: String, outputJsonl: String): Either[String, Unit] =
     for {
-      json  <- Either.catchNonFatal(ujson.read(inputJson)).left.map(_.getMessage)
+      json  <- EitherUtil.catchNonFatal(ujson.read(inputJson))
       rows  <- Right(parseJson(json))
       _     <- writeJsonl(rows, outputJsonl)
     } yield ()

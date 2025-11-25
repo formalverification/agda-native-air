@@ -62,6 +62,7 @@ import ujson.Value
 import upickle.default._
 import proofparser.AgdaJsonParser.JsonUtil.{optStr, pickPretty, pickStringArray}
 import proofparser.schema.{AgdaData, AgdaDataOps, SemanticInfo, DeclKind,Semantic}
+import proofparser.util.EitherUtil.catchNonFatal
 
 /** Reduce legacy Agda2Train JSON → canonical AgdaData JSONL. */
 object Agda2TrainReducer {
@@ -71,9 +72,9 @@ object Agda2TrainReducer {
   // ---------------------------------------------------------------------------
 
   private def slurp(path: Path): Either[String, String] =
-    Either.catchNonFatal(
+    catchNonFatal(
       new String(Files.readAllBytes(path), StandardCharsets.UTF_8)
-    ).left.map(_.getMessage)
+    )
 
   private def isLikelyJsonl(s: String): Boolean =
     s.linesIterator.take(5).exists(_.trim.startsWith("{")) &&
@@ -92,7 +93,7 @@ object Agda2TrainReducer {
       else
         for {
           acc <- accE
-          v   <- Either.catchNonFatal(ujson.read(trimmed)).left.map(_.getMessage)
+          v   <- catchNonFatal(ujson.read(trimmed))
         } yield acc :+ v
     }
 
@@ -102,9 +103,7 @@ object Agda2TrainReducer {
       if (isLikelyJsonl(s)) {
         parseLines(s.linesIterator.toList)
       } else {
-        Either
-          .catchNonFatal(tryArr(ujson.read(s)))
-          .left.map(_.getMessage)
+        catchNonFatal(tryArr(ujson.read(s)))
       }
     }
 
@@ -255,13 +254,13 @@ object Agda2TrainReducer {
   // ---------------------------------------------------------------------------
 
   private def writeJsonl(rows: List[AgdaData], out: Path): Either[String, Unit] =
-    Either.catchNonFatal {
+    catchNonFatal {
       val parent = out.getParent
       if (parent != null) Files.createDirectories(parent)
       val w = Files.newBufferedWriter(out, StandardCharsets.UTF_8)
       try rows.foreach { r => w.write(write(r)); w.write("\n") }
       finally w.close()
-    }.left.map(_.getMessage)
+    }
 
   // ---------------------------------------------------------------------------
   // Public API

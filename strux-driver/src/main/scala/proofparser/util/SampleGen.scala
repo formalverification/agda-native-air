@@ -118,7 +118,7 @@ object SampleGen {
   // ---------------------------------------------------------------------------
 
   private def writeJsonl(rows: Vector[AgdaData], out: String): Either[String, Unit] =
-    Either.catchNonFatal {
+    EitherUtil.catchNonFatal {
       val path   = Paths.get(out)
       val parent = path.getParent
       if (parent != null) Files.createDirectories(parent)
@@ -129,5 +129,6 @@ object SampleGen {
         sb.append('\n')
       }
       Files.write(path, sb.result().getBytes(StandardCharsets.UTF_8))
-    }.left.map(_.getMessage)
+      ()
+    }
 }

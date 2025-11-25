@@ -100,7 +100,7 @@ object PremiseEval {
   // ===========================================================================
 
   private def readJsonlVec[A: Reader](path: String): Either[String, Vector[A]] =
-    Either
+    EitherUtil
       .catchNonFatal {
         Using.resource(Source.fromFile(path)) { src =>
           src.getLines().iterator.zipWithIndex.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) {
@@ -115,7 +115,6 @@ object PremiseEval {
           }
         }
       }
-      .left.map(_.getMessage)
       .flatten
 
   // ===========================================================================
@@ -124,7 +123,7 @@ object PremiseEval {
 
   private def runSingleFile(in: String, k: Int, pct: Int): Either[String, Unit] =
     for {
-      rows <- readJsonlVec[Row](in)
+      rows <- readJsonlVec[AgdaData](in)
     } yield {
       if (rows.isEmpty) {
         println(s"No rows in $in")
@@ -153,7 +152,7 @@ object PremiseEval {
     }
 
   // deterministic hash-based split
-  private def hashSplit(rows: Vector[Row], pctTrain: Int): (Vector[Row], Vector[Row]) = {
+  private def hashSplit(rows: Vector[AgdaData], pctTrain: Int): (Vector[AgdaData], Vector[AgdaData]) = {
     val (tr, te) = rows.partition { r =>
       val key = s"${r.file}|${r.module.getOrElse("")}|${r.name}"
       (stableHash(key) % 100) < pctTrain
@@ -176,11 +175,11 @@ object PremiseEval {
   // ===========================================================================
 
   trait Predictor {
-    def predict(row: Row, k: Int): List[String]
+    def predict(row: AgdaData, k: Int): List[String]
   }
 
   object GlobalFreq {
-    def apply(train: Seq[Row]): GlobalFreq = {
+    def apply(train: Seq[AgdaData]): GlobalFreq = {
       val ranking =
         train.iterator
           .flatMap(_.premises)
@@ -195,12 +194,12 @@ object PremiseEval {
   }
 
   final class GlobalFreq private (ranking: Vector[String]) extends Predictor {
-    def predict(row: Row, k: Int): List[String] =
+    def predict(row: AgdaData, k: Int): List[String] =
       ranking.take(k).toList
   }
 
   object PerModuleFreq {
-    def apply(train: Seq[Row]): PerModuleFreq = {
+    def apply(train: Seq[AgdaData]): PerModuleFreq = {
       val global = GlobalFreq(train)
 
       val byMod: Map[String, Vector[String]] = {
@@ -224,7 +223,7 @@ object PremiseEval {
     global: GlobalFreq,
     byMod: Map[String, Vector[String]]
   ) extends Predictor {
-    def predict(row: Row, k: Int): List[String] = {
+    def predict(row: AgdaData, k: Int): List[String] = {
       val modKey = row.module.getOrElse("<none>")
       val base   = byMod.getOrElse(modKey, global.predict(row, Int.MaxValue).toVector)
       base.take(k).toList
@@ -252,7 +251,7 @@ object PremiseEval {
     support: Int
   )
 
-  private def evaluate(model: Predictor, test: Seq[Row], k: Int, label: String): Report = {
+  private def evaluate(model: Predictor, test: Seq[AgdaData], k: Int, label: String): Report = {
     val acc = test.foldLeft(Acc(0.0, 0.0, covered = 0, support = 0)) {
       case (acc0, r) =>
         val gold = r.premises.toSet
@@ -308,7 +307,7 @@ object PremiseEval {
           (g, tfv)
         }
 
-      val support = goalTfs.count { case (g, _) => g.imports.nonEmpty }
+      val support = goalTfs.count { case (g, _) => g.premises.nonEmpty }
 
       val hits = goalTfs.foldLeft(0) {
         case (accHits, (qg, qtf)) =>
@@ -323,7 +322,7 @@ object PremiseEval {
               .distinct
               .take(k)
 
-          val gold = qg.imports.toSet
+          val gold = qg.premises.toSet
           if (gold.nonEmpty && topPremises.exists(gold.contains)) accHits + 1
           else accHits
       }

@@ -66,7 +66,7 @@ object DatasetStats {
       case Array("--top", k) => k.toInt
     }.getOrElse(20)
 
-    val rows = readJsonlVec[Row](in)
+    val rows = readJsonlVec[AgdaData](in)
     if (rows.isEmpty) {
       println(s"No rows found in $in")
       sys.exit(0)
@@ -81,7 +81,7 @@ object DatasetStats {
   // ===========================================================================
 
   /** Produce a human-readable multi-line statistics report. */
-  def summarize(rows: Vector[Row], topK: Int): String = {
+  def summarize(rows: Vector[AgdaData], topK: Int): String = {
     val b = new StringBuilder
 
     val distinctNames   = rows.iterator.map(_.name).toSet.size
