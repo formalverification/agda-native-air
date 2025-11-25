@@ -1,118 +1,98 @@
 /** ============================================================================
  *  AgdaSimplifiedExtractor.scala
- *  --------------------------------------------------------------------------
+ *  ----------------------------------------------------------------------------
  *
  *  File: proof-parser/src/main/scala/proofparser/extract/AgdaSimplifiedExtractor.scala
  *  Package: proofparser.extract
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Purpose
  *  -------
  *  A small, robust, CLI-friendly program that:
  *
- *  1.  Launches `agda --interaction-json` (via AgdaBridge)
- *  2.  Sends a "load" command (IOTCM / Cmd_load) for one or more `.agda` files
- *  3.  Listens for JSON messages and harvests "AllGoalsWarnings" to produce
- *      training examples (goal type + local context) as JSONL rows.
+ *    1. Launches `agda --interaction-json` (via AgdaBridge)
+ *    2. Sends a "load" command (IOTCM / Cmd_load) for one or more `.agda` files
+ *    3. Listens for JSON messages and harvests "AllGoalsWarnings" to produce
+ *       *goal examples* as canonical `AgdaData` JSONL rows.
+ *
+ *  Each row is a canonical schema element:
+ *
+ *    AgdaData(
+ *      file      : String                // file name
+ *      module    : Option[String]        // module name, if found
+ *      name      : String                // synthetic goal name (e.g. "MyModule.goal_0")
+ *      agdaType  : Option[String]        // goal type
+ *      proof     : Option[String]        // None (there is no proof yet)
+ *      premises  : List[String]          // Nil (no deps yet)
+ *      declKind  : DeclKind              // inferred via Semantic.from
+ *      astSize   : Int                   // cheap size from type text
+ *    )
  *
  *  Context in Project
  *  ------------------
- *  -  Lives in the `proofparser` package alongside:
- *     * AgdaBridge.scala        : process I/O (line-in/line-out) for Agda
- *     * AgdaJsonParser.scala    : (not required here) shared parsing helpers
- *     * Agda2TrainTransformer   : transforms other JSON into training rows
- *     * Model.scala / SimpleSchema.scala : data models + schema helpers
- *  -  The extractor emits `TrainRecord` rows---a compact, line-oriented format
- *     that downstream ETL/training code can consume directly (e.g., Spark or
- *     Python trainers). This keeps the end-to-end ML pipeline observable and
- *     diffable in git.
+ *  - Lives in the `proofparser.extract` package, alongside:
+ *      * AgdaBridge.scala        : process I/O for Agda
+ *      * AgdaExtractor.scala     : regex-only, no Agda process
+ *      * Agda2TrainTransformer   : JSON → training rows
+ *  - Emits canonical `AgdaData` so that downstream tools (stats, filters,
+ *    ML pipelines) can treat goal examples just like any other dataset.
  *
  *  Design Goals
  *  ------------
- *  -  **Observability**: optional verbose logging (`--verbose`) prints what we
- *     send and what we receive (JSON vs non-JSON), so debugging is fast.
- *  -  **Robustness**: tolerate non-JSON lines (e.g., "JSON> ...") without
- *     crashing; use timeouts to avoid indefinite hangs; on the happy path,
- *     we do not throw stuff---we return `Either[String, A]` instead.
- *  -  **Protocol agility**: small CLI toggles (`--mode`, `--empty-is-null`)
- *     let us probe protocol shape differences across Agda builds (2.6–2.8+)
- *     without rewriting code. If local Agda expects slightly different IOTCM
- *     payloads, we can tweak the builder in one place.
- *  -  **Modularity**: each step is a small helper---easy to test in isolation.
- *  -  **No hidden global state**: all state lives in local vals; side effects
- *     (I/O) are explicit.
+ *  - Observability: optional verbose logging (`--verbose`) shows send/recv lines.
+ *  - Robustness   : tolerate non-JSON lines, timeouts, and IO failures via `Either`.
+ *  - Modularity   : all Agda protocol details isolated here.
+ *  - Purity       : core logic is referentially transparent; side effects explicit.
  *
  *  JSON Protocol Notes (Agda --interaction-json)
- *  -----------------------
- *  -  Many Agda builds accept a load of the form:
+ *  ---------------------------------------------
+ *  - We look for messages satisfying:
  *
- *        { "command":"IOTCM"
- *        , "payload":[ "", [], "NonInteractive"
- *          , { "command":"Cmd_load"
- *            , "file":".../Foo.agda"
- *            , "args":["-i","/path/include","-l","standard-library"] } ] }
+ *        AgdaMsgs.isAllGoals(js) == true
  *
- *     Some builds are picky about the **first payload cell** (empty string vs
- *     null) and/or **mode** ("NonInteractive" vs "Direct"). We expose both via
- *     flags so we can try variants without editing code.
+ *    which typically means:
  *
- *  -  Library resolution:
- *
- *     *  `--library-file PATH` must be passed to the **Agda process**, not
- *        inside `Cmd_load`. We therefore attach it when starting the bridge.
- *        (This matches Agda’s CLI contract.)
+ *      { "kind": "DisplayInfo",
+ *        "payload": {
+ *          "info": {
+ *            "kind": "AllGoalsWarnings",
+ *            "payload": { "goals": [ ... ] }
+ *          }
+ *        }
+ *      }
  *
  *  Usage
  *  -----
- *      runMain proofparser.AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl>
+ *      runMain proofparser.extract.AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl>
  *         [--include DIR]* [--lib LIB]* [--library-file FILE]
  *         [--mode NonInteractive|Direct] [--empty-is-null]
  *         [--verbose] [--timeout-ms N]
  *
- *  Examples (from proof-parser/)
- *  --------
- *      sbt "runMain proofparser.AgdaSimplifiedExtractor \
- *           ../agda-jang/agda/ApplyDemo.agda \
- *           ../proof-parser/output/goals.jsonl \
- *           --include ../agda-jang/agda \
- *           --lib standard-library \
- *           --library-file ../agda-jang/agda/libraries \
- *           --verbose"
+ *  Example
+ *  -------
+ *      sbt "project proof-parser" \
+ *        "runMain proofparser.extract.AgdaSimplifiedExtractor \
+ *         ../agda-jang/agda \
+ *         ../proof-parser/output/goals.jsonl \
+ *         --include ../agda-jang/agda \
+ *         --lib standard-library \
+ *         --library-file ../agda-jang/agda/libraries \
+ *         --verbose"
  *
- *      # Protocol probes whether current Agda version rejects the default:
- *      sbt "runMain proofparser.AgdaSimplifiedExtractor ... --mode Direct --verbose"
- *      sbt "runMain proofparser.AgdaSimplifiedExtractor ... --empty-is-null --verbose"
- *      sbt "runMain proofparser.AgdaSimplifiedExtractor ... --mode Direct --empty-is-null --verbose"
- *
- *  Error Handling Philosophy
- *  -------------------------
- *  -  Prefer `Either[String, A]` over throwing. The main aggregates errors and
- *     prints actionable messages.
- *  -  Only the CLI `main` uses `sys.exit(code)` after printing a single line.
- *
- *  Testing Tips
- *  ------------
- *  -  Unit test the pure helpers (`moduleName`, `iotcmLoad`, `extractGoalsPretty`)
- *     with canned inputs.
- *  -  Use `--verbose` and small timeouts in integration tests to keep runs fast.
- *
- *  Extension Points
- *  ----------------
- *  -  Want decl-specific records? Thread the declaration name into records
- *     when Agda exposes it in messages (or parse from pretty text heuristically).
- *  -  Need more message kinds (e.g., solved metas)? Add recognizers to AgdaMsgs.
- *
- * ==========================================================================
+ *  ============================================================================
  */
 
 package proofparser.extract
 
 import java.nio.file.{Files, Path, Paths}
-import java.time.{Duration, Instant}
+import java.time.Instant
+
 import scala.jdk.CollectionConverters._
 import scala.util.Try
+
 import upickle.default._
 
+import proofparser.schema.{AgdaData, AgdaDataOps, SemanticInfo, DeclKind}
+import proofparser.schema.Semantic
 
 /* -----------------------------
  * Lightweight logger
@@ -121,57 +101,33 @@ import upickle.default._
  */
 private final case class Logger(verbose: Boolean) {
   def info(msg: => String): Unit  = if (verbose) Console.err.println(s"[info] $msg")
-  def send(js:  => String): Unit  = if (verbose) Console.err.println(s"[send] $js")
-  def recv(line: => String): Unit = if (verbose) Console.err.println(s"[recv] $line")
+  def send(msg: => String): Unit  = if (verbose) Console.err.println(s"[send] $msg")
+  def recv(msg: => String): Unit  = if (verbose) Console.err.println(s"[recv] $msg")
   def warn(msg: => String): Unit  = Console.err.println(s"[warn] $msg")
   def err (msg: => String): Unit  = Console.err.println(s"[error] $msg")
 }
-
-
-/* -----------------------------
- * Data model (rows we emit)
- * -----------------------------
- * Keep this tiny and stable; downstream code depends on it.
- */
-// final case class CtxVar(name: String, tpe: String)
-// object CtxVar { implicit val rw: ReadWriter[CtxVar] = macroRW }
-
-// final case class TrainRecord(
-//   file:     String,               // e.g., "ApplyDemo.agda"
-//   module:   String,               // best-effort module name (or file base)
-//   decl:     String,               // top-level declaration (best-effort for now)
-//   context:  List[CtxVar],         // telescope: x : A, ...
-//   goalType: String,               // pretty goal type
-//   solution: Option[String],       // unused in this extractor (future: solved terms)
-//   range:    Option[String],       // unused (future: source spans)
-//   imports:  List[String]          // unused (future: visible imports)
-// )
-// object TrainRecord { implicit val rw: ReadWriter[TrainRecord] = macroRW }
-
 
 /* -----------------------------
  * CLI configuration
  * -----------------------------
  */
 private final case class Config(
-  root:         Path,
-  out:          Path,
-  includes:     List[String],
-  libs:         List[String],
-  libraryFile:  Option[String],
-  mode:         String,        // "NonInteractive" or "Direct"
-  emptyIsNull:  Boolean,       // true => first payload cell is null; false => ""
-  verbose:      Boolean,
-  timeoutMs:    Long
+  root:        Path,
+  out:         Path,
+  includes:    List[String],
+  libs:        List[String],
+  libraryFile: Option[String],
+  mode:        String,     // "NonInteractive" | "Direct"
+  emptyIsNull: Boolean,    // true => first payload cell is null; false => ""
+  verbose:     Boolean,
+  timeoutMs:   Long
 )
-
 
 object AgdaSimplifiedExtractor {
 
-  /* ===========================
-   * Filesystem helpers
-   * ===========================
-   */
+  // ===========================================================================
+  // Filesystem helpers
+  // ===========================================================================
 
   /** A path is an Agda file if it’s a regular file that ends with ".agda". */
   private def isAgda(p: Path): Boolean =
@@ -181,7 +137,7 @@ object AgdaSimplifiedExtractor {
   private def agdaFiles(root: Path): List[Path] =
     if (Files.isDirectory(root))
       Files.walk(root).iterator().asScala.filter(isAgda).toList
-    else if (Files.isRegularFile(root) && isAgda(root)) List(root)
+    else if (isAgda(root)) List(root)
     else Nil
 
   /** Best-effort module name: try "module X where" in the file; fallback to file base. */
@@ -194,47 +150,34 @@ object AgdaSimplifiedExtractor {
     }.getOrElse(fname)
   }
 
-  /** Write JSONL atomically-enough for our purpose (single writer). */
-  private def writeJsonl(records: List[TrainRecord], out: Path, log: Logger): Either[String, Unit] =
-    Try {
-      val parent = Option(out.getParent).getOrElse(out.toAbsolutePath.getParent)
-      if (parent != null) Files.createDirectories(parent)
-      val w  = java.nio.file.Files.newBufferedWriter(out)
-      val pw = new java.io.PrintWriter(w)
-      try { records.foreach(r => pw.println(write(r))); pw.flush() }
-      finally pw.close()
-      log.info(s"wrote ${records.length} examples to $out")
-    }.toEither.left.map(_.getMessage)
-
-
-  /* ===========================
-   * Agda JSON protocol builders
-   * ===========================
-   */
+  // ===========================================================================
+  // Agda JSON protocol builders (IOTCM / Cmd_load)
+  // ===========================================================================
 
   /**
    * Build the IOTCM / Cmd_load command.
    *
-   * Protocol slots:
-   *   payload[0] : editor id (often "" or null; toggle via `emptyIsNull`)
-   *   payload[1] : ignored / capabilities (often [])
-   *   payload[2] : mode string ("NonInteractive" or "Direct")
-   *   payload[3] : object with "command":"Cmd_load", "file":..., "args":[...]
+   * payload[0] : editor id (often "" or null; toggled via `emptyIsNull`)
+   * payload[1] : capabilities (often [])
+   * payload[2] : mode string ("NonInteractive" or "Direct")
+   * payload[3] : Cmd_load object
    *
-   * Only `-i` and `-l` belong in Cmd_load args. `--library-file` MUST be passed
-   * to the Agda process at startup (handled by AgdaBridge construction).
+   * NOTE:
+   *   - Only `-i` and `-l` belong in Cmd_load args.
+   *   - `--library-file` MUST be passed to the Agda process itself
+   *     (handled by AgdaBridge construction).
    */
   private def iotcmLoad(
     file: String,
     include: Seq[String],
     libs: Seq[String],
-    mode: String,          // "NonInteractive" | "Direct"
-    emptyIsNull: Boolean   // true => send null at payload[0]; else ""
+    mode: String,
+    emptyIsNull: Boolean
   ): ujson.Value = {
-    val incArgs = include.flatMap(i => Seq("-i", i))
-    val libArgs = libs.flatMap(l => Seq("-l", l))
-    val args    = incArgs ++ libArgs
-    val headCell: ujson.Value = if (emptyIsNull) ujson.Null else ujson.Str("")
+    val incArgs  = include.flatMap(i => Seq("-i", i))
+    val libArgs  = libs.flatMap(l => Seq("-l", l))
+    val args     = incArgs ++ libArgs
+    val headCell = if (emptyIsNull) ujson.Null else ujson.Str("")
     ujson.Obj(
       "command" -> "IOTCM",
       "payload" -> ujson.Arr(
@@ -248,19 +191,17 @@ object AgdaSimplifiedExtractor {
     )
   }
 
-
-  /* ===========================
-   * Input loop & parsing helpers
-   * ===========================
-   */
+  // ===========================================================================
+  // Input loop & parsing helpers
+  // ===========================================================================
 
   /** True if a line looks like JSON (starts with '{' or '['). */
   private def isJsonLine(s: String): Boolean =
     s.nonEmpty && (s.charAt(0) == '{' || s.charAt(0) == '[')
 
   /**
-   * Read lines until the predicate holds (or timeout/EOF). Non-JSON lines are
-   * logged (so we see prompts like "JSON> ...") and skipped.
+   * Read lines until the predicate holds (or timeout/EOF).
+   * Non-JSON lines are logged (prompts, diagnostics) and skipped.
    *
    * @return Right(Some(json)) when a matching message is seen;
    *         Right(None) on timeout/EOF; Left(error) on I/O failure.
@@ -271,69 +212,100 @@ object AgdaSimplifiedExtractor {
     timeoutMs: Long
   )(pred: ujson.Value => Boolean): Either[String, Option[ujson.Value]] = {
     val deadline = Instant.now().plusMillis(timeoutMs)
-    while (Instant.now().isBefore(deadline)) {
+    var done     = false
+    var result   = Option.empty[ujson.Value]
+
+    while (!done && Instant.now().isBefore(deadline)) {
       bridge.readLine() match {
-        case Left(e)       => return Left(e)
-        case Right(None)   => return Right(None) // EOF
-        case Right(Some(l)) =>
-          if (isJsonLine(l)) {
-            log.recv(l)
-            val js = ujson.read(l)
-            if (pred(js)) return Right(Some(js))
+        case Left(e) =>
+          return Left(e)
+        case Right(None) =>
+          // EOF
+          done = true
+        case Right(Some(line)) =>
+          if (isJsonLine(line)) {
+            log.recv(line)
+            val js = ujson.read(line)
+            if (pred(js)) {
+              result = Some(js)
+              done   = true
+            }
           } else {
-            log.recv(l) // non-JSON (prompt/diagnostic) — keep waiting
+            // Non-JSON prompt/diagnostic; keep looping.
+            log.recv(line)
           }
       }
     }
-    Right(None) // timeout
+
+    Right(result)
   }
 
   /**
-   * Convert an AllGoalsWarnings message into TrainRecord rows.
-   * If the build does not provide structured "goals", we return an empty list.
+   * Convert an AllGoalsWarnings message into canonical AgdaData rows.
+   *
+   * Each goal becomes:
+   *
+   *   AgdaData(
+   *     file      = <file name>,
+   *     module    = Some(moduleName),
+   *     name      = s"$moduleName.goal_<idx>",
+   *     agdaType  = Some(goalType),
+   *     proof     = None,
+   *     premises  = Nil,
+   *     declKind  = Semantic.from(...).kind,
+   *     astSize   = Semantic.from(...).astSize
+   *   )
    */
-  private def extractGoalsPretty(
+  private def extractGoalsAsAgdaData(
     msg: ujson.Value,
     file: Path,
     module: String,
     log: Logger
-  ): List[TrainRecord] = {
+  ): List[AgdaData] = {
+    // Match shape:
+    //   payload.info.kind == "AllGoalsWarnings"
+    //   payload.info.payload.goals :: Arr
     val payloadOpt =
       for {
-        info <- msg("payload").obj.get("info")
+        payload <- msg.obj.get("payload")
+        info    <- payload.obj.get("info")
         if info("kind").strOpt.contains("AllGoalsWarnings")
-        body <- info.obj.get("payload")
+        body    <- info.obj.get("payload")
       } yield body
 
     payloadOpt.toList.flatMap { body =>
       body.obj.get("goals") match {
         case Some(ujson.Arr(items)) =>
-          items.toList.flatMap { g =>
-            val gtype = g.obj.get("type").flatMap(_.strOpt).getOrElse("")
-            val ctx   = g.obj.get("context").toList.flatMap {
-              case ujson.Arr(ctxItems) =>
-                ctxItems.toList.flatMap { it =>
-                  val nm = it.obj.get("name").flatMap(_.strOpt)
-                  val tp = it.obj.get("type").flatMap(_.strOpt).orElse(it.obj.get("type").map(_.render()))
-                  (nm, tp) match {
-                    case (Some(n), Some(t)) => Some(CtxVar(n, t))
-                    case _                  => None
-                  }
-                }
-              case _ => Nil
-            }
-            if (gtype.nonEmpty)
-              List(TrainRecord(
+          items.toList.zipWithIndex.flatMap { case (g, idx) =>
+            val gtype = g.obj.get("type").flatMap(_.strOpt).getOrElse("").trim
+            if (gtype.nonEmpty) {
+              val name = s"$module.goal_$idx"
+              val agdaTypeOpt = Some(gtype)
+              val proofOpt: Option[String] = None
+
+              val sem: SemanticInfo =
+                Semantic.from(
+                  name     = name,
+                  agdaType = agdaTypeOpt,
+                  module   = Some(module),
+                  proof    = proofOpt
+                )
+
+              val raw = AgdaData(
                 file     = file.getFileName.toString,
-                module   = module,
-                decl     = module,           // future: pick the exact enclosing decl name
-                context  = ctx,
-                goalType = gtype,
-                solution = None,
-                range    = None,
-                imports  = Nil
-              ))
-            else Nil
+                module   = Some(module),
+                name     = name,
+                agdaType = agdaTypeOpt,
+                proof    = proofOpt,
+                premises = Nil,
+                declKind = sem.kind,
+                astSize  = sem.astSize
+              )
+
+              List(AgdaDataOps.normalize(raw))
+            } else {
+              Nil
+            }
           }
 
         case _ =>
@@ -343,54 +315,53 @@ object AgdaSimplifiedExtractor {
     }
   }
 
-
-  /* ===========================
-   * One-file orchestration
-   * ===========================
-   */
+  // ===========================================================================
+  // One-file orchestration
+  // ===========================================================================
 
   /**
-   * Run Agda on a single file: start bridge, send load, wait for goals, stop.
+   * Run Agda on a single file: start bridge, send load, wait for AllGoalsWarnings, stop.
    */
   private def runOnFile(
     file: Path,
     cfg: Config,
     log: Logger
-  ): Either[String, List[TrainRecord]] = {
-    // Build process command (attach --library-file at process level if provided).
+  ): Either[String, List[AgdaData]] = {
     val bridge =
       cfg.libraryFile match {
-        case Some(path) => new AgdaBridge(Seq("agda", "--interaction-json", "--library-file", path))
-        case None       => new AgdaBridge()
+        case Some(path) =>
+          new AgdaBridge(Seq("agda", "--interaction-json", "--library-file", path))
+        case None =>
+          new AgdaBridge()
       }
 
     for {
-      _ <- bridge.start()
-      _ <- {
+      _   <- bridge.start()
+      _   <- {
         val js   = iotcmLoad(file.toString, cfg.includes, cfg.libs, cfg.mode, cfg.emptyIsNull)
         val line = ujson.write(js)
         log.send(line)
         bridge.send(line)
       }
-      got <- readUntil(bridge, log, cfg.timeoutMs)(AgdaMsgs.isAllGoals)
-      _ = bridge.stop()
-    } yield got.toList.flatMap(js => extractGoalsPretty(js, file, moduleName(file), log))
+      msg <- readUntil(bridge, log, cfg.timeoutMs)(AgdaMsgs.isAllGoals)
+    } yield {
+      bridge.stop()
+      msg.toList.flatMap(js => extractGoalsAsAgdaData(js, file, moduleName(file), log))
+    }
   }
 
-
-  /* ===========================
-   * CLI parsing & main
-   * ===========================
-   */
+  // ===========================================================================
+  // CLI parsing & main
+  // ===========================================================================
 
   private def parseArgs(args: Array[String]): Either[String, Config] = {
-    if (args.length < 2)
+    if (args.length < 2) {
       Left(
         "Usage: AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl> " +
         "[--include DIR]* [--lib LIB]* [--library-file FILE] " +
         "[--mode NonInteractive|Direct] [--empty-is-null] [--verbose] [--timeout-ms N]"
       )
-    else {
+    } else {
       val root = Paths.get(args(0)).toAbsolutePath.normalize()
       val out  = Paths.get(args(1)).toAbsolutePath.normalize()
 
@@ -405,30 +376,57 @@ object AgdaSimplifiedExtractor {
       var i = 2
       while (i < args.length) {
         args(i) match {
-          case "--include" if i+1 < args.length =>
-            includes :+= Paths.get(args(i+1)).toAbsolutePath.normalize().toString; i += 2
-          case "--lib" if i+1 < args.length =>
-            libs :+= args(i+1); i += 2
-          case "--library-file" if i+1 < args.length =>
-            libraryFile = Some(Paths.get(args(i+1)).toAbsolutePath.normalize().toString); i += 2
-          case "--mode" if i+1 < args.length =>
-            mode = args(i+1); i += 2
+          case "--include" if i + 1 < args.length =>
+            includes :+= Paths.get(args(i + 1)).toAbsolutePath.normalize().toString
+            i += 2
+
+          case "--lib" if i + 1 < args.length =>
+            libs :+= args(i + 1)
+            i += 2
+
+          case "--library-file" if i + 1 < args.length =>
+            libraryFile = Some(Paths.get(args(i + 1)).toAbsolutePath.normalize().toString)
+            i += 2
+
+          case "--mode" if i + 1 < args.length =>
+            mode = args(i + 1)
+            i += 2
+
           case "--empty-is-null" =>
-            emptyIsNull = true; i += 1
+            emptyIsNull = true
+            i += 1
+
           case "--verbose" =>
-            verbose = true; i += 1
-          case "--timeout-ms" if i+1 < args.length =>
-            Try(args(i+1).toLong).toOption.foreach(v => timeoutMs = v); i += 2
+            verbose = true
+            i += 1
+
+          case "--timeout-ms" if i + 1 < args.length =>
+            Try(args(i + 1).toLong).toOption.foreach(v => timeoutMs = v)
+            i += 2
+
           case other =>
-            Console.err.println(s"[warn] Unrecognized option: $other"); i += 1
+            Console.err.println(s"[warn] Unrecognized option: $other")
+            i += 1
         }
       }
 
-      Right(Config(root, out, includes, libs, libraryFile, mode, emptyIsNull, verbose, timeoutMs))
+      Right(
+        Config(
+          root        = root,
+          out         = out,
+          includes    = includes,
+          libs        = libs,
+          libraryFile = libraryFile,
+          mode        = mode,
+          emptyIsNull = emptyIsNull,
+          verbose     = verbose,
+          timeoutMs   = timeoutMs
+        )
+      )
     }
   }
 
-  /** Entrypoint: parse args, find files, run Agda, and write JSONL. */
+  /** Entrypoint: parse args, discover files, talk to Agda, and write AgdaData JSONL. */
   def main(args: Array[String]): Unit = {
     parseArgs(args) match {
       case Left(msg) =>
@@ -445,25 +443,33 @@ object AgdaSimplifiedExtractor {
         }
         log.info(s"Discovered ${inputs.size} file(s).")
 
-        val all: List[TrainRecord] =
+        val all: List[AgdaData] =
           inputs.flatMap { p =>
             runOnFile(p, cfg, log) match {
               case Left(e) =>
-                log.err(s"${p.toString}: $e"); Nil
-              case Right(rs) =>
-                if (rs.nonEmpty) log.info(s"${p.getFileName}: extracted ${rs.size} goal(s).")
+                log.err(s"${p.toString}: $e")
+                Nil
+              case Right(rows) =>
+                if (rows.nonEmpty) log.info(s"${p.getFileName}: extracted ${rows.size} goal(s).")
                 else log.warn(s"${p.getFileName}: no structured goals found.")
-                rs
+                rows
             }
           }
 
-        writeJsonl(all, cfg.out, log) match {
-          case Left(e) =>
-            Console.err.println(s"[error] Failed to write JSONL: $e"); sys.exit(3)
-          case Right(_) =>
-            // concise success on stdout; verbose already logged above
-            println(s"wrote ${all.size} examples to ${cfg.out}")
+        // Write JSONL
+        val parent = Option(cfg.out.getParent).getOrElse(cfg.out.toAbsolutePath.getParent)
+        if (parent != null) Files.createDirectories(parent)
+
+        val w  = Files.newBufferedWriter(cfg.out)
+        val pw = new java.io.PrintWriter(w)
+        try {
+          all.foreach { r => pw.println(write(r)) }
+          pw.flush()
+        } finally {
+          pw.close()
         }
+
+        println(s"wrote ${all.size} examples to ${cfg.out.toAbsolutePath}")
     }
   }
 }
