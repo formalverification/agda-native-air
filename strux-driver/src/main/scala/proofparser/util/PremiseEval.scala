@@ -9,36 +9,43 @@
  *  Description
  *  ----------
  *  A unified micro-benchmark for premise selection with two modes:
- *  1.  Single-file mode (default): one JSONL of training rows where
- *      `premises` are the gold labels. Train/test split is hash-based.
- *  2.  Two-file mode (retrieval): <agda-data.jsonl> <goals.jsonl> —
- *      builds a TF bag-of-words index over (agdaType \n proof), retrieves
- *      nearest neighbors for each goal, unions their premises, and evaluates
- *      recall@K against the goal's imports (gold premises).
+ *
+ *  1. Single-file mode (default):
+ *       - Input: one JSONL of canonical `Row` (AgdaData) rows where
+ *         `premises` are the gold labels.
+ *       - Train/test split is deterministic hash-based on (file, module, name).
+ *       - Baselines:
+ *           * GlobalFreq   – global premise frequency ranker.
+ *           * PerModuleFreq – per-module premise frequency, backed by GlobalFreq.
+ *
+ *  2. Two-file mode (retrieval):
+ *       - Input: <agda-data.jsonl> <goals.jsonl>
+ *         where agda-data.jsonl contains canonical `AgdaData` rows and
+ *         goals.jsonl contains `TrainGoal` rows (goalType + imports).
+ *       - Builds a bag-of-words TF index over (agdaType \n proof).
+ *       - Retrieves nearest neighbors for each goal via dot product.
+ *       - Unions their premises and evaluates recall@K against the goal's
+ *         imports (gold premises).
  *
  *  Key traits
  *  ----------
- *  - Deterministic: no RNG; split uses FNV-1a hash on (file,module,name)
- *  - Fast baselines: Global/PerModule frequency rankers (mode 1)
- *  - Lightweight retrieval: integer TF + dot-product (mode 2)
- *  - Metrics: macro Precision@K, Recall@K, F1@K, Coverage
+ *  - Deterministic: no RNG; split uses FNV-1a hash on (file,module,name).
+ *  - Fast baselines: simple frequency-based rankers in mode 1.
+ *  - Lightweight retrieval in mode 2 (TF + dot product).
+ *  - Metrics: macro Precision@K, Recall@K, F1@K, Coverage.
+ *
+ *  Schema
+ *  ------
+ *    - Row       = proofparser.schema.AgdaData
+ *    - TrainGoal = proofparser.schema.TrainGoal
  *
  *  Usage
  *  -----
- *     # Mode 1 (single-file, default)
+ *     # Mode 1 (single-file, baselines)
  *     sbt "runMain proofparser.util.PremiseEval data/train.jsonl --k 10 --split 90"
  *
  *     # Mode 2 (two-file retrieval)
  *     sbt "runMain proofparser.util.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
- *
- *  Notes
- *  -----
- *  -  Row, AgdaData, and TrainGoal come from `proofparser.schema`.
- *     This keeps the schemas shared and avoids duplication.
- *  -  Mode 1 split is stable across runs and machines via hash-based partitioning.
- *  -  Mode 2 uses a simple bag-of-words TF representation for speed; more advanced
- *     embeddings can be slotted in later.
- *  -  Keep the schemas stable to avoid breaking existing corpora.
  *
  *  ============================================================================
  */
@@ -46,100 +53,106 @@
 package proofparser.util
 
 import scala.io.Source
-import scala.util.Using
+import scala.util.{Try, Using}
+
 import upickle.default._
 import proofparser.schema.{Row, AgdaData, TrainGoal}
 
 object PremiseEval {
-  // --------- Shared helpers ---------
-  private def readJsonlVec[A: Reader](path: String): Vector[A] =
-    Using.resource(Source.fromFile(path)) { src =>
-      src.getLines().iterator
-        .map(_.trim)
-        .filter(_.nonEmpty)
-        .map(s => read[A](s))
-        .toVector
-    }
 
-  // --------- CLI ---------
+  // ===========================================================================
+  // CLI
+  // ===========================================================================
+
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) {
       Console.err.println(
-        "Usage: PremiseEval <in.jsonl> [--k K] [--split PCT]  |  PremiseEval <agda.jsonl> <goals.jsonl> [--k K]"
+        "Usage:\n" +
+          "  PremiseEval <in.jsonl> [--k K] [--split PCT]\n" +
+          "  PremiseEval <agda.jsonl> <goals.jsonl> [--k K]"
       )
       sys.exit(1)
     }
 
-    val kArg   = args.sliding(2,1).collectFirst { case Array("--k", n)     => n.toInt }.getOrElse(10)
-    val splitP = args.sliding(2,1).collectFirst { case Array("--split", p) => p.toInt }.getOrElse(90)
+    val kArg   = args.sliding(2, 1).collectFirst { case Array("--k", n)     => n.toInt }.getOrElse(10)
+    val splitP = args.sliding(2, 1).collectFirst { case Array("--split", p) => p.toInt }.getOrElse(90)
 
-    // Detect mode by arity before flags
+    // Detect mode by number of non-flag arguments
     val dataArgs = args.takeWhile(!_.startsWith("--"))
-    dataArgs.length match {
-      case 1 => runSingleFile(dataArgs(0), kArg, splitP)
-      case 2 => runTwoFile(dataArgs(0), dataArgs(1), kArg)
-      case _ =>
-        Console.err.println("Bad arguments.")
-        sys.exit(1)
+    val result   =
+      dataArgs.length match {
+        case 1 => runSingleFile(dataArgs(0), kArg, splitP)
+        case 2 => runTwoFile(dataArgs(0), dataArgs(1), kArg)
+        case _ => Left("Bad arguments: expected 1 or 2 JSONL paths before flags.")
+      }
+
+    result match {
+      case Left(err) =>
+        Console.err.println(s"[PremiseEval] error: $err")
+        sys.exit(2)
+      case Right(_) =>
+        () // all printing done inside the functions
     }
   }
 
-  // --------- Mode 1: single-file, frequency baselines ---------
-  private def runSingleFile(in: String, k: Int, pct: Int): Unit = {
-    val rows = readJsonlVec[Row](in)
-    if (rows.isEmpty) { println(s"No rows in $in"); return }
+  // ===========================================================================
+  // IO helpers (Either-based, no unchecked exceptions)
+  // ===========================================================================
 
-    val (train, test) = hashSplit(rows, pct)
-    // Ensure we always have at least 1 test when dataset is non-empty.
-    val (train1, test1) =
-      if (rows.nonEmpty && test.isEmpty && train.nonEmpty) (train.dropRight(1), train.takeRight(1))
-      else (train, test)
+  private def readJsonlVec[A: Reader](path: String): Either[String, Vector[A]] =
+    Either
+      .catchNonFatal {
+        Using.resource(Source.fromFile(path)) { src =>
+          src.getLines().iterator.zipWithIndex.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) {
+            case (Left(err), _) => Left(err)
+            case (Right(acc), (line, idx)) =>
+              val trimmed = line.trim
+              if (trimmed.isEmpty) Right(acc)
+              else
+                Try(read[A](trimmed)).toEither.left
+                  .map(e => s"$path:${idx + 1}: ${e.getMessage}")
+                  .map(v => acc :+ v)
+          }
+        }
+      }
+      .left.map(_.getMessage)
+      .flatten
 
-    println(s"train: ${train1.size}  test: ${test1.size}  (split=${pct}%)")
-    if (test1.isEmpty) println("hint: try --split 50 or a larger dataset")
+  // ===========================================================================
+  // Mode 1: single-file, frequency baselines
+  // ===========================================================================
 
-    val global = new GlobalFreq(train1)
-    val perMod = new PerModuleFreq(train1)
+  private def runSingleFile(in: String, k: Int, pct: Int): Either[String, Unit] =
+    for {
+      rows <- readJsonlVec[Row](in)
+    } yield {
+      if (rows.isEmpty) {
+        println(s"No rows in $in")
+      } else {
+        val (train, test) = hashSplit(rows, pct)
 
-    println("\n=== GlobalFreq baseline ===")
-    printReport(evaluate(global, test1, k, label = s"GlobalFreq@$k"))
+        // Ensure at least one test row (if dataset non-empty)
+        val (train1, test1) =
+          if (rows.nonEmpty && test.isEmpty && train.nonEmpty)
+            (train.dropRight(1), train.takeRight(1))
+          else
+            (train, test)
 
-    println("\n=== PerModuleFreq baseline ===")
-    printReport(evaluate(perMod, test1, k, label = s"PerModuleFreq@$k"))
-  }
+        println(s"train: ${train1.size}  test: ${test1.size}  (split=${pct}%)")
+        if (test1.isEmpty) println("hint: try --split 50 or a larger dataset")
 
-  // --------- Mode 2: two-file retrieval (TF dot-product) ---------
-  private def runTwoFile(agdaJsonl: String, goalsJsonl: String, k: Int): Unit = {
-    val decls = readJsonlVec[AgdaData](agdaJsonl).map { r =>
-      val tfv = tf(tokens(r.agdaType + "\n" + r.proof))
-      (r, tfv)
+        val global = GlobalFreq(train1)
+        val perMod = PerModuleFreq(train1)
+
+        println("\n=== GlobalFreq baseline ===")
+        printReport(evaluate(global, test1, k, label = s"GlobalFreq@$k"))
+
+        println("\n=== PerModuleFreq baseline ===")
+        printReport(evaluate(perMod, test1, k, label = s"PerModuleFreq@$k"))
+      }
     }
-    val goals = readJsonlVec[TrainGoal](goalsJsonl).map { g =>
-      val tfv = tf(tokens(g.goalType))
-      (g, tfv)
-    }
 
-    val support = goals.count { case (g, _) => g.imports.nonEmpty }
-    var hits = 0
-
-    goals.foreach { case (qg, qtf) =>
-      val topPremises = decls.iterator
-        .map { case (d, dtf) => (dot(qtf, dtf), d) }
-        .filter(_._1 > 0).toVector
-        .sortBy(-_._1)
-        .take(8)                 // union premises from top-8 neighbors
-        .flatMap(_._2.premises)
-        .distinct
-        .take(k)
-      val gold = qg.imports.toSet
-      if (gold.nonEmpty && topPremises.exists(gold)) hits += 1
-    }
-
-    val recallAtK = if (support == 0) 0.0 else hits.toDouble / support.toDouble
-    println(f"retrieval recall@$k on goals-with-gold: $recallAtK%.3f  (hits=$hits/$support)")
-  }
-
-  // --------- Split/hash ---------
+  // deterministic hash-based split
   private def hashSplit(rows: Vector[Row], pctTrain: Int): (Vector[Row], Vector[Row]) = {
     val (tr, te) = rows.partition { r =>
       val key = s"${r.file}|${r.module.getOrElse("")}|${r.name}"
@@ -148,49 +161,80 @@ object PremiseEval {
     (tr, te)
   }
 
+  /** FNV-1a 32-bit hash, implemented functionally. */
   private def stableHash(s: String): Int = {
     val prime = 16777619
-    var hash  = 0x811c9dc5
-    val bs    = s.getBytes("UTF-8")
-    var i = 0
-    while (i < bs.length) { hash ^= (bs(i) & 0xff); hash *= prime; i += 1 }
-    (hash & 0x7fffffff)
+    val bytes = s.getBytes("UTF-8")
+    val h     = bytes.foldLeft(0x811c9dc5) { (hash, b) =>
+      (hash ^ (b & 0xff)) * prime
+    }
+    h & 0x7fffffff
   }
 
-  // --------- Baselines (mode 1) ---------
-  trait Predictor { def predict(row: Row, k: Int): List[String] }
+  // ===========================================================================
+  // Baseline predictors (Mode 1)
+  // ===========================================================================
 
-  final class GlobalFreq(train: Seq[Row]) extends Predictor {
-    private val ranking: Vector[String] =
-      train.iterator.flatMap(_.premises).toVector
-        .groupBy(identity).view.mapValues(_.size).toVector
-        .sortBy { case (_, c) => -c }
-        .map(_._1).toVector
+  trait Predictor {
+    def predict(row: Row, k: Int): List[String]
+  }
 
+  object GlobalFreq {
+    def apply(train: Seq[Row]): GlobalFreq = {
+      val ranking =
+        train.iterator
+          .flatMap(_.premises)
+          .toVector
+          .groupBy(identity).view.mapValues(_.size).toVector
+          .sortBy { case (_, c) => -c }
+          .map(_._1)
+          .toVector
+
+      new GlobalFreq(ranking)
+    }
+  }
+
+  final class GlobalFreq private (ranking: Vector[String]) extends Predictor {
     def predict(row: Row, k: Int): List[String] =
       ranking.take(k).toList
   }
 
-  final class PerModuleFreq(train: Seq[Row]) extends Predictor {
-    private val global = new GlobalFreq(train)
-    private val byMod: Map[String, Vector[String]] = {
-      val grouped = train.groupBy(_.module.getOrElse("<none>"))
-      grouped.view.mapValues { rs =>
-        rs.iterator.flatMap(_.premises).toVector
-          .groupBy(identity).view.mapValues(_.size).toVector
-          .sortBy { case (_, c) => -c }
-          .map(_._1).toVector
-      }.toMap
-    }
+  object PerModuleFreq {
+    def apply(train: Seq[Row]): PerModuleFreq = {
+      val global = GlobalFreq(train)
 
-    def predict(row: Row, k: Int): List[String] =
-      byMod.getOrElse(
-        row.module.getOrElse("<none>"),
-        global.predict(row, Int.MaxValue).toVector
-      ).take(k).toList
+      val byMod: Map[String, Vector[String]] = {
+        val grouped = train.groupBy(_.module.getOrElse("<none>"))
+        grouped.view.mapValues { rs =>
+          rs.iterator
+            .flatMap(_.premises)
+            .toVector
+            .groupBy(identity).view.mapValues(_.size).toVector
+            .sortBy { case (_, c) => -c }
+            .map(_._1)
+            .toVector
+        }.toMap
+      }
+
+      new PerModuleFreq(global, byMod)
+    }
   }
 
-  // --------- Metrics (mode 1) ---------
+  final class PerModuleFreq private (
+    global: GlobalFreq,
+    byMod: Map[String, Vector[String]]
+  ) extends Predictor {
+    def predict(row: Row, k: Int): List[String] = {
+      val modKey = row.module.getOrElse("<none>")
+      val base   = byMod.getOrElse(modKey, global.predict(row, Int.MaxValue).toVector)
+      base.take(k).toList
+    }
+  }
+
+  // ===========================================================================
+  // Metrics for Mode 1
+  // ===========================================================================
+
   final case class Report(
     label: String,
     k: Int,
@@ -201,32 +245,99 @@ object PremiseEval {
     support: Int
   )
 
-  private def evaluate(model: Predictor, test: Seq[Row], k: Int, label: String): Report = {
-    var precSum = 0.0
-    var recSum  = 0.0
-    var covered = 0
-    var support = 0
+  private final case class Acc(
+    precSum: Double,
+    recSum: Double,
+    covered: Int,
+    support: Int
+  )
 
-    test.foreach { r =>
-      val gold = r.premises.toSet
-      if (gold.nonEmpty) {
-        support += 1
-        val pred = model.predict(r, k).toSet
-        val tp   = (gold intersect pred).size.toDouble
-        val p    = if (pred.nonEmpty) tp / pred.size else 0.0
-        val rcl  = tp / gold.size
-        precSum += p
-        recSum  += rcl
-        if (tp > 0) covered += 1
-      }
+  private def evaluate(model: Predictor, test: Seq[Row], k: Int, label: String): Report = {
+    val acc = test.foldLeft(Acc(0.0, 0.0, covered = 0, support = 0)) {
+      case (acc0, r) =>
+        val gold = r.premises.toSet
+        if (gold.isEmpty) acc0
+        else {
+          val pred = model.predict(r, k).toSet
+          val tp   = (gold intersect pred).size.toDouble
+          val p    = if (pred.nonEmpty) tp / pred.size else 0.0
+          val rcl  = tp / gold.size
+          val cov  = if (tp > 0.0) 1 else 0
+
+          Acc(
+            precSum = acc0.precSum + p,
+            recSum  = acc0.recSum + rcl,
+            covered = acc0.covered + cov,
+            support = acc0.support + 1
+          )
+        }
     }
 
-    val precision = if (support > 0) precSum / support else 0.0
-    val recall    = if (support > 0) recSum  / support else 0.0
-    val f1        = if (precision + recall > 0) 2 * precision * recall / (precision + recall) else 0.0
-    val coverageP = if (support > 0) covered.toDouble / support.toDouble else 0.0
-    Report(label, k, precision, recall, f1, coverageP, support)
+    val precision = if (acc.support > 0) acc.precSum / acc.support else 0.0
+    val recall    = if (acc.support > 0) acc.recSum  / acc.support else 0.0
+    val f1        = if (precision + recall > 0.0) 2 * precision * recall / (precision + recall) else 0.0
+    val coverageP = if (acc.support > 0) acc.covered.toDouble / acc.support.toDouble else 0.0
+
+    Report(label, k, precision, recall, f1, coverageP, acc.support)
   }
+
+  private def printReport(r: Report): Unit = {
+    println(f"label=${r.label}  k=${r.k}%d  support=${r.support}%d")
+    println(f"precision@k=${r.precision}%.4f  recall@k=${r.recall}%.4f  f1=${r.f1}%.4f  coverage=${r.coverage}%.4f")
+  }
+
+  // ===========================================================================
+  // Mode 2: two-file retrieval (bag-of-words TF dot-product)
+  // ===========================================================================
+
+  private def runTwoFile(agdaJsonl: String, goalsJsonl: String, k: Int): Either[String, Unit] =
+    for {
+      decls <- readJsonlVec[AgdaData](agdaJsonl)
+      goals <- readJsonlVec[TrainGoal](goalsJsonl)
+    } yield {
+      val declTfs: Vector[(AgdaData, Map[String, Int])] =
+        decls.map { r =>
+          val txt  = r.agdaType.getOrElse("") + "\n" + r.proof.getOrElse("")
+          val tfv  = tf(tokens(txt))
+          (r, tfv)
+        }
+
+      val goalTfs: Vector[(TrainGoal, Map[String, Int])] =
+        goals.map { g =>
+          val tfv = tf(tokens(g.goalType))
+          (g, tfv)
+        }
+
+      val support = goalTfs.count { case (g, _) => g.imports.nonEmpty }
+
+      val hits = goalTfs.foldLeft(0) {
+        case (accHits, (qg, qtf)) =>
+          val topPremises =
+            declTfs.iterator
+              .map { case (d, dtf) => (dot(qtf, dtf), d) }
+              .filter(_._1 > 0)
+              .toVector
+              .sortBy { case (score, _) => -score }
+              .take(8) // union premises from top-8 neighbors
+              .flatMap(_._2.premises)
+              .distinct
+              .take(k)
+
+          val gold = qg.imports.toSet
+          if (gold.nonEmpty && topPremises.exists(gold.contains)) accHits + 1
+          else accHits
+      }
+
+      val recallAtK =
+        if (support == 0) 0.0
+        else hits.toDouble / support.toDouble
+
+      println(f"retrieval recall@$k on goals-with-gold: $recallAtK%.3f  (hits=$hits/$support)")
+    }
+
+  // ===========================================================================
+  // Bag-of-words helpers
+  // ===========================================================================
 
   private def tokens(s: String): Array[String] =
     s.toLowerCase
@@ -239,17 +350,8 @@ object PremiseEval {
     toks.groupBy(identity).view.mapValues(_.length).toMap
 
   private def dot(a: Map[String, Int], b: Map[String, Int]): Int =
-    if (a.size < b.size)
+    if (a.size <= b.size)
       a.iterator.map { case (k, v) => v * b.getOrElse(k, 0) }.sum
     else
       b.iterator.map { case (k, v) => v * a.getOrElse(k, 0) }.sum
-
-  private implicit class ExistsAny[A](as: Iterable[A]) {
-    def exists(set: Set[A]): Boolean = as.exists(set.contains)
-  }
-
-  private def printReport(r: Report): Unit = {
-    println(f"label=${r.label}  k=${r.k}%d  support=${r.support}%d")
-    println(f"precision@k=${r.precision}%.4f  recall@k=${r.recall}%.4f  f1=${r.f1}%.4f  coverage=${r.coverage}%.4f")
-  }
 }
