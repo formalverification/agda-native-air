@@ -3,8 +3,8 @@
  *  ----------------------------------------------------------------------------
  *
  *  File: proof-parser/src/main/scala/proofparser/Model.scala
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *  Package: proofparser
+ *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------
