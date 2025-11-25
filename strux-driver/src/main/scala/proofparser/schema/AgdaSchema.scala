@@ -190,10 +190,8 @@ object AgdaDataOps {
   }
 
   /** Should we drop this premise because it refers to the same declaration? */
-  private def isSelfPremise(r: AgdaData, p: String): Boolean = {
-    val canonP = normalizePremise(p)
-    selfIdVariants(r.file, r.module, r.name).contains(canonP)
-  }
+  private def isSelfPremise(r: AgdaData, p: String): Boolean =
+    selfIdVariants(r.file, r.module, r.name).contains(normalizePremise(p))
 
   /** Canonicalize and deduplicate premises. */
   private def canonicalPremises(ps: List[String], self: AgdaData): List[String] =
