@@ -1,10 +1,11 @@
-##
+# ==============================================================================
 # AgdaJang Makefile
 #
-# @file ./agda-ai-prover/agda-jang/Makefile
+# @file agda-ai-prover/agda-jang/Makefile
 # @version 0.2
-# @copyright 2025 Thmpr
-# WHY this exists:
+#
+# WHY this exists
+# ---------------
 #   Our north star is a closed loop:
 #     (1) Extract structured data from Agda  →  (2) Transform to ML-ready rows
 #     (3) Try tiny solving passes / search    →  (4) Log + Benchmark
@@ -16,11 +17,13 @@
 #     (1) Extract → (2) Transform → (3) Solve/Report → (4) Benchmark/Log
 #     These targets give fast feedback on the whole pipeline.
 #
-# Notes:
+# Notes
+# -----
 #   - We route Agda interface files into _build/agda so sources stay clean.
 #   - Cleaning is split into small, safe targets and a "wipe" for full reset.
 #
-# LAYOUT assumptions:
+# LAYOUT assumptions
+# ------------------
 #   - This file lives in: agda-ai-prover/agda-jang/Makefile
 #   - Agda sources here:  agda-ai-prover/agda-jang/agda/AgdaJang/…
 #   - Example data lives: agda-ai-prover/data/
@@ -28,10 +31,11 @@
 #   - Python tools live:  agda-ai-prover/agda-jang/python/tools/
 #                         (If some scripts still live at repo root, see variables below.)
 #
-# Repro tip:
+# Repro tips
+# ----------
 #   Run everything inside `nix develop` from the repo root for pinned Agda/stdlib/Scala/Python.
 #
-# ------------------------------------------------------------------------------
+# ==============================================================================
 
 # --- Tools / flags (overridable via environment) ---
 AGDA            ?= agda
