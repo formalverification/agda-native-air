@@ -16,7 +16,6 @@
  *     proofparser.schema.AgdaSchema.scala
  *
  *  New code should always import from the schema package directly.
- *  The original version of Model.scala resides in the proofparser.legacy package.
  *  ============================================================================ */
 package proofparser
 import proofparser.schema.{ AgdaData, AgdaDataOps, TrainRecord }

@@ -12,9 +12,6 @@
  *  TrainRecord from this file.
  *
  *  All definitions now live in `proofparser.schema.AgdaSchema.scala`.
- *
- *  The original version of `SimpleSchema.scala` now resides in the
- *  `proofparser.legacy` package.
  * ============================================================================ */
 package proofparser
 import proofparser.schema.TrainRecord

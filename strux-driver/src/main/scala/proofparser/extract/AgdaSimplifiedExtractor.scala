@@ -4,7 +4,6 @@
  *
  *  File: proof-parser/src/main/scala/proofparser/extract/AgdaSimplifiedExtractor.scala
  *  Package: proofparser.extract
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Purpose
  *  -------
