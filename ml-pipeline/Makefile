@@ -1,13 +1,17 @@
-##
+# ==============================================================================
 # ml-pipeline — subproject Makefile
+#
+# @file agda-ai-prover/ml-pipeline/Makefile
+# @version 0.1
 #
 # [DEPRECATED]
 # Top-level Makefile is canonical; this file is kept for old experiments and will be removed later.
 #
-# @file agda-ai-prover/ml-pipeline/Makefile
-# @version 0.1
-# Focus: Scala/Spark ETL, Python ML model training and API serving
-##
+# Focus
+# -----
+# Scala/Spark ETL, Python ML model training and API serving
+#
+# ==============================================================================
 
 SHELL := /bin/bash
 ETL_DIR=etl
