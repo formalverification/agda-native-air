@@ -1,17 +1,21 @@
-##
-# proof-parser — subproject Makefile
+# ==============================================================================
+# Makefile
+# --------
 #
 # @file agda-ai-prover/proof-parser/Makefile
 # @version 0.2
 #
-# FOCUS
+# Description
+# -----------
+# Makefile for the proofparser package.
 #
-#   -  Scala utilities (extract/transform/reduce/stats/benchmark):
-#      -  Extract / transform / reduce Agda JSON
-#      -  Dataset stats + premise-selection baselines
-#
-#   -  Local smoke tests
-##
+# Focus
+# -----
+# -  Scala utilities (extract/transform/reduce/stats/benchmark):
+#    -  Extract / transform / reduce Agda JSON
+#    -  Dataset stats + premise-selection baselines
+# -  Local smoke tests
+# ==============================================================================
 SBT          ?= sbt
 PKG          ?= proofparser
 MAIN_STATS   ?= $(PKG).DatasetStats
