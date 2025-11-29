@@ -1,3 +1,20 @@
+/** ============================================================================
+ *  TestKit.scala
+ *  ----------------------------------------------------------------------------
+ *
+ *  File: proof-parser/src/test/scala/proofparser/TestKit.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *
+ *  Description
+ *  -----------
+ *  A base trait providing common utilities for tests in the proofparser package.
+ *  It includes methods for loading test resources and generators for property-based
+ *  testing.
+ *
+ *  Run: `sbt test`
+ ** ============================================================================ */
+
 package proofparser
 
 import org.scalatest.EitherValues

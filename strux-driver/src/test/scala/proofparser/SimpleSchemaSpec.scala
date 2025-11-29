@@ -1,37 +1,35 @@
-/** ===========================================================================
- *  SimpleSchemaSpec.scala
- *  ----------------------------------------------------------------------------
- *
- *  File: proof-parser/src/test/scala/proofparser/SimpleSchemaSpec.scala
- *  Package: proofparser
- *
- *  Description
- *  -----------
- *  Simple round-trip unit test using the `TrainRecord`.
- ** ============================================================================= */
 package proofparser
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-
 import upickle.default._
 
-import proofparser.schema._
-
 final class SimpleSchemaSpec extends AnyFunSuite with Matchers {
-
-  test("TrainRecord JSON round-trip via upickle") {
+  test("TrainRecord round-trip and normalization") {
+    // Test TrainRecordOps
     val rec = TrainRecord(
-      module   = "Foo._.Bar.agda.",
-      name     = "lem<12>",
-      agdaType = "A → B",
-      proof    = "proof term",
-      premises = "p1 p2"
+      file = "Foo.agda",
+      module = "Foo._.properties.agda.",
+      decl = "lem<12>",
+      context = List(CtxVar("x", "ℕ")),
+      goalType = "A → B",
+      solution = Some("..."),
+      range = Some(Range(Pos(1,1), Pos(2,3))),
+      imports = List("Data.Nat")
     )
+    val norm = TrainRecordOps.normalize(rec)
+    norm.module shouldBe "Foo.properties"
+    norm.decl   shouldBe "lem"
 
-    val json = write(rec)
-    val back = read[TrainRecord](json)
+    // Test serialization
+    val json = write(norm)
+    read[TrainRecord](json) shouldBe norm
 
-    back shouldBe rec
+    // Additional normalization cases
+    val norm2 = TrainRecordOps.normalize(
+      TrainRecord("X.agda", "A._.B.agda.", "n<1>", Nil, "T")
+    )
+    norm2.module shouldBe "A.B"
+
   }
 }

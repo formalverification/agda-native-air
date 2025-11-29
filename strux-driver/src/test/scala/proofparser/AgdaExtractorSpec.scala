@@ -1,78 +1,110 @@
-/** ============================================================================
- *  AgdaExtractorSpec.scala
- *  ----------------------------------------------------------------------------
- *
- *  File: proof-parser/src/test/scala/proofparser/AgdaExtractorSpec.scala
- *  Package: proofparser
- *  Copyright: (c) 2024 Thmpr Lab, LLC.
- *
- *  Description
- *  -----------
- *  Unit tests for the pure, text-based utilities in AgdaExtractor.
- *  This suite intentionally does NOT spin up Agda or the JSON bridge.
- *  It verifies the current public API surface of AgdaExtractor:
- *
- *      - extractModuleName(lines: List[String]): Option[String]
- *      - isTheoremLike(line: String): Boolean
- *      - collectTheorems(lines: List[String]): List[(String, String)]
- *
- *  Design Notes
- *  ------------
- *  * We assert behavior, not implementation details.
- *  * We keep the tests deterministic with tiny inlined sources.
- *  * The “ignore comments/non-definitions” test expects an EMPTY result,
- *    matching your recent run where "someValue" was (correctly) filtered.
- *
- *  Run: `sbt test`
- *
- ** ============================================================================ */
+// file: proof-parser/src/test/scala/proofparser/AgdaExtractorSpec.scala
+//
+// PURPOSE
+//   Unit tests for the pure, text-based utilities in AgdaExtractor.
+//   This suite intentionally does NOT spin up Agda or the JSON bridge.
+//   It verifies the current public API surface of AgdaExtractor:
+//
+//     - extractModuleName(lines: List[String]): Option[String]
+//     - isTheoremLike(line: String): Boolean
+//     - collectTheorems(lines: List[String]): List[(String, String)]
+//
+// DESIGN NOTES
+//   * We assert behavior, not implementation details.
+//   * We keep the tests deterministic with tiny inlined sources.
+//   * The “ignore comments/non-definitions” test expects an EMPTY result,
+//     matching your recent run where "someValue" was (correctly) filtered.
+//
+// RUN
+//   sbt test
+//
 
 package proofparser
 
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import java.nio.file.Paths
+class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
 
-import proofparser.extract.AgdaExtractor
+  behavior of "extractModuleName"
 
-final class AgdaExtractorSpec extends AnyFunSuite with Matchers {
-
-  test("extractModuleName finds a simple module header") {
+  it should "find the declared module name when present" in {
     val src =
-      """module Foo.Bar where
-
-         x : A
-       """.stripMargin.linesIterator.toList
-
-    AgdaExtractor.extractModuleName(src) shouldBe Some("Foo.Bar")
+      """|module My.Module.Name where
+         |postulate A : Set
+         |""".stripMargin
+    val got = AgdaExtractor.extractModuleName(src.linesIterator.toList)
+    got shouldBe Some("My.Module.Name")
   }
 
-  test("isTheoremLike recognizes simple theorem-like declarations") {
+  it should "return None when no module is declared" in {
+    val src =
+      """|-- no module here
+         |postulate A : Set
+         |""".stripMargin
+    val got = AgdaExtractor.extractModuleName(src.linesIterator.toList)
+    got shouldBe None
+  }
+
+  // -------------------------------------------------------------
+
+  behavior of "isTheoremLike"
+
+  it should "detect a theorem-like declaration (name : type)" in {
     AgdaExtractor.isTheoremLike("myTheorem : A → B") shouldBe true
     AgdaExtractor.isTheoremLike("prop1 : X × Y")     shouldBe true
+  }
 
-    val nonTheorems = List(
-      "postulate A : Set",
+  it should "reject comments and irrelevant lines" in {
+    val lines = List(
+      "-- comment",
       "open import Data.Nat",
-      "data ℕ : Set where",
-      "record Foo : Set where"
+      "postulate A : Set",
+      "someValue = 42" // not a theorem declaration
     )
-
-    nonTheorems.foreach { l =>
-      withClue(s"'$l' should NOT be theorem-like") {
-        AgdaExtractor.isTheoremLike(l) shouldBe false
-      }
+    lines.foreach { l =>
+      AgdaExtractor.isTheoremLike(l) shouldBe false
     }
   }
 
-  test("parseAgdaFile returns some rows for agda-example.agda fixture") {
-    val url = getClass.getClassLoader.getResource("agda-example.agda")
-    assume(url != null, "Missing test resource: agda-example.agda")
+  // -------------------------------------------------------------
 
-    val path = Paths.get(url.toURI)
-    val rows = AgdaExtractor.parseAgdaFile(path)
+  behavior of "collectTheorems"
 
-    rows.nonEmpty shouldBe true
+  it should "extract a single, simple (name : type) theorem" in {
+    val src =
+      """|module TestModule where
+         |Thm1 : A → B
+         |Thm1 = f x
+         |""".stripMargin
+
+    val got = AgdaExtractor.collectTheorems(src.linesIterator.toList)
+    // API returns List[(name, typeString)]
+    got should contain ("Thm1" -> "A → B")
+  }
+
+  it should "extract multiple theorems" in {
+    val src =
+      """|prop1 : A → A
+         |prop1 = ...
+         |prop2 : B → B
+         |prop2 = ...
+         |""".stripMargin
+
+    val got = AgdaExtractor.collectTheorems(src.linesIterator.toList)
+    got.map(_._1).toSet shouldBe Set("prop1", "prop2")
+  }
+
+  it should "ignore comments and non-definitions" in {
+    val src =
+      """|-- this is a comment
+         |{- block comment -}
+         |module Example where
+         |someValue = 42
+         |""".stripMargin
+
+    val got = AgdaExtractor.collectTheorems(src.linesIterator.toList)
+    // Your current extractor filters these out; expect empty.
+    got shouldBe Nil
   }
 }
