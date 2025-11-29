@@ -3,11 +3,14 @@
 # --------
 #
 # @file agda-ai-prover/proof-parser/Makefile
-# @version 0.2
+# @version 0.3
 #
 # Description
 # -----------
-# Makefile for the proofparser package.
+# Makefile for the proofparser package (local dev helper).
+#
+# NOTE: The canonical interface is the top-level agda-ai-prover/Makefile.
+#       These targets are kept for convenience when working inside proof-parser/.
 #
 # Focus
 # -----
@@ -16,10 +19,8 @@
 #    -  Dataset stats + premise-selection baselines
 # -  Local smoke tests
 # ==============================================================================
+
 SBT          ?= sbt
-PKG          ?= proofparser
-MAIN_STATS   ?= $(PKG).DatasetStats
-MAIN_PREM    ?= $(PKG).PremiseEval
 
 # --- knobs (overridable from the top-level) -----------------------------------
 DATA_DIR        ?= ../data
@@ -39,10 +40,13 @@ N       ?= 16     # rows for synthetic generator
 
 SBT_FLAGS ?= -error -no-colors
 
+STATS_MAIN ?= proofparser.util.DatasetStats
+PREM_MAIN  ?= proofparser.util.PremiseEval
+
 .PHONY: help
 help:
 	@echo ""
-	@echo "proof-parser targets:"
+	@echo "proof-parser targets (local dev):"
 	@echo "  make compile              - sbt compile (this subproject)"
 	@echo "  make test                 - sbt test"
 	@echo "  make extract              - AgdaExtractorMain (.agda|dir -> TRAIN_JSONL)"
@@ -69,7 +73,7 @@ test:
 	$(SBT) $(SBT_FLAGS) test
 
 # ------------------------------------------------------------------------------
-# Extract: AgdaExtractorMain
+# Extract: AgdaExtractorMain (proofparser.extract.AgdaExtractorMain)
 .PHONY: extract
 extract:
 	@if [ ! -e "$(EXTRACT_INPUT)" ]; then \
@@ -79,10 +83,9 @@ extract:
 	fi
 	@mkdir -p $(dir $(TRAIN_JSONL))
 	@echo "→ AgdaExtractorMain: $(EXTRACT_INPUT) -> $(TRAIN_JSONL)"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.AgdaExtractorMain $(abspath $(EXTRACT_INPUT)) $(abspath $(TRAIN_JSONL))"
-	@[ -s "$(TRAIN_JSONL)" ] || { echo "❌ Expected $(TRAIN_JSONL)."; exit 1; }
+	@$(SBT) $(SBT_FLAGS) "runMain proofparser.extract.AgdaExtractorMain $(abspath $(EXTRACT_INPUT)) $(abspath $(TRAIN_JSONL))"
 
-# Transform: Agda2TrainTransformer
+# Transform: Agda2TrainTransformer (proofparser.transform.Agda2TrainTransformer)
 .PHONY: transform
 transform:
 	@if [ ! -e "$(A2T_JSON_INPUT)" ]; then \
@@ -91,10 +94,9 @@ transform:
 	fi
 	@mkdir -p $(dir $(A2T_OUT))
 	@echo "→ Agda2TrainTransformer: $(A2T_JSON_INPUT) -> $(A2T_OUT)"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.Agda2TrainTransformer $(abspath $(A2T_JSON_INPUT)) $(abspath $(A2T_OUT))"
-	@[ -s "$(A2T_OUT)" ] || { echo "❌ Expected $(A2T_OUT)."; exit 1; }
+	@$(SBT) $(SBT_FLAGS) "runMain proofparser.transform.Agda2TrainTransformer $(abspath $(A2T_JSON_INPUT)) $(abspath $(A2T_OUT))"
 
-# Reducer: Agda2TrainReducer
+# Reducer: Agda2TrainReducer (proofparser.reduce.Agda2TrainReducer)
 .PHONY: a2t
 a2t:
 	@if [ ! -e "$(A2T_JSON_INPUT)" ]; then \
@@ -103,8 +105,7 @@ a2t:
 	fi
 	@mkdir -p $(dir $(DATA_A2T_SIMPLE))
 	@echo "→ Agda2TrainReducer: $(A2T_JSON_INPUT) -> $(DATA_A2T_SIMPLE)"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.Agda2TrainReducer $(abspath $(A2T_JSON_INPUT)) $(abspath $(DATA_A2T_SIMPLE))"
-	@[ -s "$(DATA_A2T_SIMPLE)" ] || { echo "❌ Expected $(DATA_A2T_SIMPLE)."; exit 1; }
+	@$(SBT) $(SBT_FLAGS) "runMain proofparser.reduce.Agda2TrainReducer $(abspath $(A2T_JSON_INPUT)) $(abspath $(DATA_A2T_SIMPLE))"
 
 # ------------------------------------------------------------------------------
 # Guard: DATASET must exist and be non-empty
@@ -120,13 +121,13 @@ endef
 dataset-stats:
 	$(call _require_dataset)
 	@echo "📊 DatasetStats on $(DATASET) (TOP=$(TOP))"
-	@$(SBT) $(SBT_FLAGS) "runMain $(MAIN_STATS) $(DATASET) --top $(TOP)"
+	@$(SBT) $(SBT_FLAGS) "runMain $(STATS_MAIN) $(DATASET) --top $(TOP)"
 
 .PHONY: premise-eval
 premise-eval:
 	$(call _require_dataset)
 	@echo "→ PremiseEval on $(DATASET) (K=$(K) SPLIT=$(SPLIT))"
-	@$(SBT) $(SBT_FLAGS) "runMain $(MAIN_PREM) $(DATASET) --k $(K) --split $(SPLIT)"
+	@$(SBT) $(SBT_FLAGS) "runMain $(PREM_MAIN) $(DATASET) --k $(K) --split $(SPLIT)"
 
 .PHONY: premise-eval-quick
 premise-eval-quick:
@@ -142,7 +143,7 @@ smoke: compile premise-eval-quick
 gen-sample:
 	@mkdir -p ../data
 	@echo "→ Generating synthetic dataset: ../data/sample.jsonl (N=$(N))"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.SampleGen ../data/sample.jsonl --n $(N)"
+	@$(SBT) $(SBT_FLAGS) "runMain proofparser.util.SampleGen ../data/sample.jsonl --n $(N)"
 	@ls -lh ../data/sample.jsonl || true
 
 .PHONY: smoke-sample
