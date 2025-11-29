@@ -1,30 +1,32 @@
-/**  * Tests for simplified Agda extractor logic.
-  *
-  *  * File: proof-parser/src/test/scala/proofparser/AgdaSimplifiedExtractorSpec.scala
-  *
-  * DESCRIPTION
-  *
-  *   Tests for simplified Agda extractor logic. We avoid full Agda invocations
-  *   here to keep tests fast and focused on core logic.
-  *   Instead we test:
-  *     +  `moduleName` (with a tiny temp file),
-  *     +  `iotcmLoad` shape under different flags,
-  *     +  `extractGoalsPretty` with a canned `AllGoalsWarnings` JSON.
-  *
-  * USAGE
-  *
-  *   sbt test
-  *   sbt "project proof-parser" test
-  *
-  * EXAMPLES
-  *   // see individual tests below.
-  *
-  * Notes:
-  *   - These are unit tests for isolated logic; full end-to-end tests
-  *     involving Agda invocations are in AgdaExtractorSpec.scala.
-  *
-  * (c) 2024 Thmpr Lab, LLC.
-  */
+/** ============================================================================
+ *  AgdaSimplifiedExtractorSpec.scala
+ *  ----------------------------------------------------------------------------
+ *
+ *  File: proof-parser/src/test/scala/proofparser/AgdaSimplifiedExtractorSpec.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *
+ *  Description
+ *  -----------
+ *   Tests for simplified Agda extractor logic. We avoid full Agda invocations
+ *   here to keep tests fast and focused on core logic.
+ *   Instead we test:
+ *     +  `moduleName` (with a tiny temp file),
+ *     +  `iotcmLoad` shape under different flags,
+ *     +  `extractGoalsPretty` with a canned `AllGoalsWarnings` JSON.
+ *
+ *  Usage
+ *  -----
+ *   sbt test
+ *   sbt "project proof-parser" test
+ *
+ *  Notes
+ *  -----
+ *  These are unit tests for isolated logic; full end-to-end tests involving Agda
+ *  invocations are in AgdaExtractorSpec.scala.
+ *
+ ** ============================================================================ */
+
 package proofparser
 
 import java.nio.file.{Files, Paths}

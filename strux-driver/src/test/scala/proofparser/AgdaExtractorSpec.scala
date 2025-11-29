@@ -1,23 +1,31 @@
-// file: proof-parser/src/test/scala/proofparser/AgdaExtractorSpec.scala
-//
-// PURPOSE
-//   Unit tests for the pure, text-based utilities in AgdaExtractor.
-//   This suite intentionally does NOT spin up Agda or the JSON bridge.
-//   It verifies the current public API surface of AgdaExtractor:
-//
-//     - extractModuleName(lines: List[String]): Option[String]
-//     - isTheoremLike(line: String): Boolean
-//     - collectTheorems(lines: List[String]): List[(String, String)]
-//
-// DESIGN NOTES
-//   * We assert behavior, not implementation details.
-//   * We keep the tests deterministic with tiny inlined sources.
-//   * The “ignore comments/non-definitions” test expects an EMPTY result,
-//     matching your recent run where "someValue" was (correctly) filtered.
-//
-// RUN
-//   sbt test
-//
+/** ============================================================================
+ *  AgdaExtractorSpec.scala
+ *  ----------------------------------------------------------------------------
+ *
+ *  File: proof-parser/src/test/scala/proofparser/AgdaExtractorSpec.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *
+ *  Description
+ *  -----------
+ *  Unit tests for the pure, text-based utilities in AgdaExtractor.
+ *  This suite intentionally does NOT spin up Agda or the JSON bridge.
+ *  It verifies the current public API surface of AgdaExtractor:
+ *
+ *      - extractModuleName(lines: List[String]): Option[String]
+ *      - isTheoremLike(line: String): Boolean
+ *      - collectTheorems(lines: List[String]): List[(String, String)]
+ *
+ *  Design Notes
+ *  ------------
+ *  * We assert behavior, not implementation details.
+ *  * We keep the tests deterministic with tiny inlined sources.
+ *  * The “ignore comments/non-definitions” test expects an EMPTY result,
+ *    matching your recent run where "someValue" was (correctly) filtered.
+ *
+ *  Run: `sbt test`
+ *
+ ** ============================================================================ */
 
 package proofparser
 

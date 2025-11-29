@@ -1,22 +1,31 @@
-// file: proof-parser/src/test/scala/proofparser/Agda2TrainTransformerSpec.scala
-//
-// PURPOSE
-//   Unit tests for Agda2TrainTransformer—the offline transformer that turns
-//   Agda’s “agda2train” JSON dump(s) into canonical AgdaData rows.
-//
-// WHAT WE TEST
-//   1) We can parse the sample JSON and produce non-empty rows.
-//   2) Self-premise filtering removes premises that refer to the row itself.
-//   3) JSONL (multi-line) parsing doesn’t choke.
-//
-// NOTE
-//   We avoid asserting exact module representation because your transformer
-//   currently emits either [] or ["seg","subseg"] for module. We assert
-//   invariant things: names present, no self-premises, etc.
-//
-// RUN
-//   sbt test
-//
+/** ===============================================================
+ *  Agda2TrainTransformerSpec.scala
+ *  ========================================================================
+ *
+ *  File: proof-parser/src/test/scala/proofparser/Agda2TrainTransformerSpec.scala
+ *  Package: proofparser
+ *  Copyright: (c) 2024 Thmpr Lab, LLC.
+ *
+ *  Description
+ *  -----------
+ *  Unit tests for Agda2TrainTransformer—the offline transformer that turns
+ *  Agda’s “agda2train” JSON dump(s) into canonical AgdaData rows.
+ *
+ *  What We Test
+ *  -----------
+ *  1) We can parse the sample JSON and produce non-empty rows.
+ *  2) Self-premise filtering removes premises that refer to the row itself.
+ *  3) JSONL (multi-line) parsing doesn’t choke.
+ *
+ *  Notes
+ *  -----
+ *  We avoid asserting exact module representation because your transformer
+ *  currently emits either [] or ["seg","subseg"] for module. We assert
+ *  invariant things: names present, no self-premises, etc.
+ *
+ *  Run: `sbt test`
+ *
+ ** ======================================================================== */
 
 package proofparser
 

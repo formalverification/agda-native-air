@@ -1,3 +1,14 @@
+/** ===========================================================================
+ *  SimpleSchemaSpec.scala
+ *  ----------------------------------------------------------------------------
+ *
+ *  File: proof-parser/src/test/scala/proofparser/SimpleSchemaSpec.scala
+ *  Package: proofparser
+ *
+ *  Description
+ *  -----------
+ *  Simple round-trip unit test using the `TrainRecord`.
+ ** ============================================================================= */
 package proofparser
 
 import org.scalatest.funsuite.AnyFunSuite
