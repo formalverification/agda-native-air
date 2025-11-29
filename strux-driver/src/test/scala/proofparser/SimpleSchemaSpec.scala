@@ -9,38 +9,29 @@
  *  -----------
  *  Simple round-trip unit test using the `TrainRecord`.
  ** ============================================================================= */
+
 package proofparser
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import upickle.default._
 
+import proofparser.schema.TrainRecord
+
 final class SimpleSchemaSpec extends AnyFunSuite with Matchers {
-  test("TrainRecord round-trip and normalization") {
-    // Test TrainRecordOps
+
+  test("TrainRecord JSON round-trip via upickle") {
     val rec = TrainRecord(
-      file = "Foo.agda",
-      module = "Foo._.properties.agda.",
-      decl = "lem<12>",
-      context = List(CtxVar("x", "ℕ")),
-      goalType = "A → B",
-      solution = Some("..."),
-      range = Some(Range(Pos(1,1), Pos(2,3))),
-      imports = List("Data.Nat")
+      module   = "Algebra.Group",
+      name     = "assoc",
+      agdaType = "∀ x y z → x ⋆ (y ⋆ z) ≡ (x ⋆ y) ⋆ z",
+      proof    = "λ x y z → proof_0",
+      premises = "Algebra.Group.left-id Algebra.Group.right-id"
     )
-    val norm = TrainRecordOps.normalize(rec)
-    norm.module shouldBe "Foo.properties"
-    norm.decl   shouldBe "lem"
 
-    // Test serialization
-    val json = write(norm)
-    read[TrainRecord](json) shouldBe norm
+    val json = write(rec)
+    val back = read[TrainRecord](json)
 
-    // Additional normalization cases
-    val norm2 = TrainRecordOps.normalize(
-      TrainRecord("X.agda", "A._.B.agda.", "n<1>", Nil, "T")
-    )
-    norm2.module shouldBe "A.B"
-
+    back shouldBe rec
   }
 }

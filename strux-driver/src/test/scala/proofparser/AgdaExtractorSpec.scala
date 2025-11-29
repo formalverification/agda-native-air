@@ -31,8 +31,14 @@ package proofparser
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.OptionValues
 
-class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
+import proofparser.extract.AgdaExtractor
+import proofparser.schema.AgdaData
+
+final class AgdaExtractorSpec extends AnyFlatSpec
+  with Matchers
+  with OptionValues {
 
   behavior of "extractModuleName"
 
@@ -41,6 +47,7 @@ class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
       """|module My.Module.Name where
          |postulate A : Set
          |""".stripMargin
+
     val got = AgdaExtractor.extractModuleName(src.linesIterator.toList)
     got shouldBe Some("My.Module.Name")
   }
@@ -50,11 +57,12 @@ class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
       """|-- no module here
          |postulate A : Set
          |""".stripMargin
+
     val got = AgdaExtractor.extractModuleName(src.linesIterator.toList)
     got shouldBe None
   }
 
-  // -------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   behavior of "isTheoremLike"
 
@@ -75,9 +83,9 @@ class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  // -------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  behavior of "collectTheorems"
+  behavior of "extractTheorems"
 
   it should "extract a single, simple (name : type) theorem" in {
     val src =
@@ -86,9 +94,16 @@ class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
          |Thm1 = f x
          |""".stripMargin
 
-    val got = AgdaExtractor.collectTheorems(src.linesIterator.toList)
-    // API returns List[(name, typeString)]
-    got should contain ("Thm1" -> "A → B")
+    val lines  = src.linesIterator.toList
+    val module = AgdaExtractor.extractModuleName(lines)
+    val rows   = AgdaExtractor.extractTheorems(lines, fileName = "TestModule.agda", moduleName = module)
+
+    rows should have size 1
+    val only = rows.head
+
+    only.name shouldBe "Thm1"
+    only.agdaType.value shouldBe "A → B"
+    only.proof.value    shouldBe "f x"
   }
 
   it should "extract multiple theorems" in {
@@ -99,8 +114,11 @@ class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
          |prop2 = ...
          |""".stripMargin
 
-    val got = AgdaExtractor.collectTheorems(src.linesIterator.toList)
-    got.map(_._1).toSet shouldBe Set("prop1", "prop2")
+    val lines  = src.linesIterator.toList
+    val rows   = AgdaExtractor.extractTheorems(lines, fileName = "NoModule.agda", moduleName = None)
+    val names  = rows.map(_.name).toSet
+
+    names shouldBe Set("prop1", "prop2")
   }
 
   it should "ignore comments and non-definitions" in {
@@ -111,8 +129,9 @@ class AgdaExtractorSpec extends AnyFlatSpec with Matchers {
          |someValue = 42
          |""".stripMargin
 
-    val got = AgdaExtractor.collectTheorems(src.linesIterator.toList)
-    // Your current extractor filters these out; expect empty.
-    got shouldBe Nil
+    val lines = src.linesIterator.toList
+    val rows  = AgdaExtractor.extractTheorems(lines, fileName = "Example.agda", moduleName = AgdaExtractor.extractModuleName(lines))
+
+    rows shouldBe empty
   }
 }
