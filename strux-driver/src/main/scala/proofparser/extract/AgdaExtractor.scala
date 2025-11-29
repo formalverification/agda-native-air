@@ -206,9 +206,12 @@ object AgdaExtractor {
                   rows  = state.rows :+ row
                 )
               case None =>
-                // We saw a proof before the type; remember the proof alone for now.
-                val nextDecls = state.decls.updated(name, ("", Some(proof)))
-                state.copy(decls = nextDecls)
+                // No type declaration seen for this name; treat as non-theorem and ignore.
+                state
+                // OLD APPROACH
+                // // We saw a proof before the type; remember the proof alone for now.
+                // val nextDecls = state.decls.updated(name, ("", Some(proof)))
+                // state.copy(decls = nextDecls)
             }
           } else state
         } else {
