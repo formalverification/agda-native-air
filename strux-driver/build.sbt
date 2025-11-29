@@ -19,6 +19,7 @@ lazy val root = (project in file("."))
       "org.scalatest" %% "scalatest" % "3.2.19" % Test,
       "org.scalacheck" %% "scalacheck" % "1.17.0"  % Test,
       "org.json4s" %% "json4s-native" % "4.0.6",
+      "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test
     )
     // Old dependencies:
     // // Testing libraries

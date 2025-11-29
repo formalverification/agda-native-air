@@ -102,8 +102,8 @@ final class AgdaExtractorProps
           val r = rows.head
 
           r.name                shouldBe name
-          r.agdaType.value      shouldBe tpeBody
-          r.proof.value         shouldBe rhsBody
+          r.agdaType            shouldBe Some(tpeBody)
+          r.proof               shouldBe Some(rhsBody)
           r.file                shouldBe "Test.agda"
           r.module              shouldBe None
         }
