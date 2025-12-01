@@ -318,28 +318,70 @@ object AgdaSimplifiedExtractor {
     msg: ujson.Value,
     file: Path,
     module: String,
-    log: Logger
+    log:  Logger
   ): List[AgdaData] = {
-    // Match shape:
-    //   payload.info.kind == "AllGoalsWarnings"
-    //   payload.info.payload.goals :: Arr
-    val payloadOpt =
-      for {
-        payload <- msg.obj.get("payload")
-        info    <- payload.obj.get("info")
-        if info("kind").strOpt.contains("AllGoalsWarnings")
-        body    <- info.obj.get("payload")
-      } yield body
 
-    payloadOpt.toList.flatMap { body =>
-      body.obj.get("goals") match {
-        case Some(ujson.Arr(items)) =>
+    // Shape A (current Agda):
+    // { "kind": "DisplayInfo",
+    //   "info": {
+    //     "kind": "AllGoalsWarnings",
+    //     "visibleGoals": [ ... ],
+    //     "invisibleGoals": [ ... ],
+    //     ...
+    //   }
+    // }
+    //
+    // Shape B (older / other builds):
+    // { "kind": "DisplayInfo",
+    //   "payload": {
+    //     "info": {
+    //       "kind": "AllGoalsWarnings",
+    //       "payload": { "goals": [ ... ] }
+    //     }
+    //   }
+    // }
+
+    def allGoalsInfo: Option[ujson.Value] = {
+      val obj = msg.obj
+
+      // Try direct `info`
+      val direct =
+        obj.get("info").filter(info =>
+          info.obj.get("kind").exists(_.strOpt.contains("AllGoalsWarnings"))
+        )
+
+      // Try payload.info.payload (older style)
+      val viaPayload =
+        obj.get("payload")
+          .flatMap(_.obj.get("info"))
+          .filter(info =>
+            info.obj.get("kind").exists(_.strOpt.contains("AllGoalsWarnings"))
+          )
+          .flatMap(_.obj.get("payload"))
+
+      direct.orElse(viaPayload)
+    }
+
+    allGoalsInfo.toList.flatMap { body =>
+      // Prefer visibleGoals; fall back to goals if present.
+      val goalsArrOpt: Option[Seq[ujson.Value]] =
+        body.obj.get("visibleGoals") match {
+          case Some(ujson.Arr(xs)) => Some(xs.toSeq)
+          case _ =>
+            body.obj.get("goals") match {
+              case Some(ujson.Arr(xs)) => Some(xs.toSeq)
+              case _                   => None
+            }
+        }
+
+      goalsArrOpt match {
+        case Some(items) =>
           items.toList.zipWithIndex.flatMap { case (g, idx) =>
             val gtype = g.obj.get("type").flatMap(_.strOpt).getOrElse("").trim
             if (gtype.nonEmpty) {
-              val name = s"$module.goal_$idx"
-              val agdaTypeOpt = Some(gtype)
-              val proofOpt: Option[String] = None
+              val name         = s"$module.goal_$idx"
+              val agdaTypeOpt  = Some(gtype)
+              val proofOpt     = Option.empty[String]
 
               val sem: SemanticInfo =
                 Semantic.from(
@@ -366,8 +408,8 @@ object AgdaSimplifiedExtractor {
             }
           }
 
-        case _ =>
-          log.info("AllGoalsWarnings without structured 'goals' array; skipping.")
+        case None =>
+          log.info("AllGoalsWarnings without recognizable goals array; skipping.")
           Nil
       }
     }

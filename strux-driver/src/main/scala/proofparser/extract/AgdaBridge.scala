@@ -149,9 +149,33 @@ object AgdaIOTCM {
  * Keep these tiny and purely pattern-based; avoid throwing.
  */
 object AgdaMsgs {
-  def isAllGoals(m: ujson.Value): Boolean =
-    m("kind").strOpt.contains("DisplayInfo") &&
-    m.obj.get("payload").exists(p => p("info").obj.get("kind").exists(_.str == "AllGoalsWarnings"))
+
+  def isAllGoals(m: ujson.Value): Boolean = {
+    val isDisplayInfo = m("kind").strOpt.contains("DisplayInfo")
+
+    def infoKindIsAllGoals(info: ujson.Value): Boolean =
+      info.obj.get("kind").exists(_.strOpt.contains("AllGoalsWarnings"))
+
+    if (!isDisplayInfo) false
+    else {
+      val obj = m.obj
+
+      // Shape A (what your Agda is sending now):
+      // { "kind": "DisplayInfo", "info": { "kind": "AllGoalsWarnings", ... } }
+      val direct =
+        obj.get("info").exists(infoKindIsAllGoals)
+
+      // Shape B (older / other builds):
+      // { "kind": "DisplayInfo",
+      //   "payload": { "info": { "kind": "AllGoalsWarnings", ... } } }
+      val viaPayload =
+        obj.get("payload")
+          .flatMap(_.obj.get("info"))
+          .exists(infoKindIsAllGoals)
+
+      direct || viaPayload
+    }
+  }
 
   def isInteractionPoints(m: ujson.Value): Boolean =
     m("kind").strOpt.contains("InteractionPoints")
