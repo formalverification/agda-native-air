@@ -69,14 +69,13 @@
  *
  *  Example
  *  -------
- *      sbt "project proof-parser" \
- *        "runMain proofparser.extract.AgdaSimplifiedExtractor \
- *         ../agda-jang/agda \
- *         ../proof-parser/output/goals.jsonl \
- *         --include ../agda-jang/agda \
- *         --lib standard-library \
- *         --library-file ../agda-jang/agda/libraries \
- *         --verbose"
+ *  From inside the `agda-ai-prver/proof-parser` directory, enter the following command:
+ *
+ *      sbt "runMain proofparser.extract.AgdaSimplifiedExtractor \
+ *        ../agda-jang/agda output/goals.jsonl \
+ *        --include ../agda-jang/agda --lib standard-library \
+ *        --library-file ../agda-jang/agda/libraries \
+ *        --dump-raw-goals output/raw-goals --verbose"
  *
  *  ============================================================================
  */
