@@ -80,7 +80,7 @@ final class AgdaBridge(
   }
 
   /** Send a raw line (appends '\n'). */
-  def send(line: String): Either[String, Unit] =
+  def send(line: String): Either[String, Unit] = synchronized {
     outWriter match {
       case None => Left("AgdaBridge not started; call start() first.")
       case Some(w) =>
@@ -89,6 +89,7 @@ final class AgdaBridge(
           case Failure(e) => Left(s"Failed to write to Agda: ${e.getMessage}")
         }
     }
+  }
 
   /** Convenience: write a ujson.Value as a single line. */
   def sendJson(js: ujson.Value): Either[String, Unit] =

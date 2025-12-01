@@ -206,6 +206,49 @@ object AgdaSimplifiedExtractor {
     )
   }
 
+  /**
+   * A small Haskell-string builder
+   * (used for textual IOTCM commands; not JSON).
+   */
+  private def escapeHaskellString(s: String): String =
+    s.flatMap {
+      case '\\' => "\\\\"
+      case '\"' => "\\\""
+      case c    => c.toString
+    }
+
+  private def hsStr(s: String): String =
+    "\"" + escapeHaskellString(s) + "\""
+
+  private def hsList(ss: Seq[String]): String =
+    ss.map(hsStr).mkString("[", ",", "]")
+
+  /**
+   * Build a textual Haskell `IOTCM` command for Cmd_load
+   * (e.g. for Emacs-style interaction).
+   * Example:
+   *  IOTCM "Example.agda" NonInteractive Indirect (Cmd_load "Example.agda" ["-i","/tmp/agda-test"])
+   */
+  private def iotcmLoadText(
+    file:    String,
+    include: Seq[String],
+    libs:    Seq[String],
+    mode:    String // e.g. "NonInteractive"
+  ): String = {
+
+    val incArgs  = include.flatMap(i => Seq("-i", i))
+    val libArgs  = libs.flatMap(l => Seq("-l", l))
+    val allArgs  = incArgs ++ libArgs
+
+    val fileStr  = hsStr(file)
+    val argsStr  = hsList(allArgs)
+
+    // This mirrors what Emacs sends:
+    // IOTCM "Example.agda" NonInteractive Indirect (Cmd_load "Example.agda" ["-i","/tmp/agda-test"])
+    s"IOTCM $fileStr $mode Indirect (Cmd_load $fileStr $argsStr)"
+  }
+
+
   // ===========================================================================
   // Input loop & parsing helpers
   // ===========================================================================
@@ -355,11 +398,11 @@ object AgdaSimplifiedExtractor {
 
     for {
       _      <- bridge.start()
+      // Send the command as an Either in the for-comprehension (avoid Unit)
       _      <- {
-        val js   = iotcmLoad(file.toString, cfg.includes, cfg.libs, cfg.mode, cfg.emptyIsNull)
-        val line = ujson.write(js)
-        log.send(line)
-        bridge.send(line)
+        val cmd  = iotcmLoadText(file.toString, cfg.includes, cfg.libs, cfg.mode)
+        log.send(cmd)
+        bridge.send(cmd + "\n")
       }
       msgOpt <- readUntil(bridge, log, cfg.timeoutMs)(AgdaMsgs.isAllGoals)
     } yield {
