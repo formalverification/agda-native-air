@@ -123,19 +123,25 @@ object AgdaIOTCM {
     val incArgs = include.flatMap(inc => Seq("-i", inc))
     val libArgs = libs.flatMap(l => Seq("-l", l))
     val args    = incArgs ++ libArgs
+
     ujson.Obj(
-      "command" -> "IOTCM",
+      "kind"    -> "IOTCM",
       "payload" -> ujson.Arr(
-        "", ujson.Arr(), "NonInteractive",
+        ujson.Str(""),    // interaction id
+        ujson.Arr(),      // range/options
+        ujson.Str("NonInteractive"),
         ujson.Obj(
-          "command" -> "Cmd_load",
-          "file"    -> file,
-          "args"    -> ujson.Arr(args.map(ujson.Str): _*)
+          "kind"    -> "Cmd_load",
+          "payload" -> ujson.Obj(
+            "file" -> file,
+            "args" -> ujson.Arr(args.map(ujson.Str): _*)
+          )
         )
       )
     )
   }
 }
+
 
 /**
  * ## Minimal recognizers for a few Agda messages

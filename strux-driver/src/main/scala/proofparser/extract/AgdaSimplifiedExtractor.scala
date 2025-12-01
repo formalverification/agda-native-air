@@ -156,7 +156,16 @@ object AgdaSimplifiedExtractor {
   // ===========================================================================
 
   /**
-   * Build the IOTCM / Cmd_load command.
+   * Build an IOTCM / Cmd_load JSON command in the same ADT style Agda uses for
+   * its responses:
+   *
+   *   { "kind": "IOTCM"
+   *   , "payload": [ headCell, [], mode
+   *                , { "kind": "Cmd_load"
+   *                  , "payload": { "file": ..., "args": [...] }
+   *                  }
+   *                ]
+   *   }
    *
    * payload[0] : editor id (often "" or null; toggled via `emptyIsNull`)
    * payload[1] : capabilities (often [])
@@ -179,14 +188,19 @@ object AgdaSimplifiedExtractor {
     val libArgs  = libs.flatMap(l => Seq("-l", l))
     val args     = incArgs ++ libArgs
     val headCell = if (emptyIsNull) ujson.Null else ujson.Str("")
+
     ujson.Obj(
-      "command" -> "IOTCM",
+      "kind"    -> "IOTCM",
       "payload" -> ujson.Arr(
-        headCell, ujson.Arr(), mode,
+        headCell,
+        ujson.Arr(),   // interaction range / options – we mirror the shape Agda expects
+        ujson.Str(mode),
         ujson.Obj(
-          "command" -> "Cmd_load",
-          "file"    -> file,
-          "args"    -> ujson.Arr(args.map(ujson.Str): _*)
+          "kind"    -> "Cmd_load",
+          "payload" -> ujson.Obj(
+            "file" -> file,
+            "args" -> ujson.Arr(args.map(ujson.Str): _*)
+          )
         )
       )
     )
