@@ -83,6 +83,7 @@
 
 package proofparser.extract
 
+import java.io.PrintWriter
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
 
@@ -120,7 +121,8 @@ private final case class Config(
   mode:        String,     // "NonInteractive" | "Direct"
   emptyIsNull: Boolean,    // true => first payload cell is null; false => ""
   verbose:     Boolean,
-  timeoutMs:   Long
+  timeoutMs:   Long,
+  dumpRawDir:  Option[Path]   // NEW: where to write raw AllGoalsWarnings
 )
 
 object AgdaSimplifiedExtractor {
@@ -320,12 +322,15 @@ object AgdaSimplifiedExtractor {
   // ===========================================================================
 
   /**
-   * Run Agda on a single file: start bridge, send load, wait for AllGoalsWarnings, stop.
+   * Run Agda on a single file: start bridge, send load, wait for AllGoalsWarnings, stop;
+   * Updated: so that when we *do* get an `AllGoalsWarnings` message, we also
+   *   + call `dumpRawGoals` (if configured),
+   *   + log a summary in verbose mode.
    */
   private def runOnFile(
     file: Path,
-    cfg: Config,
-    log: Logger
+    cfg:  Config,
+    log:  Logger
   ): Either[String, List[AgdaData]] = {
     val bridge =
       cfg.libraryFile match {
@@ -336,17 +341,30 @@ object AgdaSimplifiedExtractor {
       }
 
     for {
-      _   <- bridge.start()
-      _   <- {
+      _      <- bridge.start()
+      _      <- {
         val js   = iotcmLoad(file.toString, cfg.includes, cfg.libs, cfg.mode, cfg.emptyIsNull)
         val line = ujson.write(js)
         log.send(line)
         bridge.send(line)
       }
-      msg <- readUntil(bridge, log, cfg.timeoutMs)(AgdaMsgs.isAllGoals)
+      msgOpt <- readUntil(bridge, log, cfg.timeoutMs)(AgdaMsgs.isAllGoals)
     } yield {
       bridge.stop()
-      msg.toList.flatMap(js => extractGoalsAsAgdaData(js, file, moduleName(file), log))
+
+      val modName = moduleName(file)
+
+      // NEW: dump raw JSON if requested
+      msgOpt.foreach(js => dumpRawGoals(cfg, file, js, log))
+
+      val rows = msgOpt.toList.flatMap(js => extractGoalsAsAgdaData(js, file, modName, log))
+
+      // NEW: richer verbose output
+      if (cfg.verbose) {
+        logGoalSummary(file, rows, log)
+      }
+
+      rows
     }
   }
 
@@ -358,8 +376,9 @@ object AgdaSimplifiedExtractor {
     if (args.length < 2) {
       Left(
         "Usage: AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl> " +
-        "[--include DIR]* [--lib LIB]* [--library-file FILE] " +
-        "[--mode NonInteractive|Direct] [--empty-is-null] [--verbose] [--timeout-ms N]"
+          "[--include DIR]* [--lib LIB]* [--library-file FILE] " +
+          "[--mode NonInteractive|Direct] [--empty-is-null] [--verbose] " +
+          "[--timeout-ms N] [--dump-raw-goals DIR]"
       )
     } else {
       val root = Paths.get(args(0)).toAbsolutePath.normalize()
@@ -372,6 +391,7 @@ object AgdaSimplifiedExtractor {
       var emptyIsNull = false
       var verbose     = false
       var timeoutMs   = 10000L
+      var dumpRawDir  = Option.empty[Path]     // NEW
 
       var i = 2
       while (i < args.length) {
@@ -404,10 +424,15 @@ object AgdaSimplifiedExtractor {
             Try(args(i + 1).toLong).toOption.foreach(v => timeoutMs = v)
             i += 2
 
+          // NEW: directory to dump raw AllGoalsWarnings JSON for each file
+          case "--dump-raw-goals" if i + 1 < args.length =>
+            dumpRawDir = Some(Paths.get(args(i + 1)).toAbsolutePath.normalize())
+            i += 2
+
           case other =>
             Console.err.println(s"[warn] Unrecognized option: $other")
             i += 1
-        }
+       }
       }
 
       Right(
@@ -420,11 +445,70 @@ object AgdaSimplifiedExtractor {
           mode        = mode,
           emptyIsNull = emptyIsNull,
           verbose     = verbose,
-          timeoutMs   = timeoutMs
+          timeoutMs   = timeoutMs,
+          dumpRawDir  = dumpRawDir
         )
       )
     }
   }
+
+
+  // ==========================================================
+  // Helpers: dumping & logging
+  // ==========================================================
+
+  /** Helper: dump raw `AllGoalsWarnings` per file
+   * Write the raw AllGoalsWarnings JSON for a file, if requested. */
+  private def dumpRawGoals(
+    cfg:   Config,
+    file:  Path,
+    js:    ujson.Value,
+    log:   Logger
+  ): Unit = {
+    cfg.dumpRawDir.foreach { dir =>
+      try {
+        Files.createDirectories(dir)
+        val stem   = file.getFileName.toString.stripSuffix(".agda")
+        val out    = dir.resolve(s"$stem.all-goals.json")
+        val writer = new PrintWriter(out.toFile, "UTF-8")
+        try {
+          writer.println(ujson.write(js, indent = 2))
+        } finally writer.close()
+        log.info(s"Wrote raw AllGoalsWarnings for $stem to $out")
+      } catch {
+        case e: Throwable =>
+          log.warn(s"Failed to write raw goals JSON for $file: ${e.getMessage}")
+      }
+    }
+  }
+
+  /** Helper: richer verbose goal summary
+   * In verbose mode, print a summary of goals for a file. */
+  private def logGoalSummary(
+    file: Path,
+    rows: List[AgdaData],
+    log:  Logger
+  ): Unit = {
+    if (rows.nonEmpty) {
+      log.info(s"${file.getFileName.toString}: ${rows.size} goal(s)")
+      rows.foreach { r =>
+        val tpe       = r.agdaType.getOrElse("<no type>")
+        val maxWidth  = 120
+        val shortType =
+          if (tpe.length <= maxWidth) tpe
+          else tpe.take(maxWidth - 3) + "..."
+        log.info(s"  ${r.name} : $shortType")
+      }
+    } else {
+      log.info(s"${file.getFileName.toString}: no goals")
+    }
+  }
+
+
+
+  // ===========================================================================
+  // Main entrypoint
+  // ==========================================================================
 
   /** Entrypoint: parse args, discover files, talk to Agda, and write AgdaData JSONL. */
   def main(args: Array[String]): Unit = {
