@@ -1,113 +1,175 @@
 <!-- agda-ai-prover/agda-jang/README.md -->
 
-# AgdaJang: AI-Assisted Proof Dojo
+# AgdaJang
 
-**AgdaJang** is the interactive proving component of `agda-ai-prover`.  
-It provides a small, safe tactic vocabulary inside Agda and Python tooling to probe, test, and search proof strategies.
+**AgdaJang** is the interactive execution and experimentation layer of the **agda-ai-prover** project.
 
----
+It provides a small, carefully designed vocabulary of *safe proof actions* inside Agda, together with external tooling that allows AI agents (and humans) to **interact with Agda's typechecker**, propose proof steps, and observe precise semantic feedback.
 
-## ✨ Features
-
--  **Agda Macros (TC monad tactics)**
-
-   - `refine⟨_⟩`: insert a candidate term
-   - `apply⟨_⟩`: apply a function/lemma and generate subgoals
-   - `applyWith⟨_,_⟩`: apply with explicit arguments
-   - `applyReport⟨_⟩` / `applySolveReport⟨_⟩`: structured reporting of subgoals
-   - `intro`: introduce a λ when the goal is a function type
-
--  **Python Tools**
-
-   - [`jang_try.py`](python/tools/jang_try.py): generate scratch Agda modules, run candidates or tactics, parse subgoals.
-   - [`search.py`](python/tools/search.py): a simple BFS/beam search over tactics and candidates.
-
--  **Makefile Shortcuts:**
-
-   -  `make check` → type-checks all Agda macros
-
-   -  `make demo1` → runs `jang_try.py` with `suc zero : Nat`
-
-      expected output: `[OK] suc zero`
-
-   -  `make demo2` → runs `jang_try.py` with `applyReport:_+_`
-
-       expected output:  
-       ```
-       [OK] tactic applyReport:_+_
-       Subgoals:
-         - AGDAJANG_GOAL:0:visible: Nat
-         - AGDAJANG_GOAL:1:visible: Nat
-      ```
-
+AgdaJang is where learned policies are *executed*, *validated*, and *debugged*.
 
 ---
 
-## ⚡ Quickstart with Nix (recommended)
+## Role in the Overall System
 
-We provide a `flake.nix` at the repo root. This pins **Agda + stdlib + Python + Scala**.
+Within the agda-ai-prover architecture, AgdaJang serves as
 
-### 1. Enter the shell
++  the **action space** for AI agents,
++  a bridge between statistical models and Agda's typechecker,
++  a sandbox for experimenting with interactive proof search.
 
-```bash
-cd agda-ai-prover
-nix develop
-```
-
-If this runs to successful completion, it will provide
-
-+ `agda` with the stdlib registered,
-+ `python3` (with venv support),
-+ `scala`, `sbt`, `jdk`.
-
-
-### 2. Run AgdaJang demos
-
-```bash
-cd agda-jang
-make check    # Type-check Agda macros
-make demo1    # OK: suc zero : Nat
-make demo2    # Subgoal report for _+_
-```
-
-### 3. Library file
-
-AgdaJang ships with an `agda-jang.agda-lib` file containing the following:
-
-```text
-name: agda-jang
-include: agda
-depend: standard-library
-```
-
-This ensures `-l agda-jang` makes our macros available in any Agda file.
+While ProofParser focuses on *learning from existing mathematics*, AgdaJang focuses on **doing mathematics** — one proof step at a time — under Agda's supervision.
 
 ---
 
-## 🧱 Project Layout
+## Design Principles
+
+AgdaJang is guided by a few core principles.
+
++  **Soundness first**: every action is checked by Agda.
++  **Small action vocabulary**: prefer a few well-understood primitives over a large tactic language.
++  **Transparency**: surface goals, contexts, and failures explicitly.
++  **Research-oriented**: optimize for inspectability and extensibility, not raw automation.
+
+AgdaJang is not intended to compete with mature tactic languages; it is intended to be *learnable* by machines.
+
+---
+
+## Agda-side Components
+
+### TC Monad Macros
+
+At the core of AgdaJang is a collection of macros implemented in Agda's **TC monad**.
+
+These macros operate *inside* Agda's type theory and can
+
++  inspect the current goal,
++  query the local context,
++  attempt to construct or apply terms,
++  report subgoals in a structured way.
+
+Key macros include:
+
++  `refine⟨_⟩` — insert a candidate term into the goal,
++  `apply⟨_⟩` — apply a function or lemma and generate subgoals,
++  `applyWith⟨_,_⟩` — apply with explicit arguments,
++  `applyReport⟨_⟩` / `applySolveReport⟨_⟩` — apply while emitting structured goal reports,
++  `intro` — introduce a lambda when the goal is a function type.
+
+Each macro is designed to be *deterministic*, *locally scoped*, and *easy to reason about in isolation*.
+
+---
+
+### AgdaJang Library Layout
 
 ```
 agda-jang/
 ├── agda/
-│   └── AgdaJang/       # Prelude, Refine, Apply, Debug, Everything
-├── python/tools/       # jang_try.py, search.py, helpers
-├── Makefile            # check + demos
-└── README.md           # (this file)
+│   └── AgdaJang/
+│       ├── Prelude.agda
+│       ├── Refine.agda
+│       ├── Apply.agda
+│       ├── Debug.agda
+│       └── Everything.agda
+├── python/
+│   └── tools/
+│       ├── jang_try.py
+│       ├── search.py
+│       └── helpers.py
+├── Makefile
+└── README.md
 ```
 
----
-
-## 🛠️ Without Nix
-
-* Install Agda (≥ 2.6.4) and [agda-stdlib](https://github.com/agda/agda-stdlib).
-* Ensure `agda` is on PATH and stdlib is registered.
-* Install Python 3.10+.
-* Run the same Make targets as above.
+The `Everything` module re-exports the full AgdaJang action vocabulary.
 
 ---
 
-## 🚀 Next Steps
+## Python-side Tooling
 
-* Add more tactics (`rewrite`, smarter `introN`).
-* JSON logging for subgoal traces (dataset prep).
-* Integration with trained LLM policies.
+AgdaJang includes lightweight Python tools that orchestrate interaction with Agda.
+
+### `jang_try.py`
+
+This script
+
++  generates scratch Agda modules,
++  inserts candidate terms or macro invocations,
++  runs Agda on the generated code,
++  parses emitted goals and diagnostics.
+
+It is primarily intended for **rapid experimentation** and debugging.
+
+---
+
+### `search.py`
+
+This script implements simple proof-search strategies (e.g. BFS / beam search) over the AgdaJang action space.
+
+Its purpose is not to be state-of-the-art, but to
+
++  demonstrate how an agent can interact with Agda step-by-step,
++  provide baselines for learned policies,
++  generate data for interactive learning.
+
+---
+
+## Typical Workflow
+
+A typical AgdaJang session looks like this.
+
+1.  Start from a goal (an Agda hole),
+2.  Propose an action (e.g. `intro`, `apply⟨lemma⟩`),
+3.  Let Agda check the result,
+4.  Observe new goals or failure reports,
+5.  Repeat until the proof is complete or abandoned.
+
+Every step is validated by Agda.
+
+---
+
+## Running AgdaJang
+
+### With Nix (recommended)
+
+From the repository root:
+
+```bash
+nix develop
+cd agda-jang
+make check
+```
+
+This type-checks all AgdaJang macros.
+
+---
+
+### Demo Targets
+
+From `agda-jang/`:
+
+```bash
+make demo1    # Simple refinement demo
+make demo2    # Apply + subgoal reporting demo
+```
+
+These demos serve as executable documentation.
+
+---
+
+## Research Notes and Future Directions
+
++  Expand the action vocabulary (e.g. rewrite, structured intro).
++  Add richer goal and failure reporting for learning.
++  Integrate learned policies from `ml-pipeline`.
++  Deeper experimentation with reflective proof search.
+
+*AgdaJang is intentionally minimal today, but designed to grow alongside the agents that use it.*
+
+---
+
+## See Also
+
+* Root project README
+* `proof-parser/README.md`
+* `ml-pipeline/README.md`
+
