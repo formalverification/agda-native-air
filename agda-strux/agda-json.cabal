@@ -37,5 +37,7 @@ test-suite agda-json-tests
     , text
     , tasty
     , tasty-hunit
+    , temporary
   default-language: GHC2021
   ghc-options: -Wall
+  build-tool-depends: agda-json:agda-json

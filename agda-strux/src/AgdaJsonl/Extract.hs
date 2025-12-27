@@ -1,10 +1,13 @@
--- | src/AgdaJsonl/Extract.hs
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | Extract.hs
 --
 -- File: agda-backend-jsonl/src/AgdaJsonl/Extract.hs
 --
 -- Description:
---   Pure-ish extraction code: once Agda has parsed + typechecked a module,
---   we inspect the current signature and emit *one JSONL row per definition*.
+--   Extraction code: after Agda has checked a module (either by actual
+--   typechecking OR by loading a cached .agdai interface), we emit *one JSONL
+--   row per definition*.
 --
 --   This is the heart of issue #38:
 --
@@ -12,7 +15,16 @@
 --     +  We are asking Agda (as a library) what it accepted and what it
 --        computed as types for declarations.
 --
---   v0 output fields:
+--   Key design choice:
+--     We extract from the *Interface signature returned by typeCheckMain*,
+--     not from the global mutable state (getSignature).
+--
+--   Why this matters:
+--     When Agda loads a cached interface, it may not populate the same global
+--     signature/state that getSignature reads from, but typeCheckMain still
+--     returns a CheckResult containing the interface (and its signature).
+--
+--   Output fields (v0):
 --     - file    : input file path (as passed to CLI)
 --     - qname   : qualified name (pretty-printed by Agda)
 --     - type    : type of the definition (pretty-printed by Agda)
@@ -24,56 +36,85 @@
 --     - definition kind (data/record/function/postulate/...)
 --     - telescope/context info, etc.
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module AgdaJsonl.Extract
-  ( dumpSignatureAsJsonl
+  ( dumpCheckResultAsJsonl
   ) where
 
-import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (ord)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
-import System.IO (Handle, hPutStrLn)
+import System.IO (Handle, hPutStrLn, stderr)
 
 -- Agda internals (post-typechecking)
+import Agda.Interaction.Imports (CheckResult, crInterface)
 import Agda.TypeChecking.Monad (TCM)
-import Agda.TypeChecking.Monad.State (getSignature)
-import Agda.TypeChecking.Monad.Base (Signature(..), defType)
-import Agda.Syntax.Common.Pretty (prettyShow)
+-- import Agda.TypeChecking.Monad.State (getSignature)
+import Agda.TypeChecking.Monad.Base
+  ( Signature(..)
+  , Interface
+  , defType
+  , iSignature
+  )
+import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 
 --------------------------------------------------------------------------------
 -- Public API
 --------------------------------------------------------------------------------
 
--- | After `typeCheckMain`, dump one JSONL row per definition currently in scope.
+-- | Split a qualified name like "A.B.C.f" into ("A.B.C", "f").
+-- If there is no '.', we treat the whole thing as the name.
+splitQName :: T.Text -> (T.Text, T.Text)
+splitQName q =
+  let (modDot, nm) = T.breakOnEnd "." q
+  in if T.null modDot
+        then ("", q)
+        else (T.dropEnd 1 modDot, nm)  -- drop trailing '.'
+
+
+-- | After type-checking, dump one JSONL row per definition  currently in scope from
+-- the returned interface signature.
+--
+-- Returns the number of rows written. This is useful for tests and for
+-- debugging "successful run but empty output".
 --
 -- IMPORTANT:
 -- The signature is *global-ish*: after typechecking, it contains all the
 -- definitions Agda has loaded so far (including imports).
--- For v0, that’s fine: it’s still “one row per declaration Agda knows about”.
--- If we later want only the “main module’s declarations”, we’ll filter by module
+-- For v0, that's fine: it's still "one row per declaration Agda knows about."
+-- If we later want only the "main module's declarations," we'll filter by module
 -- name or by the interface of the main file.
-dumpSignatureAsJsonl :: Handle -> FilePath -> TCM ()
-dumpSignatureAsJsonl h file = do
-  sig <- getSignature
+dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> TCM Int
+dumpCheckResultAsJsonl h file cr = do
+  let iface :: Interface
+      iface = crInterface cr
 
-  -- Agda 2.8.x: Signature exposes `_sigDefinitions` (NOT `sigDefinitions`).
-  -- Your compile error and GHC hint confirm this field name.
-  let defs = HM.toList (_sigDefinitions sig)
+      sig :: Signature
+      sig = iSignature iface
+
+      -- Agda 2.8.x: Signature exposes `_sigDefinitions`
+      defs = HM.toList (_sigDefinitions sig)
+
+  -- Extra debug to stderr if we ever get an empty signature.
+  when (null defs) $
+    liftIO $ hPutStrLn stderr $
+      "agda-json DEBUG: interface signature has 0 definitions; output will be empty."
 
   forM_ defs $ \(qname, defn) -> do
-    qnTxt <- pp qname
-    tyTxt <- pp (defType defn)
+    let qnTxt = T.pack (prettyShow (pretty qname))   -- scope-independent, usually fully qualified
+        (modTxt, nameTxt) = splitQName qnTxt
+    tyTxt <- pp (defType defn)                       -- keep type pretty-printing in TCM
 
-    let astSize = cheapSize tyTxt
-        kind    = "definition"  -- v0 placeholder; refine later.
+    let astSize = T.length tyTxt
+        kind    = "definition"                       -- v0 placeholder; refine later.
 
         line =
           jsonObj
             [ ("file",    jsonStr (T.pack file))
+            , ("module",  jsonStr modTxt)
+            , ("name",    jsonStr nameTxt)
             , ("qname",   jsonStr qnTxt)
             , ("type",    jsonStr tyTxt)
             , ("kind",    jsonStr kind)
@@ -82,11 +123,14 @@ dumpSignatureAsJsonl h file = do
 
     liftIO $ hPutStrLn h (T.unpack line)
 
+  pure (length defs)
+
+
 --------------------------------------------------------------------------------
 -- Pretty printing inside TCM
 --------------------------------------------------------------------------------
 
--- | Pretty-print an Agda internal thing using Agda’s own pretty-printer,
+-- | Pretty-print an Agda internal thing using Agda's own pretty-printer,
 -- inside the typechecking monad.
 pp :: PrettyTCM a => a -> TCM T.Text
 pp x = do
@@ -133,6 +177,6 @@ hex4 n =
 jsonNum :: Int -> T.Text
 jsonNum = T.pack . show
 
--- | Cheap feature: the character length of some text.
-cheapSize :: T.Text -> Int
-cheapSize = T.length
+-- -- | Cheap feature: the character length of some text.
+-- cheapSize :: T.Text -> Int
+-- cheapSize = T.length

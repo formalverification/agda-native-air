@@ -1,4 +1,6 @@
--- | src/AgdaJsonl/Run.hs
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | Run.hs
 --
 -- File: agda-backend-jsonl/src/AgdaJsonl/Run.hs
 --
@@ -8,21 +10,35 @@
 --   This module has two jobs:
 --
 --   (1) Parse CLI arguments and open the output file handle.
---   (2) Enter Agda’s typechecking monad (TCM) in a way that:
+--   (2) Enter Agda's typechecking monad (TCM) in a way that:
 --       - sets include paths
---       - respects Agda library settings (from your nix shell’s libraries file)
+--       - respects Agda library settings (from nix shell's libraries file)
 --       - then runs a TCM action that does parse+typecheck+extract
 --
---   The rest of the project should treat this as "the executable boundary":
---   everything below `withAgda` is regular Agda API usage, not ad-hoc IO hacks.
-
-{-# LANGUAGE OverloadedStrings #-}
+--   The important part is: we run `typeCheckMain` ourselves, and then extract
+--   from the returned `CheckResult` (which works whether Agda typechecks from
+--   scratch OR loads a cached .agdai interface).
+--
+--   IMPORTANT NOTE ABOUT CACHES / .agdai:
+--
+--     Agda exposes an interactive driver API:
+--
+--       runAgdaWithOptions :: Interactor a -> String -> CommandLineOptions -> TCM a
+--
+--   where the Interactor is given two callbacks: `setup` and `check`.
+--   The `check` callback returns a CheckResult and is primarily intended for
+--   the interactive protocol.
+--
+--   Empirically (and consistent with Agda's own docs), relying on `check` does
+--   NOT reliably leave the TCM state populated the way we need for extraction
+--   (especially when interfaces are cached). Agda's own `interactionInteractor`
+--   ignores `check` and calls `typeCheckMain` directly. So we do the same.
 
 module AgdaJsonl.Run
   ( main
   ) where
 
-import Control.Monad (void, when)
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (nub)
 import System.Directory (doesFileExist, makeAbsolute)
@@ -45,7 +61,7 @@ import Agda.Interaction.Options (CommandLineOptions(..), defaultOptions)
 import Agda.Main (runAgdaWithOptions, runTCMPrettyErrors)
 import Agda.TypeChecking.Monad (TCM)
 import Agda.TypeChecking.Monad.Base (srcFromPath)
-import Agda.Utils.FileName (mkAbsolute, AbsolutePath, absolute)
+import Agda.Utils.FileName (mkAbsolute, AbsolutePath)
 
 --------------------------------------------------------------------------------
 -- CLI
@@ -63,9 +79,9 @@ usage = unlines
   , "  agda-json --input PATH --output OUT.jsonl [--include DIR]..."
   , ""
   , "Example:"
-  , "  agda-json --input proof-parser/src/test/resources/agda-example.agda \\"
+  , "  agda-json --input test/resources/Example.agda \\"
   , "           --output /tmp/out.jsonl \\"
-  , "           --include proof-parser/src/test/resources"
+  , "           --include test/resources"
   ]
 
 parseCli :: [String] -> Either String Cli
@@ -103,21 +119,35 @@ main = do
 -- One run: enter Agda, typecheck, dump JSONL
 --------------------------------------------------------------------------------
 
--- | Run Agda parse+typecheck, then dump JSONL.
---
--- We automatically include the input file’s directory in the include path,
--- because many Agda projects rely on relative imports rooted there.
 runOnce :: Handle -> Cli -> IO ()
 runOnce h cli = do
   let inputFile   = cliInput cli
       includeDirs = nub (takeDirectory inputFile : cliInclude cli)
 
-  withAgda includeDirs inputFile $ do
-    absPath <- mkAbs inputFile          -- AbsolutePath
-    sf      <- srcFromPath absPath      -- SourceFile
+  withAgda includeDirs inputFile $ \absInput absIncludes -> do
+    -- Parse + typecheck *explicitly* (do not rely on interactive `check`).
+    absPath <- mkAbs inputFile
+    sf      <- srcFromPath absPath
     src     <- parseSource sf
-    _cr     <- typeCheckMain TypeCheck src
-    Extract.dumpSignatureAsJsonl h inputFile
+    -- _iface  <- typeCheckMain TypeCheck src
+    -- Dump rows; if zero rows, treat as a hard failure with a helpful message.
+    -- IMPORTANT:
+    -- typeCheckMain returns a CheckResult containing the Interface even when
+    -- Agda uses an existing .agdai cache. We extract from that.
+    cr <- typeCheckMain TypeCheck src
+    n  <- Extract.dumpCheckResultAsJsonl h inputFile cr
+
+    when (n == 0) $
+      liftIO $ die $
+        unlines
+          [ "agda-json: typechecking succeeded, but extraction produced 0 rows."
+          , "This usually means the TCM signature is empty/unpopulated."
+          , "This indicates the interface signature had no definitions."
+          , "We expected at least some definitions after typeCheckMain."
+          , "input:       " <> inputFile
+          , "absInput:    " <> absInput
+          , "absIncludes: " <> show absIncludes
+          ]
 
 --------------------------------------------------------------------------------
 -- Small helpers
@@ -133,46 +163,37 @@ mkAbs fp = do
   absFp <- liftIO (makeAbsolute fp)
   pure (mkAbsolute absFp)
 
-
-
-
-
 --------------------------------------------------------------------------------
 -- Agda boot glue
 --------------------------------------------------------------------------------
 
--- | Enter Agda’s TCM with include paths configured, then run the provided TCM action.
+-- | Enter Agda's TCM with include paths configured, then run the provided TCM action.
 --
--- Implementation strategy:
+-- We run only `setup`  (to finalize options) from Agda’s interactor framework (from
+-- `runAgdaWithOptions`) because it performs internal option normalization (notably
+-- absolute include paths) and then immediately run our TCM action.
 --
---   * Build `CommandLineOptions` starting from `defaultOptions`.
---   * Use `runAgdaWithOptions` to initialize Agda and run an “interactor”.
---   * Our interactor ignores the interactive machinery and simply runs `tcmAction`.
---   * Wrap the whole thing in `runTCMPrettyErrors` so errors are rendered nicely.
---
--- Note: `runTCMPrettyErrors` runs a `TCM ()` in `IO ()`, so this function is
--- intentionally `IO ()`. That’s totally fine for our backend: the “result” is the
--- JSONL we stream to the output handle.
-withAgda :: [FilePath] -> FilePath -> TCM () -> IO ()
+-- We deliberately DO NOT call the interactive `check` callback:
+-- Agda's own docs show that `interactionInteractor` ignores `check` and calls
+-- `typeCheckMain` directly instead.
+withAgda :: [FilePath] -> FilePath -> (FilePath -> [FilePath] -> TCM ()) -> IO ()
 withAgda includeDirs inputFile tcmAction = do
-  -- Agda is picky about invariants on option paths; keep them absolute.
   absInput    <- makeAbsolute inputFile
   absIncludes <- mapM makeAbsolute includeDirs
 
-  let opts =
-        defaultOptions
-          { optProgramName  = "agda-json"
-          , optInputFile    = Just absInput
-          , optIncludePaths = absIncludes
-          }
+  let opts = defaultOptions
+        { optProgramName   = "agda-json"
+        , optInputFile     = Just absInput
+        , optIncludePaths  = absIncludes
+        -- We *do not* rely on optIgnoreInterfaces here; extraction works for
+        -- both cached and non-cached runs because we extract from CheckResult.
+        --, optIgnoreInterfaces     = True
+        --, optIgnoreAllInterfaces  = True
+        }
 
-      -- IMPORTANT: run the setup that fills optAbsoluteIncludePaths,
-      -- and (typically) check/typecheck the input file once.
-      interactor setup check = do
-        setup
-        inputAbs <- liftIO (absolute absInput)
-        void (check inputAbs)
-        tcmAction
+      interactor setup _check = do
+        _ <- setup
+        tcmAction absInput absIncludes
 
       tcmProgram :: TCM ()
       tcmProgram = runAgdaWithOptions interactor "agda-json" opts
