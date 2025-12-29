@@ -7,6 +7,7 @@
 .PHONY: test smoke clean
 
 test:
+	cabal update
 	cabal test
 
 # Runs the backend on the shared proof-parser test file.

@@ -176,7 +176,3 @@ hex4 n =
 -- | Render a JSON number (only Int for now).
 jsonNum :: Int -> T.Text
 jsonNum = T.pack . show
-
--- -- | Cheap feature: the character length of some text.
--- cheapSize :: T.Text -> Int
--- cheapSize = T.length
