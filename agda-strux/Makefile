@@ -1,7 +1,7 @@
 ##
-# agda-backend-json
+# agda-backend-jsonl
 #
-# @file agda-backend-json/Makefile
+# @file agda-backend-jsonl/Makefile
 # @version 0.1
 
 .PHONY: test smoke clean

@@ -1,6 +1,6 @@
 -- Example.agda
 --
--- File: agda-backend-json/tests/resources/Example.agda
+-- File: agda-backend-jsonl/test/resources/Example.agda
 --
 -- Description:
 -- This file contains a simple Agda module that defines a few basic functions

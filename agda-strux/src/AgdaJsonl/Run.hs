@@ -129,11 +129,11 @@ runOnce h cli = do
     absPath <- mkAbs inputFile
     sf      <- srcFromPath absPath
     src     <- parseSource sf
-    -- _iface  <- typeCheckMain TypeCheck src
     -- Dump rows; if zero rows, treat as a hard failure with a helpful message.
     -- IMPORTANT:
     -- typeCheckMain returns a CheckResult containing the Interface even when
-    -- Agda uses an existing .agdai cache. We extract from that.
+    -- Agda uses an existing .agdai cache. The Interface is then extracted
+    -- from that CheckResult when writing JSONL.
     cr <- typeCheckMain TypeCheck src
     n  <- Extract.dumpCheckResultAsJsonl h inputFile cr
 
@@ -187,6 +187,19 @@ withAgda includeDirs inputFile tcmAction = do
         , optIncludePaths  = absIncludes
         -- We *do not* rely on optIgnoreInterfaces here; extraction works for
         -- both cached and non-cached runs because we extract from CheckResult.
+        --
+        -- The two options below are intentionally kept commented out as a
+        -- reference for debugging / development:
+        --
+        --   * optIgnoreInterfaces    = True
+        --       Force Agda to ignore existing interface files and re-check
+        --       modules from source.
+        --   * optIgnoreAllInterfaces = True
+        --       Stronger variant that disables all interface reuse.
+        --
+        -- Enabling these may be useful when diagnosing cache-related issues
+        -- or forcing a clean recheck, but they should remain disabled in
+        -- normal runs so that interface caching works as intended.
         --, optIgnoreInterfaces     = True
         --, optIgnoreAllInterfaces  = True
         }

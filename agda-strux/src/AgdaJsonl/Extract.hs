@@ -50,7 +50,7 @@ import System.IO (Handle, hPutStrLn, stderr)
 -- Agda internals (post-typechecking)
 import Agda.Interaction.Imports (CheckResult, crInterface)
 import Agda.TypeChecking.Monad (TCM)
--- import Agda.TypeChecking.Monad.State (getSignature)
+
 import Agda.TypeChecking.Monad.Base
   ( Signature(..)
   , Interface
