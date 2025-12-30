@@ -22,11 +22,12 @@ import Control.Monad (forM_, forM, unless, when)
 import Data.Aeson (Value(..), eitherDecodeStrict')
 import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
-import Data.List (sort)
+import Data.List (sort, isInfixOf)
 import Data.Text qualified as T
+import Paths_agda_json (getDataFileName)
 import System.Directory
   ( copyFile, createDirectory, doesFileExist, findExecutable, getTemporaryDirectory
-  , listDirectory, removeFile, removePathForcibly
+  , createDirectoryIfMissing, listDirectory, removeFile, removePathForcibly
   )
 import System.Exit (ExitCode(..))
 import System.FilePath ((</>), takeDirectory)
@@ -43,6 +44,14 @@ tests :: TestTree
 tests = testGroup "agda-json"
   [ testCase "produces JSONL even when .agdai cache exists (isolated temp dir)"
       test_runs_twice_jsonl
+  , testCase "fails with usage when required args are missing"
+      test_missing_args
+  , testCase "fails when input file does not exist"
+      test_input_missing
+  , testCase "fails when include path is invalid"
+      test_bad_include
+  , testCase "fails on malformed Agda code"
+      test_malformed_agda
   ]
 
 test_runs_twice_jsonl :: Assertion
@@ -63,7 +72,7 @@ test_runs_twice_jsonl = do
           ]
 
   -- Source test input in repo
-  let srcInput = "test/resources/Example.agda"
+  srcInput <- getDataFileName "test/resources/Example.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
@@ -107,6 +116,136 @@ test_runs_twice_jsonl = do
           [ "[note] Example.agdai did NOT exist after first run."
           , "[note] temp dir contents: " <> show items
           ]
+
+
+
+--------------------------------------------------------------------------------
+-- Negative tests (fast, stable)
+--------------------------------------------------------------------------------
+
+getExe :: IO FilePath
+getExe = do
+  mExe <- findExecutable "agda-json"
+  case mExe of
+    Just p  -> pure p
+    Nothing -> do
+      mp <- lookupEnv "PATH"
+      assertFailure $
+        unlines
+          [ "Could not find build tool `agda-json` on PATH."
+          , "PATH=" <> maybe "<unset>" id mp
+          , "Hint: ensure the test-suite stanza includes:"
+          , "  build-tool-depends: agda-json:agda-json"
+          ]
+
+assertExitFailureWith :: String -> (ExitCode, String, String) -> Assertion
+assertExitFailureWith needle (code, stdout, stderr) =
+  case code of
+    ExitSuccess ->
+      assertFailure $
+        unlines
+          [ "Expected ExitFailure but got ExitSuccess"
+          , "stdout:\n" <> stdout
+          , "stderr:\n" <> stderr
+          ]
+    ExitFailure _ -> do
+      let hay = stdout <> "\n" <> stderr
+      assertBool ("Expected output to contain: " <> show needle) (needle `isInfixOf` hay)
+
+test_missing_args :: Assertion
+test_missing_args = do
+  exe <- getExe
+  r <- readProcessWithExitCode exe [] ""
+  assertExitFailureWith "Missing --input" r
+  assertExitFailureWith "Usage:" r
+
+test_input_missing :: Assertion
+test_input_missing = do
+  exe <- getExe
+  withTempDir "agda-json-missing-input" $ \dir -> do
+    let out = dir </> "out.jsonl"
+    r <- readProcessWithExitCode exe
+          [ "--input", dir </> "Nope.agda"
+          , "--output", out
+          , "--include", dir
+          ] ""
+    assertExitFailureWith "Input file does not exist" r
+
+test_bad_include :: Assertion
+test_bad_include = do
+  exe <- getExe
+  withTempDir "agda-json-bad-include" $ \dir -> do
+    -- We need a module that depends on a separate include dir, because
+    -- agda-json always includes the input file's directory automatically.
+    let mainDir = dir </> "main"
+        libDir  = dir </> "lib"
+        badInc  = dir </> "nope-include-dir"
+
+        depFile  = libDir  </> "Dep.agda"
+        mainFile = mainDir </> "Main.agda"
+
+        outOk  = dir </> "ok.jsonl"
+        outBad = dir </> "bad.jsonl"
+
+    createDirectoryIfMissing True mainDir
+    createDirectoryIfMissing True libDir
+
+    -- Dep lives ONLY in libDir.
+    BS.writeFile depFile $
+      "module Dep where\n\
+      \open import Agda.Builtin.Nat using (Nat; zero)\n\
+      \bar : Nat\n\
+      \bar = zero\n"
+
+    -- Main is in mainDir and imports Dep, which must be found via --include libDir.
+    BS.writeFile mainFile $
+      "module Main where\n\
+      \open import Dep\n\
+      \open import Agda.Builtin.Nat using (Nat)\n\
+      \use : Nat\n\
+      \use = bar\n"
+
+    -- Sanity: with correct include, it should succeed.
+    (codeOk, _so, _se) <- readProcessWithExitCode exe
+      [ "--input", mainFile
+      , "--output", outOk
+      , "--include", libDir
+      ] ""
+    case codeOk of
+      ExitFailure _ ->
+        assertFailure "Expected success when --include points to libDir, but agda-json failed."
+      ExitSuccess -> pure ()
+
+    -- Now: with a bad include, it should fail (Dep is not findable).
+    r <- readProcessWithExitCode exe
+      [ "--input", mainFile
+      , "--output", outBad
+      , "--include", badInc
+      ] ""
+    case r of
+      (ExitSuccess, _stdout, _stderr) ->
+        assertFailure "Expected failure when Dep cannot be found (bad --include), but command succeeded."
+      (ExitFailure _, stdout, stderr) -> do
+        let hay = stdout <> "\n" <> stderr
+        assertBool "Expected failure output to mention Dep" ("Dep" `isInfixOf` hay)
+
+test_malformed_agda :: Assertion
+test_malformed_agda = do
+  exe <- getExe
+  withTempDir "agda-json-malformed" $ \dir -> do
+    let input = dir </> "Bad.agda"
+        out   = dir </> "out.jsonl"
+    BS.writeFile input "this is not Agda\n"
+    r <- readProcessWithExitCode exe
+          [ "--input", input
+          , "--output", out
+          , "--include", dir
+          ] ""
+    case r of
+      (ExitSuccess, _stdout, _stderr) ->
+        assertFailure "Expected failure for malformed Agda input, but command succeeded."
+      _ -> pure ()
+
 
 
 

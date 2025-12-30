@@ -19,8 +19,8 @@ executable agda-json
     , text
     , unordered-containers
 
-  default-language: Haskell2010
-  ghc-options:      -Wall -Wcompat -Wincomplete-uni-patterns -O0
+  default-language: GHC2021
+  ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0
 
 
 test-suite agda-json-tests
@@ -39,5 +39,5 @@ test-suite agda-json-tests
     , tasty-hunit
     , temporary
   default-language: GHC2021
-  ghc-options: -Wall
+  ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0
   build-tool-depends: agda-json:agda-json
