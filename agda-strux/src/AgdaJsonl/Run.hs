@@ -49,7 +49,9 @@ import System.IO
   ( BufferMode(LineBuffering)
   , Handle
   , IOMode(WriteMode)
+  , hPutStrLn
   , hSetBuffering
+  , stderr
   , withFile
   )
 
@@ -135,18 +137,29 @@ runOnce h cli = do
     -- Agda uses an existing .agdai cache. The Interface is then extracted
     -- from that CheckResult when writing JSONL.
     cr <- typeCheckMain TypeCheck src
-    n  <- Extract.dumpCheckResultAsJsonl h inputFile cr
+    st  <- Extract.dumpCheckResultAsJsonl h inputFile cr
 
-    when (n == 0) $
+    -- Hard-fail ONLY if Agda produced an *empty interface signature*.
+    -- If dsWrittenDefs == 0, that can be legitimate (e.g. module is just reexports)
+    -- especially now that we filter to "main module only".
+    when (Extract.dsTotalDefs st == 0) $
       liftIO $ die $
         unlines
-          [ "agda-json: typechecking succeeded, but extraction produced 0 rows."
-          , "This usually means the TCM signature is empty/unpopulated."
-          , "This indicates the interface signature had no definitions."
-          , "We expected at least some definitions after typeCheckMain."
+          [ "agda-json: typechecking succeeded, but interface signature had 0 definitions."
+          , "This is unexpected and usually indicates the TCM signature is empty/unpopulated."
           , "input:       " <> inputFile
           , "absInput:    " <> absInput
           , "absIncludes: " <> show absIncludes
+          ]
+
+    when (Extract.dsWrittenDefs st == 0) $
+      liftIO $ hPutStrLn stderr $
+        unlines
+          [ "agda-json WARNING: extracted 0 rows for main module."
+          , "  mainModule:  " <> show (Extract.dsMainModule st)
+          , "  input:       " <> inputFile
+          , "  totalDefs:   " <> show (Extract.dsTotalDefs st)
+          , "This can be legitimate (re-export-only module), but we keep it visible."
           ]
 
 --------------------------------------------------------------------------------

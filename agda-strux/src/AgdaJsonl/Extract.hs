@@ -38,13 +38,16 @@
 
 module AgdaJsonl.Extract
   ( dumpCheckResultAsJsonl
+  , DumpStats(..)
   ) where
 
 import Control.Monad (forM_, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (ord)
+-- import Data.List (sortOn)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
+-- import System.FilePath (takeBaseName)
 import System.IO (Handle, hPutStrLn, stderr)
 
 -- Agda internals (post-typechecking)
@@ -64,6 +67,15 @@ import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 -- Public API
 --------------------------------------------------------------------------------
 
+-- | Small stats bundle so callers can distinguish:
+--   - "interface signature empty" (almost certainly a bug)
+--   - "module had 0 local definitions" (can be legitimate)
+data DumpStats = DumpStats
+  { dsMainModule  :: T.Text
+  , dsTotalDefs   :: Int
+  , dsWrittenDefs :: Int
+  }
+
 -- | Split a qualified name like "A.B.C.f" into ("A.B.C", "f").
 -- If there is no '.', we treat the whole thing as the name.
 splitQName :: T.Text -> (T.Text, T.Text)
@@ -81,12 +93,11 @@ splitQName q =
 -- debugging "successful run but empty output".
 --
 -- IMPORTANT:
--- The signature is *global-ish*: after typechecking, it contains all the
--- definitions Agda has loaded so far (including imports).
--- For v0, that's fine: it's still "one row per declaration Agda knows about."
--- If we later want only the "main module's declarations," we'll filter by module
--- name or by the interface of the main file.
-dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> TCM Int
+--   We now filter to ONLY definitions whose module == <main module>
+--   (derived from the input file basename). This excludes:
+--     - imported defs (stdlib, deps)
+--     - nested submodules (A.B.*) when the main module is A
+dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> TCM DumpStats
 dumpCheckResultAsJsonl h file cr = do
   let iface :: Interface
       iface = crInterface cr
@@ -95,10 +106,21 @@ dumpCheckResultAsJsonl h file cr = do
       sig = iSignature iface
 
       -- Agda 2.8.x: Signature exposes `_sigDefinitions`
-      defs = HM.toList (_sigDefinitions sig)
+      defsAll = HM.toList (_sigDefinitions sig)
+
+      mainMod :: T.Text
+      mainMod = T.pack (takeBaseName file)
+
+      isMainModuleDef (qname, _defn) =
+        let qnTxt            = T.pack (prettyShow (pretty qname))
+            (modTxt, _nmTxt) = splitQName qnTxt
+        in modTxt == mainMod
+
+      defsFiltered = filter isMainModuleDef defsAll
+      defs = sortOn (\(qname,_) -> T.pack (prettyShow (pretty qname))) defsFiltered
 
   -- Extra debug to stderr if we ever get an empty signature.
-  when (null defs) $
+  when (null defsAll) $
     liftIO $ hPutStrLn stderr $
       "agda-json DEBUG: interface signature has 0 definitions; output will be empty."
 
@@ -123,7 +145,12 @@ dumpCheckResultAsJsonl h file cr = do
 
     liftIO $ hPutStrLn h (T.unpack line)
 
-  pure (length defs)
+  pure $ DumpStats
+    { dsMainModule  = mainMod
+    , dsTotalDefs   = length defsAll
+    , dsWrittenDefs = length defs
+    }
+
 
 
 --------------------------------------------------------------------------------
