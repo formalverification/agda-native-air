@@ -51,8 +51,7 @@ package proofparser.extract
 import java.nio.file.{Files, Path, Paths}
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
-import scala.util.Using
+import scala.collection.JavaConverters._
 import scala.util.matching.Regex
 
 import upickle.default._
@@ -337,13 +336,16 @@ object AgdaExtractor {
   // ===========================================================================
 
   /** Write arbitrary entries as JSONL (generic, not specific to AgdaData). */
-  def writeAsJsonl[T: upickle.default.Writer](entries: Seq[T], out: Path): Unit = {
-    Using(Files.newBufferedWriter(out)) { writer =>
+    def writeAsJsonl[T: upickle.default.Writer](entries: Seq[T], out: Path): Unit = {
+    val writer = Files.newBufferedWriter(out)
+    try {
       entries.foreach { thm =>
         writer.write(upickle.default.write(thm))
         writer.newLine()
       }
-    }.get
+    } finally {
+      writer.close()
+    }
   }
 
 }

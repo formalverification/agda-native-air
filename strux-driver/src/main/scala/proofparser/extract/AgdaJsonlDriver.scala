@@ -48,18 +48,19 @@
 package proofparser.extract
 
 import cats.data.EitherT
-import cats.effect.{IO, IOApp, Resource}
+import cats.effect.{ExitCode, IO, IOApp, Resource}
+import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
-import scala.jdk.CollectionConverters._
+import scala.collection.JavaConverters._
 
 import upickle.default._
 
-object AgdaJsonlDriver extends IOApp.Simple {
+object AgdaJsonlDriver extends IOApp {
 
   // ---------------------------------------------------------------------------
   // Manifest model (uPickle)
@@ -363,7 +364,6 @@ object AgdaJsonlDriver extends IOApp.Simple {
   // ---------------------------------------------------------------------------
 
   // Spark encoders
-  implicit val encStr: Encoder[String]     = Encoders.STRING
   implicit val encRun: Encoder[ModuleRun]  = Encoders.product[ModuleRun]
 
   private def runWithSpark(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
@@ -401,8 +401,7 @@ object AgdaJsonlDriver extends IOApp.Simple {
   // IOApp entrypoint
   // ---------------------------------------------------------------------------
 
-  override def run: IO[Unit] = {
-    val args = sys.args.toList
+  override def run(args: List[String]): IO[ExitCode] = {
 
     val program: EitherT[IO, String, Unit] =
       for {
@@ -425,8 +424,8 @@ object AgdaJsonlDriver extends IOApp.Simple {
       } yield ()
 
     program.value.flatMap {
-      case Left(err) => IO.println(s"[AgdaJsonlDriver] ERROR: $err") >> IO.raiseError(new RuntimeException(err))
-      case Right(_)  => IO.unit
+      case Left(err) => IO.println(s"[AgdaJsonlDriver] ERROR: $err").as(ExitCode.Error)
+      case Right(_)  => IO.pure(ExitCode.Success)
     }
   }
 }

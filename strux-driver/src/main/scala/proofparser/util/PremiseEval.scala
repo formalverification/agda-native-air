@@ -53,7 +53,7 @@
 package proofparser.util
 
 import scala.io.Source
-import scala.util.{Try, Using}
+import scala.util.Try
 
 import upickle.default._
 import proofparser.schema.{ AgdaData, TrainGoal}
@@ -100,22 +100,26 @@ object PremiseEval {
   // ===========================================================================
 
   private def readJsonlVec[A: Reader](path: String): Either[String, Vector[A]] =
-    EitherUtil
-      .catchNonFatal {
-        Using.resource(Source.fromFile(path)) { src =>
-          src.getLines().iterator.zipWithIndex.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) {
-            case (Left(err), _) => Left(err)
-            case (Right(acc), (line, idx)) =>
-              val trimmed = line.trim
-              if (trimmed.isEmpty) Right(acc)
-              else
-                Try(read[A](trimmed)).toEither.left
-                  .map(e => s"$path:${idx + 1}: ${e.getMessage}")
-                  .map(v => acc :+ v)
-          }
+    Try {
+      val src = Source.fromFile(path)
+      try {
+        src.getLines().zipWithIndex.foldLeft[Either[String, Vector[A]]](Right(Vector.empty)) {
+          case (Left(err), _) => Left(err)
+          case (Right(acc), (line, idx)) =>
+            val trimmed = line.trim
+            if (trimmed.isEmpty) Right(acc)
+            else
+              Try(read[A](trimmed)).toEither.left
+                .map(e => s"$path:${idx + 1}: ${e.getMessage}")
+                .map(v => acc :+ v)
         }
+      } finally {
+        src.close()
       }
-      .flatten
+    }.toEither.left.map(_.getMessage) match {
+      case Left(err) => Left(err)
+      case Right(result) => result
+    }
 
   // ===========================================================================
   // Mode 1: single-file, frequency baselines
@@ -184,7 +188,9 @@ object PremiseEval {
         train.iterator
           .flatMap(_.premises)
           .toVector
-          .groupBy(identity).view.mapValues(_.size).toVector
+          .groupBy(identity)
+          .map { case (k, v) => (k, v.size) }
+          .toVector
           .sortBy { case (_, c) => -c }
           .map(_._1)
           .toVector
@@ -204,15 +210,16 @@ object PremiseEval {
 
       val byMod: Map[String, Vector[String]] = {
         val grouped = train.groupBy(_.module.getOrElse("<none>"))
-        grouped.view.mapValues { rs =>
-          rs.iterator
+        grouped.map { case (mod, rs) =>
+          val ranking = rs.iterator
             .flatMap(_.premises)
             .toVector
-            .groupBy(identity).view.mapValues(_.size).toVector
+            .groupBy(identity).view.map { case (k, v) => (k, v.size) }.toVector
             .sortBy { case (_, c) => -c }
             .map(_._1)
             .toVector
-        }.toMap
+          (mod, ranking)
+        }
       }
 
       new PerModuleFreq(global, byMod)
@@ -346,7 +353,7 @@ object PremiseEval {
       .filter(_.nonEmpty)
 
   private def tf(toks: Array[String]): Map[String, Int] =
-    toks.groupBy(identity).view.mapValues(_.length).toMap
+    toks.groupBy(identity).view.map { case (k, v) => (k, v.length) }.toMap
 
   private def dot(a: Map[String, Int], b: Map[String, Int]): Int =
     if (a.size <= b.size)

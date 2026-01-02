@@ -44,7 +44,6 @@
 package proofparser.util
 
 import scala.io.Source
-import scala.util.Using
 
 import upickle.default._
 import proofparser.schema._                // brings Row = AgdaData into scope
@@ -108,7 +107,7 @@ object DatasetStats {
 
     // declaration kinds
     val kindCounts =
-      rows.groupBy(_.declKind.asString).view.mapValues(_.size).toVector
+      rows.groupBy(_.declKind.asString).view.map { case (k, v) => (k, v.size) }.toVector
         .sortBy { case (_, c) => -c }
 
     b.append("\n--- Declaration Kinds ---\n")
@@ -118,7 +117,7 @@ object DatasetStats {
 
     // Premise histogram
     val premiseCounts =
-      rows.flatMap(_.premises).groupBy(identity).view.mapValues(_.size).toVector
+      rows.flatMap(_.premises).groupBy(identity).view.map { case (k, v) => (k, v.size) }.toVector
         .sortBy { case (_, c) => -c }
 
     b.append(s"\n--- Premises (top-$topK) ---\n")
@@ -129,7 +128,7 @@ object DatasetStats {
     // Modules histogram
     val moduleCounts =
       rows.map(_.module.getOrElse("<none>"))
-        .groupBy(identity).view.mapValues(_.size).toVector
+        .groupBy(identity).view.map { case (k, v) => (k, v.size) }.toVector
         .sortBy{ case (_, c) => -c }
 
     b.append(s"\n--- Modules (top-$topK) ---\n")
@@ -141,7 +140,7 @@ object DatasetStats {
     val premSizes =
       rows.map(_.premises.size)
     val premHist =
-      premSizes.groupBy(identity).view.mapValues(_.size).toVector.sortBy(_._1)
+      premSizes.groupBy(identity).view.map { case (k, v) => (k, v.size) }.toVector.sortBy(_._1)
 
     b.append("\n--- Premises-per-row distribution ---\n")
     premHist.foreach { case (k, n) =>
@@ -162,9 +161,11 @@ object DatasetStats {
   // ===========================================================================
 
   /** Read a JSONL file into a Vector[A] safely. */
-  private def readJsonlVec[A: Reader](path: String): Vector[A] =
-    Using.resource(Source.fromFile(path)) { src =>
-      src.getLines().iterator
+  /** Read a JSONL file into a Vector[A] safely. */
+  private def readJsonlVec[A: Reader](path: String): Vector[A] = {
+    val src = Source.fromFile(path)
+    try {
+      src.getLines()
         .map(_.trim)
         .filter(_.nonEmpty)
         .flatMap { line =>
@@ -172,8 +173,10 @@ object DatasetStats {
           scala.util.Try(read[A](line)).toOption
         }
         .toVector
+    } finally {
+      src.close()
     }
-
+  }
   // ===========================================================================
   //  Statistics helpers
   // ===========================================================================

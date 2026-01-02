@@ -17,8 +17,6 @@ package proofparser
 import java.nio.file.{ Files, Paths }
 import java.nio.charset.StandardCharsets
 
-import scala.util.Using
-
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -62,10 +60,13 @@ final class AgdaEndToEndSpec extends AnyFunSuite with Matchers {
 
     Files.write(agdaPath, agdaSource.getBytes(StandardCharsets.UTF_8))
 
-    val lines: List[String] =
-      Using.resource(scala.io.Source.fromFile(agdaPath.toFile, "UTF-8")) { src =>
-        src.getLines().toList
-      }
+    Files.write(agdaPath, agdaSource.getBytes(StandardCharsets.UTF_8))
+
+    val lines: List[String] = {
+      val src = scala.io.Source.fromFile(agdaPath.toFile, "UTF-8")
+      try src.getLines().toList
+      finally src.close()
+    }
 
     val rawRows: Vector[AgdaData] =
       AgdaExtractor.extractTheorems(
@@ -73,8 +74,6 @@ final class AgdaEndToEndSpec extends AnyFunSuite with Matchers {
         fileName   = agdaPath.toString,
         moduleName = Some("SimpleTheorems")
       )
-
-    // We expect the two lemma declarations above.
     rawRows.size shouldBe 2
 
     val normalized: Vector[AgdaData] = rawRows.map(AgdaDataOps.normalize)

@@ -53,7 +53,6 @@
 package proofparser.extract
 
 import java.nio.file.{Files, Paths, Path}
-import scala.util.Using
 
 import upickle.default._
 import proofparser.schema.AgdaData
@@ -84,13 +83,16 @@ object AgdaExtractorMain {
       paths.toVector.flatMap(parseAgdaFile)
 
     // Write JSONL
-    Using(Files.newBufferedWriter(out)) { w =>
+    // Write JSONL
+    val writer = Files.newBufferedWriter(out)
+    try {
       rows.foreach { r =>
-        w.write(write(r))
-        w.newLine()
+        writer.write(write(r))
+        writer.newLine()
       }
-    }.get
-
+    } finally {
+      writer.close()
+    }
     println(s"Extracted ${rows.size} rows to ${out.toAbsolutePath}")
   }
 }

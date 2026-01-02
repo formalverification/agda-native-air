@@ -33,6 +33,7 @@ package proofparser.extract
 
 import cats.effect.{IO, Resource}
 import cats.syntax.all._
+import cats.syntax.parallel._
 import fs2.Stream
 import fs2.io.file.{Files => Fs2Files, Path => Fs2Path}
 
@@ -50,7 +51,6 @@ object Proc {
     env: Map[String, String],
     logFile: Path
   ): IO[ExecResult] = {
-    val t0 = IO.monotonic
 
     val procR: Resource[IO, Process] =
       Resource.make {
@@ -75,18 +75,19 @@ object Proc {
     val logR: Resource[IO, java.io.OutputStream] =
       Resource.make(IO.blocking(Files.newOutputStream(logFile)))(os => IO.blocking(os.close()).handleError(_ => ()))
 
-    (procR, logR).tupled.use { case (p, out) =>
+    Resource.both(procR, logR).use { case (p, out) =>
       val in: Stream[IO, Byte] =
         fs2.io.readInputStream(IO.blocking(p.getInputStream), chunkSize = 64 * 1024, closeAfterUse = true)
 
       val writeLog: Stream[IO, Unit] =
-        in.through(Fs2Files[IO].writeOutputStream(IO.pure(out)))
+        in.through(fs2.io.writeOutputStream(IO.pure(out), closeAfterUse = false))
 
       for {
+        t0   <- IO.monotonic
         _    <- writeLog.compile.drain
         code <- IO.blocking(p.waitFor())
         t1   <- IO.monotonic
-      } yield ExecResult(exitCode = code, seconds = (t1 - t0.unsafeRunSync()).toNanos.toDouble / 1e9) // see note below
+      } yield ExecResult(exitCode = code, seconds = (t1 - t0).toNanos.toDouble / 1e9)
     }
   }
 
