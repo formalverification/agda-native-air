@@ -36,14 +36,16 @@
 
 module AgdaJsonl.Run
   ( main
+  , runJsonl
   ) where
-
+import Control.Exception (catch, throwIO)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (nub)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.Directory (doesFileExist, makeAbsolute)
 import System.Environment (getArgs)
-import System.Exit (die)
+import System.Exit (die, ExitCode(..))
 import System.FilePath (takeDirectory)
 import System.IO
   ( BufferMode(LineBuffering)
@@ -56,6 +58,7 @@ import System.IO
   )
 
 import qualified AgdaJsonl.Extract as Extract
+import qualified AgdaJsonl.Cli     as Cli
 
 -- Agda imports (2.8.0)
 import Agda.Interaction.Imports (parseSource, typeCheckMain, Mode(..))
@@ -66,65 +69,40 @@ import Agda.TypeChecking.Monad.Base (srcFromPath)
 import Agda.Utils.FileName (mkAbsolute, AbsolutePath)
 
 --------------------------------------------------------------------------------
--- CLI
---------------------------------------------------------------------------------
-
-data Cli = Cli
-  { cliInput   :: FilePath
-  , cliOutput  :: FilePath
-  , cliInclude :: [FilePath]
-  }
-
-usage :: String
-usage = unlines
-  [ "Usage:"
-  , "  agda-json --input PATH --output OUT.jsonl [--include DIR]..."
-  , ""
-  , "Example:"
-  , "  agda-json --input test/resources/Example.agda \\"
-  , "           --output /tmp/out.jsonl \\"
-  , "           --include test/resources"
-  ]
-
-parseCli :: [String] -> Either String Cli
-parseCli xs =
-  let go acc [] = Right acc
-      go acc ("--include":d:rest) = go (acc { cliInclude = cliInclude acc <> [d] }) rest
-      go acc ("--input":f:rest)   = go (acc { cliInput   = f }) rest
-      go acc ("--output":o:rest)  = go (acc { cliOutput  = o }) rest
-      go _   bad                  = Left ("Unrecognized args: " <> show bad)
-      seed = Cli "" "" []
-  in do
-    c <- go seed xs
-    when (null (cliInput c))  (Left "Missing --input")
-    when (null (cliOutput c)) (Left "Missing --output")
-    pure c
-
---------------------------------------------------------------------------------
 -- Entry
 --------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
   args <- getArgs
-  cli  <- either (\e -> die (e <> "\n\n" <> usage)) pure (parseCli args)
+  cli  <- either (\e -> die (e <> "\n\n" <> Cli.usage)) pure (Cli.parseCli args)
+  _    <- runJsonl (Cli.cliInput cli) (Cli.cliOutput cli) (Cli.cliInclude cli)
+  pure ()
 
-  ok <- doesFileExist (cliInput cli)
+-- | In-process API for tests and future batch drivers.
+--
+-- This function:
+--   + validates the input file exists,
+--   + opens the output file handle,
+--   + boots Agda and runs extraction,
+--   + returns extraction statistics.
+runJsonl :: FilePath -> FilePath -> [FilePath] -> IO Extract.DumpStats
+runJsonl inputFile outputFile extraIncludes = do
+  ok <- doesFileExist inputFile
   when (not ok) $
-    die ("Input file does not exist: " <> cliInput cli)
+    die $ "agda-json: Input file does not exist: " <> inputFile
 
-  withFile (cliOutput cli) WriteMode $ \h -> do
+  withFile outputFile WriteMode $ \h -> do
     hSetBuffering h LineBuffering
-    runOnce h cli
+    runOnce h inputFile extraIncludes
 
 --------------------------------------------------------------------------------
 -- One run: enter Agda, typecheck, dump JSONL
 --------------------------------------------------------------------------------
 
-runOnce :: Handle -> Cli -> IO ()
-runOnce h cli = do
-  let inputFile   = cliInput cli
-      includeDirs = nub (takeDirectory inputFile : cliInclude cli)
+runOnce :: Handle -> FilePath -> [FilePath] -> IO Extract.DumpStats
+runOnce h inputFile extraIncludes = do
+  let includeDirs = nub (takeDirectory inputFile : extraIncludes)
 
   withAgda includeDirs inputFile $ \absInput absIncludes -> do
     -- Parse + typecheck *explicitly* (do not rely on interactive `check`).
@@ -162,6 +140,8 @@ runOnce h cli = do
           , "This can be legitimate (re-export-only module), but we keep it visible."
           ]
 
+    pure st
+
 --------------------------------------------------------------------------------
 -- Small helpers
 --------------------------------------------------------------------------------
@@ -180,48 +160,53 @@ mkAbs fp = do
 -- Agda boot glue
 --------------------------------------------------------------------------------
 
--- | Enter Agda's TCM with include paths configured, then run the provided TCM action.
+-- | Enter Agda's TCM with include paths configured, run the provided TCM action,
+--   and return its result.
 --
--- We run only `setup`  (to finalize options) from Agda’s interactor framework (from
--- `runAgdaWithOptions`) because it performs internal option normalization (notably
--- absolute include paths) and then immediately run our TCM action.
---
--- We deliberately DO NOT call the interactive `check` callback:
--- Agda's own docs show that `interactionInteractor` ignores `check` and calls
--- `typeCheckMain` directly instead.
-withAgda :: [FilePath] -> FilePath -> (FilePath -> [FilePath] -> TCM ()) -> IO ()
+-- Implementation note:
+--   Agda's executable-oriented runner may terminate with `exitSuccess`,
+--   which is implemented as throwing `ExitSuccess`. In library/test use, we
+--   treat ExitSuccess as normal completion, so `runAgda` runs a `TCM ()` program and
+--   returns a value by storing the action's result in an IORef and then reading it
+--   back after the Agda run finishes.
+runAgda :: TCM () -> IO ()
+runAgda prog =
+  runTCMPrettyErrors prog `catch` \e -> case e of
+    ExitSuccess   -> pure ()      -- Agda sometimes ends runs via exitSuccess
+    ExitFailure _ -> throwIO e
+
+withAgda :: [FilePath] -> FilePath -> (FilePath -> [FilePath] -> TCM a) -> IO a
 withAgda includeDirs inputFile tcmAction = do
   absInput    <- makeAbsolute inputFile
   absIncludes <- mapM makeAbsolute includeDirs
+
+  resultRef :: IORef (Maybe a) <- newIORef Nothing
 
   let opts = defaultOptions
         { optProgramName   = "agda-json"
         , optInputFile     = Just absInput
         , optIncludePaths  = absIncludes
-        -- We *do not* rely on optIgnoreInterfaces here; extraction works for
-        -- both cached and non-cached runs because we extract from CheckResult.
-        --
-        -- The two options below are intentionally kept commented out as a
-        -- reference for debugging / development:
-        --
-        --   * optIgnoreInterfaces    = True
-        --       Force Agda to ignore existing interface files and re-check
-        --       modules from source.
-        --   * optIgnoreAllInterfaces = True
-        --       Stronger variant that disables all interface reuse.
-        --
-        -- Enabling these may be useful when diagnosing cache-related issues
-        -- or forcing a clean recheck, but they should remain disabled in
-        -- normal runs so that interface caching works as intended.
-        --, optIgnoreInterfaces     = True
-        --, optIgnoreAllInterfaces  = True
         }
 
+      -- Interactor must return () for runTCMPrettyErrors.
       interactor setup _check = do
         _ <- setup
-        tcmAction absInput absIncludes
+        r <- tcmAction absInput absIncludes
+        liftIO (writeIORef resultRef (Just r))
+        pure ()
 
-      tcmProgram :: TCM ()
       tcmProgram = runAgdaWithOptions interactor "agda-json" opts
 
-  runTCMPrettyErrors tcmProgram
+  -- Run Agda (prints pretty errors if it fails).
+  runAgda tcmProgram
+
+  -- Recover the result.
+  mr <- readIORef resultRef
+  case mr of
+    Just r  -> pure r
+    Nothing ->
+      die $
+        unlines
+          [ "agda-json: internal error: Agda run completed but produced no result."
+          , "input: " <> inputFile
+          ]

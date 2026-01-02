@@ -34,5 +34,4 @@ smoke:
 	echo "[smoke] first 5 lines:"; \
 	head -n 5 "$$out"
 
-
 # end

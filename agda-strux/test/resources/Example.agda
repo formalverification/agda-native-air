@@ -11,8 +11,15 @@ module Example where
 open import Agda.Builtin.Nat      using (Nat; zero; suc)
 open import Agda.Builtin.Equality using (_≡_; refl)
 
-foo : Nat
-foo = suc zero
+foo : Nat → Nat
+foo n = suc n
 
-foo-id : foo ≡ suc zero
-foo-id = refl
+foo-id : Nat → Nat
+foo-id n = n
+
+foo-id-correct : (n : Nat) → foo-id n ≡ n
+foo-id-correct n = refl
+
+module Nested where
+  bar : Nat
+  bar = zero

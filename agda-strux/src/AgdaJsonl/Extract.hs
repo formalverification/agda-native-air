@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE LambdaCase #-}
 -- | Extract.hs
 --
 -- File: agda-backend-jsonl/src/AgdaJsonl/Extract.hs
@@ -43,11 +43,12 @@ module AgdaJsonl.Extract
 
 import Control.Monad (forM_, when)
 import Control.Monad.IO.Class (liftIO)
-import Data.Char (ord)
--- import Data.List (sortOn)
+import Data.Char (ord, isLetter, isAlphaNum)
+import Data.List (sortOn)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
--- import System.FilePath (takeBaseName)
+import qualified Data.Set as Set
+import System.FilePath (takeBaseName)
 import System.IO (Handle, hPutStrLn, stderr)
 
 -- Agda internals (post-typechecking)
@@ -57,16 +58,45 @@ import Agda.TypeChecking.Monad (TCM)
 import Agda.TypeChecking.Monad.Base
   ( Signature(..)
   , Interface
+  , Definition
   , defType
+  , theDef
+  , Defn(..)
   , iSignature
   )
 import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 
---------------------------------------------------------------------------------
--- Public API
---------------------------------------------------------------------------------
 
+
+-- ================================================================================
+-- Public API
+-- ================================================================================
+
+-- ------------------------------------------------------------------------------
+-- | v0.1: defKind
+--
+-- A coarse classification of Agda definitions.  We keep this stable for downstream
+-- consumers; anything we don't recognize is "other".
+--
+defKindOf :: Definition -> T.Text
+defKindOf = defKindOfDefn . theDef
+
+-- | Map Agda's internal definition constructors to our stable schema enum.
+--   Anything unfamiliar collapses to "other".
+defKindOfDefn :: Defn -> T.Text
+defKindOfDefn = \case
+  FunctionDefn{}      -> "function"
+  DatatypeDefn{}      -> "data"
+  RecordDefn{}        -> "record"
+  ConstructorDefn{}   -> "constructor"
+  AxiomDefn{}         -> "postulate"
+  PrimitiveDefn{}     -> "primitive"
+  PrimitiveSortDefn{} -> "primitive"
+  AbstractDefn d      -> defKindOfDefn d
+  _                   -> "other"
+
+-- ------------------------------------------------------------------------------
 -- | Small stats bundle so callers can distinguish:
 --   - "interface signature empty" (almost certainly a bug)
 --   - "module had 0 local definitions" (can be legitimate)
@@ -86,6 +116,59 @@ splitQName q =
         else (T.dropEnd 1 modDot, nm)  -- drop trailing '.'
 
 
+--------------------------------------------------------------------------------
+-- v0.1: dependencies (stable version)
+--------------------------------------------------------------------------------
+
+-- | Extract a coarse list of "dependency-like" identifiers from the pretty-printed type.
+--
+-- This is intentionally stable across Agda internal API changes:
+--   - We still rely on Agda to *compute* the type (semantic),
+--   - but we avoid importing / pattern matching on internal Term constructors.
+--
+-- Heuristic:
+--   * tokenize into identifier-ish chunks
+--   * keep tokens that look like names (start with a letter) and are not tiny noise
+--   * return unique tokens (sorted) for determinism
+--
+-- Implementation Note: dependencies are currently extracted heuristically from the
+-- pretty-printed type (v0.1), not from internal term traversal.
+dependenciesFromTypeText :: T.Text -> [T.Text]
+dependenciesFromTypeText =
+  Set.toList
+    . Set.fromList
+    . filter keep
+    . tokenize
+  where
+    keep tok =
+      T.length tok >= 2
+        && isLetter (T.head tok)
+        && tok `notElem`
+            [ "Set", "Prop", "Type"
+            , "∀", "forall"
+            ]
+
+-- | Tokenize into chunks of letters/digits/._'
+-- (Unicode letters are handled by 'isLetter'.)
+tokenize :: T.Text -> [T.Text]
+tokenize =
+  go [] T.empty
+  where
+    ok c = isAlphaNum c || c == '_' || c == '\'' || c == '.'
+
+    go acc cur txt =
+      case T.uncons txt of
+        Nothing ->
+          let acc' = if T.null cur then acc else cur : acc
+          in reverse acc'
+        Just (c, rest)
+          | ok c      -> go acc (T.snoc cur c) rest
+          | T.null cur -> go acc cur rest
+          | otherwise -> go (cur : acc) T.empty rest
+
+
+
+-- ------------------------------------------------------------------------------
 -- | After type-checking, dump one JSONL row per definition  currently in scope from
 -- the returned interface signature.
 --
@@ -130,8 +213,9 @@ dumpCheckResultAsJsonl h file cr = do
     tyTxt <- pp (defType defn)                       -- keep type pretty-printing in TCM
 
     let astSize = T.length tyTxt
-        kind    = "definition"                       -- v0 placeholder; refine later.
-
+        kind    = "definition"    --  keep existing field stable
+        defKind = defKindOf defn
+        deps    = dependenciesFromTypeText tyTxt
         line =
           jsonObj
             [ ("file",    jsonStr (T.pack file))
@@ -140,6 +224,8 @@ dumpCheckResultAsJsonl h file cr = do
             , ("qname",   jsonStr qnTxt)
             , ("type",    jsonStr tyTxt)
             , ("kind",    jsonStr kind)
+            , ("defKind", jsonStr defKind)
+            , ("dependencies", jsonArr (map jsonStr deps))
             , ("astSize", jsonNum astSize)
             ]
 
@@ -153,22 +239,23 @@ dumpCheckResultAsJsonl h file cr = do
 
 
 
---------------------------------------------------------------------------------
--- Pretty printing inside TCM
---------------------------------------------------------------------------------
-
--- | Pretty-print an Agda internal thing using Agda's own pretty-printer,
+-- ------------------------------------------------------------------------------
+-- | Pretty printing inside TCM
+--
+-- Pretty-print an Agda internal thing using Agda's own pretty-printer,
 -- inside the typechecking monad.
 pp :: PrettyTCM a => a -> TCM T.Text
 pp x = do
   doc <- prettyTCM x
   pure (T.pack (prettyShow doc))
 
---------------------------------------------------------------------------------
--- Tiny JSON encoder (no extra deps)
---------------------------------------------------------------------------------
 
--- | Render a JSON object from already-rendered JSON values.
+
+
+-- ------------------------------------------------------------------------------
+-- | Tiny JSON encoder (no extra deps)
+--
+-- Render a JSON object from already-rendered JSON values.
 -- (Keys are rendered as JSON strings.)
 jsonObj :: [(T.Text, T.Text)] -> T.Text
 jsonObj kvs =
@@ -190,6 +277,14 @@ jsonStr t = "\"" <> escape t <> "\""
       | ord c < 0x20 = T.pack ("\\u" <> hex4 (ord c))
       | otherwise    = T.singleton c
 
+-- | Render a JSON array from already-rendered JSON values.
+jsonArr :: [T.Text] -> T.Text
+jsonArr xs = "[" <> T.intercalate "," xs <> "]"
+
+-- | Render a JSON number (only Int for now).
+jsonNum :: Int -> T.Text
+jsonNum = T.pack . show
+
 -- | Render a codepoint as four hex digits.
 hex4 :: Int -> String
 hex4 n =
@@ -200,6 +295,3 @@ hex4 n =
       d3 = h !! (n `mod` 16)
   in [d0, d1, d2, d3]
 
--- | Render a JSON number (only Int for now).
-jsonNum :: Int -> T.Text
-jsonNum = T.pack . show

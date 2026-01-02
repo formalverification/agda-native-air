@@ -1,43 +1,52 @@
-cabal-version:      3.16
+cabal-version:      3.0
 name:               agda-json
 version:            0.1.0.0
 build-type:         Simple
 data-files: test/resources/Example.agda
 
-executable agda-json
-  main-is:          Main.hs
-  hs-source-dirs:   app, src
-  other-modules:
-    AgdaJsonl.Run
-    AgdaJsonl.Extract
+library
+  hs-source-dirs: src
+  exposed-modules:
+      AgdaJsonl.Run
+      AgdaJsonl.Extract
+      AgdaJsonl.Cli
   build-depends:
       base >= 4.18 && < 5
     , Agda == 2.8.0
     , containers
-    , filepath
     , directory
+    , filepath
     , text
     , unordered-containers
-
   default-language: GHC2021
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0
 
+executable agda-json
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:
+      base >= 4.18 && < 5
+    , agda-json
+  default-language: GHC2021
+  ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0
 
 test-suite agda-json-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Spec.hs
+  other-modules:
+      Paths_agda_json
   build-depends:
       base >= 4.18 && < 5
     , aeson
     , bytestring
     , directory
     , filepath
-    , process
     , text
     , tasty
     , tasty-hunit
-    , temporary
+    , agda-json
   default-language: GHC2021
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0
   build-tool-depends: agda-json:agda-json
+  autogen-modules: Paths_agda_json
