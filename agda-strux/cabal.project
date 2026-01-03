@@ -3,7 +3,7 @@ packages: .
 
 -- Reproducible solving: pin the Hackage index snapshot Cabal uses.
 -- You can update this occasionally (or pin it to the date you freeze deps).
-index-state: 2025-12-29T00:00:00Z
+-- index-state: 2025-12-29T00:00:00Z
 
 -- Keep the repo clean when using `cabal repl` etc.
 write-ghc-environment-files: never

@@ -178,10 +178,11 @@ withTempDir prefix action = do
   createDirectory fp
   keep <- lookupEnv "KEEP_TEST_DIR"
   let cleanup =
-    case keep of
-      Just _  -> pure ()          -- keep for debugging
-      Nothing -> removePathForcibly fp
+        case keep of
+          Just _  -> pure ()          -- keep for debugging
+          Nothing -> removePathForcibly fp
   action fp `finally` cleanup
+
 
 setupAgdaDir :: FilePath -> IO FilePath
 setupAgdaDir dir = do
