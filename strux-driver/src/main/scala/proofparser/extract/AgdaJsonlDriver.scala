@@ -50,6 +50,7 @@ package proofparser.extract
 import cats.data.EitherT
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import cats.effect.unsafe.implicits.global
+import cats.effect.implicits._
 import cats.syntax.all._
 
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
@@ -108,8 +109,47 @@ object AgdaJsonlDriver extends IOApp {
     outDir: Path,
     agdaJsonBin: Path,
     parallelism: Int,
-    resume: Boolean
+    resume: Boolean,
+    sparkMaster: Option[String]
   )
+
+  final case class ConfigData(
+    projectRoot: String,
+    agdaDir: String,
+    srcDir: String,
+    modulesFile: String,
+    outDir: String,
+    agdaJsonBin: String,
+    parallelism: Int,
+    resume: Boolean,
+    sparkMaster: Option[String]
+  ) extends Serializable
+
+  private def toData(cfg: Config): ConfigData =
+    ConfigData(
+      cfg.projectRoot.toString,
+      cfg.agdaDir.toString,
+      cfg.srcDir.toString,
+      cfg.modulesFile.toString,
+      cfg.outDir.toString,
+      cfg.agdaJsonBin.toString,
+      cfg.parallelism,
+      cfg.resume,
+      cfg.sparkMaster
+    )
+
+  private def fromData(d: ConfigData): Config =
+    Config(
+      projectRoot = Paths.get(d.projectRoot),
+      agdaDir     = Paths.get(d.agdaDir),
+      srcDir      = Paths.get(d.srcDir),
+      modulesFile = Paths.get(d.modulesFile),
+      outDir      = Paths.get(d.outDir),
+      agdaJsonBin = Paths.get(d.agdaJsonBin),
+      parallelism = d.parallelism,
+      resume      = d.resume,
+      sparkMaster = d.sparkMaster
+    )
 
   private val usage: String =
     """Usage:
@@ -158,6 +198,9 @@ object AgdaJsonlDriver extends IOApp {
         case "--parallelism" :: v :: tail =>
           go(tail, acc.updated("parallelism", v))
 
+        case "--spark-master" :: v :: tail =>
+          go(tail, acc.updated("sparkMaster", v))
+
         case bad =>
           Left(s"Unrecognized or incomplete args near: ${bad.take(2).mkString(" ")}\n\n$usage")
       }
@@ -186,7 +229,8 @@ object AgdaJsonlDriver extends IOApp {
           outDir      = Paths.get(od).toAbsolutePath.normalize(),
           agdaJsonBin = Paths.get(bin).toAbsolutePath.normalize(),
           parallelism = par,
-          resume      = res
+          resume      = res,
+          sparkMaster = m.get("sparkMaster")
         )
       }
     }
@@ -196,10 +240,14 @@ object AgdaJsonlDriver extends IOApp {
   // Spark session as Resource (explicit lifecycle)
   // ---------------------------------------------------------------------------
 
-  private def sparkResource(appName: String): Resource[IO, SparkSession] =
+  private def sparkResource(appName: String, master: String): Resource[IO, SparkSession] =
     Resource.make {
       IO.blocking {
-        SparkSession.builder().appName(appName).getOrCreate()
+        SparkSession.builder()
+          .appName(appName)
+          .master(master)
+          .config("spark.ui.enabled", "false")
+          .getOrCreate()
       }
     } { spark =>
       IO.blocking(spark.stop()).handleError(_ => ())
@@ -366,13 +414,19 @@ object AgdaJsonlDriver extends IOApp {
   // Spark encoders
   implicit val encRun: Encoder[ModuleRun]  = Encoders.product[ModuleRun]
 
-  private def runWithSpark(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
-    sparkResource("AgdaJsonlDriver").use { spark =>
+  private def runWithSpark(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] = {
+    val master =
+      cfg.sparkMaster
+        .orElse(sys.env.get("SPARK_MASTER"))
+        .orElse(Option(System.getProperty("spark.master")))
+        .getOrElse("local[*]")
+
+    sparkResource("AgdaJsonlDriver", master).use { spark =>
       import spark.implicits._
 
       IO.blocking {
         // Broadcast config to executors (pure data).
-        val bc = spark.sparkContext.broadcast(cfg)
+        val bc = spark.sparkContext.broadcast(toData(cfg))
 
         // Dataset so we can evolve into DataFrame-based monitoring later.
         val ds: Dataset[String] =
@@ -383,7 +437,7 @@ object AgdaJsonlDriver extends IOApp {
         // in runOne, but Spark requires a concrete value in executor code.
         val out: Array[ModuleRun] =
           ds.mapPartitions { it =>
-              val localCfg = bc.value
+              val localCfg = fromData(bc.value)
               it.toList.iterator.map { mod =>
                 // Spark boundary "escape hatch":
                 // - runOne is IO[ModuleRun]
@@ -396,6 +450,11 @@ object AgdaJsonlDriver extends IOApp {
         out.toVector
       }
     }
+  }
+
+  private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
+    modules.parTraverseN(cfg.parallelism)(mod => runOne(cfg, mod))
+
 
   // ---------------------------------------------------------------------------
   // IOApp entrypoint
@@ -413,7 +472,7 @@ object AgdaJsonlDriver extends IOApp {
         mods <- EitherT.right(readTopLevelModules(cfg.modulesFile))
         _    <- EitherT.cond[IO](mods.nonEmpty, (), s"No top-level modules found in: ${cfg.modulesFile}")
         t0   <- EitherT.right(IO.delay(Instant.now().toString))
-        res  <- EitherT.right(runWithSpark(cfg, mods))
+        res  <- EitherT.right(runLocally(cfg, mods))
         t1   <- EitherT.right(IO.delay(Instant.now().toString))
         mf   <- EitherT.right(writeManifest(cfg, t0, t1, res))
         okN   = res.count(_.ok)

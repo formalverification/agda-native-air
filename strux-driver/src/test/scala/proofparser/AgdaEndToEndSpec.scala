@@ -60,8 +60,6 @@ final class AgdaEndToEndSpec extends AnyFunSuite with Matchers {
 
     Files.write(agdaPath, agdaSource.getBytes(StandardCharsets.UTF_8))
 
-    Files.write(agdaPath, agdaSource.getBytes(StandardCharsets.UTF_8))
-
     val lines: List[String] = {
       val src = scala.io.Source.fromFile(agdaPath.toFile, "UTF-8")
       try src.getLines().toList
