@@ -52,6 +52,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 import upickle.default._
 
@@ -74,7 +75,53 @@ object AgdaJsonlDriver extends IOApp {
     validateOk: Boolean,
     validateErrors: Vector[String]
   )
-  object ModuleRun { implicit val rw: ReadWriter[ModuleRun] = macroRW }
+
+  object ModuleRun {
+    // Custom writer to avoid uPickle Option encoding ([] / [n]).
+    // Policy: omit "exitCode" when None; write a number when Some(n).
+    implicit val rw: ReadWriter[ModuleRun] =
+      upickle.default.readwriter[ujson.Value].bimap[ModuleRun](
+        r => {
+          val fields = mutable.LinkedHashMap.empty[String, ujson.Value]
+          fields += "module"         -> ujson.Str(r.module)
+          fields += "inputFile"      -> ujson.Str(r.inputFile)
+          fields += "outputFile"     -> ujson.Str(r.outputFile)
+          fields += "logFile"        -> ujson.Str(r.logFile)
+          fields += "skipped"        -> ujson.Bool(r.skipped)
+          fields += "ok"             -> ujson.Bool(r.ok)
+          r.exitCode.foreach(ec => fields += "exitCode" -> ujson.Num(ec))
+          fields += "seconds"        -> ujson.Num(r.seconds)
+          fields += "rows"           -> ujson.Num(r.rows.toDouble)
+          fields += "validateOk"     -> ujson.Bool(r.validateOk)
+          fields += "validateErrors" -> ujson.Arr(r.validateErrors.map(ujson.Str(_)))
+          ujson.Obj.from(fields)
+        },
+        json => {
+          val o = json.obj
+          def str(k: String): String = o(k).str
+          def bool(k: String): Boolean = o(k).bool
+          def numDouble(k: String): Double = o(k).num
+          def numLong(k: String): Long = o(k).num.toLong
+          def optInt(k: String): Option[Int] = o.get(k).map(_.num.toInt)
+          def vecStr(k: String): Vector[String] =
+            o.get(k).map(_.arr.toVector.map(_.str)).getOrElse(Vector.empty)
+
+          ModuleRun(
+            module         = str("module"),
+            inputFile      = str("inputFile"),
+            outputFile     = str("outputFile"),
+            logFile        = str("logFile"),
+            skipped        = bool("skipped"),
+            ok             = bool("ok"),
+            exitCode       = optInt("exitCode"),
+            seconds        = numDouble("seconds"),
+            rows           = numLong("rows"),
+            validateOk     = bool("validateOk"),
+            validateErrors = vecStr("validateErrors")
+          )
+        }
+      )
+  }
 
   final case class RunManifest(
     startedAt: String,
@@ -89,8 +136,9 @@ object AgdaJsonlDriver extends IOApp {
     resume: Boolean,
     runner: String,
     sparkMaster: String,
-    results: Vector[ModuleRun]
-  )
+    failOnError: Boolean
+  ) extends Serializable
+
   object RunManifest { implicit val rw: ReadWriter[RunManifest] = macroRW }
 
   // ---------------------------------------------------------------------------
@@ -122,7 +170,8 @@ object AgdaJsonlDriver extends IOApp {
     parallelism: Int,
     resume: Boolean,
     runner: Runner,
-    sparkMaster: String
+    sparkMaster: String,
+    failOnError : Boolean = true
   )
 
   final case class ConfigData(
@@ -134,7 +183,8 @@ object AgdaJsonlDriver extends IOApp {
     agdaJsonBin: String,
     parallelism: Int,
     resume: Boolean,
-    sparkMaster: String
+    sparkMaster: String,
+    failOnError : Boolean
   ) extends Serializable
 
   private def toData(c: Config): ConfigData =
@@ -147,7 +197,8 @@ object AgdaJsonlDriver extends IOApp {
       c.agdaJsonBin.toString,
       c.parallelism,
       c.resume,
-      c.sparkMaster
+      c.sparkMaster,
+      c.failOnError
     )
 
   private def fromData(d: ConfigData): Config =
@@ -161,7 +212,8 @@ object AgdaJsonlDriver extends IOApp {
       d.parallelism,
       d.resume,
       runner = Runner.Spark, // only used inside Spark executors; not read there
-      sparkMaster = d.sparkMaster
+      sparkMaster = d.sparkMaster,
+      failOnError = d.failOnError
     )
 
   private val usage: String =
@@ -176,6 +228,7 @@ object AgdaJsonlDriver extends IOApp {
       |    [--parallelism N] [--no-resume]
       |    [--runner spark|local|spark2]
       |    [--spark-master local[*]]
+      |    [--fail-on-error true|false]
       |
       |Notes:
       |  - Only TOP-LEVEL modules are run (no dots in name).
@@ -186,6 +239,13 @@ object AgdaJsonlDriver extends IOApp {
     def next(i: Int): Either[String, String] =
       args.lift(i + 1).toRight(s"Missing value after ${args(i)}\n\n$usage")
 
+    def normBool(s: String): Option[String] =
+      s.toLowerCase match {
+        case "true" | "1" | "yes" | "y"  => Some("true")
+        case "false" | "0" | "no" | "n"  => Some("false")
+        case _                           => None
+      }
+
     var i = 0
     var m = Map.empty[String, String]
     while (i < args.length) {
@@ -193,6 +253,19 @@ object AgdaJsonlDriver extends IOApp {
         case "--no-resume" =>
           m = m.updated("resume", "false")
           i += 1
+
+        case "--fail-on-error" =>
+          next(i) match {
+            case Left(e) => return Left(e)
+            case Right(v) =>
+              normBool(v) match {
+                case Some(b) =>
+                  m = m.updated("fail-on-error", b)
+                  i += 2
+                case None =>
+                  return Left(s"Bad value for --fail-on-error: $v (use true/false)\n\n$usage")
+              }
+          }
 
         case "--project-root" | "--agda-dir" | "--src-dir" | "--modules-file" | "--out-dir" | "--agda-json"
             | "--parallelism" | "--runner" | "--spark-master" =>
@@ -209,6 +282,9 @@ object AgdaJsonlDriver extends IOApp {
 
     def req(k: String): Either[String, String] =
       m.get(k).toRight(s"Missing --$k\n\n$usage")
+
+    val failOnError: Boolean =
+      m.get("fail-on-error").forall(_ == "true") // default true; we normalize values above
 
     for {
       pr  <- req("project-root")
@@ -242,7 +318,8 @@ object AgdaJsonlDriver extends IOApp {
         parallelism = par,
         resume      = resume,
         runner      = runner,
-        sparkMaster = sparkMaster
+        sparkMaster = sparkMaster,
+        failOnError = failOnError
       )
     }
   }
@@ -291,7 +368,7 @@ object AgdaJsonlDriver extends IOApp {
     val resumeCheck: IO[Option[ModuleRun]] =
       if (!cfg.resume) IO.pure(None)
       else
-        IO.blocking(Files.exists(out) && Files.size(out) > 0L).attempt.flatMap {
+        IO.blocking(Files.exists(out)).attempt.flatMap {
           case Right(true) =>
             JsonlValidate.validateFile(out).attempt.map {
               case Right(v) if v.ok =>
@@ -458,7 +535,7 @@ object AgdaJsonlDriver extends IOApp {
       resume      = cfg.resume,
       runner      = cfg.runner.asString,
       sparkMaster = cfg.sparkMaster,
-      results     = results
+      failOnError = cfg.failOnError
     )
 
     val out = cfg.outDir.resolve("run-manifest.json")
@@ -519,7 +596,10 @@ object AgdaJsonlDriver extends IOApp {
         _ <- IO.println(s"[AgdaJsonlDriver] manifest: $mf")
         _ <- IO.println(s"[AgdaJsonlDriver] summary: ok=$okN failed=$badN total=${results.size}")
 
-      } yield if (badN == 0) ExitCode.Success else ExitCode.Error
+      } yield {
+        if (badN > 0 && cfg.failOnError) ExitCode.Error
+        else ExitCode.Success
+      }
 
     prog.handleErrorWith { e =>
       IO.println(s"[AgdaJsonlDriver] ERROR: ${e.getMessage}").as(ExitCode.Error)

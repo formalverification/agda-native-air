@@ -42,13 +42,54 @@
 
 package proofparser.extract
 
-import cats.data.{NonEmptyList, ValidatedNel}
+// import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.IO
 import cats.syntax.all._
 import fs2.Stream
 import fs2.io.file.{Files => Fs2Files, Path => Fs2Path}
+import java.nio.file.{Files => JFiles}
 
 object JsonlValidate {
+
+   // ---------------------------------------------------------------------------
+   // Shared line-level validator (used by pure + streaming)
+   // ---------------------------------------------------------------------------
+
+   private final case class Acc(rows: Long, errs: Vector[String], lineNo: Long) {
+     def addErr(msg: String, maxErrors: Int): Acc =
+       if (errs.size >= maxErrors) this else copy(errs = errs :+ msg)
+   }
+
+   private def step(acc0: Acc, raw0: String, maxErrors: Int): Acc = {
+     val acc1   = acc0.copy(lineNo = acc0.lineNo + 1)
+     val raw    = raw0.trim
+     val isData = raw.nonEmpty
+
+     if (!isData || acc1.errs.size >= maxErrors) acc1
+     else {
+       val parsedE: Either[String, ujson.Value] =
+         Either.catchNonFatal(ujson.read(raw))
+           .leftMap(e => s"line ${acc1.lineNo}: JSON parse error: ${e.getMessage}")
+
+       parsedE match {
+         case Left(err) =>
+           acc1.addErr(err, maxErrors).copy(rows = acc1.rows + 1)
+
+         case Right(js) =>
+           js.objOpt match {
+             case None =>
+               acc1.addErr(s"line ${acc1.lineNo}: not a JSON object", maxErrors).copy(rows = acc1.rows + 1)
+
+             case Some(obj) =>
+               val keys    = obj.keySet
+               val missing = RequiredKeys.diff(keys)
+               val acc2    = acc1.copy(rows = acc1.rows + 1)
+               if (missing.isEmpty) acc2
+               else acc2.addErr(s"line ${acc1.lineNo}: missing keys: ${missing.toList.sorted.mkString(",")}", maxErrors)
+           }
+       }
+     }
+   }
 
   // ---------------------------------------------------------------------------
   // Schema expectations for v0 backend rows.
@@ -77,43 +118,10 @@ object JsonlValidate {
     * @param maxErrors cap the number of collected errors
     */
   def validateLines(lines: Iterator[String], maxErrors: Int = 50): Result = {
-    final case class Acc(rows: Long, errs: Vector[String], lineNo: Long) {
-      def addErr(msg: String): Acc =
-        if (errs.size >= maxErrors) this else copy(errs = errs :+ msg)
-    }
 
     val acc0 = Acc(rows = 0L, errs = Vector.empty, lineNo = 0L)
 
-    val accF = lines.foldLeft(acc0) { (acc, raw0) =>
-      val acc1   = acc.copy(lineNo = acc.lineNo + 1)
-      val raw    = raw0.trim
-      val isData = raw.nonEmpty
-
-      if (!isData || acc1.errs.size >= maxErrors) acc1
-      else {
-        val parsedE: Either[String, ujson.Value] =
-          Either.catchNonFatal(ujson.read(raw))
-            .leftMap(e => s"line ${acc1.lineNo}: JSON parse error: ${e.getMessage}")
-
-        parsedE match {
-          case Left(err) =>
-            acc1.addErr(err).copy(rows = acc1.rows + 1)
-
-          case Right(js) =>
-            js.objOpt match {
-              case None =>
-                acc1.addErr(s"line ${acc1.lineNo}: not a JSON object").copy(rows = acc1.rows + 1)
-
-              case Some(obj) =>
-                val keys    = obj.keySet
-                val missing = RequiredKeys.diff(keys)
-                val acc2    = acc1.copy(rows = acc1.rows + 1)
-                if (missing.isEmpty) acc2
-                else acc2.addErr(s"line ${acc1.lineNo}: missing keys: ${missing.toList.sorted.mkString(",")}")
-            }
-        }
-      }
-    }
+    val accF = lines.foldLeft(acc0)((acc, raw) => step(acc, raw, maxErrors))
 
     Result(ok = accF.errs.isEmpty, rows = accF.rows, errors = accF.errs)
   }
@@ -133,16 +141,29 @@ object JsonlValidate {
 
     // Stream file -> decode -> split lines -> validate with pure core.
     // We keep the "big file" behavior by not slurping the whole file.
-    val lines: Stream[IO, String] =
-      Fs2Files[IO]
-        .readAll(p)
-        .through(fs2.text.utf8.decode)
-        .through(fs2.text.lines)
+    IO.blocking(JFiles.exists(path)).flatMap {
+      case false =>
+        IO.pure(Result(ok = false, rows = 0L, errors = Vector(s"missing file: $path")))
 
-    lines.compile.toVector.map { vec =>
-      validateLines(vec.iterator, maxErrors)
-    }.handleError { e =>
-      Result(ok = false, rows = 0L, errors = Vector(s"validateFile failed: ${e.getMessage}"))
+      case true =>
+        IO.blocking(JFiles.size(path)).flatMap {
+          case 0L =>
+            IO.pure(Result(ok = true, rows = 0L, errors = Vector.empty))
+
+          case _ =>
+            val lines: Stream[IO, String] =
+              Fs2Files[IO]
+                .readAll(p)
+                .through(fs2.text.utf8.decode)
+                .through(fs2.text.lines)
+
+            val acc0 = Acc(rows = 0L, errs = Vector.empty, lineNo = 0L)
+            lines
+              .compile
+              .fold(acc0)((acc, raw) => step(acc, raw, maxErrors))
+              .map(acc => Result(ok = acc.errs.isEmpty, rows = acc.rows, errors = acc.errs))
+              .handleError(e => Result(ok = false, rows = 0L, errors = Vector(s"validateFile failed: ${e.getMessage}")))
+        }
     }
   }
 }
