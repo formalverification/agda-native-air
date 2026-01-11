@@ -18,12 +18,6 @@
   *  to the Haskell backend `agda-json` (which runs Agda-as-a-library), and use
   *  Scala + Spark for orchestration, resumability, and large-scale downstream ETL.
   *
-  *  Your style constraints
-  *  ----------------------
-  *  - FP-first: explicit effects in IO; no uncontrolled exceptions.
-  *  - Category-theory-friendly: EitherT/Resource/traverse for structured control flow.
-  *  - Spark-ready: SparkSession + Dataset to keep scaling path open.
-  *
   *  Practical reality about Spark
   *  -----------------------------
   *  Running external processes is inherently effectful, and Spark executors are
@@ -47,13 +41,13 @@
 
 package proofparser.extract
 
-import cats.data.EitherT
-import cats.effect.{ExitCode, IO, IOApp, Resource}
-import cats.effect.unsafe.implicits.global
+import cats.effect.{ExitCode, IO, IOApp}
 import cats.effect.implicits._
+import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
+
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
@@ -93,13 +87,30 @@ object AgdaJsonlDriver extends IOApp {
     agdaJsonBin: String,
     parallelism: Int,
     resume: Boolean,
+    runner: String,
+    sparkMaster: String,
     results: Vector[ModuleRun]
   )
   object RunManifest { implicit val rw: ReadWriter[RunManifest] = macroRW }
 
   // ---------------------------------------------------------------------------
-  // Config + FP arg parsing
+  // Config
   // ---------------------------------------------------------------------------
+
+  sealed trait Runner { def asString: String }
+  object Runner {
+    case object Spark extends Runner { val asString = "spark" }
+    case object Local extends Runner { val asString = "local" }
+    case object Spark2 extends Runner { val asString = "spark2" }
+
+    def parse(s: String): Option[Runner] =
+      s.trim.toLowerCase match {
+        case "spark" => Some(Spark)
+        case "local" => Some(Local)
+        case "spark2" => Some(Spark2)
+        case _       => None
+      }
+  }
 
   final case class Config(
     projectRoot: Path,
@@ -110,7 +121,8 @@ object AgdaJsonlDriver extends IOApp {
     agdaJsonBin: Path,
     parallelism: Int,
     resume: Boolean,
-    sparkMaster: Option[String]
+    runner: Runner,
+    sparkMaster: String
   )
 
   final case class ConfigData(
@@ -122,32 +134,33 @@ object AgdaJsonlDriver extends IOApp {
     agdaJsonBin: String,
     parallelism: Int,
     resume: Boolean,
-    sparkMaster: Option[String]
+    sparkMaster: String
   ) extends Serializable
 
-  private def toData(cfg: Config): ConfigData =
+  private def toData(c: Config): ConfigData =
     ConfigData(
-      cfg.projectRoot.toString,
-      cfg.agdaDir.toString,
-      cfg.srcDir.toString,
-      cfg.modulesFile.toString,
-      cfg.outDir.toString,
-      cfg.agdaJsonBin.toString,
-      cfg.parallelism,
-      cfg.resume,
-      cfg.sparkMaster
+      c.projectRoot.toString,
+      c.agdaDir.toString,
+      c.srcDir.toString,
+      c.modulesFile.toString,
+      c.outDir.toString,
+      c.agdaJsonBin.toString,
+      c.parallelism,
+      c.resume,
+      c.sparkMaster
     )
 
   private def fromData(d: ConfigData): Config =
     Config(
-      projectRoot = Paths.get(d.projectRoot),
-      agdaDir     = Paths.get(d.agdaDir),
-      srcDir      = Paths.get(d.srcDir),
-      modulesFile = Paths.get(d.modulesFile),
-      outDir      = Paths.get(d.outDir),
-      agdaJsonBin = Paths.get(d.agdaJsonBin),
-      parallelism = d.parallelism,
-      resume      = d.resume,
+      Paths.get(d.projectRoot),
+      Paths.get(d.agdaDir),
+      Paths.get(d.srcDir),
+      Paths.get(d.modulesFile),
+      Paths.get(d.outDir),
+      Paths.get(d.agdaJsonBin),
+      d.parallelism,
+      d.resume,
+      runner = Runner.Spark, // only used inside Spark executors; not read there
       sparkMaster = d.sparkMaster
     )
 
@@ -156,128 +169,112 @@ object AgdaJsonlDriver extends IOApp {
       |  runMain proofparser.extract.AgdaJsonlDriver \
       |    --project-root <repo-root> \
       |    --agda-dir     <repo-root>/agda-jang/agda \
-      |    --src-dir      <path-to-agda-algebras-src> \
+      |    --src-dir      <path-to-library-src> \
       |    --modules-file <everything-modules.txt> \
       |    --out-dir      <out-dir> \
       |    --agda-json    <path-to-agda-json-exe> \
       |    [--parallelism N] [--no-resume]
+      |    [--runner spark|local|spark2]
+      |    [--spark-master local[*]]
       |
       |Notes:
       |  - Only TOP-LEVEL modules are run (no dots in name).
-      |  - Spark local or cluster mode: you must ensure agda-json, AGDA_DIR, and sources
-      |    exist on executors (containerization recommended for clusters).
       |""".stripMargin
 
   private def parseArgs(args: List[String]): Either[String, Config] = {
-    // Pure recursive parser into a Map, then validated construction.
-    def go(rem: List[String], acc: Map[String, String]): Either[String, Map[String, String]] =
-      rem match {
-        case Nil => Right(acc)
+    // simple, boring parser (no cats)
+    def next(i: Int): Either[String, String] =
+      args.lift(i + 1).toRight(s"Missing value after ${args(i)}\n\n$usage")
 
-        case "--no-resume" :: tail =>
-          go(tail, acc.updated("resume", "false"))
+    var i = 0
+    var m = Map.empty[String, String]
+    while (i < args.length) {
+      args(i) match {
+        case "--no-resume" =>
+          m = m.updated("resume", "false")
+          i += 1
 
-        case "--project-root" :: v :: tail =>
-          go(tail, acc.updated("projectRoot", v))
-
-        case "--agda-dir" :: v :: tail =>
-          go(tail, acc.updated("agdaDir", v))
-
-        case "--src-dir" :: v :: tail =>
-          go(tail, acc.updated("srcDir", v))
-
-        case "--modules-file" :: v :: tail =>
-          go(tail, acc.updated("modulesFile", v))
-
-        case "--out-dir" :: v :: tail =>
-          go(tail, acc.updated("outDir", v))
-
-        case "--agda-json" :: v :: tail =>
-          go(tail, acc.updated("agdaJsonBin", v))
-
-        case "--parallelism" :: v :: tail =>
-          go(tail, acc.updated("parallelism", v))
-
-        case "--spark-master" :: v :: tail =>
-          go(tail, acc.updated("sparkMaster", v))
+        case "--project-root" | "--agda-dir" | "--src-dir" | "--modules-file" | "--out-dir" | "--agda-json"
+            | "--parallelism" | "--runner" | "--spark-master" =>
+          val k = args(i).drop(2)
+          next(i) match {
+            case Left(e)  => return Left(e)
+            case Right(v) => m = m.updated(k, v); i += 2
+          }
 
         case bad =>
-          Left(s"Unrecognized or incomplete args near: ${bad.take(2).mkString(" ")}\n\n$usage")
+          return Left(s"Unrecognized arg: $bad\n\n$usage")
       }
+    }
 
-    go(args, Map.empty).flatMap { m =>
-      def req(k: String): Either[String, String] =
-        m.get(k).toRight(s"Missing --$k\n\n$usage")
+    def req(k: String): Either[String, String] =
+      m.get(k).toRight(s"Missing --$k\n\n$usage")
 
-      for {
-        pr  <- req("projectRoot")
-        ad  <- req("agdaDir")
-        sd  <- req("srcDir")
-        mf  <- req("modulesFile")
-        od  <- req("outDir")
-        bin <- req("agdaJsonBin")
-      } yield {
-        val par = m.get("parallelism").flatMap(s => scala.util.Try(s.toInt).toOption)
+    for {
+      pr  <- req("project-root")
+      ad  <- req("agda-dir")
+      sd  <- req("src-dir")
+      mf  <- req("modules-file")
+      od  <- req("out-dir")
+      bin <- req("agda-json")
+    } yield {
+      val par =
+        m.get("parallelism").flatMap(s => scala.util.Try(s.toInt).toOption)
           .getOrElse(Runtime.getRuntime.availableProcessors())
-        val res = m.get("resume").forall(_ != "false")
 
-        Config(
-          projectRoot = Paths.get(pr).toAbsolutePath.normalize(),
-          agdaDir     = Paths.get(ad).toAbsolutePath.normalize(),
-          srcDir      = Paths.get(sd).toAbsolutePath.normalize(),
-          modulesFile = Paths.get(mf).toAbsolutePath.normalize(),
-          outDir      = Paths.get(od).toAbsolutePath.normalize(),
-          agdaJsonBin = Paths.get(bin).toAbsolutePath.normalize(),
-          parallelism = par,
-          resume      = res,
-          sparkMaster = m.get("sparkMaster")
-        )
-      }
+      val resume = m.get("resume").forall(_ != "false")
+
+      val runner =
+        m.get("runner").flatMap(Runner.parse).getOrElse(Runner.Spark)
+
+      val sparkMaster =
+        m.get("spark-master")
+          .orElse(sys.env.get("SPARK_MASTER"))
+          .getOrElse("local[*]")
+
+      Config(
+        projectRoot = Paths.get(pr).toAbsolutePath.normalize(),
+        agdaDir     = Paths.get(ad).toAbsolutePath.normalize(),
+        srcDir      = Paths.get(sd).toAbsolutePath.normalize(),
+        modulesFile = Paths.get(mf).toAbsolutePath.normalize(),
+        outDir      = Paths.get(od).toAbsolutePath.normalize(),
+        agdaJsonBin = Paths.get(bin).toAbsolutePath.normalize(),
+        parallelism = par,
+        resume      = resume,
+        runner      = runner,
+        sparkMaster = sparkMaster
+      )
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Spark session as Resource (explicit lifecycle)
+  // Module discovery
   // ---------------------------------------------------------------------------
 
-  private def sparkResource(appName: String, master: String): Resource[IO, SparkSession] =
-    Resource.make {
-      IO.blocking {
-        SparkSession.builder()
-          .appName(appName)
-          .master(master)
-          .config("spark.ui.enabled", "false")
-          .getOrCreate()
-      }
-    } { spark =>
-      IO.blocking(spark.stop()).handleError(_ => ())
-    }
-
-  // ---------------------------------------------------------------------------
-  // Module discovery (top-level only)
-  // ---------------------------------------------------------------------------
-
-  private def readTopLevelModules(modulesFile: Path): IO[Vector[String]] =
+  private def readModules(modulesFile: Path): IO[Vector[String]] =
     IO.blocking {
       Files.readAllLines(modulesFile, StandardCharsets.UTF_8).asScala.toVector
         .map(_.trim)
         .filter(s => s.nonEmpty && !s.startsWith("#"))
-        .filterNot(_.contains(".")) // <-- your constraint: no nested submodules
+        // .filterNot(_.contains(".")) // TOP-LEVEL only
         .distinct
         .sorted
     }
 
+  private def modPath(mod: String): String =
+    mod.replace('.', java.io.File.separatorChar)
+
   private def moduleToInput(srcDir: Path, mod: String): Path =
-    srcDir.resolve(s"$mod.agda")
+    srcDir.resolve(modPath(mod) + ".agda")
 
   private def moduleToOutJsonl(outDir: Path, mod: String): Path =
-    outDir.resolve("jsonl").resolve(s"$mod.jsonl")
+    outDir.resolve("jsonl").resolve(modPath(mod) + ".jsonl")
 
   private def moduleToLog(outDir: Path, mod: String): Path =
-    outDir.resolve("logs").resolve(s"$mod.log")
+    outDir.resolve("logs").resolve(modPath(mod) + ".log")
 
   // ---------------------------------------------------------------------------
-  // One-module run in IO (effects explicit)
+  // One-module run
   // ---------------------------------------------------------------------------
 
   private def runOne(cfg: Config, mod: String): IO[ModuleRun] = {
@@ -294,12 +291,10 @@ object AgdaJsonlDriver extends IOApp {
     val resumeCheck: IO[Option[ModuleRun]] =
       if (!cfg.resume) IO.pure(None)
       else
-        (IO.blocking(Files.exists(out) && Files.size(out) > 0L) >>= { existsNonEmpty =>
-          if (!existsNonEmpty) IO.pure(None)
-          else
-            JsonlValidate.validateFile(out).map { v =>
-              // If valid, we treat it as skipped+ok; otherwise, force rerun.
-              if (v.ok)
+        IO.blocking(Files.exists(out) && Files.size(out) > 0L).attempt.flatMap {
+          case Right(true) =>
+            JsonlValidate.validateFile(out).attempt.map {
+              case Right(v) if v.ok =>
                 Some(
                   ModuleRun(
                     module = mod,
@@ -315,73 +310,138 @@ object AgdaJsonlDriver extends IOApp {
                     validateErrors = v.errors
                   )
                 )
-              else None
+              case _ => None
             }
-        }).handleError(_ => None)
+          case _ => IO.pure(None)
+        }
 
-    val runFresh: IO[ModuleRun] = {
-      val missingInput: IO[ModuleRun] =
-        IO.pure(
-          ModuleRun(
-            module = mod,
-            inputFile = input.toString,
-            outputFile = out.toString,
-            logFile = log.toString,
-            skipped = false,
-            ok = false,
-            exitCode = None,
-            seconds = 0.0,
-            rows = 0L,
-            validateOk = false,
-            validateErrors = Vector(s"missing input file: $input")
-          )
+    def missingInput: ModuleRun =
+      ModuleRun(
+        module = mod,
+        inputFile = input.toString,
+        outputFile = out.toString,
+        logFile = log.toString,
+        skipped = false,
+        ok = false,
+        exitCode = None,
+        seconds = 0.0,
+        rows = 0L,
+        validateOk = false,
+        validateErrors = Vector(s"missing input file: $input")
+      )
+
+    val runBackend: IO[ModuleRun] = {
+      val cmd = Seq(
+        cfg.agdaJsonBin.toString,
+        "--input", input.toString,
+        "--output", out.toString,
+        "--include", cfg.srcDir.toString
+      )
+
+      val env = Map("AGDA_DIR" -> cfg.agdaDir.toString)
+
+      for {
+        exec <- Proc.runLogged(cmd, cwd = cfg.projectRoot, env = env, logFile = log)
+        v    <- if (exec.exitCode == 0) JsonlValidate.validateFile(out)
+                else IO.pure(JsonlValidate.Result(false, 0L, Vector(s"exit_code=${exec.exitCode}")))
+        ok    = exec.exitCode == 0 && v.ok
+      } yield
+        ModuleRun(
+          module = mod,
+          inputFile = input.toString,
+          outputFile = out.toString,
+          logFile = log.toString,
+          skipped = false,
+          ok = ok,
+          exitCode = Some(exec.exitCode),
+          seconds = exec.seconds,
+          rows = v.rows,
+          validateOk = v.ok,
+          validateErrors = v.errors
         )
-
-      val runBackend: IO[ModuleRun] = {
-        val cmd = Seq(
-          cfg.agdaJsonBin.toString,
-          "--input", input.toString,
-          "--output", out.toString,
-          "--include", cfg.srcDir.toString
-        )
-
-        val env = Map("AGDA_DIR" -> cfg.agdaDir.toString)
-
-        for {
-          exec <- Proc.runLogged(cmd, cwd = cfg.projectRoot, env = env, logFile = log)
-          v    <- if (exec.exitCode == 0) JsonlValidate.validateFile(out) else IO.pure(JsonlValidate.Result(false, 0L, Vector(s"exit_code=${exec.exitCode}")))
-          ok    = exec.exitCode == 0 && v.ok
-        } yield
-          ModuleRun(
-            module = mod,
-            inputFile = input.toString,
-            outputFile = out.toString,
-            logFile = log.toString,
-            skipped = false,
-            ok = ok,
-            exitCode = Some(exec.exitCode),
-            seconds = exec.seconds,
-            rows = v.rows,
-            validateOk = v.ok,
-            validateErrors = v.errors
-          )
-      }
-
-      IO.blocking(Files.exists(input)).flatMap {
-        case false => missingInput
-        case true  => runBackend
-      }
     }
 
     for {
       _    <- ensureDirs
       skip <- resumeCheck
-      res  <- skip.fold(runFresh)(IO.pure)
+      res  <- skip match {
+                case Some(r) => IO.pure(r)
+                case None =>
+                  IO.blocking(Files.exists(input)).flatMap {
+                    case false => IO.pure(missingInput)
+                    case true  => runBackend
+                  }
+              }
     } yield res
   }
 
   // ---------------------------------------------------------------------------
-  // Manifest write (IO)
+  // Local bounded-parallel runner (non-Spark)
+  // ---------------------------------------------------------------------------
+
+  private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
+    modules.parTraverseN(cfg.parallelism)(m => runOne(cfg, m))
+
+  // ---------------------------------------------------------------------------
+  // Spark runner (simple SparkSession config)
+  // ---------------------------------------------------------------------------
+
+  implicit val encRun: Encoder[ModuleRun] = Encoders.product[ModuleRun]
+
+  private def mkSpark(appName: String, master: String, addOpens: Option[String]): SparkSession = {
+    val b =
+      SparkSession.builder()
+        .appName(appName)
+        .config("spark.master", master)
+        .config("spark.ui.enabled", "false")
+
+    // These are *often* what fixes JDK17 module-access issues in Spark/Netty
+    // even when JAVA_TOOL_OPTIONS doesn't propagate.
+    val b2 = addOpens match {
+      case Some(opts) =>
+        b
+          .config("spark.driver.extraJavaOptions", opts)
+          .config("spark.executor.extraJavaOptions", opts)
+      case None =>
+        b
+    }
+
+    b2.getOrCreate()
+  }
+
+  private def runWithSpark(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
+    IO.blocking {
+      val addOpens =
+        sys.env.get("JAVA_TOOL_OPTIONS")
+          .filter(_.contains("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"))
+          .orElse(Some("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"))
+
+      val spark = mkSpark("AgdaJsonlDriver", cfg.sparkMaster, addOpens)
+      try {
+        spark.sparkContext.setLogLevel("WARN")
+        import spark.implicits._
+
+        val bc = spark.sparkContext.broadcast(toData(cfg))
+
+        val ds: Dataset[String] =
+          spark.createDataset(modules).repartition(cfg.parallelism)
+
+        val out: Array[ModuleRun] =
+          ds.map { mod =>
+              val localCfg = fromData(bc.value)
+              // Spark boundary escape hatch
+              runOne(localCfg, mod).unsafeRunSync()
+            }
+            .collect()
+
+        out.toVector
+      } finally {
+        spark.stop()
+      }
+    }
+
+  // ---------------------------------------------------------------------------
+  // Manifest write
   // ---------------------------------------------------------------------------
 
   private def writeManifest(cfg: Config, startedAt: String, finishedAt: String, results: Vector[ModuleRun]): IO[Path] = {
@@ -396,6 +456,8 @@ object AgdaJsonlDriver extends IOApp {
       agdaJsonBin = cfg.agdaJsonBin.toString,
       parallelism = cfg.parallelism,
       resume      = cfg.resume,
+      runner      = cfg.runner.asString,
+      sparkMaster = cfg.sparkMaster,
       results     = results
     )
 
@@ -408,83 +470,59 @@ object AgdaJsonlDriver extends IOApp {
   }
 
   // ---------------------------------------------------------------------------
-  // Spark boundary: Dataset orchestration
-  // ---------------------------------------------------------------------------
-
-  // Spark encoders
-  implicit val encRun: Encoder[ModuleRun]  = Encoders.product[ModuleRun]
-
-  private def runWithSpark(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] = {
-    val master =
-      cfg.sparkMaster
-        .orElse(sys.env.get("SPARK_MASTER"))
-        .orElse(Option(System.getProperty("spark.master")))
-        .getOrElse("local[*]")
-
-    sparkResource("AgdaJsonlDriver", master).use { spark =>
-      import spark.implicits._
-
-      IO.blocking {
-        // Broadcast config to executors (pure data).
-        val bc = spark.sparkContext.broadcast(toData(cfg))
-
-        // Dataset so we can evolve into DataFrame-based monitoring later.
-        val ds: Dataset[String] =
-          spark.createDataset(modules).repartition(cfg.parallelism)
-
-        // mapPartitions: amortize overhead; traverse in functional style.
-        // NOTE: we evaluate IO at the Spark boundary; side effects are explicit
-        // in runOne, but Spark requires a concrete value in executor code.
-        val out: Array[ModuleRun] =
-          ds.mapPartitions { it =>
-              val localCfg = fromData(bc.value)
-              it.toList.iterator.map { mod =>
-                // Spark boundary "escape hatch":
-                // - runOne is IO[ModuleRun]
-                // - Spark requires ModuleRun
-                runOne(localCfg, mod).unsafeRunSync()
-              }
-            }
-            .collect()
-
-        out.toVector
-      }
-    }
-  }
-
-  private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
-    modules.parTraverseN(cfg.parallelism)(mod => runOne(cfg, mod))
-
-
-  // ---------------------------------------------------------------------------
-  // IOApp entrypoint
+  // Entry
   // ---------------------------------------------------------------------------
 
   override def run(args: List[String]): IO[ExitCode] = {
+    val start = IO.delay(Instant.now().toString)
 
-    val program: EitherT[IO, String, Unit] =
+    val prog: IO[ExitCode] =
       for {
-        cfg <- EitherT.fromEither[IO](parseArgs(args))
-        _   <- EitherT.right(IO.blocking {
+        cfg <- IO.fromEither(parseArgs(args).leftMap(new RuntimeException(_)))
+        _   <- IO.blocking {
                  Files.createDirectories(cfg.outDir.resolve("jsonl"))
                  Files.createDirectories(cfg.outDir.resolve("logs"))
-               })
-        mods <- EitherT.right(readTopLevelModules(cfg.modulesFile))
-        _    <- EitherT.cond[IO](mods.nonEmpty, (), s"No top-level modules found in: ${cfg.modulesFile}")
-        t0   <- EitherT.right(IO.delay(Instant.now().toString))
-        res  <- EitherT.right(runLocally(cfg, mods))
-        t1   <- EitherT.right(IO.delay(Instant.now().toString))
-        mf   <- EitherT.right(writeManifest(cfg, t0, t1, res))
-        okN   = res.count(_.ok)
-        badN  = res.size - okN
-        _    <- EitherT.right(IO.println(s"[AgdaJsonlDriver] manifest: $mf"))
-        _    <- EitherT.right(IO.println(s"[AgdaJsonlDriver] summary: ok=$okN failed=$badN total=${res.size}"))
-        _    <- EitherT.cond[IO](badN == 0, (), s"$badN module(s) failed; see manifest/logs.")
-      } yield ()
+               }
+        mods <- readModules(cfg.modulesFile)
+        _    <- IO.raiseWhen(mods.isEmpty)(new RuntimeException(s"No top-level modules found in: ${cfg.modulesFile}"))
 
-    program.value.flatMap {
-      case Left(err) => IO.println(s"[AgdaJsonlDriver] ERROR: $err").as(ExitCode.Error)
-      case Right(_)  => IO.pure(ExitCode.Success)
+        t0 <- start
+
+        results <-
+          cfg.runner match {
+            case Runner.Local =>
+              runLocally(cfg, mods)
+
+            case Runner.Spark =>
+              runWithSpark(cfg, mods).handleErrorWith { e =>
+                // automatic fallback
+                IO.println(s"[AgdaJsonlDriver] Spark failed (${e.getClass.getSimpleName}): ${e.getMessage}") *>
+                IO.println(s"[AgdaJsonlDriver] Falling back to local runner...") *>
+                runLocally(cfg.copy(runner = Runner.Local), mods)
+              }
+
+            case Runner.Spark2 =>
+              runWithSpark(cfg, mods).handleErrorWith { e =>
+                IO.println(s"[AgdaJsonlDriver] Spark failed (${e.getClass.getName}): ${e.getMessage}") *>
+                IO.blocking(e.printStackTrace()) *>
+                IO.println("[AgdaJsonlDriver] Falling back to local runner...") *>
+                runLocally(cfg.copy(runner = Runner.Local), mods)
+              }
+          }
+
+        t1 <- IO.delay(Instant.now().toString)
+        mf <- writeManifest(cfg, t0, t1, results)
+
+        okN  = results.count(_.ok)
+        badN = results.size - okN
+
+        _ <- IO.println(s"[AgdaJsonlDriver] manifest: $mf")
+        _ <- IO.println(s"[AgdaJsonlDriver] summary: ok=$okN failed=$badN total=${results.size}")
+
+      } yield if (badN == 0) ExitCode.Success else ExitCode.Error
+
+    prog.handleErrorWith { e =>
+      IO.println(s"[AgdaJsonlDriver] ERROR: ${e.getMessage}").as(ExitCode.Error)
     }
   }
 }

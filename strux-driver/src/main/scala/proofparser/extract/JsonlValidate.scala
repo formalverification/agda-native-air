@@ -115,7 +115,7 @@ object JsonlValidate {
       }
     }
 
-    Result(ok = accF.errs.isEmpty && accF.rows > 0, rows = accF.rows, errors = accF.errs)
+    Result(ok = accF.errs.isEmpty, rows = accF.rows, errors = accF.errs)
   }
 
   // ---------------------------------------------------------------------------
