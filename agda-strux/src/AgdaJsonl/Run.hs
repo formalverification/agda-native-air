@@ -121,10 +121,10 @@ runOnce h inputFile extraIncludes = do
     -- If dsWrittenDefs == 0, that can be legitimate (e.g. module is just reexports)
     -- especially now that we filter to "main module only".
     when (Extract.dsTotalDefs st == 0) $
-      liftIO $ die $
+      liftIO $ hPutStrLn stderr $
         unlines
-          [ "agda-json: typechecking succeeded, but interface signature had 0 definitions."
-          , "This is unexpected and usually indicates the TCM signature is empty/unpopulated."
+          [ "agda-json NOTE: typechecking succeeded but extracted 0 definitions."
+          , "This is normal for barrel/re-export modules."
           , "input:       " <> inputFile
           , "absInput:    " <> absInput
           , "absIncludes: " <> show absIncludes

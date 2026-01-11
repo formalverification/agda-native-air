@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+
 -- | Extract.hs
 --
 -- File: agda-backend-jsonl/src/AgdaJsonl/Extract.hs
 --
 -- Description:
 --   Extraction code: after Agda has checked a module (either by actual
---   typechecking OR by loading a cached .agdai interface), we emit *one JSONL
---   row per definition*.
+--   typechecking OR by loading a cached .agdai interface), we emit one JSONL
+--   row per definition.
 --
 --   This is the heart of issue #38:
 --
@@ -16,13 +17,14 @@
 --        computed as types for declarations.
 --
 --   Key design choice:
---     We extract from the *Interface signature returned by typeCheckMain*,
---     not from the global mutable state (getSignature).
+--     We no longer just extract from the Interface signature returned by
+--     typeCheckMain*, but now use the global mutable state (getSignature).
 --
---   Why this matters:
---     When Agda loads a cached interface, it may not populate the same global
---     signature/state that getSignature reads from, but typeCheckMain still
---     returns a CheckResult containing the interface (and its signature).
+--     **However** when Agda loads a cached interface, it may not populate the same
+--     global signature/state that getSignature reads from; typeCheckMain still
+--     returns a CheckResult containing the interface (and its signature).  So, we
+--     still need to verify that the new approach works correctly when Agda loads
+--     from cache.
 --
 --   Output fields (v0):
 --     - file    : input file path (as passed to CLI)
@@ -48,10 +50,9 @@ import Data.List (sortOn)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 import qualified Data.Set as Set
-import System.FilePath (takeBaseName)
+-- import System.FilePath (takeBaseName)
 import System.IO (Handle, hPutStrLn, stderr)
 
--- Agda internals (post-typechecking)
 import Agda.Interaction.Imports (CheckResult, crInterface)
 import Agda.TypeChecking.Monad (TCM)
 
@@ -63,27 +64,67 @@ import Agda.TypeChecking.Monad.Base
   , theDef
   , Defn(..)
   , iSignature
+  , iModuleName
   )
 import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 
 
+--------------------------------------------------------------------------------
+-- | Stats
+--
+-- Small stats bundle so callers can distinguish:
+-- - "interface signature empty" (almost certainly a bug)
+-- - "module had 0 local definitions" (can be legitimate)
+data DumpStats = DumpStats
+  { dsMainModule  :: T.Text
+  , dsTotalDefs   :: Int     -- total defs seen (root + sections)
+  , dsWrittenDefs :: Int     -- written after filtering to “belongs to this file”
+  }
 
--- ================================================================================
--- Public API
--- ================================================================================
+--------------------------------------------------------------------------------
+-- Helpers: name splitting and normalization
+
+-- | Split Name
+-- Split a qualified name like "A.B.C.f" into ("A.B.C", "f").
+-- If there is no '.', we treat the whole thing as the name.
+splitQName :: T.Text -> (T.Text, T.Text)
+splitQName q =
+  let (modDot, nm) = T.breakOnEnd "." q
+  in if T.null modDot
+        then ("", q)
+        else (T.dropEnd 1 modDot, nm)  -- drop trailing '.'
+
+-- | Normalize Name
+-- Drop anonymous/section-y segments from a qualified name.
+-- Conservative rule: remove path segments that are "_" or start with "_" .
+-- (We can tighten/loosen later once we see actual Agda pretty output.)
+normalizeQNameText :: T.Text -> T.Text
+normalizeQNameText q =
+  let segs = T.splitOn "." q
+      keep s =
+        not (T.null s)
+        && s /= "_"
+        && not ("_" `T.isPrefixOf` s)
+      segs' = filter keep segs
+  in T.intercalate "." segs'
+
+-- normalizeModuleText :: T.Text -> T.Text
+-- normalizeModuleText = fst . splitQName . normalizeQNameText . (<> ".dummy")
+-- -- ^ hack: append ".dummy" so splitQName works for module-only strings
+
 
 -- ------------------------------------------------------------------------------
 -- | v0.1: defKind
 --
 -- A coarse classification of Agda definitions.  We keep this stable for downstream
 -- consumers; anything we don't recognize is "other".
---
 defKindOf :: Definition -> T.Text
 defKindOf = defKindOfDefn . theDef
 
--- | Map Agda's internal definition constructors to our stable schema enum.
---   Anything unfamiliar collapses to "other".
+-- | Map Agda Constructors
+-- Map Agda's internal definition constructors to our stable schema enum.
+-- Anything unfamiliar collapses to "other".
 defKindOfDefn :: Defn -> T.Text
 defKindOfDefn = \case
   FunctionDefn{}      -> "function"
@@ -96,40 +137,22 @@ defKindOfDefn = \case
   AbstractDefn d      -> defKindOfDefn d
   _                   -> "other"
 
--- ------------------------------------------------------------------------------
--- | Small stats bundle so callers can distinguish:
---   - "interface signature empty" (almost certainly a bug)
---   - "module had 0 local definitions" (can be legitimate)
-data DumpStats = DumpStats
-  { dsMainModule  :: T.Text
-  , dsTotalDefs   :: Int
-  , dsWrittenDefs :: Int
-  }
-
--- | Split a qualified name like "A.B.C.f" into ("A.B.C", "f").
--- If there is no '.', we treat the whole thing as the name.
-splitQName :: T.Text -> (T.Text, T.Text)
-splitQName q =
-  let (modDot, nm) = T.breakOnEnd "." q
-  in if T.null modDot
-        then ("", q)
-        else (T.dropEnd 1 modDot, nm)  -- drop trailing '.'
-
 
 --------------------------------------------------------------------------------
 -- v0.1: dependencies (stable version)
 --------------------------------------------------------------------------------
 
--- | Extract a coarse list of "dependency-like" identifiers from the pretty-printed type.
+-- | Extract Dependencies
+-- Extract a coarse list of "dependency-like" identifiers from the pretty-printed type.
 --
 -- This is intentionally stable across Agda internal API changes:
---   - We still rely on Agda to *compute* the type (semantic),
---   - but we avoid importing / pattern matching on internal Term constructors.
+-- + We still rely on Agda to compute the type (semantic),
+-- + but avoid importing / pattern matching on internal Term constructors.
 --
 -- Heuristic:
---   * tokenize into identifier-ish chunks
---   * keep tokens that look like names (start with a letter) and are not tiny noise
---   * return unique tokens (sorted) for determinism
+-- + tokenize into identifier-ish chunks
+-- + keep tokens that look like names (start with a letter) and are not tiny noise
+-- + return unique tokens (sorted) for determinism
 --
 -- Implementation Note: dependencies are currently extracted heuristically from the
 -- pretty-printed type (v0.1), not from internal term traversal.
@@ -143,12 +166,10 @@ dependenciesFromTypeText =
     keep tok =
       T.length tok >= 2
         && isLetter (T.head tok)
-        && tok `notElem`
-            [ "Set", "Prop", "Type"
-            , "∀", "forall"
-            ]
+        && tok `notElem` [ "Set", "Prop", "Type" , "∀", "forall" ]
 
--- | Tokenize into chunks of letters/digits/._'
+-- | Tokenize
+-- Tokenize into chunks of letters/digits/._'
 -- (Unicode letters are handled by 'isLetter'.)
 tokenize :: T.Text -> [T.Text]
 tokenize =
@@ -168,18 +189,21 @@ tokenize =
 
 
 
+
 -- ------------------------------------------------------------------------------
--- | After type-checking, dump one JSONL row per definition  currently in scope from
--- the returned interface signature.
---
--- Returns the number of rows written. This is useful for tests and for
--- debugging "successful run but empty output".
---
--- IMPORTANT:
---   We now filter to ONLY definitions whose module == <main module>
---   (derived from the input file basename). This excludes:
---     - imported defs (stdlib, deps)
---     - nested submodules (A.B.*) when the main module is A
+-- | Pretty Print
+-- Pretty-print an Agda internal thing using Agda's own pretty-printer,
+-- inside the typechecking monad.
+pp :: PrettyTCM a => a -> TCM T.Text
+pp x = do
+  doc <- prettyTCM x
+  pure (T.pack (prettyShow doc))
+
+
+-- | Dump JSOL Row
+-- After type-checking, dump one JSONL row per definition  currently in scope from
+-- the returned interface signature. Returns the number of rows written for tests and
+-- debugging.
 dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> TCM DumpStats
 dumpCheckResultAsJsonl h file cr = do
   let iface :: Interface
@@ -190,38 +214,66 @@ dumpCheckResultAsJsonl h file cr = do
 
       -- Agda 2.8.x: Signature exposes `_sigDefinitions`
       defsAll = HM.toList (_sigDefinitions sig)
+      -- defsAll :: [(Agda.Syntax.Common.Name.QName, Definition)]
+      -- defsAll = HM.toList (collectDefsRecursive sig)
 
       mainMod :: T.Text
-      mainMod = T.pack (takeBaseName file)
+      -- IMPORTANT: do NOT use takeBaseName for modules like Base/Relations/Discrete.agda
+      mainMod = T.pack (prettyShow (pretty (iModuleName iface)))
+      -- mainMod =
+      --    -- Prefer Agda’s module name (correct for Base/Relations/Discrete.agda)
+      --   -- Fallback keeps old behavior if API differs.
+      --   case safePrettyModule iface of
+      --     Just m  -> m
+      --     Nothing -> T.pack (takeBaseName file)
 
-      isMainModuleDef (qname, _defn) =
+      -- belongsToThisFile :: (Agda.Syntax.Common.Name.QName, Definition) -> Bool
+      belongsToThisFile (qname, _defn) =
         let qnTxt            = T.pack (prettyShow (pretty qname))
             (modTxt, _nmTxt) = splitQName qnTxt
-        in modTxt == mainMod
+        in modTxt == mainMod || (mainMod <> ".") `T.isPrefixOf` modTxt
 
-      defsFiltered = filter isMainModuleDef defsAll
-      defs = sortOn (\(qname,_) -> T.pack (prettyShow (pretty qname))) defsFiltered
+      -- isMainModuleDef :: (Agda.Syntax.Common.Name.QName, Definition) -> Bool
+      -- isMainModuleDef (qname, _defn) =
+      --   let qnTxt            = T.pack (prettyShow (pretty qname))
+      --       (modTxt, _nmTxt) = splitQName qnTxt
+      --   in modTxt == mainMod
+
+      -- defsFiltered = filter isMainModuleDef defsAll
+      -- defsFiltered :: [(Agda.Syntax.Common.Name.QName, Definition)]
+      defsFiltered = filter belongsToThisFile defsAll
+
+      -- defsSorted :: [(Agda.Syntax.Common.Name.QName, Definition)]
+      defsSorted = sortOn (\(qname,_) -> T.pack (prettyShow (pretty qname))) defsFiltered
 
   -- Extra debug to stderr if we ever get an empty signature.
   when (null defsAll) $
     liftIO $ hPutStrLn stderr $
-      "agda-json DEBUG: interface signature has 0 definitions; output will be empty."
+      "agda-json DEBUG: interface + sections yielded 0 definitions; output will be empty."
 
-  forM_ defs $ \(qname, defn) -> do
-    let qnTxt = T.pack (prettyShow (pretty qname))   -- scope-independent, usually fully qualified
+  forM_ defsSorted $ \(qname, defn) -> do
+    let qnTxt = T.pack (prettyShow (pretty qname))   -- stable, internal-ish
         (modTxt, nameTxt) = splitQName qnTxt
+
+        prettyQn   = normalizeQNameText qnTxt
+        (pMod, pNm) = splitQName prettyQn
+
     tyTxt <- pp (defType defn)                       -- keep type pretty-printing in TCM
 
     let astSize = T.length tyTxt
         kind    = "definition"    --  keep existing field stable
         defKind = defKindOf defn
         deps    = dependenciesFromTypeText tyTxt
+
         line =
           jsonObj
             [ ("file",    jsonStr (T.pack file))
             , ("module",  jsonStr modTxt)
             , ("name",    jsonStr nameTxt)
             , ("qname",   jsonStr qnTxt)
+            , ("prettyModule", jsonStr pMod)
+            , ("prettyName",   jsonStr pNm)
+            , ("prettyQname",  jsonStr prettyQn)
             , ("type",    jsonStr tyTxt)
             , ("kind",    jsonStr kind)
             , ("defKind", jsonStr defKind)
@@ -234,23 +286,17 @@ dumpCheckResultAsJsonl h file cr = do
   pure $ DumpStats
     { dsMainModule  = mainMod
     , dsTotalDefs   = length defsAll
-    , dsWrittenDefs = length defs
+    , dsWrittenDefs = length defsSorted
     }
 
-
-
--- ------------------------------------------------------------------------------
--- | Pretty printing inside TCM
---
--- Pretty-print an Agda internal thing using Agda's own pretty-printer,
--- inside the typechecking monad.
-pp :: PrettyTCM a => a -> TCM T.Text
-pp x = do
-  doc <- prettyTCM x
-  pure (T.pack (prettyShow doc))
-
-
-
+-- -- | Helper: try to pretty-print the interface module name if available.
+-- safePrettyModule :: Interface -> Maybe T.Text
+-- safePrettyModule iface =
+--   -- If Agda exposes iModuleName :: Interface -> ModuleName
+--   -- then prettyShow (pretty ...) should work.
+--   -- If this doesn't compile, temporarily return Nothing and
+--   -- keep the fallback while we adjust imports/types.
+--   Just (T.pack (prettyShow (pretty (iModuleName iface))))
 
 -- ------------------------------------------------------------------------------
 -- | Tiny JSON encoder (no extra deps)
@@ -258,10 +304,8 @@ pp x = do
 -- Render a JSON object from already-rendered JSON values.
 -- (Keys are rendered as JSON strings.)
 jsonObj :: [(T.Text, T.Text)] -> T.Text
-jsonObj kvs =
-  "{" <> T.intercalate "," (map field kvs) <> "}"
-  where
-    field (k, v) = jsonStr k <> ":" <> v
+jsonObj kvs = "{" <> T.intercalate "," (map field kvs) <> "}"
+  where field (k, v) = jsonStr k <> ":" <> v
 
 -- | Render a JSON string with basic escaping.
 jsonStr :: T.Text -> T.Text

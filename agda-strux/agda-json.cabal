@@ -31,6 +31,21 @@ executable agda-json
   default-language: GHC2021
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0
 
+executable agda-json-runner
+  main-is:          Runner.hs
+  hs-source-dirs:   app
+  build-depends:
+      base >= 4.18 && < 5
+    , aeson
+    , bytestring
+    , directory
+    , filepath
+    , process
+    , text
+    , time
+  default-language: GHC2021
+  ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0 -threaded -rtsopts
+
 test-suite agda-json-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test

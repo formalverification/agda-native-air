@@ -20,6 +20,12 @@ foo-id n = n
 foo-id-correct : (n : Nat) → foo-id n ≡ n
 foo-id-correct n = refl
 
+-- Anonymous section: defs here often live in *section signatures*
+module _ {A : Set} where
+  secId : A → A
+  secId x = x
+
+-- Named nested module: should also be included if we do prefix filtering
 module Nested where
   bar : Nat
   bar = zero
