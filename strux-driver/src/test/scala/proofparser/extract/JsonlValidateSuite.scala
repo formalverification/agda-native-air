@@ -72,14 +72,14 @@ final class JsonlValidateSuite extends AnyFreeSpec with Matchers {
     "returns ok=false when JSON object is missing required keys" in {
       val p = Files.createTempFile("jsonl-missing-keys-", ".jsonl")
       // valid JSON object, but incomplete schema
-      writeUtf8(p, """{"file":"X","module":"M"}\n""")
+      writeUtf8(p, """{"file":"X","module":"M"}""" + "\n")
 
       val r = JsonlValidate.validateFile(p).unsafeRunSync()
-      withClue(r.toString) {
-        r.ok shouldBe false
-        r.rows shouldBe 1L
-        r.errors.exists(_.contains("missing keys")) shouldBe false
-      }
+      r.ok shouldBe false
+      r.rows shouldBe 1L
+      val msg = r.errors.mkString("\n").toLowerCase
+      msg should include ("missing")
+      msg should (include ("key") or include ("required"))
     }
 
     "returns ok=true when JSON object has all required keys" in {
