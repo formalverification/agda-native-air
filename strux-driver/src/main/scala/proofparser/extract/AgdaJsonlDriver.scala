@@ -465,6 +465,8 @@ object AgdaJsonlDriver extends IOApp {
   // Chunk size for processing modules within Spark partitions.
   // Balances memory usage (smaller chunks) vs. resource management overhead
   // (larger chunks allow better batching of IO operations).
+  // This is a reasonable default; if needed, it could be made configurable
+  // via the Config object for runtime tuning based on deployment requirements.
   private val SparkPartitionChunkSize = 10
 
   // NOTE: This implementation uses Spark for distributed execution across
@@ -518,7 +520,7 @@ object AgdaJsonlDriver extends IOApp {
 
         // Use mapPartitions to process modules in batches per partition.
         // This improves resource management by grouping IOs and executing them
-        // together with parTraverseN, rather than individually with map.
+        // together with parTraverse, rather than individually with map.
         // We process in chunks to balance memory usage with resource management.
         // We still need unsafeRunSync at the Spark boundary, but this approach
         // allows for better error handling and cleanup within each chunk.
