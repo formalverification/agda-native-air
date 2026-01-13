@@ -109,11 +109,6 @@ normalizeQNameText q =
       segs' = filter keep segs
   in T.intercalate "." segs'
 
--- normalizeModuleText :: T.Text -> T.Text
--- normalizeModuleText = fst . splitQName . normalizeQNameText . (<> ".dummy")
--- -- ^ hack: append ".dummy" so splitQName works for module-only strings
-
-
 -- ------------------------------------------------------------------------------
 -- | v0.1: defKind
 --
@@ -214,36 +209,18 @@ dumpCheckResultAsJsonl h file cr = do
 
       -- Agda 2.8.x: Signature exposes `_sigDefinitions`
       defsAll = HM.toList (_sigDefinitions sig)
-      -- defsAll :: [(Agda.Syntax.Common.Name.QName, Definition)]
-      -- defsAll = HM.toList (collectDefsRecursive sig)
 
       mainMod :: T.Text
       -- IMPORTANT: do NOT use takeBaseName for modules like Base/Relations/Discrete.agda
       mainMod = T.pack (prettyShow (pretty (iModuleName iface)))
-      -- mainMod =
-      --    -- Prefer Agda’s module name (correct for Base/Relations/Discrete.agda)
-      --   -- Fallback keeps old behavior if API differs.
-      --   case safePrettyModule iface of
-      --     Just m  -> m
-      --     Nothing -> T.pack (takeBaseName file)
 
-      -- belongsToThisFile :: (Agda.Syntax.Common.Name.QName, Definition) -> Bool
       belongsToThisFile (qname, _defn) =
         let qnTxt            = T.pack (prettyShow (pretty qname))
             (modTxt, _nmTxt) = splitQName qnTxt
         in modTxt == mainMod || (mainMod <> ".") `T.isPrefixOf` modTxt
 
-      -- isMainModuleDef :: (Agda.Syntax.Common.Name.QName, Definition) -> Bool
-      -- isMainModuleDef (qname, _defn) =
-      --   let qnTxt            = T.pack (prettyShow (pretty qname))
-      --       (modTxt, _nmTxt) = splitQName qnTxt
-      --   in modTxt == mainMod
-
-      -- defsFiltered = filter isMainModuleDef defsAll
-      -- defsFiltered :: [(Agda.Syntax.Common.Name.QName, Definition)]
       defsFiltered = filter belongsToThisFile defsAll
 
-      -- defsSorted :: [(Agda.Syntax.Common.Name.QName, Definition)]
       defsSorted = sortOn (\(qname,_) -> T.pack (prettyShow (pretty qname))) defsFiltered
 
   -- Extra debug to stderr if we ever get an empty signature.
@@ -289,14 +266,6 @@ dumpCheckResultAsJsonl h file cr = do
     , dsWrittenDefs = length defsSorted
     }
 
--- -- | Helper: try to pretty-print the interface module name if available.
--- safePrettyModule :: Interface -> Maybe T.Text
--- safePrettyModule iface =
---   -- If Agda exposes iModuleName :: Interface -> ModuleName
---   -- then prettyShow (pretty ...) should work.
---   -- If this doesn't compile, temporarily return Nothing and
---   -- keep the fallback while we adjust imports/types.
---   Just (T.pack (prettyShow (pretty (iModuleName iface))))
 
 -- ------------------------------------------------------------------------------
 -- | Tiny JSON encoder (no extra deps)
