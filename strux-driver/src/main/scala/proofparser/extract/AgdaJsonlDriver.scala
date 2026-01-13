@@ -237,7 +237,7 @@ object AgdaJsonlDriver extends IOApp {
   private def parseArgs(args: List[String]): Either[String, Config] = {
     // simple, boring parser (no cats)
     def next(i: Int): Either[String, String] =
-      args.lift(i + 1).toRight(s"Missing value after ${args(i)}\n\n$usage")
+      args.lift(i + 1).toRight(s"Missing value after ${args(i)}\n\n${usage}")
 
     def normBool(s: String): Option[String] =
       s.toLowerCase match {
@@ -263,7 +263,7 @@ object AgdaJsonlDriver extends IOApp {
                   m = m.updated("fail-on-error", b)
                   i += 2
                 case None =>
-                  return Left(s"Bad value for --fail-on-error: $v (use true/false)\n\n$usage")
+                  return Left(s"Bad value for --fail-on-error: $v (use true/false)\n\n${usage}")
               }
           }
 
@@ -276,12 +276,12 @@ object AgdaJsonlDriver extends IOApp {
           }
 
         case bad =>
-          return Left(s"Unrecognized arg: $bad\n\n$usage")
+          return Left(s"Unrecognized arg: $bad\n\n${usage}")
       }
     }
 
     def req(k: String): Either[String, String] =
-      m.get(k).toRight(s"Missing --$k\n\n$usage")
+      m.get(k).toRight(s"Missing --$k\n\n${usage}")
 
     val failOnError: Boolean =
       m.get("fail-on-error").forall(_ == "true") // default true; we normalize values above

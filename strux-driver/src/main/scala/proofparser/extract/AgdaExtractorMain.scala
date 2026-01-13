@@ -83,7 +83,6 @@ object AgdaExtractorMain {
       paths.toVector.flatMap(parseAgdaFile)
 
     // Write JSONL
-    // Write JSONL
     val writer = Files.newBufferedWriter(out)
     try {
       rows.foreach { r =>
