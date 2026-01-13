@@ -463,11 +463,12 @@ object AgdaJsonlDriver extends IOApp {
   // Spark runner
   // ---------------------------------------------------------------------------
   // NOTE: This implementation uses Spark for distributed execution across
-  // partitions. Within each partition, modules are processed using parTraverseN
-  // which provides proper resource management and error handling via cats-effect IO.
-  // The unsafeRunSync() call is made once per partition (not per module), after
-  // collecting all IOs for that partition. This provides better resource management
-  // than the naive approach of calling unsafeRunSync() individually for each module.
+  // partitions. Within each partition, modules are processed in chunks using
+  // parTraverse which provides proper resource management and error handling via
+  // cats-effect IO. The unsafeRunSync() call is made once per chunk (not per
+  // module), which balances memory usage with resource management. This provides
+  // better resource management than calling unsafeRunSync() individually for each
+  // module while avoiding loading entire partitions into memory.
   // ---------------------------------------------------------------------------
 
   implicit val encRun: Encoder[ModuleRun] = Encoders.product[ModuleRun]
@@ -513,18 +514,22 @@ object AgdaJsonlDriver extends IOApp {
         // Use mapPartitions to process modules in batches per partition.
         // This improves resource management by grouping IOs and executing them
         // together with parTraverseN, rather than individually with map.
+        // We process in chunks to balance memory usage with resource management.
         // We still need unsafeRunSync at the Spark boundary, but this approach
-        // allows for better error handling and cleanup within each partition.
+        // allows for better error handling and cleanup within each chunk.
         val out: Array[ModuleRun] =
           ds.mapPartitions { partition =>
               val localCfg = fromData(bc.value)
-              val modulesInPartition = partition.toVector
-              // Process all modules in this partition with parallel execution
-              // parTraverseN provides better resource management than individual unsafeRunSync calls
-              modulesInPartition
-                .parTraverseN(Math.max(1, cfg.parallelism / 4))(m => runOne(localCfg, m))
-                .unsafeRunSync()
-                .iterator
+              // Process partition in chunks to balance memory vs resource management
+              val chunkSize = 10  // Process 10 modules at a time
+              partition
+                .grouped(chunkSize)
+                .flatMap { chunk =>
+                  // Execute IOs for this chunk with proper resource management
+                  chunk.toList
+                    .parTraverse(m => runOne(localCfg, m))
+                    .unsafeRunSync()
+                }
             }
             .collect()
 
