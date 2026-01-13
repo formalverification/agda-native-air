@@ -12,10 +12,10 @@
 ## =============================================================================
 
 from fastapi.testclient import TestClient
-import torch
-
 from api import main
 
+import pytest
+torch = pytest.importorskip("torch")
 
 class DummyModel:
     """Simple stand-in for a trained TorchScript model."""
