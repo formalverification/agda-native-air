@@ -460,7 +460,15 @@ object AgdaJsonlDriver extends IOApp {
     modules.parTraverseN(cfg.parallelism)(m => runOne(cfg, m))
 
   // ---------------------------------------------------------------------------
-  // Spark runner (simple SparkSession config)
+  // Spark runner
+  // ---------------------------------------------------------------------------
+  // NOTE: This implementation uses Spark for work distribution/partitioning,
+  // then executes IOs on the driver with parTraverseN. This avoids unsafeRunSync()
+  // inside Spark executors, enabling proper resource management and error handling.
+  // Trade-off: Work executes on the driver node, not distributed across Spark
+  // executors. For this use case (running external Agda processes), local parallel
+  // execution with cats-effect IO provides better resource management than
+  // distributed execution with unsafeRunSync().
   // ---------------------------------------------------------------------------
 
   implicit val encRun: Encoder[ModuleRun] = Encoders.product[ModuleRun]
@@ -487,35 +495,34 @@ object AgdaJsonlDriver extends IOApp {
   }
 
   private def runWithSpark(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
-    IO.blocking {
-      val addOpens =
-        sys.env.get("JAVA_TOOL_OPTIONS")
-          .filter(_.contains("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"))
-          .orElse(Some("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"))
+    for {
+      // Use Spark to distribute the modules, but execute IOs outside Spark
+      // This avoids unsafeRunSync() inside Spark executors and enables proper
+      // resource management and error handling via cats-effect IO
+      partitionedModules <- IO.blocking {
+        val addOpens =
+          sys.env.get("JAVA_TOOL_OPTIONS")
+            .filter(_.contains("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"))
+            .orElse(Some("--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"))
 
-      val spark = mkSpark("AgdaJsonlDriver", cfg.sparkMaster, addOpens)
-      try {
-        spark.sparkContext.setLogLevel("WARN")
-        import spark.implicits._
+        val spark = mkSpark("AgdaJsonlDriver", cfg.sparkMaster, addOpens)
+        try {
+          spark.sparkContext.setLogLevel("WARN")
+          import spark.implicits._
 
-        val bc = spark.sparkContext.broadcast(toData(cfg))
+          val ds: Dataset[String] =
+            spark.createDataset(modules).repartition(cfg.parallelism)
 
-        val ds: Dataset[String] =
-          spark.createDataset(modules).repartition(cfg.parallelism)
-
-        val out: Array[ModuleRun] =
-          ds.map { mod =>
-              val localCfg = fromData(bc.value)
-              // Spark boundary escape hatch
-              runOne(localCfg, mod).unsafeRunSync()
-            }
-            .collect()
-
-        out.toVector
-      } finally {
-        spark.stop()
+          // Just collect the modules (Spark handles distribution/partitioning)
+          // Don't execute the IOs here
+          ds.collect().toVector
+        } finally {
+          spark.stop()
+        }
       }
-    }
+      // Now execute the IOs with proper resource management outside of Spark
+      results <- partitionedModules.parTraverseN(cfg.parallelism)(m => runOne(cfg, m))
+    } yield results
 
   // ---------------------------------------------------------------------------
   // Manifest write
