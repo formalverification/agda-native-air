@@ -532,7 +532,7 @@ object AgdaJsonlDriver extends IOApp {
                 .grouped(SparkPartitionChunkSize)
                 .flatMap { chunk =>
                   // Execute IOs for this chunk with proper resource management
-                  chunk.toList
+                  chunk.toVector
                     .parTraverse(m => runOne(localCfg, m))
                     .unsafeRunSync()
                 }
