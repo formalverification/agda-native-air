@@ -148,7 +148,6 @@ readTopLevelModules fp = do
     | l <- map trim (lines txt)
     , not (null l)
     , not ("#" `isPrefixOf` l)
-    , not ('.' `elem` l)
     ]
   where
     trim = reverse . dropWhile (== ' ') . reverse . dropWhile (== ' ')
