@@ -25,10 +25,11 @@
 module Main (main) where
 
 import Control.Exception (bracket, finally)
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM, forM_, unless, when)
 import Data.Aeson (Value(..), eitherDecodeStrict')
 import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
+import Data.Foldable (toList)
 import Data.Text qualified as T
 import Paths_agda_json (getDataFileName)
 import System.Directory  ( copyFile, createDirectory, doesFileExist
@@ -50,6 +51,8 @@ tests = testGroup "agda-json"
       test_runs_twice_jsonl_invariants
   , testCase "Empty.agda succeeds and produces empty JSONL"
       test_empty_module_allows_empty_jsonl
+  , testCase "extracts proof clauses for lemma-like function defs"
+      test_extracts_proof_clauses
   ]
 
 
@@ -126,6 +129,19 @@ parseLine line =
         _ -> assertFailure ("Expected JSON object but got: " <> show v)
 
 
+-- | Parse JSONL file into list of JSON objects.
+-- Fails the test on invalid JSON or non-object lines.
+parseJsonlObjects :: FilePath -> IO [KM.KeyMap Value]
+parseJsonlObjects out = do
+  bs <- BS.readFile out
+  let ls = filter (not . BS.null) (BS.split 10 bs)
+  fmap concat $ forM ls $ \line ->
+    case eitherDecodeStrict' line :: Either String Value of
+      Left e -> assertFailure ("Invalid JSON line: " <> e) >> pure []
+      Right (Object o) -> pure [o]
+      Right _ -> assertFailure "Expected JSON object" >> pure []
+
+
 test_runs_twice_jsonl_invariants :: Assertion
 test_runs_twice_jsonl_invariants = do
   srcInput <- getDataFileName "test/resources/Example.agda"
@@ -195,6 +211,66 @@ test_empty_module_allows_empty_jsonl = do
       _st <- Run.runJsonl input out []
       rows <- parseJsonl True out
       assertBool "expected 0 rows for Empty.agda" (null rows)
+
+
+test_extracts_proof_clauses :: Assertion
+test_extracts_proof_clauses = do
+  srcInput <- getDataFileName "test/resources/Proofs.agda"
+  exists <- doesFileExist srcInput
+  unless exists $
+    assertFailure ("Missing test input file: " <> srcInput)
+
+  withTempDir "agda-json-proofs-test" $ \dir -> do
+    let input = dir </> "Proofs.agda"
+        out   = dir </> "proofs.jsonl"
+
+    copyFile srcInput input
+    agdaDir <- setupAgdaDir dir
+
+    withEnv "AGDA_DIR" agdaDir $ do
+      _st <- Run.runJsonl input out []
+      objs <- parseJsonlObjects out
+
+      let findByPrettyQ pq =
+            [ o | o <- objs
+                , KM.lookup "prettyQname" o == Just (String (T.pack pq))
+            ]
+
+      let rowsRefl = findByPrettyQ "Proofs.⊑-refl"
+      assertBool "expected row Proofs.⊑-refl" (not (null rowsRefl))
+
+      let oRefl = head rowsRefl
+
+      -- case KM.lookup "clauses" oRefl of
+      --   Just (Array arr) ->
+      --     assertBool "expected non-empty clauses for ⊑-refl" (not (null (toList arr)))
+      --   other ->
+      --     assertFailure ("expected clauses: Array, got: " <> show other)
+
+      case (KM.lookup "hasBody" oRefl, KM.lookup "body" oRefl) of
+        (Just (Bool True), Just (String t)) ->
+          assertBool "expected non-empty body for ⊑-refl" (not (T.null t))
+        other ->
+          assertFailure ("expected hasBody=true and body=String, got: " <> show other)
+
+
+
+      let rowsTrans = findByPrettyQ "Proofs.⊑-trans"
+      assertBool "expected row Proofs.⊑-trans" (not (null rowsTrans))
+
+      let oTrans = head rowsTrans
+      -- case KM.lookup "clauses" oTrans of
+      --   Just (Array arr) ->
+      --     assertBool "expected non-empty clauses for ⊑-trans" (not (null (toList arr)))
+      --   other ->
+      --     assertFailure ("expected clauses: Array, got: " <> show other)
+
+      case (KM.lookup "hasBody" oTrans, KM.lookup "body" oTrans) of
+        (Just (Bool True), Just (String t)) ->
+          assertBool "expected non-empty body for ⊑-trans" (not (T.null t))
+        other ->
+          assertFailure ("expected hasBody=true and body=String, got: " <> show other)
+
 
 --------------------------------------------------------------------------------
 -- Deterministic environment + temp dir

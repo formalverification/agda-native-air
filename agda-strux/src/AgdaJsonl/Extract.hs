@@ -5,38 +5,39 @@
 --
 -- File: agda-backend-jsonl/src/AgdaJsonl/Extract.hs
 --
--- Description:
---   Extraction code: after Agda has checked a module (either by actual
---   typechecking OR by loading a cached .agdai interface), we emit one JSONL
---   row per definition.
+-- Purpose
+-- =======
+-- After Agda has checked a module (either by actual typechecking OR by loading a
+-- cached .agdai interface), we emit one JSONL row per definition.
 --
---   This is the heart of issue #38:
+-- We are NOT scraping surface syntax. We ask Agda (as a library) for:
+--   * the fully elaborated type of each definition
+--   * a coarse "definition kind"
+--   * (NEW) "proof-ish" bodies for functions/theorems (as Agda internal syntax)
 --
---     +  We are not doing syntactic scraping of .agda files.
---     +  We are asking Agda (as a library) what it accepted and what it
---        computed as types for declarations.
+-- About "proof extraction"
+-- ========================
+-- In Agda, theorems are just functions whose bodies inhabit their types.
+-- So, to capture proofs we focus on function definitions:
+--   * `theDef defn` yields a `Defn`
+--   * For function-like defs, `funClauses :: Defn -> [Clause]`
+--     (NOTE: it is a selector on Defn, not on FunctionData). :contentReference[oaicite:1]{index=1}
+--   * Each `Clause` has an optional `clauseBody :: Maybe Term`
+--     which we pretty-print using Agda's pretty-printer inside TCM.
 --
---   Key design choice:
---     We no longer just extract from the Interface signature returned by
---     typeCheckMain*, but now use the global mutable state (getSignature).
+-- Caveats:
+--   * The "body" we emit is Agda's *internal* syntax, not original source text.
+--   * Some functions may have no clause bodies (e.g. postulated/abstract/opaque),
+--     in which case `body = null` and `hasBody = false`.
 --
---     **However** when Agda loads a cached interface, it may not populate the same
---     global signature/state that getSignature reads from; typeCheckMain still
---     returns a CheckResult containing the interface (and its signature).  So, we
---     still need to verify that the new approach works correctly when Agda loads
---     from cache.
+-- Output fields
+-- =============
+-- Existing required fields are preserved. We add two OPTIONAL fields:
+--   - body    : null | string
+--   - hasBody : bool
 --
---   Output fields (v0):
---     - file    : input file path (as passed to CLI)
---     - qname   : qualified name (pretty-printed by Agda)
---     - type    : type of the definition (pretty-printed by Agda)
---     - kind    : placeholder ("definition" for now)
---     - astSize : cheap proxy feature (length of pretty-printed type)
---
---   Later (v1+), this is where we'll extend rows with:
---     - def clauses / patterns / compiled clauses
---     - definition kind (data/record/function/postulate/...)
---     - telescope/context info, etc.
+-- These are optional so older validators/tests that enforce a fixed required-key
+-- set won't fail until we intentionally make them required.
 
 module AgdaJsonl.Extract
   ( dumpCheckResultAsJsonl
@@ -47,10 +48,10 @@ import Control.Monad (forM_, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (ord, isLetter, isAlphaNum)
 import Data.List (sortOn)
+import Data.Maybe (catMaybes, isJust)
 import qualified Data.HashMap.Strict as HM
-import qualified Data.Text as T
 import qualified Data.Set as Set
--- import System.FilePath (takeBaseName)
+import qualified Data.Text as T
 import System.IO (Handle, hPutStrLn, stderr)
 
 import Agda.Interaction.Imports (CheckResult, crInterface)
@@ -65,17 +66,19 @@ import Agda.TypeChecking.Monad.Base
   , Defn(..)
   , iSignature
   , iModuleName
+  , funClauses        -- IMPORTANT: selector on Defn (Agda 2.8.x) :contentReference[oaicite:2]{index=2}
   )
 import Agda.Syntax.Common.Pretty (prettyShow, pretty)
+import qualified Agda.Syntax.Internal as I
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 
-
 --------------------------------------------------------------------------------
--- | Stats
---
--- Small stats bundle so callers can distinguish:
--- - "interface signature empty" (almost certainly a bug)
--- - "module had 0 local definitions" (can be legitimate)
+-- Stats
+--------------------------------------------------------------------------------
+
+-- | Small stats bundle so callers can distinguish:
+--   * "interface signature empty" (almost certainly a bug)
+--   * "module had 0 local definitions" (can be legitimate)
 data DumpStats = DumpStats
   { dsMainModule  :: T.Text
   , dsTotalDefs   :: Int     -- total defs seen (root + sections)
@@ -84,9 +87,9 @@ data DumpStats = DumpStats
 
 --------------------------------------------------------------------------------
 -- Helpers: name splitting and normalization
+--------------------------------------------------------------------------------
 
--- | Split Name
--- Split a qualified name like "A.B.C.f" into ("A.B.C", "f").
+-- | Split a qualified name like @"A.B.C.f"@ into @"A.B.C"@ and @"f"@.
 -- If there is no '.', we treat the whole thing as the name.
 splitQName :: T.Text -> (T.Text, T.Text)
 splitQName q =
@@ -95,10 +98,8 @@ splitQName q =
         then ("", q)
         else (T.dropEnd 1 modDot, nm)  -- drop trailing '.'
 
--- | Normalize Name
--- Drop anonymous/section-y segments from a qualified name.
+-- | Normalize a qualified name by dropping anonymous/section-y segments.
 -- Conservative rule: remove path segments that are "_" or start with "_" .
--- (We can tighten/loosen later once we see actual Agda pretty output.)
 normalizeQNameText :: T.Text -> T.Text
 normalizeQNameText q =
   let segs = T.splitOn "." q
@@ -109,17 +110,16 @@ normalizeQNameText q =
       segs' = filter keep segs
   in T.intercalate "." segs'
 
--- ------------------------------------------------------------------------------
--- | v0.1: defKind
---
--- A coarse classification of Agda definitions.  We keep this stable for downstream
--- consumers; anything we don't recognize is "other".
+--------------------------------------------------------------------------------
+-- v0.1: defKind (stable classification)
+--------------------------------------------------------------------------------
+
+-- | A coarse classification of Agda definitions.
+-- We keep this stable for downstream consumers; anything unrecognized is "other".
 defKindOf :: Definition -> T.Text
 defKindOf = defKindOfDefn . theDef
 
--- | Map Agda Constructors
--- Map Agda's internal definition constructors to our stable schema enum.
--- Anything unfamiliar collapses to "other".
+-- | Map Agda's internal definition constructors to a stable schema enum.
 defKindOfDefn :: Defn -> T.Text
 defKindOfDefn = \case
   FunctionDefn{}      -> "function"
@@ -132,25 +132,12 @@ defKindOfDefn = \case
   AbstractDefn d      -> defKindOfDefn d
   _                   -> "other"
 
-
 --------------------------------------------------------------------------------
--- v0.1: dependencies (stable version)
+-- v0.1: dependencies (heuristic, stable)
 --------------------------------------------------------------------------------
 
--- | Extract Dependencies
--- Extract a coarse list of "dependency-like" identifiers from the pretty-printed type.
---
--- This is intentionally stable across Agda internal API changes:
--- + We still rely on Agda to compute the type (semantic),
--- + but avoid importing / pattern matching on internal Term constructors.
---
--- Heuristic:
--- + tokenize into identifier-ish chunks
--- + keep tokens that look like names (start with a letter) and are not tiny noise
--- + return unique tokens (sorted) for determinism
---
--- Implementation Note: dependencies are currently extracted heuristically from the
--- pretty-printed type (v0.1), not from internal term traversal.
+-- | Extract a coarse list of dependency-like identifiers from the pretty-printed type.
+-- Heuristic: tokenize and keep identifier-ish tokens.
 dependenciesFromTypeText :: T.Text -> [T.Text]
 dependenciesFromTypeText =
   Set.toList
@@ -163,9 +150,7 @@ dependenciesFromTypeText =
         && isLetter (T.head tok)
         && tok `notElem` [ "Set", "Prop", "Type" , "∀", "forall" ]
 
--- | Tokenize
--- Tokenize into chunks of letters/digits/._'
--- (Unicode letters are handled by 'isLetter'.)
+-- | Tokenize into chunks of letters/digits/._'
 tokenize :: T.Text -> [T.Text]
 tokenize =
   go [] T.empty
@@ -178,27 +163,66 @@ tokenize =
           let acc' = if T.null cur then acc else cur : acc
           in reverse acc'
         Just (c, rest)
-          | ok c      -> go acc (T.snoc cur c) rest
+          | ok c       -> go acc (T.snoc cur c) rest
           | T.null cur -> go acc cur rest
-          | otherwise -> go (cur : acc) T.empty rest
+          | otherwise  -> go (cur : acc) T.empty rest
 
+--------------------------------------------------------------------------------
+-- Pretty printing helpers
+--------------------------------------------------------------------------------
 
-
-
--- ------------------------------------------------------------------------------
--- | Pretty Print
--- Pretty-print an Agda internal thing using Agda's own pretty-printer,
--- inside the typechecking monad.
+-- | Pretty-print an Agda internal thing using Agda's own pretty-printer inside TCM.
 pp :: PrettyTCM a => a -> TCM T.Text
 pp x = do
   doc <- prettyTCM x
   pure (T.pack (prettyShow doc))
 
+--------------------------------------------------------------------------------
+-- Proof-ish extraction (function clause bodies)
+--------------------------------------------------------------------------------
 
--- | Dump JSOL Row
--- After type-checking, dump one JSONL row per definition  currently in scope from
--- the returned interface signature. Returns the number of rows written for tests and
--- debugging.
+-- | Attempt to extract a "body" for a definition.
+--
+-- We only attempt this for function-like defs, because:
+--   * in Agda, proofs are function bodies
+--   * function bodies live (after elaboration) in the clause bodies
+--
+-- Returns:
+--   * Nothing if there is no meaningful body to report
+--   * Just text if at least one clause body exists
+ppDefnBody :: Defn -> TCM (Maybe T.Text)
+ppDefnBody = \case
+  -- If a definition is wrapped as abstract, peel and continue.
+  AbstractDefn d ->
+    ppDefnBody d
+
+  -- IMPORTANT (Agda 2.8.x):
+  -- `funClauses` is a selector on Defn, not on FunctionData. :contentReference[oaicite:3]{index=3}
+  --
+  -- So we must keep the whole Defn around (d@...) and call funClauses d.
+  d@FunctionDefn{} -> do
+    let cls = funClauses d
+    bodies <- catMaybes <$> mapM ppClauseBody cls
+    pure $ if null bodies
+      then Nothing
+      else Just (T.intercalate "\n" bodies)
+
+  -- Everything else: not a proof-bearing definitional equality.
+  _ ->
+    pure Nothing
+
+-- | Pretty-print the body of a single clause, if it exists.
+-- Clause bodies are Agda internal terms (I.Term).
+ppClauseBody :: I.Clause -> TCM (Maybe T.Text)
+ppClauseBody cl =
+  case I.clauseBody cl of
+    Nothing -> pure Nothing
+    Just t  -> Just <$> pp t
+
+--------------------------------------------------------------------------------
+-- Main entry: dump one JSONL row per definition in the checked interface
+--------------------------------------------------------------------------------
+
 dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> TCM DumpStats
 dumpCheckResultAsJsonl h file cr = do
   let iface :: Interface
@@ -211,17 +235,16 @@ dumpCheckResultAsJsonl h file cr = do
       defsAll = HM.toList (_sigDefinitions sig)
 
       mainMod :: T.Text
-      -- IMPORTANT: do NOT use takeBaseName for modules like Base/Relations/Discrete.agda
       mainMod = T.pack (prettyShow (pretty (iModuleName iface)))
 
+      -- Keep only defs that "belong" to this file/module (main module + nested).
       belongsToThisFile (qname, _defn) =
         let qnTxt            = T.pack (prettyShow (pretty qname))
             (modTxt, _nmTxt) = splitQName qnTxt
         in modTxt == mainMod || (mainMod <> ".") `T.isPrefixOf` modTxt
 
       defsFiltered = filter belongsToThisFile defsAll
-
-      defsSorted = sortOn (\(qname,_) -> T.pack (prettyShow (pretty qname))) defsFiltered
+      defsSorted   = sortOn (\(qname,_) -> T.pack (prettyShow (pretty qname))) defsFiltered
 
   -- Extra debug to stderr if we ever get an empty signature.
   when (null defsAll) $
@@ -229,33 +252,39 @@ dumpCheckResultAsJsonl h file cr = do
       "agda-json DEBUG: interface + sections yielded 0 definitions; output will be empty."
 
   forM_ defsSorted $ \(qname, defn) -> do
-    let qnTxt = T.pack (prettyShow (pretty qname))   -- stable, internal-ish
-        (modTxt, nameTxt) = splitQName qnTxt
+    let qnTxt              = T.pack (prettyShow (pretty qname))   -- stable, internal-ish
+        (modTxt, nameTxt)  = splitQName qnTxt
 
-        prettyQn   = normalizeQNameText qnTxt
-        (pMod, pNm) = splitQName prettyQn
+        prettyQn           = normalizeQNameText qnTxt
+        (pMod, pNm)        = splitQName prettyQn
 
-    tyTxt <- pp (defType defn)                       -- keep type pretty-printing in TCM
+    tyTxt   <- pp (defType defn)
+    bodyTxt <- ppDefnBody (theDef defn)
+    let hasBody = isJust bodyTxt
 
     let astSize = T.length tyTxt
-        kind    = "definition"    --  keep existing field stable
+        kind    = "definition"
         defKind = defKindOf defn
         deps    = dependenciesFromTypeText tyTxt
 
         line =
           jsonObj
-            [ ("file",    jsonStr (T.pack file))
-            , ("module",  jsonStr modTxt)
-            , ("name",    jsonStr nameTxt)
-            , ("qname",   jsonStr qnTxt)
+            [ ("file",         jsonStr (T.pack file))
+            , ("module",       jsonStr modTxt)
+            , ("name",         jsonStr nameTxt)
+            , ("qname",        jsonStr qnTxt)
             , ("prettyModule", jsonStr pMod)
             , ("prettyName",   jsonStr pNm)
             , ("prettyQname",  jsonStr prettyQn)
-            , ("type",    jsonStr tyTxt)
-            , ("kind",    jsonStr kind)
-            , ("defKind", jsonStr defKind)
+            , ("type",         jsonStr tyTxt)
+            , ("kind",         jsonStr kind)
+            , ("defKind",      jsonStr defKind)
             , ("dependencies", jsonArr (map jsonStr deps))
-            , ("astSize", jsonNum astSize)
+            , ("astSize",      jsonNum astSize)
+
+            -- OPTIONAL new fields (so older validators/tests do not break):
+            , ("body",         maybe jsonNull jsonStr bodyTxt)
+            , ("hasBody",      jsonBool hasBody)
             ]
 
     liftIO $ hPutStrLn h (T.unpack line)
@@ -266,15 +295,15 @@ dumpCheckResultAsJsonl h file cr = do
     , dsWrittenDefs = length defsSorted
     }
 
+--------------------------------------------------------------------------------
+-- Tiny JSON encoder (no extra deps)
+--------------------------------------------------------------------------------
 
--- ------------------------------------------------------------------------------
--- | Tiny JSON encoder (no extra deps)
---
--- Render a JSON object from already-rendered JSON values.
--- (Keys are rendered as JSON strings.)
+-- | Render a JSON object from already-rendered JSON values.
 jsonObj :: [(T.Text, T.Text)] -> T.Text
 jsonObj kvs = "{" <> T.intercalate "," (map field kvs) <> "}"
-  where field (k, v) = jsonStr k <> ":" <> v
+  where
+    field (k, v) = jsonStr k <> ":" <> v
 
 -- | Render a JSON string with basic escaping.
 jsonStr :: T.Text -> T.Text
@@ -298,13 +327,21 @@ jsonArr xs = "[" <> T.intercalate "," xs <> "]"
 jsonNum :: Int -> T.Text
 jsonNum = T.pack . show
 
+-- | JSON null value.
+jsonNull :: T.Text
+jsonNull = "null"
+
+-- | Render a JSON boolean.
+jsonBool :: Bool -> T.Text
+jsonBool True  = "true"
+jsonBool False = "false"
+
 -- | Render a codepoint as four hex digits.
 hex4 :: Int -> String
 hex4 n =
-  let h = "0123456789abcdef"
+  let h  = "0123456789abcdef"
       d0 = h !! ((n `div` 4096) `mod` 16)
       d1 = h !! ((n `div` 256)  `mod` 16)
       d2 = h !! ((n `div` 16)   `mod` 16)
       d3 = h !! (n `mod` 16)
   in [d0, d1, d2, d3]
-
