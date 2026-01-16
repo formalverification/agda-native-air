@@ -76,7 +76,7 @@ main :: IO ()
 main = do
   args <- getArgs
   cli  <- either (\e -> die (e <> "\n\n" <> Cli.usage)) pure (Cli.parseCli args)
-  _    <- runJsonl (Cli.cliInput cli) (Cli.cliOutput cli) (Cli.cliInclude cli)
+  _    <- runJsonl (Cli.cliInput cli) (Cli.cliOutput cli) (Cli.cliInclude cli) (Cli.cliFormat cli)
   pure ()
 
 -- | In-process API for tests and future batch drivers.
@@ -86,22 +86,22 @@ main = do
 --   + opens the output file handle,
 --   + boots Agda and runs extraction,
 --   + returns extraction statistics.
-runJsonl :: FilePath -> FilePath -> [FilePath] -> IO Extract.DumpStats
-runJsonl inputFile outputFile extraIncludes = do
+runJsonl :: FilePath -> FilePath -> [FilePath] -> Cli.OutputFormat -> IO Extract.DumpStats
+runJsonl inputFile outputFile extraIncludes fmt = do
   ok <- doesFileExist inputFile
   when (not ok) $
     die $ "agda-json: Input file does not exist: " <> inputFile
 
   withFile outputFile WriteMode $ \h -> do
     hSetBuffering h LineBuffering
-    runOnce h inputFile extraIncludes
+    runOnce h inputFile outputFile extraIncludes fmt
 
 --------------------------------------------------------------------------------
 -- One run: enter Agda, typecheck, dump JSONL
 --------------------------------------------------------------------------------
 
-runOnce :: Handle -> FilePath -> [FilePath] -> IO Extract.DumpStats
-runOnce h inputFile extraIncludes = do
+runOnce :: Handle -> FilePath -> FilePath -> [FilePath] -> Cli.OutputFormat -> IO Extract.DumpStats
+runOnce h inputFile outputFile extraIncludes fmt = do
   let includeDirs = nub (takeDirectory inputFile : extraIncludes)
 
   withAgda includeDirs inputFile $ \absInput absIncludes -> do
@@ -115,7 +115,7 @@ runOnce h inputFile extraIncludes = do
     -- Agda uses an existing .agdai cache. The Interface is then extracted
     -- from that CheckResult when writing JSONL.
     cr <- typeCheckMain TypeCheck src
-    st  <- Extract.dumpCheckResultAsJsonl h inputFile cr
+    st  <- Extract.dumpCheckResultAsJsonl h inputFile cr fmt
 
     -- Hard-fail ONLY if Agda produced an *empty interface signature*.
     -- If dsWrittenDefs == 0, that can be legitimate (e.g. module is just reexports)

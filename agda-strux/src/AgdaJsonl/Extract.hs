@@ -71,6 +71,7 @@ import Agda.TypeChecking.Monad.Base
 import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import qualified Agda.Syntax.Internal as I
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
+import qualified AgdaJsonl.Cli as Cli
 
 --------------------------------------------------------------------------------
 -- Stats
@@ -223,8 +224,8 @@ ppClauseBody cl =
 -- Main entry: dump one JSONL row per definition in the checked interface
 --------------------------------------------------------------------------------
 
-dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> TCM DumpStats
-dumpCheckResultAsJsonl h file cr = do
+dumpCheckResultAsJsonl :: Handle -> FilePath -> CheckResult -> Cli.OutputFormat -> TCM DumpStats
+dumpCheckResultAsJsonl h file cr fmt = do
   let iface :: Interface
       iface = crInterface cr
 
@@ -267,25 +268,30 @@ dumpCheckResultAsJsonl h file cr = do
         defKind = defKindOf defn
         deps    = dependenciesFromTypeText tyTxt
 
-        line =
-          jsonObj
-            [ ("file",         jsonStr (T.pack file))
-            , ("module",       jsonStr modTxt)
-            , ("name",         jsonStr nameTxt)
-            , ("qname",        jsonStr qnTxt)
-            , ("prettyModule", jsonStr pMod)
-            , ("prettyName",   jsonStr pNm)
-            , ("prettyQname",  jsonStr prettyQn)
-            , ("type",         jsonStr tyTxt)
-            , ("kind",         jsonStr kind)
-            , ("defKind",      jsonStr defKind)
-            , ("dependencies", jsonArr (map jsonStr deps))
-            , ("astSize",      jsonNum astSize)
-
-            -- OPTIONAL new fields (so older validators/tests do not break):
-            , ("body",         maybe jsonNull jsonStr bodyTxt)
-            , ("hasBody",      jsonBool hasBody)
-            ]
+        line = case fmt of
+          Cli.Human ->
+            jsonObj
+              [ ("name", jsonStr nameTxt)
+              , ("type", jsonStr tyTxt)
+              , ("body", maybe jsonNull jsonStr bodyTxt)
+              ]
+          Cli.Full  ->
+            jsonObj
+              [ ("file",         jsonStr (T.pack file))
+              , ("module",       jsonStr modTxt)
+              , ("name",         jsonStr nameTxt)
+              , ("qname",        jsonStr qnTxt)
+              , ("prettyModule", jsonStr pMod)
+              , ("prettyName",   jsonStr pNm)
+              , ("prettyQname",  jsonStr prettyQn)
+              , ("type",         jsonStr tyTxt)
+              , ("kind",         jsonStr kind)
+              , ("defKind",      jsonStr defKind)
+              , ("dependencies", jsonArr (map jsonStr deps))
+              , ("astSize",      jsonNum astSize)
+              , ("body",         maybe jsonNull jsonStr bodyTxt)
+              , ("hasBody",      jsonBool hasBody)
+              ]
 
     liftIO $ hPutStrLn h (T.unpack line)
 
