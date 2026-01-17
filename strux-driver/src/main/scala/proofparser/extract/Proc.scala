@@ -39,10 +39,44 @@ import fs2.io.file.{Files => Fs2Files, Path => Fs2Path}
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 object Proc {
 
   final case class ExecResult(exitCode: Int, seconds: Double)
+
+  // --- helpers ---------------------------------------------------------------
+
+  private val tsFmt: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX")
+
+  private def nowTs: String =
+    ZonedDateTime.now().format(tsFmt)
+
+  // Minimal shell-ish quoting so the command is copy/pasteable
+  private def shQuote(s: String): String =
+    if (s.isEmpty) "''"
+    else if (s.forall(ch => ch.isLetterOrDigit || "-._/:=@".contains(ch))) s
+    else "'" + s.replace("'", "'\"'\"'") + "'"
+
+  private def renderRepro(cmd: Seq[String], env: Map[String, String], cwd: Path): String = {
+    val envPart =
+      if (env.isEmpty) ""
+      else env.toVector.sortBy(_._1).map { case (k, v) => s"$k=${shQuote(v)}" }.mkString("", " ", " ")
+
+    val cmdPart = cmd.map(shQuote).mkString(" ")
+
+    // One-liner repro + extra context lines
+    s"""|=== PROC RUN ===
+        |time: ${nowTs}
+        |cwd:  ${cwd.toAbsolutePath.normalize()}
+        |env:  ${env.toVector.sortBy(_._1).map { case (k, v) => s"$k=$v" }.mkString(", ")}
+        |REPRO:
+        |${envPart}${cmdPart}
+        |----------------
+        |""".stripMargin
+  }
 
   /** Run a command, merging stderr into stdout, and teeing output to a log file. */
   def runLogged(
@@ -73,9 +107,13 @@ object Proc {
       }
 
     val logR: Resource[IO, java.io.OutputStream] =
-      Resource.make(IO.blocking(Files.newOutputStream(logFile)))(os => IO.blocking(os.close()).handleError(_ => ()))
+      Resource.make(IO.blocking(Files.newOutputStream(logFile)))(os =>
+        IO.blocking(os.close()).handleError(_ => ())
+      )
 
     Resource.both(procR, logR).use { case (p, out) =>
+      val headerBytes = renderRepro(cmd, env, cwd).getBytes(StandardCharsets.UTF_8)
+
       val in: Stream[IO, Byte] =
         fs2.io.readInputStream(IO.blocking(p.getInputStream), chunkSize = 64 * 1024, closeAfterUse = true)
 
@@ -83,17 +121,22 @@ object Proc {
         in.through(fs2.io.writeOutputStream(IO.pure(out), closeAfterUse = false))
 
       for {
+        _    <- IO.blocking(out.write(headerBytes))
         t0   <- IO.monotonic
         _    <- writeLog.compile.drain
         code <- IO.blocking(p.waitFor())
         t1   <- IO.monotonic
-      } yield ExecResult(exitCode = code, seconds = (t1 - t0).toNanos.toDouble / 1e9)
+        secs  = (t1 - t0).toNanos.toDouble / 1e9
+        _    <- IO.blocking {
+                  val trailer =
+                    s"\n----------------\nexitCode: $code\nseconds:  $secs\n=== END PROC RUN ===\n"
+                  out.write(trailer.getBytes(StandardCharsets.UTF_8))
+                }
+      } yield ExecResult(exitCode = code, seconds = secs)
     }
   }
 
   /** NOTE:
-    * The one awkward line above is subtracting timestamps. For a purer approach, we could
-    * replace that with a single `for { t0 <- IO.monotonic; ...; t1 <- IO.monotonic } yield ...`
-    * and compute (t1 - t0) without the unsafeRunSync.
+    * We time using IO.monotonic so it's unaffected by wall-clock changes.
     */
 }

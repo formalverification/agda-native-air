@@ -49,6 +49,7 @@ import cats.syntax.all._
 import fs2.Stream
 
 import java.nio.charset.StandardCharsets
+import java.nio.file.StandardOpenOption.{APPEND, CREATE}
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
 
@@ -87,6 +88,13 @@ object AgdaJsonlDriver extends IOApp {
     def info(s: String): IO[Unit] =
       IO.println(s"${ts} - $s")
   }
+
+  private def appendLogLine(log: Path, line: String): IO[Unit] =
+    IO.blocking {
+      val msg = (line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8)
+      Files.write(log, msg, CREATE, APPEND)
+    }
+
 
   object ModuleRun {
     // Custom writer to avoid uPickle Option encoding ([] / [n]).
@@ -477,7 +485,13 @@ object AgdaJsonlDriver extends IOApp {
       _    <- ensureDirs
       skip <- resumeCheck
       res  <- skip match {
-                case Some(r) => IO.pure(r)
+                case Some(r) => {
+                  val logMsg =
+                    s"[AgdaJsonlDriver]  ⏭️  Skipping module $mod (output exists and is valid);\n" +
+                    s"                       resume=true; output=${out.toString};" +
+                    s"                       to force re-run: delete the output file or pass --no-resume."
+                  appendLogLine(log, logMsg.trim.replaceAll("\n", " ")) *> IO.pure(r)
+                }
                 case None =>
                   IO.blocking(Files.exists(input)).flatMap {
                     case false => IO.pure(missingInput)
