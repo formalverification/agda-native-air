@@ -100,16 +100,12 @@ splitQName q =
         else (T.dropEnd 1 modDot, nm)  -- drop trailing '.'
 
 -- | Normalize a qualified name by dropping anonymous/section-y segments.
--- Conservative rule: remove path segments that are "_" or start with "_" .
+-- Conservative rule: remove only segments that are exactly "_" (anonymous module markers).
 normalizeQNameText :: T.Text -> T.Text
 normalizeQNameText q =
-  let segs = T.splitOn "." q
-      keep s =
-        not (T.null s)
-        && s /= "_"
-        && not ("_" `T.isPrefixOf` s)
-      segs' = filter keep segs
-  in T.intercalate "." segs'
+  let segs  = T.splitOn "." q
+      keep s = not (T.null s) && s /= "_"
+  in T.intercalate "." (filter keep segs)
 
 --------------------------------------------------------------------------------
 -- v0.1: defKind (stable classification)
