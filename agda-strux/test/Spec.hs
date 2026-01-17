@@ -53,6 +53,12 @@ tests = testGroup "agda-json"
       test_empty_module_allows_empty_jsonl
   , testCase "extracts proof clauses for lemma-like function defs"
       test_extracts_proof_clauses
+  , testCase "regression: NoetherLike normalizes anonymous-section names"
+      test_regression_noetherlike_normalization
+  , testCase "regression: golden Noether.jsonl schema + normalization invariants"
+      test_regression_golden_noether_jsonl
+  , testCase "extracts commutativity proof + local where lemma in AddCommExample"
+      test_addcommexample_extracts_comm_and_where_lemma
   ]
 
 
@@ -265,6 +271,186 @@ test_extracts_proof_clauses = do
           assertBool "expected non-empty body for ⊑-trans" (not (T.null t))
         other ->
           assertFailure ("expected hasBody=true and body=String, got: " <> show other)
+
+test_addcommexample_extracts_comm_and_where_lemma :: Assertion
+test_addcommexample_extracts_comm_and_where_lemma = do
+  srcInput <- getDataFileName "test/resources/AddCommExample.agda"
+  exists <- doesFileExist srcInput
+  unless exists $
+    assertFailure ("Missing test input file: " <> srcInput)
+
+  -- NEW: AddCommExample imports Proofs, so we must copy it too for hermetic tests.
+  srcProofs <- getDataFileName "test/resources/Proofs.agda"
+  proofsExists <- doesFileExist srcProofs
+  unless proofsExists $
+    assertFailure ("Missing test dependency file: " <> srcProofs)
+
+  withTempDir "agda-json-addcomm-test" $ \dir -> do
+    let input     = dir </> "AddCommExample.agda"
+        proofsDep = dir </> "Proofs.agda"
+        out       = dir </> "addcomm.jsonl"
+
+    copyFile srcInput input
+    copyFile srcProofs proofsDep
+
+    agdaDir <- setupAgdaDir dir
+
+    withEnv "AGDA_DIR" agdaDir $ do
+      _st  <- Run.runJsonl input out [] Cli.Full
+      objs <- parseJsonlObjects out
+
+      assertBool "expected non-empty JSONL for AddCommExample.agda" (not (null objs))
+
+      let findByPrettyQname pq =
+            [ o | o <- objs
+                , KM.lookup "prettyQname" o == Just (String (T.pack pq))
+            ]
+
+      let findByQname qn =
+            [ o | o <- objs
+                , KM.lookup "qname" o == Just (String (T.pack qn))
+            ]
+
+      -- 0) Regression: operators that start with '_' must NOT be treated as anonymous-module segments.
+      --    After the normalizeQNameText fix, _+_ should remain in prettyName / prettyQname.
+      let plusRows = findByQname "AddCommExample._+_"
+      assertBool "expected row qname AddCommExample._+_" (not (null plusRows))
+
+      oPlus <- case plusRows of
+        o : _ -> pure o
+        []    -> assertFailure "expected row AddCommExample._+_" >> error "unreachable"
+
+      case ( KM.lookup "prettyModule" oPlus
+           , KM.lookup "prettyName"   oPlus
+           , KM.lookup "prettyQname"  oPlus
+           ) of
+        (Just (String pm), Just (String pn), Just (String pq)) -> do
+          assertBool "expected prettyModule == AddCommExample" (pm == "AddCommExample")
+          assertBool "expected prettyName == _+_" (pn == "_+_")
+          assertBool "expected prettyQname == AddCommExample._+_" (pq == "AddCommExample._+_")
+        other ->
+          assertFailure ("expected prettyModule/prettyName/prettyQname to be strings, got: " <> show other)
+
+      -- 1) Main theorem exists + has non-empty body
+      let commRows = findByPrettyQname "AddCommExample.properties.+-comm"
+      assertBool "expected row AddCommExample.properties.+-comm" (not (null commRows))
+
+      oComm <- case commRows of
+        o : _ -> pure o
+        []    -> assertFailure "expected row AddCommExample.properties.+-comm" >> error "unreachable"
+
+      case (KM.lookup "hasBody" oComm, KM.lookup "body" oComm) of
+        (Just (Bool True), Just (String t)) -> do
+          assertBool "expected non-empty body for +-comm" (not (T.null t))
+          assertBool "expected body to mention '+-comm'" ("+-comm" `T.isInfixOf` t)
+          assertBool "expected body to mention 'cong' or 'trans'"
+            (("cong" `T.isInfixOf` t) || ("trans" `T.isInfixOf` t))
+        other ->
+          assertFailure ("expected hasBody=true and body=String, got: " <> show other)
+
+      -- 2) Tight regression for the where-lemma name normalization:
+      --    qname contains section marker "._." but prettyQname does not.
+      let sucRows = findByPrettyQname "AddCommExample.properties.+-suc"
+      assertBool "expected row AddCommExample.properties.+-suc" (not (null sucRows))
+
+      oSuc <- case sucRows of
+        o : _ -> pure o
+        []    -> assertFailure "expected row AddCommExample.properties.+-suc" >> error "unreachable"
+
+      case (KM.lookup "qname" oSuc, KM.lookup "prettyQname" oSuc) of
+        (Just (String q), Just (String pq)) -> do
+          assertBool "expected raw qname to contain 'properties._.'" ("properties._." `T.isInfixOf` q)
+          assertBool "expected prettyQname to be normalized (no '._.')" (not ("._." `T.isInfixOf` pq))
+        other ->
+          assertFailure ("expected qname/prettyQname to be strings, got: " <> show other)
+
+      -- Optional extra invariant: prettyModule should be normalized too
+      case (KM.lookup "module" oSuc, KM.lookup "prettyModule" oSuc) of
+        (Just (String m), Just (String pm)) -> do
+          assertBool "expected module to contain 'properties._'" ("AddCommExample.properties._" `T.isInfixOf` m)
+          assertBool "expected prettyModule to be normalized"
+            (pm == "AddCommExample.properties")
+        other ->
+          assertFailure ("expected module/prettyModule to be strings, got: " <> show other)
+
+test_regression_noetherlike_normalization :: Assertion
+test_regression_noetherlike_normalization = do
+  srcInput <- getDataFileName "test/resources/agda-algebras-regressions/NoetherLike.agda"
+  exists <- doesFileExist srcInput
+  unless exists $
+    assertFailure ("Missing test input file: " <> srcInput)
+
+  withTempDir "agda-json-noetherlike-test" $ \dir -> do
+    let input = dir </> "NoetherLike.agda"
+        out   = dir </> "noetherlike.jsonl"
+
+    copyFile srcInput input
+    agdaDir <- setupAgdaDir dir
+
+    withEnv "AGDA_DIR" agdaDir $ do
+      _st <- Run.runJsonl input out [] Cli.Full
+      objs <- parseJsonlObjects out
+
+      -- Basic sanity: non-empty
+      assertBool "expected non-empty JSONL for NoetherLike.agda" (not (null objs))
+
+      -- Core regression: we should see at least one row whose *raw* qname contains "._."
+      -- but whose prettyQname does NOT contain "._."
+      let hasAnonInQname o =
+            case (KM.lookup "qname" o, KM.lookup "prettyQname" o) of
+              (Just (String q), Just (String pq)) ->
+                   ("._." `T.isInfixOf` q)
+                && not ("._." `T.isInfixOf` pq)
+              _ -> False
+
+      assertBool
+        "expected at least one def with qname containing '._.' but prettyQname normalized"
+        (any hasAnonInQname objs)
+
+      -- Also assert the specific symbol we expect is present in prettyQname space.
+      let hasPretty pq =
+            any (\o -> KM.lookup "prettyQname" o == Just (String (T.pack pq))) objs
+
+      assertBool "expected NoetherLike.secId in prettyQname" (hasPretty "NoetherLike.secId")
+      assertBool "expected NoetherLike.FirstHomTheorem|Set in prettyQname" (hasPretty "NoetherLike.FirstHomTheorem|Set")
+      assertBool "expected NoetherLike.Nested.bar in prettyQname" (hasPretty "NoetherLike.Nested.bar")
+
+
+test_regression_golden_noether_jsonl :: Assertion
+test_regression_golden_noether_jsonl = do
+  fp <- getDataFileName "test/resources/agda-algebras-regressions/Noether.jsonl"
+  exists <- doesFileExist fp
+  unless exists $
+    assertFailure ("Missing golden JSONL file: " <> fp)
+
+  objs <- parseJsonlObjects fp
+
+  assertBool "expected Noether.jsonl to contain at least one object" (not (null objs))
+
+  -- Guard the exact weirdness seen in the snapshot:
+  -- module can be "Base.Homomorphisms.Noether._" while prettyModule is normalized.
+  let hasNormalizedPrettyModule o =
+        case (KM.lookup "module" o, KM.lookup "prettyModule" o) of
+          (Just (String m), Just (String pm)) ->
+               ("._" `T.isInfixOf` m)
+            && not ("._" `T.isInfixOf` pm)
+          _ -> False
+
+  assertBool
+    "expected at least one row where module contains '._' but prettyModule is normalized"
+    (any hasNormalizedPrettyModule objs)
+
+  -- Similar check for qname vs prettyQname
+  let hasNormalizedPrettyQname o =
+        case (KM.lookup "qname" o, KM.lookup "prettyQname" o) of
+          (Just (String q), Just (String pq)) ->
+               ("._." `T.isInfixOf` q)
+            && not ("._." `T.isInfixOf` pq)
+          _ -> False
+
+  assertBool
+    "expected at least one row where qname contains '._.' but prettyQname is normalized"
+    (any hasNormalizedPrettyQname objs)
 
 
 --------------------------------------------------------------------------------

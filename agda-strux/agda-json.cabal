@@ -2,7 +2,10 @@ cabal-version:      3.0
 name:               agda-json
 version:            0.1.0.0
 build-type:         Simple
-data-files: test/resources/Example.agda
+data-files:
+  test/resources/*.agda
+  test/resources/*.jsonl
+  test/resources/agda-algebras-regressions/*
 tested-with: GHC ==9.4.7, GHC ==9.10.3
 
 library
