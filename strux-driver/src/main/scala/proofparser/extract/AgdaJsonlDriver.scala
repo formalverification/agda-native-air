@@ -491,8 +491,6 @@ object AgdaJsonlDriver extends IOApp {
   // Local bounded-parallel runner (non-Spark)
   // ---------------------------------------------------------------------------
 
-  // private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
-  //   modules.parTraverseN(cfg.parallelism)(m => runOne(cfg, m))
   private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
     Stream
       .emits(modules)
@@ -680,9 +678,7 @@ object AgdaJsonlDriver extends IOApp {
         okN  = results.count(_.ok)
         badN = results.size - okN
 
-        // _ <- IO.println(s"[AgdaJsonlDriver] manifest: $mf")
-        // _ <- IO.println(s"[AgdaJsonlDriver] summary: ok=$okN failed=$badN total=${results.size}")
-        _ <- Log.info(s"[AgdaJsonlDriver] 🏁 Extraction complete. ")
+        _ <- Log.info(s"[AgdaJsonlDriver] 🏁 Extraction complete.")
         _ <- Log.info(s"[AgdaJsonlDriver]      summary: ok=$okN failed=$badN total=${results.size}")
         _ <- Log.info(s"[AgdaJsonlDriver]      manifest: $mf")
 
