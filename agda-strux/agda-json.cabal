@@ -18,6 +18,7 @@ library
     , directory
     , filepath
     , text
+    , time
     , unordered-containers
   default-language: GHC2021
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -O0

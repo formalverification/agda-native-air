@@ -39,16 +39,18 @@ data Cli = Cli
 usage :: String
 usage = unlines
   [ "Usage:"
-  , "  agda-json --input PATH --output OUT.jsonl [--include DIR]... [--format full|human | --human]"
-  , ""
+  , " |   agda-json --input PATH --output OUT.jsonl [--include DIR]... [--format full|human | --human]"
+  , " | "
   , "Example:"
-  , "  agda-json --input test/resources/Example.agda \\"
-  , "           --output /tmp/out.jsonl \\"
-  , "           --include test/resources"
-  , ""
+  , " |   agda-json --input test/resources/Example.agda \\"
+  , " |             --output /tmp/out.jsonl \\"
+  , " |             --include test/resources"
+  , " | "
   , "Human output:"
-  , "  agda-json --input X.agda --output /tmp/out.jsonl --human"
+  , " |   agda-json --input X.agda --output /tmp/out.jsonl --human"
+  , " | "
   ]
+
 
 -- | Total CLI parser: never throws; returns an error message on failure.
 parseCli :: [String] -> Either String Cli

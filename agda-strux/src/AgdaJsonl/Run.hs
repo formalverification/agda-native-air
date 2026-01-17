@@ -41,6 +41,7 @@ module AgdaJsonl.Run
 import Control.Exception (catch, throwIO)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
+import Data.Time (getZonedTime, formatTime, defaultTimeLocale)
 import Data.List (nub)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.Directory (doesFileExist, makeAbsolute)
@@ -79,6 +80,15 @@ main = do
   _    <- runJsonl (Cli.cliInput cli) (Cli.cliOutput cli) (Cli.cliInclude cli) (Cli.cliFormat cli)
   pure ()
 
+-- | Log an info message with timestamp to stderr.
+-- Used for simple progress logging.
+logInfo :: String -> IO ()
+logInfo msg = do
+  z <- getZonedTime
+  let ts = formatTime defaultTimeLocale "%F %T" z
+  hPutStrLn stderr (ts <> " - INFO  - " <> msg)
+
+
 -- | In-process API for tests and future batch drivers.
 --
 -- This function:
@@ -94,14 +104,17 @@ runJsonl inputFile outputFile extraIncludes fmt = do
 
   withFile outputFile WriteMode $ \h -> do
     hSetBuffering h LineBuffering
-    runOnce h inputFile outputFile extraIncludes fmt
+    logInfo ("[agda-backend-jsonl/Run] Checking " <> inputFile)
+    st <- runOnce h inputFile extraIncludes fmt
+    logInfo ("[agda-backend-jsonl/Run] ✅ wrote " <> show (Extract.dsWrittenDefs st) <> " JSON records to " <> outputFile)
+    pure st
 
 --------------------------------------------------------------------------------
 -- One run: enter Agda, typecheck, dump JSONL
 --------------------------------------------------------------------------------
 
-runOnce :: Handle -> FilePath -> FilePath -> [FilePath] -> Cli.OutputFormat -> IO Extract.DumpStats
-runOnce h inputFile outputFile extraIncludes fmt = do
+runOnce :: Handle -> FilePath -> [FilePath] -> Cli.OutputFormat -> IO Extract.DumpStats
+runOnce h inputFile extraIncludes fmt = do
   let includeDirs = nub (takeDirectory inputFile : extraIncludes)
 
   withAgda includeDirs inputFile $ \absInput absIncludes -> do

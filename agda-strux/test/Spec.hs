@@ -29,7 +29,6 @@ import Control.Monad (forM, forM_, unless, when)
 import Data.Aeson (Value(..), eitherDecodeStrict')
 import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
-import Data.Foldable (toList)
 import Data.Text qualified as T
 import Paths_agda_json (getDataFileName)
 import System.Directory  ( copyFile, createDirectory, doesFileExist
@@ -41,6 +40,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified AgdaJsonl.Run as Run
+import qualified AgdaJsonl.Cli as Cli
 
 main :: IO ()
 main = defaultMain tests
@@ -166,13 +166,15 @@ test_runs_twice_jsonl_invariants = do
     agdaDir <- setupAgdaDir dir
 
     withEnv "AGDA_DIR" agdaDir $ do
+      let fmt = Cli.Full
+
       -- Run #1
-      _st1  <- Run.runJsonl input out1 []   -- includeDirs already include input dir
+      _st1  <- Run.runJsonl input out1 [] fmt  -- includeDirs already include input dir
       rows1 <- parseJsonl False out1
       assertBool "expected at least one row on first run" (not (null rows1))
 
       -- Run #2 (cache should be used)
-      _st2  <- Run.runJsonl input out2 []
+      _st2  <- Run.runJsonl input out2 [] fmt
       rows2 <- parseJsonl False out2
       assertBool "expected at least one row on second run" (not (null rows2))
 
@@ -208,7 +210,8 @@ test_empty_module_allows_empty_jsonl = do
 
     agdaDir <- setupAgdaDir dir
     withEnv "AGDA_DIR" agdaDir $ do
-      _st <- Run.runJsonl input out []
+      let fmt = Cli.Full
+      _st <- Run.runJsonl input out [] fmt
       rows <- parseJsonl True out
       assertBool "expected 0 rows for Empty.agda" (null rows)
 
@@ -228,7 +231,8 @@ test_extracts_proof_clauses = do
     agdaDir <- setupAgdaDir dir
 
     withEnv "AGDA_DIR" agdaDir $ do
-      _st <- Run.runJsonl input out []
+      let fmt = Cli.Full
+      _st <- Run.runJsonl input out [] fmt
       objs <- parseJsonlObjects out
 
       let findByPrettyQ pq =
@@ -239,13 +243,9 @@ test_extracts_proof_clauses = do
       let rowsRefl = findByPrettyQ "Proofs.⊑-refl"
       assertBool "expected row Proofs.⊑-refl" (not (null rowsRefl))
 
-      let oRefl = head rowsRefl
-
-      -- case KM.lookup "clauses" oRefl of
-      --   Just (Array arr) ->
-      --     assertBool "expected non-empty clauses for ⊑-refl" (not (null (toList arr)))
-      --   other ->
-      --     assertFailure ("expected clauses: Array, got: " <> show other)
+      oRefl <- case rowsRefl of
+        o : _ -> pure o
+        []    -> assertFailure "expected row Proofs.⊑-refl" >> error "unreachable"
 
       case (KM.lookup "hasBody" oRefl, KM.lookup "body" oRefl) of
         (Just (Bool True), Just (String t)) ->
@@ -253,17 +253,12 @@ test_extracts_proof_clauses = do
         other ->
           assertFailure ("expected hasBody=true and body=String, got: " <> show other)
 
-
-
       let rowsTrans = findByPrettyQ "Proofs.⊑-trans"
       assertBool "expected row Proofs.⊑-trans" (not (null rowsTrans))
 
-      let oTrans = head rowsTrans
-      -- case KM.lookup "clauses" oTrans of
-      --   Just (Array arr) ->
-      --     assertBool "expected non-empty clauses for ⊑-trans" (not (null (toList arr)))
-      --   other ->
-      --     assertFailure ("expected clauses: Array, got: " <> show other)
+      oTrans <- case rowsTrans of
+        o : _ -> pure o
+        []    -> assertFailure "expected row Proofs.⊑-trans" >> error "unreachable"
 
       case (KM.lookup "hasBody" oTrans, KM.lookup "body" oTrans) of
         (Just (Bool True), Just (String t)) ->
