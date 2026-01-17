@@ -88,7 +88,6 @@ logInfo msg = do
   let ts = formatTime defaultTimeLocale "%F %T" z
   hPutStrLn stderr (ts <> " - INFO  - " <> msg)
 
-
 -- | In-process API for tests and future batch drivers.
 --
 -- This function:

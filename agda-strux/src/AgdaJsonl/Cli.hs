@@ -78,4 +78,3 @@ parseCli xs =
     when (null (cliInput c))  (Left "Missing --input")
     when (null (cliOutput c)) (Left "Missing --output")
     pure c
-
