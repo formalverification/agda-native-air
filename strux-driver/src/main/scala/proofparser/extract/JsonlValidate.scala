@@ -82,7 +82,9 @@ object JsonlValidate {
 
              case Some(obj) =>
                val keys    = obj.keySet
-               val missing = RequiredKeys.diff(keys)
+               val required =
+                 if (keys.contains("file")) FullKeys else HumanKeys
+               val missing = required.diff(keys)
                val acc2    = acc1.copy(rows = acc1.rows + 1)
                if (missing.isEmpty) acc2
                else acc2.addErr(s"line ${acc1.lineNo}: missing keys: ${missing.toList.sorted.mkString(",")}", maxErrors)
@@ -95,8 +97,9 @@ object JsonlValidate {
   // Schema expectations for v0 backend rows.
   // ---------------------------------------------------------------------------
 
-  private val RequiredKeys: Set[String] =
-    Set("file", "module", "name", "qname", "type", "kind", "astSize")
+  private val FullKeys: Set[String] = Set("file", "module", "name", "qname", "type", "kind", "astSize")
+
+  private val HumanKeys: Set[String] = Set("name", "type", "body")
 
   // ---------------------------------------------------------------------------
   // Result model

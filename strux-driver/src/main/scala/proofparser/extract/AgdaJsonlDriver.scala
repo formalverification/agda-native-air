@@ -46,11 +46,14 @@ import cats.effect.implicits._
 import cats.effect.unsafe.implicits.global
 import cats.syntax.all._
 
-import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
+import fs2.Stream
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import java.time.Instant
+
+import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
+
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -75,6 +78,15 @@ object AgdaJsonlDriver extends IOApp {
     validateOk: Boolean,
     validateErrors: Vector[String]
   )
+
+  private object Log {
+    private val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    private def ts: String =
+      java.time.ZonedDateTime.now().format(fmt)
+
+    def info(s: String): IO[Unit] =
+      IO.println(s"${ts} - $s")
+  }
 
   object ModuleRun {
     // Custom writer to avoid uPickle Option encoding ([] / [n]).
@@ -171,7 +183,8 @@ object AgdaJsonlDriver extends IOApp {
     resume: Boolean,
     runner: Runner,
     sparkMaster: String,
-    failOnError : Boolean = true
+    failOnError : Boolean = true,
+    jsonlFormat: String = "full"
   )
 
   final case class ConfigData(
@@ -184,7 +197,8 @@ object AgdaJsonlDriver extends IOApp {
     parallelism: Int,
     resume: Boolean,
     sparkMaster: String,
-    failOnError : Boolean
+    failOnError : Boolean,
+    jsonlFormat: String
   ) extends Serializable
 
   private def toData(c: Config): ConfigData =
@@ -198,7 +212,8 @@ object AgdaJsonlDriver extends IOApp {
       c.parallelism,
       c.resume,
       c.sparkMaster,
-      c.failOnError
+      c.failOnError,
+      c.jsonlFormat
     )
 
   private def fromData(d: ConfigData): Config =
@@ -213,7 +228,8 @@ object AgdaJsonlDriver extends IOApp {
       d.resume,
       runner = Runner.Spark, // only used inside Spark executors; not read there
       sparkMaster = d.sparkMaster,
-      failOnError = d.failOnError
+      failOnError = d.failOnError,
+      jsonlFormat = d.jsonlFormat
     )
 
   private val usage: String =
@@ -229,9 +245,8 @@ object AgdaJsonlDriver extends IOApp {
       |    [--runner spark|local|spark2]
       |    [--spark-master local[*]]
       |    [--fail-on-error true|false]
+      |    [--format full|human] [--human]
       |
-      |Notes:
-      |  - Only TOP-LEVEL modules are run (no dots in name).
       |""".stripMargin
 
   private def parseArgs(args: List[String]): Either[String, Config] = {
@@ -250,6 +265,22 @@ object AgdaJsonlDriver extends IOApp {
     var m = Map.empty[String, String]
     while (i < args.length) {
       args(i) match {
+        case "--human" =>
+          m = m.updated("format", "human")
+          i += 1
+        case "--format" =>
+          next(i) match {
+            case Left(e) => return Left(e)
+            case Right(v) =>
+              val vv = v.trim.toLowerCase
+              vv match {
+                case "full" | "human" =>
+                  m = m.updated("format", vv)
+                  i += 2
+                case _ =>
+                  return Left(s"[AgdaJsonlDriver]  ❌ Bad value for --format: $v (use full|human)\n\n${usage}")
+              }
+          }
         case "--no-resume" =>
           m = m.updated("resume", "false")
           i += 1
@@ -263,7 +294,7 @@ object AgdaJsonlDriver extends IOApp {
                   m = m.updated("fail-on-error", b)
                   i += 2
                 case None =>
-                  return Left(s"Bad value for --fail-on-error: $v (use true/false)\n\n${usage}")
+                  return Left(s"[AgdaJsonlDriver] ❌ Bad value for --fail-on-error: $v (use true/false)\n\n${usage}")
               }
           }
 
@@ -276,7 +307,7 @@ object AgdaJsonlDriver extends IOApp {
           }
 
         case bad =>
-          return Left(s"Unrecognized arg: $bad\n\n${usage}")
+          return Left(s"[AgdaJsonlDriver] ❌ Unrecognized arg: $bad\n\n${usage}")
       }
     }
 
@@ -319,7 +350,8 @@ object AgdaJsonlDriver extends IOApp {
         resume      = resume,
         runner      = runner,
         sparkMaster = sparkMaster,
-        failOnError = failOnError
+        failOnError = failOnError,
+        jsonlFormat = m.get("format").getOrElse("full")
       )
     }
   }
@@ -408,12 +440,15 @@ object AgdaJsonlDriver extends IOApp {
       )
 
     val runBackend: IO[ModuleRun] = {
-      val cmd = Seq(
-        cfg.agdaJsonBin.toString,
-        "--input", input.toString,
-        "--output", out.toString,
-        "--include", cfg.srcDir.toString
-      )
+      val cmd = {
+        val base = Seq(
+          cfg.agdaJsonBin.toString,
+          "--input", input.toString,
+          "--output", out.toString,
+          "--include", cfg.srcDir.toString
+        )
+        if (cfg.jsonlFormat == "human") base :+ "--human" else base
+      }
 
       val env = Map("AGDA_DIR" -> cfg.agdaDir.toString)
 
@@ -456,8 +491,24 @@ object AgdaJsonlDriver extends IOApp {
   // Local bounded-parallel runner (non-Spark)
   // ---------------------------------------------------------------------------
 
+  // private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
+  //   modules.parTraverseN(cfg.parallelism)(m => runOne(cfg, m))
   private def runLocally(cfg: Config, modules: Vector[String]): IO[Vector[ModuleRun]] =
-    modules.parTraverseN(cfg.parallelism)(m => runOne(cfg, m))
+    Stream
+      .emits(modules)
+      .covary[IO]
+      .parEvalMapUnordered(cfg.parallelism) { m =>
+        val input = moduleToInput(cfg.srcDir, m)
+        Log.info(s"> Checking $m ($input).") *>
+          runOne(cfg, m).flatTap { r =>
+            val status =
+              if (r.ok) s"[AgdaJsonlDriver] ✅ [success] wrote ${r.rows} JSON records to ${r.outputFile}"
+              else      s"[AgdaJsonlDriver] ❌ [failure] exit=${r.exitCode.getOrElse(-1)} log=${r.logFile}"
+            Log.info(status)
+          }
+      }
+      .compile
+      .toVector
 
   // ---------------------------------------------------------------------------
   // Spark runner
@@ -591,6 +642,14 @@ object AgdaJsonlDriver extends IOApp {
         mods <- readModules(cfg.modulesFile)
         _    <- IO.raiseWhen(mods.isEmpty)(new RuntimeException(s"No top-level modules found in: ${cfg.modulesFile}"))
 
+        _ <- Log.info("[AgdaJsonlDriver]  ✅ Logging configuration complete")
+        _ <- Log.info(s"[AgdaJsonlDriver]  🔁 Running extractor")
+        _ <- Log.info(s"[AgdaJsonlDriver]       outDir: ${cfg.outDir}")
+        _ <- Log.info(s"[AgdaJsonlDriver]       srcDir: ${cfg.srcDir}")
+        _ <- Log.info(s"[AgdaJsonlDriver]       modulesFile: ${cfg.modulesFile}")
+        _ <- Log.info(s"[AgdaJsonlDriver]       parallelism: ${cfg.parallelism}")
+        _ <- Log.info(s"[AgdaJsonlDriver]       runner: ${cfg.runner.asString}")
+
         t0 <- start
 
         results <-
@@ -601,16 +660,16 @@ object AgdaJsonlDriver extends IOApp {
             case Runner.Spark =>
               runWithSpark(cfg, mods).handleErrorWith { e =>
                 // automatic fallback
-                IO.println(s"[AgdaJsonlDriver] Spark failed (${e.getClass.getSimpleName}): ${e.getMessage}") *>
-                IO.println(s"[AgdaJsonlDriver] Falling back to local runner...") *>
+                IO.println(s"[AgdaJsonlDriver]  ❌ Spark failed (${e.getClass.getSimpleName}): ${e.getMessage}") *>
+                IO.println(s"[AgdaJsonlDriver]       Falling back to local runner...") *>
                 runLocally(cfg.copy(runner = Runner.Local), mods)
               }
 
             case Runner.Spark2 =>
               runWithSpark(cfg, mods).handleErrorWith { e =>
-                IO.println(s"[AgdaJsonlDriver] Spark failed (${e.getClass.getName}): ${e.getMessage}") *>
+                IO.println(s"[AgdaJsonlDriver]  ❌ Spark failed (${e.getClass.getName}): ${e.getMessage}") *>
                 IO.blocking(e.printStackTrace()) *>
-                IO.println("[AgdaJsonlDriver] Falling back to local runner...") *>
+                IO.println("[AgdaJsonlDriver]       Falling back to local runner...") *>
                 runLocally(cfg.copy(runner = Runner.Local), mods)
               }
           }
@@ -621,8 +680,11 @@ object AgdaJsonlDriver extends IOApp {
         okN  = results.count(_.ok)
         badN = results.size - okN
 
-        _ <- IO.println(s"[AgdaJsonlDriver] manifest: $mf")
-        _ <- IO.println(s"[AgdaJsonlDriver] summary: ok=$okN failed=$badN total=${results.size}")
+        // _ <- IO.println(s"[AgdaJsonlDriver] manifest: $mf")
+        // _ <- IO.println(s"[AgdaJsonlDriver] summary: ok=$okN failed=$badN total=${results.size}")
+        _ <- Log.info(s"[AgdaJsonlDriver] 🏁 Extraction complete. ")
+        _ <- Log.info(s"[AgdaJsonlDriver]      summary: ok=$okN failed=$badN total=${results.size}")
+        _ <- Log.info(s"[AgdaJsonlDriver]      manifest: $mf")
 
       } yield {
         if (badN > 0 && cfg.failOnError) ExitCode.Error
@@ -630,7 +692,7 @@ object AgdaJsonlDriver extends IOApp {
       }
 
     prog.handleErrorWith { e =>
-      IO.println(s"[AgdaJsonlDriver] ERROR: ${e.getMessage}").as(ExitCode.Error)
+      IO.println(s"[AgdaJsonlDriver]  ❌ ERROR: ${e.getMessage}").as(ExitCode.Error)
     }
   }
 }
