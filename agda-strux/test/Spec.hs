@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | Integration tests for the Agda JSONL backend (in-process).
 --
@@ -30,6 +31,7 @@ import Data.Aeson (Value(..), eitherDecodeStrict')
 import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
 import Data.Text qualified as T
+import Data.Foldable (toList)
 import Paths_agda_json (getDataFileName)
 import System.Directory  ( copyFile, createDirectory, doesFileExist
                          , getTemporaryDirectory , removePathForcibly )
@@ -59,6 +61,8 @@ tests = testGroup "agda-json"
       test_regression_golden_noether_jsonl
   , testCase "extracts commutativity proof + local where lemma in AddCommExample"
       test_addcommexample_extracts_comm_and_where_lemma
+  , testCase "typeAst: parses, tag == Type, and contains a Pi (Example.secId)"
+      test_typeAst_contains_Pi_for_secId
   ]
 
 
@@ -116,21 +120,6 @@ parseLine line =
             (Just (String m), Just (String n), Just (String q), Just (String pq)) ->
               pure [(T.unpack m, T.unpack n, T.unpack q, T.unpack pq)]
             _ -> assertFailure "module/name/qname/prettyQname missing or not strings"
-
-          -- -- defKind must be a non-empty string
-          -- case KM.lookup "defKind" o of
-          --   Just (String dk)  -> assertBool "defKind must be non-empty" (not (T.null dk))
-          --   _                 -> assertFailure "defKind must be a JSON string"
-
-          -- -- dependencies must be a JSON array (even if empty)
-          -- case KM.lookup "dependencies" o of
-          --   Just (Array _arr)  -> pure ()
-          --   _                  -> assertFailure "dependencies must be a JSON array"
-
-          -- case (KM.lookup "module" o, KM.lookup "name" o, KM.lookup "qname" o) of
-          --   (Just (String m), Just (String n), Just (String q)) ->
-          --     pure [(T.unpack m, T.unpack n, T.unpack q)]
-          --   _ -> assertFailure "module/name/qname missing or not strings"
 
         _ -> assertFailure ("Expected JSON object but got: " <> show v)
 
@@ -191,11 +180,11 @@ test_runs_twice_jsonl_invariants = do
       assertBool "expected Example.foo-id"
         (any (\(_,_,_,pq) -> pq == "Example.foo-id") rows2)
 
-      -- NEW: section traversal must find Example.secId
+      -- section traversal must find Example.secId
       assertBool "expected Example.secId (from anonymous module section)"
         (any (\(_,_,_,pq) -> pq == "Example.secId") rows2)
 
-      -- NEW: prefix filtering includes nested module defs too
+      -- prefix filtering includes nested module defs too
       assertBool "expected Example.Nested.bar"
         (any (\(_,_,_,pq) -> pq == "Example.Nested.bar") rows2)
 
@@ -251,7 +240,7 @@ test_extracts_proof_clauses = do
 
       oRefl <- case rowsRefl of
         o : _ -> pure o
-        []    -> assertFailure "expected row Proofs.⊑-refl" >> error "unreachable"
+        []    -> assertFailure "expected row Proofs.⊑-refl" >> error "no rows found for Proofs.⊑-refl"
 
       case (KM.lookup "hasBody" oRefl, KM.lookup "body" oRefl) of
         (Just (Bool True), Just (String t)) ->
@@ -264,7 +253,7 @@ test_extracts_proof_clauses = do
 
       oTrans <- case rowsTrans of
         o : _ -> pure o
-        []    -> assertFailure "expected row Proofs.⊑-trans" >> error "unreachable"
+        []    -> assertFailure "expected row Proofs.⊑-trans" >> error "no rows found for Proofs.⊑-trans"
 
       case (KM.lookup "hasBody" oTrans, KM.lookup "body" oTrans) of
         (Just (Bool True), Just (String t)) ->
@@ -279,7 +268,7 @@ test_addcommexample_extracts_comm_and_where_lemma = do
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
 
-  -- NEW: AddCommExample imports Proofs, so we must copy it too for hermetic tests.
+  -- AddCommExample imports Proofs, so we must copy it too for hermetic tests.
   srcProofs <- getDataFileName "test/resources/Proofs.agda"
   proofsExists <- doesFileExist srcProofs
   unless proofsExists $
@@ -318,7 +307,7 @@ test_addcommexample_extracts_comm_and_where_lemma = do
 
       oPlus <- case plusRows of
         o : _ -> pure o
-        []    -> assertFailure "expected row AddCommExample._+_" >> error "unreachable"
+        []    -> assertFailure "expected row AddCommExample._+_" >> error "no rows found for AddCommExample._+_"
 
       case ( KM.lookup "prettyModule" oPlus
            , KM.lookup "prettyName"   oPlus
@@ -337,7 +326,7 @@ test_addcommexample_extracts_comm_and_where_lemma = do
 
       oComm <- case commRows of
         o : _ -> pure o
-        []    -> assertFailure "expected row AddCommExample.properties.+-comm" >> error "unreachable"
+        []    -> assertFailure "expected row AddCommExample.properties.+-comm" >> error "no rows found for AddCommExample.properties.+-comm"
 
       case (KM.lookup "hasBody" oComm, KM.lookup "body" oComm) of
         (Just (Bool True), Just (String t)) -> do
@@ -355,7 +344,7 @@ test_addcommexample_extracts_comm_and_where_lemma = do
 
       oSuc <- case sucRows of
         o : _ -> pure o
-        []    -> assertFailure "expected row AddCommExample.properties.+-suc" >> error "unreachable"
+        []    -> assertFailure "expected row AddCommExample.properties.+-suc" >> error "no rows found for AddCommExample.properties.+-suc"
 
       case (KM.lookup "qname" oSuc, KM.lookup "prettyQname" oSuc) of
         (Just (String q), Just (String pq)) -> do
@@ -372,6 +361,85 @@ test_addcommexample_extracts_comm_and_where_lemma = do
             (pm == "AddCommExample.properties")
         other ->
           assertFailure ("expected module/prettyModule to be strings, got: " <> show other)
+
+--------------------------------------------------------------------------------
+-- typeAst structural schema checks (v0)
+--------------------------------------------------------------------------------
+
+test_typeAst_contains_Pi_for_secId :: Assertion
+test_typeAst_contains_Pi_for_secId = do
+  srcInput <- getDataFileName "test/resources/Example.agda"
+  exists <- doesFileExist srcInput
+  unless exists $
+    assertFailure ("Missing test input file: " <> srcInput)
+
+  withTempDir "agda-json-typeast-test" $ \dir -> do
+    let input = dir </> "Example.agda"
+        out   = dir </> "example-typeast.jsonl"
+
+    copyFile srcInput input
+    agdaDir <- setupAgdaDir dir
+
+    withEnv "AGDA_DIR" agdaDir $ do
+      _st  <- Run.runJsonl input out [] Cli.Full
+      objs <- parseJsonlObjects out
+      assertBool "expected non-empty JSONL" (not (null objs))
+
+      let findByPrettyQ pq =
+            [ o | o <- objs
+                , KM.lookup "prettyQname" o == Just (String (T.pack pq))
+            ]
+
+      let rows = findByPrettyQ "Example.secId"
+      assertBool "expected row Example.secId" (not (null rows))
+
+      o <- case rows of
+        x : _ -> pure x
+        []    -> assertFailure "unreachable" >> error "no rows found for Example.secId"
+
+      -- 1) JSON parses + required key exists
+      typeAstVal <- case KM.lookup "typeAst" o of
+        Nothing -> assertFailure "missing key: typeAst" >> error "missing key: typeAst"
+        Just v  -> pure v
+
+      -- 2) typeAst.tag == "Type"
+      case typeAstVal of
+        Object taObj ->
+          case KM.lookup "tag" taObj of
+            Just (String "Type") -> pure ()
+            other -> assertFailure ("typeAst.tag expected \"Type\", got: " <> show other)
+        other ->
+          assertFailure ("typeAst expected JSON object, got: " <> show other)
+
+      -- Optional: version guard (if you added it)
+      case KM.lookup "typeAstVersion" o of
+        Just (String "0.3-v0") -> pure ()
+        Just (String v)        -> assertFailure ("unexpected typeAstVersion: " <> T.unpack v)
+        Just other             -> assertFailure ("typeAstVersion must be a string, got: " <> show other)
+        Nothing                -> pure () -- allow missing if you kept it optional
+
+      -- 3) Somewhere inside typeAst, we should see a node with tag == "Pi"
+      assertBool "expected typeAst to contain at least one Pi"
+        (containsTag "Pi" typeAstVal)
+
+
+-- | Does a JSON Value contain an object with field { "tag": <wanted> } anywhere?
+containsTag :: T.Text -> Value -> Bool
+containsTag wanted = go
+  where
+    go :: Value -> Bool
+    go = \case
+      Object o ->
+        hasWantedTag o || any go (KM.elems o)
+      Array arr ->
+        any go (toList arr)
+      _ ->
+        False
+
+    hasWantedTag o =
+      case KM.lookup "tag" o of
+        Just (String t) -> t == wanted
+        _               -> False
 
 test_regression_noetherlike_normalization :: Assertion
 test_regression_noetherlike_normalization = do

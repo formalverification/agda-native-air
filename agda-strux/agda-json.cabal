@@ -14,6 +14,7 @@ library
       AgdaJsonl.Run
       AgdaJsonl.Extract
       AgdaJsonl.Cli
+      AgdaJsonl.StructAst
   build-depends:
       base >= 4.17.2.0 && < 5
     , Agda == 2.8.0
@@ -21,6 +22,7 @@ library
     , directory
     , filepath
     , text
+    , aeson
     , time
     , unordered-containers
   default-language: GHC2021

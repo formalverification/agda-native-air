@@ -52,6 +52,9 @@ import Data.Maybe (catMaybes, isJust)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Text as AT
 import System.IO (Handle, hPutStrLn, stderr)
 
 import Agda.Interaction.Imports (CheckResult, crInterface)
@@ -72,7 +75,7 @@ import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import qualified Agda.Syntax.Internal as I
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 import qualified AgdaJsonl.Cli as Cli
-
+import AgdaJsonl.StructAst (typeToAst)
 --------------------------------------------------------------------------------
 -- Stats
 --------------------------------------------------------------------------------
@@ -256,6 +259,7 @@ dumpCheckResultAsJsonl h file cr fmt = do
         (pMod, pNm)        = splitQName prettyQn
 
     tyTxt   <- pp (defType defn)
+    tyAst   <- typeToAst (defType defn)
     bodyTxt <- ppDefnBody (theDef defn)
     let hasBody = isJust bodyTxt
 
@@ -273,20 +277,22 @@ dumpCheckResultAsJsonl h file cr fmt = do
               ]
           Cli.Full  ->
             jsonObj
-              [ ("file",         jsonStr (T.pack file))
-              , ("module",       jsonStr modTxt)
-              , ("name",         jsonStr nameTxt)
-              , ("qname",        jsonStr qnTxt)
-              , ("prettyModule", jsonStr pMod)
-              , ("prettyName",   jsonStr pNm)
-              , ("prettyQname",  jsonStr prettyQn)
-              , ("type",         jsonStr tyTxt)
-              , ("kind",         jsonStr kind)
-              , ("defKind",      jsonStr defKind)
-              , ("dependencies", jsonArr (map jsonStr deps))
-              , ("astSize",      jsonNum astSize)
-              , ("body",         maybe jsonNull jsonStr bodyTxt)
-              , ("hasBody",      jsonBool hasBody)
+              [ ("file",           jsonStr (T.pack file))
+              , ("module",         jsonStr modTxt)
+              , ("name",           jsonStr nameTxt)
+              , ("qname",          jsonStr qnTxt)
+              , ("prettyModule",   jsonStr pMod)
+              , ("prettyName",     jsonStr pNm)
+              , ("prettyQname",    jsonStr prettyQn)
+              , ("type",           jsonStr tyTxt)
+              , ("typeAstVersion", jsonStr "0.3-v0")
+              , ("typeAst",        jsonVal tyAst)
+              , ("kind",           jsonStr kind)
+              , ("defKind",        jsonStr defKind)
+              , ("dependencies",   jsonArr (map jsonStr deps))
+              , ("astSize",        jsonNum astSize)
+              , ("body",           maybe jsonNull jsonStr bodyTxt)
+              , ("hasBody",        jsonBool hasBody)
               ]
 
     liftIO $ hPutStrLn h (T.unpack line)
@@ -337,6 +343,10 @@ jsonNull = "null"
 jsonBool :: Bool -> T.Text
 jsonBool True  = "true"
 jsonBool False = "false"
+
+-- | Embed a nested aeson value as raw JSON (not a JSON string).
+jsonVal :: A.Value -> T.Text
+jsonVal = TL.toStrict . AT.encodeToLazyText
 
 -- | Render a codepoint as four hex digits.
 hex4 :: Int -> String
