@@ -18,7 +18,7 @@ package proofparser.schema
  *   • TrainRecord     – ML-ready training row
  *   • TrainGoal       – goal/query for premise selection evaluation
  *   • TheoremData     – intermediate summary representation
-  *
+ *
  *  This module enforces:
  *
  *   • consistent JSON serialization (uPickle)
