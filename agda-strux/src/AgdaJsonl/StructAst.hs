@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
+-- ^ for fallback patterns like "other ->", which we added to preserve
+--   totality in case Agda adds new constructors in future versions.
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -63,10 +66,11 @@ levelToAst = \case
       , "max"  .= n
       , "plus" .= fmap plusLevelToAst ps
       ]
-  _ ->
+  other ->
     -- Fallback for future/unknown Level' constructors to preserve totality.
     object
-      [ "tag" .= ("OtherLevel" :: T.Text)
+      [ "tag"  .= ("OtherLevel" :: T.Text)
+      , "ctor" .= ctorName other
       ]
 
 -- | Convert Agda PlusLevel to AST

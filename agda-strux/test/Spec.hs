@@ -30,11 +30,12 @@ import Control.Monad (forM, forM_, unless, when)
 import Data.Aeson (Value(..), eitherDecodeStrict')
 import Data.Aeson.KeyMap qualified as KM
 import Data.ByteString qualified as BS
+import Data.Char (isSpace, toLower)
 import Data.Text qualified as T
 import Data.Foldable (toList)
 import Paths_agda_json (getDataFileName)
-import System.Directory  ( copyFile, createDirectory, doesFileExist
-                         , getTemporaryDirectory , removePathForcibly )
+import System.Directory  ( copyFile, createDirectory, createDirectoryIfMissing
+                         , doesFileExist , getTemporaryDirectory , removePathForcibly )
 import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.FilePath ((</>))
 import System.IO (hClose, openTempFile)
@@ -531,18 +532,60 @@ withEnv k v action =
     setEnv k v
     action
 
+-- Treat any non-empty value as true except explicit "0"/"false"/"no"/"off"
+envTruthy :: Maybe String -> Bool
+envTruthy = \case
+  Nothing -> False
+  Just s0 ->
+    let s = map toLower (trim s0)
+    in not (null s) && s `notElem` ["0","false","no","off"]
+  where
+    trim :: String -> String
+    trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
+
 withTempDir :: String -> (FilePath -> IO a) -> IO a
 withTempDir prefix action = do
-  tmp <- getTemporaryDirectory
-  (fp, h) <- openTempFile tmp prefix
-  hClose h
-  removePathForcibly fp
-  createDirectory fp
-  keep <- lookupEnv "KEEP_TEST_DIR"
+  -- New knobs (preferred):
+  --   AGDA_JSON_TEST_KEEP=1
+  --   AGDA_JSON_TEST_OUT_ROOT=data/test-output/agda-backend-jsonl
+  --
+  -- Back-compat (legacy):
+  --   KEEP_TEST_DIR=1
+  keepNew    <- lookupEnv "AGDA_JSON_TEST_KEEP"
+  keepLegacy <- lookupEnv "KEEP_TEST_DIR"
+  outRoot    <- lookupEnv "AGDA_JSON_TEST_OUT_ROOT"
+
+  let keep = envTruthy keepNew || envTruthy keepLegacy
+
+  fp <-
+    if keep
+      then do
+        base <- case outRoot of
+          Just r | not (null r) -> pure r
+          _                     -> getTemporaryDirectory
+
+        -- Ensure base exists, e.g. data/test-output/agda-backend-jsonl/
+        createDirectoryIfMissing True base
+
+        -- Unique run dir under base (openTempFile gives uniqueness)
+        (p, h) <- openTempFile base prefix
+        hClose h
+        removePathForcibly p
+        createDirectory p
+        pure p
+      else do
+        tmp <- getTemporaryDirectory
+        (p, h) <- openTempFile tmp prefix
+        hClose h
+        removePathForcibly p
+        createDirectory p
+        pure p
+
   let cleanup =
-        case keep of
-          Just _  -> pure ()          -- keep for debugging
-          Nothing -> removePathForcibly fp
+        if keep
+          then pure ()            -- keep for debugging / sharing
+          else removePathForcibly fp
+
   action fp `finally` cleanup
 
 
