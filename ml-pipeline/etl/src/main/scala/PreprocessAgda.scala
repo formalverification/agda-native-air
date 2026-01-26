@@ -2,7 +2,6 @@
  * PreprocessAgda.scala
  *
  * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/PreprocessAgda.scala
- * Copyright: (c) 2025-2026 Thmpr Lab
  *
  * Description:
  *   Preprocess canonical Agda backend JSONL (agda-json --format full) to Parquet.
@@ -23,7 +22,7 @@
  *   sbt "run /abs/in/train.jsonl /abs/out/dir"
  *
  */
-
+package etl
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -32,9 +31,43 @@ object PreprocessAgda {
 
   def process(spark: SparkSession, inJsonl: String, outDir: String): Unit = {
 
-    // Read JSONL as raw lines, then extract only what we want.
-    // This keeps nested JSON (`typeAst`) stable by storing it as a string column.
+    // Explicit *output* schema (typed columns we expect after extraction).
+    // (This is documentation + a “contract” for downstream code/tests.)
+    val outSchema = StructType(Seq(
+      StructField("file", StringType, true),
+      StructField("module", StringType, true),
+      StructField("name", StringType, true),
+      StructField("qname", StringType, true),
+      StructField("prettyModule", StringType, true),
+      StructField("prettyName", StringType, true),
+      StructField("prettyQname", StringType, true),
+      StructField("defKind", StringType, true),
+      StructField("type", StringType, true),
+      StructField("body", StringType, true),
+      StructField("hasBody", BooleanType, true),
+      StructField("typeAstVersion", StringType, true),
+      StructField("typeAstJson", StringType, true),
+      StructField("dependencies", ArrayType(StringType), true),
+      StructField("astSize", IntegerType, true)
+    ))
+
     val lines = spark.read.text(inJsonl).toDF("raw")
+    // ------------------------------------------------------------------------
+    // Why not `spark.read.schema(...).json(inJsonl)`?
+    //
+    // We do want explicit typing for the columns we train on (Strings, arrays,
+    // ints, etc.). However, the backend `typeAst` is a nested JSON structure with
+    // evolving shape/versioning. Representing that as a Spark StructType would be
+    // brittle and would force schema churn into ETL.
+    //
+    // Instead, we:
+    // 1. read each JSONL row as raw text;
+    // 2. extract known scalar fields with get_json_object;
+    // 3. keep `typeAst` as a stable JSON STRING column: `typeAstJson`.
+    //
+    // This still gives us explicit, predictable column *types* for the output.
+    // ------------------------------------------------------------------------
+
 
     val extracted = lines.select(
       get_json_object(col("raw"), "$.file").as("file"),
@@ -58,16 +91,24 @@ object PreprocessAgda {
       get_json_object(col("raw"), "$.typeAst").as("typeAstJson"),
 
       // Arrays: parse JSON array string into Spark ArrayType
-      from_json(get_json_object(col("raw"), "$.dependencies"), ArrayType(StringType)).as("dependencies"),
+      coalesce(
+        from_json(get_json_object(col("raw"), "$.dependencies"), ArrayType(StringType)),
+        array()
+      ).as("dependencies"),
 
       // Numeric (may be absent/null)
       get_json_object(col("raw"), "$.astSize").cast(IntegerType).as("astSize")
     )
 
+    // Enforce output column order + types (as a sanity contract)
+    val projected = extracted.select(outSchema.fieldNames.map(col): _*)
+
     // Basic sanity features (useful for quick baselines/debugging)
-    val cleaned = extracted
+    val cleaned = projected
       .withColumn("lenType", length(coalesce(col("type"), lit(""))))
       .withColumn("lenBody", length(coalesce(col("body"), lit(""))))
+      // Back-compat alias: older code/tests often talk about "proof length".
+      .withColumn("lenProof", col("lenBody"))
       .withColumn("hasTypeAst", col("typeAstJson").isNotNull)
       .withColumn("typeAstBytes", length(coalesce(col("typeAstJson"), lit(""))))
 

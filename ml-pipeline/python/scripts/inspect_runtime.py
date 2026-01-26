@@ -1,10 +1,13 @@
-#!/usr/bin/env python3
 """
 inspect_runtime.py
-------------------
 
-Prints information about the Python runtime and torch installation.
-Used by the Makefile for debugging environment + GPU/CPU status.
+File: agda-ai-prover/ml-pipeline/python/scripts/inspect_runtime.py
+
+Purpose
+-------
+  Prints information about the Python runtime and torch installation.
+  Used by the Makefile for debugging environment + GPU/CPU status.
+
 """
 import sys
 print(f"Python executable : {sys.executable}")

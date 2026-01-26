@@ -3,6 +3,11 @@
  *
  * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/Preprocess.scala
  *
+ * LEGACY / DEMO ONLY.
+ *
+ * This file is a generic Spark CSV ETL example and is NOT used by the Agda pipeline.
+ * The real Agda ETL is `etl.PreprocessAgda`.
+ *
  * A simple ETL pipeline using Apache Spark to preprocess data.
  *
  * Description:
@@ -21,8 +26,6 @@
  * Assumes input file is located at ../data/raw/data.csv relative to the
  * working directory.  Outputs Parquet files to features/train.parquet and
  * features/test.parquet.
- *
- * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
 import org.apache.spark.sql.SparkSession
@@ -31,7 +34,7 @@ import org.apache.spark.sql.functions._
 object Preprocess {
   def main(args: Array[String]): Unit = {
     val spark = SparkSession.builder()
-      .appName("ETL Pipeline")
+      .appName("ETL Pipeline (Legacy CSV Demo)")
       .master("local[*]")
       .getOrCreate()
 

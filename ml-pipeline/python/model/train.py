@@ -1,12 +1,15 @@
 """
-A simple PyTorch training script that reads data from a Parquet file,
-trains a basic MLP model, and saves the trained model.
-
-Assumes the Parquet file has columns 'feature1', 'feature2', and 'label'.
+train.py
 
 File: agda-ai-prover/ml-pipeline/python/model/train.py
 
-Copyright (c) 2025 Thmpr Lab, LLC.
+Purpose
+-------
+  A simple PyTorch training script that reads data from a Parquet file,
+  trains a basic MLP model, and saves the trained model.
+
+  Assumes the Parquet file has columns 'feature1', 'feature2', and 'label'.
+
 """
 
 from __future__ import annotations
@@ -72,6 +75,10 @@ def load_data(path) -> Tuple[torch.Tensor, torch.Tensor]:
 
     # If our toy feature columns are missing, synthesize them
     if not {"feature1", "feature2"} <= set(df.columns):
+        # Prefer canonical backend columns; fall back to legacy.
+        type_col = "type" if "type" in df.columns else "agdaType"
+        body_col = "body" if "body" in df.columns else "proof"
+
         def length_col(col: str):
             if col in df.columns:
                 return (
@@ -84,8 +91,8 @@ def load_data(path) -> Tuple[torch.Tensor, torch.Tensor]:
                 # Column missing altogether: just zeros
                 return pd.Series([0] * len(df), index=df.index)
 
-        df["feature1"] = length_col("agdaType")
-        df["feature2"] = length_col("proof")
+        df["feature1"] = length_col(type_col)
+        df["feature2"] = length_col(body_col)
 
     X_np = df[["feature1", "feature2"]].to_numpy()
     y_np = df.get("label", pd.Series([0] * len(df), index=df.index)).to_numpy()

@@ -1,15 +1,13 @@
-## =============================================================================
-#  test_main.py
-#  -----------------------------------------------------------------------------
-#
-#  File: agda-ai-prover/ml-pipeline/python/api/test_main.py
-#
-#  Description
-#  -----------
-#  Unit tests for the FastAPI application defined in main.py,
-#  specifically testing the prediction endpoint.
-#
-## =============================================================================
+"""
+test_main.py
+
+File: agda-ai-prover/ml-pipeline/python/api/test_main.py
+
+Purpose
+-------
+  Unit tests for the FastAPI application defined in main.py,
+  specifically testing the prediction endpoint.
+"""
 
 from fastapi.testclient import TestClient
 from api import main

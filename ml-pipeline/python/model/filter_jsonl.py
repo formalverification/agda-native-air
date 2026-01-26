@@ -3,18 +3,19 @@ filter_jsonl.py
 ===============
 
 File: ml-pipeline/python/model/filter_jsonl.py
-Copyright: (c) 2025 Thmpr Lab, LLC.
 
 Purpose
 -------
 
 This module provides a small command-line tool that:
 
-1. Reads a JSON Lines (JSONL) file containing *AgdaData-style* records.
+1. Reads a JSON Lines (JSONL) file containing records from either:
+   - the canonical Haskell backend (`agda-json --format full`), or
+   - the legacy Scala extractor (AgdaData-style).
 2. Applies a few simple *schema-aware* filters:
-   - Removes rows with very short or missing `agdaType` and `proof` fields.
-   - Optionally enforces user-provided minimum lengths for `agdaType` and `proof`.
-   - Deduplicates rows based on a stable key (e.g. `(file, name, agdaType, proof)`).
+   - Removes rows with very short or missing type/body fields.
+   - Optionally enforces user-provided minimum lengths.
+   - Deduplicates rows based on a stable join key when available (prefer `prettyQname`).
 3. Writes the filtered result back as JSONL.
 
 The goal is to create a saner, more ML-friendly dataset from a noisy or
@@ -24,20 +25,21 @@ heterogeneous extraction.
 Expected Input Schema
 ---------------------
 
-The input JSONL file is assumed to have the following the structure
-(produced by the Scala `AgdaExtractor`):
+We accept either schema:
+
+Canonical backend (preferred):
 
     {
       "file":      "<relative-or-absolute-path>",
-      "module":    "<Agda module name (optional)>",
-      "name":      "<theorem or definition name>",
-      "agdaType":  "<type as Agda concrete syntax>",
-      "proof":     "<right-hand side / proof term>",
-      "premises":  ["List", "of", "depended-on", "names"]  (optional)
+      "prettyQname":"<stable join key>",
+      "type":      "<pretty-printed type>",
+      "typeAstVersion": "0.3-v0",
+      "typeAst":   { ... },
+      "body":      "<pretty-printed clauses>" | null
     }
 
-Not all fields are guaranteed to be present, but `agdaType` and `proof`
-are the main focus of this filter.
+Legacy Scala extractor:
+  uses `agdaType` + `proof` instead of `type` + `body`.
 
 
 Command-line Usage
@@ -73,7 +75,7 @@ Design Notes
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import argparse
 import pandas as pd
@@ -116,17 +118,35 @@ def parse_args() -> argparse.Namespace:
         "--min-type-len",
         type=int,
         default=5,
-        help="Minimum length of `agdaType` to keep (default: 5).",
+        help="Minimum length of the type field to keep (default: 5).",
     )
     parser.add_argument(
         "--min-proof-len",
         type=int,
         default=5,
-        help="Minimum length of `proof` to keep (default: 5).",
+        help="Minimum length of the body/proof field to keep (default: 5).",
     )
 
     return parser.parse_args()
 
+def _pick_text_fields(df: pd.DataFrame) -> Tuple[str, str]:
+    """
+    Decide which columns to treat as (type, body/proof).
+
+    Prefer canonical backend columns (`type`, `body`). Fall back to legacy
+    (`agdaType`, `proof`).
+    """
+    if "type" in df.columns:
+        type_col = "type"
+    else:
+        type_col = "agdaType"
+
+    if "body" in df.columns:
+        body_col = "body"
+    else:
+        body_col = "proof"
+
+    return type_col, body_col
 
 def _normalize_text_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
     """
@@ -172,7 +192,7 @@ def _normalize_text_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFram
     return result
 
 
-def _deduplicate(df: pd.DataFrame) -> pd.DataFrame:
+def _deduplicate(df: pd.DataFrame, type_col: str, body_col: str) -> pd.DataFrame:
     """
     Deduplicate rows based on a stable key.
 
@@ -190,7 +210,11 @@ def _deduplicate(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         Deduplicated DataFrame.
     """
-    candidate_key: List[str] = ["file", "name", "agdaType", "proof"]
+    # Prefer stable join key when present; otherwise fall back to legacy-ish tuple.
+    if "prettyQname" in df.columns:
+        candidate_key: List[str] = ["prettyQname", type_col, body_col, "typeAstVersion"]
+    else:
+        candidate_key: List[str] = ["file", "name", "agdaType", "proof"]
     key_cols: List[str] = [c for c in candidate_key if c in df.columns]
 
     if not key_cols:
@@ -217,9 +241,9 @@ def filter_dataset(
     Steps
     -----
     1. Read JSONL into a pandas DataFrame.
-    2. Normalize `agdaType` and `proof` into well-typed string columns.
+    2. Normalize type/body columns into well-typed string columns.
     3. Filter rows by minimum length constraints.
-    4. Deduplicate by `(file, name, agdaType, proof)`.
+    4. Deduplicate (prefer `prettyQname` when present).
     5. Write the result as JSONL.
 
     Parameters
@@ -238,14 +262,18 @@ def filter_dataset(
 
     original_count: int = len(df)
 
+    type_col, body_col = _pick_text_fields(df)
+
     # Step 2: normalize the core textual columns
-    df_norm: pd.DataFrame = _normalize_text_columns(df, ["agdaType", "proof"])
+    df_norm: pd.DataFrame = _normalize_text_columns(df, [type_col, body_col])
 
     # Step 3: apply length-based filters in a column-wise / declarative way
-    type_len = df_norm["agdaType"].str.len()
-    proof_len = df_norm["proof"].str.len()
+    type_len = df_norm[type_col].str.len()
+    body_len = df_norm[body_col].str.len()
 
-    mask = (type_len >= min_type_len) & (proof_len >= min_proof_len)
+    # We require a non-trivial type. Body/proof can be empty for some defs,
+    # but for "training rows" we usually want non-empty bodies.
+    mask = (type_len >= min_type_len) & (body_len >= min_proof_len)
 
     # This boolean mask application is also a vectorized, functional-style
     # operation: we produce a new filtered DataFrame instead of iterating
@@ -253,7 +281,7 @@ def filter_dataset(
     df_filtered: pd.DataFrame = df_norm[mask].copy()
 
     # Step 4: deduplicate
-    df_dedup: pd.DataFrame = _deduplicate(df_filtered)
+    df_dedup: pd.DataFrame = _deduplicate(df_filtered, type_col=type_col, body_col=body_col)
 
     # Step 5: write to JSONL
     output_path.parent.mkdir(parents=True, exist_ok=True)

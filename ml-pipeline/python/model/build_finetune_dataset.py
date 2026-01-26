@@ -3,7 +3,6 @@ build_finetune_dataset.py
 =========================
 
 File: ml-pipeline/python/model/build_finetune_dataset.py
-Copyright: (c) 2025 Thmpr Lab, LLC.
 
 Purpose
 -------
@@ -28,8 +27,11 @@ input, output) triples.
 Expected Input Schema
 ---------------------
 
-We assume the input JSONL file has the same structure as produced by the
-Scala `AgdaExtractor` and optionally filtered by `filter_jsonl.py`, i.e.:
+We accept either:
+  - canonical backend rows (`type`, `body`, `prettyQname`, ...)
+  - legacy extractor rows (`agdaType`, `proof`, ...)
+
+Typically the input is produced by `filter_jsonl.py`.
 
     {
       "file":      "...",   # optional
@@ -202,8 +204,9 @@ def _row_to_example(row: pd.Series) -> Dict[str, str]:
     """
     module: str = str(row.get("module", "") or "")
     name: str = str(row.get("name", "") or "")
-    agda_type: str = str(row.get("agdaType", "") or "")
-    proof: str = str(row.get("proof", "") or "")
+    # Prefer canonical backend columns; fall back to legacy.
+    agda_type: str = str(row.get("type", "") or row.get("agdaType", "") or "")
+    proof: str = str(row.get("body", "") or row.get("proof", "") or "")
 
     instruction: str = _make_instruction()
     input_text: str = _build_input_text(module=module, name=name, agda_type=agda_type)

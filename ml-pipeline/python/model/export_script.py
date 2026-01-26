@@ -1,4 +1,10 @@
-# file: agda-ai-prover/ml-pipeline/model/export_script.py
+"""
+export_script.py
+
+File: agda-ai-prover/ml-pipeline/model/export_script.py
+Purpose: Exports a trained PyTorch model to the TorchScript format.
+
+"""
 import torch
 from train import SimpleMLP
 

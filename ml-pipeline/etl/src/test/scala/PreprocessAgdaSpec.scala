@@ -1,75 +1,80 @@
 /**
  * PreprocessAgdaSpec.scala
  *
- * Test suite for PreprocessAgda ETL process.
- *
- * This test checks that given the input JSONL file exists and is non-empty,
- * the ETL process produces Parquet files with the expected schema.
- *
- * This test:
- * +  Skips itself (via `assume`) if `../../data/train.jsonl` isn’t present yet.
- * +  Calls our real `PreprocessAgda.main` (integration-style).
- * +  Verifies Parquet files exist and checks a few expected columns + row count.
- *
- * To run this test, ensure you have run `make extract` to generate the
- * necessary JSONL data file.  Then do
- *
- *     cd ml-pipeline/etl
- *     sbt -batch test
- *
  * File: agda-ai-prover/ml-pipeline/etl/src/test/scala/PreprocessAgdaSpec.scala
+ * Copyright: (c) 2025-2026 Thmpr Lab
  *
- * Copyright (c) 2025 Thmpr Lab, LLC.
+ * Fixture-driven integration test for PreprocessAgda ETL process.
+ * + uses a tiny JSONL fixture in src/test/resources
+ * + runs PreprocessAgda.process
+ * + validates Parquet output + schema
  */
 
 package etl
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
-import java.io.File
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Path, Paths}
 import org.apache.spark.sql.SparkSession
 
 class PreprocessAgdaSpec extends AnyFunSuite with Matchers {
 
-  private val repoData   = Paths.get("../../data/train.jsonl").toFile
-  private val trainPath  = Paths.get("../features/train.parquet")
-  private val testPath   = Paths.get("../features/test.parquet")
+  private def mkTempDir(prefix: String): Path =
+    Files.createTempDirectory(prefix)
 
-  test("PreprocessAgda writes Parquet with expected columns (if JSONL exists)") {
-    // Make this test a no-op if you haven't run `make extract` yet
-    assume(repoData.exists() && repoData.length() > 0,
-      s"Skipping: ${repoData.getPath} not found or empty. Run `make extract` first.")
-
-    // Run the ETL main (writes ../features/*.parquet)
-    PreprocessAgda.main(Array.empty)
-
-    // Check outputs exist
-    Files.exists(trainPath) shouldBe true
-    Files.exists(testPath)  shouldBe true
-
-    // Open Spark to validate schema quickly
+  test("PreprocessAgda writes Parquet with expected columns (fixture-driven)") {
     val spark = SparkSession.builder()
       .appName("PreprocessAgdaSpec")
       .master(sys.props.getOrElse("spark.master", "local[*]"))
       .getOrCreate()
 
+    val outDir    = mkTempDir("etl-preprocess-agda-")
+    val trainPath = outDir.resolve("train.parquet")
+    val testPath  = outDir.resolve("test.parquet")
+
+    val fixtureUrl =
+      Option(getClass.getResource("/backend-full.example.jsonl"))
+        .getOrElse(fail("Missing fixture: src/test/resources/backend-full.example.jsonl"))
+    val inJsonl = Paths.get(fixtureUrl.toURI).toString
+
     try {
+      // Run ETL directly (no reliance on ../../data/train.jsonl)
+      PreprocessAgda.process(spark, inJsonl = inJsonl, outDir = outDir.toString)
+
+      Files.exists(trainPath) shouldBe true
+      Files.exists(testPath)  shouldBe true
+
       val df = spark.read.parquet(trainPath.toString)
 
-      // Columns we expect given PreprocessAgda.scala
       val cols = df.columns.toSet
       cols should contain ("file")
       cols should contain ("module")
       cols should contain ("name")
-      cols should contain ("agdaType")
-      cols should contain ("proof")
-      cols should contain ("premises")
+      cols should contain ("qname")
+      cols should contain ("prettyModule")
+      cols should contain ("prettyName")
+      cols should contain ("prettyQname")
+      cols should contain ("defKind")
+
+      cols should contain ("type")
+      cols should contain ("body")
+      cols should contain ("hasBody")
+      cols should contain ("typeAstVersion")
+      cols should contain ("typeAstJson")
+      cols should contain ("dependencies")
+      cols should contain ("astSize")
+
       cols should contain ("lenType")
       cols should contain ("lenProof")
+      cols should contain ("lenBody")
+      cols should contain ("hasTypeAst")
+      cols should contain ("typeAstBytes")
 
-      // And we expect at least one row when train.jsonl was non-empty
       df.count() should be > 0L
+
+      // Sanity: at least one row should have typeAstJson (fixture includes it)
+      df.filter("hasTypeAst = true").count() should be > 0L
+
     } finally {
       spark.stop()
     }
