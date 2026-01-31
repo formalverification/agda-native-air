@@ -2,7 +2,6 @@
  * PreprocessAgdaSpec.scala
  *
  * File: agda-ai-prover/ml-pipeline/etl/src/test/scala/PreprocessAgdaSpec.scala
- * Copyright: (c) 2025-2026 Thmpr Lab
  *
  * Fixture-driven integration test for PreprocessAgda ETL process.
  * + uses a tiny JSONL fixture in src/test/resources

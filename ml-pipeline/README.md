@@ -137,16 +137,159 @@ This provides Python, Scala, Spark, and all required dependencies.
 
 ### Common Tasks
 
+#### Extraction and Conversion: Agda -> JSONL -> Parquet
+
+From the repository root:
+
+``` bash
+```sh
+# Enter default Nis devShell:
+nix develop
+
+# Extract agda-algebras to JSONL files in data/agda-algebras/raw/jsonl:
+make extract-lib
+
+# Merging all records into single train.sample.jsonl file:
+make train-jsonl-sample
+
+# Convert single JSONL file to Parquet format:
+cd ml-pipeline && sbt -batch "project etl" "runMain etl.PreprocessAgda ../../data/train.sample.jsonl ../features"
+```
+
+(Note, the last command may show many Spark-generated `[error]` lines; these can be ignored.)
+
+Finally, confirm the Parquet has the **new columns** and **rows > 0**:
+
+```sh
+python - <<'PY'
+import os, glob
+import pyarrow.parquet as pq
+
+base = "ml-pipeline/features"
+need = {"type","body","hasBody","typeAstVersion","typeAstJson","prettyQname","defKind","dependencies","astSize"}
+for split in ["train.parquet", "test.parquet"]:
+    path = os.path.join(base, split)
+    files = glob.glob(path + "/**/*.parquet", recursive=True)
+    assert files, f"no parquet files under {path}"
+    t = pq.read_table(path)
+    cols = set(t.column_names)
+    missing = sorted(need - cols)
+    print(split, "rows=", t.num_rows, "missing=", missing)
+    assert t.num_rows > 0
+    assert not missing
+print("OK")
+PY
+```
+
+What success looks like:
+
+``` bash
+train.parquet rows= 61 missing= []
+test.parquet rows= 4 missing= []
+OK
+```
+
+This proves: Agda extraction → sample JSONL → Spark ETL is wired and produces both
+string and structural fields.
+
+
+---
+
+### ETL, Train, Serve, and Smoke Tests
+
 From the repository root:
 
 ```bash
-make etl          # JSONL → Parquet features
-make train        # Train a baseline model
-make serve        # Start the inference server
-make smoke        # End-to-end sanity check
+make etl          # JSONL → Parquet features.
+make train        # Train a baseline model.
+make serve        # Start the inference server (placeholder; yet to be implemented).
+make smoke        # End-to-end sanity checks.
 ```
 
-Run `make help` for additional configuration options.
+What success looks like:
+
+``` bash
+$ make etl
+>> [etl] Spark: JSONL -> Parquet -> /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
+cd ml-pipeline && \
+  sbt -Dsbt.supershell=false "project etl" "runMain etl.PreprocessAgda"
+[info] welcome to sbt 1.10.11 (N/A Java 21.0.3)
+[info] loading settings for project ml-pipeline-build-build from metals.sbt...
+[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/project/project
+[info] loading settings for project ml-pipeline-build from metals.sbt...
+[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/project
+[success] Generated .bloop/ml-pipeline-build.json
+[success] Total time: 2 s, completed Feb 1, 2026, 2:38:18 PM
+[info] loading settings for project root from build.sbt...
+[info] set current project to ml-pipeline (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/)
+[info] set current project to ETL (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/)
+[info] running (fork) etl.PreprocessAgda 
+[error] Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+[error] 26/02/01 14:38:20 WARN Utils: Your hostname, alonzo resolves to a loopback address: 127.0.1.1; using 192.168.1.34 instead (on interface wlp0s20f3)
+...
+[error] 26/02/01 14:38:26 INFO ShutdownHookManager: Shutdown hook called
+[error] 26/02/01 14:38:26 INFO ShutdownHookManager: Deleting directory /tmp/spark-73102be6-e849-4ce6-8a1a-02aadd609d99
+[success] Total time: 8 s, completed Feb 1, 2026, 2:38:26 PM
+✅ wrote /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
+
+$ make train
+>> [train] USE_VENV=1 TORCH_MODE=cpu
+   TRAIN_DATA=/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/data/train.jsonl
+🐍 inspecting Python / torch runtime...
+Python executable : /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/bin/python
+torch version     : 2.6.0+cu124
+/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  return torch._C._cuda_getDeviceCount() > 0
+CUDA available    : False
+🧊 USING CPU-ONLY TORCH
+>> [train] training -> /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt (input=/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/data/train.jsonl)
+/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  return torch._C._cuda_getDeviceCount() > 0
+epoch 1/10  loss=0.0085
+epoch 2/10  loss=0.0039
+epoch 3/10  loss=0.0019
+epoch 4/10  loss=0.0010
+epoch 5/10  loss=0.0006
+epoch 6/10  loss=0.0004
+epoch 7/10  loss=0.0002
+epoch 8/10  loss=0.0001
+epoch 9/10  loss=0.0001
+epoch 10/10  loss=0.0001
+✅ saved model to /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
+✅ model ready: /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
+
+$ make serve
+⚠️  /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/python/api/app.py not found; skipping serve.
+
+$ make smoke
+→ Top-level smoke on "2026-02-01T21:39:16Z"
+→ logs: /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/data/make-logs/20260201T213916Z
+------------------------------------------------------------
+>>> make gen-sample
+✓ gen-sample (17s)
+------------------------------------------------------------
+>>> make dataset-stats-sample
+✓ dataset-stats-sample (12s)
+------------------------------------------------------------
+>>> make premise-eval-quick-sample
+✓ premise-eval-quick-sample (13s)
+------------------------------------------------------------
+>>> make extract
+✓ extract (7s)
+------------------------------------------------------------
+>>> make test
+✓ test (27s)
+------------------------------------------------------------
+>>> make backend-smoke
+✓ backend-smoke (12s)
+✓ smoke passed: gen-sample dataset-stats-sample premise-eval-quick-sample extract test backend-smoke
+```
+
+---
+
+### Other Common Tasks
+ 
+Run `make help` for additional targets and configuration options.
 
 ---
 

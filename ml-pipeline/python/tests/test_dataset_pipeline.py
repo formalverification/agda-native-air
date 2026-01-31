@@ -2,7 +2,7 @@
 test_dataset_pipeline.py
 ========================
 
-File: ml_pipeline/python/tests/test_dataset_pipeline.py
+File: ml-pipeline/python/tests/test_dataset_pipeline.py
 
 Purpose
 -------
@@ -13,7 +13,7 @@ Usage
 -----
 
 From the repository root, run:
-    pytest -v ml_pipeline/python/tests/test_dataset_pipeline.py
+    pytest -v ml-pipeline/python/tests/test_dataset_pipeline.py
 or via Make:
     make test-ml-pipeline
 """
@@ -23,9 +23,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ml_pipeline.python.model.filter_jsonl import filter_dataset
-from ml_pipeline.python.model.build_finetune_dataset import build_finetune_dataset
-
+from model.filter_jsonl import filter_dataset
+from model.build_finetune_dataset import build_finetune_dataset
 
 def _write_jsonl(path: Path, rows) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)

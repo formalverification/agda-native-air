@@ -129,7 +129,7 @@ object PreprocessAgda {
 
     try {
       // Defaults match Makefile (but prefer passing an explicit JSONL path):
-      //   sbt "project etl" "runMain PreprocessAgda /abs/in.jsonl /abs/outdir"
+      //   sbt "project etl" "runMain etl.PreprocessAgda /abs/in.jsonl /abs/outdir"
       val in  = if (args.length >= 1) args(0) else new java.io.File("../../data/train.jsonl").getAbsolutePath
       val out = if (args.length >= 2) args(1) else new java.io.File("../features").getAbsolutePath
 

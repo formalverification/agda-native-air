@@ -75,7 +75,7 @@ Design Notes
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import argparse
 import pandas as pd
@@ -129,24 +129,7 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def _pick_text_fields(df: pd.DataFrame) -> Tuple[str, str]:
-    """
-    Decide which columns to treat as (type, body/proof).
 
-    Prefer canonical backend columns (`type`, `body`). Fall back to legacy
-    (`agdaType`, `proof`).
-    """
-    if "type" in df.columns:
-        type_col = "type"
-    else:
-        type_col = "agdaType"
-
-    if "body" in df.columns:
-        body_col = "body"
-    else:
-        body_col = "proof"
-
-    return type_col, body_col
 
 def _normalize_text_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
     """
@@ -214,7 +197,7 @@ def _deduplicate(df: pd.DataFrame, type_col: str, body_col: str) -> pd.DataFrame
     if "prettyQname" in df.columns:
         candidate_key: List[str] = ["prettyQname", type_col, body_col, "typeAstVersion"]
     else:
-        candidate_key: List[str] = ["file", "name", "agdaType", "proof"]
+        candidate_key = ["file", "name", type_col, body_col]
     key_cols: List[str] = [c for c in candidate_key if c in df.columns]
 
     if not key_cols:
@@ -257,19 +240,44 @@ def filter_dataset(
     min_proof_len : int
         Minimum length of `proof` to keep.
     """
+    # --- Step 1. Read JSONL into a pandas DataFrame. ---
     # Pandas directly supports reading JSON Lines into a DataFrame.
     df: pd.DataFrame = pd.read_json(input_path, lines=True)
 
     original_count: int = len(df)
 
-    type_col, body_col = _pick_text_fields(df)
+    # --- Step 2: Normalize *all* possible source columns we may reference. ---
+    cols_to_norm = [c for c in ["type", "agdaType", "body", "proof"] if c in df.columns]
+    df_norm: pd.DataFrame = _normalize_text_columns(df, cols_to_norm)
 
-    # Step 2: normalize the core textual columns
-    df_norm: pd.DataFrame = _normalize_text_columns(df, [type_col, body_col])
+    def _first_nonempty(a: pd.Series, b: pd.Series) -> pd.Series:
+        # Prefer a when it is a non-empty string; otherwise fallback to b.
+        aa = a.fillna("").astype(str).str.strip()
+        bb = b.fillna("").astype(str).str.strip()
+        return aa.where(aa.str.len() > 0, bb)
 
-    # Step 3: apply length-based filters in a column-wise / declarative way
-    type_len = df_norm[type_col].str.len()
-    body_len = df_norm[body_col].str.len()
+    # Compute canonical text columns used for filtering/dedup.
+    if "type" in df_norm.columns and "agdaType" in df_norm.columns:
+        df_norm["typeText"] = _first_nonempty(df_norm["type"], df_norm["agdaType"])
+    elif "type" in df_norm.columns:
+        df_norm["typeText"] = df_norm["type"].fillna("").astype(str).str.strip()
+    elif "agdaType" in df_norm.columns:
+        df_norm["typeText"] = df_norm["agdaType"].fillna("").astype(str).str.strip()
+    else:
+        df_norm["typeText"] = ""
+
+    if "body" in df_norm.columns and "proof" in df_norm.columns:
+        df_norm["bodyText"] = _first_nonempty(df_norm["body"], df_norm["proof"])
+    elif "body" in df_norm.columns:
+        df_norm["bodyText"] = df_norm["body"].fillna("").astype(str).str.strip()
+    elif "proof" in df_norm.columns:
+        df_norm["bodyText"] = df_norm["proof"].fillna("").astype(str).str.strip()
+    else:
+        df_norm["bodyText"] = ""
+
+    # --- Step 3: apply length-based filters in a column-wise / declarative way ---
+    type_len = df_norm["typeText"].str.len()
+    body_len = df_norm["bodyText"].str.len()
 
     # We require a non-trivial type. Body/proof can be empty for some defs,
     # but for "training rows" we usually want non-empty bodies.
@@ -280,10 +288,17 @@ def filter_dataset(
     # row-by-row.
     df_filtered: pd.DataFrame = df_norm[mask].copy()
 
-    # Step 4: deduplicate
-    df_dedup: pd.DataFrame = _deduplicate(df_filtered, type_col=type_col, body_col=body_col)
+    # --- Step 4: deduplicate ---
+    # Use canonical columns for dedup fallback so it works regardless of schema.
+    # (We still let `_deduplicate` prefer prettyQname when present.)
+    df_dedup: pd.DataFrame = _deduplicate(
+        df_filtered,
+        type_col="typeText",
+        body_col="bodyText",
+    )
 
-    # Step 5: write to JSONL
+
+    # --- Step 5: write to JSONL ---
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df_dedup.to_json(
         output_path,
