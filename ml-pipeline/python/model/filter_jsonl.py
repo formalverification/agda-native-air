@@ -179,14 +179,19 @@ def _deduplicate(df: pd.DataFrame, type_col: str, body_col: str) -> pd.DataFrame
     """
     Deduplicate rows based on a stable key.
 
-    We consider the combination `(file, name, agdaType, proof)` as a
-    canonical key, if these columns exist. If some of them are missing,
-    we only use the subset that is present.
+    When `prettyQname` is present, we prefer the combination
+    `(prettyQname, type_col, body_col, typeAstVersion)` as the canonical key.
+    Otherwise, we fall back to `(file, name, type_col, body_col)`.
+    If some of these columns are missing, we only use the subset that is present.
 
     Parameters
     ----------
     df : pd.DataFrame
         Input DataFrame, assumed to already be filtered by length.
+    type_col : str
+        Name of the column containing the type/signature text (e.g., "typeText" or "agdaType").
+    body_col : str
+        Name of the column containing the body/proof text (e.g., "bodyText" or "proof").
 
     Returns
     -------
