@@ -33,23 +33,8 @@ object PreprocessAgda {
 
     // Explicit *output* schema (typed columns we expect after extraction).
     // (This is documentation + a “contract” for downstream code/tests.)
-    val outSchema = StructType(Seq(
-      StructField("file", StringType, true),
-      StructField("module", StringType, true),
-      StructField("name", StringType, true),
-      StructField("qname", StringType, true),
-      StructField("prettyModule", StringType, true),
-      StructField("prettyName", StringType, true),
-      StructField("prettyQname", StringType, true),
-      StructField("defKind", StringType, true),
-      StructField("type", StringType, true),
-      StructField("body", StringType, true),
-      StructField("hasBody", BooleanType, true),
-      StructField("typeAstVersion", StringType, true),
-      StructField("typeAstJson", StringType, true),
-      StructField("dependencies", ArrayType(StringType), true),
-      StructField("astSize", IntegerType, true)
-    ))
+    // val outSchema : StructType = PreprocessAgdaSchema.required
+    val baseNames = PreprocessAgdaSchema.base.map(_.name)
 
     val lines = spark.read.text(inJsonl).toDF("raw")
     // ------------------------------------------------------------------------
@@ -101,7 +86,8 @@ object PreprocessAgda {
     )
 
     // Enforce output column order + types (as a sanity contract)
-    val projected = extracted.select(outSchema.fieldNames.map(col): _*)
+    // val projected = extracted.select(outSchema.fieldNames.map(col): _*)
+    val projected = extracted.select(baseNames.map(col): _*)
 
     // Basic sanity features (useful for quick baselines/debugging)
     val cleaned = projected
