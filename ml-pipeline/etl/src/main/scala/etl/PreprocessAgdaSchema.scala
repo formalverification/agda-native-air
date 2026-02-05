@@ -1,7 +1,7 @@
 /**
  * PreprocessAgdaSchema.scala
  *
- * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/PreprocessAgdaSchema.scala
+ * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/etl/PreprocessAgdaSchema.scala
  *
  * Description:
  *   Schema for preprocessed Agda definitions.  This is the gold standard schema used
@@ -16,7 +16,6 @@ object PreprocessAgdaSchema {
 
   // Keep this strict for “contract fields”.
   // If you later add optional fields, add them as optional, not required.
-  // val required: StructType = StructType(Seq(
   val base: Seq[StructField] = Seq(
     StructField("file", StringType, nullable = true),
     StructField("module", StringType, nullable = true),
@@ -47,7 +46,6 @@ object PreprocessAgdaSchema {
     StructField("typeAstBytes", IntegerType, nullable = true)
   )
 
-  // val required: StructType = StrucType (base ++ derived)
   val required: Seq[StructField] = base ++ derived
 
   val requiredNames: Set[String] = required.map(_.name).toSet
