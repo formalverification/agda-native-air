@@ -154,9 +154,16 @@ make train-jsonl-sample
 
 # Convert single JSONL file to Parquet format:
 cd ml-pipeline && sbt -batch "project etl" "runMain etl.PreprocessAgda ../../data/train.sample.jsonl ../features"
+
+# Alternative: Use the new config-driven ETL target (after extraction):
+make etl-agda-algebras
 ```
 
-(Note, the last command may show many Spark-generated `[error]` lines; these can be ignored.)
+**Note:** The new `etl-agda-algebras` target automatically handles merging JSONL shards
+and running the ETL pipeline according to `configs/agda-algebras.yaml`. It produces
+outputs in `ml-pipeline/data/agda-algebras/{train,test}.parquet`.
+
+(Note, ETL commands may show many Spark-generated `[error]` lines; these can be ignored.)
 
 Finally, confirm the Parquet has the **new columns** and **rows > 0**:
 
