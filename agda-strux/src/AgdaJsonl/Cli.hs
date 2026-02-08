@@ -42,7 +42,7 @@ usage = unlines
   , " |   agda-json --input PATH --output OUT.jsonl [--include DIR]... [--format full|human | --human]"
   , " | "
   , "Example:"
-  , " |   agda-json --input test/resources/Example.agda \\"
+  , " |   agda-json --input ../data/agda/Example.agda \\"
   , " |             --output /tmp/out.jsonl \\"
   , " |             --include test/resources"
   , " | "

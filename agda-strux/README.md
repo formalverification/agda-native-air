@@ -114,3 +114,21 @@ cabal test
 +  Tests set `AGDA_DIR` to avoid relying on `~/.config/agda`.
 +  Some tests intentionally allow empty JSONL outputs for "barrel modules"
    (i.e., container modules that merely list other modules).
+
+
+---
+
+## See Also
+
++ [Root project README][]
++ [`agda-jang/README.md`][agda-jang/README]
++ [`ml-pipeline/README.md`][ml-pipeline/README]
++ [`proof-parser/README.md`][proof-parser/README]
+
+[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
+[proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
+[agda-jang/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/README.md
+[ml-pipeline/README]: https://github.com/formalverification/agda-ai-prover/blob/main/ml-pipeline/README.md
+[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+
+

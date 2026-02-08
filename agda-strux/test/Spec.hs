@@ -140,7 +140,7 @@ parseJsonlObjects out = do
 
 test_runs_twice_jsonl_invariants :: Assertion
 test_runs_twice_jsonl_invariants = do
-  srcInput <- getDataFileName "test/resources/Example.agda"
+  srcInput <- getDataFileName "../data/agda/Example.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
@@ -192,7 +192,7 @@ test_runs_twice_jsonl_invariants = do
 
 test_empty_module_allows_empty_jsonl :: Assertion
 test_empty_module_allows_empty_jsonl = do
-  srcInput <- getDataFileName "test/resources/Empty.agda"
+  srcInput <- getDataFileName "../data/agda/Empty.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
@@ -214,7 +214,7 @@ test_empty_module_allows_empty_jsonl = do
 
 test_extracts_proof_clauses :: Assertion
 test_extracts_proof_clauses = do
-  srcInput <- getDataFileName "test/resources/Proofs.agda"
+  srcInput <- getDataFileName "../data/agda/Proofs.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
@@ -264,13 +264,13 @@ test_extracts_proof_clauses = do
 
 test_addcommexample_extracts_comm_and_where_lemma :: Assertion
 test_addcommexample_extracts_comm_and_where_lemma = do
-  srcInput <- getDataFileName "test/resources/AddCommExample.agda"
+  srcInput <- getDataFileName "../data/agda/AddCommExample.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
 
   -- AddCommExample imports Proofs, so we must copy it too for hermetic tests.
-  srcProofs <- getDataFileName "test/resources/Proofs.agda"
+  srcProofs <- getDataFileName "../data/agda/Proofs.agda"
   proofsExists <- doesFileExist srcProofs
   unless proofsExists $
     assertFailure ("Missing test dependency file: " <> srcProofs)
@@ -369,7 +369,7 @@ test_addcommexample_extracts_comm_and_where_lemma = do
 
 test_typeAst_contains_Pi_for_secId :: Assertion
 test_typeAst_contains_Pi_for_secId = do
-  srcInput <- getDataFileName "test/resources/Example.agda"
+  srcInput <- getDataFileName "../data/agda/Example.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
@@ -444,7 +444,7 @@ containsTag wanted = go
 
 test_regression_noetherlike_normalization :: Assertion
 test_regression_noetherlike_normalization = do
-  srcInput <- getDataFileName "test/resources/agda-algebras-regressions/NoetherLike.agda"
+  srcInput <- getDataFileName "../data/agda/agda-algebras-regressions/NoetherLike.agda"
   exists <- doesFileExist srcInput
   unless exists $
     assertFailure ("Missing test input file: " <> srcInput)
@@ -487,7 +487,7 @@ test_regression_noetherlike_normalization = do
 
 test_regression_golden_noether_jsonl :: Assertion
 test_regression_golden_noether_jsonl = do
-  fp <- getDataFileName "test/resources/agda-algebras-regressions/Noether.jsonl"
+  fp <- getDataFileName "../data/agda/agda-algebras-regressions/Noether.jsonl"
   exists <- doesFileExist fp
   unless exists $
     assertFailure ("Missing golden JSONL file: " <> fp)

@@ -27,7 +27,7 @@ smoke:
 	out="$$tmp/agda-example.jsonl"; \
 	echo "[smoke] writing $$out"; \
 	cabal run agda-json -- \
-	  --input  ../proof-parser/src/test/resources/agda-example.agda \
+	  --input  ../data/agda/agda-example.agda \
 	  --output "$$out" \
 	  --include ../proof-parser/src/test/resources; \
 	test -s "$$out"; \
