@@ -51,7 +51,18 @@ Each stage can be run independently.
 
 ---
 
-## ETL and Feature Engineering (Scala / Spark)
+## 1) Input: JSONL datasets produced by ProofParser
+
+This is the pre-ETL stage and is the responsibility of the `agda-backend-jsonl` and
+`ProofParser` components of the project; see:
+
++  [agda-backend-jsonl/README][]
++  [proof-parser/README][]
+
+---
+
+
+## 2) ETL and Feature Engineering (Scala / Spark)
 
 ### Why Scala and Spark?
 
@@ -63,8 +74,6 @@ MLPipe reuses the Scala/Spark stack introduced in ProofParser for several reason
 +  Clear declarative transformations over structured data.
 
 Spark is used where it provides leverage; small experiments can be run locally without a cluster.
-
----
 
 ### Typical ETL Tasks
 
@@ -79,7 +88,7 @@ The output is typically written in **Parquet** format for efficiency and reprodu
 
 ---
 
-## Training and Evaluation (Python / PyTorch)
+## 3) Training and Evaluation (Python / PyTorch)
 
 ### Model Training
 
@@ -93,8 +102,6 @@ The initial focus is on relatively simple, interpretable models, including
 
 These serve both as baselines and as scaffolding for more ambitious approaches.
 
----
-
 ### Evaluation
 
 Evaluation emphasizes **simple, transparent metrics**, for example,
@@ -107,7 +114,7 @@ The goal is not to optimize leaderboards, but to understand what information the
 
 ---
 
-## Inference and Serving
+## 4) Inference and Serving
 
 MLPipe includes early-stage support for model serving.
 
@@ -118,6 +125,11 @@ A lightweight **FastAPI** server can
 +  return ranked predictions or scores.
 
 This server is intended to be called by interactive components such as AgdaJang, closing the loop between learning and proof execution.
+
+### Pre-training policy backend
+
+See [agda-jang/README](https://github.com/formalverification/agda-ai-prover/blob/85-agda-check-evaluator-fixtures/agda-jang/README.md#policy-fixturepy)
+
 
 ---
 
@@ -314,6 +326,15 @@ Run `make help` for additional targets and configuration options.
 
 ## See Also
 
-* Root project README
-* `proof-parser/README.md`
-* `agda-jang/README.md`
++ [Root project README][]
++ [`agda-backend-jsonl/README.md`][agda-backend-jsonl/README]
++ [`agda-jang/README.md`][agda-jang/README]
++ [`proof-parser/README.md`][proof-parser/README]
+
+[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
+[agda-backend-jsonl/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-backend-jsonl/README.md
+[proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
+[agda-jang/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/README.md
+[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+
+
