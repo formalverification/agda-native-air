@@ -62,7 +62,7 @@ DEMO2 := --goal Nat --tactic applyReport:_+_ --imports "open import Agda.Builtin
 # --- Data / transform paths ---
 REPO_ROOT   := ..
 DATA_DIR    := $(REPO_ROOT)/data
-EXAMPLE_AGDA:= $(DATA_DIR)/agda-example.agda
+EXAMPLE_AGDA:= $(DATA_DIR)/agda/agda-example.agda
 RAW_JSON    := $(DATA_DIR)/agda-example.json
 TRAIN_JSONL := $(DATA_DIR)/train.jsonl
 SOLVE_JSONL := $(DATA_DIR)/solve_report.jsonl

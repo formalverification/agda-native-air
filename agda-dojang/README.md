@@ -75,6 +75,7 @@ agda-jang/
 │   └── tools/
 │       ├── jang_try.py
 │       ├── search.py
+│       ├── policy_fixture.py
 │       └── helpers.py
 ├── Makefile
 └── README.md
@@ -99,7 +100,6 @@ This script
 
 It is primarily intended for **rapid experimentation** and debugging.
 
----
 
 ### `search.py`
 
@@ -110,6 +110,19 @@ Its purpose is not to be state-of-the-art, but to
 +  demonstrate how an agent can interact with Agda step-by-step,
 +  provide baselines for learned policies,
 +  generate data for interactive learning.
+
+
+### `policy_fixture.py`
+
+This is a temporary, minimal policy backend that we can use to test the
+inference/serving integration and make the demo pass even before any training
+exists.  It reads a request JSON containing `{goal, context}`
+and returns a ranked list of candidate terms.  It's deterministic and uses only a few
+safe heuristics:
+
++ If the goal matches a context binder's type, propose that binder name (assumption).
++ If the goal contains `≡` (equality), propose `refl` (works for `x ≡ x` fixtures).
++ If the goal is `⊤`, propose `tt`.
 
 ---
 
@@ -169,7 +182,15 @@ These demos serve as executable documentation.
 
 ## See Also
 
-* Root project README
-* `proof-parser/README.md`
-* `ml-pipeline/README.md`
++ [Root project README][]
++ [`agda-backend-jsonl/README.md`][agda-backend-jsonl/README]
++ [`ml-pipeline/README.md`][ml-pipeline/README]
++ [`proof-parser/README.md`][proof-parser/README]
+
+[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
+[agda-backend-jsonl/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-backend-jsonl/README.md
+[proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
+[ml-pipeline/README]: https://github.com/formalverification/agda-ai-prover/blob/main/ml-pipeline/README.md
+[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+
 
