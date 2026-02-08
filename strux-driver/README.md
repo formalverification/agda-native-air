@@ -338,6 +338,15 @@ In particular, we are continually exploring new ways to improve it.  Here are so
 
 ## See Also
 
-+  Root project README
-+  `agda-jang/README.md`
-+  `ml-pipeline/README.md`
++ [Root project README][]
++ [`agda-backend-jsonl/README.md`][agda-backend-jsonl/README]
++ [`agda-jang/README.md`][agda-jang/README]
++ [`ml-pipeline/README.md`][ml-pipeline/README]
+
+[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
+[agda-backend-jsonl/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-backend-jsonl/README.md
+[agda-jang/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/README.md
+[ml-pipeline/README]: https://github.com/formalverification/agda-ai-prover/blob/main/ml-pipeline/README.md
+[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+
+

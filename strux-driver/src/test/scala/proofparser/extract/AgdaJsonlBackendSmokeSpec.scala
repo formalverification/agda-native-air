@@ -107,7 +107,8 @@ final class AgdaJsonlBackendSmokeSpec extends AnyFreeSpec with Matchers {
   }
 
   private def fixture(repoRoot: Path, fileName: String): Path =
-    repoRoot.resolve("agda-backend-jsonl").resolve("test").resolve("resources").resolve(fileName)
+    // repoRoot.resolve("agda-backend-jsonl").resolve("test").resolve("resources").resolve(fileName)
+    repoRoot.resolve("data").resolve("agda").resolve(fileName)
 
   // -------- tests --------
 
