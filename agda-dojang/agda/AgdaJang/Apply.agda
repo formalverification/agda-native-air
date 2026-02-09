@@ -1,9 +1,28 @@
--- agda-jang/agda/AgdaJang/Apply.agda
--- We don't try to invent metas yet (that's version-sensitive);
--- we just give ergonomic builders for *explicit* applications.
--- We'll extend it to implicit-meta insertion later.
+-- Apply.agda
 --
--- USAGE
+-- File: agda-jang/agda/AgdaJang/Apply.agda
+--
+-- Description:
+--   This file contains tactics for applying functions to goals, with various levels
+--   of user-supplied information and reporting.  The main challenges are:
+--
+--   +  Building an application term with the right head (def or con) and the right
+--      number of args.
+--   +  Collecting the number of Π-binders from a function's type to know how
+--      many args to build, without risking non-termination from normalization.
+--
+--   We solve the first by a helper that takes a *term* (e.g., `suc` or `_+_`) and
+--   builds a head application with the right head constructor.
+--
+--   We solve the second by a syntactic bound on the number of Π-binders, plus a
+--   worker that peels normalization one step at a time, so the termination checker
+--   is happy.
+--
+--   We don't try to invent metas yet (that's version-sensitive);
+--   we just give ergonomic builders for *explicit* applications.
+--   We'll extend it to implicit-meta insertion later.
+--
+-- Usage:
 --
 --   Example 1. Fully explicit functions
 --     Inside some module where 'suc' is in scope and args are explicit:

@@ -1,4 +1,20 @@
--- agda/AgdaJang/Prelude.agda
+-- Prelude.agda
+--
+-- File: agda-jang/agda/AgdaJang/Prelude.agda
+--
+-- Description:
+--   This module serves as a prelude for the AgdaJang project, providing common
+--   imports and definitions that are used across the project. It re-exports necessary
+--   parts of the Agda standard library and the reflection API, and defines some
+--   convenient aliases and helper functions for working with the TC monad and terms.
+--   The goal is to have a single place where we can manage our imports and common
+--   utilities, making it easier to maintain and update as needed.
+--
+-- Notes:
+--   This module is not intended to be a comprehensive prelude; it only includes
+--   the specific imports and definitions that are currently needed for the AgdaJang
+--   project. As the project evolves, we may add more imports or utilities here as needed.
+--
 
 module AgdaJang.Prelude where
 
@@ -6,6 +22,7 @@ open import Agda.Primitive public
 open import Agda.Builtin.Bool public
 open import Agda.Builtin.List using (List; []; _∷_) public
 open import Agda.Builtin.Nat  using (Nat; zero; suc; _+_) public
+open import Agda.Builtin.Sigma using (Σ; _,_; fst; snd) public
 open import Agda.Builtin.String using (String; primShowNat) public
 open import Agda.Builtin.Unit using (⊤; tt) public
 open import Data.Bool using (if_then_else_) public
@@ -22,6 +39,8 @@ open import Agda.Builtin.Reflection as R public
         ; catchTC; checkType; con
         ; def
         ; ErrorPart
+        ; formatErrorParts
+        ; getContext
         ; hidden
         ; instance′; inferType
         ; Modality; modality

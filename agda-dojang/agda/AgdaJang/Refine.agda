@@ -1,15 +1,36 @@
--- agda/AgdaJang/Refine.agda
+-- Refine.agda
 --
--- NOTES
+-- File: agda-jang/agda/AgdaJang/Refine.agda
 --
--- + `refine⟨_⟩` is the fast, reliable building block. If Agda accepts the candidate
---    term, it unifies the hole.
+-- Description:
+--   This module defines two macros, `refine⟨_⟩` and `try⟨_⟩`, that can be used in
+--   Agda holes to attempt to fill the hole with a candidate term (`cand`).
 --
--- +  `try⟨_⟩` uses `catchTC` to signal OK/FAIL without committing the solution.
---    For v0 we use a `typeError` message as a signaling channel; the CLI looks
---    for `AGDADOJO_TRY:OK`/`FAIL` in Agda's JSON.
+--   +  `refine⟨_⟩` checks if `cand` typechecks against the goal type and, if so, fills the
+--      hole with `cand`. If it doesn't typecheck, it raises a type error.
 --
---  USAGE
+--   +  `try⟨_⟩` performs the same check but does not fill the hole; instead, it uses
+--      `catchTC` to signal whether the check succeeded or failed via compile-time
+--      messages.  This can be useful for testing candidate terms without committing to them.
+--
+-- Notes:
+--
+--   +  `refine⟨_⟩` is the fast, reliable building block. If Agda accepts the candidate
+--       term, it unifies the hole.
+--
+--   +  `try⟨_⟩` uses `catchTC` to signal OK/FAIL without committing the solution.
+--      For v0 we use a `typeError` message as a signaling channel; the CLI looks
+--      for `AGDADOJO_TRY:OK`/`FAIL` in Agda's JSON.
+--
+--  Usage:
+--
+--    In a hole, write `refine⟨ cand ⟩` where `cand` is a term (with implicits
+--    explicit or implicit as usual).  If it typechecks, the goal gets solved;
+--    otherwise, Agda prints a type error.
+--
+--    In a hole, write `try⟨ cand ⟩` to check if `cand` would typecheck against the
+--    goal type. This does not solve the hole; instead, it reports the result via
+--    compile-time messages.
 --
 module AgdaJang.Refine where
 

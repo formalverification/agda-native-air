@@ -119,11 +119,11 @@ help:
 
 # ------------------------------------------------------------------------------
 
-# 1) Compile-time health check for our Agda macros
+# 0) Compile-time health check for our Agda macros
 check:
 	$(AGDA) $(AGDA_FLAGS) $(AGDA_DIR)/AgdaJang/Everything.agda
 
-# 2) Demos (use jang_try.py). We forward the same AGDA_FLAGS the compiler uses.
+# 1) Demos (use jang_try.py). We forward the same AGDA_FLAGS the compiler uses.
 demo: demo1 demo2
 
 demo1:
@@ -131,6 +131,21 @@ demo1:
 
 demo2:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(JANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
+
+# 2) Demo: run the agent bridge on a fixture file with holes, then check the output type-checks.
+# 	This is a sanity check for the whole loop (Agda → Python agent → Agda) on a fixed example before we add any model.
+FIXTURE_DIR := $(REPO_ROOT)/data/agda
+FIXTURE_IN  := $(FIXTURE_DIR)/FixtureHoles.agda
+FIXTURE_OUT := $(abspath _build/FixtureHoles.solved.agda)
+
+demo-agent-bridge:
+	@mkdir -p _build
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) python/tools/agent_bridge.py \
+	  --input "$(FIXTURE_IN)" \
+	  --output "$(FIXTURE_OUT)" \
+	  --agda-bin "$(AGDA)" \
+	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR) --allow-unsolved-metas"
+	$(AGDA) $(AGDA_FLAGS) -i "$(FIXTURE_DIR)" "$(FIXTURE_OUT)"
 
 # ------------------------------------------------------------------------------
 
