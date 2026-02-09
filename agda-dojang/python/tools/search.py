@@ -177,7 +177,7 @@ def score_for_child(base_goal: str, action: Action, binders: Optional[List[Binde
 
 # ========= Expansion =========
 
-def expand(cfg: OracleCfg, s: State, beam_k: int, cache: Dict[str, StepResult], visited: set[str]) -> List[State]:
+def expand(cfg: OracleCfg, s: State, beam_k: int, cache: Dict[str, StepResult], visited: set[Tuple[str, str, str]]) -> List[State]:
     candidates: List[Tuple[Tuple[int, int, int], State]] = []
 
     def cache_get(a: Action) -> StepResult:
@@ -269,7 +269,7 @@ def expand(cfg: OracleCfg, s: State, beam_k: int, cache: Dict[str, StepResult], 
 def bfs(cfg: OracleCfg, start: State, max_depth: int, beam_k: int) -> Optional[State]:
     from collections import deque
     cache: Dict[str, StepResult] = {}
-    visited: set[str] = set()
+    visited: set[Tuple[str, str, str]] = set()
     q = deque([start])
     depth = 0
     while q and depth <= max_depth:

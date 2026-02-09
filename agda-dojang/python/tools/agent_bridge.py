@@ -3,61 +3,57 @@
 agent_bridge.py
 ===============
 
-File: agda-jang/python/tools/agent_bridge.py
+File: agda-ai-prover/agda-jang/python/tools/agent_bridge.py
 
-Purpose
--------
-A tiny, deterministic v0 "agent loop" bridge:
+Goal (Issue #23 v0)
+------------------
+Provide a tiny, deterministic "report → policy → patch → check" loop:
 
-  (1) locate the next hole in an Agda file
-  (2) ask Agda to *report* (goal, context) at that hole
-  (3) query a policy backend with (goal, context)
-  (4) try top-k candidate terms by patching the hole and re-checking with Agda
-  (5) repeat until we've solved N holes or there are no holes left
+  1) Create a *reporting* variant of a target Agda file by replacing the next hole
+     with a marker-emitting macro call (e.g. `reportGoalCtx ?`).
+  2) Run Agda on the reporting variant and parse a `{goal, context}` request from
+     stable BEGIN/END markers in the compiler output.
+  3) Call a policy backend (local process) to get ranked candidate terms.
+  4) Try candidates by patching the original hole; accept the first candidate that
+     typechecks; repeat for up to N holes.
 
-This is designed to make Issue #23's "propose/check/refine" loop work *before*
-any ML exists, using the scripted fixture policy.
+Design constraints / style
+--------------------------
+- Reuses project utilities:
+    utils.command_runner.run_command
+    utils.file_ops.temp_dir, utils.file_ops.write_text_atomic
+    utils.result.Result (Ok/Err)
+    utils.types.PipelineError, CommandResult
+- Avoids exceptions for control flow (errors become PipelineError values).
+- Keeps data immutable (dataclasses, frozen where appropriate).
+- Type annotations everywhere.
 
-Key constraints / design choices
---------------------------------
-- Non-destructive: never overwrites the input file.
-- Deterministic: left-to-right, top-to-bottom hole order; deterministic policy.
-- Minimal coupling: shells out to `agda` and parses tagged markers from output.
-- Functional style: pure helpers for parsing/rendering; controlled side effects.
+Important note
+--------------
+This bridge expects the Agda-side reporting macro to emit a request block:
 
-Assumptions
------------
-1) The file is typecheckable under our Agda setup (flags, libraries, includes).
-2) There exists an Agda macro in scope (via imports) that emits a goal+context
-   report with markers parseable by tools.report_parser.parse_goalctx_report.
+  AGDAJANG_REQ_BEGIN
+  { "goal": "...", "context": [ { "name": "...", "type": "..." }, ... ] }
+  AGDAJANG_REQ_END
 
-   For example, our macro could be named `reportGoalCtx` and be used as:
-     reportGoalCtx ?
-   in a hole position (or equivalently inserted by this bridge).
+The parsing support for these markers is added in tools/report_parser.py (diff below).
 
-CLI example (repo root, via agda-jang Makefile)
------------------------------------------------
+CLI examples
+------------
+From repo root (recommended, so --library-file paths resolve):
+
   PYTHONPATH=agda-jang/python \
-    python3 agda-jang/python/tools/agent_bridge.py \
-      --input  data/agda/FixtureHoles.agda \
-      --output _build/FixtureHoles.solved.agda \
-      --agda-bin agda \
-      --agda-flags "-i agda --library-file=agda/libraries -l agda-jang -i data/agda" \
-      --max-holes 10 \
-      --k 5
+  python3 agda-jang/python/tools/agent_bridge.py \
+    --file data/agda/FixtureHoles.agda \
+    --policy "python3 agda-jang/python/tools/policy_fixture.py" \
+    --agda-bin agda \
+    --agda-flags "-i agda --library-file=agda/libraries -l agda-jang" \
+    --include "data/agda" \
+    --max-holes 4 \
+    --k 5
 
-Exit code
----------
-0 on success (solved requested holes or file has no holes), nonzero on failure.
-
-IMPORTANT NOTES
----------------
--  This bridge inserts `open import AgdaJang.Debug` into the working copy if missing
-   (output will include it if needed).
--  It expects our macro to be available as `reportGoalCtx ?` by default; override
-with `--report-macro` if you choose a different name.
-
-
+If you want to inspect generated workdir files:
+  ... --keep-workdir
 """
 
 from __future__ import annotations
@@ -66,621 +62,456 @@ import argparse
 import json
 import re
 import shlex
-import subprocess
-import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from tools.report_parser import (
-    has_req_markers,
-    parse_goalctx_report,
+    extract_policy_request_from_output,
 )
 
-# -------------------------
-# Domain types (immutable)
-# -------------------------
+from utils.command_runner import run_command
+from utils.file_ops import temp_dir, write_text_atomic
+from utils.result import Err, Ok, Result
+from utils.types import CommandResult, PipelineError
+
+
+# =========================
+# Small immutable data types
+# =========================
 
 @dataclass(frozen=True)
-class ProcResult:
-    """Result of a subprocess invocation."""
-    rc: int
-    stdout: str
-    stderr: str
-
-    @property
-    def combined(self) -> str:
-        """Stable combined stream for marker parsing."""
-        if self.stderr:
-            return (self.stdout or "") + ("\n" if self.stdout and not self.stdout.endswith("\n") else "") + self.stderr
-        return self.stdout or ""
-
-
-@dataclass(frozen=True)
-class CtxEntry:
-    """A single context binder entry."""
-    name: str
-    type: str
-    visibility: str  # "visible" | "hidden" | "instance" | ...
+class HoleSpan:
+    """
+    A byte/character span for a single hole occurrence in a source file,
+    plus a 1-based (line, col) for nicer logging.
+    """
+    start: int
+    end: int
+    line: int
+    col: int
 
 
 @dataclass(frozen=True)
-class GoalCtx:
-    """The (goal, context) payload we send to policies."""
-    goal: str
-    context: Tuple[CtxEntry, ...]
-
-
-@dataclass(frozen=True)
-class Candidate:
-    """A single candidate proposal returned by the policy backend."""
+class PolicyCandidate:
     term: str
     score: float
     meta: Dict[str, Any]
 
 
 @dataclass(frozen=True)
-class BridgeCfg:
-    """All configuration needed for the bridge run."""
-    agda_bin: str
-    agda_flags: Tuple[str, ...]
-    input_path: Path
-    output_path: Path
-    policy_script: Path
-    k: int
-    max_holes: int
-    keep_workdir: bool
-    allow_unsolved_metas: bool
-    # Which macro do we insert for goal/context reporting?
-    report_macro_expr: str  # e.g. "reportGoalCtx ?"
-    # Ensure these imports are present in the working file
-    required_open_imports: Tuple[str, ...]
+class PolicyResponse:
+    schemaVersion: str
+    candidates: List[PolicyCandidate]
+    meta: Dict[str, Any]
 
 
 @dataclass(frozen=True)
-class HoleSpan:
-    """A span in a source file corresponding to a hole."""
-    start: int
-    end: int
-    kind: str  # "braced" for "{!!}", "qmark" for "?"
-
-    def slice(self) -> slice:
-        return slice(self.start, self.end)
+class PolicyRequest:
+    goal: str
+    context: List[Dict[str, str]]  # [{"name":..., "type":...}, ...]
+    module: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
 
 
-# -------------------------
-# Small pure utilities
-# -------------------------
+@dataclass(frozen=True)
+class BridgeConfig:
+    file: Path
+    policy_cmd: List[str]
+    agda_bin: str
+    agda_flags: str
+    include_dirs: List[str]
+    timeout_sec: Optional[float]
+    keep_workdir: bool
+    max_holes: int
+    top_k: int
+    cwd: Optional[Path]
 
-_BOUNDARY_CHARS = set(" \t\r\n()[]{};,:.=+-*/<>|&!@#$%^~`'\\\"")
+    # The Agda-side reporting macro call we inject in place of `{!!}`
+    # (expects a trailing `?` to stand for "current goal hole term").
+    report_expr: str
 
 
-def _is_boundary(ch: str) -> bool:
-    return (ch == "") or (ch in _BOUNDARY_CHARS)
+# =========================
+# Pure-ish helpers (strings)
+# =========================
+
+_HOLE_TOKEN = "{!!}"
 
 
-def _split_flags(flags: str) -> Tuple[str, ...]:
+def _split_flags(flag_str: str) -> List[str]:
     """
-    Split a flag string into argv tokens.
-    Mirrors the style used in jang_try.py (shlex-based, robust).
+    Parse an Agda flag string into argv tokens.
+
+    Mirrors the small safety in jang_try.py:
+      - drop a dangling "-l" if present (avoids Agda parse error).
     """
-    toks = tuple(shlex.split(flags)) if flags else tuple()
-    # defensive: drop dangling "-l" which can happen in some ad-hoc scripts
+    toks = shlex.split(flag_str) if flag_str else []
     if toks and toks[-1] == "-l":
-        return toks[:-1]
+        toks = toks[:-1]
     return toks
 
 
-def ensure_required_imports(source: str, required_open_imports: Sequence[str]) -> str:
+def _find_next_hole(src: str) -> Optional[HoleSpan]:
     """
-    Ensure `open import ...` lines exist in the module, inserting them after
-    the `module ... where` line (first occurrence).
+    Find the next `{!!}` hole token.
 
-    Pure function: returns new source text.
+    v0 deliberately keeps this simple: it does not attempt to parse comments/strings.
+    For FixtureHoles.agda, this is sufficient and deterministic.
+
+    Returns None if no hole exists.
     """
-    req = [ln.strip() for ln in required_open_imports if ln.strip()]
-    if not req:
-        return source
+    idx = src.find(_HOLE_TOKEN)
+    if idx < 0:
+        return None
+    start = idx
+    end = idx + len(_HOLE_TOKEN)
 
-    # Fast path: all present
-    missing = [ln for ln in req if ln not in source]
-    if not missing:
-        return source
-
-    lines = source.splitlines(keepends=True)
-
-    # Find module header line
-    insert_at: Optional[int] = None
-    for i, ln in enumerate(lines):
-        if ln.lstrip().startswith("module ") and " where" in ln:
-            insert_at = i + 1
-            break
-
-    # If we can’t find a module header, append at the top (still safe for demo files)
-    if insert_at is None:
-        insert_at = 0
-
-    block = ""
-    # Keep formatting stable: one blank line, imports, one blank line
-    block += "\n" if (insert_at > 0 and (insert_at <= len(lines)) and (not lines[insert_at - 1].endswith("\n"))) else ""
-    block += "\n".join(missing) + "\n\n"
-
-    new_lines = list(lines)
-    new_lines.insert(insert_at, block)
-    return "".join(new_lines)
+    # 1-based line/col
+    line = src.count("\n", 0, start) + 1
+    last_nl = src.rfind("\n", 0, start)
+    col = (start - last_nl) if last_nl >= 0 else (start + 1)
+    return HoleSpan(start=start, end=end, line=line, col=col)
 
 
-def replace_span(text: str, span: HoleSpan, replacement: str) -> str:
-    """Pure string splice."""
-    return text[: span.start] + replacement + text[span.end :]
+def _replace_span(src: str, span: HoleSpan, replacement: str) -> str:
+    return src[: span.start] + replacement + src[span.end :]
 
 
-def scan_next_hole(source: str) -> Optional[HoleSpan]:
+def _json_dumps(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, indent=2)
+
+
+# =========================
+# IO helpers (Result-returning)
+# =========================
+
+def read_text(path: Path) -> Result[str, PipelineError]:
     """
-    Find the next hole in the file, skipping:
-      - line comments starting with `--`
-      - block comments delimited by `{-` ... `-}` (non-nested handling is *good enough* for v0;
-        we support simple nesting anyway)
-      - string literals "..."
-
-    Hole forms supported:
-      - `{!!}` (preferred for fixtures)
-      - `?` (as a standalone token, best-effort boundary checks)
-
-    Deterministic: returns first occurrence in lexical order.
+    Read UTF-8 text from a file, returning PipelineError on failure.
     """
-    i = 0
-    n = len(source)
-
-    in_line_comment = False
-    in_string = False
-    block_depth = 0
-
-    while i < n:
-        # Line comment
-        if in_line_comment:
-            if source[i] == "\n":
-                in_line_comment = False
-            i += 1
-            continue
-
-        # String literal
-        if in_string:
-            if source[i] == "\\" and i + 1 < n:
-                i += 2
-                continue
-            if source[i] == "\"":
-                in_string = False
-            i += 1
-            continue
-
-        # Block comment (handle shallow nesting)
-        if block_depth > 0:
-            if source.startswith("{-", i):
-                block_depth += 1
-                i += 2
-                continue
-            if source.startswith("-}", i):
-                block_depth -= 1
-                i += 2
-                continue
-            i += 1
-            continue
-
-        # Enter comment/string
-        if source.startswith("--", i):
-            in_line_comment = True
-            i += 2
-            continue
-        if source.startswith("{-", i):
-            block_depth = 1
-            i += 2
-            continue
-        if source[i] == "\"":
-            in_string = True
-            i += 1
-            continue
-
-        # Hole: {!!}
-        if source.startswith("{!!}", i):
-            return HoleSpan(start=i, end=i + 4, kind="braced")
-
-        # Hole: ? (best-effort standalone token)
-        if source[i] == "?":
-            prev = source[i - 1] if i > 0 else ""
-            nxt = source[i + 1] if i + 1 < n else ""
-            if _is_boundary(prev) and _is_boundary(nxt):
-                return HoleSpan(start=i, end=i + 1, kind="qmark")
-
-        i += 1
-
-    return None
+    try:
+        return Ok(path.read_text(encoding="utf-8"))
+    except OSError as e:
+        return Err(PipelineError(
+            kind="OSError",
+            cmd=[],
+            rc=-1,
+            stdout="",
+            stderr="",
+            message=f"failed to read {path}: {e}",
+        ))
 
 
-def count_holes(source: str) -> int:
-    """Count holes by repeatedly scanning; pure and deterministic."""
-    cnt = 0
-    s = source
-    while True:
-        h = scan_next_hole(s)
-        if h is None:
-            return cnt
-        cnt += 1
-        # remove the first hole to continue scanning after it
-        s = replace_span(s, h, " ")  # preserve indices roughly; we just need count
-
-
-# -------------------------
-# Subprocess boundary
-# -------------------------
-
-def run_process(cmd: Sequence[str], timeout_s: Optional[float]) -> ProcResult:
-    """
-    Minimal subprocess runner.
-    We always capture stdout+stderr; callers decide how to interpret rc.
-    """
-    p = subprocess.run(
-        list(cmd),
-        capture_output=True,
-        text=True,
-        timeout=timeout_s,
-    )
-    return ProcResult(rc=p.returncode, stdout=p.stdout or "", stderr=p.stderr or "")
-
-
-def agda_check(
-    cfg: BridgeCfg,
+def run_agda(
+    cfg: BridgeConfig,
     file_path: Path,
-    timeout_s: Optional[float],
-    allow_unsolved: bool,
-) -> ProcResult:
+    extra_include_dirs: Sequence[str],
+) -> Result[CommandResult, PipelineError]:
     """
-    Invoke `agda` on the given file. If allow_unsolved is True, pass
-    `--allow-unsolved-metas` unless already present in agda_flags.
+    Run Agda on `file_path`, adding include dirs.
+
+    Note: run_command returns Err on non-zero exit; for *report mode* we still want
+    stdout, so callers should usually normalize Err into a "collected output" shape.
     """
-    flags = list(cfg.agda_flags)
-    if allow_unsolved and "--allow-unsolved-metas" not in flags:
-        flags.append("--allow-unsolved-metas")
-    cmd = [cfg.agda_bin, *flags, str(file_path)]
-    return run_process(cmd, timeout_s=timeout_s)
+    inc: List[str] = []
+    for d in extra_include_dirs:
+        inc += ["-i", d]
+    for d in cfg.include_dirs:
+        inc += ["-i", d]
+
+    cmd = [cfg.agda_bin, *_split_flags(cfg.agda_flags), *inc, str(file_path)]
+    return run_command(cmd, cwd=cfg.cwd, timeout=cfg.timeout_sec, merge_stderr=True)
 
 
-# -------------------------
-# Policy boundary
-# -------------------------
+def collect_output(res: Result[CommandResult, PipelineError]) -> Tuple[int, str]:
+    """
+    Normalize Ok/Err from run_command into (rc, merged_output).
 
-def parse_candidates(resp: Dict[str, Any]) -> List[Candidate]:
+    - Ok: rc==0, output in stdout
+    - Err: rc is error.rc, output in error.stdout (+error.stderr if present)
     """
-    Parse a policy response:
-      { "candidates": [ { "term": "...", "score": 1.0, "meta": {...} }, ... ] }
-    """
-    raw = resp.get("candidates", [])
-    if not isinstance(raw, list):
-        return []
-    out: List[Candidate] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        term = str(item.get("term", "")).strip()
-        if not term:
-            continue
-        score = float(item.get("score", 0.0) or 0.0)
-        meta = item.get("meta", {})
-        if not isinstance(meta, dict):
-            meta = {}
-        out.append(Candidate(term=term, score=score, meta=dict(meta)))
-    return out
+    if isinstance(res, Ok):
+        return res.value.rc, res.value.stdout
+    err = res.error
+    merged = (err.stdout or "") + (("\n" + err.stderr) if err.stderr else "")
+    return err.rc, merged
 
 
 def call_policy(
-    cfg: BridgeCfg,
-    goalctx: GoalCtx,
-    timeout_s: Optional[float],
-) -> List[Candidate]:
+    cfg: BridgeConfig,
+    req: PolicyRequest,
+    workdir: Path,
+) -> Result[PolicyResponse, PipelineError]:
     """
-    Call the policy backend as a subprocess:
-      python policy_fixture.py --in - --out - --k K
+    Call the policy backend as a local process.
 
-    Returns candidate list (possibly empty). Raises on malformed JSON output.
+    We avoid stdin piping so we can reuse run_command:
+      - write req.json
+      - run: <policy_cmd> --in req.json --out -
+      - parse stdout as JSON
     """
-    req: Dict[str, Any] = {
-        "schemaVersion": "goalctx.v0",
-        "goal": goalctx.goal,
-        "context": [
-            {"name": e.name, "type": e.type, "visibility": e.visibility}
-            for e in goalctx.context
-        ],
-    }
+    req_path = workdir / "policy_req.json"
+    write_text_atomic(req_path, _json_dumps({
+        "goal": req.goal,
+        "context": req.context,
+        "module": req.module,
+        "meta": req.meta,
+    }) + "\n")
 
-    cmd = [
-        sys.executable,
-        str(cfg.policy_script),
-        "--in",
-        "-",
-        "--out",
-        "-",
-        "--k",
-        str(cfg.k),
-    ]
-    p = subprocess.run(cmd, input=json.dumps(req), capture_output=True, text=True, timeout=timeout_s)
-    out = (p.stdout or "").strip()
-    if not out:
-        raise ValueError(f"policy produced empty stdout (rc={p.returncode})")
-    resp = json.loads(out)
-    if not isinstance(resp, dict):
-        raise ValueError("policy response is not a JSON object")
-    return parse_candidates(resp)
+    cmd = [*cfg.policy_cmd, "--in", str(req_path), "--out", "-", "--k", str(cfg.top_k)]
+    res = run_command(cmd, cwd=cfg.cwd, timeout=cfg.timeout_sec, merge_stderr=True)
 
+    if isinstance(res, Err):
+        e = res.error
+        return Err(PipelineError(
+            kind=e.kind,
+            cmd=e.cmd,
+            rc=e.rc,
+            stdout=e.stdout,
+            stderr=e.stderr,
+            message=f"policy backend failed: {e.message}",
+        ))
 
-# -------------------------
-# Bridge loop (pure-ish core)
-# -------------------------
-
-def extract_goalctx_from_report(output: str) -> GoalCtx:
-    """
-    Parse a tagged goal/context report from Agda output.
-    Delegates to tools.report_parser.parse_goalctx_report.
-    """
-    rep = parse_goalctx_report(output)
-
-    goal = str(rep.get("goal", "")).strip()
-    if not goal:
-        raise ValueError("goalctx report missing goal")
-
-    ctx_list: List[CtxEntry] = []
-    raw_ctx = rep.get("context", [])
-    if isinstance(raw_ctx, list):
-        for item in raw_ctx:
-            if not isinstance(item, dict):
-                continue
-            ctx_list.append(
-                CtxEntry(
-                    name=str(item.get("name", "")).strip(),
-                    type=str(item.get("type", "")).strip(),
-                    visibility=str(item.get("visibility", "")).strip(),
-                )
-            )
-
-    # keep only entries with names
-    ctx_tuple = tuple(e for e in ctx_list if e.name)
-    return GoalCtx(goal=goal, context=ctx_tuple)
-
-
-def solve_one_hole(
-    cfg: BridgeCfg,
-    work_file: Path,
-    source_text: str,
-    timeout_s: Optional[float],
-) -> Tuple[str, bool, Optional[str]]:
-    """
-    Attempt to solve the *next* hole in source_text.
-
-    Returns:
-      (new_source_text, solved?, diagnostic_message_if_failed)
-
-    Strategy:
-      1) Replace the next hole with the report macro expression, run Agda,
-         parse goal+context from tagged output.
-      2) Query policy; try candidates in order by patching the hole with term.
-      3) Accept the first candidate that makes Agda succeed (rc == 0).
-    """
-    hole = scan_next_hole(source_text)
-    if hole is None:
-        return (source_text, True, None)  # nothing to do
-
-    # Ensure the report macro is in scope in the working module
-    base = ensure_required_imports(source_text, cfg.required_open_imports)
-
-    # For reporting, we replace the hole with e.g. `reportGoalCtx ?`
-    report_text = replace_span(base, hole, cfg.report_macro_expr)
-
-    work_file.write_text(report_text, encoding="utf-8")
-
-    rep_res = agda_check(
-        cfg=cfg,
-        file_path=work_file,
-        timeout_s=timeout_s,
-        allow_unsolved=True,
-    )
-
-    combined = rep_res.combined
-    if not has_req_markers(combined):
-        # Provide a helpful failure: show some output to debug macro/markers.
-        msg = (
-            "Agda output did not include AGDAJANG_REQ_BEGIN/END markers.\n"
-            "This usually means the report macro is missing, not imported, or markers changed.\n"
-            "---- Agda combined output (truncated) ----\n"
-            + combined[:2000]
-            + ("\n... (truncated) ..." if len(combined) > 2000 else "")
-        )
-        return (source_text, False, msg)
-
-    goalctx = extract_goalctx_from_report(combined)
-
-    # Call policy
+    out = res.value.stdout.strip()
     try:
-        cands = call_policy(cfg, goalctx, timeout_s=timeout_s)
-    except Exception as e:
-        return (source_text, False, f"policy call failed: {e}")
+        obj = json.loads(out)
+    except Exception as ex:
+        return Err(PipelineError(
+            kind="OSError",
+            cmd=cmd,
+            rc=-1,
+            stdout=out,
+            stderr="",
+            message=f"policy backend returned non-JSON: {ex}",
+        ))
 
-    if not cands:
-        return (source_text, False, f"policy returned no candidates for goal: {goalctx.goal}")
+    cands: List[PolicyCandidate] = []
+    for raw in (obj.get("candidates") or []):
+        if not isinstance(raw, dict):
+            continue
+        term = str(raw.get("term", "")).strip()
+        if not term:
+            continue
+        score = float(raw.get("score", 0.0))
+        meta = raw.get("meta") if isinstance(raw.get("meta"), dict) else {}
+        cands.append(PolicyCandidate(term=term, score=score, meta=meta))
 
-    # Try candidates in order, patching the original hole (not the macro version)
-    for cand in cands:
-        trial = replace_span(base, hole, cand.term)
+    return Ok(PolicyResponse(
+        schemaVersion=str(obj.get("schemaVersion", "")),
+        candidates=cands,
+        meta=obj.get("meta") if isinstance(obj.get("meta"), dict) else {},
+    ))
 
-        # Decide whether to allow unsolved metas (if remaining holes exist)
-        remaining = count_holes(trial)
-        allow_unsolved = cfg.allow_unsolved_metas and (remaining > 0)
 
-        work_file.write_text(trial, encoding="utf-8")
-        chk = agda_check(cfg, work_file, timeout_s=timeout_s, allow_unsolved=allow_unsolved)
+# =========================
+# Core algorithm
+# =========================
 
-        if chk.rc == 0:
-            return (trial, True, None)
+def build_report_variant(cfg: BridgeConfig, src: str, hole: HoleSpan) -> str:
+    """
+    Replace the hole token with the reporting expression.
+    Example replacement: "reportGoalCtx ?"
+    """
+    return _replace_span(src, hole, cfg.report_expr)
 
-    # No candidate worked
-    diag = (
-        "No candidate term typechecked for this hole.\n"
-        f"Goal: {goalctx.goal}\n"
-        "Candidates tried:\n"
-        + "\n".join(f"  - {c.term} (score={c.score})" for c in cands)
+
+def build_candidate_variant(src: str, hole: HoleSpan, term: str) -> str:
+    """
+    Replace the hole token with a candidate term (surface syntax).
+    """
+    return _replace_span(src, hole, term)
+
+
+def solve_one_hole(cfg: BridgeConfig, src: str, hole: HoleSpan, workdir: Path) -> Result[str, PipelineError]:
+    """
+    Attempt to solve exactly one hole.
+    Returns updated source text if solved; Err if unsolved or failure.
+    """
+    # 1) Report mode: write a reporting variant into workdir, run Agda, parse request.
+    report_src = build_report_variant(cfg, src, hole)
+    report_file = workdir / cfg.file.name
+    write_text_atomic(report_file, report_src)
+
+    # Ensure Agda can resolve the module by including the *workdir* and original file dir.
+    # (Also include user-provided include_dirs from cfg.)
+    report_run = run_agda(cfg, report_file, extra_include_dirs=[str(workdir), str(cfg.file.parent)])
+    _rc, out = collect_output(report_run)
+
+    req_obj = extract_policy_request_from_output(out)
+    if req_obj is None:
+        return Err(PipelineError(
+            kind="NonZeroExit",
+            cmd=[],
+            rc=42,
+            stdout=out,
+            stderr="",
+            message=(
+                "could not extract policy request markers from Agda output. "
+                "Is the reporting macro implemented and emitting AGDAJANG_REQ_BEGIN/END?"
+            ),
+        ))
+
+    req = PolicyRequest(
+        goal=str(req_obj.get("goal", "")).strip(),
+        context=req_obj.get("context") if isinstance(req_obj.get("context"), list) else [],
+        module=req_obj.get("module") if isinstance(req_obj.get("module"), str) else None,
+        meta=req_obj.get("meta") if isinstance(req_obj.get("meta"), dict) else None,
     )
-    return (source_text, False, diag)
+
+    # 2) Call policy backend.
+    pol = call_policy(cfg, req, workdir)
+    if isinstance(pol, Err):
+        return pol
+
+    candidates = pol.value.candidates
+    if not candidates:
+        return Err(PipelineError(
+            kind="NonZeroExit",
+            cmd=[],
+            rc=43,
+            stdout=_json_dumps(req_obj),
+            stderr="",
+            message="policy returned zero candidates",
+        ))
+
+    # 3) Try top-k candidates by patching the *original* file in workdir and running Agda.
+    for cand in candidates[: cfg.top_k]:
+        cand_src = build_candidate_variant(src, hole, cand.term)
+        cand_file = workdir / cfg.file.name
+        write_text_atomic(cand_file, cand_src)
+
+        cand_run = run_agda(cfg, cand_file, extra_include_dirs=[str(workdir), str(cfg.file.parent)])
+        rc, _out = collect_output(cand_run)
+        if rc == 0:
+            return Ok(cand_src)
+
+    return Err(PipelineError(
+        kind="NonZeroExit",
+        cmd=[],
+        rc=44,
+        stdout="",
+        stderr="",
+        message=f"no candidate among top-{cfg.top_k} typechecked for hole at {hole.line}:{hole.col}",
+    ))
 
 
-def solve_file(cfg: BridgeCfg, timeout_s: Optional[float]) -> Tuple[str, int]:
+def solve_file(cfg: BridgeConfig) -> Result[str, PipelineError]:
     """
-    Solve up to cfg.max_holes holes in cfg.input_path.
-    Returns (final_source, solved_count).
+    Solve up to cfg.max_holes holes in cfg.file.
+
+    Returns the final (possibly partially solved) source as Ok,
+    or Err on a hard failure.
     """
-    src0 = cfg.input_path.read_text(encoding="utf-8")
-    src = src0
-    solved = 0
+    r0 = read_text(cfg.file)
+    if isinstance(r0, Err):
+        return r0
+    src0 = r0.value
 
-    # Work in a private directory so interface artifacts don’t pollute repo.
-    with tempfile.TemporaryDirectory(prefix="agda-jang-bridge-") as td:
-        workdir = Path(td)
-        if cfg.keep_workdir:
-            # If user wants to keep the workdir, we simply don’t delete it:
-            # emulate by copying to a stable path at the end.
-            pass
+    with temp_dir(cfg.keep_workdir, prefix="agent-bridge_") as d:
+        # Work on a local copy, but write back only at the end (atomic).
+        src = src0
+        solved = 0
 
-        work_file = workdir / cfg.input_path.name
-        work_file.write_text(src, encoding="utf-8")
-
-        # Main loop: solve one hole at a time
-        for _ in range(cfg.max_holes):
-            if scan_next_hole(src) is None:
+        for _i in range(cfg.max_holes):
+            hole = _find_next_hole(src)
+            if hole is None:
                 break
 
-            new_src, ok, msg = solve_one_hole(cfg, work_file, src, timeout_s=timeout_s)
-            if not ok:
-                raise RuntimeError(msg or "unknown failure in solve_one_hole")
-            # If there was “nothing to do”, ok=True, new_src == src.
-            if new_src == src:
-                break
+            r1 = solve_one_hole(cfg, src, hole, d)
+            if isinstance(r1, Err):
+                return r1
 
-            src = new_src
+            src = r1.value
             solved += 1
 
-        # Optional: copy workdir to output-adjacent debug location if requested
-        if cfg.keep_workdir:
-            dbg_dir = cfg.output_path.parent / "_agent_bridge_workdir"
-            dbg_dir.mkdir(parents=True, exist_ok=True)
-            (dbg_dir / cfg.input_path.name).write_text(src, encoding="utf-8")
+        # If we solved at least one hole, verify final file checks.
+        if solved > 0:
+            final_file = d / cfg.file.name
+            write_text_atomic(final_file, src)
+            final_run = run_agda(cfg, final_file, extra_include_dirs=[str(d), str(cfg.file.parent)])
+            rc, out = collect_output(final_run)
+            if rc != 0:
+                return Err(PipelineError(
+                    kind="NonZeroExit",
+                    cmd=[],
+                    rc=rc,
+                    stdout=out,
+                    stderr="",
+                    message="file did not typecheck after solving (unexpected)",
+                ))
 
-    return (src, solved)
+        return Ok(src)
 
 
-# -------------------------
+# =========================
 # CLI
-# -------------------------
+# =========================
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> BridgeCfg:
-    ap = argparse.ArgumentParser(description="AgdaJang agent bridge (report -> policy -> patch -> check).")
-    ap.add_argument("--input", required=True, help="Input .agda file (will not be modified).")
-    ap.add_argument("--output", required=True, help="Output .agda file to write (solved copy).")
-
-    ap.add_argument("--agda-bin", default="agda", help="Agda binary.")
-    ap.add_argument("--agda-flags", default="", help="Extra flags passed to Agda (quoted string).")
-
-    ap.add_argument("--policy-script", default=None, help="Path to policy backend script (default: policy_fixture.py).")
-    ap.add_argument("--k", type=int, default=5, help="Top-k candidates to request from the policy.")
-    ap.add_argument("--max-holes", type=int, default=10, help="Maximum number of holes to attempt to solve.")
-    ap.add_argument("--keep-workdir", action="store_true", help="Keep a copy of intermediate work for debugging.")
-
+def parse_args(argv: Optional[List[str]] = None) -> BridgeConfig:
+    ap = argparse.ArgumentParser(description="AgdaJang agent bridge (report → policy → patch → check).")
+    ap.add_argument("--file", required=True, help="Path to an .agda file with `{!!}` holes.")
+    ap.add_argument("--policy", required=True, help="Policy command (quoted), e.g. 'python3 .../policy_fixture.py'")
+    ap.add_argument("--agda-bin", default="agda", help="Agda binary")
+    ap.add_argument("--agda-flags", default="", help="Extra flags passed to Agda (quoted string)")
+    ap.add_argument("--include", action="append", default=[], help="Extra -i include dirs (repeatable)")
+    ap.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) for each process invocation")
+    ap.add_argument("--keep-workdir", action="store_true", help="Keep the working directory for inspection")
+    ap.add_argument("--max-holes", type=int, default=1, help="Max number of holes to solve")
+    ap.add_argument("--k", type=int, default=5, help="Top-k candidates to try per hole")
+    ap.add_argument("--cwd", default=None, help="Working directory for running tools (recommended: repo root)")
     ap.add_argument(
-        "--no-allow-unsolved-metas",
-        action="store_true",
-        help="If set, do NOT pass --allow-unsolved-metas during intermediate checks (not recommended).",
-    )
-
-    ap.add_argument(
-        "--report-macro",
+        "--report-expr",
         default="reportGoalCtx ?",
-        help="Macro expression inserted in place of a hole to force goal/context reporting.",
+        help="Expression to inject into a hole to make Agda emit a {goal,context} request block",
     )
 
-    args = ap.parse_args(list(argv) if argv is not None else None)
+    args = ap.parse_args(argv)
 
-    inp = Path(args.input).resolve()
-    out = Path(args.output).resolve()
+    policy_cmd = shlex.split(args.policy)
+    if not policy_cmd:
+        raise SystemExit("ERROR: --policy parsed to empty command")
 
-    if not inp.exists():
-        raise SystemExit(f"ERROR: input file not found: {inp}")
-    if inp.suffix.lower() != ".agda":
-        raise SystemExit(f"ERROR: expected a .agda file, got: {inp}")
-    if inp == out:
-        raise SystemExit("ERROR: input and output paths are identical (refusing to overwrite input).")
+    cwd = Path(args.cwd).resolve() if args.cwd else None
 
-    policy_script = (
-        Path(args.policy_script).resolve()
-        if args.policy_script
-        else (Path(__file__).resolve().parent / "policy_fixture.py")
-    )
-    if not policy_script.exists():
-        raise SystemExit(f"ERROR: policy script not found: {policy_script}")
-
-    # Required imports so `reportGoalCtx` is in scope
-    # (can extend this later if we move macro names/modules.)
-    required_open_imports = (
-        "open import AgdaJang.Debug",
-    )
-
-    return BridgeCfg(
+    return BridgeConfig(
+        file=Path(args.file).resolve(),
+        policy_cmd=policy_cmd,
         agda_bin=str(args.agda_bin),
-        agda_flags=_split_flags(args.agda_flags),
-        input_path=inp,
-        output_path=out,
-        policy_script=policy_script,
-        k=int(args.k),
-        max_holes=int(args.max_holes),
+        agda_flags=str(args.agda_flags),
+        include_dirs=[str(x) for x in (args.include or [])],
+        timeout_sec=args.timeout,
         keep_workdir=bool(args.keep_workdir),
-        allow_unsolved_metas=not bool(args.no_allow_unsolved_metas),
-        report_macro_expr=str(args.report_macro).strip(),
-        required_open_imports=tuple(required_open_imports),
+        max_holes=int(args.max_holes),
+        top_k=int(args.k),
+        cwd=cwd,
+        report_expr=str(args.report_expr),
     )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     cfg = parse_args(argv)
 
-    # Ensure output directory exists
-    cfg.output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        final_src, solved = solve_file(cfg, timeout_s=None)
-    except Exception as e:
-        print(f"❌ agent_bridge failed: {e}", file=sys.stderr)
+    if not cfg.file.exists():
+        print(f"ERROR: file not found: {cfg.file}")
+        return 2
+    if cfg.file.suffix.lower() != ".agda":
+        print(f"ERROR: expected .agda file, got: {cfg.file}")
         return 2
 
-    cfg.output_path.write_text(final_src, encoding="utf-8")
+    res = solve_file(cfg)
+    if isinstance(res, Err):
+        e = res.error
+        print(f"[agent-bridge] FAIL: {e.message}")
+        if e.stdout.strip():
+            print("---- output ----")
+            print(e.stdout.rstrip())
+            print("---------------")
+        return 1
 
-    # Final strict check:
-    # - If holes remain, report that clearly.
-    remaining = count_holes(final_src)
-    if remaining > 0:
-        print(
-            f"ℹ️  Wrote {cfg.output_path} after solving {solved} hole(s); "
-            f"{remaining} hole(s) remain.",
-            file=sys.stderr,
-        )
-        # Still consider it success for v0, since we may cap max-holes intentionally.
-        return 0
-
-    # If no holes remain, typecheck without --allow-unsolved-metas (unless user put it in agda_flags)
-    final_check = agda_check(cfg, cfg.output_path, timeout_s=None, allow_unsolved=False)
-    if final_check.rc != 0:
-        print("❌ Final Agda check failed (no holes remain, but file did not typecheck).", file=sys.stderr)
-        print("---- Agda output ----", file=sys.stderr)
-        print(final_check.combined.rstrip(), file=sys.stderr)
-        print("---------------------", file=sys.stderr)
-        return 3
-
-    print(f"✅ Solved {solved} hole(s); wrote {cfg.output_path}", file=sys.stderr)
+    # Write back atomically
+    write_text_atomic(cfg.file, res.value)
+    print(f"[agent-bridge] OK: wrote patched file: {cfg.file}")
     return 0
 
 
