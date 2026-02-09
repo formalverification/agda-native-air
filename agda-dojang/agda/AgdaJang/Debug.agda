@@ -59,8 +59,11 @@ mkCtxParts :
   List ErrorPart →
   TC (List ErrorPart)
 mkCtxParts _ [] tail = unit tail
-mkCtxParts i ((nm , arg (arg-info v _) ty) ∷ rest) tail = do
-  tyStr  ← formatErrorParts (termErr ty ∷ [])
+mkCtxParts i ((nm , arg (arg-info v _) t) ∷ rest) tail = do
+  -- NOTE: in getContext, the payload is a *term for the variable*; infer its type.
+  ty    ← inferType t
+  tyNF  ← normalise ty
+  tyStr ← formatErrorParts (termErr tyNF ∷ [])
   tail′  ← mkCtxParts (suc i) rest tail
   unit (  strErr "AGDAJANG_CTX:" ∷ strErr (primShowNat i) ∷ strErr ":" ∷ strErr (visTag v)
         ∷ strErr ":" ∷ strErr nm ∷ strErr ": " ∷ strErr tyStr ∷ strErr "\n"
@@ -69,8 +72,9 @@ mkCtxParts i ((nm , arg (arg-info v _) ty) ∷ rest) tail = do
 macro
   reportGoalCtx : Term → TC ⊤
   reportGoalCtx hole = do
-    goalTy ← inferType hole
-    goalStr ← formatErrorParts (termErr goalTy ∷ [])
+    goalTy  ← inferType hole
+    goalNF  ← normalise goalTy
+    goalStr ← formatErrorParts (termErr goalNF ∷ [])
 
     ctx ← getContext
 

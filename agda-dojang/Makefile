@@ -136,16 +136,21 @@ demo2:
 # 	This is a sanity check for the whole loop (Agda → Python agent → Agda) on a fixed example before we add any model.
 FIXTURE_DIR := $(REPO_ROOT)/data/agda
 FIXTURE_IN  := $(FIXTURE_DIR)/FixtureHoles.agda
-FIXTURE_OUT := $(abspath _build/FixtureHoles.solved.agda)
+FIXTURE_OUT := $(abspath _build/FixtureHoles.agda)
 
 demo-agent-bridge:
 	@mkdir -p _build
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) python/tools/agent_bridge.py \
 	  --input "$(FIXTURE_IN)" \
 	  --output "$(FIXTURE_OUT)" \
+	  --policy "$(PYTHON) python/tools/policy_fixture.py" \
+	  --max-holes 4 \
+	  --keep-workdir \
+	  --k 5 \
 	  --agda-bin "$(AGDA)" \
-	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR) --allow-unsolved-metas"
-	$(AGDA) $(AGDA_FLAGS) -i "$(FIXTURE_DIR)" "$(FIXTURE_OUT)"
+	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR)" \
+	  --report-expr "reportGoalCtx"
+	$(AGDA) $(AGDA_FLAGS) -i "$(dir $(FIXTURE_OUT))" "$(FIXTURE_OUT)"
 
 # ------------------------------------------------------------------------------
 

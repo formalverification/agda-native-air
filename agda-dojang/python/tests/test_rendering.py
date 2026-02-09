@@ -1,7 +1,9 @@
 """
-file: agda-jang/python/tests/test_rendering.py
-description: tests for the rendering.py utilities
-copyright: 2025 Thmpr
+test_rendering.py
+
+File: agda-jang/python/tests/test_rendering.py
+
+Description: tests for the rendering.py utilities
 """
 # -*- coding: utf-8 -*-
 from __future__ import annotations

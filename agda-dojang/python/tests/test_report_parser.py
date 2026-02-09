@@ -1,6 +1,7 @@
 """
 test_report_parser.py
-=====================
+
+File: agda-jang/python/tests/test_report_parser.py
 
 What:
   Unit tests for the log parser that reads AgdaJang’s reporting macros output.
@@ -14,11 +15,9 @@ Why:
   - It also guards against regressions if we tweak markers or whitespace.
 
 How to run:
-  ```bash
   nix develop
   cd agda-jang
   PYTHONPATH=python pytest -q
-  ```
 
 Expected:
   - `has_markers` detects BEGIN/END.

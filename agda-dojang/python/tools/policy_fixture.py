@@ -84,7 +84,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--k", type=int, default=5, help="top-k candidates to emit")
     args = p.parse_args(argv)
 
-    raw_in = sys.stdin.read() if args.in_path == "-" else open(args.in_path, "r", encoding="utf-8").read()
+    # raw_in = sys.stdin.read() if args.in_path == "-" else open(args.in_path, "r", encoding="utf-8").read()
+    if args.in_path == "-":
+        raw_in = sys.stdin.read()
+    else:
+        with open(args.in_path, "r", encoding="utf-8") as f:
+            raw_in = f.read()
+
     req = json.loads(raw_in)
 
     goal = str(req.get("goal", ""))

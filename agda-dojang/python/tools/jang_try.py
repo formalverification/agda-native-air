@@ -1,7 +1,10 @@
 """
-file: python/tools/jang_try.py
-description: AgdaJang probe & tactics runner (typed, functional style).
-copyright: 2025 Thmpr
+jang_try.py
+
+File: agda-jang/python/tools/jang_try.py
+
+Description: AgdaJang probe & tactics runner (typed, functional style).
+
 
 WHAT IT DOES
 ------------
