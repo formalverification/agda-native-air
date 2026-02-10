@@ -15,6 +15,10 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from tools.policy_contract import (
+    POLICY_REQUEST_SCHEMA_V0,
+    POLICY_RESPONSE_SCHEMA_V0,
+)
 
 @dataclass(frozen=True)
 class CtxEntry:
@@ -77,6 +81,28 @@ def propose_terms(goal: str, ctx: List[CtxEntry], k: int = 5) -> List[Dict[str, 
     return ranked[:k]
 
 
+def _validate_request_schema(req: Dict[str, Any]) -> Optional[str]:
+    """
+    Return None if the request is acceptable, else return an error message.
+
+    We accept:
+      - schema-tagged v0 requests
+      - legacy requests with no 'schema' key (optional transitional support)
+    We reject:
+      - any unknown schema string
+      - non-string schema
+    """
+    sch = req.get("schema")
+    if sch is None:
+        # Legacy request (pre-freeze). Keep acceptance for now to avoid breakage.
+        return None
+    if not isinstance(sch, str):
+        return "policy request 'schema' must be a string"
+    if sch != POLICY_REQUEST_SCHEMA_V0:
+        return f"unsupported policy request schema: {sch!r} (expected: {POLICY_REQUEST_SCHEMA_V0!r})"
+    return None
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Deterministic fixture policy backend (no ML).")
     p.add_argument("--in", dest="in_path", default="-", help="input JSON path or '-' for stdin")
@@ -93,14 +119,30 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     req = json.loads(raw_in)
 
+    if not isinstance(req, dict):
+        print("ERROR: policy request must be a JSON object", file=sys.stderr)
+        return 2
+
+    err = _validate_request_schema(req)
+    if err is not None:
+        print(f"ERROR: {err}", file=sys.stderr)
+        return 2
+
     goal = str(req.get("goal", ""))
     ctx = _parse_ctx(req.get("context", []))
     candidates = propose_terms(goal, ctx, k=args.k)
 
     resp = {
-        "schemaVersion": "policy.v0",
+        # Preferred contract key:
+        "schema": POLICY_RESPONSE_SCHEMA_V0,
+        # Transitional legacy key (optional; remove once all callers enforce 'schema'):
+        "schemaVersion": "policy_fixture.v0",
         "candidates": candidates,
-        "meta": {"policy": "fixture", "deterministic": True},
+        "meta": {
+            "policy": "fixture",
+            "deterministic": True,
+            "requestSchema": req.get("schema", None),
+        },
     }
 
     raw_out = json.dumps(resp, ensure_ascii=False, indent=2) + "\n"

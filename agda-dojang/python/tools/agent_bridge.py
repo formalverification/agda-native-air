@@ -68,6 +68,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from tools.policy_contract import (
+    build_request as build_policy_request,
+    parse_response_json as parse_policy_response_json,
+    POLICY_RESPONSE_SCHEMA_V0,
+)
+
 from tools.report_parser import (
     extract_policy_request_from_output,
 )
@@ -103,7 +109,7 @@ class PolicyCandidate:
 
 @dataclass(frozen=True)
 class PolicyResponse:
-    schemaVersion: str
+    schema: str
     candidates: List[PolicyCandidate]
     meta: Dict[str, Any]
 
@@ -483,12 +489,13 @@ def call_policy(
       - parse stdout as JSON
     """
     req_path = workdir / "policy_req.json"
-    write_text_atomic(req_path, _json_dumps({
-        "goal": req.goal,
-        "context": req.context,
-        "module": req.module,
-        "meta": req.meta,
-    }) + "\n")
+    req_obj = build_policy_request(
+        goal=req.goal,
+        context=req.context,
+        module=req.module,
+        meta=req.meta,
+    )
+    write_text_atomic(req_path, _json_dumps(req_obj) + "\n")
 
     cmd = [*cfg.policy_cmd, "--in", str(req_path), "--out", "-", "--k", str(cfg.top_k)]
     res = run_command(cmd, cwd=cfg.cwd, timeout=cfg.timeout_sec, merge_stderr=True)
@@ -506,7 +513,7 @@ def call_policy(
 
     out = res.value.stdout.strip()
     try:
-        obj = json.loads(out)
+        parsed = parse_policy_response_json(out)
     except Exception as ex:
         return Err(PipelineError(
             kind="OSError",
@@ -514,24 +521,27 @@ def call_policy(
             rc=-1,
             stdout=out,
             stderr="",
-            message=f"policy backend returned non-JSON: {ex}",
+            message=f"policy backend returned invalid response: {ex}",
+        ))
+
+    if parsed.schema != POLICY_RESPONSE_SCHEMA_V0:
+        return Err(PipelineError(
+            kind="OSError",
+            cmd=cmd,
+            rc=-1,
+            stdout=out,
+            stderr="",
+            message=f"unsupported policy response schema: {parsed.schema!r}",
         ))
 
     cands: List[PolicyCandidate] = []
-    for raw in (obj.get("candidates") or []):
-        if not isinstance(raw, dict):
-            continue
-        term = str(raw.get("term", "")).strip()
-        if not term:
-            continue
-        score = float(raw.get("score", 0.0))
-        meta = _coerce_meta(raw.get("meta"))
-        cands.append(PolicyCandidate(term=term, score=score, meta=meta))
+    for c in parsed.candidates:
+        cands.append(PolicyCandidate(term=c.term, score=c.score, meta=_coerce_meta(c.meta)))
 
     return Ok(PolicyResponse(
-        schemaVersion=str(obj.get("schemaVersion", "")),
+        schema=parsed.schema,
         candidates=cands,
-        meta=_coerce_meta(obj.get("meta")),
+        meta=_coerce_meta(parsed.meta),
     ))
 
 
