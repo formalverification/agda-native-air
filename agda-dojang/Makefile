@@ -132,12 +132,13 @@ demo1:
 demo2:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(JANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
 
-# 2) Demo: run the agent bridge on a fixture file with holes, then check the output type-checks.
-# 	This is a sanity check for the whole loop (Agda → Python agent → Agda) on a fixed example before we add any model.
+# 2) The agent bridge is a sanity check for the whole loop (Agda → Python agent → Agda)
+#    on a fixed example before we add any model.
 FIXTURE_DIR := $(REPO_ROOT)/data/agda
 FIXTURE_IN  := $(FIXTURE_DIR)/FixtureHoles.agda
 FIXTURE_OUT := $(abspath _build/FixtureHoles.agda)
-
+#
+# 2.1) Run the agent bridge on the fixture file, keeping the workdir for inspection.
 demo-agent-bridge:
 	@mkdir -p _build
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) python/tools/agent_bridge.py \
@@ -151,8 +152,39 @@ demo-agent-bridge:
 	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR)" \
 	  --report-expr "reportGoalCtx"
 	$(AGDA) $(AGDA_FLAGS) -i "$(dir $(FIXTURE_OUT))" "$(FIXTURE_OUT)"
-
-# ------------------------------------------------------------------------------
+#
+# 2.2) Run the full eval loop on the fixture file, writing JSONL + logs + scoreboard.
+## eval-proof-completion: Run fixture evaluator; writes JSONL + logs + scoreboard.
+eval-proof-completion:
+	@mkdir -p _build/eval-proof-completion
+	PYTHONPATH=python python3 python/tools/eval_fixtures.py \
+	  --fixtures "../data/agda/Fixture*.agda" \
+	  --out-dir "_build/eval-proof-completion" \
+	  --run-id "latest" \
+	  --clean \
+	  --policy "python3 python/tools/policy_fixture.py" \
+	  --max-holes 4 \
+	  --k 5 \
+	  --timeout 20 \
+	  --agda-bin "agda" \
+	  --agda-flags "-i agda --library-file=agda/libraries -l agda-jang  -i ../data/agda" \
+	  --report-expr "reportGoalCtx"
+#
+## demo-proof-completion: Alias for eval-proof-completion (kept for docs/checklists).
+demo-proof-completion: eval-proof-completion
+#
+# 2.3) A smoke test with tighter limits for quick feedback (e.g., in CI).
+eval-proof-completion-smoke:
+	PYTHONPATH=python python3 python/tools/eval_fixtures.py \
+	  --fixtures "../data/agda/Fixture01.agda" \
+	  --out-dir "_build/eval-proof-completion" \
+	  --run-id "smoke" \
+	  --clean \
+	  --policy "python3 python/tools/policy_fixture.py" \
+	  --max-holes 2 --k 3 --timeout 10 \
+	  --agda-bin "agda" \
+	  --agda-flags "-i agda --library-file=agda/libraries -l agda-jang  -i ../data/agda" \
+	  --report-expr "reportGoalCtx"
 
 # 3) Extract: produce intermediate JSON from an example Agda file
 #    WHY: Stabilize a canonical intermediate we can diff/test before transforming.

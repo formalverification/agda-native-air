@@ -54,31 +54,45 @@ Key macros include:
 +  `apply⟨_⟩` — apply a function or lemma and generate subgoals,
 +  `applyWith⟨_,_⟩` — apply with explicit arguments,
 +  `applyReport⟨_⟩` / `applySolveReport⟨_⟩` — apply while emitting structured goal reports,
++  `reportGoalCtx` — emit a stable `(goal, context)` request block for external tools,
 +  `intro` — introduce a lambda when the goal is a function type.
 
 Each macro is designed to be *deterministic*, *locally scoped*, and *easy to reason about in isolation*.
 
 ---
 
-### AgdaJang Library Layout
+### AgdaJang Layout
 
 ```
-agda-jang/
-├── agda/
-│   └── AgdaJang/
+agda-jang
+├── agda
+│   └── AgdaJang
+│       ├── Apply.agda         -- tactics for applying functions to goals
+│       ├── ApplyDemo.agda     -- demo the `apply` macro
+│       ├── Debug.agda         -- macros to print goal, its type, normalisation, whnf
+│       ├── Everything.agda
+│       ├── Examples.agda
 │       ├── Prelude.agda
-│       ├── Refine.agda
-│       ├── Apply.agda
-│       ├── Debug.agda
-│       └── Everything.agda
-├── python/
-│   └── tools/
-│       ├── jang_try.py
-│       ├── search.py
-│       ├── policy_fixture.py
-│       └── helpers.py
-├── Makefile
-└── README.md
+│       └── Refine.agda        -- macros for attempting to fill a hole with candidate term
+└── python
+    ├── tests
+    │   ├── test_rendering.py      -- tests for the rendering.py utilities
+    │   └── test_report_parser.py  -- log parser that reads AgdaJang’s reporting macros output
+    ├── tools
+    │   ├── agent_bridge.py    -- tiny deterministic "report → policy → patch → check" loop
+    │   ├── eval_fixtures.py   -- deterministic Agda-check evaluator + fixtures scoreboard
+    │   ├── jang_extract.py    -- AgdaJang trace extractor
+    │   ├── jang_try.py        -- AgdaJang probe & tactics runner
+    │   ├── policy_fixture.py  -- simple deterministic policy backend for tests and demos
+    │   ├── prompt_baseline.py -- turn list of tasks into list of (context, goal, completion) attempts
+    │   ├── report_parser.py   -- parsing of Agda subgoal reports from stderr
+    │   └── search.py          -- AgdaJang search loop (BFS/beam)
+    └── utils
+        ├── command_runner.py  -- functional command execution utilities
+        ├── file_ops.py        -- functional wrappers for file system operations
+        ├── rendering.py       -- pure rendering helpers for building scratch modules
+        ├── result.py          -- tiny Result type
+        └── types.py           -- data classes for config, command results, errors, reports
 ```
 
 The `Everything` module re-exports the full AgdaJang action vocabulary.
@@ -99,6 +113,22 @@ This script
 +  parses emitted goals and diagnostics.
 
 It is primarily intended for **rapid experimentation** and debugging.
+
+
+### `agent_bridge.py`
+
+This is a tiny deterministic **integration bridge**:
+
++  inject `reportGoalCtx` into the next `{!!}` hole to obtain `(goal, context)`,
++  call a policy backend (local process) to get top-k candidates,
++  try candidates in Agda and patch the first that typechecks.
+
+This is the v0 deliverable for “policy ↔ AgdaJang integration” (Issue #23).
+
+### `eval_fixtures.py`
+
+This is the deterministic **Agda-check evaluator + fixtures scoreboard** (Issue #85).
+It produces machine-readable JSONL logs (`results.jsonl`, `fixtures.jsonl`) and a small scoreboard.
 
 
 ### `search.py`
@@ -169,6 +199,132 @@ These demos serve as executable documentation.
 
 ---
 
+## Proof-completion evaluator (Issue #85)
+
+AgdaJang includes a deterministic **Agda-check evaluator** for “proof completion” fixtures.
+It runs a small **propose → check** loop:
+
+1. For each `{!!}` hole in a fixture module, inject a reporting macro (e.g. `reportGoalCtx`)
+   to extract a `(goal, context)` request from Agda output.
+2. Call a **policy backend** (local process) to obtain top-k candidate terms.
+3. Check each candidate in Agda (Agda is the oracle).
+4. Patch the fixture with the first candidate that typechecks.
+5. If all holes are solved, run a strict final typecheck.
+
+
+### Run it
+
+From `agda-jang/`:
+
+```bash
+make eval-proof-completion
+```
+
+This uses the scripted fixture policy backend (`python/tools/policy_fixture.py`) and runs
+over the committed fixtures (default glob: `../data/agda/Fixture*.agda`).
+
+
+### Output artifacts
+
+Artifacts are written under: `agda-jang/_build/eval-proof-completion/<run-id>/`
+
+The Make target uses `run-id = latest` and cleans it each run.
+
+Key outputs:
+
++ `results.jsonl` — **one JSON object per candidate attempt** (the main “score log”)
++ `fixtures.jsonl` — **one JSON object per fixture module** (summary rows)
++ `logs/` — captured Agda output per hole/candidate
++ `solved/` — fully solved fixture modules (canonical filenames), only when strict check passes
++ `agda_version.txt` — best-effort `agda --version` capture (when available)
+
+Directory layout:
+
+```
+_build/eval-proof-completion/latest/
+  results.jsonl
+  fixtures.jsonl
+  agda_version.txt
+  logs/
+    <FixtureId>/
+      hole-00/
+        cand-01.txt
+        cand-02.txt
+        ...
+      hole-01/
+        ...
+      final_strict.txt
+  solved/
+    <FixtureId>.agda
+  work/                  # only if --keep-workdir is enabled
+    <FixtureId>/
+      shadow/
+      _input_overlay/
+```
+
++ `logs/<FixtureId>/hole-XX/cand-RR.txt` contains the merged Agda output for that candidate check.
++ `logs/<FixtureId>/final_strict.txt` contains output from the final strict check (only if all holes were filled).
++ `solved/<FixtureId>.agda` is written only when the fixture becomes hole-free and the strict final check succeeds.
+
+---
+
+## Result schema (v0)
+
+Both `results.jsonl` and `fixtures.jsonl` are **append-only JSON Lines** (one JSON object per line).
+Every row includes a `schemaVersion` so the format can evolve without breaking consumers.
+
+### `results.jsonl` (per-candidate attempts)
+
+Each row describes *one* attempt to solve *one* hole with *one* candidate term:
+
++  `schemaVersion` (string) — currently `eval-proof-completion.v0`
++  `fixtureId` (string) — fixture module stem, e.g. `Fixture01`
++  `module` (string) — module name (currently same as `fixtureId`)
++  `fixturePath` (string) — absolute path to the fixture file
++  `holeIndex` (int) — 0-based index of the hole in the solving sequence
++  `holeLine` (int) — 1-based line number of the hole token in the fixture source
++  `holeCol` (int) — 1-based column of the hole token in the fixture source
++  `candidateRank` (int) — 1..k rank among returned candidates (0 for synthetic error rows)
++  `candidate` (string) — candidate term (empty string for synthetic error rows)
++  `status` (string) — one of:
+
+   +  `ok` (candidate typechecked)
+   +  `type_error` (Agda rejected candidate)
+   +  `timeout` (candidate check timed out)
+   +  `crash` (tooling/IO failure)
+   +  `policy_error` (policy invocation or parsing failed)
+   +  `report_error` (could not extract `(goal, context)` markers)
++  `elapsedMs` (int) — wall-clock time for the candidate check (milliseconds)
++  `rc` (int) — process return code (best-effort; timeouts/crashes may be synthetic)
++  `logPath` (string) — path to the captured output file for this attempt
+
+### `fixtures.jsonl` (per-fixture summaries)
+
+Each row summarizes evaluation for one fixture module:
+
++  `schemaVersion` (string) — currently `eval-proof-completion.v0`
++  `fixtureId` (string)
++  `module` (string)
++  `fixturePath` (string)
++  `holesTotal` (int) — number of `{!!}` holes in the original fixture source
++  `holesSolved` (int) — number of holes successfully filled by typechecking candidates
++  `fullySolved` (bool) — `true` iff the fixture became hole-free **and** strict final check passed
++  `finalStatus` (string) — `ok` if fully solved, else `unsolved` or an error-like status
++  `elapsedMs` (int) — total time spent evaluating the fixture (milliseconds)
++  `solvedPath` (string | null) — path to the solved `.agda` file if `fullySolved`, else null
+
+### Compatibility promise
+
+For `schemaVersion = eval-proof-completion.v0`, consumers may rely on:
+
++  the presence and meaning of the keys above,
++  `results.jsonl` being per-candidate and `fixtures.jsonl` being per-fixture,
++  new fields may be added in later versions, but existing keys should not change meaning.
+
+
+---
+
+
 ## Research Notes and Future Directions
 
 +  Expand the action vocabulary (e.g. rewrite, structured intro).
@@ -191,6 +347,6 @@ These demos serve as executable documentation.
 [agda-backend-jsonl/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-backend-jsonl/README.md
 [proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
 [ml-pipeline/README]: https://github.com/formalverification/agda-ai-prover/blob/main/ml-pipeline/README.md
-[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+[`agda-jang/python/tools/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
 
 
