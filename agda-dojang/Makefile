@@ -307,6 +307,10 @@ rows:
 	@echo "✅ Wrote $(ROWS_OUT)"
 
 
+## test-python: Run Python unittests with friendly output.
+test-python:
+	PYTHONPATH=python python3 python/utils/run_unittests.py
+
 # ------------------------------------------------------------------------------
 
 # Cleaning (small brooms)
