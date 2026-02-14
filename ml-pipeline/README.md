@@ -88,6 +88,52 @@ The output is typically written in **Parquet** format for efficiency and reprodu
 
 ---
 
+### Proof-completion dataset builder (Phase 1) — `proof-completion.v0`
+
+MLPipe includes a small, deterministic dataset builder that converts
+**canonical Agda definition rows** (from the extractor's "Full" JSONL) into a
+proof-completion-style training dataset, with key-value pairs of the form
+
+> **(goal, local context) → proof body**
+
+**Implementation**. `ml-pipeline/etl/src/main/scala/etl/BuildProofCompletionDataset.scala`
+
+**Input**.  canonical JSONL rows containing (at minimum) `file`, `prettyQname`,
+`type`, `body`, `hasBody`, and structural AST as either `typeAst` (object) or
+`typeAstJson` (string).
+
+**Output**. JSONL rows with `schemaVersion = "proof-completion.v0"` and keys such as
+`goal`, `context`, `targetRaw`, `target`, `targetResolver`, `targetResolved`, and
+lightweight provenance fields.
+
+**The builder is CI-friendly**.
+
++ streaming (no full-corpus load),
++ deterministic ordering,
++ skip-reason reporting (useful when a fixture slice unexpectedly yields zero rows),
++ `--strict` fails on parse errors **or** if `emitted == 0`.
+
+**Run**. Recommended smoke target (fixture-driven) is run with
+
+```sh
+# from repo root
+make etl-proof-completion-dataset-smoke
+```
+
+**Run manually**.  Direct invocation with
+
+```sh
+cd ml-pipeline
+sbt -batch "project etl" \
+  "runMain etl.BuildProofCompletionDataset \
+    --in   /abs/path/to/canonical.full.jsonl \
+    --out  /abs/path/to/proof_completion.jsonl \
+    --limit 200 \
+    --strict"
+```
+
+---
+
 ## 3) Training and Evaluation (Python / PyTorch)
 
 ### Model Training

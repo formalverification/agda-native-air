@@ -5,14 +5,19 @@
  *
  * Purpose
  * -------
- *   Build a deterministic proof-completion-style dataset from the canonical Agda backend JSONL.
+ *   Build a deterministic proof-completion-style dataset from canonical Agda definition rows.
  *
  * Context in the project
  * ----------------------
  *   Upstream proof-parser extractor (AgdaJsonlDriver + agda-json backend) produces
- *   JSONL rows:
+ *   JSONL rows (canonical "Full" style):
  *
- *   file, module, name, qname, prettyQname, type, typeAstVersion, typeAst, body, hasBody, ...
+ *     file, module, name, qname, prettyQname,
+ *     type, typeAstVersion, typeAst, body, hasBody, ...
+ *
+ *   We also accept the post-ETL style where the structural AST is stored as:
+ *
+ *     typeAstJson : "<json-string>"
  *
  *   This tool turns those definition rows into "(goal, context) -> target" training rows,
  *   with a deliberately minimal resolver:
@@ -46,7 +51,34 @@
  * -----------------------------
  *   - Streaming read/write (does not load the whole corpus).
  *   - Deterministic: reads input in order and stops after --limit emitted rows.
+ *     (Note: --limit counts *emitted* rows, not input rows.)
  *   - Default filter: only “simple” bodies (no whitespace) to keep v0 targets term-like.
+ *     Use --all-bodies to include whitespace-containing bodies.
+ *   - Deterministic JSON output: stable key order via LinkedHashMap serialization.
+ *
+ * Failure handling / observability
+ * -------------------------------
+ *   This builder is intended to be fixture-driven and debuggable in CI:
+ *
+ *   - Parse errors are counted and reported (with the first error + line prefix).
+ *   - Skipped rows are classified by a stable "skip reason" string (for log grep),
+ *     e.g.:
+ *       parseError
+ *       filter:noBody
+ *       filter:notSimpleBody
+ *       outputRow:unsupportedSort
+ *       outputRow:typeAst
+ *       outputRow:failed
+ *
+ *   Strict mode (--strict):
+ *     - fails if parseErrors > 0
+ *     - fails if emitted == 0
+ *
+ * Sort handling (typeAst)
+ * ----------------------
+ *   We only need Π-binders from typeAst.term; the surrounding universe/sort wrapper
+ *   is not used. However, for CI clarity we validate the top-level sort tag when
+ *   present and only allow: Set | Inf | OtherSort.
  *
  * Usage
  * -----
@@ -57,6 +89,9 @@
  *        --out /abs/path/to/out/proof_completion.jsonl \
  *        --limit 200 \
  *        --strict"
+ *
+ *   For deterministic CI smoke tests, prefer running via the top-level Makefile
+ *   target which uses a committed fixture slice.
  *
  * Notes on de Bruijn direction
  * ----------------------------
@@ -73,7 +108,7 @@
 package etl
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
-
+import scala.collection.immutable.SortedSet
 import java.io.{BufferedWriter, File}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
@@ -86,6 +121,20 @@ object BuildProofCompletionDataset {
   // Output schema version
   // ---------------------------------------------------------------------------
   private val SchemaVersion: String = "proof-completion.v0"
+
+  // ---------------------------------------------------------------------------
+  // Optional: allow binder extraction across common universe/sort encodings.
+  // We only need Π-binders from typeAst.term; the surrounding sort is not used.
+  // ---------------------------------------------------------------------------
+  private val AllowedSortTags: Set[String] = SortedSet("Inf", "OtherSort", "Set")
+
+  // ---------------------------------------------------------------------------
+  // Skip reason keys (stable strings for CI/log grep)
+  // ---------------------------------------------------------------------------
+  private val SkipParseError      = "parseError"
+  private val SkipNoBody          = "filter:noBody"
+  private val SkipNotSimpleBody   = "filter:notSimpleBody"
+  private val SkipOutputRowFailed = "outputRow:failed"
 
   // ---------------------------------------------------------------------------
   // Config + tiny error model
@@ -551,6 +600,20 @@ object BuildProofCompletionDataset {
       case None =>
         Left(ArgError("Missing typeAst/typeAstJson (cannot resolve binders in v0)."))
       case Some(taj) =>
+        {
+          // Broad support: accept Set/Inf/OtherSort (Agda emits Inf frequently).
+          // Fail loudly for unknown sort tags so skip-reasons are actionable.
+          val sortTag =
+            Try(mapper.readTree(taj)).toOption match {
+              case None    => "" // if typeAstJson isn't parseable, binder parsing will fail below anyway
+              case Some(n) => n.path("sort").path("tag").asText("")
+            }
+          if (sortTag.nonEmpty && !AllowedSortTags.contains(sortTag)) {
+            return Left(ArgError(
+              s"Unsupported typeAst.sort.tag=$sortTag (allowed: ${AllowedSortTags.toList.sorted.mkString(", ")})"
+            ))
+          }
+        }
         collectPiBindersOuterToInner(taj).map { binders =>
           val binderNamesOuterToInner = assignBinderNamesOuterToInner(binders)
           val (ctx, goal) = typeToContextGoal(typeTrim, binderNamesOuterToInner)
@@ -588,7 +651,33 @@ object BuildProofCompletionDataset {
   // Streaming build
   // ---------------------------------------------------------------------------
 
-  final case class Stats(seen: Long, emitted: Long, skipped: Long, parseErrors: Long, firstParseError: Option[String])
+  final case class Stats(
+    seen: Long,
+    emitted: Long,
+    skipped: Long,
+    parseErrors: Long,
+    firstParseError: Option[String],
+    skipReasons: Map[String, Long]
+  )
+
+  private def bump(m: Map[String, Long], k: String): Map[String, Long] =
+    m.updated(k, m.getOrElse(k, 0L) + 1L)
+
+  private def classifyBuildError(e: BuildError): String = {
+    // Keep these strings reasonably stable: they show up in CI logs.
+    val msg = Option(e.message).getOrElse("").toLowerCase
+    if (msg.contains("sort") || msg.contains("universe")) "outputRow:unsupportedSort"
+    else if (msg.contains("typeast")) "outputRow:typeAst"
+    else SkipOutputRowFailed
+  }
+
+  private def renderSkipReasons(m: Map[String, Long], max: Int = 12): String = {
+    if (m.isEmpty) ""
+    else {
+      val top = m.toSeq.sortBy { case (_, n) => -n }.take(max)
+      top.map { case (k, n) => s"      - $k=$n" }.mkString("\n")
+    }
+  }
 
   private def build(cfg: Config): Either[BuildError, Stats] = {
     val inFile = cfg.inJsonl.toFile
@@ -628,17 +717,36 @@ object BuildProofCompletionDataset {
                     val prefix = if (line.length <= 200) line else line.take(200) + "…"
                     Some(s"${e.message}${if (cause.nonEmpty) s" cause=$cause" else ""}\nlinePrefix=$prefix")
                   }
-                st1.copy(parseErrors = st1.parseErrors + 1, skipped = st1.skipped + 1, firstParseError = first)
+                st1.copy(
+                  parseErrors = st1.parseErrors + 1,
+                  skipped = st1.skipped + 1,
+                  firstParseError = first,
+                  skipReasons = bump(st1.skipReasons, SkipParseError)
+                )
 
               case Right(in) =>
                 val keepHasBody = in.hasBody && in.body != null && in.body.trim.nonEmpty
                 val keepSimple  = if (cfg.simpleOnly) isSimpleBody(in.body) else true
 
-                if (!keepHasBody || !keepSimple) st1.copy(skipped = st1.skipped + 1)
+                if (!keepHasBody) {
+                  st1.copy(
+                    skipped = st1.skipped + 1,
+                    skipReasons = bump(st1.skipReasons, SkipNoBody)
+                  )
+                } else if (!keepSimple) {
+                  st1.copy(
+                    skipped = st1.skipped + 1,
+                    skipReasons = bump(st1.skipReasons, SkipNotSimpleBody)
+                  )
+                }
                 else {
                   buildOutputRow(in) match {
-                    case Left(_) =>
-                      st1.copy(skipped = st1.skipped + 1)
+                    case Left(err) =>
+                      val reason = classifyBuildError(err)
+                      st1.copy(
+                        skipped = st1.skipped + 1,
+                        skipReasons = bump(st1.skipReasons, reason)
+                      )
                     case Right(row) =>
                       out.write(toJsonLine(row))
                       out.newLine()
@@ -651,7 +759,14 @@ object BuildProofCompletionDataset {
         }
       }
 
-      Right(loop(Stats(seen = 0L, emitted = 0L, skipped = 0L, parseErrors = 0L, firstParseError = None)))
+      Right(loop(Stats(
+        seen = 0L,
+        emitted = 0L,
+        skipped = 0L,
+        parseErrors = 0L,
+        firstParseError = None,
+        skipReasons = Map.empty
+      )))
     } catch {
       case e: java.io.IOException =>
         Left(IoError(s"I/O error while building dataset: ${e.getMessage}", e))
@@ -737,6 +852,8 @@ object BuildProofCompletionDataset {
           case Right(st) =>
             println(s"[BuildProofCompletionDataset] ✅ wrote dataset: ${cfg.outJsonl}")
             println(s"[BuildProofCompletionDataset]    seen=${st.seen} emitted=${st.emitted} skipped=${st.skipped} parseErrors=${st.parseErrors}")
+            if (st.skipped > 0 && st.skipReasons.nonEmpty)
+              println("[BuildProofCompletionDataset]    skip reasons:\n" + renderSkipReasons(st.skipReasons))
             if (st.parseErrors > 0) {
               System.err.println(s"[BuildProofCompletionDataset] ⚠️  parseErrors=${st.parseErrors}")
               st.firstParseError.foreach { msg =>
@@ -747,6 +864,12 @@ object BuildProofCompletionDataset {
                 System.err.println("[BuildProofCompletionDataset] ❌ --strict enabled: failing due to parse errors")
                 System.exit(3)
               }
+            }
+            if (cfg.strict && st.emitted <= 0) {
+              System.err.println("[BuildProofCompletionDataset] ❌ --strict enabled: emitted == 0 (no training rows produced)")
+              if (st.skipReasons.nonEmpty)
+                System.err.println("[BuildProofCompletionDataset]    skip reasons:\n" + renderSkipReasons(st.skipReasons))
+              System.exit(4)
             }
         }
     }
