@@ -600,8 +600,7 @@ def _print_scoreboard(summaries: List[FixtureSummary]) -> None:
     # Simple deterministic text output; no external deps.
     def final_cell(s: FixtureSummary) -> str:
         o = (s.evalOutcome or s.finalStatus or "").strip()
-        if not o:
-            o = s.finalStatus
+
         # Make outcomes explicit while still showing underlying finalStatus when non-ok.
         if o in ("ok",):
             return "ok"
