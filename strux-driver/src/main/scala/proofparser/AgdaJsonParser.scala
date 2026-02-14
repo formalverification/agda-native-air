@@ -33,15 +33,11 @@
 package proofparser
 
 import java.io.{File, PrintWriter}
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.native.JsonMethods._
 import scala.io.Source
 import scala.util.{Try, Success, Failure}
+import ujson._
 
 object AgdaJsonParser {
-  // Set up JSON parsing with the correct implicit formats
-  implicit val formats: Formats = DefaultFormats
 
   case class AgdaRecord(
     fileName: String,
@@ -97,22 +93,20 @@ object AgdaJsonParser {
       val jsonString = Source.fromFile(inputPath).mkString
 
       // Parse the JSON
-      val json = parse(jsonString)
+      val json = ujson.read(jsonString)
 
       // Extract the top-level name (file/module name)
-      val fileModuleName = AgdaJsonParser.RichJValue(json \ "name").extractOrElse[String]("")
+      val fileModuleName = json("name").strOpt.getOrElse("")
 
       // Extract local scope items
-      val scopeLocal = (json \ "scope-local").extract[List[JValue]]
+      val scopeLocal = json("scope-local").arrOpt.getOrElse(Vector()).toList
 
       // Process each item in scope-local
       val records = scopeLocal.flatMap { item =>
         for {
-          name <- (item \ "name").extractOpt[String]
-          typeObj <- (item \ "type").extractOpt[JValue]
-          typePretty <- (typeObj \ "pretty").extractOpt[String]
-          defObj <- (item \ "definition").extractOpt[JValue]
-          defPretty <- (defObj \ "pretty").extractOpt[String]
+          name <- item("name").strOpt
+          typePretty <- item("type")("pretty").strOpt
+          defPretty <- item("definition")("pretty").strOpt
         } yield {
           AgdaRecord(
             fileName = fileModuleName,
@@ -128,14 +122,15 @@ object AgdaJsonParser {
       val writer = new PrintWriter(new File(outputPath))
       try {
         records.foreach { record =>
-          val recordJson =
-            ("fileName" -> record.fileName) ~
-            ("moduleName" -> record.moduleName) ~
-            ("theoremName" -> record.theoremName) ~
-            ("theoremType" -> record.theoremType) ~
-            ("proof" -> record.proof)
+          val recordJson = ujson.Obj(
+            "fileName" -> record.fileName,
+            "moduleName" -> record.moduleName,
+            "theoremName" -> record.theoremName,
+            "theoremType" -> record.theoremType,
+            "proof" -> record.proof
+          )
 
-          writer.println(compact(render(recordJson)))
+          writer.println(ujson.write(recordJson))
         }
         println(s"Successfully processed ${records.size} records to $outputPath")
       } finally {
@@ -149,9 +144,4 @@ object AgdaJsonParser {
     }
   }
 
-  // Helper extension method for safer extraction
-  implicit class RichJValue(val jv: JValue) extends AnyVal {
-    def extractOrElse[T](default: T)(implicit formats: Formats, mf: Manifest[T]): T =
-      jv.extractOpt[T].getOrElse(default)
-  }
 }

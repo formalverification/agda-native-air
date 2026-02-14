@@ -55,7 +55,7 @@ import java.time.Instant
 
 import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 import upickle.default._

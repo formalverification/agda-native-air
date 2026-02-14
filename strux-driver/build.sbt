@@ -1,7 +1,7 @@
 // File: agda-ai-prover/proof-parser/build.sbt
 
 // Define Scala version for the entire build
-ThisBuild / scalaVersion := "2.12.20"
+ThisBuild / scalaVersion := "2.13.17"
 
 Compile / run / fork := true
 
@@ -9,9 +9,9 @@ Compile / run / fork := true
 val json4sV = "3.7.0-M11"
 
 // Root project definition
-lazy val ProofParser = (project in file("."))
+lazy val ProofParser = project.in(file("."))
   .settings(
-    name := "proof-parser",
+    name := "ProofParser",
     version := "0.1.0",
 
     // Main class setting:
@@ -29,7 +29,28 @@ lazy val ProofParser = (project in file("."))
       "org.typelevel" %% "cats-effect" % "3.5.4",
       "co.fs2" %% "fs2-core" % "3.9.3",
       "co.fs2" %% "fs2-io" % "3.9.3",
-      "org.apache.spark" %% "spark-core" % "3.5.1",
-      "org.apache.spark" %% "spark-sql"  % "3.5.1"
-    )
+      "org.apache.spark" %% "spark-sql" % "4.1.0",
+      "org.apache.spark" %% "spark-core" % "4.1.0"
+    ),
+
+  // Nice defaults
+  scalacOptions ++= Seq("-deprecation", "-feature"),
+  Test / parallelExecution := false,
+
+  // We fork java and grant JDK21 module opens for Spark (Run + Test)
+  fork := true,
+  // These apply to `sbt run` (which our `make etl` uses):
+  Compile / run / fork := true,
+  Compile / run / javaOptions ++= Seq(
+    "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED"
+  ),
+    // ---------- IMPORTANT for Java 17/21 ----------
+    // Fixes "IllegalAccessError: sun.nio.ch.DirectBuffer" when running Spark under Java 17+.
+    // These apply to `sbt test` (Spark inside tests).
+    // If we ever switch dev shell to JDK 17, we can remove these flags.
+  Test / javaOptions ++= Seq(
+    "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED"
   )
+)
