@@ -642,56 +642,43 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
         default=["../data/agda/Fixture*.agda"],
         help="Repeatable file/glob spec. Default: ../data/agda/Fixture*.agda",
     )
-    ap.add_argument("--out-dir", default="_build/eval-proof-completion", help="Output root directory")
-    ap.add_argument("--run-id", default="latest", help="Subdirectory under out-dir (deterministic)")
-    ap.add_argument("--clean", action="store_true", help="Delete out-dir/run-id before running")
+    ap.add_argument("--out-dir", default="_build/eval-proof-completion", help="Output root directory.")
+    ap.add_argument("--run-id", default="latest", help="Subdirectory under out-dir (deterministic).")
+    ap.add_argument("--clean", action="store_true", help="Delete out-dir/run-id before running.")
 
     ap.add_argument("--policy", default=f"{sys.executable} python/tools/policy_fixture.py",
-                    help="Policy command (quoted). Default: python/tools/policy_fixture.py")
-    ap.add_argument("--k", type=int, default=5, help="Top-k candidates to try per hole")
-    ap.add_argument("--max-holes", type=int, default=4, help="Max holes to attempt per fixture")
+                    help="Policy command (quoted). Default: python/tools/policy_fixture.py.")
+    ap.add_argument("--k", type=int, default=5, help="Top-k candidates to try per hole.")
+    ap.add_argument("--max-holes", type=int, default=4, help="Max holes to attempt per fixture.")
 
-    ap.add_argument("--agda-bin", default="agda", help="Agda binary")
-    ap.add_argument("--agda-flags", default="", help="Extra flags passed to Agda (quoted string)")
-    ap.add_argument("--include", action="append", default=[], help="Extra -i include dirs (repeatable)")
-    ap.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) per process invocation")
-    ap.add_argument("--cwd", default=None, help="Working directory (recommended: repo root)")
-    ap.add_argument("--keep-workdir", action="store_true", help="Keep per-fixture work dirs under out-dir")
-    ap.add_argument("--report-expr", default="reportGoalCtx", help="Expression injected for reporting")
+    ap.add_argument("--agda-bin", default="agda", help="Agda binary.")
+    ap.add_argument("--agda-flags", default="", help="Extra flags passed to Agda (quoted string).")
+    ap.add_argument("--include", action="append", default=[], help="Extra -i include dirs (repeatable).")
+    ap.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) per process invocation.")
+    ap.add_argument("--cwd", default=None, help="Working directory (recommended: repo root).")
+    ap.add_argument("--keep-workdir", action="store_true", help="Keep per-fixture work dirs under out-dir.")
+    ap.add_argument("--report-expr", default="reportGoalCtx", help="Expression injected for reporting.")
 
 
     # XFAIL support (negative fixtures that are expected to remain unsolved).
-    ap.add_argument(
-        "--xfail",
-        action="append",
-        default=[],
-        help="Fixture id(s) expected to fail (repeatable; comma-separated ok).",
-    )
-    ap.add_argument(
-        "--xfail-file",
-        default=None,
-        help="File listing xfail fixture ids (one per line; '#' comments allowed).",
-    )
-    ap.add_argument(
-        "--xfail-none",
-        action="store_true",
-        help="Disable default xfail set (FixtureFail01).",
-    )
-    ap.add_argument(
-        "--fail-on-xpass",
-        action="store_true",
-        help="Non-zero exit if an xfail fixture is unexpectedly solved (XPASS).",
-    )
+    ap.add_argument("--xfail", action="append", default=[],
+                    help="Fixture id(s) expected to fail (repeatable; comma-separated ok).")
+    ap.add_argument("--xfail-file", default=None,
+                    help="File listing xfail fixture ids (one per line; '#' comments allowed).")
+    ap.add_argument("--xfail-none", action="store_true",
+                    help="Disable default xfail set (FixtureFail01).")
+    ap.add_argument("--fail-on-xpass", action="store_true",
+                    help="Non-zero exit if an xfail fixture is unexpectedly solved (XPASS).")
 
     args = ap.parse_args(argv)
     policy_cmd = args.policy.strip()
     if not policy_cmd:
-        raise SystemExit("ERROR: --policy parsed to empty command")
+        raise SystemExit("ERROR: --policy parsed to empty command.")
 
     import shlex
     cmd = shlex.split(policy_cmd)
     if not cmd:
-        raise SystemExit("ERROR: --policy parsed to empty argv")
+        raise SystemExit("ERROR: --policy parsed to empty argv.")
 
     cwd = Path(args.cwd).resolve() if args.cwd else None
     fixtures = _discover_fixtures(args.fixtures or [])
