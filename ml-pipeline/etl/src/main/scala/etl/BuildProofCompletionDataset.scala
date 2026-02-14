@@ -299,10 +299,24 @@ object BuildProofCompletionDataset {
     else {
       val digits = body.drop(1)
       if (digits.nonEmpty && digits.forall(_.isDigit)) {
-        val i = Try(digits.toInt).toOption.getOrElse(-1)
-        val n = binderNamesOuterToInner.size
-        val pos = n - 1 - i
-        if (i >= 0 && pos >= 0 && pos < n) Some(binderNamesOuterToInner(pos)) else None
+        // Guard against Int overflow so that extremely large de Bruijn indices
+        // (e.g. "@2147483648") are explicitly noted rather than silently mapped
+        // to -1 via a failed toInt conversion.
+        val intMaxStr = Int.MaxValue.toString
+        val indexOpt =
+          if (digits.length > intMaxStr.length || (digits.length == intMaxStr.length && digits > intMaxStr)) {
+            // Log overflow-like indices for easier debugging while still treating
+            // them as invalid indices in the return value.
+            System.err.println(s"Warning: de Bruijn index '$body' exceeds Int.MaxValue; treating as invalid.")
+            None
+          } else {
+            Try(digits.toInt).toOption
+          }
+        indexOpt.flatMap { i =>
+          val n = binderNamesOuterToInner.size
+          val pos = n - 1 - i
+          if (i >= 0 && pos >= 0 && pos < n) Some(binderNamesOuterToInner(pos)) else None
+        }
       } else None
     }
   }

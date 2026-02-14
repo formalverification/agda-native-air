@@ -26,8 +26,11 @@ final class BuildProofCompletionDatasetSpec extends AnyFunSuite with Matchers {
   private def writeUtf8(p: Path, s: String): Unit =
     Files.write(p, s.getBytes(StandardCharsets.UTF_8))
 
-  private def readLines(p: Path): Vector[String] =
-    scala.io.Source.fromFile(p.toFile)(scala.io.Codec.UTF8).getLines().toVector
+  private def readLines(p: Path): Vector[String] = {
+    val src = scala.io.Source.fromFile(p.toFile)(scala.io.Codec.UTF8)
+    try src.getLines().toVector
+    finally src.close()
+  }
 
   test("resolves @0 to innermost binder (de Bruijn direction)") {
     // bar : {α}{A} → A → A
