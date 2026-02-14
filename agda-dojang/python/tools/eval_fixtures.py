@@ -16,6 +16,12 @@ What this does (v0):
       4) patch the fixture source with the first passing candidate.
   - If the fixture becomes hole-free, run a strict final Agda check.
 
+XFAIL support (Issue #84 nicety):
+  - Some fixtures are intentionally UNSOLVABLE by the current policy (negative examples).
+  - Mark them as "expected fail" (xfail) so the demo/CI remains green while retaining negatives.
+  - By default, FixtureFail01 is xfail.
+  - Use --xfail / --xfail-file to add more; use --xfail-none to disable defaults.
+
 Outputs (deterministic paths):
   _build/eval-proof-completion/<run-id>/
     results.jsonl          # per-candidate attempt rows
@@ -33,9 +39,9 @@ import os
 import shutil
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Set
 
 from tools.report_parser import extract_policy_request_from_output
 from utils.file_ops import write_text_atomic
@@ -87,6 +93,8 @@ class EvalConfig:
     top_k: int
     cwd: Optional[Path]
     report_expr: str
+    xfail_ids: Set[str]
+    fail_on_xpass: bool
 
 
 @dataclass(frozen=True)
@@ -117,6 +125,8 @@ class FixtureSummary:
     finalStatus: str  # ok | unsolved | type_error | timeout | crash
     elapsedMs: int
     solvedPath: Optional[str]
+    expectedFail: bool = False
+    evalOutcome: str = ""  # ok | fail | xfail | xpass
     schemaVersion: str = "eval-proof-completion.v0"
 
 
@@ -129,6 +139,51 @@ _HOLE_TOKEN = "{!!}"
 
 def _count_holes(src: str) -> int:
     return src.count(_HOLE_TOKEN)
+
+def _split_csv(items: Iterable[str]) -> List[str]:
+    out: List[str] = []
+    for it in items:
+        for part in str(it).split(","):
+            s = part.strip()
+            if s:
+                out.append(s)
+    return out
+
+
+def _read_xfail_file(path: Path) -> List[str]:
+    """
+    Read fixture ids from a file (one per line).
+    Allows blank lines and '#' comments.
+    """
+    try:
+        txt = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    out: List[str] = []
+    for line in txt.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        out.append(s)
+    return out
+
+
+def _annotate_outcome(cfg: EvalConfig, s: FixtureSummary) -> FixtureSummary:
+    """
+    Add expectedFail + evalOutcome while keeping finalStatus stable for v0 consumers.
+    Outcome:
+      - ok:    fully solved and not expectedFail
+      - fail:  not fully solved and not expectedFail
+      - xfail: not fully solved and expectedFail
+      - xpass: fully solved and expectedFail
+    """
+    expected = s.fixtureId in cfg.xfail_ids
+    passed = bool(s.fullySolved)
+    outcome = ("xpass" if (expected and passed) else
+               "xfail" if (expected and not passed) else
+               "ok" if (not expected and passed) else
+               "fail")
+    return replace(s, expectedFail=expected, evalOutcome=outcome)
 
 
 def _mkdir_clean(path: Path) -> Result[None, PipelineError]:
@@ -543,6 +598,17 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
 
 def _print_scoreboard(summaries: List[FixtureSummary]) -> None:
     # Simple deterministic text output; no external deps.
+    def final_cell(s: FixtureSummary) -> str:
+        o = (s.evalOutcome or s.finalStatus or "").strip()
+        if not o:
+            o = s.finalStatus
+        # Make outcomes explicit while still showing underlying finalStatus when non-ok.
+        if o in ("ok",):
+            return "ok"
+        if o in ("xfail", "xpass", "fail"):
+            return f"{o}:{s.finalStatus}"
+        return o
+
     rows = [
         ("fixture", "holes", "solved", "final", "ms"),
         *[
@@ -550,7 +616,7 @@ def _print_scoreboard(summaries: List[FixtureSummary]) -> None:
                 s.fixtureId,
                 str(s.holesTotal),
                 str(s.holesSolved),
-                s.finalStatus,
+                final_cell(s),
                 str(s.elapsedMs),
             )
             for s in summaries
@@ -593,6 +659,30 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
     ap.add_argument("--keep-workdir", action="store_true", help="Keep per-fixture work dirs under out-dir")
     ap.add_argument("--report-expr", default="reportGoalCtx", help="Expression injected for reporting")
 
+
+    # XFAIL support (negative fixtures that are expected to remain unsolved).
+    ap.add_argument(
+        "--xfail",
+        action="append",
+        default=[],
+        help="Fixture id(s) expected to fail (repeatable; comma-separated ok).",
+    )
+    ap.add_argument(
+        "--xfail-file",
+        default=None,
+        help="File listing xfail fixture ids (one per line; '#' comments allowed).",
+    )
+    ap.add_argument(
+        "--xfail-none",
+        action="store_true",
+        help="Disable default xfail set (FixtureFail01).",
+    )
+    ap.add_argument(
+        "--fail-on-xpass",
+        action="store_true",
+        help="Non-zero exit if an xfail fixture is unexpectedly solved (XPASS).",
+    )
+
     args = ap.parse_args(argv)
     policy_cmd = args.policy.strip()
     if not policy_cmd:
@@ -605,6 +695,15 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
 
     cwd = Path(args.cwd).resolve() if args.cwd else None
     fixtures = _discover_fixtures(args.fixtures or [])
+
+    # XFAIL ids:
+    # - default includes FixtureFail01 unless disabled
+    xfail_ids: Set[str] = set()
+    if not bool(args.xfail_none):
+        xfail_ids.add("FixtureFail01")
+    xfail_ids.update(_split_csv(args.xfail or []))
+    if args.xfail_file:
+        xfail_ids.update(_read_xfail_file(Path(args.xfail_file).resolve()))
 
     cfg = EvalConfig(
         fixtures=fixtures,
@@ -620,6 +719,8 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
         top_k=int(args.k),
         cwd=cwd,
         report_expr=str(args.report_expr),
+        xfail_ids=xfail_ids,
+        fail_on_xpass=bool(args.fail_on_xpass),
     )
     return cfg, bool(args.clean)
 
@@ -650,8 +751,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         for fx in cfg.fixtures:
             s = eval_one_fixture(cfg, fx, results_fp)
             if isinstance(s, Ok):
-                summaries.append(s.value)
-                _write_jsonl_line(fixtures_fp, s.value.__dict__)
+                s2 = _annotate_outcome(cfg, s.value)
+                summaries.append(s2)
+                _write_jsonl_line(fixtures_fp, s2.__dict__)
             else:
                 # Hard failure: record a minimal summary-like row and continue.
                 err = s.error
@@ -666,13 +768,29 @@ def main(argv: Optional[List[str]] = None) -> int:
                     elapsedMs=0,
                     solvedPath=None,
                 )
-                summaries.append(pseudo)
-                _write_jsonl_line(fixtures_fp, pseudo.__dict__)
+                pseudo2 = _annotate_outcome(cfg, pseudo)
+                summaries.append(pseudo2)
+                _write_jsonl_line(fixtures_fp, pseudo2.__dict__)
                 print(f"[eval] FAIL fixture {fx.stem}: {err.message}", file=sys.stderr)
 
     _print_scoreboard(summaries)
     print(f"\nWrote: {results_path}")
     print(f"Wrote: {fixtures_path}")
+
+    unexpected = [s for s in summaries if s.evalOutcome == "fail"]
+    xpasses = [s for s in summaries if s.evalOutcome == "xpass"]
+
+    if unexpected:
+        ids = ", ".join(s.fixtureId for s in unexpected)
+        print(f"[eval] ERROR: unexpected failures: {ids}", file=sys.stderr)
+        return 1
+
+    if xpasses:
+        ids = ", ".join(s.fixtureId for s in xpasses)
+        print(f"[eval] NOTE: unexpected passes (xpass): {ids}", file=sys.stderr)
+        if cfg.fail_on_xpass:
+            return 3
+
     return 0
 
 
