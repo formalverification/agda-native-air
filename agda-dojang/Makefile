@@ -138,53 +138,61 @@ FIXTURE_DIR := $(REPO_ROOT)/data/agda
 FIXTURE_IN  := $(FIXTURE_DIR)/FixtureHoles.agda
 FIXTURE_OUT := $(abspath _build/FixtureHoles.agda)
 #
+# --- Proof-completion evaluator knobs (overridable) ---
+EVAL_FIXTURES   ?= $(FIXTURE_DIR)/Fixture*.agda
+EVAL_OUT_DIR    ?= _build/eval-proof-completion
+EVAL_RUN_ID     ?= latest
+EVAL_POLICY     ?= $(PYTHON) python/tools/policy_fixture.py
+EVAL_MAX_HOLES  ?= 4
+EVAL_K          ?= 5
+EVAL_TIMEOUT    ?= 20
+EVAL_REPORT_EXPR?= reportGoalCtx
+EVAL_CLEAN      ?= 1
+EVAL_XFAIL      ?=
+# ^ after support for this is added in eval_fixtures.py
+EVAL_CLEAN_FLAG := $(if $(filter 1,$(EVAL_CLEAN)),--clean,)
+#
 # 2.1) Run the agent bridge on the fixture file, keeping the workdir for inspection.
 demo-agent-bridge:
 	@mkdir -p _build
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) python/tools/agent_bridge.py \
 	  --input "$(FIXTURE_IN)" \
 	  --output "$(FIXTURE_OUT)" \
-	  --policy "$(PYTHON) python/tools/policy_fixture.py" \
-	  --max-holes 4 \
+	  --policy "$(EVAL_POLICY)" \
+	  --max-holes "$(EVAL_MAX_HOLES)" \
 	  --keep-workdir \
-	  --k 5 \
+	  --k "$(EVAL_K)" \
 	  --agda-bin "$(AGDA)" \
 	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR)" \
-	  --report-expr "reportGoalCtx"
+	  --report-expr "$(EVAL_REPORT_EXPR)"
 	$(AGDA) $(AGDA_FLAGS) -i "$(dir $(FIXTURE_OUT))" "$(FIXTURE_OUT)"
 #
 # 2.2) Run the full eval loop on the fixture file, writing JSONL + logs + scoreboard.
 ## eval-proof-completion: Run fixture evaluator; writes JSONL + logs + scoreboard.
 eval-proof-completion:
-	@mkdir -p _build/eval-proof-completion
-	PYTHONPATH=python python3 python/tools/eval_fixtures.py \
-	  --fixtures "../data/agda/Fixture*.agda" \
-	  --out-dir "_build/eval-proof-completion" \
-	  --run-id "latest" \
-	  --clean \
-	  --policy "python3 python/tools/policy_fixture.py" \
-	  --max-holes 4 \
-	  --k 5 \
-	  --timeout 20 \
-	  --agda-bin "agda" \
-	  --agda-flags "-i agda --library-file=agda/libraries -l agda-jang  -i ../data/agda" \
-	  --report-expr "reportGoalCtx"
+	@mkdir -p "$(EVAL_OUT_DIR)"
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) python/tools/eval_fixtures.py \
+	  --fixtures "$(EVAL_FIXTURES)" \
+	  --out-dir "$(EVAL_OUT_DIR)" \
+	  --run-id "$(EVAL_RUN_ID)" \
+	  $(EVAL_CLEAN_FLAG) \
+	  --policy "$(EVAL_POLICY)" \
+	  --max-holes "$(EVAL_MAX_HOLES)" \
+	  --k "$(EVAL_K)" \
+	  --timeout "$(EVAL_TIMEOUT)" \
+	  --agda-bin "$(AGDA)" \
+	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR)" \
+	  --report-expr "$(EVAL_REPORT_EXPR)"
 #
 ## demo-proof-completion: Alias for eval-proof-completion (kept for docs/checklists).
 demo-proof-completion: eval-proof-completion
 #
 # 2.3) A smoke test with tighter limits for quick feedback (e.g., in CI).
 eval-proof-completion-smoke:
-	PYTHONPATH=python python3 python/tools/eval_fixtures.py \
-	  --fixtures "../data/agda/Fixture01.agda" \
-	  --out-dir "_build/eval-proof-completion" \
-	  --run-id "smoke" \
-	  --clean \
-	  --policy "python3 python/tools/policy_fixture.py" \
-	  --max-holes 2 --k 3 --timeout 10 \
-	  --agda-bin "agda" \
-	  --agda-flags "-i agda --library-file=agda/libraries -l agda-jang  -i ../data/agda" \
-	  --report-expr "reportGoalCtx"
+	$(MAKE) eval-proof-completion \
+	  EVAL_FIXTURES="$(FIXTURE_DIR)/Fixture01.agda" \
+	  EVAL_RUN_ID=smoke \
+	  EVAL_MAX_HOLES=2 EVAL_K=3 EVAL_TIMEOUT=10
 
 # 3) Extract: produce intermediate JSON from an example Agda file
 #    WHY: Stabilize a canonical intermediate we can diff/test before transforming.
