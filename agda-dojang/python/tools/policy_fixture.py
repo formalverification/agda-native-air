@@ -82,22 +82,39 @@ def _pick_vars_with_type_substr(ctx: List[CtxEntry], type_substr: str, n: int) -
     return out
 
 
-def _try_boolean_algebra_oracles(goal_norm: str, ctx: List[CtxEntry]) -> List[Dict[str, Any]]:
+def _try_stdlib_boolalg(goal_norm: str, ctx: List[CtxEntry]) -> List[Dict[str, Any]]:
     """
-    FixtureStdlibBooleanAlgebra helper:
-      - If goal looks like a De Morgan law, and the corresponding oracle lemma exists,
-        propose `oracle-deMorgan₁ x y` / `oracle-deMorgan₂ x y` using local Bool vars.
+    FixtureStdlibBooleanAlgebra helper (stdlib-backed):
+      - ¬ ⊥ ≈ ⊤          solved by `⊥≉⊤`
+      - deMorgan₁ goal    solved by `deMorgan₁ x y`
+      - deMorgan₂ goal    solved by `deMorgan₂ x y`
+
+    We deliberately use binder names from the local context to avoid introducing metas.
     """
+    out: List[Dict[str, Any]] = []
+
+    # ¬ ⊥ ≈ ⊤  (context is empty here)
+    if ("¬⊥" in goal_norm and "≈⊤" in goal_norm) or ("¬ ⊥" in goal_norm and "≈ ⊤" in goal_norm):
+        out.append({"term": "⊥≉⊤", "score": 1.2, "meta": {"rule": "stdlib-boolalg-⊥≉⊤"}})
+        return out
+
     xs = _pick_vars_with_type_substr(ctx, "Bool", 2)
     if len(xs) != 2:
-        return []
+        return out
     x, y = xs[0], xs[1]
 
-    out: List[Dict[str, Any]] = []
-    if ("¬ x ∨ ¬ y" in goal_norm or "¬ y ∨ ¬ x" in goal_norm) and _has_name(ctx, "oracle-deMorgan₁"):
-        out.append({"term": f"oracle-deMorgan₁ {x} {y}", "score": 0.97, "meta": {"rule": "oracle-demorgan1"}})
-    if ("¬ x ∧ ¬ y" in goal_norm or "¬ y ∧ ¬ x" in goal_norm) and _has_name(ctx, "oracle-deMorgan₂"):
-        out.append({"term": f"oracle-deMorgan₂ {x} {y}", "score": 0.97, "meta": {"rule": "oracle-demorgan2"}})
+    # deMorgan₁ : ¬ (x ∧ y) ≈ ¬ x ∨ ¬ y
+    if ("¬(" in goal_norm or "¬ (" in goal_norm) and "∧" in goal_norm and "∨" in goal_norm:
+        if ("¬" in goal_norm and "∨" in goal_norm) and ("¬" in goal_norm and "∧" in goal_norm):
+            # Prefer deMorgan₁ if RHS mentions ∨
+            if "∨" in goal_norm and "∧" in goal_norm and ("¬ x ∨ ¬ y" in goal_norm or "∨ ¬" in goal_norm):
+                out.append({"term": f"deMorgan₁ {x} {y}", "score": 1.1, "meta": {"rule": "stdlib-boolalg-deMorgan₁"}})
+
+    # deMorgan₂ : ¬ (x ∨ y) ≈ ¬ x ∧ ¬ y
+    if ("¬(" in goal_norm or "¬ (" in goal_norm) and "∨" in goal_norm and "∧" in goal_norm:
+        if ("¬ x ∧ ¬ y" in goal_norm) or ("∧ ¬" in goal_norm):
+            out.append({"term": f"deMorgan₂ {x} {y}", "score": 1.1, "meta": {"rule": "stdlib-boolalg-deMorgan₂"}})
+
     return out
 
 
@@ -156,8 +173,8 @@ def propose_terms(goal: str, ctx: List[CtxEntry], req: Dict[str, Any], k: int = 
     goal_n = _normalize(goal)
     cands: List[Dict[str, Any]] = []
 
-    # 0) Fixture oracle hook (when request.meta includes a stable goal id).
-    cands.extend(_oracle_candidates(_goal_id_from_request(req)))
+    # 0) FixtureStdlibBooleanAlgebra hook (stdlib-backed).
+    cands.extend(_try_stdlib_boolalg(goal_n, ctx))
 
     # 1) Assumption rule: if some binder has exactly the goal type, return it.
     # Prefer later binders (often the most local one).
@@ -171,9 +188,6 @@ def propose_terms(goal: str, ctx: List[CtxEntry], req: Dict[str, Any], k: int = 
                 }
             )
             break  # one is enough for the demo
-
-    # 1.5) Small oracle shortcuts for fixtures with "oracle-…" lemmas.
-    cands.extend(_try_boolean_algebra_oracles(goal_n, ctx))
 
     # 2) Unit goal
     # (Agda.Builtin.Unit uses ⊤ and tt)
