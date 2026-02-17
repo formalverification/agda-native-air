@@ -1,6 +1,14 @@
 """
-file: agda-jang/python/tools/report_parser.py
-description: parsing of Agda subgoal reports from stderr.
+report_parser.py
+
+File: agda-jang/python/tools/report_parser.py
+
+Description:
+  - Parse Agda's stderr for subgoal reports (marked by AGDAJANG_SUBGOALS_BEGIN/END).
+  - Extract structured goal information (index, visibility, type) from lines like
+    AGDAJANG_GOAL:0:visible: <TYPE>.
+  - Also support a separate marker pair AGDAJANG_REQ_BEGIN/END for policy requests
+    (goal + context) used by agent_bridge (Issue #23).
 """
 from __future__ import annotations
 import json

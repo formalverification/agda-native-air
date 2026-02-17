@@ -1,59 +1,55 @@
 #!/usr/bin/env python3
 """
 agent_bridge.py
-===============
 
 File: agda-ai-prover/agda-jang/python/tools/agent_bridge.py
 
-Goal (Issue #23 v0)
-------------------
-Provide a tiny, deterministic "report → policy → patch → check" loop:
+Goal (Issue #23 v0):
+  Provide a tiny, deterministic "report → policy → patch → check" loop:
 
-  1) Create a *reporting* variant of a target Agda file by replacing the next hole
+  1. Create a *reporting* variant of a target Agda file by replacing the next hole
      with a marker-emitting macro call (e.g. `reportGoalCtx ?`).
-  2) Run Agda on the reporting variant and parse a `{goal, context}` request from
+  2. Run Agda on the reporting variant and parse a `{goal, context}` request from
      stable BEGIN/END markers in the compiler output.
-  3) Call a policy backend (local process) to get ranked candidate terms.
-  4) Try candidates by patching the original hole; accept the first candidate that
+  3. Call a policy backend (local process) to get ranked candidate terms.
+  4. Try candidates by patching the original hole; accept the first candidate that
      typechecks; repeat for up to N holes.
 
-Design constraints / style
---------------------------
-- Reuses project utilities:
+Design constraints / style:
+  - Reuses project utilities:
+
     utils.command_runner.run_command
     utils.file_ops.temp_dir, utils.file_ops.write_text_atomic
     utils.result.Result (Ok/Err)
     utils.types.PipelineError, CommandResult
-- Avoids exceptions for control flow (errors become PipelineError values).
-- Keeps data immutable (dataclasses, frozen where appropriate).
-- Type annotations everywhere.
 
-Important note
---------------
-This bridge expects the Agda-side reporting macro to emit a request block:
+  - Avoids exceptions for control flow (errors become PipelineError values).
+  - Keeps data immutable (dataclasses, frozen where appropriate).
+  - Type annotations everywhere.
+
+Important note:
+  This bridge expects the Agda-side reporting macro to emit a request block:
 
   AGDAJANG_REQ_BEGIN
   { "goal": "...", "context": [ { "name": "...", "type": "..." }, ... ] }
   AGDAJANG_REQ_END
 
-The parsing support for these markers is added in tools/report_parser.py (diff below).
+  The parsing support for these markers is added in tools/report_parser.py
 
-CLI examples
-------------
-From repo root (recommended, so --library-file paths resolve):
+CLI examples:
+  From repo root (recommended, so --library-file paths resolve):
 
-  PYTHONPATH=agda-jang/python \
-  python3 agda-jang/python/tools/agent_bridge.py \
-    --file data/agda/FixtureHoles.agda \
-    --policy "python3 agda-jang/python/tools/policy_fixture.py" \
-    --agda-bin agda \
-    --agda-flags "-i agda --library-file=agda/libraries -l agda-jang" \
-    --include "data/agda" \
-    --max-holes 4 \
-    --k 5
+    PYTHONPATH=agda-jang/python \
+    python3 agda-jang/python/tools/agent_bridge.py \
+      --file data/agda/FixtureHoles.agda \
+      --policy "python3 agda-jang/python/tools/policy_fixture.py" \
+      --agda-bin agda \
+      --agda-flags "-i agda --library-file=agda/libraries -l agda-jang" \
+      --include "data/agda" \
+      --max-holes 4 \
+      --k 5
 
-If you want to inspect generated workdir files:
-  ... --keep-workdir
+To inspect generated workdir files, be sure to include `--keep-workdir`.
 """
 
 from __future__ import annotations

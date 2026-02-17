@@ -4,20 +4,18 @@ policy_contract.py
 
 File: agda-jang/python/tools/policy_contract.py
 
-Purpose
--------
-Canonical, versioned request/response contract for policy backends used by AgdaJang.
+Purpose:
+  Canonical, versioned request/response contract for policy backends used by AgdaJang.
 
-"Freeze v0" means:
+Frozen V0:
   - There is exactly one place that defines schema identifiers.
   - Callers always emit requests with a schema tag.
   - Backends always respond with a schema tag.
   - Parsers validate required keys and normalize candidates.
 
-Versioning
-----------
-- Breaking changes MUST bump the schema string suffix (e.g. @v1).
-- Unknown schema versions should be rejected by default.
+Versioning:
+  - Breaking changes MUST bump the schema string suffix (e.g. @v1).
+  - Unknown schema versions should be rejected by default.
 
 This module intentionally has *no* dependency on project Result/Error types;
 callers can catch ValueError and map to PipelineError as appropriate.

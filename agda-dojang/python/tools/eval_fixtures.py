@@ -4,7 +4,9 @@ eval_fixtures.py
 
 File: agda-jang/python/tools/eval_fixtures.py
 
-Issue #85 deliverable: deterministic Agda-check evaluator + fixtures scoreboard.
+Description:
+  Deterministic Agda-check evaluator + fixtures scoreboard.
+  (Issue #85 deliverable.)
 
 What this does (v0):
   - Enumerate fixture modules with `{!!}` holes.

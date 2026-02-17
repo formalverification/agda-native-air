@@ -4,7 +4,21 @@ policy_fixture.py
 File: agda-jang/python/tools/policy_fixture.py
 
 Description:
-  A simple deterministic policy backend for testing and demonstration purposes.
+  A simple deterministic oracle policy backend for testing fixture-driven proof
+  completion.
+
+Goal:
+  Given a goal identifier (name) coming from the evaluator, return a list
+  of candidate expressions (strings) to try in the hole.
+
+This policy is *deterministic* and is intended to make the end-to-end
+"propose → Agda-check → metrics" demo pass before any ML exists.
+
+How it works:
+  - For known holes in FixtureStdlibBooleanAlgebra, return the true proof first.
+  - Fill the remaining slots with deterministic distractors that parse but
+    (usually) do not typecheck.
+
 """
 from __future__ import annotations
 
