@@ -27,7 +27,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional
 
 from tools.policy_contract import (
     POLICY_REQUEST_SCHEMA_V0,
