@@ -555,19 +555,23 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         holes_solved += 1
         hole_index += 1
 
-    fully_solved = (_find_next_hole(src) is None) and (holes_total > 0 or holes_total == 0)
-    final_status = "unsolved"
+    no_holes_left = (_find_next_hole(src) is None)
+    final_status: str = "unsolved"
     solved_path: Optional[str] = None
 
-    if fully_solved and holes_total > 0:
+    # Always do a strict check when there are no holes left.
+    # Special-case: fixtures with 0 holes should be treated as "ok" if they strictly typecheck.
+    if no_holes_left:
         final_status, _rc, out = _final_strict_check(bridge_cfg, src, shadow_dir, overlay)
-        # Save strict output
+
+        # Save strict output (even for hole-free fixtures) for debugging/CI artifacts.
         strict_log = _work_root(cfg) / "logs" / fixture_id / "final_strict.txt"
         _mkdir_clean(strict_log.parent)
         write_text_atomic(strict_log, out.rstrip() + "\n")
 
         if final_status == "ok":
-            # Write solved module artifact (canonical filename, so it’s typecheckable).
+            # Write a canonical, typecheckable artifact for any strictly-ok fixture,
+            # regardless of whether it started with holes.
             solved_dir = _fixture_solved_dir(cfg)
             _mkdir_clean(solved_dir)
             solved_file = solved_dir / f"{fixture_id}.agda"
@@ -583,8 +587,8 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         fixturePath=str(fixture),
         holesTotal=holes_total,
         holesSolved=holes_solved,
-        fullySolved=bool(fully_solved and final_status == "ok"),
-        finalStatus=("ok" if (fully_solved and final_status == "ok") else final_status),
+        fullySolved=bool(final_status == "ok"),
+        finalStatus=("ok" if final_status == "ok" else final_status),
         elapsedMs=elapsed_ms,
         solvedPath=solved_path,
     )

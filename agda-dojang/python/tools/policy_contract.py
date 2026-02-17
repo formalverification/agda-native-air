@@ -101,6 +101,18 @@ def validate_request_obj(obj: Any) -> None:
     if not isinstance(obj, dict):
         raise ValueError("policy request must be a JSON object")
 
+    # Required keys (even for legacy requests).
+    goal = obj.get("goal")
+    if not isinstance(goal, str):
+        raise ValueError("policy request missing/invalid 'goal' (must be a string)")
+
+    ctx = obj.get("context")
+    if ctx is None:
+        # Legacy callers may omit 'context' entirely; treat as empty list.
+        obj["context"] = []
+    elif not isinstance(ctx, list):
+        raise ValueError("policy request 'context' must be a list")
+
     sch = obj.get("schema")
     if sch is None:
         if LEGACY_REQUEST_HAS_NO_SCHEMA_OK:
@@ -135,8 +147,16 @@ def validate_response_obj(obj: Any) -> None:
         # If schema is missing, we treat this as legacy and require schemaVersion.
         sv = obj.get("schemaVersion")
         if isinstance(sv, str):
-            # We do not attempt to map arbitrary schemaVersion strings.
-            # Callers may choose to accept legacy by special-case mapping.
+            # Still validate candidates shape for legacy responses.
+            cands0 = obj.get("candidates")
+            if not isinstance(cands0, list):
+                raise ValueError("policy response missing/invalid 'candidates' (must be a list)")
+            for i, c in enumerate(cands0):
+                if not isinstance(c, dict):
+                    raise ValueError(f"policy response candidate[{i}] must be an object")
+                term = c.get("term")
+                if not isinstance(term, str) or not term.strip():
+                    raise ValueError(f"policy response candidate[{i}] missing/invalid 'term'")
             return
         raise ValueError("policy response missing required key: 'schema' (or legacy 'schemaVersion')")
 
@@ -201,3 +221,19 @@ def parse_response_json(text: str) -> Response:
 
     meta = _coerce_meta(obj.get("meta"))
     return Response(schema=schema, candidates=cands, meta=meta)
+
+def parse_request_json(text: str) -> Dict[str, Any]:
+    """
+    Parse + validate a request JSON string.
+    Returns the raw dict (callers can extract fields as they wish).
+    """
+    try:
+        obj = json.loads(text)
+    except Exception as ex:
+        raise ValueError(f"policy request is not valid JSON: {ex}") from ex
+
+    validate_request_obj(obj)
+    if not isinstance(obj, dict):
+        # Defensive: validate_request_obj enforces dict, but keep type-checkers happy.
+        raise ValueError("policy request must be a JSON object")
+    return obj
