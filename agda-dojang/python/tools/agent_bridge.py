@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import sys
@@ -316,6 +317,47 @@ def _extract_import_lines(src: str) -> List[str]:
             out.append(line)
     return out
 
+def _extract_prelude_lines(src: str) -> List[str]:
+    """
+    Extract the *top-level prelude* we need to re-create the same scope in the
+    scratch module:
+      - open import ...
+      - import ...
+      - open <ModuleOrRecord> ...      (e.g. `open BooleanAlgebra (...)`)
+
+    IMPORTANT: we only take these from the initial prelude block (before the
+    first “real” definition) to avoid accidentally pulling `open` statements
+    from inside where-blocks/definitions.
+    """
+    out: List[str] = []
+    for raw in src.splitlines():
+        s = raw.strip()
+
+        # Skip obvious non-prelude noise.
+        if not s:
+            continue
+        if s.startswith("--"):
+            continue
+        if s.startswith("{-#") and s.endswith("#-}"):
+            # Don’t include OPTIONS pragmas here: render_module puts these lines
+            # after `module ... where`, and Agda requires OPTIONS before module.
+            continue
+        if s.startswith("module "):
+            continue
+
+        if s.startswith("open import ") or s.startswith("import "):
+            out.append(raw.rstrip())
+            continue
+
+        if s.startswith("open ") and not s.startswith("open import "):
+            out.append(raw.rstrip())
+            continue
+
+        # First non-prelude line => stop.
+        break
+
+    return out
+
 def _render_postulates_from_context(ctx: List[Dict[str, Any]]) -> str:
     """
     Render a `postulate` block for the policy request context.
@@ -363,6 +405,50 @@ def _render_candidate_scratch(req_obj: Dict[str, Any], user_imports: List[str], 
 def _json_dumps(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, indent=2)
 
+_UNSOLVED_HDR_RE = re.compile(
+    r"Unsolved(?:\s+interaction)?\s+metas\s+at\s+the\s+following\s+locations:",
+    re.IGNORECASE,
+)
+_ERR_LINE = ": error:"
+_UNSOLVED_TAG = re.compile(r"\[Unsolved", re.IGNORECASE)
+_POS = re.compile(r":(\d+)[\.,](\d+)")
+
+def _unsolved_meta_positions(out: str) -> List[Tuple[int, int]]:
+    """
+    Best-effort parse of the positions listed in Agda's “Unsolved metas …” block.
+    We only care about (line, col) starts.
+    """
+    m = _UNSOLVED_HDR_RE.search(out)
+    if not m:
+        return []
+    tail = out[m.end():]
+    return [(int(m.group(1)), int(m.group(2))) for m in _POS.finditer(tail)]
+
+def _only_unsolved_metas(out: str) -> bool:
+    """
+    True iff the run appears to have failed *only* due to remaining unsolved metas.
+    """
+    if not _UNSOLVED_HDR_RE.search(out):
+        return False
+
+    # If Agda prints tagged error lines, ensure they’re only “unsolved meta” ones.
+    err_lines = [ln for ln in out.splitlines() if _ERR_LINE in ln]
+    if not err_lines:
+        # Some runs only print the unsolved-metas header (rare); accept.
+        return True
+
+    def ok_line(ln: str) -> bool:
+        return (("Unsolved" in ln and "metas" in ln) or bool(_UNSOLVED_TAG.search(ln)))
+
+    return all(ok_line(ln) for ln in err_lines)
+
+def _filled_hole_still_unsolved(hole: HoleSpan, out: str) -> bool:
+    """
+    True iff Agda still reports an unsolved meta starting at the hole’s (line,col).
+    This catches candidates like `_` or `?` that don’t actually solve the hole.
+    """
+    pos = set(_unsolved_meta_positions(out))
+    return (hole.line, hole.col) in pos
 
 # =========================
 # IO helpers (Result-returning)
@@ -468,6 +554,15 @@ def _strip_flag(flags: str, flag: str) -> str:
     """
     toks = shlex.split(flags) if flags else []
     toks = [t for t in toks if t != flag]
+    return " ".join(shlex.quote(t) for t in toks)
+
+def _ensure_flag(flags: str, flag: str) -> str:
+    """
+    Ensure a single flag token is present in a shell-ish flag string.
+    """
+    toks = shlex.split(flags) if flags else []
+    if flag not in toks:
+        toks.append(flag)
     return " ".join(shlex.quote(t) for t in toks)
 
 
@@ -613,18 +708,30 @@ def solve_one_hole(cfg: BridgeConfig, src: str, hole: HoleSpan, workdir: Path, o
             message="policy returned zero candidates",
         ))
 
-    # 3) Try top-k candidates in a scratch module. This avoids false negatives
-    #    when the original file still contains other `{!!}` holes.
-    user_imports = _extract_import_lines(src)
-    scratch_file = workdir / "TrySandbox.agda"
-    for cand in candidates[: cfg.top_k]:
-        scratch_src = _render_candidate_scratch(req_obj, user_imports, cand.term)
-        write_text_atomic(scratch_file, scratch_src)
+    # 3) Try candidates by patching the *shadow copy* of the original module and
+    #    running Agda normally.
+    #
+    # We do NOT use --allow-unsolved-metas (it is rejected by stdlib’s --safe modules).
+    # Instead, we treat “failure only due to remaining unsolved metas elsewhere”
+    # as a successful candidate, as long as the filled hole is not still unsolved.
+    trial_file = workdir / cfg.file.name
 
-        cand_run = run_agda(cfg, scratch_file, extra_include_dirs=[str(workdir), str(overlay)])
-        rc, _out = collect_output(cand_run)
+    for idx, cand in enumerate(candidates[: cfg.top_k]):
+        trial_src = build_candidate_variant(src, hole, cand.term)
+        write_text_atomic(trial_file, trial_src)
+
+        cand_run = run_agda(cfg, trial_file, extra_include_dirs=[str(workdir), str(overlay)])
+        rc, out2 = collect_output(cand_run)
+
+        if cfg.keep_workdir:
+            logp = workdir / f"try_candidate_{idx:02d}.txt"
+            write_text_atomic(logp, out2.rstrip() + "\n")
+
         if rc == 0:
-            return Ok(build_candidate_variant(src, hole, cand.term))
+            return Ok(trial_src)
+
+        if _only_unsolved_metas(out2) and not _filled_hole_still_unsolved(hole, out2):
+            return Ok(trial_src)
 
     return Err(PipelineError(
         kind="NonZeroExit",

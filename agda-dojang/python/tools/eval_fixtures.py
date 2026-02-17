@@ -69,6 +69,7 @@ from tools.agent_bridge import (  # type: ignore
     _coerce_context,
     _coerce_meta,
     _extract_import_lines,
+    _extract_prelude_lines,
     _find_next_hole,
     _render_candidate_scratch,
     _strip_flag,
@@ -416,7 +417,7 @@ def _try_candidates_for_hole(
         return Ok((False, fixture_src))
 
     # Candidate checking in a scratch module, so other holes don’t interfere.
-    user_imports = _extract_import_lines(fixture_src)
+    user_imports = _extract_prelude_lines(fixture_src)
     scratch_file = shadow_dir / "TrySandbox.agda"
 
     for rank, cand in enumerate(candidates, start=1):
