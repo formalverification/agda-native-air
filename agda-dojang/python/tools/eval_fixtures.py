@@ -70,6 +70,8 @@ from tools.agent_bridge import (  # type: ignore
     _coerce_meta,
     _extract_import_lines,
     _extract_prelude_lines,
+    _only_unsolved_metas,
+    _filled_hole_still_unsolved,
     _find_next_hole,
     _render_candidate_scratch,
     _strip_flag,
@@ -416,22 +418,25 @@ def _try_candidates_for_hole(
         _write_jsonl_line(results_fp, attempt.__dict__)
         return Ok((False, fixture_src))
 
-    # Candidate checking in a scratch module, so other holes don’t interfere.
-    user_imports = _extract_prelude_lines(fixture_src)
-    scratch_file = shadow_dir / "TrySandbox.agda"
-
+    logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
+    _mkdir_clean(logs_dir)
     for rank, cand in enumerate(candidates, start=1):
-        logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
-        _mkdir_clean(logs_dir)
         log_path = logs_dir / f"cand-{rank:02d}.txt"
 
-        scratch_src = _render_candidate_scratch(req_obj, user_imports, cand.term)
-        write_text_atomic(scratch_file, scratch_src)
+        # Validate in a patched shadow copy of the *fixture module*.
+        shadow_file = shadow_dir / bridge_cfg.file.name
+        trial_src = build_candidate_variant(fixture_src, hole, cand.term)
+        write_text_atomic(shadow_file, trial_src)
 
         t0 = time.monotonic()
-        run_res = run_agda(bridge_cfg, scratch_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
+        run_res = run_agda(bridge_cfg, shadow_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
         status, rc, out = _status_from_run(run_res)
         elapsed = int((time.monotonic() - t0) * 1000.0)
+
+        # Accept “only unsolved metas” as long as the filled hole is no longer unsolved.
+        accepted = (status == "ok") or (_only_unsolved_metas(out) and not _filled_hole_still_unsolved(hole, out))
+        if accepted:
+            status = "ok"
 
         write_text_atomic(log_path, out.rstrip() + "\n")
 
@@ -451,9 +456,8 @@ def _try_candidates_for_hole(
         )
         _write_jsonl_line(results_fp, attempt.__dict__)
 
-        if status == "ok":
-            updated = build_candidate_variant(fixture_src, hole, cand.term)
-            return Ok((True, updated))
+        if accepted:
+            return Ok((True, trial_src))
 
     return Ok((False, fixture_src))
 

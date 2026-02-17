@@ -41,9 +41,25 @@ class CtxEntry:
     type: str
 
 
+def _strip_qualifiers(s: str) -> str:
+    """
+    Drop module qualifiers like `Data.Bool.Base.` from pretty-printed goals.
+    This is only for heuristic matching (not for emitting terms).
+    """
+    # Remove any `Foo.Bar.Baz.` prefix before the next token (including operators like ∧/∨).
+    return re.sub(r"\b(?:[A-Za-z_][\w']*\.)+(?=[^\s])", "", s)
+
 def _normalize(s: str) -> str:
-    # cheap normalization: collapse whitespace
-    return re.sub(r"\s+", " ", s).strip()
+    # Normalize only for heuristic matching (never for emitting terms).
+    s = re.sub(r"\s+", " ", s).strip()
+    # Drop qualifiers like `Data.Bool.Base.` (works for infix like `x Data.Bool.Base.∧ y` too).
+    s = re.sub(r"\b(?:[A-Za-z_][\w']*\.)+(?=[^\s])", "", s)
+    # After stripping qualifiers, `not` becomes bare; map to `¬` so we match consistently.
+    s = re.sub(r"\bnot\b", "¬", s)
+    return s
+
+def _compact(s: str) -> str:
+    return re.sub(r"\s+", "", s)
 
 
 def _parse_ctx(raw: Any) -> List[CtxEntry]:
@@ -90,8 +106,10 @@ def _try_fixture_stdlib_boolean_algebra(goal_norm: str, ctx: List[CtxEntry]) -> 
     """
     out: List[Dict[str, Any]] = []
 
+    goal_c = _compact(goal_norm)
+
     # 0) ¬ ⊥ ≈ ⊤  (no binders needed)
-    if ("¬ ⊥" in goal_norm or "¬⊥" in goal_norm) and ("≈ ⊤" in goal_norm or "≈⊤" in goal_norm):
+    if ("¬⊥" in goal_c) and ("≈⊤" in goal_c):
         out.append({"term": "oracle-¬⊥≈⊤", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-⊥"}})
         out.append({"term": "⊥≉⊤",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-⊥"}})
         return out
@@ -102,16 +120,16 @@ def _try_fixture_stdlib_boolean_algebra(goal_norm: str, ctx: List[CtxEntry]) -> 
     x, y = xs[0], xs[1]
 
     # deMorgan₁ : ¬ (x ∧ y) ≈ ¬ x ∨ ¬ y
-    lhs_and = (f"{x} ∧ {y}" in goal_norm) or (f"({x} ∧ {y})" in goal_norm)
-    rhs_or  = (f"¬ {x} ∨ ¬ {y}" in goal_norm) or (f"¬ {y} ∨ ¬ {x}" in goal_norm)
+    lhs_and = (f"{x}∧{y}" in goal_c) or (f"({x}∧{y})" in goal_c)
+    rhs_or  = (f"¬{x}∨¬{y}" in goal_c) or (f"¬{y}∨¬{x}" in goal_c)
     if lhs_and and rhs_or:
         out.append({"term": f"oracle-deMorgan₁ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm1"}})
         out.append({"term": f"deMorgan₁ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm1"}})
         return out
 
     # deMorgan₂ : ¬ (x ∨ y) ≈ ¬ x ∧ ¬ y
-    lhs_or  = (f"{x} ∨ {y}" in goal_norm) or (f"({x} ∨ {y})" in goal_norm)
-    rhs_and = (f"¬ {x} ∧ ¬ {y}" in goal_norm) or (f"¬ {y} ∧ ¬ {x}" in goal_norm)
+    lhs_or  = (f"{x}∨{y}" in goal_c) or (f"({x}∨{y})" in goal_c)
+    rhs_and = (f"¬{x}∧¬{y}" in goal_c) or (f"¬{y}∧¬{x}" in goal_c)
     if lhs_or and rhs_and:
         out.append({"term": f"oracle-deMorgan₂ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm2"}})
         out.append({"term": f"deMorgan₂ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm2"}})
