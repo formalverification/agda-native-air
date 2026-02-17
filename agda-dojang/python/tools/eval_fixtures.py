@@ -569,7 +569,7 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         _mkdir_clean(strict_log.parent)
         write_text_atomic(strict_log, out.rstrip() + "\n")
 
-        if final_status == "ok":
+        if final_status == "ok" and holes_total > 0:
             # Write a canonical, typecheckable artifact for any strictly-ok fixture,
             # regardless of whether it started with holes.
             solved_dir = _fixture_solved_dir(cfg)
@@ -577,8 +577,6 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
             solved_file = solved_dir / f"{fixture_id}.agda"
             write_text_atomic(solved_file, src)
             solved_path = str(solved_file)
-    else:
-        final_status = "unsolved"
 
     elapsed_ms = int((time.monotonic() - t_start) * 1000.0)
     summary = FixtureSummary(
