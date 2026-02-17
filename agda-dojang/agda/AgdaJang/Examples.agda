@@ -2,6 +2,7 @@
 -- This file gives three compile-time checks that exercise `applyWith1`,
 -- `applyWith2`, and `rewriteDef`.  The `intro` family is best used interactively,
 -- so we leave commented “try me” goals at the bottom.
+{-# OPTIONS --safe --cubical-compatible #-}
 
 module AgdaJang.Examples where
 

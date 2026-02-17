@@ -14,6 +14,8 @@
 --   where `?` is a meta that can be filled in later.  If the goal is not already a
 --   function type, this will leave a subgoal (meta) that needs to be solved.
 --
+{-# OPTIONS --safe --cubical-compatible #-}
+
 module ApplyDemo where
 open import Agda.Builtin.Nat
 open import AgdaJang.Apply

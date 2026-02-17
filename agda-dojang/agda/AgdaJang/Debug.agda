@@ -16,6 +16,8 @@
 --   Note that these macros will raise a type error with the information, so they
 --   should be used for debugging and not included in final code.
 --
+{-# OPTIONS --safe --cubical-compatible #-}
+
 module AgdaJang.Debug where
 
 open import AgdaJang.Prelude

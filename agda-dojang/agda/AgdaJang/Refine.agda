@@ -32,6 +32,8 @@
 --    goal type. This does not solve the hole; instead, it reports the result via
 --    compile-time messages.
 --
+{-# OPTIONS --safe --cubical-compatible #-}
+
 module AgdaJang.Refine where
 
 open import AgdaJang.Prelude

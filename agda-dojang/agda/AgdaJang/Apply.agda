@@ -35,6 +35,7 @@
 --
 -- We'll make this nicer once we add implicit-meta insertion.
 -- For now, `Apply.agda` is a staging area for those helpers.
+{-# OPTIONS --safe --cubical-compatible #-}
 
 module AgdaJang.Apply where
 

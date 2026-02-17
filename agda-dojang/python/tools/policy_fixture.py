@@ -81,6 +81,44 @@ def _pick_vars_with_type_substr(ctx: List[CtxEntry], type_substr: str, n: int) -
     out.reverse()
     return out
 
+def _try_fixture_stdlib_boolean_algebra(goal_norm: str, ctx: List[CtxEntry]) -> List[Dict[str, Any]]:
+    """
+    Solve the three specific goals in FixtureStdlibBooleanAlgebra using either:
+      - the fixture's own oracle-* lemmas (preferred), or
+      - stdlib fallbacks (if we trim the fixture).
+    This does NOT rely on req.meta.
+    """
+    out: List[Dict[str, Any]] = []
+
+    # 0) ¬ ⊥ ≈ ⊤  (no binders needed)
+    if ("¬ ⊥" in goal_norm or "¬⊥" in goal_norm) and ("≈ ⊤" in goal_norm or "≈⊤" in goal_norm):
+        out.append({"term": "oracle-¬⊥≈⊤", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-⊥"}})
+        out.append({"term": "⊥≉⊤",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-⊥"}})
+        return out
+
+    xs = _pick_vars_with_type_substr(ctx, "Bool", 2)
+    if len(xs) != 2:
+        return out
+    x, y = xs[0], xs[1]
+
+    # deMorgan₁ : ¬ (x ∧ y) ≈ ¬ x ∨ ¬ y
+    lhs_and = (f"{x} ∧ {y}" in goal_norm) or (f"({x} ∧ {y})" in goal_norm)
+    rhs_or  = (f"¬ {x} ∨ ¬ {y}" in goal_norm) or (f"¬ {y} ∨ ¬ {x}" in goal_norm)
+    if lhs_and and rhs_or:
+        out.append({"term": f"oracle-deMorgan₁ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm1"}})
+        out.append({"term": f"deMorgan₁ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm1"}})
+        return out
+
+    # deMorgan₂ : ¬ (x ∨ y) ≈ ¬ x ∧ ¬ y
+    lhs_or  = (f"{x} ∨ {y}" in goal_norm) or (f"({x} ∨ {y})" in goal_norm)
+    rhs_and = (f"¬ {x} ∧ ¬ {y}" in goal_norm) or (f"¬ {y} ∧ ¬ {x}" in goal_norm)
+    if lhs_or and rhs_and:
+        out.append({"term": f"oracle-deMorgan₂ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm2"}})
+        out.append({"term": f"deMorgan₂ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm2"}})
+        return out
+
+    return out
+
 
 def _try_stdlib_boolalg(goal_norm: str, ctx: List[CtxEntry]) -> List[Dict[str, Any]]:
     """
@@ -173,10 +211,16 @@ def propose_terms(goal: str, ctx: List[CtxEntry], req: Dict[str, Any], k: int = 
     goal_n = _normalize(goal)
     cands: List[Dict[str, Any]] = []
 
-    # 0) FixtureStdlibBooleanAlgebra hook (stdlib-backed).
+    # 0) FixtureStdlibBooleanAlgebra special-cases (no req.meta needed)
+    cands.extend(_try_fixture_stdlib_boolean_algebra(goal_n, ctx))
+
+    # 1) FixtureStdlibBooleanAlgebra hook (stdlib-backed).
     cands.extend(_try_stdlib_boolalg(goal_n, ctx))
 
-    # 1) Assumption rule: if some binder has exactly the goal type, return it.
+    # 2) Fixture oracle hook (when request.meta includes a stable goal id).
+    cands.extend(_oracle_candidates(_goal_id_from_request(req)))
+
+    # 3) Assumption rule: if some binder has exactly the goal type, return it.
     # Prefer later binders (often the most local one).
     for e in reversed(ctx):
         if _normalize(e.type) == goal_n:
@@ -189,12 +233,12 @@ def propose_terms(goal: str, ctx: List[CtxEntry], req: Dict[str, Any], k: int = 
             )
             break  # one is enough for the demo
 
-    # 2) Unit goal
+    # 4) Unit goal
     # (Agda.Builtin.Unit uses ⊤ and tt)
     if "⊤" in goal_n or goal_n.endswith("Top") or goal_n == "Unit":
         cands.append({"term": "tt", "score": 0.9, "meta": {"rule": "unit"}})
 
-    # 3) Equality goal
+    # 5) Equality goal
     # refl will typecheck for definitional equalities like x ≡ x (fixture-friendly)
     if "≡" in goal_n or "_≡_" in goal_n:
         cands.append({"term": "refl", "score": 0.8, "meta": {"rule": "refl"}})

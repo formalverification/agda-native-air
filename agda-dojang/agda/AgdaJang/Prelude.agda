@@ -15,6 +15,7 @@
 --   the specific imports and definitions that are currently needed for the AgdaJang
 --   project. As the project evolves, we may add more imports or utilities here as needed.
 --
+{-# OPTIONS --safe --cubical-compatible #-}
 
 module AgdaJang.Prelude where
 

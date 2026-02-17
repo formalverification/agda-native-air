@@ -1,4 +1,6 @@
 -- agda-jang/agda/AgdaJang/Everything.agda
+{-# OPTIONS --safe --cubical-compatible #-}
+
 module AgdaJang.Everything where
 
 open import AgdaJang.Prelude
