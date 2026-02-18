@@ -61,6 +61,80 @@ def _normalize(s: str) -> str:
 def _compact(s: str) -> str:
     return re.sub(r"\s+", "", s)
 
+def _name_in_goal(goal_norm: str, name: str) -> bool:
+    # Prefer exact identifier matches (avoid x matching x₁ when possible).
+    # Python's \w is unicode-aware, so this works decently with Agda names.
+    return re.search(rf"(?<![\w']){re.escape(name)}(?![\w'])", goal_norm) is not None
+
+def _is_value_binder(e: CtxEntry) -> bool:
+    # Heuristic: treat arrows as “functions/operators”, not value binders.
+    t = _normalize(e.type)
+    return ("→" not in t) and ("->" not in t)
+
+def _pick_goal_vars(ctx: List[CtxEntry], goal_norm: str, type_substr: str, n: int) -> List[str]:
+    """
+    Pick up to n variable names whose type mentions type_substr, preferring
+    value binders that appear in the goal text.
+    """
+    candidates = [
+        e for e in ctx
+        if (type_substr in e.type)
+        and _is_value_binder(e)
+        and not e.name.startswith("oracle-")
+    ]
+
+    # Prefer most-local binders that appear in the goal.
+    chosen: List[str] = []
+    for e in reversed(candidates):
+        if len(chosen) >= n:
+            break
+        if _name_in_goal(goal_norm, e.name):
+            chosen.append(e.name)
+    if len(chosen) >= n:
+        chosen.reverse()
+        return chosen[:n]
+
+    # Fallback: just take most-local value binders of the right “type family”.
+    out: List[str] = []
+    for e in reversed(candidates):
+        if len(out) >= n:
+            break
+        out.append(e.name)
+    out.reverse()
+    return out
+
+def _infer_binop_vars_from_goal(goal_norm: str, op: str) -> List[str]:
+    """
+    Fallback: infer variable names from a boolean goal when ctx types are unreliable
+    or the goal is pretty-printed across multiple lines.
+
+    Looks for shapes like: ¬(x ∧ y) ...   or   ¬(x ∨ y) ...
+    after _normalize/_compact.
+    """
+    g = _compact(goal_norm)
+    m = re.search(rf"¬\(([_A-Za-z][\w']*)\{op}([_A-Za-z][\w']*)\)", g)
+    if m:
+        return [m.group(1), m.group(2)]
+    # looser fallback (rare)
+    m = re.search(rf"¬([_A-Za-z][\w']*)\{op}([_A-Za-z][\w']*)", g)
+    if m:
+        return [m.group(1), m.group(2)]
+    return []
+
+
+def _has_neg(goal_c: str, v: str) -> bool:
+    # allow ¬x or ¬(x)
+    return (f"¬{v}" in goal_c) or (f"¬({v})" in goal_c)
+
+def _has_binop(goal_c: str, op: str, a: str, b: str) -> bool:
+    # allow parentheses around args
+    pats = [
+        f"{a}{op}{b}",
+        f"({a}){op}{b}",
+        f"{a}{op}({b})",
+        f"({a}){op}({b})",
+    ]
+    return any(p in goal_c for p in pats)
 
 def _parse_ctx(raw: Any) -> List[CtxEntry]:
     if not isinstance(raw, list):
@@ -109,31 +183,29 @@ def _try_fixture_stdlib_boolean_algebra(goal_norm: str, ctx: List[CtxEntry]) -> 
     goal_c = _compact(goal_norm)
 
     # 0) ¬ ⊥ ≈ ⊤  (no binders needed)
-    if ("¬⊥" in goal_c) and ("≈⊤" in goal_c):
+    if ("¬⊥" in goal_c) and ("⊤" in goal_c) and ("≈" in goal_c or "≡" in goal_c):
         out.append({"term": "oracle-¬⊥≈⊤", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-⊥"}})
         out.append({"term": "⊥≉⊤",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-⊥"}})
         return out
 
-    xs = _pick_vars_with_type_substr(ctx, "Bool", 2)
-    if len(xs) != 2:
-        return out
-    x, y = xs[0], xs[1]
-
     # deMorgan₁ : ¬ (x ∧ y) ≈ ¬ x ∨ ¬ y
-    lhs_and = (f"{x}∧{y}" in goal_c) or (f"({x}∧{y})" in goal_c)
-    rhs_or  = (f"¬{x}∨¬{y}" in goal_c) or (f"¬{y}∨¬{x}" in goal_c)
-    if lhs_and and rhs_or:
-        out.append({"term": f"oracle-deMorgan₁ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm1"}})
-        out.append({"term": f"deMorgan₁ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm1"}})
-        return out
+    xs = _pick_goal_vars(ctx, goal_norm, "Bool", 2) or _infer_binop_vars_from_goal(goal_norm, "∧")
+    if len(xs) == 2:
+        x, y = xs[0], xs[1]
+        # tolerant: LHS shape is enough even if RHS got truncated at ≡
+        if ("¬" in goal_c) and _has_binop(goal_c, "∧", x, y):
+            out.append({"term": f"oracle-deMorgan₁ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm1"}})
+            out.append({"term": f"deMorgan₁ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm1"}})
+            return out
 
     # deMorgan₂ : ¬ (x ∨ y) ≈ ¬ x ∧ ¬ y
-    lhs_or  = (f"{x}∨{y}" in goal_c) or (f"({x}∨{y})" in goal_c)
-    rhs_and = (f"¬{x}∧¬{y}" in goal_c) or (f"¬{y}∧¬{x}" in goal_c)
-    if lhs_or and rhs_and:
-        out.append({"term": f"oracle-deMorgan₂ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm2"}})
-        out.append({"term": f"deMorgan₂ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm2"}})
-        return out
+    xs = _pick_goal_vars(ctx, goal_norm, "Bool", 2) or _infer_binop_vars_from_goal(goal_norm, "∨")
+    if len(xs) == 2:
+        x, y = xs[0], xs[1]
+        if ("¬" in goal_c) and _has_binop(goal_c, "∨", x, y):
+            out.append({"term": f"oracle-deMorgan₂ {x} {y}", "score": 1.20, "meta": {"rule": "fixture-boolalg-oracle-dm2"}})
+            out.append({"term": f"deMorgan₂ {x} {y}",        "score": 1.10, "meta": {"rule": "fixture-boolalg-stdlib-dm2"}})
+            return out
 
     return out
 
@@ -148,27 +220,27 @@ def _try_stdlib_boolalg(goal_norm: str, ctx: List[CtxEntry]) -> List[Dict[str, A
     We deliberately use binder names from the local context to avoid introducing metas.
     """
     out: List[Dict[str, Any]] = []
+    goal_c = _compact(goal_norm)
 
     # ¬ ⊥ ≈ ⊤  (context is empty here)
-    if ("¬⊥" in goal_norm and "≈⊤" in goal_norm) or ("¬ ⊥" in goal_norm and "≈ ⊤" in goal_norm):
+    if ("¬⊥" in goal_c) and ("⊤" in goal_c) and ("≈" in goal_c or "≡" in goal_c):
         out.append({"term": "⊥≉⊤", "score": 1.2, "meta": {"rule": "stdlib-boolalg-⊥≉⊤"}})
         return out
 
-    xs = _pick_vars_with_type_substr(ctx, "Bool", 2)
-    if len(xs) != 2:
-        return out
-    x, y = xs[0], xs[1]
+    xs_ctx = _pick_vars_with_type_substr(ctx, "Bool", 2)
 
     # deMorgan₁ : ¬ (x ∧ y) ≈ ¬ x ∨ ¬ y
-    if ("¬(" in goal_norm or "¬ (" in goal_norm) and "∧" in goal_norm and "∨" in goal_norm:
-        if ("¬" in goal_norm and "∨" in goal_norm) and ("¬" in goal_norm and "∧" in goal_norm):
-            # Prefer deMorgan₁ if RHS mentions ∨
-            if "∨" in goal_norm and "∧" in goal_norm and ("¬ x ∨ ¬ y" in goal_norm or "∨ ¬" in goal_norm):
-                out.append({"term": f"deMorgan₁ {x} {y}", "score": 1.1, "meta": {"rule": "stdlib-boolalg-deMorgan₁"}})
+    xs = xs_ctx or _infer_binop_vars_from_goal(goal_norm, "∧")
+    if len(xs) == 2:
+        x, y = xs[0], xs[1]
+        if ("¬" in goal_c) and _has_binop(goal_c, "∧", x, y):
+            out.append({"term": f"deMorgan₁ {x} {y}", "score": 1.1, "meta": {"rule": "stdlib-boolalg-deMorgan₁"}})
 
     # deMorgan₂ : ¬ (x ∨ y) ≈ ¬ x ∧ ¬ y
-    if ("¬(" in goal_norm or "¬ (" in goal_norm) and "∨" in goal_norm and "∧" in goal_norm:
-        if ("¬ x ∧ ¬ y" in goal_norm) or ("∧ ¬" in goal_norm):
+    xs = xs_ctx or _infer_binop_vars_from_goal(goal_norm, "∨")
+    if len(xs) == 2:
+        x, y = xs[0], xs[1]
+        if ("¬" in goal_c) and _has_binop(goal_c, "∨", x, y):
             out.append({"term": f"deMorgan₂ {x} {y}", "score": 1.1, "meta": {"rule": "stdlib-boolalg-deMorgan₂"}})
 
     return out

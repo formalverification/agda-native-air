@@ -316,8 +316,12 @@ rows:
 
 
 ## test-python: Run Python unittests with friendly output.
-test-python:
+test-python-unittest:
 	PYTHONPATH=python python3 python/utils/run_unittests.py
+
+## test-python: Run Python tests (pytest runs both pytest + unittest tests).
+test-python:
+	PYTHONPATH=python python3 -m pytest -q python/tests
 
 # ------------------------------------------------------------------------------
 

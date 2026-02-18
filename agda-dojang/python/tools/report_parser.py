@@ -58,9 +58,31 @@ def parse_marked_report(stderr: str, source: str) -> Dict[str, Any]:
 _REQ_BEGIN = "AGDAJANG_REQ_BEGIN"
 _REQ_END   = "AGDAJANG_REQ_END"
 
-_REQ_GOAL_LINE = re.compile(r"^\s*AGDAJANG_GOAL:\s*(.*)\s*$")
+_REQ_GOAL_PREFIX = "AGDAJANG_GOAL:"
+_REQ_CTX_PREFIX  = "AGDAJANG_CTX:"
 
-_REQ_CTX_LINE = re.compile(r"^\s*AGDAJANG_CTX:(\d+):([^:]+):([^:]+):\s*(.*)\s*$")
+def _is_req_marker_line(line: str) -> bool:
+    s = line.strip()
+    return (
+        s in {_REQ_BEGIN, _REQ_END, "AGDAJANG_CTX_BEGIN", "AGDAJANG_CTX_END"}
+        or s.startswith(_REQ_GOAL_PREFIX)
+        or s.startswith(_REQ_CTX_PREFIX)
+    )
+
+def _parse_req_ctx_line(line: str) -> Optional[Dict[str, Any]]:
+    s = line.strip()
+    if not s.startswith(_REQ_CTX_PREFIX):
+        return None
+    rest = s[len(_REQ_CTX_PREFIX):]
+    parts = rest.split(":", 3)  # keep colons inside the type
+    if len(parts) != 4:
+        return None
+    idx_s, vis, name, typ = parts
+    try:
+        idx = int(idx_s)
+    except Exception:
+        return None
+    return {"index": idx, "visibility": vis.strip(), "name": name.strip(), "type": typ.strip()}
 
 def has_request_markers(s: str) -> bool:
     """
@@ -127,46 +149,42 @@ def _parse_request_as_lines(block: str) -> Optional[Dict[str, Any]]:
       AGDAJANG_CTX:<i>:<vis>:<name>: <type>
       ...
     """
-    goal: Optional[str] = None
+    goal_parts: List[str] = []
     ctx: List[Dict[str, Any]] = []
+    current_ctx: Optional[Dict[str, Any]] = None
+    mode: Optional[str] = None  # "goal" | "ctx"
 
     for raw in block.splitlines():
-        line = raw.strip()
-        if not line:
+        s = raw.strip()
+        if not s:
             continue
-
-        mg = _REQ_GOAL_LINE.match(line)
-        if mg:
-            goal = mg.group(1).strip()
+        if s.startswith(_REQ_GOAL_PREFIX):
+            mode = "goal"
+            current_ctx = None
+            goal_parts = [s[len(_REQ_GOAL_PREFIX):].strip()]
             continue
-
-        mc = _REQ_CTX_LINE.match(line)
-        if mc:
-            idx_s, vis, name, typ = mc.group(1), mc.group(2), mc.group(3), mc.group(4)
-            try:
-                idx = int(idx_s)
-            except Exception:
-                idx = -1
-            ctx.append({
-                "index": idx,
-                "visibility": vis.strip(),
-                "name": name.strip(),
-                "type": typ.strip(),
-            })
+        parsed = _parse_req_ctx_line(s)
+        if parsed is not None:
+            mode = "ctx"
+            current_ctx = parsed
+            ctx.append(parsed)
             continue
+        if s in {"AGDAJANG_CTX_BEGIN", "AGDAJANG_CTX_END"}:
+            continue
+        if _is_req_marker_line(s):
+            mode = None
+            current_ctx = None
+            continue
+        # continuation line
+        if mode == "goal":
+            goal_parts.append(s)
+        elif mode == "ctx" and current_ctx is not None:
+            current_ctx["type"] = (str(current_ctx.get("type","")) + " " + s).strip()
 
-        # ignore other lines like AGDAJANG_CTX_BEGIN
-        continue
-
-    if goal is None:
+    if not goal_parts:
         return None
-
-    # Deterministic order: sort by index if present
+    goal = re.sub(r"\s+", " ", " ".join(goal_parts)).strip()
+    for e in ctx:
+        e["type"] = re.sub(r"\s+", " ", str(e.get("type",""))).strip()
     ctx_sorted = sorted(ctx, key=lambda d: int(d.get("index", -1)))
-
-    return {
-        "goal": goal,
-        "context": ctx_sorted,
-    }
-
-
+    return {"goal": goal, "context": ctx_sorted}

@@ -343,6 +343,10 @@ def _run_report(
     res = run_agda(bridge_cfg, shadow_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
     _rc, out = collect_output(res)
     req_obj = extract_policy_request_from_output(out)
+    if isinstance(req_obj, dict):
+        m = req_obj.get("module")
+        if not isinstance(m, str) or not m:
+            req_obj["module"] = bridge_cfg.file.stem
     return req_obj, out
 
 
@@ -370,11 +374,16 @@ def _try_candidates_for_hole(
         meta=_coerce_meta(req_obj.get("meta")) or None,
     )
 
+    logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
+    _mkdir_clean(logs_dir)
+    # Record the exact request we are about to send.
+    write_text_atomic(
+        logs_dir / "policy_request.json",
+        json.dumps(asdict(req), ensure_ascii=False, indent=2) + "\n",
+    )
+
     pol = call_policy(bridge_cfg, req=req, workdir=shadow_dir)
     if isinstance(pol, Err):
-        # Record a single synthetic attempt row
-        logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
-        _mkdir_clean(logs_dir)
         log_path = logs_dir / "policy_error.txt"
         write_text_atomic(log_path, pol.error.message + "\n")
 
@@ -395,10 +404,14 @@ def _try_candidates_for_hole(
         _write_jsonl_line(results_fp, attempt.__dict__)
         return Err(pol.error)
 
+    # Record the raw policy response (candidates + meta).
+    write_text_atomic(
+        logs_dir / "policy_response.json",
+        json.dumps(asdict(pol.value), ensure_ascii=False, indent=2) + "\n",
+    )
+
     candidates = pol.value.candidates[: cfg.top_k]
     if not candidates:
-        logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
-        _mkdir_clean(logs_dir)
         log_path = logs_dir / "no_candidates.txt"
         write_text_atomic(log_path, json.dumps(asdict(req), ensure_ascii=False, indent=2) + "\n")
         attempt = CandidateAttempt(
@@ -418,8 +431,6 @@ def _try_candidates_for_hole(
         _write_jsonl_line(results_fp, attempt.__dict__)
         return Ok((False, fixture_src))
 
-    logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
-    _mkdir_clean(logs_dir)
     for rank, cand in enumerate(candidates, start=1):
         log_path = logs_dir / f"cand-{rank:02d}.txt"
 
