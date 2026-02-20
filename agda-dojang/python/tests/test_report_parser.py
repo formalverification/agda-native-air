@@ -24,7 +24,8 @@ Expected:
   - `parse_marked_report` extracts (index, visibility, type) triples.
 """
 
-from tools.report_parser import parse_marked_report, has_markers
+import re
+from tools.report_parser import parse_marked_report, has_markers, extract_policy_request_from_output
 
 _SAMPLE = """Checking TrySandbox (...)
 TrySandbox.agda:10.5-23: error: [GenericDocError]
@@ -49,3 +50,58 @@ def test_parse_marked_report_basic():
     assert goals[1] == {"index": 1, "visibility": "visible", "type": "Nat"}
     # keep raw stderr for debugging
     assert "stderr" in doc["raw"]
+
+
+def test_extract_policy_request_line_protocol_multiline():
+    out = """
+noise
+AGDAJANG_REQ_BEGIN
+AGDAJANG_GOAL: ¬ (x ∧ y) ≈
+  ¬ x ∨ ¬ y
+AGDAJANG_CTX_BEGIN
+AGDAJANG_CTX:0:visible:y: Bool
+AGDAJANG_CTX:1:visible:x: Bool
+AGDAJANG_CTX_END
+AGDAJANG_REQ_END
+more noise
+"""
+    req = extract_policy_request_from_output(out)
+    assert req is not None
+    assert "goal" in req and "context" in req
+
+    goal = req["goal"]
+    assert "¬" in goal
+    assert ("∨" in goal) or ("_∨_" in goal)
+    assert ("∧" in goal) or ("_∧_" in goal)
+
+    ctx = req["context"]
+    # accept either order
+    by_name = {e["name"]: e["type"] for e in ctx}
+    assert set(by_name.keys()) == {"x", "y"}
+    assert re.search(r"\bBool\b", by_name["x"])
+    assert re.search(r"\bBool\b", by_name["y"])
+
+
+def test_extract_policy_request_fixture_lambda_ctx_type_is_A():
+    """
+    Regression guard for dependent binders:
+      foo : {A : Set} → A → A
+      foo = λ x → {!!}
+
+    The reported context must include x : A (not x : x).
+    """
+    out = """
+noise
+AGDAJANG_REQ_BEGIN
+AGDAJANG_GOAL: A
+AGDAJANG_CTX_BEGIN
+AGDAJANG_CTX:0:visible:x: A
+AGDAJANG_CTX:1:hidden:A: Set₀
+AGDAJANG_REQ_END
+more noise
+"""
+    req = extract_policy_request_from_output(out)
+    assert req is not None
+    by_name = {e["name"]: e["type"] for e in req["context"]}
+    assert by_name["x"].strip() == "A"
+    assert by_name["A"].strip().startswith("Set")

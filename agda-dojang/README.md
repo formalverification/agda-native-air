@@ -76,13 +76,18 @@ agda-jang
 │       └── Refine.agda        -- macros for attempting to fill a hole with candidate term
 └── python
     ├── tests
-    │   ├── test_rendering.py      -- tests for the rendering.py utilities
-    │   └── test_report_parser.py  -- log parser that reads AgdaJang’s reporting macros output
+    │   ├── test_agent_bridge.py                -- tests for agent bridge utils in agent_bridge.py.
+    │   ├── test_eval_fixture_policy_request.py -- tests policy request in eval_fixtures.py has right shape/content
+    │   ├── test_policy_contract.py             -- tests policy contract in policy_contract.py
+    │   ├── test_policy_fixture.py              -- tests policy fixture in policy_fixture.py adheres to contract
+    │   ├── test_rendering.py                   -- tests for the rendering.py utilities
+    │   └── test_report_parser.py               -- tests log parser that reads AgdaJang’s reporting macros output
     ├── tools
     │   ├── agent_bridge.py    -- tiny deterministic "report → policy → patch → check" loop
     │   ├── eval_fixtures.py   -- deterministic Agda-check evaluator + fixtures scoreboard
     │   ├── jang_extract.py    -- AgdaJang trace extractor
     │   ├── jang_try.py        -- AgdaJang probe & tactics runner
+    │   ├── policy_contract.py -- canonical, versioned request/response contract for policy backends
     │   ├── policy_fixture.py  -- simple deterministic policy backend for tests and demos
     │   ├── prompt_baseline.py -- turn list of tasks into list of (context, goal, completion) attempts
     │   ├── report_parser.py   -- parsing of Agda subgoal reports from stderr
@@ -92,6 +97,7 @@ agda-jang
         ├── file_ops.py        -- functional wrappers for file system operations
         ├── rendering.py       -- pure rendering helpers for building scratch modules
         ├── result.py          -- tiny Result type
+        ├── run_unittests.py   -- pretty-ish unittest runner (stdlib only)
         └── types.py           -- data classes for config, command results, errors, reports
 ```
 
@@ -335,6 +341,122 @@ For `schemaVersion = eval-proof-completion.v0`, consumers may rely on:
 *AgdaJang is intentionally minimal today, but designed to grow alongside the agents that use it.*
 
 ---
+
+## Appendix
+
+### Tutorial: TC monad, macros and Kleisli arrows (for a category theorist)
+
+
+#### What the `TC` monad *is*
+
+Agda's reflection API runs during typechecking. The typechecker maintains (at least)
+
++  the **local context** Γ (bound variables, their types, visibility, modalities),
++  the **signature** (global definitions),
++  the **meta-variable store** (holes, constraints, unification problems),
++  the current **goal** / expected type,
++  and it can fail with a structured error message (`typeError`).
+
+A *reflection computation* is therefore not a pure function; it's an effectful computation that can
+
++  *read* Γ (`getContext`),
++  *query* types (`inferType`),
++  *normalise* (`normalise`),
++  and *abort* with a message (`typeError`).
+
+So Agda packages *typechecker effects* into a monad with
+
++  **objects**: Agda types `A : Set ℓ`
++  **morphisms**: `A → TC B` (Kleisli arrows)
++  **unit**: `returnTC : A → TC A`
++  **bind**: `bindTC` (denoted by `_>>=_`)
+
+Categorically, `TC` is a monad on the category of Agda types/terms whose Kleisli category is "programs that can consult/modify the typechecking state and fail."
+
+
+#### What these macros *do*
+
+A **`macro`** in Agda is a compile-time program (in `TC`) that Agda runs while elaborating terms.
+
+In AgdaJang, the macros are **instrumentation**;
+
++  they compute info about the goal and context;
++  then intentionally stop compilation by throwing a `typeError` whose payload contains stable markers.
+
+That is why the evaluator sees:
+
+```
+error: [GenericDocError]
+AGDAJANG_REQ_BEGIN
+...
+AGDAJANG_REQ_END
+```
+
+We're using Agda's error channel as a "structured side-channel" to export `{goal, context}`.
+
+### An Aside: `do` vs `>>=` (bind)
+
+In Agda, a `do _ ← _` block is syntactic sugar for chaining `>>=`; for example,
+
+```agda
+reportGoalCtx hole = do
+  goalTy  ← inferType hole
+  goalNF  ← normalise goalTy
+  goalStr ← formatErrorParts (termErr goalNF ∷ [])
+  ...
+```
+
+desugars (morally) to
+
+```agda
+reportGoalCtx hole =
+  inferType hole >>= λ goalTy →
+  normalise goalTy >>= λ goalNF →
+  formatErrorParts (termErr goalNF ∷ []) >>= λ goalStr →
+  ...
+```
+
+So `do` is just syntax for composing Kleisli arrows using bind.
+
+### Kleisli arrows: composition of effectful maps
+
+A Kleisli arrow is a map `A → TC B`. Given
+
+* `f : A → TC B`
+* `g : B → TC C`
+
+their Kleisli composite is:
+
+```agda
+(f >=> g) : A → TC C
+(f >=> g) a = f a >>= g
+```
+
+That's exactly the operator we used:
+
+```agda
+(inferType >=> normalise >=> termToString) hole
+```
+
+Interpretation: "infer the type, then normalise it, then pretty print it, all inside the TC effects."
+
+### Why `do` and Kleisli composition are *the same*
+
++  `do` is *notation* for sequencing binds;
++  Kleisli composition is a *categorical packaging* of the same sequencing;
++  Both express associativity/unit laws of the monad, just at different levels of abstraction.
+
+In our code,
+
++  `mkCtxParts` is sequencing `normalise`, `formatErrorParts`, recursion, then `returnTC`;
++  `reportGoalCtx` is sequencing `inferType`, `normalise`, `formatErrorParts`, `getContext`, `mkCtxParts`, then `typeError`.
+
+All of those are "paths" in the Kleisli category of `TC`.
+
+
+---
+
+
 
 ## See Also
 

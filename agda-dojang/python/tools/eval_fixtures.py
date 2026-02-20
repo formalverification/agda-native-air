@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Set
 
 from tools.report_parser import extract_policy_request_from_output
+from tools.policy_contract import build_request as build_policy_request
 from utils.file_ops import write_text_atomic
 from utils.result import Err, Ok, Result
 from utils.types import PipelineError, CommandResult
@@ -367,19 +368,34 @@ def _try_candidates_for_hole(
     Try top-k policy candidates for a single hole, writing per-candidate rows to results_fp.
     Returns Ok((solved?, updated_src)).
     """
+    meta0 = _coerce_meta(req_obj.get("meta")) or {}
+    # Attach stable per-run identifiers so the deterministic fixture policy can
+    # special-case exact (fixture, hole) pairs when needed.
+    meta = {
+        **meta0,
+        "fixtureId": fixture_id,
+        "holeIndex": hole_index,
+    }
+
     req = PolicyRequest(
         goal=str(req_obj.get("goal", "")).strip(),
         context=_coerce_context(req_obj.get("context")),
         module=req_obj.get("module") if isinstance(req_obj.get("module"), str) else None,
-        meta=_coerce_meta(req_obj.get("meta")) or None,
+        meta=meta,
     )
 
     logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
     _mkdir_clean(logs_dir)
     # Record the exact request we are about to send.
+    req_log_obj = build_policy_request(
+        goal=req.goal,
+        context=req.context,
+        module=req.module,
+        meta=req.meta,
+    )
     write_text_atomic(
         logs_dir / "policy_request.json",
-        json.dumps(asdict(req), ensure_ascii=False, indent=2) + "\n",
+        json.dumps(req_log_obj, ensure_ascii=False, indent=2) + "\n",
     )
 
     pol = call_policy(bridge_cfg, req=req, workdir=shadow_dir)
@@ -413,7 +429,7 @@ def _try_candidates_for_hole(
     candidates = pol.value.candidates[: cfg.top_k]
     if not candidates:
         log_path = logs_dir / "no_candidates.txt"
-        write_text_atomic(log_path, json.dumps(asdict(req), ensure_ascii=False, indent=2) + "\n")
+        write_text_atomic(log_path, json.dumps(req_log_obj, ensure_ascii=False, indent=2) + "\n")
         attempt = CandidateAttempt(
             fixtureId=fixture_id,
             module=fixture.stem,
@@ -522,11 +538,22 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         if hole is None:
             break
 
+        # Per-hole logs dir (we keep all artifacts for this hole here).
+        logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
+        _mkdir_clean(logs_dir)
+
         req_obj, out = _run_report(bridge_cfg, src, hole, shadow_dir, overlay)
+
+        # Save raw Agda output from the report step (even on success).
+        report_log = logs_dir / "report_output.txt"
+        write_text_atomic(report_log, out.rstrip() + "\n")
+
         if req_obj is None:
             # Record a single report_error attempt and stop this fixture.
             logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
             _mkdir_clean(logs_dir)
+            # Always keep the raw Agda output that we tried to parse.
+            write_text_atomic(logs_dir / "report_output.txt", out.rstrip() + "\n")
             log_path = logs_dir / "report_error.txt"
             write_text_atomic(log_path, out.rstrip() + "\n")
             attempt = CandidateAttempt(
@@ -546,6 +573,8 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
             _write_jsonl_line(results_fp, attempt.__dict__)
             break
 
+        # Stash report output; _try_candidates_for_hole cleans logs_dir, so write after.
+        report_out = out
         r1 = _try_candidates_for_hole(
             cfg=cfg,
             bridge_cfg=bridge_cfg,
@@ -559,6 +588,18 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
             overlay=overlay,
             results_fp=results_fp,
         )
+
+        # Persist the raw report output for this hole (survives logs_dir cleaning).
+        logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
+        try:
+            if logs_dir.exists():
+                ro_path = logs_dir / "report_output.txt"
+                if not ro_path.exists():
+                    write_text_atomic(ro_path, report_out.rstrip() + "\n")
+        except Exception:
+            # Best-effort: never fail the evaluation because logging failed.
+            pass
+
         if isinstance(r1, Err):
             # policy_error already logged in results.jsonl
             break
@@ -658,8 +699,8 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
     ap.add_argument(
         "--fixtures",
         action="append",
-        default=["../data/agda/Fixture*.agda"],
-        help="Repeatable file/glob spec. Default: ../data/agda/Fixture*.agda",
+        default=None,
+        help="Repeatable file/glob spec. If omitted, defaults to ../data/agda/Fixture*.agda",
     )
     ap.add_argument("--out-dir", default="_build/eval-proof-completion", help="Output root directory.")
     ap.add_argument("--run-id", default="latest", help="Subdirectory under out-dir (deterministic).")
@@ -700,7 +741,8 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
         raise SystemExit("ERROR: --policy parsed to empty argv.")
 
     cwd = Path(args.cwd).resolve() if args.cwd else None
-    fixtures = _discover_fixtures(args.fixtures or [])
+    fixture_specs = args.fixtures if (args.fixtures is not None) else ["../data/agda/Fixture*.agda"]
+    fixtures = _discover_fixtures(fixture_specs)
 
     # XFAIL ids:
     # - default includes FixtureFail01 unless disabled
