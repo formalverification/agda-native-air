@@ -119,6 +119,37 @@ help:
 
 # ------------------------------------------------------------------------------
 
+# --- Makefile Hygiene --------------------------------------------------------
+# Probe all PROBE targets: try all declared targets, keep going, write a
+# summary. Usage: make probe-all PROBE_JOBS=1 (or higher, but start at 1)
+PROBE_JOBS ?= 1
+PROBE_TARGETS := check peek-extract test-python-unittest test-python \
+                 eval-proof-completion eval-proof-completion-smoke demo-agent-bridge \
+                 extract demo demo1 demo2 rows help tree transform solve test
+
+LOG_DIR := probe-logs
+probe-all:
+	@mkdir -p "$(LOG_DIR)"
+	@echo "→ probe-all: attempting (almost) all targets; logs in $(LOG_DIR)"
+	@set +e; \
+	fail=0; \
+	for t in $(PROBE_TARGETS); do \
+	  echo "------------------------------------------------------------"; \
+	  echo ">>> make $$t"; \
+	  log="$(LOG_DIR)/probe.$$t.log"; \
+	  $(MAKE) --no-print-directory $$t >"$$log" 2>&1; \
+	  rc="$$?"; \
+	  if [ "$$rc" -ne 0 ]; then \
+	    echo "✖ $$t (rc=$$rc)"; \
+	    tail -n 30 "$$log" || true; \
+	    fail=1; \
+	  else \
+	    echo "✓ $$t"; \
+	  fi; \
+	done; \
+	exit "$$fail"
+
+
 # 0) Compile-time health check for our Agda macros
 check:
 	$(AGDA) $(AGDA_FLAGS) $(AGDA_DIR)/AgdaJang/Everything.agda
