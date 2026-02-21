@@ -40,7 +40,7 @@
 # --- Tools / flags (overridable via environment) ---
 AGDA            ?= agda
 AGDA_DIR        := agda
-HAVE_IFACE_DIR  := $(shell agda --help 2>/dev/null | grep -q -- '--interface-dir' && echo yes || echo no)
+HAVE_IFACE_DIR  := $(shell $(AGDA) --help 2>/dev/null | grep -q -- '--interface-dir' && echo yes || echo no)
 AGDA_IFACE_DIR  ?= _build/agda
 BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-jang
 AGDA_FLAGS      := $(BASE_AGDA_FLAGS) $(if $(filter $(HAVE_IFACE_DIR),yes),--interface-dir=$(AGDA_IFACE_DIR),)
@@ -87,7 +87,8 @@ ROWS_IN  := $(REPO_ROOT)/data/tasks.jsonl
 ROWS_OUT := $(REPO_ROOT)/data/rows.jsonl
 
 .PHONY: help check demo demo1 demo2 extract transform solve test \
-        clean clean-scratch clean-pycache clean-agda clean-build clean-data \
+        eval-proof-completion demo-proof-completion eval-proof-completion-smoke demo-agent-bridge \
+        probe-all clean clean-scratch clean-pycache clean-agda clean-build clean-data \
         wipe tree peek-extract
 
 
@@ -103,6 +104,12 @@ help:
 	@echo "  make check        - Type-check AgdaJang macros"
 	@echo "  make demo1        - Run simple candidate: suc zero : Nat"
 	@echo "  make demo2        - Run reporting tactic: applyReport:_+_"
+	@echo ""
+	@echo "Proof-completion demo:"
+	@echo "  make eval-proof-completion        - Evaluate fixtures via report→policy→Agda-check"
+	@echo "  make demo-proof-completion        - Alias for eval-proof-completion"
+	@echo "  make eval-proof-completion-smoke  - Fast smoke run on a tiny fixture"
+	@echo "  make demo-agent-bridge            - Bridge sanity check on FixtureHoles"
 	@echo ""
 	@echo "End-to-end loop (toy example):"
 	@echo "  make extract      - Agda → JSON (AGDA2TRAIN-style) at $(RAW_JSON)"
@@ -221,9 +228,9 @@ demo-proof-completion: eval-proof-completion
 # 2.3) A smoke test with tighter limits for quick feedback (e.g., in CI).
 eval-proof-completion-smoke:
 	$(MAKE) eval-proof-completion \
-	  EVAL_FIXTURES="$(FIXTURE_DIR)/Fixture01.agda" \
+	  EVAL_FIXTURES="$(FIXTURE_DIR)/FixtureLambda.agda" \
 	  EVAL_RUN_ID=smoke \
-	  EVAL_MAX_HOLES=2 EVAL_K=3 EVAL_TIMEOUT=10
+	  EVAL_MAX_HOLES=1 EVAL_K=3 EVAL_TIMEOUT=10
 
 # 3) Extract: produce intermediate JSON from an example Agda file
 #    WHY: Stabilize a canonical intermediate we can diff/test before transforming.
@@ -274,7 +281,7 @@ transform:
 	  exit 1; \
 	fi
 	cd $(TRANSFORM_DIR) && \
-	  $(SBT) 'runMain proofparser.Agda2TrainTransformer ../data/agda-example.json ../data/train.jsonl'
+	  $(SBT) 'runMain proofparser.transform.Agda2TrainTransformer ../data/agda-example.json ../data/train.jsonl'
 	@echo "✅ Wrote $(TRAIN_JSONL)"
 
 # 5) Solve: tiny benchmark loop (stub-friendly)

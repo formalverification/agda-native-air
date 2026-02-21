@@ -38,6 +38,7 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import shutil
 import sys
 import time
@@ -657,7 +658,7 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
     return Ok(summary)
 
 
-def _print_scoreboard(summaries: List[FixtureSummary]) -> None:
+def _format_scoreboard(summaries: List[FixtureSummary]) -> str:
     # Simple deterministic text output; no external deps.
     def final_cell(s: FixtureSummary) -> str:
         o = (s.evalOutcome or s.finalStatus or "").strip()
@@ -683,11 +684,88 @@ def _print_scoreboard(summaries: List[FixtureSummary]) -> None:
         ],
     ]
     colw = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    lines: List[str] = []
     for j, r in enumerate(rows):
         line = "  ".join(r[i].ljust(colw[i]) for i in range(len(r)))
-        print(line)
+        lines.append(line)
         if j == 0:
-            print("  ".join("-" * colw[i] for i in range(len(r))))
+            lines.append("  ".join("-" * colw[i] for i in range(len(r))))
+    return "\n".join(lines)
+
+def _print_scoreboard(summaries: List[FixtureSummary]) -> None:
+    print(_format_scoreboard(summaries))
+
+def _compute_report_stats(cfg: EvalConfig, summaries: List[FixtureSummary]) -> Dict[str, Any]:
+    num_goals = sum(int(s.holesTotal) for s in summaries)
+    num_typechecked = sum(int(s.holesSolved) for s in summaries)
+    success_rate = (num_typechecked / num_goals) if num_goals else 0.0
+    return {
+        "numGoals": num_goals,
+        "k": int(cfg.top_k),
+        "numTypechecked": num_typechecked,
+        "successRate": success_rate,
+    }
+
+
+def _render_command_block() -> str:
+    """
+    Best-effort: render the *actual* invocation of this script (argv),
+    prefixed with PYTHONPATH if set.
+    """
+    py_path = os.environ.get("PYTHONPATH")
+    prefix = f"PYTHONPATH={shlex.quote(py_path)} " if py_path else ""
+
+    # sys.argv[0] is the script path as invoked (often python/tools/eval_fixtures.py)
+    parts = [shlex.quote(sys.executable), shlex.quote(sys.argv[0])] + [shlex.quote(a) for a in sys.argv[1:]]
+    if not parts:
+        return ""
+
+    # Render one-arg-per-line for readability.
+    if len(parts) == 1:
+        return prefix + parts[0]
+
+    lines = [prefix + f"{parts[0]} {parts[1]} \\"]
+    rest = parts[2:]
+    for i, a in enumerate(rest):
+        is_last = (i == len(rest) - 1)
+        suffix = "" if is_last else " \\"
+        lines.append(f"  {a}{suffix}")
+    return "\n".join(lines)
+
+
+def _write_reports(cfg: EvalConfig, summaries: List[FixtureSummary]) -> None:
+    """
+    Write report.json + report.md under out-dir/run-id.
+    Best-effort: should never fail the evaluation if writing reports fails.
+    """
+    try:
+        root = _work_root(cfg)
+        stats = _compute_report_stats(cfg, summaries)
+        scoreboard = _format_scoreboard(summaries)
+        cmd_block = _render_command_block()
+
+        # JSON report (machine-readable)
+        report_json = json.dumps(stats, ensure_ascii=False, indent=2) + "\n"
+        write_text_atomic(root / "report.json", report_json)
+
+        # Markdown report (human-readable)
+        pct = round(float(stats["successRate"]) * 100.0)
+        md = []
+        md.append("# Proof Completion Report\n")
+        md.append("## Statistics\n")
+        md.append(f"+ `numGoals`: {stats['numGoals']}\n")
+        md.append(f"+ `k`: {stats['k']}\n")
+        md.append(f"+ `numTypechecked`: {stats['numTypechecked']}\n")
+        md.append(f"+ `successRate`: {pct}%\n")
+        md.append("\n## Commands\n\n```bash\n")
+        md.append(cmd_block.rstrip() + "\n")
+        md.append("```\n")
+        md.append("\n## Report Card\n\n```\n")
+        md.append(scoreboard.rstrip() + "\n")
+        md.append("```\n")
+        write_text_atomic(root / "report.md", "".join(md))
+    except Exception:
+        return
 
 
 # =============================================================================
@@ -824,6 +902,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     _print_scoreboard(summaries)
     print(f"\nWrote: {results_path}")
     print(f"Wrote: {fixtures_path}")
+
+    # Write aggregated reports (best-effort)
+    _write_reports(cfg, summaries)
 
     unexpected = [s for s in summaries if s.evalOutcome == "fail"]
     xpasses = [s for s in summaries if s.evalOutcome == "xpass"]
