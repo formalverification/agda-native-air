@@ -336,9 +336,13 @@ def _oracle_by_fixture_hole(req: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
     # Fill this as needed once you see the remaining failing (fixture, hole) pairs.
-    # Example shape:
-    # if (fixture_id, hole_index) == ("Fixture01", 0):
-    #     return [{"term": "someKnownProof", "score": 1.30, "meta": {"rule": "oracle-by-fixture-hole"}}]
+    # Example: match on (fixture_id, hole_index); e.g.,
+    #   `if (fixture_id, hole_index) == ("Fixture01", 0):`
+    # Each candidate dict should have at least:
+    #   - "term":  the proposed Agda term (string)
+    #   - "score": a numeric ranking score
+    #   - "meta":  e.g. {"rule": "oracle-by-fixture-hole"}
+    # E.g., `return [{"term": "someKnownProof", "score": 1.30, "meta": {"rule": "oracle-by-fixture-hole"}}]`
     return []
 
 
