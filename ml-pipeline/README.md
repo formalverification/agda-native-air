@@ -8,6 +8,24 @@ Its purpose is to take the **structured, semantically informed datasets** produc
 
 MLPipe is intentionally modular and research-oriented; it is designed to support experimentation with different data representations, learning objectives, and model architectures, rather than to lock the project into a single ML stack or approach.
 
+
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [Role in the Overall System](#role-in-the-overall-system)
+- [Design Principles](#design-principles)
+- [Pipeline Overview](#pipeline-overview)
+- [Stage 1: Input (JSONL datasets produced by ProofParser)](#stage-1-input-jsonl-datasets-produced-by-proofparser)
+- [Stage 2: ETL and Feature Engineering (Scala / Spark)](#stage-2-etl-and-feature-engineering-scala--spark)
+- [Stage 3: Training and Evaluation (Python / PyTorch)](#stage-3-training-and-evaluation-python--pytorch)
+- [Stage 4: Inference and Serving](#stage-4-inference-and-serving)
+- [Running MLPipe](#running-mlpipe)
+- [Research Notes and Future Directions](#research-notes-and-future-directions)
+- [See Also](#see-also)
+
+<!-- markdown-toc end -->
+
+
 ---
 
 ## Role in the Overall System
@@ -51,7 +69,7 @@ Each stage can be run independently.
 
 ---
 
-## 1) Input: JSONL datasets produced by ProofParser
+## Stage 1: Input (JSONL datasets produced by ProofParser)
 
 This is the pre-ETL stage and is the responsibility of the `agda-backend-jsonl` and
 `ProofParser` components of the project; see:
@@ -61,8 +79,7 @@ This is the pre-ETL stage and is the responsibility of the `agda-backend-jsonl` 
 
 ---
 
-
-## 2) ETL and Feature Engineering (Scala / Spark)
+## Stage 2: ETL and Feature Engineering (Scala / Spark)
 
 ### Why Scala and Spark?
 
@@ -86,9 +103,15 @@ ETL jobs perform tasks such as
 
 The output is typically written in **Parquet** format for efficiency and reproducibility.
 
----
+### Proof-completion training dataset builder (Phase 1)
 
-### Proof-completion dataset builder (Phase 1) — `proof-completion.v0`
+This is the ETL stage where we consume existing Agda libraries and extract
+proof-completion training data sets from them.
+
+(This is distinct from the
+[Proof completion demo](#proof-completion-demo-phase-1-propose--agda-check)
+in Stage 4 below, which proposes and verifies proofs to fill holes in incomplete Agda
+files.)
 
 MLPipe includes a small, deterministic dataset builder that converts
 **canonical Agda definition rows** (from the extractor's "Full" JSONL) into a
@@ -134,7 +157,7 @@ sbt -batch "project etl" \
 
 ---
 
-## 3) Training and Evaluation (Python / PyTorch)
+## Stage 3: Training and Evaluation (Python / PyTorch)
 
 ### Model Training
 
@@ -160,7 +183,7 @@ The goal is not to optimize leaderboards, but to understand what information the
 
 ---
 
-## 4) Inference and Serving
+## Stage 4: Inference and Serving
 
 MLPipe includes early-stage support for model serving.
 
@@ -176,6 +199,19 @@ This server is intended to be called by interactive components such as AgdaJang,
 
 See [agda-jang/README](https://github.com/formalverification/agda-ai-prover/blob/85-agda-check-evaluator-fixtures/agda-jang/README.md#policy-fixturepy)
 
+#### Proof completion demo (Phase 1: propose → Agda-check)
+
+Two canonical commands:
+
+```bash
+# Full fixture evaluation (writes logs + JSONL + report.json/report.md)
+make eval-proof-completion
+
+# Fast smoke run (single tiny fixture; good for CI/local sanity checks)
+make -C agda-jang eval-proof-completion-smoke
+```
+
+These commands currently run Python tooling inside the `agda-jang` subproject because the evaluation loop depends on the AgdaJang *reflection macros* (to extract goal + local context) and the AgdaJang library setup (pinned stdlib, library-file, include paths). The ML pipeline consumes the resulting artifacts (goal/context requests, candidate attempts, aggregate reports) as inputs to later dataset-building and model work.
 
 ---
 
@@ -200,7 +236,6 @@ This provides Python, Scala, Spark, and all required dependencies.
 From the repository root:
 
 ``` bash
-```sh
 # Enter default Nis devShell:
 nix develop
 
@@ -225,7 +260,7 @@ outputs in `ml-pipeline/data/agda-algebras/{train,test}.parquet`.
 
 Finally, confirm the Parquet has the **new columns** and **rows > 0**:
 
-```sh
+```bash
 python - <<'PY'
 import os, glob
 import pyarrow.parquet as pq
@@ -248,7 +283,7 @@ PY
 
 What success looks like:
 
-``` bash
+```bash
 train.parquet rows= 61 missing= []
 test.parquet rows= 4 missing= []
 OK
@@ -256,7 +291,6 @@ OK
 
 This proves: Agda extraction → sample JSONL → Spark ETL is wired and produces both
 string and structural fields.
-
 
 ---
 
@@ -353,7 +387,7 @@ $ make smoke
 ---
 
 ### Other Common Tasks
- 
+
 Run `make help` for additional targets and configuration options.
 
 ---
