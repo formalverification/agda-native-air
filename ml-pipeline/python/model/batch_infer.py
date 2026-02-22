@@ -1,14 +1,20 @@
 """
 batch_infer.py
 
-File: agda-ai-prover/ml-pipeline/python/model/batch_infer.py
+File: ml-pipeline/python/model/batch_infer.py
 
-Purpose
--------
+Description:
   Performs batch inference using a pre-trained TorchScript model.
-  It reads input features from a Parquet file, makes predictions, and
-  writes the results to a CSV file.
-  Assumes the Parquet file has columns 'feature1' and 'feature2'.
+
+  This is a simple script to load a trained TorchScript model and run batch inference
+  on a Parquet file of features, saving the predictions back to a new CSV file.
+
+  It reads input features from a Parquet file, makes predictions, and writes the
+  results to a CSV file.
+
+  It assumes the input Parquet file is at "features/test.parquet" and contains
+  columns 'feature1' and 'feature2'. The output CSV file will be saved as
+  "features/test_with_preds.csv" with an additional 'prediction' column.
 """
 
 import torch

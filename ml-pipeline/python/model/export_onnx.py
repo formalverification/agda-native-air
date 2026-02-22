@@ -1,9 +1,11 @@
 """
 export_onnx.py
 
-File: agda-ai-prover/ml-pipeline/model/export_onnx.py
-Purpose: Exports a trained PyTorch model to the ONNX format.
+File: ml-pipeline/python/model/export_onnx.py
 
+Description:
+  A simple script to load a trained PyTorch model and export it as an ONNX file
+  for interoperability with other frameworks.
 """
 
 import torch

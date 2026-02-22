@@ -3,8 +3,7 @@ main.py
 
 File: agda-ai-prover/ml-pipeline/python/api/main.py
 
-Purpose
--------
+Description:
   This module sets up a FastAPI application that loads a pre-trained
   PyTorch model and provides an endpoint for making predictions based on
   input data.

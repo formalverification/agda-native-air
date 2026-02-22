@@ -1,17 +1,19 @@
 """
 build_finetune_dataset.py
-=========================
 
 File: ml-pipeline/python/model/build_finetune_dataset.py
 
-Purpose
--------
+Description:
+  A script to convert a filtered AgdaData JSONL dataset into a
+  fine-tuning-ready JSONL file with instruction/input/output triples.
 
-This module converts a filtered AgdaData JSONL dataset into a
-*fine-tuning-ready* JSONL file suitable for instruction-tuning or
-supervised learning.
 
-Each output record is a JSON object with the following fields:
+Purpose:
+  This module converts a filtered AgdaData JSONL dataset into a
+  *fine-tuning-ready* JSONL file suitable for instruction-tuning or
+  supervised learning.
+
+  Each output record is a JSON object with the following fields:
 
     {
       "instruction": "<natural-language instruction>",
@@ -19,19 +21,17 @@ Each output record is a JSON object with the following fields:
       "output":      "<proof term or RHS>"
     }
 
-The aim is to move from a *schema tuned to extraction* (Agda-specific
-fields like `file`, `module`, `name`, `agdaType`, `proof`) to a
-*schema tuned to language models*, which expect textual (instruction,
-input, output) triples.
+  The aim is to move from a *schema tuned to extraction* (Agda-specific
+  fields like `file`, `module`, `name`, `agdaType`, `proof`) to a
+  *schema tuned to language models*, which expect textual (instruction,
+  input, output) triples.
 
-Expected Input Schema
----------------------
+Expected Input Schema:
+  We accept either
+  +  canonical backend rows (`type`, `body`, `prettyQname`, ...)
+  +  legacy extractor rows (`agdaType`, `proof`, ...)
 
-We accept either:
-  - canonical backend rows (`type`, `body`, `prettyQname`, ...)
-  - legacy extractor rows (`agdaType`, `proof`, ...)
-
-Typically the input is produced by `filter_jsonl.py`.
+  Typically the input is produced by `filter_jsonl.py`.
 
     {
       "file":      "...",   # optional
@@ -42,40 +42,36 @@ Typically the input is produced by `filter_jsonl.py`.
       ...
     }
 
-Missing fields are handled gracefully; we only require `proof` to be
-present (or at least convertable to string).
+  Missing fields are handled gracefully; we only require `proof` to be
+  present (or at least convertable to string).
 
-Command-Line Usage
-------------------
-
-From the repository root:
+Command-Line Usage:
+  From the repository root:
 
     python -m ml_pipeline.python.model.build_finetune_dataset \\
         --input data/train-stdlib-2.2.filtered.jsonl \\
         --out   data/train-stdlib-2.2.finetune.jsonl
 
-Or via Make (recommended):
+  Or via Make (recommended):
 
     make finetune-dataset
 
-which will call this script with the appropriate paths.
+  which will call this script with the appropriate paths.
 
-Design Notes
-------------
+Design Notes:
+  -  The `instruction` string is intentionally simple and generic:
+     "Complete the Agda proof for the following type."
+     You can later parameterize this by module or library.
+  -  The `input` field combines optional `module` and `name` information
+     with the `agdaType`, separated by blank lines. This gives the model
+     more context without forcing a particular Agda syntax representation.
+  -  We use a **list comprehension** to produce the sequence of output
+     records; this is close to a functional `map`, and avoids imperative
+     row-by-row mutation.
 
-- The `instruction` string is intentionally simple and generic:
-  "Complete the Agda proof for the following type."
-  You can later parameterize this by module or library.
-- The `input` field combines optional `module` and `name` information
-  with the `agdaType`, separated by blank lines. This gives the model
-  more context without forcing a particular Agda syntax representation.
-- We use a **list comprehension** to produce the sequence of output
-  records; this is close to a functional `map`, and avoids imperative
-  row-by-row mutation.
-
-If you later want multiple *task flavors* (e.g. “predict premises”
-vs “complete proof”), this script is a good place to add them, perhaps
-with a `--task` CLI flag.
+  If we later want multiple *task flavors* (e.g. "predict premises"
+  vs "complete proof"), this script is a good place to add them, perhaps
+  with a `--task` CLI flag.
 """
 
 from __future__ import annotations

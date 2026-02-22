@@ -1,4 +1,10 @@
 #!/usr/bin/env sh
+#
+# venv-gpu.sh
+#
+# File: ml-pipeline/python/scripts/venv-gpu.sh
+#
+# Description: Create a Python virtual environment with PyTorch and CUDA support.
 set -euo pipefail
 ENV_DIR="${1:-$HOME/venvs/aap-gpu}"
 PY="${PYTHON:-python3}"

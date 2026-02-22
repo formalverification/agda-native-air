@@ -3,11 +3,12 @@ inspect_runtime.py
 
 File: agda-ai-prover/ml-pipeline/python/scripts/inspect_runtime.py
 
-Purpose
--------
-  Prints information about the Python runtime and torch installation.
-  Used by the Makefile for debugging environment + GPU/CPU status.
+Description:
+  Utility script to inspect and print the runtime environment, including Python
+  version, torch installation, and CUDA availability. Useful for debugging issues in
+  different deployment environments (e.g. local dev vs cloud).
 
+  Used by the Makefile for debugging environment + GPU/CPU status.
 """
 import sys
 print(f"Python executable : {sys.executable}")

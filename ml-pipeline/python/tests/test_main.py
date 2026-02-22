@@ -1,12 +1,20 @@
 """
 test_main.py
 
-File: agda-ai-prover/ml-pipeline/python/api/test_main.py
+File: ml-pipeline/python/tests/test_main.py
 
-Purpose
--------
-  Unit tests for the FastAPI application defined in main.py,
-  specifically testing the prediction endpoint.
+Description:
+  Unit tests for the FastAPI application defined in ../api/main.py, focusing on the
+  /predict endpoint.  Uses pytest and FastAPI's TestClient to simulate requests to
+  the API.  The test includes a dummy model to avoid dependencies on the actual model
+  file, allowing the test to run even if the model has not been created yet.
+
+Usage:
+  From the repository root, run:
+    pytest -v ml-pipeline/python/tests/test_main.py
+
+  or via Make:
+    make test-ml-pipeline
 """
 
 from fastapi.testclient import TestClient

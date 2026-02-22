@@ -1,20 +1,21 @@
 """
 test_dataset_pipeline.py
-========================
 
 File: ml-pipeline/python/tests/test_dataset_pipeline.py
 
-Purpose
--------
+Description:
+  Tests for the dataset processing pipeline, including filtering and finetune
+  dataset building.  Ensures that the filter accepts both canonical and legacy
+  formats and that the finetune dataset builder produces the expected
+  instruction/input/output format.
 
-Tests for dataset filtering and finetune dataset building.
+Usage:
+  From the repository root, run:
 
-Usage
------
-
-From the repository root, run:
     pytest -v ml-pipeline/python/tests/test_dataset_pipeline.py
-or via Make:
+
+  or via Make:
+
     make test-ml-pipeline
 """
 

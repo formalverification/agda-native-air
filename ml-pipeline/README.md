@@ -69,6 +69,70 @@ Each stage can be run independently.
 
 ---
 
+## Directory Structure
+
+### Main Directories
+
++ `etl`: Scala/Spark ETL programs.
++ `python`: Python modeling and training programs.
++ `scripts`: various utility scripts.
+
+### Scala/Spark Programs
+
+These are in `ml-pipeline/etl/src/main/scala/etl`.
+
++ `BuildProofCompletionDataset.scala`: builds proof-completion dataset from Agda definition rows.
++ `PreprocessAgda.scala`: preprocesses Agda backend JSONL to Parquet.
++ `PreprocessAgdaSchema.scala`: schema for preprocessed Agda definitions.
+
+### Python Programs
+
+These are under `ml-pipeline/python`.
+
+
++  `conftest.py`: Pytest configuration for the ml-pipeline project.
++  `requirements.txt`: Python package dependencies.
++  `api/main.py`: sets up FastAPI app; loads pre-trained PyTorch model; endpoint for making predictions.
++  `model/`
+
+   +  `batch_infer.py` performs batch inference using a pre-trained TorchScript model.
+
+   +  `build_finetune_dataset.py` converts a filtered AgdaData JSONL dataset into a
+      fine-tuning-ready JSONL file with instruction/input/output triples.
+
+   +  `export_onnx.py` loads a trained PyTorch model and exports it as ONNX file.
+
+   +  `export_script.py` loads a trained PyTorch model and exports it as TorchScript file.
+
+   +  `filter_jsonl.py` reads a JSON Lines (JSONL) file containing records, applies
+      a few simple *schema-aware* filters, writes the filtered result back as JSONL.
+
+   +  `train.py` is a PyTorch training script; reads data from Parquet file; trains
+      basic MLP model; saves trained model.
+
+   +  `train_retrieval.py` builds a deterministic retrieval artifact for
+      `agda-jang/python/tools/policy_retrieval.py`.
+
++  `scripts/inspect_runtime.py`: inspect and print the runtime environment.
+
++  `tests/`
+
+   + `test_dataset_pipeline.py`
+   + `test_main.py`
+
+
+### Miscellaneous Scripts
+
+These are in `ml-pipeline/scripts`.
+
++ `run_etl.sh`:
++ `start_server.sh`:
++ `train_model.sh`:
++ `venv-gpu.sh`:
+
+---
+
+
 ## Stage 1: Input (JSONL datasets produced by ProofParser)
 
 This is the pre-ETL stage and is the responsibility of the `agda-backend-jsonl` and

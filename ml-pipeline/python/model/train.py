@@ -1,15 +1,13 @@
 """
 train.py
 
-File: agda-ai-prover/ml-pipeline/python/model/train.py
+File: ml-pipeline/python/model/train.py
 
-Purpose
--------
+Description:
   A simple PyTorch training script that reads data from a Parquet file,
   trains a basic MLP model, and saves the trained model.
 
   Assumes the Parquet file has columns 'feature1', 'feature2', and 'label'.
-
 """
 
 from __future__ import annotations
@@ -23,8 +21,6 @@ import pyarrow.parquet as pq
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-
-
 
 # ---------- CLI ----------
 

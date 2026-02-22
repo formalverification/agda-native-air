@@ -1,51 +1,40 @@
 """
 filter_jsonl.py
-===============
 
 File: ml-pipeline/python/model/filter_jsonl.py
 
-Purpose
--------
+Description:
+  This module provides a small command-line tool that:
 
-This module provides a small command-line tool that:
+  1.  Reads a JSON Lines (JSONL) file containing records from either:
+      - the canonical Haskell backend (`agda-json --format full`), or
+      - the legacy Scala extractor (AgdaData-style).
+  2.  Applies a few simple *schema-aware* filters:
+      - Removes rows with very short or missing type/body fields.
+      - Optionally enforces user-provided minimum lengths.
+      - Deduplicates rows based on a stable join key when available (prefer `prettyQname`).
+  3.  Writes the filtered result back as JSONL.
 
-1. Reads a JSON Lines (JSONL) file containing records from either:
-   - the canonical Haskell backend (`agda-json --format full`), or
-   - the legacy Scala extractor (AgdaData-style).
-2. Applies a few simple *schema-aware* filters:
-   - Removes rows with very short or missing type/body fields.
-   - Optionally enforces user-provided minimum lengths.
-   - Deduplicates rows based on a stable join key when available (prefer `prettyQname`).
-3. Writes the filtered result back as JSONL.
+  The goal is to create a saner, more ML-friendly dataset from a noisy or
+  heterogeneous extraction.
 
-The goal is to create a saner, more ML-friendly dataset from a noisy or
-heterogeneous extraction.
+Expected Input Schema:
+  We accept either
+  +  Canonical backend schema (preferred):
+     {
+       "file":      "<relative-or-absolute-path>",
+       "prettyQname":"<stable join key>",
+       "type":      "<pretty-printed type>",
+       "typeAstVersion": "0.3-v0",
+       "typeAst":   { ... },
+       "body":      "<pretty-printed clauses>" | null
+     }
 
+  +  Legacy Scala extractor schema:
+     uses `agdaType` + `proof` instead of `type` + `body`.
 
-Expected Input Schema
----------------------
-
-We accept either schema:
-
-Canonical backend (preferred):
-
-    {
-      "file":      "<relative-or-absolute-path>",
-      "prettyQname":"<stable join key>",
-      "type":      "<pretty-printed type>",
-      "typeAstVersion": "0.3-v0",
-      "typeAst":   { ... },
-      "body":      "<pretty-printed clauses>" | null
-    }
-
-Legacy Scala extractor:
-  uses `agdaType` + `proof` instead of `type` + `body`.
-
-
-Command-line Usage
-------------------
-
-Typical usage from the repository root:
+Command-line Usage:
+  Typical usage from the repository root:
 
     python -m ml_pipeline.python.model.filter_jsonl \\
         --input data/train-stdlib-2.2.jsonl \\
@@ -53,23 +42,20 @@ Typical usage from the repository root:
         --min-type-len 5 \\
         --min-proof-len 5
 
-Or via the Makefile (recommended):
+  Or via the Makefile (recommended):
 
     make filter TRAIN_DATA=data/train-stdlib-2.2.jsonl
 
-which internally invokes this script with the appropriate arguments.
+  which internally invokes this script with the appropriate arguments.
 
-
-Design Notes
-------------
-
-- We prefer **vectorized / column-wise operations** in Pandas whenever
-  possible (functional style on columns instead of row-by-row loops).
-- We *do* use a small amount of mutation (e.g. `df["col"] = ...`).
-  This is explicitly documented where it occurs; it is a pragmatic
-  compromise because the Pandas API is built around in-place
-  transformations, but the operations themselves are still “pure”
-  transformations of entire columns.
+Design Notes:
+  -  We prefer **vectorized / column-wise operations** in Pandas whenever
+     possible (functional style on columns instead of row-by-row loops).
+  -  We *do* use a small amount of mutation (e.g. `df["col"] = ...`).
+     This is explicitly documented where it occurs; it is a pragmatic
+     compromise because the Pandas API is built around in-place
+     transformations, but the operations themselves are still “pure”
+     transformations of entire columns.
 """
 
 from __future__ import annotations

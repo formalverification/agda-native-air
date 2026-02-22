@@ -1,9 +1,14 @@
 """
-Pytest configuration for the ml-pipeline project.
+conftest.py
 
-Ensures that the `python/` directory is on sys.path so that imports like
-`from api.main import app` work when running pytest from the `ml-pipeline`
-root (as done in CI and `make test-ml-pipeline`).
+File: ml-pipeline/python/conftest.py
+
+Description:
+  Pytest configuration for the ml-pipeline project.
+
+  Ensures that the `python/` directory is on sys.path so that imports like
+  `from api.main import app` work when running pytest from the `ml-pipeline`
+  root (as done in CI and `make test-ml-pipeline`).
 """
 
 import sys
