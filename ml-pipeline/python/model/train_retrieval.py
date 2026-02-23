@@ -52,6 +52,7 @@ from collections import Counter
 from itertools import chain, groupby
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+import logging
 
 RETRIEVAL_MODEL_SCHEMA_V0 = "agda-ai-prover/retrieval-policy@v0"
 
@@ -181,8 +182,12 @@ def write_bytes_atomic(path: Path, content: bytes) -> None:
         try:
             if tmp.exists():
                 tmp.unlink()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                "Failed to remove temporary file %s during atomic write cleanup: %s",
+                tmp,
+                e,
+            )
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train deterministic retrieval artifact (TF-IDF-ish).")
