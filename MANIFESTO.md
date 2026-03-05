@@ -1,6 +1,8 @@
+<!-- File: MANIFESTO.md -->
+
 # Toward an Agda-Native AI Reasoning Environment
 
-*MANIFESTO for agda-ai-prover (v2.0)*
+*MANIFESTO for agda-native (v2.1)*
 
 ## 1. Motivation
 
@@ -10,11 +12,11 @@ gold-medal performance on the International Mathematical Olympiad and solved all
 twelve 2025 Putnam problems.  All of these systems target the **Lean 4** proof
 assistant language.
 
-The emergence of a winning paradigm is clear: **general-purpose coding agents**
-(Claude Code, Codex CLI) interact with proof assistants through programmatic
-interfaces (MCP servers, LSP wrappers), using the type-checker as a correctness
-oracle in a propose–check–refine loop.  Specialized prover models are giving way to
-frontier LLMs augmented with retrieval tools and proof-assistant feedback.
+A winning paradigm is emerging: **general-purpose coding agents** (Claude Code, Codex
+CLI) interact with proof assistants through programmatic interfaces (MCP servers, LSP
+wrappers), using the type-checker as a correctness oracle in a propose–check–refine
+loop.  Specialized prover models are giving way to frontier LLMs augmented with
+retrieval tools and proof-assistant feedback.
 
 **Agda has no equivalent tooling.**  Despite having some unique technical
 advantages---proof terms rather than tactic scripts, a mature ecosystem for
@@ -24,10 +26,12 @@ closed, Agda risks irrelevance precisely when formal methods are receiving
 unprecedented attention and investment.
 
 This project builds the **missing interaction layer** between frontier AI models and
-the Agda proof assistant.  The goal is not to train a custom prover model, but to
-create an environment in which any sufficiently capable LLM can reason effectively
-with Agda---exploiting its unique type-theoretic features rather than working around
-them.
+the Agda proof assistant, augmented by **small, locally-trained models** for
+domain-specific tasks where specialized knowledge outperforms general reasoning.  The
+goal is to create an environment in which any sufficiently capable LLM can reason
+effectively with Agda---exploiting its unique type-theoretic features rather than
+working around them---while local models handle retrieval, ranking, and routine proof
+obligations cheaply and privately.
 
 ---
 
@@ -48,17 +52,15 @@ To position this work, we briefly survey what exists.
    competition and (increasingly) research-level benchmarks.
 +  **Mathlib**: 250,000+ theorems providing a massive retrieval corpus.
 
-
 ### 2.2 Agda Ecosystem (sparse)
 
 +  **Kogkalidis, Melkonian & Bernardy** (NeurIPS 2024): first ML dataset of Agda
-   proofs with sub-type-level resolution; a structure-aware neural architecture for
-   premise selection based on structural (not nominal) principles.
+   proofs with sub-type-level resolution; a structure-aware neural architecture
+   (QUILL) for premise selection based on structural (not nominal) principles.
 +  **MLFMF** (Bauer, Petković & Todorovski, NeurIPS 2023): benchmark datasets for
    Agda (stdlib, agda-unimath, TypeTopology) and Lean.
-+  **This project (agda-native-air)**: a Haskell-based structured data extractor and
++  **This project (agda-ai-prover)**: a Haskell-based structured data extractor and
    AgdaJang, a programmatic interaction interface; both described below.
-
 
 ### 2.3 The Gap
 
@@ -74,7 +76,7 @@ breadth, tactic automation, and community momentum make it a natural choice for 
 projects.  But Agda offers specific, concrete advantages that matter for AI research
 on formal reasoning---advantages that are not merely aesthetic.
 
-### 3.1 Proof Terms as First-Class Training Data
+### 3.1 Proof Terms as First-Class Data
 
 In Lean, proofs are typically written as tactic scripts---imperative sequences whose
 meaning depends on the prover's internal state at each step.  The underlying proof
@@ -86,13 +88,15 @@ For AI, this difference is significant:
 +  The dependency structure of a proof is directly visible in the syntax.
 +  Proof search is equivalent to **program synthesis** in a dependently typed
    language---a well-studied problem with clear formal semantics.
-+  A model trained on (or retrieving from) Agda proofs works with a **direct
-   representation of logical structure**, not an intermediate control language whose
-   semantics is opaque without replaying the elaborator.
++  Both frontier models (retrieving from Agda proofs as context) and local models
+   (trained on Agda proof terms) work with a **direct representation of logical
+   structure**, not an intermediate control language whose semantics is opaque without
+   replaying the elaborator.
 
 The Kogkalidis et al. work demonstrates this concretely: their structure-aware neural
 architecture for premise selection was possible precisely because Agda proofs are
-terms with explicit, inspectable structure.
+terms with explicit, inspectable structure.  A locally-trained premise selection model
+can exploit this structure in ways that are unavailable for tactic-based systems.
 
 ### 3.2 Cubical Type Theory: Computational Equality
 
@@ -133,7 +137,8 @@ theory, category theory and group theory---Agda offers
 
 ## 4. Architecture: The Agda-Native AI Reasoning Environment
 
-The system has three layers, each independently useful.
+The system has four layers.  The first three are independently useful; the fourth
+is a performance and autonomy enhancement that becomes viable as the system matures.
 
 ### 4.1 Interaction Layer: AgdaJang
 
@@ -147,18 +152,18 @@ AgdaJang provides programmatic access to Agda's proof engine.
    continue interacting.
 +  **Module-level operations**. Load files, check imports, inspect dependency graphs.
 
-AgdaJang is the Agda analog of LeanDojo for Lean. It is the foundation on which all
+AgdaJang is the Agda analog of LeanDojo for Lean.  It is the foundation on which all
 AI interaction is built.
 
 ### 4.2 Bridge Layer: agda-mcp
 
-An Model Context Protocol (MCP) server that wraps AgdaJang and exposes Agda
+A Model Context Protocol (MCP) server that wraps AgdaJang and exposes Agda
 interaction to any MCP-compatible coding agent (Claude Code, Codex CLI, Cursor,
 etc.).  The server provides
 
 +  **proof state tools**: get goal, fill hole, check file, get diagnostics;
 +  **search/retrieval tools**: find definitions by type signature, search the corpus
-   by name or structure, retrieve relevant lemmas for a given goal.
+   by name or structure, retrieve relevant lemmas for a given goal;
 +  **context tools**: get file contents, navigate module structure, inspect the
    dependency graph.
 
@@ -167,8 +172,8 @@ and formats responses for the agent.
 
 ### 4.3 Intelligence Layer: Retrieval and Reasoning
 
-The agent itself is a frontier LLM (not a custom model). Its effectiveness depends on
-three main factors.
+The primary reasoning agent is a frontier LLM (not a custom model).  Its
+effectiveness depends on three main factors.
 
 +  **Retrieval quality**.  Given a proof goal, which lemmas, definitions, and
    proof patterns from the corpus are most relevant?  This is where structure-aware
@@ -178,14 +183,49 @@ three main factors.
 +  **Error interpretation**: understanding Agda's type-checker feedback and using it
    to refine the current attempt.
 
-*We do not build or train the LLM.  We build the environment that makes it effective.*
+We do not build the frontier model.  We build the environment that makes it
+effective.
+
+### 4.4 Local Specialist Layer: Domain-Specific Models
+
+For well-defined, narrow tasks, small locally-trained models can outperform frontier
+LLMs---and they run cheaply, privately, and without network dependency.  This layer
+is **optional**: the system works end-to-end with only Layers 4.1--4.3.  But local
+models improve performance, reduce API costs, and enable offline use.
+
+The local models we plan to train (in priority order):
+
+1.  **Premise selection**.  Given a goal type, rank which library lemmas are most
+    likely relevant.  This is a classification/ranking task---exactly the kind of
+    narrow problem where domain-specific training data and a small architecture
+    (cf. QUILL) beat general-purpose models.
+
+2.  **Type-aware embeddings**.  A small encoder producing vector representations
+    where semantically similar Agda definitions are close in embedding space.
+    Powers fast approximate search in the retrieval layer.
+
+3.  **Proof-term ranker**.  Given several candidate proof terms (proposed by the
+    frontier model), quickly rank them by likelihood of type-checking---a cheap
+    filter that reduces the number of expensive Agda invocations.
+
+4.  **Routine proof completer**.  A fine-tuned 7B model (QLoRA) that handles
+    predictable proof obligations (e.g., showing a construction preserves a
+    property) without calling the frontier model.  Viable once sufficient training
+    data has been collected from the propose–check–refine loop.
+
+These models are **tools in the MCP server's toolkit**---called by the agent when
+useful, not replacements for the agent's reasoning.
+
+**Target hardware**: NVIDIA Jetson AGX Orin 64GB, supporting QLoRA fine-tuning
+up to ~13B and quantized inference up to ~30B parameters.  For specialized tasks
+(ranking, embeddings), 1B--3B models are likely sufficient.
 
 ---
 
 ## 5. Structured Corpus Extraction
 
-The starting point for retrieval (and for any future fine-tuning or evaluation work)
-is a **structured corpus** extracted from Agda libraries.
+The starting point for retrieval (and for local model training and evaluation) is a
+**structured corpus** extracted from Agda libraries.
 
 The extraction tool (agda-backend-jsonl) uses Agda as a Haskell library to produce
 JSONL records containing five main features.
@@ -200,8 +240,29 @@ JSONL records containing five main features.
 +  **Derived views** (optional): port/wire decompositions, interface signatures, edge
    lists for graph experiments.
 
-The corpus is designed to be a **reusable research artifact**, useful for retrieval,
-for training, for graph analysis, and for evaluation benchmarks.
+The corpus serves three distinct purposes:
+
+1.  **Retrieval**.  The MCP server's search tools query a structured index built from
+    canonical JSONL rows.  This is the primary consumer.
+2.  **Specialized training**.  Premise selection, embedding, and ranking models are
+    trained on corpus-derived datasets.  These are narrow tasks---not general
+    reasoning.
+3.  **Evaluation**.  Measuring system performance requires a catalogue of proof
+    obligations with known solutions.
+
+### 5.1 Relationship to AGDA2TRAIN
+
+Our extractor and the Kogkalidis et al. AGDA2TRAIN tool are complementary.
+AGDA2TRAIN captures **sub-term-level proof states**---many interaction snapshots per
+definition, recording the full typing context at each point.  This data is optimized
+for training neural proof-step predictors (like QUILL).
+
+Our extractor captures **definition-level structural summaries**---one compact,
+human-readable row per definition, optimized for retrieval, graph construction, and
+as context that can be included in an LLM prompt.
+
+A combined system uses AGDA2TRAIN's output to train premise selection models and our
+output to power the retrieval and search tools in the MCP server.
 
 ---
 
@@ -212,14 +273,15 @@ for training, for graph analysis, and for evaluation benchmarks.
 Via editor integration (Emacs agda2-mode, VSCode, or a terminal agent).
 
 1.  The user writes a theorem statement with a hole.
-2.  The agent (via agda-mcp) inspects the goal, retrieves relevant lemmas, and
-    proposes a candidate.
+2.  The agent (via agda-mcp) inspects the goal, retrieves relevant lemmas
+    (using local premise selection if available), and proposes a candidate.
 3.  Agda type-checks the candidate; on failure, the agent reads the error and
     refines.
 4.  The loop continues until success or the agent reports an obstacle requiring human
     input.
 
-This is the same workflow demonstrated by Numina-Lean-Agent for Lean, but targeting Agda.
+For routine obligations, a local proof completion model may fill the hole directly,
+without invoking the frontier model---providing faster response and zero API cost.
 
 ### 6.2 Library Development Assistance
 
@@ -246,12 +308,14 @@ For working mathematicians who use Agda.
 
 ## 7. What This Project Is Not
 
-+  **Not a custom prover model**.  We do not train LLMs.  Frontier models improve
-   monthly; our job is to give them the best possible interface to Agda.
++  **Not a general-purpose prover model**.  We do not train an LLM to do open-ended
+   mathematical reasoning.  The frontier model handles that.  We *do* train small,
+   local models for narrow tasks (premise selection, ranking, embeddings, routine
+   completion) where domain-specific training outperforms general reasoning.
 +  **Not a Lean competitor**.  We target domains where Agda's type theory provides
    genuine advantages.  We do not target competition math or large-scale
    formalizations in classical logic.
-+  **Not a finished product.**  This is a research program with a prototype.  The goal
++  **Not a finished product**.  This is a research program with a prototype.  The goal
    is to demonstrate feasibility, produce interesting/publishable results, and provide
    infrastructure for the Agda community.
 
@@ -272,13 +336,15 @@ For working mathematicians who use Agda.
 +  Baseline evaluation: success rate on a curated set of proof obligations.
 +  **Deliverable**: tool paper (AIM / ITP / CICM).
 
-### Phase 2 — Structure-Aware Retrieval (medium-term)
+### Phase 2 — Retrieval + Local Models (medium-term)
 
-+  Integrate premise selection (structural representations) into the retrieval
-   pipeline.
-+  Evaluate whether structure-aware retrieval improves proof success rate over naive
-   prompting.
-+  **Deliverable**: research paper comparing retrieval strategies.
++  Integrate structure-aware retrieval (type-based search, dependency graph,
+   neural premise selection) into the MCP server.
++  Train local models: premise selector, type-aware embeddings, proof-term ranker.
++  Evaluate whether structure-aware retrieval and local models improve proof success
+   rate over the Phase 1 baseline (frontier model alone).
++  **Deliverable**: research paper comparing retrieval strategies and measuring the
+   contribution of local models.
 
 ### Phase 3 — Research Mathematics (long-term)
 
@@ -287,28 +353,39 @@ For working mathematicians who use Agda.
 +  Document the experience of AI-assisted research-level formalization.
 +  **Deliverable**: mathematics paper with AI-assisted formal proofs.
 
+### Phase 4 — Routine Proof Completion Model (stretch)
+
++  Train a local 7B model (QLoRA) on successful proof completions collected during
+   Phases 1--3.
++  Handle predictable proof obligations locally, without frontier model API calls.
++  **Deliverable**: evaluation of local-only vs. hybrid vs. frontier-only proving.
+
 Each phase produces a usable tool and a publishable result.
 
 ---
 
 ## 9. Research Orientation
 
-This project is grounded in two *testable* hypotheses.
+This project is grounded in three *testable* hypotheses.
 
 +  **H1**.  Agda's term-level proofs provide richer, more direct signals for
    AI-assisted proof search than tactic-level representations.
-
-   *This is testable*.  Compare proof completion rates using structural (term-level)
+   *Testable:*  compare proof completion rates using structural (term-level)
    retrieval vs. text-level retrieval, on matched proof obligations.
 
 +  **H2**.  Cubical Agda enables AI reasoning about equality, transport, and quotient
    constructions that is not possible in systems where these features are axiomatic.
+   *Testable:*  identify proof tasks that require computational univalence or HITs and
+   measure whether AI agents can handle them.
 
-   *This is testable*.  Identify proof tasks that require computational univalence or
-   HITs and measure whether AI agents can handle them.
++  **H3**.  A hybrid architecture combining a frontier LLM (for reasoning) with
+   locally-trained specialist models (for retrieval and ranking) outperforms either
+   component alone on Agda proof completion tasks.
+   *Testable:*  compare success rates across configurations---frontier-only,
+   local-only, and hybrid---on a fixed benchmark of proof obligations.
 
-Both hypotheses may be wrong, but they are specific enough to be investigated, and
-the infrastructure we build will be useful regardless of the outcome.
+All three hypotheses may be wrong.  But they are specific enough to be investigated,
+and the infrastructure we build is useful regardless of the outcome.
 
 ---
 
@@ -317,9 +394,13 @@ the infrastructure we build will be useful regardless of the outcome.
 This project builds directly on the following:
 
 +  **Kogkalidis, Melkonian & Bernardy (2024)**: their structural representations and
-   premise selection model are a natural retrieval backend for our system.
+   premise selection model (QUILL) are a natural retrieval backend for our system.
+   Their AGDA2TRAIN extraction tool complements our definition-level extractor.  A
+   collaboration combining AgdaJang + agda-mcp with AGDA2TRAIN + QUILL is a key
+   strategic goal.
 +  **Numina-Lean-Agent (Liu et al., 2026)**: our architecture mirrors theirs (general
-   agent + MCP + proof assistant), adapted for Agda.
+   agent + MCP + proof assistant), adapted for Agda, and extended with
+   structure-aware retrieval and local specialist models that Lean tools lack.
 +  **LeanDojo (Yang et al., 2023)**: AgdaJang serves the same role for Agda that
    LeanDojo serves for Lean.
 +  **agda-algebras (DeMeo & Carette)** + **agda-categories (Carette)**: our primary
@@ -328,4 +409,3 @@ This project builds directly on the following:
 We aim to complement, not duplicate, the Lean ecosystem.  Where the Lean tools
 optimize for breadth and scale, we optimize for depth in domains where Agda's type
 theory foundations matter.
-
