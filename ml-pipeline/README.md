@@ -117,8 +117,11 @@ These are under `ml-pipeline/python`.
 
 +  `tests/`
 
-   + `test_dataset_pipeline.py`
-   + `test_main.py`
+   +  `test_main.py`: unit tests for FastAPI app defined in ../api/main.py.
+   +  `test_train_retrieval.py`: tests ensuring retrieval model artifact is
+      deterministic across runs and adheres to expected invariants.
+   +  `test_dataset_pipeline.py`: tests for dataset processing pipeline, ensuring
+      finetune dataset builder produces expected instruction/input/output format.
 
 
 ### Miscellaneous Scripts
