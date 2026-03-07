@@ -60,7 +60,7 @@ To position this work, we briefly survey what exists.
 +  **MLFMF** (Bauer, Petković & Todorovski, NeurIPS 2023): benchmark datasets for
    Agda (stdlib, agda-unimath, TypeTopology) and Lean.
 +  **This project (agda-ai-prover)**: a Haskell-based structured data extractor and
-   AgdaJang, a programmatic interaction interface; both described below.
+   AgdaDojang, a programmatic interaction interface; both described below.
 
 ### 2.3 The Gap
 
@@ -140,9 +140,9 @@ theory, category theory and group theory---Agda offers
 The system has four layers.  The first three are independently useful; the fourth
 is a performance and autonomy enhancement that becomes viable as the system matures.
 
-### 4.1 Interaction Layer: AgdaJang
+### 4.1 Interaction Layer: AgdaDojang
 
-AgdaJang provides programmatic access to Agda's proof engine.
+AgdaDojang provides programmatic access to Agda's proof engine.
 
 +  **Goal inspection**.  Query the type of a hole, its local context, and available
    definitions.
@@ -152,12 +152,12 @@ AgdaJang provides programmatic access to Agda's proof engine.
    continue interacting.
 +  **Module-level operations**. Load files, check imports, inspect dependency graphs.
 
-AgdaJang is the Agda analog of LeanDojo for Lean.  It is the foundation on which all
+AgdaDojang is the Agda analog of LeanDojo for Lean.  It is the foundation on which all
 AI interaction is built.
 
 ### 4.2 Bridge Layer: agda-mcp
 
-A Model Context Protocol (MCP) server that wraps AgdaJang and exposes Agda
+A Model Context Protocol (MCP) server that wraps AgdaDojang and exposes Agda
 interaction to any MCP-compatible coding agent (Claude Code, Codex CLI, Cursor,
 etc.).  The server provides
 
@@ -167,7 +167,7 @@ etc.).  The server provides
 +  **context tools**: get file contents, navigate module structure, inspect the
    dependency graph.
 
-This is the thinnest possible layer; it translates MCP requests into AgdaJang calls
+This is the thinnest possible layer; it translates MCP requests into AgdaDojang calls
 and formats responses for the agent.
 
 ### 4.3 Intelligence Layer: Retrieval and Reasoning
@@ -326,12 +326,12 @@ For working mathematicians who use Agda.
 ### Phase 0 — Infrastructure (current)
 
 +  Reliable corpus extraction from agda-algebras + stdlib.
-+  AgdaJang interaction working on small examples.
++  AgdaDojang interaction working on small examples.
 +  Schema documentation and validation.
 
 ### Phase 1 — MCP Server + First Proofs (near-term)
 
-+  Build agda-mcp: the MCP wrapper around AgdaJang.
++  Build agda-mcp: the MCP wrapper around AgdaDojang.
 +  Demonstrate Claude Code filling holes in agda-algebras via agda-mcp.
 +  Baseline evaluation: success rate on a curated set of proof obligations.
 +  **Deliverable**: tool paper (AIM / ITP / CICM).
@@ -396,12 +396,12 @@ This project builds directly on the following:
 +  **Kogkalidis, Melkonian & Bernardy (2024)**: their structural representations and
    premise selection model (QUILL) are a natural retrieval backend for our system.
    Their AGDA2TRAIN extraction tool complements our definition-level extractor.  A
-   collaboration combining AgdaJang + agda-mcp with AGDA2TRAIN + QUILL is a key
+   collaboration combining AgdaDojang + agda-mcp with AGDA2TRAIN + QUILL is a key
    strategic goal.
 +  **Numina-Lean-Agent (Liu et al., 2026)**: our architecture mirrors theirs (general
    agent + MCP + proof assistant), adapted for Agda, and extended with
    structure-aware retrieval and local specialist models that Lean tools lack.
-+  **LeanDojo (Yang et al., 2023)**: AgdaJang serves the same role for Agda that
++  **LeanDojo (Yang et al., 2023)**: AgdaDojang serves the same role for Agda that
    LeanDojo serves for Lean.
 +  **agda-algebras (DeMeo & Carette)** + **agda-categories (Carette)**: our primary
    test corpora and the mathematical domain driving design decisions.

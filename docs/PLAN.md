@@ -41,7 +41,7 @@ can reason effectively with Agda.
 Frontier LLMs improve monthly.  Our job is to give them the best possible interface
 to Agda, not to train a competing general reasoner.  We build
 
-+ the **interaction layer** (agda-mcp / AgdaJang),
++ the **interaction layer** (agda-mcp / AgdaDojang),
 + the **retrieval layer** (structured corpus, search, premise selection),
 + the **evaluation layer** (benchmarks, fixtures, typecheck-based scoring).
 
@@ -115,7 +115,7 @@ engines — are *supporting actors*.  They propose candidates; **Agda checks**.
          │                            │
          ▼                            ▼
 ┌─────────────────┐     ┌──────────────────────────────────┐
-│    AgdaJang     │     │     Local models (Jetson)        │
+│   AgdaDojang    │     │     Local models (Jetson)        │
 │                 │     │                                  │
 │ Programmatic    │     │  Premise selector (QUILL-like)   │
 │ interaction     │     │  Type-aware embeddings           │
@@ -135,7 +135,7 @@ engines — are *supporting actors*.  They propose candidates; **Agda checks**.
 ```
 
 **Key design property**.  The system works end-to-end with just the MCP server,
-AgdaJang, and a frontier LLM.  Local models are performance optimizations that
+AgdaDojang, and a frontier LLM.  Local models are performance optimizations that
 improve retrieval quality, reduce API costs, and enable offline/low-connectivity use.
 
 ---
@@ -197,7 +197,7 @@ This is the basis for potential collaboration.
 
 **Deliverables**.
 
-1.  **agda-mcp server** — thin MCP wrapper around AgdaJang exposing
+1.  **agda-mcp server** — thin MCP wrapper around AgdaDojang exposing
 
     + `get-goal`: inspect the type of a hole and its local context;
     + `fill-hole`: propose a candidate term and get typecheck feedback;
@@ -218,7 +218,7 @@ This is the basis for potential collaboration.
 
 **Issue mapping:**
 
-- Update #23 (AgdaJang ↔ policy integration) to target MCP protocol.
+- Update #23 (AgdaDojang ↔ policy integration) to target MCP protocol.
 - New issue: agda-mcp server implementation.
 - New issue: baseline evaluation benchmark (20–50 proof obligations).
 - New issue: Claude Code integration testing and documentation.
@@ -330,7 +330,7 @@ graph TD
 
 ### NEXT (2–6 weeks)
 
-1.  Build agda-mcp: the thinnest possible MCP wrapper around AgdaJang.
+1.  Build agda-mcp: the thinnest possible MCP wrapper around AgdaDojang.
 2.  Connect Claude Code via agda-mcp; get the first 2–3 proofs type-checking.
 3.  Curate the evaluation benchmark (20–50 proof obligations).
 4.  Talk to Orestis about collaboration.
@@ -427,7 +427,7 @@ benchmark source, LLM prompt context.
 ### 9.2 What we have
 
 +  agda-backend-jsonl: definition-level structural corpus extraction.
-+  AgdaJang: programmatic interaction with Agda (goals, holes, diagnostics).
++  AgdaDojang: programmatic interaction with Agda (goals, holes, diagnostics).
 +  Ports/wires knowledge-graph view (in progress).
 +  agda-algebras: a substantial universal algebra formalization.
 
@@ -436,7 +436,7 @@ benchmark source, LLM prompt context.
 +  KMB's **QUILL** becomes a retrieval tool behind our **agda-mcp** server.
 +  KMB's **AGDA2TRAIN** generates training data for premise selection; our
    **agda-backend-jsonl** generates the retrieval index and LLM context.
-+  **AgdaJang** provides the interaction loop that neither tool currently has.
++  **AgdaDojang** provides the interaction loop that neither tool currently has.
 +  The resulting system is the Agda equivalent of Numina-Lean-Agent, but with
    structure-aware retrieval that Lean tools lack.
 
