@@ -91,7 +91,8 @@ agda-native/
 ├── CODE_OF_CONDUCT.md
 ├── docs/
 │   ├── MANIFESTO.md
-│   ├── PLAN.mdarchitecture.md
+│   ├── PLAN.md
+│   ├── architecture.md
 │   ├── representation.md
 │   ├── architecture.md
 │   ├── HowToRun.md
