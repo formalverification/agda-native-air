@@ -51,7 +51,7 @@ import tempfile
 from collections import Counter
 from itertools import chain, groupby
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import logging
 
 RETRIEVAL_MODEL_SCHEMA_V0 = "agda-ai-prover/retrieval-policy@v0"
@@ -175,9 +175,11 @@ def write_bytes_atomic(path: Path, content: bytes) -> None:
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".tmp_")
     tmp = Path(tmp_name)
     try:
-        os.write(fd, content)
-        os.close(fd)
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
         os.replace(tmp, path)
+        # ^ os.replace stays outside the with block intentionally; we only do the
+        #   rename after the write is flushed and the descriptor properly closed.
     finally:
         try:
             if tmp.exists():
