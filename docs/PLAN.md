@@ -58,10 +58,10 @@ to Agda, not to train a competing general reasoner.
 
 The environment consists of four main components.
 
-+  the **interaction layer** (`agda-dojang`),
-+  the **bridge layer** (`agda-mcp`),
-+  the **retrieval layer** (structured corpus + search),
-+  the **evaluation layer** (fixtures, metrics, deterministic reports, benchmarks,
++  **interaction layer** (`agda-dojang`),
++  **bridge layer** (`agda-mcp`),
++  **retrieval layer** (structured corpus + search),
++  **evaluation layer** (fixtures, metrics, deterministic reports, benchmarks,
    typecheck-based scoring).
 
 This will provide a laboratory for Agda-native AI experimentation.
@@ -217,7 +217,7 @@ examples are the following:
 
 Our extractor and AGDA2TRAIN are complementary rather than redundant.
 
-+  **agda-native extractor** is definition-level, compact, stable, and retrieval-friendly.
++  **agda-native extractor** (`agda-strux`) is definition-level, compact, stable, and retrieval-friendly.
 +  **Agda2Train** is interaction-state-level, larger, and ideal for premise-selection or proof-step learning.
 
 A future collaboration should treat these as two views of the same ecosystem:
@@ -226,7 +226,7 @@ A future collaboration should treat these as two views of the same ecosystem:
 +  **agda-native extraction pipeline** for indexing, retrieval, graph analysis, and prompt context.
 
 
-|                       | agda-native extractor                       | AGDA2TRAIN                                  |
+|                       | agda-strux                                  | AGDA2TRAIN                                  |
 |-----------------------|---------------------------------------------|---------------------------------------------|
 | **Granularity**       | One row per definition                      | Many states per definition (sub-term level) |
 | **Primary use**       | Retrieval, graph, LLM context               | Training neural proof-step predictors       |
@@ -601,6 +601,8 @@ The following are no longer central:
 * FastAPI as the main integration story;
 * next-tactic / next-step modeling as the identity of the project;
 * broad AI-mathematician behaviors as near-term deliverables;
-* deep SMT / reflection integration as an early milestone.
+* deep SMT / reflection-driven automation.
 
-They are not forbidden forever. They are simply not the main road now.
+These directions are deferred for sequencing reasons, not because they are
+uninteresting; in fact, they may become some of the most Agda-distinctive research
+directions once the core environment is stable.
