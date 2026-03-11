@@ -1,0 +1,17 @@
+agda-native-air
+Copyright 2025-2026 William DeMeo and Contributors
+
+This product is an independent research project and is not affiliated with,
+sponsored by, or endorsed by any employer or institution of any contributor.
+
+---
+
+This project incorporates code and git history originally developed in
+agda-ai-prover (private repository), authored by William DeMeo.
+That prior work is also Copyright 2025-2026 William DeMeo.
+
+---
+
+Documentation and datasets in this repository (docs/ and data/) are licensed
+separately under the Creative Commons Attribution 4.0 International License
+(CC-BY 4.0). See LICENSE-docs for details.
