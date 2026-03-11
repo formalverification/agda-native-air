@@ -1,7 +1,7 @@
 /**
  * Integration smoke tests for the Haskell `agda-json` backend.
  *
- * File: proof-parser/src/test/scala/proofparser/extract/AgdaJsonlBackendSmokeSpec.scala
+ * File: strux-driver/src/test/scala/proofparser/extract/AgdaJsonlBackendSmokeSpec.scala
  *
  * What this test covers
  * ---------------------
@@ -50,9 +50,9 @@ final class AgdaJsonlBackendSmokeSpec extends AnyFreeSpec with Matchers {
   // -------- helpers --------
 
   private def repoRootFromCwd(): Path = {
-    // Tests typically run with cwd = proof-parser (sbt base dir).
+    // Tests typically run with cwd = strux-driver (sbt base dir).
     val cwd = Paths.get(".").toAbsolutePath.normalize()
-    if (cwd.getFileName != null && cwd.getFileName.toString == "proof-parser") cwd.getParent
+    if (cwd.getFileName != null && cwd.getFileName.toString == "strux-driver") cwd.getParent
     else cwd
   }
 
@@ -107,7 +107,7 @@ final class AgdaJsonlBackendSmokeSpec extends AnyFreeSpec with Matchers {
   }
 
   private def fixture(repoRoot: Path, fileName: String): Path =
-    // repoRoot.resolve("agda-backend-jsonl").resolve("test").resolve("resources").resolve(fileName)
+    // repoRoot.resolve("agda-strux").resolve("test").resolve("resources").resolve(fileName)
     repoRoot.resolve("data").resolve("agda").resolve(fileName)
 
   // -------- tests --------

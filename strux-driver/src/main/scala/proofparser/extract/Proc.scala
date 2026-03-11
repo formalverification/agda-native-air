@@ -2,7 +2,7 @@
   *  Proc.scala
   *  ----------------------------------------------------------------------------
   *
-  *  File: proof-parser/src/main/scala/proofparser/extract/Proc.scala
+  *  File: strux-driver/src/main/scala/proofparser/extract/Proc.scala
   *  Package: proofparser.extract
   *  Copyright: (c) 2025--2026 Thmpr Lab, LLC.
   *

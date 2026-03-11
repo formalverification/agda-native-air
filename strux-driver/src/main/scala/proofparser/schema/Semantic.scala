@@ -2,7 +2,7 @@
  *  Semantic.scala
  *  --------------
  *
- *  File: proof-parser/src/main/scala/proofparser/schema/Semantic.scala
+ *  File: strux-driver/src/main/scala/proofparser/schema/Semantic.scala
  *  Package: proofparser.schema
  *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *

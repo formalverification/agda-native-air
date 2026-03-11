@@ -2,7 +2,7 @@
  *  AgdaSimplifiedExtractorSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/test/scala/proofparser/AgdaSimplifiedExtractorSpec.scala
+ *  File: strux-driver/src/test/scala/proofparser/AgdaSimplifiedExtractorSpec.scala
  *  Package: proofparser
  *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *
@@ -18,7 +18,7 @@
  *  Usage
  *  -----
  *   sbt test
- *   sbt "project proof-parser" test
+ *   sbt "project strux-driver" test
  *
  *  Notes
  *  -----

@@ -1,4 +1,4 @@
-// File: agda-ai-prover/proof-parser/build.sbt
+// File: agda-native-air/strux-driver/build.sbt
 
 // Define Scala version for the entire build
 ThisBuild / scalaVersion := "2.13.17"
@@ -9,9 +9,9 @@ Compile / run / fork := true
 val json4sV = "3.7.0-M11"
 
 // Root project definition
-lazy val ProofParser = project.in(file("."))
+lazy val StruxDriver = project.in(file("."))
   .settings(
-    name := "ProofParser",
+    name := "StruxDriver",
     version := "0.1.0",
 
     // Main class setting:

@@ -2,7 +2,7 @@
  *  ProofContextBuilder.scala
  *  ---------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/ProofContextBuilder.scala
+ *  File: strux-driver/src/main/scala/proofparser/ProofContextBuilder.scala
  *  Package: proofparser
  *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *

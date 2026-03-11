@@ -2,15 +2,15 @@
 # Makefile
 # --------
 #
-# @file agda-ai-prover/proof-parser/Makefile
+# @file agda-native-air/strux-driver/Makefile
 # @version 0.3
 #
 # Description
 # -----------
 # Makefile for the proofparser package (local dev helper).
 #
-# NOTE: The canonical interface is the top-level agda-ai-prover/Makefile.
-#       These targets are kept for convenience when working inside proof-parser/.
+# NOTE: The canonical interface is the top-level agda-native-air/Makefile.
+#       These targets are kept for convenience when working inside strux-driver/.
 #
 # Focus
 # -----
@@ -46,7 +46,7 @@ PREM_MAIN  ?= proofparser.util.PremiseEval
 .PHONY: help
 help:
 	@echo ""
-	@echo "proof-parser targets (local dev):"
+	@echo "strux-driver targets (local dev):"
 	@echo "  make compile              - sbt compile (this subproject)"
 	@echo "  make test                 - sbt test"
 	@echo "  make extract              - AgdaExtractorMain (.agda|dir -> TRAIN_JSONL)"
@@ -136,7 +136,7 @@ premise-eval-quick:
 # Local smoke test: build + quick eval
 .PHONY: smoke
 smoke: compile premise-eval-quick
-	@echo "✓ proof-parser smoke OK"
+	@echo "✓ strux-driver smoke OK"
 
 # --- generate a tiny synthetic dataset ---
 .PHONY: gen-sample
@@ -150,6 +150,6 @@ gen-sample:
 smoke-sample: gen-sample
 	$(MAKE) dataset-stats DATASET=../data/sample.jsonl TOP=10
 	$(MAKE) premise-eval-quick DATASET=../data/sample.jsonl
-	@echo "✓ proof-parser smoke (sample) OK"
+	@echo "✓ strux-driver smoke (sample) OK"
 
 # end

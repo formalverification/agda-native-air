@@ -2,7 +2,7 @@
  *  PremiseEval.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/util/PremiseEval.scala
+ *  File: strux-driver/src/main/scala/proofparser/util/PremiseEval.scala
  *  Package: proofparser.util
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *

@@ -2,7 +2,7 @@
  *  TestKit.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/test/scala/proofparser/TestKit.scala
+ *  File: strux-driver/src/test/scala/proofparser/TestKit.scala
  *  Package: proofparser
  *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *

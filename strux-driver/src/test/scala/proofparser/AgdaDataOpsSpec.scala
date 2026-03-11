@@ -2,7 +2,7 @@
  *  AgdaDataOpsSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/test/scala/proofparser/AgdaDataOpsSpec.scala
+ *  File: strux-driver/src/test/scala/proofparser/AgdaDataOpsSpec.scala
  *  Package: proofparser
  *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *

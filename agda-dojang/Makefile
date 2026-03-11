@@ -27,7 +27,7 @@
 #   - This file lives in: agda-native-air/agda-dojang/Makefile
 #   - Agda sources here:  agda-native-air/agda-dojang/agda/AgdaDojang/…
 #   - Example data lives: agda-native-air/data/
-#   - Scala tools live:   agda-native-air/proof-parser/
+#   - Scala tools live:   agda-native-air/strux-driver/
 #   - Python tools live:  agda-native-air/agda-dojang/python/tools/
 #                         (If some scripts still live at repo root, see variables below.)
 #
@@ -72,8 +72,8 @@ EXAMPLE_AGDA_ABS := $(abspath $(EXAMPLE_AGDA))
 RAW_JSON_ABS     := $(abspath $(RAW_JSON))
 
 
-# Scala transformer runs from the proof-parser project directory
-TRANSFORM_DIR := $(REPO_ROOT)/proof-parser
+# Scala transformer runs from the strux-driver project directory
+TRANSFORM_DIR := $(REPO_ROOT)/strux-driver
 
 # --- Housekeeping globs (only within this subproject) ---
 SCRATCH_GLOBS   := .tmp_* .scratch_*

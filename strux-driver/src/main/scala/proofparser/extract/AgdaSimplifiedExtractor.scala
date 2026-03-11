@@ -2,7 +2,7 @@
  *  AgdaSimplifiedExtractor.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/extract/AgdaSimplifiedExtractor.scala
+ *  File: strux-driver/src/main/scala/proofparser/extract/AgdaSimplifiedExtractor.scala
  *  Package: proofparser.extract
  *
  *  Purpose
@@ -69,7 +69,7 @@
  *
  *  Example
  *  -------
- *  From inside the `agda-ai-prver/proof-parser` directory, enter the following command:
+ *  From inside the `agda-ai-prver/strux-driver` directory, enter the following command:
  *
  *      sbt "runMain proofparser.extract.AgdaSimplifiedExtractor \
  *        ../agda-jang/agda output/goals.jsonl \

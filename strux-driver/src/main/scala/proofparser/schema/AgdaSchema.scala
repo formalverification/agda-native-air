@@ -4,14 +4,14 @@ package proofparser.schema
  *  AgdaSchema.scala
  *  ---------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/schema/AgdaSchema.scala
+ *  File: strux-driver/src/main/scala/proofparser/schema/AgdaSchema.scala
  *  Package: proofparser.schema
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------
  *  Canonical definitions of all core datatypes used throughout the
- *  proof-parser module. This file replaces older, duplicated schema
+ *  strux-driver module. This file replaces older, duplicated schema
  *  definitions and serves as the single source of truth for:
  *
  *   • AgdaData        – a single extracted declaration

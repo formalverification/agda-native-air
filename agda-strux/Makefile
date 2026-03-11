@@ -19,7 +19,7 @@ test:
 	cabal update
 	cabal test
 
-# Runs the backend on the shared proof-parser test file.
+# Runs the backend on the shared strux-driver test file.
 # Fails if the output is empty.
 smoke:
 	@set -eu; \
@@ -29,7 +29,7 @@ smoke:
 	cabal run agda-json -- \
 	  --input  ../data/agda/agda-example.agda \
 	  --output "$$out" \
-	  --include ../proof-parser/src/test/resources; \
+	  --include ../strux-driver/src/test/resources; \
 	test -s "$$out"; \
 	echo "[smoke] first 5 lines:"; \
 	head -n 5 "$$out"

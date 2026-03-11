@@ -2,7 +2,7 @@
  *  Model.scala (shim)
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/Model.scala
+ *  File: strux-driver/src/main/scala/proofparser/Model.scala
  *  Package: proofparser
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *

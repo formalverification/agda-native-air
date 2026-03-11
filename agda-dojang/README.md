@@ -20,7 +20,7 @@ Within the agda-native-air architecture, AgdaDojang serves as
 +  a bridge between statistical models and Agda's typechecker,
 +  a sandbox for experimenting with interactive proof search.
 
-While ProofParser focuses on *learning from existing mathematics*, AgdaDojang focuses on **doing mathematics** — one proof step at a time — under Agda's supervision.
+While other parts of the project involve *learning from existing mathematics*, AgdaDojang focuses on **doing mathematics** — one proof step at a time — under Agda's supervision.
 
 ---
 
@@ -465,11 +465,11 @@ All of those are "paths" in the Kleisli category of `TC`.
 + [Root project README][]
 + [`agda-strux/README.md`][agda-strux/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
-+ [`proof-parser/README.md`][proof-parser/README]
++ [`strux-driver/README.md`][strux-driver/README]
 
 [Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
 [agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
-[proof-parser/README]: https://github.com/formalverification/agda-native-air/blob/main/proof-parser/README.md
+[strux-driver/README]: https://github.com/formalverification/agda-native-air/blob/main/strux-driver/README.md
 [ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
 [`agda-dojang/python/tools/policy_fixture.py`]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/python/tools/policy_fixture.py
 

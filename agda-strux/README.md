@@ -123,10 +123,10 @@ cabal test
 + [Root project README][]
 + [`agda-dojang/README.md`][agda-dojang/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
-+ [`proof-parser/README.md`][proof-parser/README]
++ [`strux-driver/README.md`][strux-driver/README]
 
 [Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
-[proof-parser/README]: https://github.com/formalverification/agda-native-air/blob/main/proof-parser/README.md
+[strux-driver/README]: https://github.com/formalverification/agda-native-air/blob/main/strux-driver/README.md
 [agda-dojang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/README.md
 [ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
 [`agda-dojang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/python/tools/policy_fixture.py

@@ -2,7 +2,7 @@
  *  SimpleSchema.scala (shim)
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/SimpleSchema.scala
+ *  File: strux-driver/src/main/scala/proofparser/SimpleSchema.scala
  *  Package: proofparser
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *

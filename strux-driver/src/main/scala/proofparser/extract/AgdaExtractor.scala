@@ -2,7 +2,7 @@
  *  AgdaExtractor.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/extract/AgdaExtractor.scala
+ *  File: strux-driver/src/main/scala/proofparser/extract/AgdaExtractor.scala
  *  Package: proofparser.extract
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *

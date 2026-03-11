@@ -2,7 +2,7 @@
  *  SimpleSchemaSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/test/scala/proofparser/SimpleSchemaSpec.scala
+ *  File: strux-driver/src/test/scala/proofparser/SimpleSchemaSpec.scala
  *  Package: proofparser
  *
  *  Description

@@ -1,7 +1,7 @@
 /**
  * Unit tests for JsonlValidate functionality.
  *
- * File: proof-parser/src/test/scala/proofparser/extract/JsonlValidateSuite.scala
+ * File: strux-driver/src/test/scala/proofparser/extract/JsonlValidateSuite.scala
  * Package: proofparser.extract
  *
  * Design Notes

@@ -2,7 +2,7 @@
  *  SampleGen.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/util/SampleGen.scala
+ *  File: strux-driver/src/main/scala/proofparser/util/SampleGen.scala
  *  Package: proofparser.util
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *

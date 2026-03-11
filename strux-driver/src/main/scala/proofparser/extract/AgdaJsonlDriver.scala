@@ -2,7 +2,7 @@
   *  AgdaJsonlDriver.scala
   *  ----------------------------------------------------------------------------
   *
-  *  File: proof-parser/src/main/scala/proofparser/extract/AgdaJsonlDriver.scala
+  *  File: strux-driver/src/main/scala/proofparser/extract/AgdaJsonlDriver.scala
   *  Package: proofparser.extract
   *
   *  Purpose

@@ -2,7 +2,7 @@
  *  AgdaExtractorMain.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/extract/AgdaExtractorMain.scala
+ *  File: strux-driver/src/main/scala/proofparser/extract/AgdaExtractorMain.scala
  *  Package: proofparser.extract
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
@@ -29,12 +29,12 @@
  *
  *  Usage
  *  -----
- *      sbt "project proof-parser" \
+ *      sbt "project strux-driver" \
  *          "runMain proofparser.extract.AgdaExtractorMain <in.agda|dir> <out.jsonl>"
  *
  *  Examples
  *  --------
- *      sbt "project proof-parser" \
+ *      sbt "project strux-driver" \
  *          "runMain proofparser.extract.AgdaExtractorMain \
  *           src/test/resources/agda-example.agda \
  *           target/example.jsonl"

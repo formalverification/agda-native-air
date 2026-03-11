@@ -2,7 +2,7 @@
  *  Agda2TrainReducer.scala
  *  ----------------------------------------------------------------------
  *
- *  File: proof-parser/src/main/scala/proofparser/reduce/Agda2TrainReducer.scala
+ *  File: strux-driver/src/main/scala/proofparser/reduce/Agda2TrainReducer.scala
  *  Package: proofparser.reduce
  *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
@@ -29,7 +29,7 @@
  *
  *  Usage
  *  -----
- *      sbt "project proof-parser" \
+ *      sbt "project strux-driver" \
  *          "runMain proofparser.reduce.Agda2TrainReducer <in.json|jsonl> <out.jsonl>"
  *
  *  Output
