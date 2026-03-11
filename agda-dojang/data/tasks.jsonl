@@ -1,0 +1,3 @@
+{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "candidate":"suc zero"}
+{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "tactic":"applyReport:_+_"}
+{"imports":["open import Agda.Builtin.Nat","open import Agda.Builtin.Bool"], "goal":"Nat", "candidate":"true"}

@@ -1,0 +1,15 @@
+module AgdaDojo.TrySandbox where
+
+open import AgdaDojo.Prelude
+
+-- Extra imports the example needs:
+{{IMPORTS}}
+
+{{CONTEXT_DECLS}}
+
+postulate
+  GoalTy : Set
+GoalTy = {{GOAL_TYPE}}
+
+test : GoalTy
+test = {!!}  -- we'll fill this meta with `try⟨ CANDIDATE ⟩` via direct text replacement:
