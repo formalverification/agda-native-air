@@ -1,12 +1,12 @@
 <!-- File: docs/representation.md -->
 
-# Data Representation (JSONL → Derived Views) — agda-ai-prover
+# Data Representation (JSONL → Derived Views) — agda-native-air
 
-This document specifies the **data contract** for artifacts emitted by the Haskell `agda-json` backend (JSONL) and the **derived views** produced by converters/ETL (Parquet, edge lists, training datasets).
+This document specifies the **data contract** for artifacts emitted by the Haskell `agda-strux` backend (JSONL) and the **derived views** produced by converters/ETL (Parquet, edge lists, training datasets).
 
 It is intentionally **versioned and incremental**: consumers should tolerate *unknown fields*, and producers should avoid breaking existing fields without a version bump + converter.
 
-This document also records a small number of **operational contracts** used by interactive tooling (e.g. AgdaJang ↔ policy backend), which are *not* derived from canonical JSONL rows.
+This document also records a small number of **operational contracts** used by interactive tooling (e.g. AgdaDoJang ↔ policy backend), which are *not* derived from canonical JSONL rows.
 
 ---
 
@@ -30,40 +30,50 @@ This document also records a small number of **operational contracts** used by i
 
 ## 1. Terminology
 
-- **Definition**: Any Agda entity emitted as one JSON object in the JSONL stream (functions/theorems, records, data types, constructors, postulates, etc.).
-- **Canonical row**: One JSON object emitted by the backend for a definition.
-- **Derived view**: Any computed artifact that can be regenerated from canonical rows (graphs, training datasets, indices).
-- **Operational contract**: A versioned request/response schema used by tooling at runtime (e.g. Agda goal/context → policy candidates). Not derived from canonical rows.
-- **Pretty name**: Normalized `prettyQname` intended as the stable join key.
-- **Wire**: A dependency edge from a definition to some referenced identifier (type deps ∪ body deps).
++  **Definition**: any Agda entity emitted as one JSON object in the JSONL stream
+   (functions/theorems, records, data types, constructors, postulates, etc.).
++  **Canonical row**: one JSON object emitted by the backend for a definition.
++  **Derived view**: any computed artifact that can be regenerated from canonical
+   rows (graphs, training datasets, indices).
++  **Operational contract**: a versioned request/response schema used by tooling at
+   runtime (e.g. Agda goal/context → policy candidates). Not derived from canonical rows.
++  **Pretty name**:  normalized `prettyQname` intended as the stable join key.
++  **Wire**: a dependency edge from a definition to some referenced identifier (type deps ∪ body deps).
 
 ---
 
 ## 2. Canonical JSONL output
 
 ### 2.1 Output formats
-The backend emits JSONL in two formats (CLI-controlled):
 
-- **Full (`Cli.Full`)** — machine-oriented; stable contract; used by ETL.
-- **Human (`Cli.Human`)** — debug-oriented; not a stable contract.
+The backend emits JSONL in two formats (CLI-controlled).
+
++  **Full (`Cli.Full`)**: machine-oriented; stable contract; used by ETL.
++  **Human (`Cli.Human`)**: debug-oriented; not a stable contract.
 
 This doc mainly specifies **Full**.
 
 ### 2.2 Status of downstream consumers
 
-**As of:** February 2026
+**Current State** (as of February 2026)
 
-**Current state:**
-- **Canonical extraction:** `agda-json` backend emits Full JSONL format with `typeAst` structural encoding (version `0.3-v0`).
-- **ETL alignment:** Integration of `typeAst` and structural schema into downstream ETL pipeline is tracked in [Issue #58](https://github.com/formalverification/agda-ai-prover/issues/58).
-- **Legacy migration:** Until Issue #58 is complete, legacy ETL components may still assume older field names or schemas. Converter logic to normalize old → new formats is being developed as part of the migration.
-- **Production status:** Backend fully supports current schema. ETL pipeline integration is work-in-progress (WIP).
++  **Canonical extraction**.  `agda-strux` backend emits Full JSONL format with
+   `typeAst` structural encoding (version `0.3-v0`).
++  **ETL alignment**.  Integration of `typeAst` and structural schema into downstream
+   ETL pipeline is tracked in [Issue
+   #58](https://github.com/formalverification/agda-ai-prover/issues/58).
++  **Legacy migration**.  Issue #58 is complete, so legacy ETL components should no longer
+   assume older field names or schemas; converter logic to normalize old → new
+   formats is already developed. **TODO**: check/confirm.
++  **Production status**.  Backend fully supports current schema; ETL pipeline
+   integration is done. **TODO**: check/confirm.
 
 ---
 
-## 3. Full-row schema (v0.x)
+## 3. Full-row schema (v0.01)
 
 ### 3.1 Required fields (Full)
+
 | Field | Type | Meaning |
 |------:|------|---------|
 | `file` | string | Source file path used by extractor (may be absolute). |
@@ -81,9 +91,11 @@ This doc mainly specifies **Full**.
 | `dependencies` | array[string] | Heuristic tokens extracted from `type` (type-level deps). |
 | `astSize` | number | Character length of the `type` string: `astSize = length(type)`. Used for sanity checks and debugging. |
 
-**Stability guarantee:** required fields must not disappear in v0.x.
+**Stability guarantee:** required fields must not disappear in v0.01.
+
 
 ### 3.2 Optional fields (Full)
+
 | Field | Type | Meaning |
 |------:|------|---------|
 | `body` | null \| string | Pretty-printed clause bodies (Agda internal terms), if available. |
@@ -113,16 +125,19 @@ Operators like `_+_` can surface naming/pathological normalization issues.
 ## 5. Structural AST (`typeAst`) contract
 
 ### 5.1 Versioning
-- `typeAstVersion` is mandatory.
-- Consumers must branch by version:
-  - `"0.3-v0"`: current encoder described here.
-- Breaking changes require:
-  1) bump `typeAstVersion`,
-  2) add a converter in ETL to normalize old → new when needed,
-  3) update this doc + add regression fixtures.
+
++  `typeAstVersion` is mandatory.
++  Consumers must branch by version:
+   + `"0.3-v0"`: current encoder described here.
++  Breaking changes require
+
+   1. bump `typeAstVersion`
+   2. add a converter in ETL to normalize old → new when needed,
+   3. update this doc + add regression fixtures.
 
 ### 5.2 Common node tags (0.3-v0)
-*(This section is deliberately partial; unknown constructors are bucketed as `Other*`.)*
+
+*This section is deliberately partial; unknown constructors are bucketed as `Other*`.*
 
 - `Type`: `{ tag, sort, term }`
 - `Pi`: `{ tag, binder, dom, cod }`
@@ -136,8 +151,9 @@ Operators like `_+_` can surface naming/pathological normalization issues.
 - `Other`, `OtherElim`, `OtherLevel`, etc.
 
 ### 5.3 Invariants
-- Encoder is **total**: never throws; unknown nodes become `Other*`.
-- Application structure is represented via elimination lists (`elims`) on `Def/Var/Con`.
+
+-  Encoder is **total**: never throws; unknown nodes become `Other*`.
+-  Application structure is represented via elimination lists (`elims`) on `Def/Var/Con`.
 
 ---
 
@@ -147,7 +163,8 @@ Operators like `_+_` can surface naming/pathological normalization issues.
 
 This is a **derived-but-stored** view: it can be emitted by the backend (preferred) or computed in ETL from canonical data.
 
-**Tracking:** Implementation tracked in [Issue #61](https://github.com/formalverification/agda-ai-prover/issues/61).
+**Tracking**.  Implementation tracked in [Issue #61](https://github.com/formalverification/agda-ai-prover/issues/61).
+
 
 ### 6.1 Ports schema (v0)
 
@@ -167,6 +184,7 @@ This is a **derived-but-stored** view: it can be emitted by the backend (preferr
 +  `outputs` is the remaining codomain (after peeling).
 +  `type` strings in ports are produced via Agda pretty printer (v0). Future versions may add `typeAst`.
 
+
 ### 6.2 Wires schema (v0)
 
 ```json
@@ -177,15 +195,16 @@ This is a **derived-but-stored** view: it can be emitted by the backend (preferr
 +  `refsFromBody`: heuristic identifier tokens from `body`.
 +  `wires`: `dedupe(dependencies ∪ refsFromBody)`.
 
+
 ### 6.3 Intended uses
 
-+  Graph building: edges `(prettyQname → wireToken)`
-+  Retrieval: “neighbors in dependency graph”
-+  Curriculum: sample by fan-in/fan-out, depth, interface complexity
++  Graph building: edges `(prettyQname → wireToken)`.
++  Retrieval: "neighbors in dependency graph".
++  Curriculum: sample by fan-in/fan-out, depth, interface complexity.
 +  Training tasks:
 
-  +  **Interface completion**: predict `ports` from statement
-  +  **Missing wire**: predict masked edge in `wires`
+   +  **Interface completion**: predict `ports` from statement.
+   +  **Missing wire**: predict masked edge in `wires`.
 
 ### 6.4 Non-goals (v0)
 
@@ -198,18 +217,18 @@ This is a **derived-but-stored** view: it can be emitted by the backend (preferr
 
 ### 7.1 Graph artifacts
 
-+  **Edge list**: `(srcPrettyQname, depToken, depKind)` where `depKind ∈ {type, body, union}`
-+  **Reverse index**: token → list of definitions that mention it
-+  **Graph stats**: SCCs, degrees, depth estimates, module clustering
++  **Edge list**: `(srcPrettyQname, depToken, depKind)` where `depKind ∈ {type, body, union}`.
++  **Reverse index**: token → list of definitions that mention it.
++  **Graph stats**: SCCs, degrees, depth estimates, module clustering.
 
 ---
 
 ### 7.2 Training datasets (examples)
 
-+  **Next-step dataset** (planned): `(goal/context) → tactic/step`
-+  **Ports dataset** (planned): `(typeAst + defKind) → ports`
-+  **Missing-wire dataset** (planned): `(ports + partial wires) → missing wire`
-+  **Proof-completion dataset** (Phase 1, Issue #84): `(goal/context) → proof term/body` (scored by Agda typechecking)
++  **Next-step dataset** (planned): `(goal/context) → tactic/step`.
++  **Ports dataset** (planned): `(typeAst + defKind) → ports`.
++  **Missing-wire dataset** (planned): `(ports + partial wires) → missing wire`.
++  **Proof-completion dataset** (Phase 1, Issue #84): `(goal/context) → proof term/body` (scored by Agda typechecking).
 
 ---
 

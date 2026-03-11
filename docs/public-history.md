@@ -2,17 +2,17 @@
 
 ## Public History: notes on the migration
 
-When making this project public, we migrated from v.0.1 (agda-ai-prover) to v.1.0 (agda-native).
+When making this project public, we migrated from v.0.1 (agda-ai-prover) to v.1.0 (agda-native-air).
 Here are some notes on the migration.
 
 ### 1. New public repo identity
 
 Use
 
-+  **repo name:** `agda-native`
++  **repo name:** `agda-native-air`
 +  **tagline:** Agda-native AI reasoning environment
-+  **primary concepts:** AgdaDojang, agda-mcp, corpus extraction, retrieval, evaluation
-   (de-emphasize "small local prover" and "AI mathematician" as immediate deliverables).
++  **primary components:** `agda-dojang`, `agda-mcp`, `agda-strux` structured corpus extraction
+   (de-emphasizing "small local prover" and "AI mathematician" as immediate deliverables).
 
 This gives newcomers a clean entry point while still preserving the long-range vision
 in the `MANIFESTO.md`.
@@ -28,22 +28,24 @@ These are the parts that are already the backbone of the story.
 +  `docs/HowToRun.md` after cleanup;
 +  `agda-jang` **Agda interaction/evaluation tooling** → rename `agda-dojang`;
 +  the **fixture-based proof-completion demo**;
-+  **structured extraction pipeline** `agda-backend-jsonl`
-   (→ rename tbd) + `AgdaJsonlDriver.scala` and docs explaining them;
++  **structured extraction pipeline** `agda-backend-jsonl` → rename `agda-strux` +
+   `AgdaJsonlDriver.scala` and the docs describing them;
 +  **core Make targets** (e.g., `make extract-lib`, `make eval-proof-completion`),
    that demonstrate extraction and evaluation.
 
-...basically, just the pieces that are still relevant in the new manifesto/plan, and
-that show the project has some history, is already useful, and is not vaporware.
+...basically, just the pieces that are still relevant in the new manifesto/plan,
+which show the project has some history and we've already developed some useful tools
+and infrastructure.
 
 ### 3. What to rename
 
 We rename the following immediately in the public repo:
 
-+  `agda-jang` → **`agda-dojang`**
 +  "AgdaJang" → **"AgdaDojang"**
++  `agda-jang` → **`agda-dojang`**
 +  "AgdaBridge" terminology → **AgdaDojang / agda-mcp bridge**
-+  "agda-ai-prover" in user-facing docs → **agda-native**
++  `agda-backend-jsonl` → **`agda-strux`**
++  `agda-ai-prover` → **`agda-native-air`**
 
 For the first public phase, we keep small compatibility notes in docs, but the old
 branding is no longer prominent.
@@ -76,15 +78,15 @@ We leave behind and/or heavily prune the following:
 +  abandoned or superseded training targets;
 +  duplicate READMEs and transitional notes;
 +  one-off scripts that only made sense during internal iteration;
-+  old branches of the plan that assume the project's identity is "train a theorem
-   prover".
++  old branches of the plan that assumed the project's goal was "train a theorem
+   prover."
 
 ---
 
 ### 6. Top-level public layout
 
 ```text
-agda-native/
+agda-native-air/
 ├── README.md
 ├── LICENSE
 ├── CONTRIBUTING.md
@@ -104,14 +106,14 @@ agda-native/
 │   ├── python/
 │   ├── tests/
 │   └── Makefile
-├── extraction/
+├── agda-strux/
 │   ├── README.md
 │   ├── backend/
 │   ├── etl/
 │   └── tests/
-├── mcp/
+├── agda-mcp/
 │   ├── README.md
-│   └── agda-mcp/
+│   └── mcp/
 ├── data/
 │   └── fixtures/
 ├── experiments/
@@ -134,9 +136,9 @@ following primary components:
 
 ### 7. Git-history strategy
 
-#### Steps which led to the public agda-native repo
+#### Steps which led to the public agda-native-air repo
 
-+  create `agda-native` as a **new repo**
++  create `agda-native-air` as a **new repo**
 +  import selected directories using **history-preserving subtree/filter-repo extraction**
 +  create this `docs/public-history.md` artifact explaining that the public repo is a
    curated continuation of a prior private development effort.
@@ -156,6 +158,7 @@ We split migration into four units so history stays meaningful.
 
 **Unit B — Extraction spine**.
 
++  move `agda-backend-jsonl/` → `agda-strux/`
 +  move the backend/ETL/extraction docs and tests
 +  preserve history
 +  prune dead experimental scripts
@@ -168,6 +171,6 @@ We split migration into four units so history stays meaningful.
 + CONTRIBUTING
 + architecture docs
 
-**Unit D — Experimental leftovers**. Selectively copy, not fully preserve, anything
+**Unit D — Experimental leftovers**.  Selectively copy, not fully preserve, anything
 that is still useful but not central.
 

@@ -4,9 +4,9 @@
 
 *A manifesto for agda-native (v2.2)*
 
-**The Project in One Sentence**. *A research program for building the missing
-interaction, retrieval, and evaluation infrastructure that allows modern AI agents to
-reason and interface effectively with Agda.*
+**The Project in One Sentence**. *A research program for building the interaction,
+retrieval, and evaluation infrastructure that allows modern AI agents to reason and
+interface effectively with Agda.*
 
 ## 1. Motivation
 
@@ -354,7 +354,7 @@ The near-term goal is a credible, publishable Agda-native reasoning environment 
 
 +  a working interaction layer (`agda-dojang`),
 +  a standard mcp bridge for agent access (`agda-mcp`),
-+  retrieval over a structured Agda corpus (`agda-strux` + planned search/retrieval tool),
++  retrieval over a structured Agda corpus (`agda-strux` + a search/retrieval tool),
 +  deterministic evaluation on committed fixtures,
 +  some compelling end-to-end demonstrations.
 

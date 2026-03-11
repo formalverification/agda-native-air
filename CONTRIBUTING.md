@@ -1,9 +1,9 @@
-# Contributing to agda-native
+# Contributing to agda-native-air
 
-Thank you for your interest in contributing to `agda-native`!
+Thank you for your interest in contributing to `agda-native-air`!
 
 This project is still in an early phase.  The codebase is real and already
-useful, but parts of it are being renamed, reorganized, and clarified as we move
+useful, but parts of it are being reorganized and clarified as we move
 away from a private research repository and into a public collaboration space.
 
 The goal of this document is to make contribution easier and less intimidating.
@@ -16,8 +16,8 @@ We welcome help with
 
 - Agda tooling and interaction workflows;
 - `agda-dojang` and proof-state tooling;
-- MCP bridge design and implementation;
-- extraction, ETL, and schema validation;
+- `agda-mcp` bridge design and implementation;
+- `agda-strux` extraction, ETL, and schema validation;
 - retrieval and graph-based views;
 - fixture and benchmark design;
 - tests, CI, and developer experience;
@@ -31,7 +31,7 @@ We welcome help with
 
 ### 1. Agda is the oracle
 
-All AI components are supporting actors. Proposals are cheap; typechecked results
+All AI components are supporting actors. Proposals are cheap; type-checked results
 matter.
 
 ### 2. Prefer small, reviewable changes
@@ -77,8 +77,8 @@ See `docs/HowToRun.md`.
 Typical setup:
 
 ```sh
-git clone git@github.com:formalverification/agda-native.git
-cd agda-native
+git clone git@github.com:formalverification/agda-native-air.git
+cd agda-native-air
 nix develop
 make test
 ```
@@ -113,9 +113,9 @@ Use descriptive names, ideally with an issue number when applicable.
 +  `18-add-mcp-tool-schema`
 +  `22-fix-fixture-demo-docs`
 
-In fact, it's best to make sure an issue describing the purpose of a new branch
-already exists; in that case, the new branch can be created using the link on the
-right side of the issue page.  GitHub will then propose such a branch name for you.
+It's best if there's a GitHub issue that describes the purpose of a branch;
+in that case, if the branch is created using the link on the right-hand side of the
+issue page, then GitHub will propose a good branch name for you.
 
 ### Pull request guidelines
 
@@ -137,7 +137,7 @@ Examples include
 
 +  fixture demo / evaluator tests;
 +  extraction / ETL tests;
-+  `agda-dojang` unit tests;
++  unit tests for `agda-dojang`, `agda-strux`, `agda-mcp`;
 +  CI-related smoke tests.
 
 If a change affects reproducibility or setup, please mention exactly what you ran.
@@ -146,7 +146,7 @@ If a change affects reproducibility or setup, please mention exactly what you ra
 
 ## Documentation expectations
 
-Relevant docs include:
+Relevant docs include
 
 +  `README.md`
 +  `docs/MANIFESTO.md`
@@ -156,13 +156,14 @@ Relevant docs include:
 +  `docs/architecture.md`
 +  `docs/public-history.md`
 
-If your change invalidates any of these, update them in the same PR.
+If your change affects any of these, please update them in the same PR.
 
 ---
 
 ## Coding style
 
-We use multiple languages and tools in this repository.  In general,
+We use multiple languages and tools in this repository, including Agda, Haskell,
+Rust, Scala, Spark, and Python.  In general,
 
 +  prefer explicit, maintainable code;
 +  prefer deterministic behavior in evaluation tooling;
@@ -175,25 +176,24 @@ subproject.
 
 ---
 
-## Research directions: deferred does not mean rejected
+## Research directions
 
-Some directions are intentionally deferred while the environment is stabilized; these
-including the following:
+Some research directions are intentionally deferred while the environment is
+stabilizing; these including the following:
 
 +  deep reflection-driven automation;
 +  deep SMT / reflection integration;
 +  broad conjecture-generation workflows.
 
-These remain interesting and welcome as future research directions; they are simply
-not a primary focus during for the current public bootstrap phase.
+These remain interesting and encouraged as future research directions; they are
+simply not a primary focus during the current public bootstrap phase.
 
 ---
 
 ## Questions
 
 If you are unsure where a contribution belongs, open an issue or draft PR and ask.
-That is much better than guessing wrong in silence.
-
-We would rather help shape a good contribution early than untangle a large one late.
+That is much better than guessing wrong in silence.  We would rather help shape a
+good contribution early than untangle a large one late.
 
 

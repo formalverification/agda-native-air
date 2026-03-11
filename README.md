@@ -1,17 +1,17 @@
-# agda-native
+# agda-native-air
 
-**Agda-native AI reasoning environment**
+**Agda Native AI Reasoning environment**
 
-`agda-native` is a research project for building the missing interaction,
-retrieval, and evaluation infrastructure that allows modern AI agents to work
-effectively with **Agda**.
+`agda-native-air` is a research project for building the interaction, retrieval, and
+evaluation infrastructure that allows modern AI agents to work effectively with
+**Agda**.
 
-The project is organized around four core ideas:
+The project is organized around four core components.
 
-1. **interaction** — programmatic access to Agda proof states and hole filling;
-2. **bridge** — an MCP-based interface for AI agents;
-3. **retrieval** — structured corpus extraction and search over Agda libraries;
-4. **evaluation** — deterministic fixtures, logs, and reproducible proof-completion reports.
+1. **Interaction** — programmatic access to Agda proof states and hole filling;
+2. **Bridge** — an MCP-based interface for AI agents;
+3. **Retrieval** — structured corpus extraction and search over Agda libraries;
+4. **Evaluation** — deterministic fixtures, logs, and reproducible proof-completion reports.
 
 Agda remains the final arbiter of correctness.
 
@@ -41,7 +41,7 @@ publishable **Agda-native reasoning environment**.
 ## Repository layout
 
 ```
-agda-native/
+agda-native-air/
 ├── README.md
 ├── LICENSE
 ├── CONTRIBUTING.md
@@ -54,8 +54,8 @@ agda-native/
 │   ├── HowToRun.md
 │   └── public-history.md
 ├── agda-dojang/
-├── extraction/
-├── mcp/
+├── agda-strux/
+├── agda-mcp/
 ├── data/
 ├── experiments/
 └── scripts/
@@ -70,15 +70,15 @@ agda-native/
    + hole filling and candidate checking
    + fixture-based proof-completion demo
 
-+  `extraction/`
++  `agda-strux/`
 
    + structured corpus extraction
    + ETL and derived views
    + schema and validation tooling
 
-+  `mcp/`
++  `agda-mcp/`
 
-   + `agda-mcp` bridge layer
+   + bridge layer
    + agent-facing tool definitions and implementations
 
 +  `data/`
@@ -97,18 +97,16 @@ agda-native/
 
 This repository is the public continuation of a longer private development effort.
 
-What already exists in working form:
+The following already exist in working form:
 
 +  deterministic fixture-based proof completion;
 +  Agda-in-the-loop propose → check workflows;
 +  structured extraction and ETL foundations;
 +  schema documentation and evaluation reports.
 
-What is being built next:
+The following is currently under development:
 
-+  the `AgdaJang` → `AgdaDojang` rename;
 +  `agda-mcp`;
-+  a public benchmark set;
 +  retrieval over structured Agda corpora;
 +  local specialist models for narrow tasks such as premise selection and candidate ranking.
 
@@ -124,36 +122,36 @@ For details, see:
 
 See [`docs/HowToRun.md`](docs/HowToRun.md) for the full setup.
 
-Typical development flow:
+Typical development flow is as follows (exact commands provided below):
 
-1. clone the repo
-2. enter the Nix development shell
-3. run tests
-4. run the fixture demo
-5. explore extraction / evaluation workflows
+1. clone the repo;
+2. enter the Nix development shell;
+3. run tests;
+4. run the fixture demo;
+5. explore extraction / evaluation workflows.
 
-Example high-level flow:
+**Example high-level commands**.
 
 ```sh
-git clone git@github.com:formalverification/agda-native.git
-cd agda-native
+git clone git@github.com:formalverification/agda-native-air.git
+cd agda-native-air
 nix develop
 make test
 make eval-proof-completion-smoke
+make help    # see what's available and working now
 ```
 
 ---
 
 ## Project scope
 
-This project is **not**:
+This project is **not**
 
-+  a claim that Agda will replace Lean across the board;
-+  a promise to train a small local model that matches frontier models at open-ended reasoning;
 +  a mere autocomplete plugin;
++  training local models to compete with frontier models at open-ended reasoning;
 +  a finished product.
 
-This project **is**:
+This project **is**
 
 +  an Agda-native reasoning environment;
 +  a research platform;
@@ -163,23 +161,23 @@ This project **is**:
 
 ## Collaboration
 
-We welcome contributors interested in:
+We welcome contributors interested in
 
-+  Agda tooling
-+  proof assistant infrastructure
-+  corpus extraction and representation
-+  retrieval and local specialist models
-+  evaluation and benchmarking
-+  constructive, algebraic, categorical, and cubical mathematics
++  Agda tooling;
++  proof assistant infrastructure;
++  corpus extraction and representation;
++  retrieval and local specialist models;
++  evaluation and benchmarking;
++  constructive, algebraic, category theoretic mathematics, general type theory and/or HoTT.
 
-Please start with [`CONTRIBUTING.md`](CONTRIBUTING.md).
+If you want to join us, please start by reading [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 
 ## Citation / publication status
 
-Publication drafts are in progress.
-For now, please cite the repository URL and reference the relevant docs in `docs/`.
+Publication drafts are in progress.  For now, please cite the repository URL and
+reference the relevant docs in `docs/`.
 
 ---
 
