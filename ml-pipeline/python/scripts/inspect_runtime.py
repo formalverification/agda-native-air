@@ -1,7 +1,7 @@
 """
 inspect_runtime.py
 
-File: agda-ai-prover/ml-pipeline/python/scripts/inspect_runtime.py
+File: agda-native-air/ml-pipeline/python/scripts/inspect_runtime.py
 
 Description:
   Utility script to inspect and print the runtime environment, including Python

@@ -1,7 +1,7 @@
 # ==============================================================================
 # ml-pipeline — subproject Makefile
 #
-# @file agda-ai-prover/ml-pipeline/Makefile
+# @file agda-native-air/ml-pipeline/Makefile
 # @version 0.1
 #
 # [DEPRECATED]
@@ -23,7 +23,7 @@ API_DIR=api
 .PHONY: help
 help:
 	@echo "This ml-pipeline Makefile is deprecated."
-	@echo "Use the top-level agda-ai-prover/Makefile (e.g. 'make train-stdlib')."
+	@echo "Use the top-level agda-native-air/Makefile (e.g. 'make train-stdlib')."
 
 seed:
 	mkdir -p data/raw

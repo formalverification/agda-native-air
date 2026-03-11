@@ -1,7 +1,7 @@
 """
 main.py
 
-File: agda-ai-prover/ml-pipeline/python/api/main.py
+File: agda-native-air/ml-pipeline/python/api/main.py
 
 Description:
   This module sets up a FastAPI application that loads a pre-trained

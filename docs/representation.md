@@ -356,11 +356,11 @@ instead of skipping malformed lines).
 
 ### 7.4 Policy backend contract (v0) — operational interface
 
-AgdaJang’s end-to-end “propose → check” loop queries a **policy backend** using a small JSON request/response schema.
+AgdaDojang’s end-to-end “propose → check” loop queries a **policy backend** using a small JSON request/response schema.
 This is an **operational contract** (not derived from canonical JSONL rows).
 
-- Request schema: `agda-ai-prover/policy-request@v0`
-- Response schema: `agda-ai-prover/policy-response@v0`
+- Request schema: `agda-native-air/policy-request@v0`
+- Response schema: `agda-native-air/policy-response@v0`
 - Hard requirement: response contains `candidates[*].term` (ranked proof term/body candidates).
 
 Preferred version key is `schema` (string). Legacy `schemaVersion` may appear during transition but should be removed once all backends are updated.

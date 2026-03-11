@@ -14,7 +14,7 @@
 --   Usage:
 --     agda-json-runner \
 --       --project-root <repo-root> \
---       --agda-dir     <repo-root>/agda-jang/agda \
+--       --agda-dir     <repo-root>/agda-dojang/agda \
 --       --src-dir      <path-to-library-src> \
 --       --modules-file <everything-modules.txt> \
 --       --out-dir      <out-dir> \
@@ -24,7 +24,7 @@
 --   Example:
 --     agda-json-runner \
 --       --project-root ~/dev/agda/agda-strux \
---       --agda-dir     ~/dev/agda/agda-jang/agda \
+--       --agda-dir     ~/dev/agda/agda-dojang/agda \
 --       --src-dir      ~/dev/agda/agda-stdlib/src \
 --       --modules-file ~/dev/agda/agda-stdlib/everything-modules.txt
 --       --out-dir      ~/tmp/agda-jsonl-out \
@@ -106,7 +106,7 @@ usage = unlines
   [ "Usage:"
   , "  agda-json-runner \\"
   , "    --project-root <repo-root> \\"
-  , "    --agda-dir     <repo-root>/agda-jang/agda \\"
+  , "    --agda-dir     <repo-root>/agda-dojang/agda \\"
   , "    --src-dir      <path-to-library-src> \\"
   , "    --modules-file <everything-modules.txt> \\"
   , "    --out-dir      <out-dir> \\"

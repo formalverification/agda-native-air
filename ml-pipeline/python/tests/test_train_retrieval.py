@@ -15,7 +15,7 @@ Description:
 
   + given tiny JSONL dataset, `train_retrieval` produces same pickle bytes across runs;
   + vocab is sorted; postings are sorted (inverted index construction is sorted/grouped);
-  + schema key is exactly `"agda-ai-prover/retrieval-policy@v0"`.
+  + schema key is exactly `"agda-native-air/retrieval-policy@v0"`.
 """
 
 from __future__ import annotations

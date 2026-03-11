@@ -129,6 +129,5 @@ cabal test
 [strux-driver/README]: https://github.com/formalverification/agda-native-air/blob/main/strux-driver/README.md
 [agda-dojang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/README.md
 [ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
-[`agda-dojang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/python/tools/policy_fixture.py
 
 

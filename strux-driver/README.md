@@ -340,13 +340,12 @@ In particular, we are continually exploring new ways to improve it.  Here are so
 
 + [Root project README][]
 + [`agda-strux/README.md`][agda-strux/README]
-+ [`agda-jang/README.md`][agda-jang/README]
++ [`agda-dojang/README.md`][agda-dojang/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
 
 [Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
 [agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
-[agda-jang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-jang/README.md
+[agda-dojang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/README.md
 [ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
-[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-native-air/blob/main/agda-jang/python/tools/policy_fixture.py
 
 

@@ -1,7 +1,7 @@
 /**
  * PreprocessAgda.scala
  *
- * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/PreprocessAgda.scala
+ * File: agda-native-air/ml-pipeline/etl/src/main/scala/PreprocessAgda.scala
  *
  * Description:
  *   Preprocess canonical Agda backend JSONL (agda-json --format full) to Parquet.

@@ -26,7 +26,7 @@ Description:
 
   Output artifact (pickle dict):
     {
-      "schema": "agda-ai-prover/retrieval-policy@v0",
+      "schema": "agda-native-air/retrieval-policy@v0",
       "vocab": { token: int, ... },
       "idf": [float, ...],
       "docs": [ { "target": str, "meta": {...} }, ... ],
@@ -54,7 +54,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import logging
 
-RETRIEVAL_MODEL_SCHEMA_V0 = "agda-ai-prover/retrieval-policy@v0"
+RETRIEVAL_MODEL_SCHEMA_V0 = "agda-native-air/retrieval-policy@v0"
 
 _TOKEN_RE = re.compile(
     r"_[^\s]+_"                      # Agda mixfix operators like _≡_

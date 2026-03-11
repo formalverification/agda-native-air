@@ -1,7 +1,7 @@
 /**
  * PreprocessAgdaSpec.scala
  *
- * File: agda-ai-prover/ml-pipeline/etl/src/test/scala/PreprocessAgdaSpec.scala
+ * File: agda-native-air/ml-pipeline/etl/src/test/scala/PreprocessAgdaSpec.scala
  *
  * Fixture-driven integration test for PreprocessAgda ETL process.
  * + uses a tiny JSONL fixture in src/test/resources

@@ -1,7 +1,7 @@
 /**
  * BuildProofCompletionDataset.scala
  *
- * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/etl/BuildProofCompletionDataset.scala
+ * File: agda-native-air/ml-pipeline/etl/src/main/scala/etl/BuildProofCompletionDataset.scala
  *
  * Purpose
  * -------
@@ -9,7 +9,7 @@
  *
  * Context in the project
  * ----------------------
- *   Upstream proof-parser extractor (AgdaJsonlDriver + agda-json backend) produces
+ *   Upstream strux-driver extractor (AgdaJsonlDriver + agda-json backend) produces
  *   JSONL rows (canonical "Full" style):
  *
  *     file, module, name, qname, prettyQname,

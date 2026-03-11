@@ -1,10 +1,10 @@
-<!-- agda-ai-prover/ml-pipeline/README.md -->
+<!-- agda-native-air/ml-pipeline/README.md -->
 
 # MLPipe
 
-This is the learning, evaluation, and inference component of the **agda-ai-prover** project.
+This is the learning, evaluation, and inference component of the **agda-native-air** project.
 
-Its purpose is to take the **structured, semantically informed datasets** produced by ProofParser and use them to train, evaluate, and deploy machine-learning models that support AI-assisted reasoning in Agda.
+Its purpose is to take the **structured, semantically informed datasets** produced by StruxDriver and use them to train, evaluate, and deploy machine-learning models that support AI-assisted reasoning in Agda.
 
 MLPipe is intentionally modular and research-oriented; it is designed to support experimentation with different data representations, learning objectives, and model architectures, rather than to lock the project into a single ML stack or approach.
 
@@ -15,7 +15,7 @@ MLPipe is intentionally modular and research-oriented; it is designed to support
 - [Role in the Overall System](#role-in-the-overall-system)
 - [Design Principles](#design-principles)
 - [Pipeline Overview](#pipeline-overview)
-- [Stage 1: Input (JSONL datasets produced by ProofParser)](#stage-1-input-jsonl-datasets-produced-by-proofparser)
+- [Stage 1: Input (JSONL datasets produced by StruxDriver)](#stage-1-input-jsonl-datasets-produced-by-proofparser)
 - [Stage 2: ETL and Feature Engineering (Scala / Spark)](#stage-2-etl-and-feature-engineering-scala--spark)
 - [Stage 3: Training and Evaluation (Python / PyTorch)](#stage-3-training-and-evaluation-python--pytorch)
 - [Stage 4: Inference and Serving](#stage-4-inference-and-serving)
@@ -30,14 +30,14 @@ MLPipe is intentionally modular and research-oriented; it is designed to support
 
 ## Role in the Overall System
 
-Within the agda-ai-prover architecture, MLPipe is responsible for
+Within the agda-native-air architecture, MLPipe is responsible for
 
 +  transforming extracted proof data into learning-ready features,
 +  training models for tasks such as premise selection and goal prediction,
 +  evaluating models using simple, reproducible baselines,
-+  serving trained models to interactive components (e.g. AgdaJang).
++  serving trained models to interactive components (e.g. AgdaDojang).
 
-Where ProofParser answers *“what mathematical structure is present?”* and AgdaJang answers *“what actions can we take?”*, MLPipe answers
+Where StruxDriver answers *“what mathematical structure is present?”* and AgdaDojang answers *“what actions can we take?”*, MLPipe answers
 
 > *“What patterns can be learned from existing mathematics, and how can they guide future proof search?”*
 
@@ -60,7 +60,7 @@ The pipeline favors clarity and inspectability over maximal performance.
 
 At a high level, the pipeline consists of four stages.
 
-1. **Input**: JSONL datasets produced by ProofParser (`AgdaData`, `TrainRecord`).
+1. **Input**: JSONL datasets produced by StruxDriver (`AgdaData`, `TrainRecord`).
 2. **ETL / Feature Engineering**: transformation into columnar, model-friendly formats.
 3. **Training & Evaluation**: learning models and measuring performance.
 4. **Inference / Serving**: making trained models available to agents.
@@ -111,7 +111,7 @@ These are under `ml-pipeline/python`.
       basic MLP model; saves trained model.
 
    +  `train_retrieval.py` builds a deterministic retrieval artifact for
-      `agda-jang/python/tools/policy_retrieval.py`.
+      `agda-dojang/python/tools/policy_retrieval.py`.
 
 +  `scripts/inspect_runtime.py`: inspect and print the runtime environment.
 
@@ -136,13 +136,13 @@ These are in `ml-pipeline/scripts`.
 ---
 
 
-## Stage 1: Input (JSONL datasets produced by ProofParser)
+## Stage 1: Input (JSONL datasets produced by StruxDriver)
 
-This is the pre-ETL stage and is the responsibility of the `agda-backend-jsonl` and
-`ProofParser` components of the project; see:
+This is the pre-ETL stage and is the responsibility of the `agda-strux` and
+`StruxDriver` components of the project; see:
 
-+  [agda-backend-jsonl/README][]
-+  [proof-parser/README][]
++  [agda-strux/README][]
++  [strux-driver/README][]
 
 ---
 
@@ -150,7 +150,7 @@ This is the pre-ETL stage and is the responsibility of the `agda-backend-jsonl` 
 
 ### Why Scala and Spark?
 
-MLPipe reuses the Scala/Spark stack introduced in ProofParser for several reasons.
+MLPipe reuses the Scala/Spark stack introduced in StruxDriver for several reasons.
 
 +  Strong static typing for feature schemas.
 +  Mature support for large-scale data processing.
@@ -260,11 +260,11 @@ A lightweight **FastAPI** server can
 +  accept structured goal or premise queries,
 +  return ranked predictions or scores.
 
-This server is intended to be called by interactive components such as AgdaJang, closing the loop between learning and proof execution.
+This server is intended to be called by interactive components such as AgdaDojang, closing the loop between learning and proof execution.
 
 ### Pre-training policy backend
 
-See [agda-jang/README](https://github.com/formalverification/agda-ai-prover/blob/85-agda-check-evaluator-fixtures/agda-jang/README.md#policy-fixturepy)
+See [agda-dojang/README](https://github.com/formalverification/agda-native-air/blob/85-agda-check-evaluator-fixtures/agda-dojang/README.md#policy-fixturepy)
 
 #### Proof completion demo (Phase 1: propose → Agda-check)
 
@@ -275,10 +275,10 @@ Two canonical commands:
 make eval-proof-completion
 
 # Fast smoke run (single tiny fixture; good for CI/local sanity checks)
-make -C agda-jang eval-proof-completion-smoke
+make -C agda-dojang eval-proof-completion-smoke
 ```
 
-These commands currently run Python tooling inside the `agda-jang` subproject because the evaluation loop depends on the AgdaJang *reflection macros* (to extract goal + local context) and the AgdaJang library setup (pinned stdlib, library-file, include paths). The ML pipeline consumes the resulting artifacts (goal/context requests, candidate attempts, aggregate reports) as inputs to later dataset-building and model work.
+These commands currently run Python tooling inside the `agda-dojang` subproject because the evaluation loop depends on the AgdaDojang *reflection macros* (to extract goal + local context) and the AgdaDojang library setup (pinned stdlib, library-file, include paths). The ML pipeline consumes the resulting artifacts (goal/context requests, candidate attempts, aggregate reports) as inputs to later dataset-building and model work.
 
 ---
 
@@ -376,19 +376,19 @@ What success looks like:
 
 ``` bash
 $ make etl
->> [etl] Spark: JSONL -> Parquet -> /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
+>> [etl] Spark: JSONL -> Parquet -> /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
 cd ml-pipeline && \
   sbt -Dsbt.supershell=false "project etl" "runMain etl.PreprocessAgda"
 [info] welcome to sbt 1.10.11 (N/A Java 21.0.3)
 [info] loading settings for project ml-pipeline-build-build from metals.sbt...
-[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/project/project
+[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/project/project
 [info] loading settings for project ml-pipeline-build from metals.sbt...
-[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/project
+[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/project
 [success] Generated .bloop/ml-pipeline-build.json
 [success] Total time: 2 s, completed Feb 1, 2026, 2:38:18 PM
 [info] loading settings for project root from build.sbt...
-[info] set current project to ml-pipeline (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/)
-[info] set current project to ETL (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/)
+[info] set current project to ml-pipeline (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/)
+[info] set current project to ETL (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/)
 [info] running (fork) etl.PreprocessAgda 
 [error] Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
 [error] 26/02/01 14:38:20 WARN Utils: Your hostname, alonzo resolves to a loopback address: 127.0.1.1; using 192.168.1.34 instead (on interface wlp0s20f3)
@@ -396,20 +396,20 @@ cd ml-pipeline && \
 [error] 26/02/01 14:38:26 INFO ShutdownHookManager: Shutdown hook called
 [error] 26/02/01 14:38:26 INFO ShutdownHookManager: Deleting directory /tmp/spark-73102be6-e849-4ce6-8a1a-02aadd609d99
 [success] Total time: 8 s, completed Feb 1, 2026, 2:38:26 PM
-✅ wrote /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
+✅ wrote /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
 
 $ make train
 >> [train] USE_VENV=1 TORCH_MODE=cpu
-   TRAIN_DATA=/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/data/train.jsonl
+   TRAIN_DATA=/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/data/train.jsonl
 🐍 inspecting Python / torch runtime...
-Python executable : /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/bin/python
+Python executable : /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/bin/python
 torch version     : 2.6.0+cu124
-/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
   return torch._C._cuda_getDeviceCount() > 0
 CUDA available    : False
 🧊 USING CPU-ONLY TORCH
->> [train] training -> /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt (input=/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/data/train.jsonl)
-/home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+>> [train] training -> /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt (input=/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/data/train.jsonl)
+/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
   return torch._C._cuda_getDeviceCount() > 0
 epoch 1/10  loss=0.0085
 epoch 2/10  loss=0.0039
@@ -421,15 +421,15 @@ epoch 7/10  loss=0.0002
 epoch 8/10  loss=0.0001
 epoch 9/10  loss=0.0001
 epoch 10/10  loss=0.0001
-✅ saved model to /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
-✅ model ready: /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
+✅ saved model to /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
+✅ model ready: /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
 
 $ make serve
-⚠️  /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/ml-pipeline/python/api/app.py not found; skipping serve.
+⚠️  /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/python/api/app.py not found; skipping serve.
 
 $ make smoke
 → Top-level smoke on "2026-02-01T21:39:16Z"
-→ logs: /home/williamdemeo/git/AI/PROJECTS/agda-ai-prover/worktrees/william/58-integrate-into-etl/data/make-logs/20260201T213916Z
+→ logs: /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/data/make-logs/20260201T213916Z
 ------------------------------------------------------------
 >>> make gen-sample
 ✓ gen-sample (17s)
@@ -465,7 +465,7 @@ Run `make help` for additional targets and configuration options.
 +  Joint models over goals and action sequences.
 +  Integration with large language models as components.
 +  Curriculum learning across mathematical corpora.
-+  Active learning driven by AgdaJang interactions.
++  Active learning driven by AgdaDojang interactions.
 
 *MLPipe is intentionally conservative today, providing a stable foundation for more experimental work.*
 
@@ -474,14 +474,13 @@ Run `make help` for additional targets and configuration options.
 ## See Also
 
 + [Root project README][]
-+ [`agda-backend-jsonl/README.md`][agda-backend-jsonl/README]
-+ [`agda-jang/README.md`][agda-jang/README]
-+ [`proof-parser/README.md`][proof-parser/README]
++ [`agda-strux/README.md`][agda-strux/README]
++ [`agda-dojang/README.md`][agda-dojang/README]
++ [`strux-driver/README.md`][strux-driver/README]
 
-[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
-[agda-backend-jsonl/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-backend-jsonl/README.md
-[proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
-[agda-jang/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/README.md
-[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+[Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
+[agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
+[strux-driver/README]: https://github.com/formalverification/agda-native-air/blob/main/strux-driver/README.md
+[agda-dojang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/README.md
 
 

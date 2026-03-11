@@ -4,7 +4,7 @@
  * Description:
  *   SBT build configuration for the ETL module of the ML pipeline.
  *
- * File: agda-ai-prover/ml-pipeline/build.sbt
+ * File: agda-native-air/ml-pipeline/build.sbt
  *
  * Copyright (c) 2025 Thmpr Lab, LLC.
  */

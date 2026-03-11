@@ -244,7 +244,7 @@ object AgdaJsonlDriver extends IOApp {
     """Usage:
       |  runMain proofparser.extract.AgdaJsonlDriver \
       |    --project-root <repo-root> \
-      |    --agda-dir     <repo-root>/agda-jang/agda \
+      |    --agda-dir     <repo-root>/agda-dojang/agda \
       |    --src-dir      <path-to-library-src> \
       |    --modules-file <everything-modules.txt> \
       |    --out-dir      <out-dir> \

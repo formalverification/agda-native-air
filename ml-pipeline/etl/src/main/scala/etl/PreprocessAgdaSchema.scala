@@ -1,7 +1,7 @@
 /**
  * PreprocessAgdaSchema.scala
  *
- * File: agda-ai-prover/ml-pipeline/etl/src/main/scala/etl/PreprocessAgdaSchema.scala
+ * File: agda-native-air/ml-pipeline/etl/src/main/scala/etl/PreprocessAgdaSchema.scala
  *
  * Description:
  *   Schema for preprocessed Agda definitions.  This is the gold standard schema used

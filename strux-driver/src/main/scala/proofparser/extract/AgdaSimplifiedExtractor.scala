@@ -72,9 +72,9 @@
  *  From inside the `agda-ai-prver/strux-driver` directory, enter the following command:
  *
  *      sbt "runMain proofparser.extract.AgdaSimplifiedExtractor \
- *        ../agda-jang/agda output/goals.jsonl \
- *        --include ../agda-jang/agda --lib standard-library \
- *        --library-file ../agda-jang/agda/libraries \
+ *        ../agda-dojang/agda output/goals.jsonl \
+ *        --include ../agda-dojang/agda --lib standard-library \
+ *        --library-file ../agda-dojang/agda/libraries \
  *        --dump-raw-goals output/raw-goals --verbose"
  *
  *  ============================================================================
