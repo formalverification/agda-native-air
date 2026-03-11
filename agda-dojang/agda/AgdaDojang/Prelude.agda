@@ -1,9 +1,9 @@
 -- Prelude.agda
 --
--- File: agda-jang/agda/AgdaJang/Prelude.agda
+-- File: agda-dojang/agda/AgdaDojang/Prelude.agda
 --
 -- Description:
---   This module serves as a prelude for the AgdaJang project, providing common
+--   This module serves as a prelude for the AgdaDojang project, providing common
 --   imports and definitions that are used across the project. It re-exports necessary
 --   parts of the Agda standard library and the reflection API, and defines some
 --   convenient aliases and helper functions for working with the TC monad and terms.
@@ -12,12 +12,12 @@
 --
 -- Notes:
 --   This module is not intended to be a comprehensive prelude; it only includes
---   the specific imports and definitions that are currently needed for the AgdaJang
+--   the specific imports and definitions that are currently needed for the AgdaDojang
 --   project. As the project evolves, we may add more imports or utilities here as needed.
 --
 {-# OPTIONS --safe --cubical-compatible #-}
 
-module AgdaJang.Prelude where
+module AgdaDojang.Prelude where
 
 open import Agda.Primitive public
 open import Agda.Builtin.Bool public

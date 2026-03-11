@@ -3,7 +3,7 @@
 """
 test_agent_bridge.py
 
-File: agda-jang/python/tests/test_agent_bridge.py
+File: agda-dojang/python/tests/test_agent_bridge.py
 
 Description:
     Tests for the agent bridge utilities in tools/agent_bridge.py.

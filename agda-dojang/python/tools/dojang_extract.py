@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-AgdaJang Trace extractor (v0, safe CLI)
+AgdaDojang Trace extractor (v0, safe CLI)
 =======================================
 
-FILE: python/tools/jang_extract.py
+FILE: python/tools/dojang_extract.py
 
 DESCRIPTION
 
@@ -48,7 +48,7 @@ NOTES
 SCHEMA (v0)
 
   {
-    "version": "agda-jang-extract-v0",
+    "version": "agda-dojang-extract-v0",
     "timestamp": "...",
     "file": "/abs/path/to/file.agda",
     "module": "agda-example" | null,
@@ -98,7 +98,7 @@ def main():
     size_bytes = len(text.encode("utf-8", errors="strict"))
 
     payload = {
-        "version":   "agda-jang-extract-v0",
+        "version":   "agda-dojang-extract-v0",
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "file":      str(inp),
         "module":    module_name,

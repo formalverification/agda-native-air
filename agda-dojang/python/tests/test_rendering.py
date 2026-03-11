@@ -1,7 +1,7 @@
 """
 test_rendering.py
 
-File: agda-jang/python/tests/test_rendering.py
+File: agda-dojang/python/tests/test_rendering.py
 
 Description: tests for the rendering.py utilities
 """
@@ -72,12 +72,12 @@ def test_render_module_contains_module_header_and_goal_and_body():
 
     assert "module TrySandbox where" in src
     assert "open import Agda.Builtin.Nat" in src
-    # Check AgdaJang imports are included
+    # Check AgdaDojang imports are included
     for req in [
-        "open import AgdaJang.Prelude",
-        "open import AgdaJang.Refine",
-        "open import AgdaJang.Apply",
-        "open import AgdaJang.Debug",
+        "open import AgdaDojang.Prelude",
+        "open import AgdaDojang.Refine",
+        "open import AgdaDojang.Apply",
+        "open import AgdaDojang.Debug",
     ]:
         assert req in src
 
@@ -91,7 +91,7 @@ def test_render_module_dedupes_imports_and_preserves_user_order():
     user_imports = [
         "open import Agda.Builtin.Unit",
         "open import Agda.Builtin.Nat",
-        "open import AgdaJang.Apply",  # duplicated on purpose to test dedupe
+        "open import AgdaDojang.Apply",  # duplicated on purpose to test dedupe
     ]
     body = "intro"
 
@@ -102,15 +102,15 @@ def test_render_module_dedupes_imports_and_preserves_user_order():
     pos_nat  = src.find("open import Agda.Builtin.Nat")
     assert pos_unit != -1 and pos_nat != -1 and pos_unit < pos_nat
 
-    # The duplicate AgdaJang import should not appear twice
-    assert src.count("open import AgdaJang.Apply") == 1
+    # The duplicate AgdaDojang import should not appear twice
+    assert src.count("open import AgdaDojang.Apply") == 1
 
     # All required Jang imports are still present (deduped)
     for req in [
-        "open import AgdaJang.Prelude",
-        "open import AgdaJang.Refine",
-        "open import AgdaJang.Apply",
-        "open import AgdaJang.Debug",
+        "open import AgdaDojang.Prelude",
+        "open import AgdaDojang.Refine",
+        "open import AgdaDojang.Apply",
+        "open import AgdaDojang.Debug",
     ]:
         assert req in src
 

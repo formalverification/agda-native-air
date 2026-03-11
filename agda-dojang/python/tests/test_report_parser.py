@@ -1,13 +1,13 @@
 """
 test_report_parser.py
 
-File: agda-jang/python/tests/test_report_parser.py
+File: agda-dojang/python/tests/test_report_parser.py
 
 What:
-  Unit tests for the log parser that reads AgdaJang’s reporting macros output.
+  Unit tests for the log parser that reads AgdaDojang’s reporting macros output.
   The macros (`applyReport⟨_⟩`, `applySolveReport⟨_⟩`) emit a BEGIN/END block
   to stderr with lines like:
-      AGDAJANG_GOAL:0:visible: Nat
+      AGDADOJANG_GOAL:0:visible: Nat
 
 Why:
   - This is the backbone of dataset creation and CLI UX: we rely on a stable
@@ -16,7 +16,7 @@ Why:
 
 How to run:
   nix develop
-  cd agda-jang
+  cd agda-dojang
   PYTHONPATH=python pytest -q
 
 Expected:
@@ -29,10 +29,10 @@ from tools.report_parser import parse_marked_report, has_markers, extract_policy
 
 _SAMPLE = """Checking TrySandbox (...)
 TrySandbox.agda:10.5-23: error: [GenericDocError]
-AGDAJANG_SUBGOALS_BEGIN
-AGDAJANG_GOAL:0:visible: Nat
-AGDAJANG_GOAL:1:visible: Nat
-AGDAJANG_SUBGOALS_END
+AGDADOJANG_SUBGOALS_BEGIN
+AGDADOJANG_GOAL:0:visible: Nat
+AGDADOJANG_GOAL:1:visible: Nat
+AGDADOJANG_SUBGOALS_END
 when checking that the expression
 unquote applyReport⟨ quoteTerm _+_ ⟩ has type Nat
 """
@@ -55,14 +55,14 @@ def test_parse_marked_report_basic():
 def test_extract_policy_request_line_protocol_multiline():
     out = """
 noise
-AGDAJANG_REQ_BEGIN
-AGDAJANG_GOAL: ¬ (x ∧ y) ≈
+AGDADOJANG_REQ_BEGIN
+AGDADOJANG_GOAL: ¬ (x ∧ y) ≈
   ¬ x ∨ ¬ y
-AGDAJANG_CTX_BEGIN
-AGDAJANG_CTX:0:visible:y: Bool
-AGDAJANG_CTX:1:visible:x: Bool
-AGDAJANG_CTX_END
-AGDAJANG_REQ_END
+AGDADOJANG_CTX_BEGIN
+AGDADOJANG_CTX:0:visible:y: Bool
+AGDADOJANG_CTX:1:visible:x: Bool
+AGDADOJANG_CTX_END
+AGDADOJANG_REQ_END
 more noise
 """
     req = extract_policy_request_from_output(out)
@@ -92,12 +92,12 @@ def test_extract_policy_request_fixture_lambda_ctx_type_is_A():
     """
     out = """
 noise
-AGDAJANG_REQ_BEGIN
-AGDAJANG_GOAL: A
-AGDAJANG_CTX_BEGIN
-AGDAJANG_CTX:0:visible:x: A
-AGDAJANG_CTX:1:hidden:A: Set₀
-AGDAJANG_REQ_END
+AGDADOJANG_REQ_BEGIN
+AGDADOJANG_GOAL: A
+AGDADOJANG_CTX_BEGIN
+AGDADOJANG_CTX:0:visible:x: A
+AGDADOJANG_CTX:1:hidden:A: Set₀
+AGDADOJANG_REQ_END
 more noise
 """
     req = extract_policy_request_from_output(out)

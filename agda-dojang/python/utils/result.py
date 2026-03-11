@@ -1,5 +1,5 @@
 """
-file: agda-ai-prover/agda-jang/python/utils/result.py
+file: agda-native-air/agda-dojang/python/utils/result.py
 description: tiny Result type
 copyright: 2025 Thmpr
 """

@@ -3,7 +3,7 @@
 
 -- |  Runner.hs
 --
--- File: agda-backend-jsonl/app/Runner.hs
+-- File: agda-strux/app/Runner.hs
 --
 -- Description:
 --   agda-jsonl runner: run agda-jsonl over a list of top-level
@@ -23,12 +23,12 @@
 --
 --   Example:
 --     agda-json-runner \
---       --project-root ~/dev/agda/agda-backend-jsonl \
+--       --project-root ~/dev/agda/agda-strux \
 --       --agda-dir     ~/dev/agda/agda-jang/agda \
 --       --src-dir      ~/dev/agda/agda-stdlib/src \
 --       --modules-file ~/dev/agda/agda-stdlib/everything-modules.txt
 --       --out-dir      ~/tmp/agda-jsonl-out \
---       --agda-json    ~/dev/agda/agda-backend-jsonl/dist-newstyle/build/agda-jsonl/agda-jsonl \
+--       --agda-json    ~/dev/agda/agda-strux/dist-newstyle/build/agda-jsonl/agda-jsonl \
 --       --parallelism  16 \
 --       --no-resume
 --

@@ -1,37 +1,39 @@
-<!-- agda-ai-prover/agda-jang/README.md -->
+<!-- agda-native-air/agda-dojang/README.md -->
 
-# AgdaJang
+# AgdaDojang
 
-**AgdaJang** is the interactive execution and experimentation layer of the **agda-ai-prover** project.
+This is the interactive execution and experimentation layer of the **agda-native-air** project.
 
-It provides a small, carefully designed vocabulary of *safe proof actions* inside Agda, together with external tooling that allows AI agents (and humans) to **interact with Agda's typechecker**, propose proof steps, and observe precise semantic feedback.
+> *Dojang (도장) literally means "place of the way" or "training hall" in Korean martial arts, like Taekwondo, Hapkido, and Tang Soo Do.*
 
-AgdaJang is where learned policies are *executed*, *validated*, and *debugged*.
+AgdaDojang provides a small, carefully designed vocabulary of *safe proof actions* inside Agda, together with external tooling that allows AI agents (and humans) to **interact with Agda's typechecker**, propose proof steps, and observe precise semantic feedback.
+
+AgdaDojang is where learned policies are *executed*, *validated*, and *debugged*.
 
 ---
 
 ## Role in the Overall System
 
-Within the agda-ai-prover architecture, AgdaJang serves as
+Within the agda-native-air architecture, AgdaDojang serves as
 
 +  the **action space** for AI agents,
 +  a bridge between statistical models and Agda's typechecker,
 +  a sandbox for experimenting with interactive proof search.
 
-While ProofParser focuses on *learning from existing mathematics*, AgdaJang focuses on **doing mathematics** — one proof step at a time — under Agda's supervision.
+While ProofParser focuses on *learning from existing mathematics*, AgdaDojang focuses on **doing mathematics** — one proof step at a time — under Agda's supervision.
 
 ---
 
 ## Design Principles
 
-AgdaJang is guided by a few core principles.
+AgdaDojang is guided by a few core principles.
 
 +  **Soundness first**: every action is checked by Agda.
 +  **Small action vocabulary**: prefer a few well-understood primitives over a large tactic language.
 +  **Transparency**: surface goals, contexts, and failures explicitly.
 +  **Research-oriented**: optimize for inspectability and extensibility, not raw automation.
 
-AgdaJang is not intended to compete with mature tactic languages; it is intended to be *learnable* by machines.
+AgdaDojang is not intended to compete with mature tactic languages; it is intended to be *learnable* by machines.
 
 ---
 
@@ -39,7 +41,7 @@ AgdaJang is not intended to compete with mature tactic languages; it is intended
 
 ### TC Monad Macros
 
-At the core of AgdaJang is a collection of macros implemented in Agda's **TC monad**.
+At the core of AgdaDojang is a collection of macros implemented in Agda's **TC monad**.
 
 These macros operate *inside* Agda's type theory and can
 
@@ -61,12 +63,12 @@ Each macro is designed to be *deterministic*, *locally scoped*, and *easy to rea
 
 ---
 
-### AgdaJang Layout
+### AgdaDojang Layout
 
 ```
-agda-jang
+agda-dojang
 ├── agda
-│   └── AgdaJang
+│   └── AgdaDojang
 │       ├── Apply.agda         -- tactics for applying functions to goals
 │       ├── ApplyDemo.agda     -- demo the `apply` macro
 │       ├── Debug.agda         -- macros to print goal, its type, normalisation, whnf
@@ -81,17 +83,17 @@ agda-jang
     │   ├── test_policy_contract.py             -- tests policy contract in policy_contract.py
     │   ├── test_policy_fixture.py              -- tests policy fixture in policy_fixture.py adheres to contract
     │   ├── test_rendering.py                   -- tests for the rendering.py utilities
-    │   └── test_report_parser.py               -- tests log parser that reads AgdaJang’s reporting macros output
+    │   └── test_report_parser.py               -- tests log parser that reads AgdaDojang's reporting macros output
     ├── tools
     │   ├── agent_bridge.py    -- tiny deterministic "report → policy → patch → check" loop
     │   ├── eval_fixtures.py   -- deterministic Agda-check evaluator + fixtures scoreboard
-    │   ├── jang_extract.py    -- AgdaJang trace extractor
-    │   ├── jang_try.py        -- AgdaJang probe & tactics runner
+    │   ├── dojang_extract.py  -- AgdaDojang trace extractor
+    │   ├── dojang_try.py      -- AgdaDojang probe & tactics runner
     │   ├── policy_contract.py -- canonical, versioned request/response contract for policy backends
     │   ├── policy_fixture.py  -- simple deterministic policy backend for tests and demos
     │   ├── prompt_baseline.py -- turn list of tasks into list of (context, goal, completion) attempts
     │   ├── report_parser.py   -- parsing of Agda subgoal reports from stderr
-    │   └── search.py          -- AgdaJang search loop (BFS/beam)
+    │   └── search.py          -- AgdaDojang search loop (BFS/beam)
     └── utils
         ├── command_runner.py  -- functional command execution utilities
         ├── file_ops.py        -- functional wrappers for file system operations
@@ -101,15 +103,15 @@ agda-jang
         └── types.py           -- data classes for config, command results, errors, reports
 ```
 
-The `Everything` module re-exports the full AgdaJang action vocabulary.
+The `Everything` module re-exports the full AgdaDojang action vocabulary.
 
 ---
 
 ## Python-side Tooling
 
-AgdaJang includes lightweight Python tools that orchestrate interaction with Agda.
+AgdaDojang includes lightweight Python tools that orchestrate interaction with Agda.
 
-### `jang_try.py`
+### `dojang_try.py`
 
 This script
 
@@ -129,7 +131,7 @@ This is a tiny deterministic **integration bridge**:
 +  call a policy backend (local process) to get top-k candidates,
 +  try candidates in Agda and patch the first that typechecks.
 
-This is the v0 deliverable for “policy ↔ AgdaJang integration” (Issue #23).
+This is the v0 deliverable for “policy ↔ AgdaDojang integration” (Issue #23).
 
 ### `eval_fixtures.py`
 
@@ -139,7 +141,7 @@ It produces machine-readable JSONL logs (`results.jsonl`, `fixtures.jsonl`) and 
 
 ### `search.py`
 
-This script implements simple proof-search strategies (e.g. BFS / beam search) over the AgdaJang action space.
+This script implements simple proof-search strategies (e.g. BFS / beam search) over the AgdaDojang action space.
 
 Its purpose is not to be state-of-the-art, but to
 
@@ -164,7 +166,7 @@ safe heuristics:
 
 ## Typical Workflow
 
-A typical AgdaJang session looks like this.
+A typical AgdaDojang session looks like this.
 
 1.  Start from a goal (an Agda hole),
 2.  Propose an action (e.g. `intro`, `apply⟨lemma⟩`),
@@ -176,7 +178,7 @@ Every step is validated by Agda.
 
 ---
 
-## Running AgdaJang
+## Running AgdaDojang
 
 ### With Nix (recommended)
 
@@ -184,17 +186,17 @@ From the repository root:
 
 ```bash
 nix develop
-cd agda-jang
+cd agda-dojang
 make check
 ```
 
-This type-checks all AgdaJang macros.
+This type-checks all AgdaDojang macros.
 
 ---
 
 ### Demo Targets
 
-From `agda-jang/`:
+From `agda-dojang/`:
 
 ```bash
 make demo1    # Simple refinement demo
@@ -207,7 +209,7 @@ These demos serve as executable documentation.
 
 ## Proof-completion evaluator (Issue #85)
 
-AgdaJang includes a deterministic **Agda-check evaluator** for “proof completion” fixtures.
+AgdaDojang includes a deterministic **Agda-check evaluator** for “proof completion” fixtures.
 It runs a small **propose → check** loop:
 
 1. For each `{!!}` hole in a fixture module, inject a reporting macro (e.g. `reportGoalCtx`)
@@ -220,7 +222,7 @@ It runs a small **propose → check** loop:
 
 ### Run it
 
-From `agda-jang/`:
+From `agda-dojang/`:
 
 ```bash
 make eval-proof-completion
@@ -232,7 +234,7 @@ over the committed fixtures (default glob: `../data/agda/Fixture*.agda`).
 
 ### Output artifacts
 
-Artifacts are written under: `agda-jang/_build/eval-proof-completion/<run-id>/`
+Artifacts are written under: `agda-dojang/_build/eval-proof-completion/<run-id>/`
 
 The Make target uses `run-id = latest` and cleans it each run.
 
@@ -338,7 +340,7 @@ For `schemaVersion = eval-proof-completion.v0`, consumers may rely on:
 +  Integrate learned policies from `ml-pipeline`.
 +  Deeper experimentation with reflective proof search.
 
-*AgdaJang is intentionally minimal today, but designed to grow alongside the agents that use it.*
+*AgdaDojang is intentionally minimal today, but designed to grow alongside the agents that use it.*
 
 ---
 
@@ -378,7 +380,7 @@ Categorically, `TC` is a monad on the category of Agda types/terms whose Kleisli
 
 A **`macro`** in Agda is a compile-time program (in `TC`) that Agda runs while elaborating terms.
 
-In AgdaJang, the macros are **instrumentation**;
+In AgdaDojang, the macros are **instrumentation**;
 
 +  they compute info about the goal and context;
 +  then intentionally stop compilation by throwing a `typeError` whose payload contains stable markers.
@@ -387,9 +389,9 @@ That is why the evaluator sees:
 
 ```
 error: [GenericDocError]
-AGDAJANG_REQ_BEGIN
+AGDADOJANG_REQ_BEGIN
 ...
-AGDAJANG_REQ_END
+AGDADOJANG_REQ_END
 ```
 
 We're using Agda's error channel as a "structured side-channel" to export `{goal, context}`.
@@ -461,14 +463,14 @@ All of those are "paths" in the Kleisli category of `TC`.
 ## See Also
 
 + [Root project README][]
-+ [`agda-backend-jsonl/README.md`][agda-backend-jsonl/README]
++ [`agda-strux/README.md`][agda-strux/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
 + [`proof-parser/README.md`][proof-parser/README]
 
-[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
-[agda-backend-jsonl/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-backend-jsonl/README.md
-[proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
-[ml-pipeline/README]: https://github.com/formalverification/agda-ai-prover/blob/main/ml-pipeline/README.md
-[`agda-jang/python/tools/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+[Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
+[agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
+[proof-parser/README]: https://github.com/formalverification/agda-native-air/blob/main/proof-parser/README.md
+[ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
+[`agda-dojang/python/tools/policy_fixture.py`]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/python/tools/policy_fixture.py
 
 

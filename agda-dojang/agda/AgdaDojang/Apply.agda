@@ -1,6 +1,6 @@
 -- Apply.agda
 --
--- File: agda-jang/agda/AgdaJang/Apply.agda
+-- File: agda-dojang/agda/AgdaDojang/Apply.agda
 --
 -- Description:
 --   This file contains tactics for applying functions to goals, with various levels
@@ -37,9 +37,9 @@
 -- For now, `Apply.agda` is a staging area for those helpers.
 {-# OPTIONS --safe --cubical-compatible #-}
 
-module AgdaJang.Apply where
+module AgdaDojang.Apply where
 
-open import AgdaJang.Prelude
+open import AgdaDojang.Prelude
 open import Data.List.Base
 ------------------------------------------------------------------------
 -- Convenience: refine any surface term against the current goal.
@@ -115,7 +115,7 @@ headZero fTerm =
     (def f _) → unit (def f [])
     (con c _) → unit (con c [])
     _ → typeError
-          ( strErr "AGDAJANG_APPLY: expected a bare name (e.g., suc, _+_, proj₁)"
+          ( strErr "AGDADOJANG_APPLY: expected a bare name (e.g., suc, _+_, proj₁)"
           ∷ termErr t′ ∷ [] )
 
 -- Build an application with the right head (def or con).
@@ -126,7 +126,7 @@ headApp fTerm args =
     (def f _) → unit (def f args)
     (con c _) → unit (con c args)
     _ → typeError
-          ( strErr "AGDAJANG_APPLY: expected a bare name (e.g., suc, _+_, proj₁)"
+          ( strErr "AGDADOJANG_APPLY: expected a bare name (e.g., suc, _+_, proj₁)"
           ∷ termErr t′ ∷ [] )
 ------------------------------------------------------------------------
 
@@ -155,13 +155,13 @@ macro
 ------------------------------------------------------------------------
 -- Print stable, parseable lines describing expected binders
 -- Lines look like:
---   AGDAJANG_GOAL:0:visible:  <TYPE_TERM_RENDERED>
---   AGDAJANG_GOAL:1:hidden:   <TYPE_TERM_RENDERED>
+--   AGDADOJANG_GOAL:0:visible:  <TYPE_TERM_RENDERED>
+--   AGDADOJANG_GOAL:1:hidden:   <TYPE_TERM_RENDERED>
 --
 -- Notes:
 -- +  We include the domain type of each binder (`A`), and whether it's
 --    `visible/hidden/instance`.
--- +  We wrap the list with `AGDAJANG_SUBGOALS_BEGIN` / `..._END` markers
+-- +  We wrap the list with `AGDADOJANG_SUBGOALS_BEGIN` / `..._END` markers
 --    so the parser can be simple and robust.
 -- +  This macro does NOT attempt to solve; it only reports (so it will
 --    exit non-zero; our runner should expect that when using report mode).
@@ -173,9 +173,9 @@ visTag hidden    = "hidden"
 visTag instance′ = "instance"
 
 build_parts : Nat → List (Arg Term) → List ErrorPart
-build_parts _ [] = strErr "AGDAJANG_SUBGOALS_END" ∷ []
+build_parts _ [] = strErr "AGDADOJANG_SUBGOALS_END" ∷ []
 build_parts n (arg (arg-info v _) A ∷ rest) =
-  ( strErr "AGDAJANG_GOAL:"
+  ( strErr "AGDADOJANG_GOAL:"
   ∷ strErr (primShowNat n)
   ∷ strErr ":"
   ∷ strErr (visTag v)
@@ -185,7 +185,7 @@ build_parts n (arg (arg-info v _) A ∷ rest) =
   ∷ build_parts (suc n) rest )
 
 get_subgoals : List (Arg Term) → List ErrorPart
-get_subgoals bs = strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ build_parts 0 bs
+get_subgoals bs = strErr "AGDADOJANG_SUBGOALS_BEGIN\n" ∷ build_parts 0 bs
 
 macro
   applyReport⟨_⟩ : Term → Term → TC ⊤
@@ -268,7 +268,7 @@ macro
 ------------------------------------------------------------------------
 -- Tactic: applySolveReport⟨ f ⟩
 -- Apply f against the current goal (so unification runs), then print the
--- instantiated types of any remaining meta arguments as AGDAJANG_GOAL lines.
+-- instantiated types of any remaining meta arguments as AGDADOJANG_GOAL lines.
 ------------------------------------------------------------------------
 macro
   applySolveReport⟨_⟩ : Term → Term → TC ⊤
@@ -283,7 +283,7 @@ macro
     -- post-unification reporting (instantiated metas)
     -- build the lines, then emit once
     mkParts 0 (gather app′) >>= λ parts →
-    emit (strErr "AGDAJANG_SUBGOALS_BEGIN\n" ∷ parts)
+    emit (strErr "AGDADOJANG_SUBGOALS_BEGIN\n" ∷ parts)
 
     where
     -- Force typeError to a concrete result type (`TC ⊤`)
@@ -302,11 +302,11 @@ macro
 
     -- Build tagged lines; avoid (++) and just cons the 5 parts in front of the tail
     mkParts : Nat → List Term → TC (List ErrorPart)
-    mkParts _ []       = unit (strErr "AGDAJANG_SUBGOALS_END" ∷ [])
+    mkParts _ []       = unit (strErr "AGDADOJANG_SUBGOALS_END" ∷ [])
     mkParts i (t ∷ ts) =
       inferType t >>= λ A →
       mkParts (suc i) ts >>= λ tail →
-      unit (  strErr "AGDAJANG_GOAL:" ∷ strErr (primShowNat i)
+      unit (  strErr "AGDADOJANG_GOAL:" ∷ strErr (primShowNat i)
             ∷ strErr ":?arg: "        ∷ termErr A
             ∷ strErr "\n"             ∷ tail )
 
@@ -334,7 +334,7 @@ macro
             body = abs nm unknown
             lamT = lam v body
         in checkType lamT ty >>= λ lam′ → unify hole lam′
-      _ → typeError (strErr "AGDAJANG_INTRO: goal is not a function/Π-type" ∷ [])
+      _ → typeError (strErr "AGDADOJANG_INTRO: goal is not a function/Π-type" ∷ [])
 
 -- Notes:
 -- `intro` is nullary for ergonomics: write simply `intro` in a goal to lambda-intro.
@@ -356,7 +356,7 @@ mkNLams (suc n) ty =
       mkNLams n B >>= λ bod →
       let nm = if s == "" then "x" else s in
       unit (lam v (abs nm bod))
-    _ → typeError (strErr "AGDAJANG_INTROS: not enough Π-binders in goal type" ∷ [])
+    _ → typeError (strErr "AGDADOJANG_INTROS: not enough Π-binders in goal type" ∷ [])
 
 -- Plain TC worker to avoid nested macro expansion (which can cause de Bruijn issues).
 introsWorker : Nat → Term → TC ⊤

@@ -1,7 +1,7 @@
 """
 policy_fixture.py
 
-File: agda-jang/python/tools/policy_fixture.py
+File: agda-dojang/python/tools/policy_fixture.py
 
 Description:
   A simple deterministic oracle policy backend for testing fixture-driven proof

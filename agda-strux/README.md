@@ -1,8 +1,8 @@
-<!-- File: agda-backend-jsonl/README.md -->
+<!-- File: agda-strux/README.md -->
 
-# agda-backend-jsonl
+# agda-strux
 
-`agda-backend-jsonl` is a subproject of the main `agda-ai-prover` project.  It
+`agda-strux` is a subproject of the main `agda-native-air` project.  It
 contains (the source code for building) the `agda-json` program, which is a Haskell
 backend that extracts data from Agda source code (`.agda` files) and runs Agda as a
 library to parse and interpret that data.  For each Agda file processed, the
@@ -13,13 +13,13 @@ from the Agda file.
 
 ## Building `agda-json`
 
-From the project root directory (often `agda-ai-prover/`), enter the following in the CLI:
+From the project root directory (often `agda-native-air/`), enter the following in the CLI:
 
 ``` sh
 make build-agda-json
 ```
 
-Alternatively, from inside the `agda-backend-jsonl/` directory, 
+Alternatively, from inside the `agda-strux/` directory, 
 
 ```sh
 cabal build all
@@ -30,10 +30,10 @@ cabal build all
 
 ## Running `agda-json`
 
-To extract data from an Agda file called `Foo.agda`, enter the following from the `agda-backend-jsonl/` directory:
+To extract data from an Agda file called `Foo.agda`, enter the following from the `agda-strux/` directory:
 
 ```sh
-AGDA_DIR=/path/to/agda-jang/agda \
+AGDA_DIR=/path/to/agda-dojang/agda \
 cabal run exe:agda-json -- \
   --input  path/to/Foo.agda \
   --output /tmp/Foo.jsonl \
@@ -51,19 +51,19 @@ shell (i.e., after running `nix develop .#backend`), then you shouldn't need to 
 
 You can also extract data from a large collection of Agda files.  For example, if
 you clone the `agda-algebras` library into, say, `$(HOME)/git/ualib/agda-algebras/master`
-and then run `make extract-lib-nix` from the `agda-ai-prover/` directory, then JSON
+and then run `make extract-lib-nix` from the `agda-native-air/` directory, then JSON
 records for all definitions of the `agda-algebras` library are generated and
 stored under `data/agda-algebras/raw/` (JSON data in `raw/jsonl/`, logs in
 `raw/logs/`, etc.)
 
 ```sh
 # assuming you already cloned agda-algebras
-cd ~/git/agda-ai-prover
+cd ~/git/agda-native-air
 nix develop .#backend
 make extract-lib-nix
 ```
 
-Then inspect the resulting JSON data in `agda-ai-prover/data/agda-algebras/raw/jsonl`.
+Then inspect the resulting JSON data in `agda-native-air/data/agda-algebras/raw/jsonl`.
 
 Check the Makefile for other examples.  Also, ensure the `AGDA_ALGEBRAS_ROOT` Makefile
 variable points to the directory containing your clone of `agda-algebras`!
@@ -78,8 +78,8 @@ mkdir -p git/ualib/agda-algebras
 cd git/ualib/agda-algebras          # change to the new ~/git/ualib/agda-algebras directory
 git clone https://github.com/ualib/agda-algebras.git master
 cd  ~/git                           # change to git directory
-git clone https://github.com/formalverification/agda-ai-prover.git
-cd agda-ai-prover
+git clone https://github.com/formalverification/agda-native-air.git
+cd agda-native-air
 make extract-lib-nix
 ```
 
@@ -95,13 +95,13 @@ make extract-lib-nix
 
 ## Testing `agda-json`
 
-From the project root directory (e.g., `agda-ai-prover/`), enter the following on the CLI:
+From the project root directory (e.g., `agda-native-air/`), enter the following on the CLI:
 
 ```sh
 make backend-test
 ```
 
-Alternatively, from inside the `agda-backend-jsonl/` directory,
+Alternatively, from inside the `agda-strux/` directory,
 
 ```sh
 cabal test
@@ -121,14 +121,14 @@ cabal test
 ## See Also
 
 + [Root project README][]
-+ [`agda-jang/README.md`][agda-jang/README]
++ [`agda-dojang/README.md`][agda-dojang/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
 + [`proof-parser/README.md`][proof-parser/README]
 
-[Root project README]: https://github.com/formalverification/agda-ai-prover/blob/main/README.md
-[proof-parser/README]: https://github.com/formalverification/agda-ai-prover/blob/main/proof-parser/README.md
-[agda-jang/README]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/README.md
-[ml-pipeline/README]: https://github.com/formalverification/agda-ai-prover/blob/main/ml-pipeline/README.md
-[`agda-jang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-ai-prover/blob/main/agda-jang/python/tools/policy_fixture.py
+[Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
+[proof-parser/README]: https://github.com/formalverification/agda-native-air/blob/main/proof-parser/README.md
+[agda-dojang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/README.md
+[ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
+[`agda-dojang/python/agdajang/policy_fixture.py`]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/python/tools/policy_fixture.py
 
 

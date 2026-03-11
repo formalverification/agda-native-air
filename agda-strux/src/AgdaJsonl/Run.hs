@@ -2,7 +2,7 @@
 
 -- | Run.hs
 --
--- File: agda-backend-jsonl/src/AgdaJsonl/Run.hs
+-- File: agda-strux/src/AgdaJsonl/Run.hs
 --
 -- Description:
 --   CLI + Agda "boot glue"
@@ -103,9 +103,9 @@ runJsonl inputFile outputFile extraIncludes fmt = do
 
   withFile outputFile WriteMode $ \h -> do
     hSetBuffering h LineBuffering
-    logInfo ("[agda-backend-jsonl/Run] Checking " <> inputFile)
+    logInfo ("[agda-strux/Run] Checking " <> inputFile)
     st <- runOnce h inputFile extraIncludes fmt
-    logInfo ("[agda-backend-jsonl/Run] ✅ wrote " <> show (Extract.dsWrittenDefs st) <> " JSON records to " <> outputFile)
+    logInfo ("[agda-strux/Run] ✅ wrote " <> show (Extract.dsWrittenDefs st) <> " JSON records to " <> outputFile)
     pure st
 
 --------------------------------------------------------------------------------

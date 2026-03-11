@@ -3,7 +3,7 @@
 
 -- | Integration tests for the Agda JSONL backend (in-process).
 --
--- File: agda-backend-jsonl/test/Spec.hs
+-- File: agda-strux/test/Spec.hs
 --
 -- Description:
 --
@@ -547,7 +547,7 @@ withTempDir :: String -> (FilePath -> IO a) -> IO a
 withTempDir prefix action = do
   -- New knobs (preferred):
   --   AGDA_JSON_TEST_KEEP=1
-  --   AGDA_JSON_TEST_OUT_ROOT=data/test-output/agda-backend-jsonl
+  --   AGDA_JSON_TEST_OUT_ROOT=data/test-output/agda-strux
   --
   -- Back-compat (legacy):
   --   KEEP_TEST_DIR=1
@@ -564,7 +564,7 @@ withTempDir prefix action = do
           Just r | not (null r) -> pure r
           _                     -> getTemporaryDirectory
 
-        -- Ensure base exists, e.g. data/test-output/agda-backend-jsonl/
+        -- Ensure base exists, e.g. data/test-output/agda-strux/
         createDirectoryIfMissing True base
 
         -- Unique run dir under base (openTempFile gives uniqueness)

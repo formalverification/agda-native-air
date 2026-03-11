@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # file: python/tools/search.py
 """
-AgdaJang search loop (BFS/beam), v0.3
+AgdaDojang search loop (BFS/beam), v0.3
 
 Highlights
 ----------
-- Pure driver that shells out to `python/tools/jang_try.py` as an oracle.
+- Pure driver that shells out to `python/tools/dojang_try.py` as an oracle.
 - Prefers structured subgoal tags from `applyReport:` / `applySolveReport:`.
 - Simple scoring so the beam keeps promising children first.
 - Dedup/caching across oracle calls and enqueued states.
@@ -48,7 +48,7 @@ class Action:
 class OracleCfg:
     agda_dir: str
     agda_bin: str = "agda"
-    jang_try: str = "python/tools/jang_try.py"
+    dojang_try: str = "python/tools/dojang_try.py"
     timeout: Optional[float] = None
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ def hash_key(imports: Tuple[str, ...], goal: str, action: Action) -> str:
     h.update((action.kind + ":" + action.payload).encode())
     return h.hexdigest()
 
-# ========= Oracle (via jang_try.py) =========
+# ========= Oracle (via dojang_try.py) =========
 
 def _run_json(cmd: List[str]) -> Tuple[int, str]:
     p = subprocess.run(cmd, capture_output=True, text=True)
@@ -74,7 +74,7 @@ def _run_json(cmd: List[str]) -> Tuple[int, str]:
 
 
 def oracle_candidate(cfg: OracleCfg, imports: Tuple[str, ...], goal: str, candidate: str) -> StepResult:
-    cmd = [sys.executable, cfg.jang_try, "--goal", goal, "--candidate", candidate,
+    cmd = [sys.executable, cfg.dojang_try, "--goal", goal, "--candidate", candidate,
            "--agda-dir", cfg.agda_dir, "--agda-bin", cfg.agda_bin, "--format", "json"]
     for imp in imports: cmd += ["--imports", imp]
     if cfg.timeout is not None: cmd += ["--timeout", str(cfg.timeout)]
@@ -88,7 +88,7 @@ def oracle_candidate(cfg: OracleCfg, imports: Tuple[str, ...], goal: str, candid
 
 
 def oracle_tactic(cfg: OracleCfg, imports: Tuple[str, ...], goal: str, tactic: str) -> StepResult:
-    cmd = [sys.executable, cfg.jang_try, "--goal", goal, "--tactic", tactic,
+    cmd = [sys.executable, cfg.dojang_try, "--goal", goal, "--tactic", tactic,
            "--agda-dir", cfg.agda_dir, "--agda-bin", cfg.agda_bin, "--format", "json"]
     for imp in imports: cmd += ["--imports", imp]
     if cfg.timeout is not None: cmd += ["--timeout", str(cfg.timeout)]
@@ -103,7 +103,7 @@ def oracle_tactic(cfg: OracleCfg, imports: Tuple[str, ...], goal: str, tactic: s
 
 # ========= Structured binder peek =========
 
-_BLINE = re.compile(r"^AGDAJANG_GOAL:(\d+):([^:]+):\s*(.+)$")
+_BLINE = re.compile(r"^AGDADOJANG_GOAL:(\d+):([^:]+):\s*(.+)$")
 
 @dataclass(frozen=True)
 class Binder:
@@ -286,10 +286,10 @@ def bfs(cfg: OracleCfg, start: State, max_depth: int, beam_k: int) -> Optional[S
 # ========= CLI =========
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="AgdaJang search loop (BFS/beam), v0.3")
+    ap = argparse.ArgumentParser(description="AgdaDojang search loop (BFS/beam), v0.3")
     ap.add_argument("--agda-dir", default="agda")
     ap.add_argument("--agda-bin", default="agda")
-    ap.add_argument("--jang-try", default="python/tools/jang_try.py")
+    ap.add_argument("--jang-try", default="python/tools/dojang_try.py")
     ap.add_argument("--goal", default="Nat")
     ap.add_argument("--imports", action="append", default=["open import Agda.Builtin.Nat"])
     ap.add_argument("--max-depth", type=int, default=3)
@@ -297,7 +297,7 @@ def main() -> None:
     ap.add_argument("--timeout", type=float, default=None)
     args = ap.parse_args()
 
-    cfg = OracleCfg(agda_dir=args.agda_dir, agda_bin=args.agda_bin, jang_try=args.jang_try, timeout=args.timeout)
+    cfg = OracleCfg(agda_dir=args.agda_dir, agda_bin=args.agda_bin, dojang_try=args.dojang_try, timeout=args.timeout)
     start = State(imports=tuple(args.imports), goal=args.goal, script=tuple())
     res = bfs(cfg, start, max_depth=args.max_depth, beam_k=args.beam)
     if res:

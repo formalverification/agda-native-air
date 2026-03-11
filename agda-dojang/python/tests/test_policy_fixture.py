@@ -2,7 +2,7 @@
 """
 test_policy_contract.py
 
-File: agda-jang/python/tests/test_policy_fixture.py
+File: agda-dojang/python/tests/test_policy_fixture.py
 
 Description:
     Tests for the policy fixture defined in tools/policy_fixture.py, ensuring it

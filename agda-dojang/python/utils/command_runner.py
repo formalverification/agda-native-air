@@ -1,5 +1,5 @@
 """
-file: agda-ai-prover/agda-jang/python/utils/command_runner.py
+file: agda-native-air/agda-dojang/python/utils/command_runner.py
 description: functional command execution utilities for the build pipeline.
 copyright: 2025 Thmpr
 """

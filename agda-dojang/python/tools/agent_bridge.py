@@ -2,7 +2,7 @@
 """
 agent_bridge.py
 
-File: agda-ai-prover/agda-jang/python/tools/agent_bridge.py
+File: agda-native-air/agda-dojang/python/tools/agent_bridge.py
 
 Goal (Issue #23 v0):
   Provide a tiny, deterministic "report → policy → patch → check" loop:
@@ -30,21 +30,21 @@ Design constraints / style:
 Important note:
   This bridge expects the Agda-side reporting macro to emit a request block:
 
-  AGDAJANG_REQ_BEGIN
+  AGDADOJANG_REQ_BEGIN
   { "goal": "...", "context": [ { "name": "...", "type": "..." }, ... ] }
-  AGDAJANG_REQ_END
+  AGDADOJANG_REQ_END
 
   The parsing support for these markers is added in tools/report_parser.py
 
 CLI examples:
   From repo root (recommended, so --library-file paths resolve):
 
-    PYTHONPATH=agda-jang/python \
-    python3 agda-jang/python/tools/agent_bridge.py \
+    PYTHONPATH=agda-dojang/python \
+    python3 agda-dojang/python/tools/agent_bridge.py \
       --file data/agda/FixtureHoles.agda \
-      --policy "python3 agda-jang/python/tools/policy_fixture.py" \
+      --policy "python3 agda-dojang/python/tools/policy_fixture.py" \
       --agda-bin agda \
-      --agda-flags "-i agda --library-file=agda/libraries -l agda-jang" \
+      --agda-flags "-i agda --library-file=agda/libraries -l agda-dojang" \
       --include "data/agda" \
       --max-holes 4 \
       --k 5
@@ -196,7 +196,7 @@ def _split_flags(flag_str: str) -> List[str]:
     """
     Parse an Agda flag string into argv tokens.
 
-    Mirrors the small safety in jang_try.py:
+    Mirrors the small safety in dojang_try.py:
       - drop a dangling "-l" if present (avoids Agda parse error).
     """
     toks = shlex.split(flag_str) if flag_str else []
@@ -681,7 +681,7 @@ def solve_one_hole(cfg: BridgeConfig, src: str, hole: HoleSpan, workdir: Path, o
             stderr="",
             message=(
                 "could not extract policy request markers from Agda output. "
-                "Is the reporting macro implemented and emitting AGDAJANG_REQ_BEGIN/END?"
+                "Is the reporting macro implemented and emitting AGDADOJANG_REQ_BEGIN/END?"
             ),
         ))
 
@@ -809,7 +809,7 @@ def solve_file(cfg: BridgeConfig) -> Result[str, PipelineError]:
 # =========================
 
 def parse_args(argv: Optional[List[str]] = None) -> BridgeConfig:
-    ap = argparse.ArgumentParser(description="AgdaJang agent bridge (report → policy → patch → check).")
+    ap = argparse.ArgumentParser(description="AgdaDojang agent bridge (report → policy → patch → check).")
     ap.add_argument("--input", "--file", dest="file", required=True,
                     help="Path to an .agda file with `{!!}` holes.")
     ap.add_argument("--output", default=None,

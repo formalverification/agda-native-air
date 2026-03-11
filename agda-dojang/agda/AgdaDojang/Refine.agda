@@ -1,6 +1,6 @@
 -- Refine.agda
 --
--- File: agda-jang/agda/AgdaJang/Refine.agda
+-- File: agda-dojang/agda/AgdaDojang/Refine.agda
 --
 -- Description:
 --   This module defines two macros, `refine⟨_⟩` and `try⟨_⟩`, that can be used in
@@ -34,9 +34,9 @@
 --
 {-# OPTIONS --safe --cubical-compatible #-}
 
-module AgdaJang.Refine where
+module AgdaDojang.Refine where
 
-open import AgdaJang.Prelude
+open import AgdaDojang.Prelude
 open import Agda.Builtin.Unit using (⊤; tt)
 open import Agda.Builtin.List using (List; []; _∷_)
 
@@ -67,8 +67,8 @@ macro
     catchTC {A = ⊤}
       ( inferType hole       >>= λ goalTy →
         checkType cand goalTy >>= λ _ →
-        typeError (strErr "AGDAJANG_TRY:OK" ∷ []) )
-      ( typeError (strErr "AGDAJANG_TRY:FAIL" ∷ []))
+        typeError (strErr "AGDADOJANG_TRY:OK" ∷ []) )
+      ( typeError (strErr "AGDADOJANG_TRY:FAIL" ∷ []))
 
 -- Notes.
 -- `catchTC` has type: `∀ {A} → TC A → (Error → TC A) → TC A`

@@ -1,6 +1,6 @@
 -- Debug.agda
 --
--- File: agda-jang/agda/AgdaJang/Debug.agda
+-- File: agda-dojang/agda/AgdaDojang/Debug.agda
 --
 -- Description:
 --   This module contains macros that can be used to print out the current goal, its
@@ -18,9 +18,9 @@
 --
 {-# OPTIONS --safe --cubical-compatible #-}
 
-module AgdaJang.Debug where
+module AgdaDojang.Debug where
 
-open import AgdaJang.Prelude
+open import AgdaDojang.Prelude
 open import Agda.Builtin.List using (_∷_; [])
 -- We need qualified access to reflection constructors like R.var / R.lam:
 open import Agda.Builtin.Reflection as R using ()
@@ -107,7 +107,7 @@ visTag instance′ = "instance"
 termToString : Term → TC String
 termToString t = formatErrorParts (termErr t ∷ [])
 
--- Context lines: AGDAJANG_CTX:<i>:<vis>:<name>: <type>
+-- Context lines: AGDADOJANG_CTX:<i>:<vis>:<name>: <type>
 mkCtxParts :
   Nat →
   List (Σ String (λ _ → Arg Term)) →
@@ -124,7 +124,7 @@ mkCtxParts i ((nm , arg (arg-info v _) t) ∷ rest) tail =
   normalise (raiseTerm (suc i) t) >>= λ tyNF →
   termToString tyNF               >>= λ tyStr →
   mkCtxParts (suc i) rest tail    >>= λ tail′ →
-  unit (  strErr "AGDAJANG_CTX:" ∷ strErr (primShowNat i) ∷ strErr ":" ∷ strErr (visTag v)
+  unit (  strErr "AGDADOJANG_CTX:" ∷ strErr (primShowNat i) ∷ strErr ":" ∷ strErr (visTag v)
         ∷ strErr ":" ∷ strErr nm ∷ strErr ": " ∷ strErr tyStr ∷ strErr "\n"
         ∷ tail′ )
 
@@ -134,11 +134,11 @@ macro
     -- Build goal string: inferType >=> normalise >=> termToString
     (inferType >=> normalise >=> termToString) hole >>= λ goalStr →
     getContext >>= λ ctx →
-    mkCtxParts 0 ctx (strErr "AGDAJANG_REQ_END" ∷ []) >>= λ ctxParts →
+    mkCtxParts 0 ctx (strErr "AGDADOJANG_REQ_END" ∷ []) >>= λ ctxParts →
     typeError
-      ( strErr "AGDAJANG_REQ_BEGIN\n"
-      ∷ strErr "AGDAJANG_GOAL: " ∷ strErr goalStr ∷ strErr "\n"
-      ∷ strErr "AGDAJANG_CTX_BEGIN\n"
+      ( strErr "AGDADOJANG_REQ_BEGIN\n"
+      ∷ strErr "AGDADOJANG_GOAL: " ∷ strErr goalStr ∷ strErr "\n"
+      ∷ strErr "AGDADOJANG_CTX_BEGIN\n"
       ∷ ctxParts
       )
 -- Notes.

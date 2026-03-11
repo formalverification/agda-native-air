@@ -1,4 +1,4 @@
-name: agda-jang
+name: agda-dojang
 -- Paths are relative to this file:
 include: agda
 -- Declare stdlib here by name (our nix flake ensures it's registered):

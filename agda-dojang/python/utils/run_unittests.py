@@ -2,7 +2,7 @@
 """
 run_unittests.py
 
-File: agda-jang/python/tools/run_unittests.py
+File: agda-dojang/python/tools/run_unittests.py
 
 Description:
   Pretty-ish unittest runner (stdlib only).

@@ -3,7 +3,7 @@
 
 -- | Extract.hs
 --
--- File: agda-backend-jsonl/src/AgdaJsonl/Extract.hs
+-- File: agda-strux/src/AgdaJsonl/Extract.hs
 --
 -- Purpose
 -- =======

@@ -2,7 +2,7 @@
 
 -- | Cli.hs
 --
--- File: agda-backend-jsonl/src/AgdaJsonl/Cli.hs
+-- File: agda-strux/src/AgdaJsonl/Cli.hs
 --
 -- Description: Pure CLI parsing for agda-json.
 --

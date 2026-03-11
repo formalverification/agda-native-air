@@ -1,4 +1,4 @@
--- agda-backend-jsonl/cabal.project
+-- agda-strux/cabal.project
 packages: .
 
 -- Reproducible solving: pin the Hackage index snapshot Cabal uses.

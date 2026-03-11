@@ -1,2 +1,2 @@
-# file: agda-jang/python/utils/__init__.py
+# file: agda-dojang/python/utils/__init__.py
 # package: python.utils

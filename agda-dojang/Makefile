@@ -1,7 +1,7 @@
 # ==============================================================================
-# AgdaJang Makefile
+# AgdaDojang Makefile
 #
-# @file agda-ai-prover/agda-jang/Makefile
+# @file agda-native-air/agda-dojang/Makefile
 # @version 0.2
 #
 # WHY this exists
@@ -24,11 +24,11 @@
 #
 # LAYOUT assumptions
 # ------------------
-#   - This file lives in: agda-ai-prover/agda-jang/Makefile
-#   - Agda sources here:  agda-ai-prover/agda-jang/agda/AgdaJang/…
-#   - Example data lives: agda-ai-prover/data/
-#   - Scala tools live:   agda-ai-prover/proof-parser/
-#   - Python tools live:  agda-ai-prover/agda-jang/python/tools/
+#   - This file lives in: agda-native-air/agda-dojang/Makefile
+#   - Agda sources here:  agda-native-air/agda-dojang/agda/AgdaDojang/…
+#   - Example data lives: agda-native-air/data/
+#   - Scala tools live:   agda-native-air/proof-parser/
+#   - Python tools live:  agda-native-air/agda-dojang/python/tools/
 #                         (If some scripts still live at repo root, see variables below.)
 #
 # Repro tips
@@ -42,17 +42,17 @@ AGDA            ?= agda
 AGDA_DIR        := agda
 HAVE_IFACE_DIR  := $(shell $(AGDA) --help 2>/dev/null | grep -q -- '--interface-dir' && echo yes || echo no)
 AGDA_IFACE_DIR  ?= _build/agda
-BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-jang
+BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-dojang
 AGDA_FLAGS      := $(BASE_AGDA_FLAGS) $(if $(filter $(HAVE_IFACE_DIR),yes),--interface-dir=$(AGDA_IFACE_DIR),)
 PYTHON          ?= python3
 SBT             ?= sbt
 PYTHON_DIR      := python
 PYTHONPATH      := $(PYTHON_DIR)
 PYTHON_TOOLS    := $(PYTHON_DIR)/tools
-JANG_TRY        ?= $(PYTHON_TOOLS)/jang_try.py
+DOJANG_TRY        ?= $(PYTHON_TOOLS)/dojang_try.py
 
 # Extract / search scripts
-EXTRACT_SCRIPT  ?= $(PYTHON_TOOLS)/jang_extract.py
+EXTRACT_SCRIPT  ?= $(PYTHON_TOOLS)/dojang_extract.py
 SEARCH_SCRIPT   ?= $(PYTHON_TOOLS)/search.py
 
 # --- Demo arguments ---
@@ -100,8 +100,8 @@ test:
 
 help:
 	@echo ""
-	@echo "AgdaJang targets:"
-	@echo "  make check        - Type-check AgdaJang macros"
+	@echo "AgdaDojang targets:"
+	@echo "  make check        - Type-check AgdaDojang macros"
 	@echo "  make demo1        - Run simple candidate: suc zero : Nat"
 	@echo "  make demo2        - Run reporting tactic: applyReport:_+_"
 	@echo ""
@@ -159,16 +159,16 @@ probe-all:
 
 # 0) Compile-time health check for our Agda macros
 check:
-	$(AGDA) $(AGDA_FLAGS) $(AGDA_DIR)/AgdaJang/Everything.agda
+	$(AGDA) $(AGDA_FLAGS) $(AGDA_DIR)/AgdaDojang/Everything.agda
 
-# 1) Demos (use jang_try.py). We forward the same AGDA_FLAGS the compiler uses.
+# 1) Demos (use dojang_try.py). We forward the same AGDA_FLAGS the compiler uses.
 demo: demo1 demo2
 
 demo1:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(JANG_TRY) $(DEMO1) --agda-flags "$(AGDA_FLAGS)"
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(DOJANG_TRY) $(DEMO1) --agda-flags "$(AGDA_FLAGS)"
 
 demo2:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(JANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(DOJANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
 
 # 2) The agent bridge is a sanity check for the whole loop (Agda → Python agent → Agda)
 #    on a fixed example before we add any model.
@@ -248,7 +248,7 @@ extract: | $(DATA_DIR)
 	  exit 1; \
 	fi
 	@if [ ! -f "$(EXTRACT_SCRIPT)" ]; then \
-	  echo "ERROR: EXTRACT_SCRIPT '$(EXTRACT_SCRIPT)' not found. Update the path (e.g., to $(PYTHON_TOOLS)/jang_extract.py)."; \
+	  echo "ERROR: EXTRACT_SCRIPT '$(EXTRACT_SCRIPT)' not found. Update the path (e.g., to $(PYTHON_TOOLS)/dojang_extract.py)."; \
 	  exit 1; \
 	fi
 	@echo ">> CWD           : $$(pwd)"
@@ -296,7 +296,7 @@ solve:
 	@PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(SEARCH_SCRIPT) \
 	  --agda-dir "$(AGDA_DIR)" \
 	  --agda-bin "$(AGDA)" \
-	  --jang-try "$(JANG_TRY)" \
+	  --dojang-try "$(DOJANG_TRY)" \
 	  --imports "open import Agda.Builtin.Nat" \
 	  --goal "Nat" \
 	  --max-depth 3 \

@@ -1,5 +1,5 @@
 {
-  "title": "AgdaJangGoalExample",
+  "title": "AgdaDojangGoalExample",
   "type": "object",
   "required": ["file", "module", "goal_range", "context", "goal_type", "solution_term"],
   "properties": {

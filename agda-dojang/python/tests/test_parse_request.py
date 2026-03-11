@@ -2,7 +2,7 @@
 """
 test_parse_request.py
 
-File: agda-jang/python/tests/test_parse_request.py
+File: agda-dojang/python/tests/test_parse_request.py
 
 Description:
   Tests for the parse_request_json function in policy_contract.py, which is
@@ -55,4 +55,4 @@ def test_parse_request_json_rejects_non_list_context():
 
 def test_parse_request_json_rejects_unknown_schema():
     with pytest.raises(ValueError, match=r"unsupported policy request schema"):
-        parse_request_json(json.dumps({"schema": "agda-ai-prover/policy-request@v999", "goal": "A", "context": []}))
+        parse_request_json(json.dumps({"schema": "agda-native-air/policy-request@v999", "goal": "A", "context": []}))

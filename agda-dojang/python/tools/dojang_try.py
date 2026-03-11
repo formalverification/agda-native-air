@@ -1,9 +1,9 @@
 """
-jang_try.py
+dojang_try.py
 
-File: agda-jang/python/tools/jang_try.py
+File: agda-dojang/python/tools/dojang_try.py
 
-Description: AgdaJang probe & tactics runner (typed, functional style).
+Description: AgdaDojang probe & tactics runner (typed, functional style).
 
 
 WHAT IT DOES
@@ -19,7 +19,7 @@ There are two modes:
 
     Pass the candidate term on the CLI; e.g.
 
-      $ python3 tools/jang_try.py \
+      $ python3 tools/dojang_try.py \
           --goal Nat \
           --candidate "suc zero" \
           --imports "open import Agda.Builtin.Nat"
@@ -31,7 +31,7 @@ There are two modes:
 
     Another example (will fail):
 
-      $ python3 tools/jang_try.py \
+      $ python3 tools/dojang_try.py \
           --goal Nat \
           --candidate true \
           --imports "open import Agda.Builtin.Nat" \
@@ -46,7 +46,7 @@ There are two modes:
     The runner parses Agda output to:
 
        +  Return OK/FAIL (candidate), or
-       +  Report subgoals from `AGDAJANG_GOAL:` tags or fall back to heuristics.
+       +  Report subgoals from `AGDADOJANG_GOAL:` tags or fall back to heuristics.
 
     Supported tactics (so far):
 
@@ -62,21 +62,21 @@ There are two modes:
           Does **not** solve. It prints structured lines that describe the
           binder domains and visibilities of `<lemma>` with stable tags like:
 
-            AGDAJANG_GOAL:<index>:<visibility>: <type>
+            AGDADOJANG_GOAL:<index>:<visibility>: <type>
 
           The runner parses those lines and returns them as `subgoals`.
 
     Example:
 
-      $ python3 tools/jang_try.py \
+      $ python3 tools/dojang_try.py \
           --goal Nat \
           --tactic applyReport:_+_ \
           --imports "open import Agda.Builtin.Nat"
 
       Output:  [OK] tactic applyReport:_+_
                → Subgoals:
-                   AGDAJANG_GOAL:0:visible: Nat
-                   AGDAJANG_GOAL:1:visible: Nat
+                   AGDADOJANG_GOAL:0:visible: Nat
+                   AGDADOJANG_GOAL:1:visible: Nat
 
 N.B. We do NOT edit our own Agda files to use these probes. The runner generates
 an ephemeral scratch file each call, including an Agda module that:
@@ -92,12 +92,12 @@ CLI EXAMPLES
 
   CANDIDATES
   ----------
-    python3 tools/jang_try.py --goal Nat --candidate "suc zero" \
+    python3 tools/dojang_try.py --goal Nat --candidate "suc zero" \
       --imports "open import Agda.Builtin.Nat"
 
     OUTPUT:  [OK] suc zero
 
-    python3 tools/jang_try.py --goal Nat \
+    python3 tools/dojang_try.py --goal Nat \
       --candidates "zero; suc zero; true" \
       --imports "open import Agda.Builtin.Nat" \
       --imports "open import Agda.Builtin.Bool"
@@ -110,7 +110,7 @@ CLI EXAMPLES
   -------
   1.  `apply:`
 
-      python3 tools/jang_try.py --goal Nat --tactic apply:suc \
+      python3 tools/dojang_try.py --goal Nat --tactic apply:suc \
         --imports "open import Agda.Builtin.Nat" --show-errors
 
       OUTPUT:  [OK] tactic apply:suc
@@ -118,7 +118,7 @@ CLI EXAMPLES
 
   2.  `applyWith:` with args
 
-       python3 tools/jang_try.py --goal Nat --tactic 'applyWith:_+_:[zero]' \
+       python3 tools/dojang_try.py --goal Nat --tactic 'applyWith:_+_:[zero]' \
          --imports "open import Agda.Builtin.Nat"
 
        OUTPUT:  [OK] tactic applyWith:_+_:[zero]
@@ -126,27 +126,27 @@ CLI EXAMPLES
 
   3.  `applyReport:` with structured subgoals
 
-      python3 tools/jang_try.py --goal Nat --tactic applyReport:suc \
+      python3 tools/dojang_try.py --goal Nat --tactic applyReport:suc \
         --imports "open import Agda.Builtin.Nat" --format text
 
       OUTPUT:  [OK] tactic applyReport:suc
                Subgoals:
-                 - AGDAJANG_GOAL:0:visible: Nat
+                 - AGDADOJANG_GOAL:0:visible: Nat
 
   4.  `applyReport:` with multiple subgoals
 
-      python3 tools/jang_try.py --goal Nat --tactic 'applyReport:_+_' \
+      python3 tools/dojang_try.py --goal Nat --tactic 'applyReport:_+_' \
         --imports "open import Agda.Builtin.Nat"
 
       OUTPUT:  [OK] tactic applyReport:_+_
                   Subgoals:
-                      - AGDAJANG_GOAL:0:visible: Nat
-                      - AGDAJANG_GOAL:1:visible: Nat
+                      - AGDADOJANG_GOAL:0:visible: Nat
+                      - AGDADOJANG_GOAL:1:visible: Nat
 
   JSON (for logging)
   ------------------
 
-    python3 tools/jang_try.py --goal Nat --candidates "zero; true" \
+    python3 tools/dojang_try.py --goal Nat --candidates "zero; true" \
       --imports "open import Agda.Builtin.Nat" \
       --imports "open import Agda.Builtin.Bool" \
       --format json
@@ -169,15 +169,15 @@ CLI EXAMPLES
 
    TIMEOUT and ERRORS
    ------------------
-     python3 tools/jang_try.py --goal Nat --candidates "true" \
+     python3 tools/dojang_try.py --goal Nat --candidates "true" \
        --imports "open import Agda.Builtin.Nat" \
        --imports "open import Agda.Builtin.Bool" \
        --show-errors --timeout 10
 
     OUTPUT:  [FAIL] true
              ---- Agda ----
-             Checking TrySandbox (./agda-ai-prover/agda-jang/.tmp_1756066729604/TrySandbox.agda).
-             ./agda-ai-prover/agda-jang/.tmp_1756066729604/TrySandbox.agda:13.8-22: error: [UnequalTerms]
+             Checking TrySandbox (./agda-native-air/agda-dojang/.tmp_1756066729604/TrySandbox.agda).
+             ./agda-native-air/agda-dojang/.tmp_1756066729604/TrySandbox.agda:13.8-22: error: [UnequalTerms]
              Bool !=< Nat
              when checking that the expression true has type GoalTy
              --------------
@@ -292,7 +292,7 @@ def main() -> None:
     ap.add_argument("--imports", action="append", default=[], help="Repeatable; e.g., 'open import Agda.Builtin.Nat'")
     ap.add_argument("--agda-dir", default="agda", help="Path to repo Agda sources (default: ./agda)")
     ap.add_argument("--agda-bin", default="agda", help="Path to Agda binary")
-    ap.add_argument("--agda-flags", default="", help="Extra flags to pass to Agda (e.g., \'-l agda-jang\')")
+    ap.add_argument("--agda-flags", default="", help="Extra flags to pass to Agda (e.g., \'-l agda-dojang\')")
     ap.add_argument("--format", choices=["text", "json", "csv"], default="text")
     ap.add_argument("--show-errors", action="store_true", help="Include Agda diagnostics for failures")
     ap.add_argument("--timeout", type=float, default=None, help="Per-run timeout (seconds)")
@@ -322,7 +322,7 @@ def main() -> None:
                 print(f"[OK] tactic {t}")
                 print("Subgoals:")
                 for g in rep["goals"]:
-                    print(f"  - AGDAJANG_GOAL:{g['index']}:{g['visibility']}: {g['type']}")
+                    print(f"  - AGDADOJANG_GOAL:{g['index']}:{g['visibility']}: {g['type']}")
             sys.exit(0)
 
         # Fallback: ordinary success/failure report

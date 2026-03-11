@@ -1,16 +1,16 @@
--- ./agda-jang/agda/AgdaJang/Examples.agda
+-- ./agda-dojang/agda/AgdaDojang/Examples.agda
 -- This file gives three compile-time checks that exercise `applyWith1`,
 -- `applyWith2`, and `rewriteDef`.  The `intro` family is best used interactively,
 -- so we leave commented “try me” goals at the bottom.
 {-# OPTIONS --safe --cubical-compatible #-}
 
-module AgdaJang.Examples where
+module AgdaDojang.Examples where
 
 open import Agda.Builtin.Nat using (Nat; zero; suc; _+_)
 open import Agda.Builtin.Unit using (⊤; tt)
 
-open import AgdaJang.Prelude
-open import AgdaJang.Apply
+open import AgdaDojang.Prelude
+open import AgdaDojang.Apply
 
 ------------------------------------------------------------------------
 -- These are *total* examples that compile (no interactive holes).

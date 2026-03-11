@@ -1,6 +1,6 @@
 -- | app/Main.hs
 --
--- File: agda-backend-jsonl/app/Main.hs
+-- File: agda-strux/app/Main.hs
 --
 -- Description:
 --   Minimal entrypoint.

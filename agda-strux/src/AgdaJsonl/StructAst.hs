@@ -6,7 +6,7 @@
 
 -- | StructAst.hs
 --
--- File: agda-backend-jsonl/src/AgdaJsonl/StructAst.hs
+-- File: agda-strux/src/AgdaJsonl/StructAst.hs
 --
 -- Structural AST encoder for Agda internal syntax (v0).
 --

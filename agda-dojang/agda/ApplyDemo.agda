@@ -1,7 +1,7 @@
 -- agda/ApplyDemo.agda
 module ApplyDemo where
-open import AgdaJang.Prelude
-open import AgdaJang.Apply
+open import AgdaDojang.Prelude
+open import AgdaDojang.Apply
 
 -- Succeeds: fills the goal with a surface term
 ex₁ : Nat

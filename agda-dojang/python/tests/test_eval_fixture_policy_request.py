@@ -3,7 +3,7 @@
 """
 test_eval_fixture_policy_request.py
 
-File: agda-jang/python/tests/test_eval_fixture_policy_request.py
+File: agda-dojang/python/tests/test_eval_fixture_policy_request.py
 
 Description:
     Tests that the policy request emitted by eval_fixtures.py for a particular goal
@@ -31,7 +31,7 @@ def test_policy_request_for_boolean_algebra_deMorgan1(tmp_path: Path):
         return
 
     repo = Path(__file__).resolve().parents[3]          # adjust if your layout differs
-    agda_jang = repo / "agda-jang"
+    agda_jang = repo / "agda-dojang"
     fixture = repo / "data" / "agda" / "FixtureStdlibBooleanAlgebra.agda"
 
     out_dir = tmp_path / "eval-out"
@@ -51,7 +51,7 @@ def test_policy_request_for_boolean_algebra_deMorgan1(tmp_path: Path):
             "--k 5",
             "--timeout 20",
             '--agda-bin "agda"',
-            '--agda-flags "-i agda --library-file=agda/libraries -l agda-jang -i ../data/agda"',
+            '--agda-flags "-i agda --library-file=agda/libraries -l agda-dojang -i ../data/agda"',
             '--report-expr "reportGoalCtx"',
         ])
     ]

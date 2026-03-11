@@ -1,7 +1,7 @@
 ##
-# agda-backend-jsonl
+# agda-strux
 #
-# @file agda-backend-jsonl/Makefile
+# @file agda-strux/Makefile
 # @version 0.1
 
 .PHONY: build bin test smoke clean

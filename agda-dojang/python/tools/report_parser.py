@@ -1,13 +1,13 @@
 """
 report_parser.py
 
-File: agda-jang/python/tools/report_parser.py
+File: agda-dojang/python/tools/report_parser.py
 
 Description:
-  - Parse Agda's stderr for subgoal reports (marked by AGDAJANG_SUBGOALS_BEGIN/END).
+  - Parse Agda's stderr for subgoal reports (marked by AGDADOJANG_SUBGOALS_BEGIN/END).
   - Extract structured goal information (index, visibility, type) from lines like
-    AGDAJANG_GOAL:0:visible: <TYPE>.
-  - Also support a separate marker pair AGDAJANG_REQ_BEGIN/END for policy requests
+    AGDADOJANG_GOAL:0:visible: <TYPE>.
+  - Also support a separate marker pair AGDADOJANG_REQ_BEGIN/END for policy requests
     (goal + context) used by agent_bridge (Issue #23).
 """
 from __future__ import annotations
@@ -15,12 +15,12 @@ import json
 import re
 from typing import List, Dict, Any, Optional
 
-_BEGIN = "AGDAJANG_SUBGOALS_BEGIN"
-_END   = "AGDAJANG_SUBGOALS_END"
+_BEGIN = "AGDADOJANG_SUBGOALS_BEGIN"
+_END   = "AGDADOJANG_SUBGOALS_END"
 # Lines look like either:
-#   AGDAJANG_GOAL:0:visible:  <TYPE>
-#   AGDAJANG_GOAL:1:?arg:     <TYPE>          (solve-report variant)
-_LINE  = re.compile(r"^AGDAJANG_GOAL:(\d+):([a-z?]+):\s+(.*)$")
+#   AGDADOJANG_GOAL:0:visible:  <TYPE>
+#   AGDADOJANG_GOAL:1:?arg:     <TYPE>          (solve-report variant)
+_LINE  = re.compile(r"^AGDADOJANG_GOAL:(\d+):([a-z?]+):\s+(.*)$")
 
 def has_markers(s: str) -> bool:
     return _BEGIN in s and _END in s
@@ -55,16 +55,16 @@ def parse_marked_report(stderr: str, source: str) -> Dict[str, Any]:
 # Policy request markers (goal + context) for agent_bridge (Issue #23)
 # =============================================================================
 
-_REQ_BEGIN = "AGDAJANG_REQ_BEGIN"
-_REQ_END   = "AGDAJANG_REQ_END"
+_REQ_BEGIN = "AGDADOJANG_REQ_BEGIN"
+_REQ_END   = "AGDADOJANG_REQ_END"
 
-_REQ_GOAL_PREFIX = "AGDAJANG_GOAL:"
-_REQ_CTX_PREFIX  = "AGDAJANG_CTX:"
+_REQ_GOAL_PREFIX = "AGDADOJANG_GOAL:"
+_REQ_CTX_PREFIX  = "AGDADOJANG_CTX:"
 
 def _is_req_marker_line(line: str) -> bool:
     s = line.strip()
     return (
-        s in {_REQ_BEGIN, _REQ_END, "AGDAJANG_CTX_BEGIN", "AGDAJANG_CTX_END"}
+        s in {_REQ_BEGIN, _REQ_END, "AGDADOJANG_CTX_BEGIN", "AGDADOJANG_CTX_END"}
         or s.startswith(_REQ_GOAL_PREFIX)
         or s.startswith(_REQ_CTX_PREFIX)
     )
@@ -127,9 +127,9 @@ def extract_policy_request_from_output(output: str) -> Optional[Dict[str, Any]]:
 def _parse_request_as_json(block: str) -> Optional[Dict[str, Any]]:
     """
     Optional future format:
-      AGDAJANG_REQ_BEGIN
+      AGDADOJANG_REQ_BEGIN
       { ... JSON ... }
-      AGDAJANG_REQ_END
+      AGDADOJANG_REQ_END
     """
     payload = block.strip()
     if not payload:
@@ -144,9 +144,9 @@ def _parse_request_as_json(block: str) -> Optional[Dict[str, Any]]:
 def _parse_request_as_lines(block: str) -> Optional[Dict[str, Any]]:
     """
     Current v0 line protocol (matches your Debug.agda):
-      AGDAJANG_GOAL: <goal>
-      AGDAJANG_CTX_BEGIN
-      AGDAJANG_CTX:<i>:<vis>:<name>: <type>
+      AGDADOJANG_GOAL: <goal>
+      AGDADOJANG_CTX_BEGIN
+      AGDADOJANG_CTX:<i>:<vis>:<name>: <type>
       ...
     """
     goal_parts: List[str] = []
@@ -169,7 +169,7 @@ def _parse_request_as_lines(block: str) -> Optional[Dict[str, Any]]:
             current_ctx = parsed
             ctx.append(parsed)
             continue
-        if s in {"AGDAJANG_CTX_BEGIN", "AGDAJANG_CTX_END"}:
+        if s in {"AGDADOJANG_CTX_BEGIN", "AGDADOJANG_CTX_END"}:
             continue
         if _is_req_marker_line(s):
             mode = None

@@ -1,5 +1,5 @@
 """
-file: agda-jang/python/utils/types.py
+file: agda-dojang/python/utils/types.py
 description: data classes for configuration, command results, errors, and reports.
 copyright: 2025 Thmpr
 """

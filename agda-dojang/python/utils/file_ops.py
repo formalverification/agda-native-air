@@ -1,5 +1,5 @@
 """
-file: agda-jang/python/utils/file_ops.py
+file: agda-dojang/python/utils/file_ops.py
 description: Provides pure, functional wrappers for file system operations.
 copyright: 2025 Thmpr
 """
@@ -23,7 +23,7 @@ def ensure_dir(p: Path) -> Path:
     return p
 
 @contextmanager
-def temp_dir(keep: bool, prefix: str = "agda-jang_") -> Iterator[Path]:
+def temp_dir(keep: bool, prefix: str = "agda-dojang_") -> Iterator[Path]:
     """
     If keep=True: returns a stable '.scratch_try' directory and leaves it.
     If keep=False: creates a unique temp directory and deletes it on exit.

@@ -1,9 +1,9 @@
 -- ApplyDemo.agda
 --
--- File: agda-jang/agda/AgdaJang/ApplyDemo.agda
+-- File: agda-dojang/agda/AgdaDojang/ApplyDemo.agda
 --
 -- Description:
---   This module demonstrates the use of the `apply` macro from `AgdaJang
+--   This module demonstrates the use of the `apply` macro from `AgdaDojang
 --   Apply`. The `apply` macro allows us to create an application of a function to
 --   some arguments, where the arguments are represented as metas (holes) that can be
 --   filled in later.  This can be useful for constructing terms incrementally or for
@@ -18,7 +18,7 @@
 
 module ApplyDemo where
 open import Agda.Builtin.Nat
-open import AgdaJang.Apply
+open import AgdaDojang.Apply
 
 -- If 'suc' is in scope:
 ex₁ : Nat

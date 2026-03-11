@@ -3,11 +3,11 @@
 prompt_baseline.py
 ==================
 
-File: agda-ai-prover/agda-jang/python/tools/prompt_baseline.py
+File: agda-native-air/agda-dojang/python/tools/prompt_baseline.py
 
 What:
   Tiny "prompting baseline" that turns a list of tasks (JSONL) into a list of
-  (context, goal, completion) attempts (JSONL), by invoking `jang_try.py` and
+  (context, goal, completion) attempts (JSONL), by invoking `dojang_try.py` and
   recording Agda’s verdict.
 
 Why:
@@ -28,32 +28,32 @@ Input (tasks.jsonl):
   {"imports":["open import Agda.Builtin.Nat","open import Agda.Builtin.Bool"], "goal":"Nat", "candidate":"true"}
 
 Output (rows.jsonl):
-  One or more JSON objects per input task (more than one if `jang_try.py`
+  One or more JSON objects per input task (more than one if `dojang_try.py`
   responds with a batch list). Fields:
     - "context": {"imports": [...]}
     - "goal": str
     - "completion": str         (candidate or tactic used)
     - "ok": bool                (Agda accepted)
-    - "agda": object            (verbatim parsed JSON from jang_try or element)
+    - "agda": object            (verbatim parsed JSON from dojang_try or element)
 
 Usage:
   The following commands will create a tiny seed `tasks.jsonl` file and run this script on it.
 
   ```bash
-  cd agda-ai-prover
+  cd agda-native-air
   nix develop
-  cd agda-jang
+  cd agda-dojang
   make rows
   ```
 
   Alternatively, use the example `tasks.json` file provided in the repository, or
   create one and run this script manually, from inside `nix develop` shell, in
-  the `agda-jang` directory, as follows:
+  the `agda-dojang` directory, as follows:
 
   ```bash
   PYTHONPATH=python python3 python/tools/prompt_baseline.py \
     data/tasks.jsonl data/rows.jsonl \
-    --agda-flags "-i agda --library-file=agda/libraries -l agda-jang"
+    --agda-flags "-i agda --library-file=agda/libraries -l agda-dojang"
   ```
 
 Tip:
@@ -83,7 +83,7 @@ def iter_jsonl(path: pathlib.Path) -> Iterable[Task]:
             yield obj
 
 def run_try(tool: pathlib.Path, task: Task, agda_flags: str) -> AgdaJSON:
-    # Build argv for jang_try.py
+    # Build argv for dojang_try.py
     args: List[str] = [
         sys.executable, str(tool),
         "--goal", task["goal"],
@@ -99,9 +99,9 @@ def run_try(tool: pathlib.Path, task: Task, agda_flags: str) -> AgdaJSON:
     else:
         args += ["--candidate", "suc zero"]
 
-    # Ensure child has PYTHONPATH=python so jang_try can import local modules.
+    # Ensure child has PYTHONPATH=python so dojang_try can import local modules.
     env = dict(os.environ)
-    pyroot = str(pathlib.Path(__file__).resolve().parents[1])  # agda-jang/python
+    pyroot = str(pathlib.Path(__file__).resolve().parents[1])  # agda-dojang/python
     env["PYTHONPATH"] = env.get("PYTHONPATH", "") or pyroot
 
     p = subprocess.run(args, capture_output=True, text=True, env=env)
@@ -149,11 +149,11 @@ def main():
 
     tasks_in = pathlib.Path(sys.argv[1]).resolve()
     rows_out = pathlib.Path(sys.argv[2]).resolve()
-    agda_flags = "-i agda --library-file=agda/libraries -l agda-jang"
+    agda_flags = "-i agda --library-file=agda/libraries -l agda-dojang"
     if len(sys.argv) > 3 and sys.argv[3] == "--agda-flags":
         agda_flags = sys.argv[4]
 
-    tool = pathlib.Path(__file__).resolve().parent / "jang_try.py"
+    tool = pathlib.Path(__file__).resolve().parent / "dojang_try.py"
     rows_out.parent.mkdir(parents=True, exist_ok=True)
 
     count_in = 0

@@ -2,7 +2,7 @@
 """
 test_policy_contract.py
 
-File: agda-jang/python/tests/test_policy_contract.py
+File: agda-dojang/python/tests/test_policy_contract.py
 
 Description:
     Tests for the policy contract defined in policy_contract.py, using the policy fixture.
@@ -60,7 +60,7 @@ class TestPolicyContract(unittest.TestCase):
         policy = self._policy_fixture_path()
 
         req = {
-            "schema": "agda-ai-prover/policy-request@v999",
+            "schema": "agda-native-air/policy-request@v999",
             "goal": "⊤",
             "context": [],
         }

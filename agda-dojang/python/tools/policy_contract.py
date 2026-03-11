@@ -2,10 +2,10 @@
 """
 policy_contract.py
 
-File: agda-jang/python/tools/policy_contract.py
+File: agda-dojang/python/tools/policy_contract.py
 
 Purpose:
-  Canonical, versioned request/response contract for policy backends used by AgdaJang.
+  Canonical, versioned request/response contract for policy backends used by AgdaDojang.
 
 Frozen V0:
   - There is exactly one place that defines schema identifiers.
@@ -31,8 +31,8 @@ from typing import Any, Dict, List, Optional
 # Schema identifiers (the "frozen" part)
 # -----------------------------------------------------------------------------
 
-POLICY_REQUEST_SCHEMA_V0 = "agda-ai-prover/policy-request@v0"
-POLICY_RESPONSE_SCHEMA_V0 = "agda-ai-prover/policy-response@v0"
+POLICY_REQUEST_SCHEMA_V0 = "agda-native-air/policy-request@v0"
+POLICY_RESPONSE_SCHEMA_V0 = "agda-native-air/policy-response@v0"
 
 SUPPORTED_REQUEST_SCHEMAS = {POLICY_REQUEST_SCHEMA_V0}
 SUPPORTED_RESPONSE_SCHEMAS = {POLICY_RESPONSE_SCHEMA_V0}

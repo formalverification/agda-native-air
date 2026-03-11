@@ -1,9 +1,9 @@
 """
-file: agda-jang/python/utils/rendering.py
+file: agda-dojang/python/utils/rendering.py
 description: Pure Agda rendering helpers for building scratch modules.
 features:
   * no I/O, no subprocess—just string assembly;
-  * ensures scratch module imports the AgdaJang macros and user’s imports;
+  * ensures scratch module imports the AgdaDojang macros and user’s imports;
   * keeps tactic syntax ergonomic (`applyReport:_+_` → `applyReport⟨ _+_ ⟩`)
     unless user explicitly wrote `⟨…⟩`.
 copyright: 2025 Thmpr
@@ -48,16 +48,16 @@ def render_body_for_tactic(tactic: str) -> str:
 def render_module(goal: str, user_imports: List[str], body_term: str) -> str:
     """
     Build a minimal Agda module that:
-      - brings AgdaJang macros into scope,
+      - brings AgdaDojang macros into scope,
       - includes user-supplied imports,
       - declares a single goal with the given body term.
     """
     # Required for tactics/macros
     jang_imports = [
-        "open import AgdaJang.Prelude",
-        "open import AgdaJang.Refine",
-        "open import AgdaJang.Apply",
-        "open import AgdaJang.Debug",
+        "open import AgdaDojang.Prelude",
+        "open import AgdaDojang.Refine",
+        "open import AgdaDojang.Apply",
+        "open import AgdaDojang.Debug",
     ]
     # De-duplicate while preserving order
     seen = set()

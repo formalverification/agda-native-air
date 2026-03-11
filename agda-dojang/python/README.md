@@ -1,9 +1,9 @@
-# agda-jang Python code
+# agda-dojang Python code
 
 ## Layout
 
 ```
-agda-jang/python/
+agda-dojang/python/
 ├── tools/
 │   ├── jang_try.py          # slim, orchestration only code
 │   ├── report_parser.py
