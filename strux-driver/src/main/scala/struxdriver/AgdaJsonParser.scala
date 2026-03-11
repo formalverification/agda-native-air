@@ -2,8 +2,8 @@
  *  AgdaJsonParser.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/AgdaJsonParser.scala
- *  Package: proofparser
+ *  File: strux-driver/src/main/scala/struxdriver/AgdaJsonParser.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -13,7 +13,7 @@
  *
  *  Usage
  *  -----
- *  1. import proofparser.AgdaJsonParser // (as needed by transformers/extractors)
+ *  1. import struxdriver.AgdaJsonParser // (as needed by transformers/extractors)
  *  2. scala AgdaJsonParser <input_json_file> <output_jsonl_file>
  *
  *  Examples
@@ -29,7 +29,7 @@
  * =============================================================================
  */
 
-package proofparser
+package struxdriver
 
 import java.io.{File, PrintWriter}
 import scala.io.Source

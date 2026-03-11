@@ -2,18 +2,18 @@
  *  SimpleSchema.scala (shim)
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/SimpleSchema.scala
- *  Package: proofparser
+ *  File: strux-driver/src/main/scala/struxdriver/SimpleSchema.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
  *  Legacy compatibility for modules that previously imported
  *  TrainRecord from this file.
  *
- *  All definitions now live in `proofparser.schema.AgdaSchema.scala`.
+ *  All definitions now live in `struxdriver.schema.AgdaSchema.scala`.
  * ============================================================================ */
-package proofparser
-import proofparser.schema.TrainRecord
+package struxdriver
+import struxdriver.schema.TrainRecord
 object SimpleSchema {
-  type TrainRecord = proofparser.schema.TrainRecord
+  type TrainRecord = struxdriver.schema.TrainRecord
 }

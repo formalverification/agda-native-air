@@ -2,8 +2,8 @@
  *  ProofContext.scala
  *  ---------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/schema/ProofContext.scala
- *  Package: proofparser.schema
+ *  File: strux-driver/src/main/scala/struxdriver/schema/ProofContext.scala
+ *  Package: struxdriver.schema
  *
  *  Description
  *  -----------
@@ -54,7 +54,7 @@
  *
  ** ============================================================================ */
 
-package proofparser.schema
+package struxdriver.schema
 
 import upickle.default.{ReadWriter, macroRW}
 

@@ -2,8 +2,8 @@
  *  Agda2TrainTransformer.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/transform/Agda2TrainTransformer.scala
- *  Package: proofparser.transform
+ *  File: strux-driver/src/main/scala/struxdriver/transform/Agda2TrainTransformer.scala
+ *  Package: struxdriver.transform
  *
  *  Description
  *  -----------
@@ -19,7 +19,7 @@
  *
  *  CLI
  *  ---
- *    sbt "runMain proofparser.transform.Agda2TrainTransformer in.json out.jsonl"
+ *    sbt "runMain struxdriver.transform.Agda2TrainTransformer in.json out.jsonl"
  *
  *  The transformer accepts:
  *   • a top-level JSON array of items, OR
@@ -36,11 +36,11 @@
  *  ============================================================================
  */
 
-package proofparser.transform
+package struxdriver.transform
 
-import proofparser.schema._
-import proofparser.schema.AgdaDataOps._
-import proofparser.util.EitherUtil
+import struxdriver.schema._
+import struxdriver.schema.AgdaDataOps._
+import struxdriver.util.EitherUtil
 
 import upickle.default._
 import ujson._
@@ -230,7 +230,7 @@ object Agda2TrainTransformer {
   def main(args: Array[String]): Unit = {
     if (args.length != 2) {
       System.err.println(
-        s"Usage: proofparser.transform.Agda2TrainTransformer <input.json> <output.jsonl> (got ${args.length} args)"
+        s"Usage: struxdriver.transform.Agda2TrainTransformer <input.json> <output.jsonl> (got ${args.length} args)"
       )
       sys.exit(1)
     }

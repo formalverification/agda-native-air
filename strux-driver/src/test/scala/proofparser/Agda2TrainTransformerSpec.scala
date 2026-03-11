@@ -2,8 +2,8 @@
  *  Agda2TrainTransformerSpec.scala
  *  ========================================================================
  *
- *  File: strux-driver/src/test/scala/proofparser/Agda2TrainTransformerSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/Agda2TrainTransformerSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -26,19 +26,19 @@
  *
  ** ======================================================================== */
 
-package proofparser
+package struxdriver
 
 import ujson._
 import org.scalatest.Inside
 
-import proofparser.schema.{AgdaData, AgdaDataOps, DeclKind}
-import proofparser.schema.Semantic
+import struxdriver.schema.{AgdaData, AgdaDataOps, DeclKind}
+import struxdriver.schema.Semantic
 
 final class Agda2TrainTransformerSpec extends TestKit with Inside {
 
   "Manual Agda2Train-style parsing" should {
     "extract canonical AgdaData rows from the sample agda-example.json" in {
-      val text = loadResource("/proofparser/agda-example.json")
+      val text = loadResource("/struxdriver/agda-example.json")
       val json = ujson.read(text)
 
       // Flatten "scope-local" and "scope-private"

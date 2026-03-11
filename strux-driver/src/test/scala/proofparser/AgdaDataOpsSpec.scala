@@ -2,8 +2,8 @@
  *  AgdaDataOpsSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/AgdaDataOpsSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/AgdaDataOpsSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -12,12 +12,12 @@
  *  Run: `sbt test`
  *
  ** =========================================================================== */
-package proofparser
+package struxdriver
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import proofparser.schema.{ AgdaData, AgdaDataOps, DeclKind }
+import struxdriver.schema.{ AgdaData, AgdaDataOps, DeclKind }
 
 /** ========================================================================
   *  AgdaDataOpsSpec

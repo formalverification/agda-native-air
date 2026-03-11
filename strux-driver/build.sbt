@@ -15,8 +15,8 @@ lazy val StruxDriver = project.in(file("."))
     version := "0.1.0",
 
     // Main class setting:
-    // Compile / run / mainClass := Some("proofparser.AgdaExtractorMain")
-    Compile / mainClass := Some("proofparser.extract.AgdaJsonlDriver"),
+    // Compile / run / mainClass := Some("struxdriver.AgdaExtractorMain")
+    Compile / mainClass := Some("struxdriver.extract.AgdaJsonlDriver"),
     // All library dependencies consolidated here
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "upickle"    % "3.1.2",

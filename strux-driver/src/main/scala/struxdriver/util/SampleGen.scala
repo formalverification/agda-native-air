@@ -2,13 +2,13 @@
  *  SampleGen.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/util/SampleGen.scala
- *  Package: proofparser.util
+ *  File: strux-driver/src/main/scala/struxdriver/util/SampleGen.scala
+ *  Package: struxdriver.util
  *
  *  Description
  *  -----------
  *  Tiny synthetic generator for JSONL datasets compatible with the canonical
- *  AgdaData schema (proofparser.schema.AgdaData). This is useful for:
+ *  AgdaData schema (struxdriver.schema.AgdaData). This is useful for:
  *
  *    • smoke-testing DatasetStats, PremiseEval, and any Scala/Python loaders
  *    • end-to-end CI checks without needing real Agda extraction output
@@ -25,20 +25,20 @@
  *
  *  Usage
  *  -----
- *      sbt "runMain proofparser.util.SampleGen out.jsonl --n 16"
+ *      sbt "runMain struxdriver.util.SampleGen out.jsonl --n 16"
  *
  *  ============================================================================
  */
 
-package proofparser.util
+package struxdriver.util
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
 import upickle.default._
 
-import proofparser.schema.{AgdaData, AgdaDataOps}
-import proofparser.schema.Semantic
+import struxdriver.schema.{AgdaData, AgdaDataOps}
+import struxdriver.schema.Semantic
 
 object SampleGen {
 

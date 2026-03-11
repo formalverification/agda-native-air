@@ -2,8 +2,8 @@
  *  AgdaExtractorMain.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/extract/AgdaExtractorMain.scala
- *  Package: proofparser.extract
+ *  File: strux-driver/src/main/scala/struxdriver/extract/AgdaExtractorMain.scala
+ *  Package: struxdriver.extract
  *
  *  Description
  *  -----------
@@ -16,7 +16,7 @@
  *
  *  Schema
  *  ------
- *    - AgdaData (from proofparser.schema):
+ *    - AgdaData (from struxdriver.schema):
  *        file      : String
  *        module    : Option[String]
  *        name      : String
@@ -29,12 +29,12 @@
  *  Usage
  *  -----
  *      sbt "project strux-driver" \
- *          "runMain proofparser.extract.AgdaExtractorMain <in.agda|dir> <out.jsonl>"
+ *          "runMain struxdriver.extract.AgdaExtractorMain <in.agda|dir> <out.jsonl>"
  *
  *  Examples
  *  --------
  *      sbt "project strux-driver" \
- *          "runMain proofparser.extract.AgdaExtractorMain \
+ *          "runMain struxdriver.extract.AgdaExtractorMain \
  *           src/test/resources/agda-example.agda \
  *           target/example.jsonl"
  *
@@ -49,12 +49,12 @@
  *  ============================================================================
  */
 
-package proofparser.extract
+package struxdriver.extract
 
 import java.nio.file.{Files, Paths, Path}
 
 import upickle.default._
-import proofparser.schema.AgdaData
+import struxdriver.schema.AgdaData
 
 object AgdaExtractorMain {
 

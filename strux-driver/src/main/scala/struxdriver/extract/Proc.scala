@@ -2,8 +2,8 @@
   *  Proc.scala
   *  ----------------------------------------------------------------------------
   *
-  *  File: strux-driver/src/main/scala/proofparser/extract/Proc.scala
-  *  Package: proofparser.extract
+  *  File: strux-driver/src/main/scala/struxdriver/extract/Proc.scala
+  *  Package: struxdriver.extract
   *
   *  Purpose
   *  -------
@@ -28,7 +28,7 @@
   *  ============================================================================
   */
 
-package proofparser.extract
+package struxdriver.extract
 
 import cats.effect.{IO, Resource}
 import cats.syntax.all._

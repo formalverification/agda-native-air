@@ -1,7 +1,7 @@
 /**
  * Integration smoke tests for the Haskell `agda-json` backend.
  *
- * File: strux-driver/src/test/scala/proofparser/extract/AgdaJsonlBackendSmokeSpec.scala
+ * File: strux-driver/src/test/scala/struxdriver/extract/AgdaJsonlBackendSmokeSpec.scala
  *
  * What this test covers
  * ---------------------
@@ -30,7 +30,7 @@
  * If these variables are missing, the tests will be skipped (cancelled) rather
  * than failing.
  */
-package proofparser.extract
+package struxdriver.extract
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

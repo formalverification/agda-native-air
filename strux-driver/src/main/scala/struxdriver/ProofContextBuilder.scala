@@ -2,8 +2,8 @@
  *  ProofContextBuilder.scala
  *  ---------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/ProofContextBuilder.scala
- *  Package: proofparser
+ *  File: strux-driver/src/main/scala/struxdriver/ProofContextBuilder.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -37,9 +37,9 @@
  *
  ** ============================================================================ */
 
-package proofparser
+package struxdriver
 
-import proofparser.schema.{AgdaData, ProofContext}
+import struxdriver.schema.{AgdaData, ProofContext}
 
 object ProofContextBuilder {
 

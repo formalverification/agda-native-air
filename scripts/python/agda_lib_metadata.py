@@ -304,7 +304,7 @@ def main(argv: List[str] | None = None) -> int:
             libraries_file = Path(env).resolve()
         else:
             # Prefer the project-local libraries file written by flake shellHook.
-            candidate = project_root / "agda-jang" / "agda" / "libraries"
+            candidate = project_root / "agda-dojang" / "agda" / "libraries"
             if candidate.is_file():
                 libraries_file = candidate.resolve()
             else:

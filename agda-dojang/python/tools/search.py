@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-# file: python/tools/search.py
 """
-AgdaDojang search loop (BFS/beam), v0.3
+search.py
+
+File: agda-dojang/python/tools/search.py
+
+Description:
+  A simple BFS/beam search driver for AgdaDojang, v0.3.
 
 Highlights
 ----------

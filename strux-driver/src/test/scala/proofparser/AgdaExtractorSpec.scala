@@ -2,8 +2,8 @@
  *  AgdaExtractorSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/AgdaExtractorSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/AgdaExtractorSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -26,14 +26,14 @@
  *
  ** ============================================================================ */
 
-package proofparser
+package struxdriver
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.OptionValues
 
-import proofparser.extract.AgdaExtractor
-import proofparser.schema.AgdaData
+import struxdriver.extract.AgdaExtractor
+import struxdriver.schema.AgdaData
 
 final class AgdaExtractorSpec extends AnyFlatSpec
   with Matchers

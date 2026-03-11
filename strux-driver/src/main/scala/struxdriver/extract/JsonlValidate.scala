@@ -2,8 +2,8 @@
   *  JsonlValidate.scala
   *  ----------------------------------------------------------------------------
   *
-  *  File: strux-driver/src/main/scala/proofparser/extract/JsonlValidate.scala
-  *  Package: proofparser.extract
+  *  File: strux-driver/src/main/scala/struxdriver/extract/JsonlValidate.scala
+  *  Package: struxdriver.extract
   *
   *  Purpose
   *  -------
@@ -39,7 +39,7 @@
   *  ============================================================================
   */
 
-package proofparser.extract
+package struxdriver.extract
 
 // import cats.data.{NonEmptyList, ValidatedNel}
 import cats.effect.IO

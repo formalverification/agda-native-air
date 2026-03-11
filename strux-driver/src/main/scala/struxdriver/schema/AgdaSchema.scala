@@ -1,11 +1,11 @@
-package proofparser.schema
+package struxdriver.schema
 
 /** ===========================================================================
  *  AgdaSchema.scala
  *  ---------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/schema/AgdaSchema.scala
- *  Package: proofparser.schema
+ *  File: strux-driver/src/main/scala/struxdriver/schema/AgdaSchema.scala
+ *  Package: struxdriver.schema
  *
  *  Description
  *  -----------

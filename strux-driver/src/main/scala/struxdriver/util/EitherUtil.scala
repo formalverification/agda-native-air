@@ -1,4 +1,4 @@
-package proofparser.util
+package struxdriver.util
 
 import scala.util.{Try, Success, Failure}
 import scala.util.control.NonFatal

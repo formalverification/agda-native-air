@@ -1,8 +1,8 @@
 /**
  * Unit tests for JsonlValidate functionality.
  *
- * File: strux-driver/src/test/scala/proofparser/extract/JsonlValidateSuite.scala
- * Package: proofparser.extract
+ * File: strux-driver/src/test/scala/struxdriver/extract/JsonlValidateSuite.scala
+ * Package: struxdriver.extract
  *
  * Design Notes
  * - Uses temporary files to test various scenarios.
@@ -21,7 +21,7 @@
  *
  */
 
-package proofparser.extract
+package struxdriver.extract
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

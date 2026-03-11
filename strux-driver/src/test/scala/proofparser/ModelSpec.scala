@@ -2,8 +2,8 @@
  *  ModelSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/ModelSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/ModelSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -14,12 +14,12 @@
  * =============================================================================
  */
 
-package proofparser
+package struxdriver
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import proofparser.schema.{AgdaData, AgdaDataOps, DeclKind}
+import struxdriver.schema.{AgdaData, AgdaDataOps, DeclKind}
 
 final class ModelSpec extends AnyFunSuite with Matchers {
 

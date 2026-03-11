@@ -7,7 +7,7 @@
 #
 # Description
 # -----------
-# Makefile for the proofparser package (local dev helper).
+# Makefile for the struxdriver package (local dev helper).
 #
 # NOTE: The canonical interface is the top-level agda-native-air/Makefile.
 #       These targets are kept for convenience when working inside strux-driver/.
@@ -28,7 +28,7 @@ TRAIN_JSONL     ?= $(DATA_DIR)/train.jsonl
 
 # Example Agda + JSON fixtures
 EXTRACT_INPUT   ?= src/test/resources/agda-example.agda
-A2T_JSON_INPUT  ?= src/test/resources/proofparser/agda-example.json
+A2T_JSON_INPUT  ?= src/test/resources/struxdriver/agda-example.json
 A2T_OUT         ?= ../target/a2t.simple.jsonl
 DATA_A2T_SIMPLE ?= $(DATA_DIR)/a2t.simple.jsonl
 
@@ -40,8 +40,8 @@ N       ?= 16     # rows for synthetic generator
 
 SBT_FLAGS ?= -error -no-colors
 
-STATS_MAIN ?= proofparser.util.DatasetStats
-PREM_MAIN  ?= proofparser.util.PremiseEval
+STATS_MAIN ?= struxdriver.util.DatasetStats
+PREM_MAIN  ?= struxdriver.util.PremiseEval
 
 .PHONY: help
 help:
@@ -73,7 +73,7 @@ test:
 	$(SBT) $(SBT_FLAGS) test
 
 # ------------------------------------------------------------------------------
-# Extract: AgdaExtractorMain (proofparser.extract.AgdaExtractorMain)
+# Extract: AgdaExtractorMain (struxdriver.extract.AgdaExtractorMain)
 .PHONY: extract
 extract:
 	@if [ ! -e "$(EXTRACT_INPUT)" ]; then \
@@ -83,9 +83,9 @@ extract:
 	fi
 	@mkdir -p $(dir $(TRAIN_JSONL))
 	@echo "→ AgdaExtractorMain: $(EXTRACT_INPUT) -> $(TRAIN_JSONL)"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.extract.AgdaExtractorMain $(abspath $(EXTRACT_INPUT)) $(abspath $(TRAIN_JSONL))"
+	@$(SBT) $(SBT_FLAGS) "runMain struxdriver.extract.AgdaExtractorMain $(abspath $(EXTRACT_INPUT)) $(abspath $(TRAIN_JSONL))"
 
-# Transform: Agda2TrainTransformer (proofparser.transform.Agda2TrainTransformer)
+# Transform: Agda2TrainTransformer (struxdriver.transform.Agda2TrainTransformer)
 .PHONY: transform
 transform:
 	@if [ ! -e "$(A2T_JSON_INPUT)" ]; then \
@@ -94,9 +94,9 @@ transform:
 	fi
 	@mkdir -p $(dir $(A2T_OUT))
 	@echo "→ Agda2TrainTransformer: $(A2T_JSON_INPUT) -> $(A2T_OUT)"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.transform.Agda2TrainTransformer $(abspath $(A2T_JSON_INPUT)) $(abspath $(A2T_OUT))"
+	@$(SBT) $(SBT_FLAGS) "runMain struxdriver.transform.Agda2TrainTransformer $(abspath $(A2T_JSON_INPUT)) $(abspath $(A2T_OUT))"
 
-# Reducer: Agda2TrainReducer (proofparser.reduce.Agda2TrainReducer)
+# Reducer: Agda2TrainReducer (struxdriver.reduce.Agda2TrainReducer)
 .PHONY: a2t
 a2t:
 	@if [ ! -e "$(A2T_JSON_INPUT)" ]; then \
@@ -105,7 +105,7 @@ a2t:
 	fi
 	@mkdir -p $(dir $(DATA_A2T_SIMPLE))
 	@echo "→ Agda2TrainReducer: $(A2T_JSON_INPUT) -> $(DATA_A2T_SIMPLE)"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.reduce.Agda2TrainReducer $(abspath $(A2T_JSON_INPUT)) $(abspath $(DATA_A2T_SIMPLE))"
+	@$(SBT) $(SBT_FLAGS) "runMain struxdriver.reduce.Agda2TrainReducer $(abspath $(A2T_JSON_INPUT)) $(abspath $(DATA_A2T_SIMPLE))"
 
 # ------------------------------------------------------------------------------
 # Guard: DATASET must exist and be non-empty
@@ -143,7 +143,7 @@ smoke: compile premise-eval-quick
 gen-sample:
 	@mkdir -p ../data
 	@echo "→ Generating synthetic dataset: ../data/sample.jsonl (N=$(N))"
-	@$(SBT) $(SBT_FLAGS) "runMain proofparser.util.SampleGen ../data/sample.jsonl --n $(N)"
+	@$(SBT) $(SBT_FLAGS) "runMain struxdriver.util.SampleGen ../data/sample.jsonl --n $(N)"
 	@ls -lh ../data/sample.jsonl || true
 
 .PHONY: smoke-sample

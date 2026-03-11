@@ -80,18 +80,18 @@
         fi
       fi
 
-      export AGDA_DIR="$ROOT/agda-jang/agda"
+      export AGDA_DIR="$ROOT/agda-dojang/agda"
       mkdir -p "$AGDA_DIR"
 
       cat > "$AGDA_DIR/libraries" <<EOF
-    $ROOT/agda-jang/agda-jang.agda-lib
+    $ROOT/agda-dojang/agda-dojang.agda-lib
     ${agdaStdlibPkg}/standard-library.agda-lib
     EOF
 
       # IMPORTANT: choose which libraries are active by default.
       # These names must match the `name:` fields inside the .agda-lib files.
       cat > "$AGDA_DIR/defaults" <<EOF
-    agda-jang
+    agda-dojang
     standard-library
     EOF
 
@@ -261,7 +261,7 @@ PY
               git rev-parse --show-toplevel 2>/dev/null || pwd
             )"
 
-            export AGDA_DIR="$ROOT/agda-jang/agda"
+            export AGDA_DIR="$ROOT/agda-dojang/agda"
 
             # If the repo structure ever differs, fail loudly:
             if [ ! -d "$AGDA_DIR" ]; then

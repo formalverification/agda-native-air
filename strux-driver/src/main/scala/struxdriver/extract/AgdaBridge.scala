@@ -2,8 +2,8 @@
  *  AgdaBridge.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/extract/AgdaBridge.scala
- *  Package: proofparser.extract
+ *  File: strux-driver/src/main/scala/struxdriver/extract/AgdaBridge.scala
+ *  Package: struxdriver.extract
  *
  *  Purpose
  *  -------
@@ -37,7 +37,7 @@
  *  ============================================================================
  */
 
-package proofparser.extract
+package struxdriver.extract
 
 import java.io.{BufferedReader, InputStreamReader, OutputStreamWriter, PrintWriter}
 import java.nio.charset.StandardCharsets

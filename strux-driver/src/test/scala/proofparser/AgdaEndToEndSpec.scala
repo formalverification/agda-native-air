@@ -2,8 +2,8 @@
  *  AgdaEndToEndSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/AgdaEndToEndSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/AgdaEndToEndSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -11,7 +11,7 @@
  * ============================================================================ */
 
 
-package proofparser
+package struxdriver
 
 import java.nio.file.{ Files, Paths }
 import java.nio.charset.StandardCharsets
@@ -21,8 +21,8 @@ import org.scalatest.matchers.should.Matchers
 
 import upickle.default._
 
-import proofparser.extract.AgdaExtractor
-import proofparser.schema.{ AgdaData, AgdaDataOps }
+import struxdriver.extract.AgdaExtractor
+import struxdriver.schema.{ AgdaData, AgdaDataOps }
 
 /** ========================================================================
   *  AgdaEndToEndSpec

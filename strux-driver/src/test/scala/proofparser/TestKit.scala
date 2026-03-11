@@ -2,19 +2,19 @@
  *  TestKit.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/TestKit.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/TestKit.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
- *  A base trait providing common utilities for tests in the proofparser package.
+ *  A base trait providing common utilities for tests in the struxdriver package.
  *  It includes methods for loading test resources and generators for property-based
  *  testing.
  *
  *  Run: `sbt test`
  ** ============================================================================ */
 
-package proofparser
+package struxdriver
 
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers

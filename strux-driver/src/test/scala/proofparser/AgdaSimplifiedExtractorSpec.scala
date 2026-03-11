@@ -2,8 +2,8 @@
  *  AgdaSimplifiedExtractorSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/AgdaSimplifiedExtractorSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/AgdaSimplifiedExtractorSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -26,7 +26,7 @@
  *
  ** ============================================================================ */
 
-package proofparser
+package struxdriver
 
 import java.nio.file.Files
 

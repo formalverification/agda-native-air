@@ -2,8 +2,8 @@
  *  Agda2TrainReducer.scala
  *  ----------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/reduce/Agda2TrainReducer.scala
- *  Package: proofparser.reduce
+ *  File: strux-driver/src/main/scala/struxdriver/reduce/Agda2TrainReducer.scala
+ *  Package: struxdriver.reduce
  *
  *  Description
  *  -----------
@@ -11,7 +11,7 @@
  *
  *  This tool walks over a (possibly messy) JSON structure produced by older
  *  Agda2Train experiments and reduces it to our canonical JSONL row format
- *  `proofparser.schema.AgdaData`.
+ *  `struxdriver.schema.AgdaData`.
  *
  *  It is deliberately tolerant of schema drift:
  *    - probes multiple alternative keys for module / file / name / type / body,
@@ -29,7 +29,7 @@
  *  Usage
  *  -----
  *      sbt "project strux-driver" \
- *          "runMain proofparser.reduce.Agda2TrainReducer <in.json|jsonl> <out.jsonl>"
+ *          "runMain struxdriver.reduce.Agda2TrainReducer <in.json|jsonl> <out.jsonl>"
  *
  *  Output
  *  ------
@@ -53,15 +53,15 @@
  *    to `AgdaDataOps.normalize`, so the reducer itself stays simple.
  *
  * ====================================================================== */
-package proofparser.reduce
+package struxdriver.reduce
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths, Path}
 import scala.util.control.NonFatal
 import ujson.Value
 import upickle.default._
-import proofparser.AgdaJsonParser.JsonUtil.{optStr, pickPretty, pickStringArray}
-import proofparser.schema.{AgdaData, AgdaDataOps, SemanticInfo, DeclKind,Semantic}
-import proofparser.util.EitherUtil.catchNonFatal
+import struxdriver.AgdaJsonParser.JsonUtil.{optStr, pickPretty, pickStringArray}
+import struxdriver.schema.{AgdaData, AgdaDataOps, SemanticInfo, DeclKind,Semantic}
+import struxdriver.util.EitherUtil.catchNonFatal
 
 /** Reduce legacy Agda2Train JSON → canonical AgdaData JSONL. */
 object Agda2TrainReducer {

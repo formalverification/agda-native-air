@@ -2,21 +2,21 @@
  *  SimpleSchemaSpec.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/SimpleSchemaSpec.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/SimpleSchemaSpec.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
  *  Simple round-trip unit test using the `TrainRecord`.
  ** ============================================================================= */
 
-package proofparser
+package struxdriver
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import upickle.default._
 
-import proofparser.schema.TrainRecord
+import struxdriver.schema.TrainRecord
 
 final class SimpleSchemaSpec extends AnyFunSuite with Matchers {
 

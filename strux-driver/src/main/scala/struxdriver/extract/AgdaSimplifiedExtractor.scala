@@ -2,8 +2,8 @@
  *  AgdaSimplifiedExtractor.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/extract/AgdaSimplifiedExtractor.scala
- *  Package: proofparser.extract
+ *  File: strux-driver/src/main/scala/struxdriver/extract/AgdaSimplifiedExtractor.scala
+ *  Package: struxdriver.extract
  *
  *  Purpose
  *  -------
@@ -29,7 +29,7 @@
  *
  *  Context in Project
  *  ------------------
- *  - Lives in the `proofparser.extract` package, alongside:
+ *  - Lives in the `struxdriver.extract` package, alongside:
  *      * AgdaBridge.scala        : process I/O for Agda
  *      * AgdaExtractor.scala     : regex-only, no Agda process
  *      * Agda2TrainTransformer   : JSON → training rows
@@ -62,7 +62,7 @@
  *
  *  Usage
  *  -----
- *      runMain proofparser.extract.AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl>
+ *      runMain struxdriver.extract.AgdaSimplifiedExtractor <agda-file-or-dir> <out.jsonl>
  *         [--include DIR]* [--lib LIB]* [--library-file FILE]
  *         [--mode NonInteractive|Direct] [--empty-is-null]
  *         [--verbose] [--timeout-ms N]
@@ -71,7 +71,7 @@
  *  -------
  *  From inside the `agda-ai-prver/strux-driver` directory, enter the following command:
  *
- *      sbt "runMain proofparser.extract.AgdaSimplifiedExtractor \
+ *      sbt "runMain struxdriver.extract.AgdaSimplifiedExtractor \
  *        ../agda-dojang/agda output/goals.jsonl \
  *        --include ../agda-dojang/agda --lib standard-library \
  *        --library-file ../agda-dojang/agda/libraries \
@@ -80,7 +80,7 @@
  *  ============================================================================
  */
 
-package proofparser.extract
+package struxdriver.extract
 
 import java.io.PrintWriter
 import java.nio.file.{Files, Path, Paths}
@@ -91,8 +91,8 @@ import scala.util.Try
 
 import upickle.default._
 
-import proofparser.schema.{AgdaData, AgdaDataOps, SemanticInfo, DeclKind}
-import proofparser.schema.Semantic
+import struxdriver.schema.{AgdaData, AgdaDataOps, SemanticInfo, DeclKind}
+import struxdriver.schema.Semantic
 
 /* -----------------------------
  * Lightweight logger

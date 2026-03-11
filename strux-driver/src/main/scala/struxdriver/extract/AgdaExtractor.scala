@@ -2,8 +2,8 @@
  *  AgdaExtractor.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/extract/AgdaExtractor.scala
- *  Package: proofparser.extract
+ *  File: strux-driver/src/main/scala/struxdriver/extract/AgdaExtractor.scala
+ *  Package: struxdriver.extract
  *
  *  Description
  *  -----------
@@ -35,7 +35,7 @@
  *  Usage
  *  -----
  *    import java.nio.file.Paths
- *    import proofparser.extract.AgdaExtractor
+ *    import struxdriver.extract.AgdaExtractor
  *
  *    val rows: Vector[AgdaData] =
  *      AgdaExtractor.parseAgdaFile(Paths.get("path/to/Foo.agda"))
@@ -45,7 +45,7 @@
  *  ============================================================================
  */
 
-package proofparser.extract
+package struxdriver.extract
 
 import java.nio.file.{Files, Path, Paths}
 
@@ -55,8 +55,8 @@ import scala.util.matching.Regex
 
 import upickle.default._
 
-import proofparser.schema.{AgdaData, AgdaDataOps}
-import proofparser.schema.{Semantic, DeclKind, SemanticInfo}
+import struxdriver.schema.{AgdaData, AgdaDataOps}
+import struxdriver.schema.{Semantic, DeclKind, SemanticInfo}
 
 object AgdaExtractor {
 

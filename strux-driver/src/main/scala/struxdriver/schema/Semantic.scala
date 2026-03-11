@@ -2,8 +2,8 @@
  *  Semantic.scala
  *  --------------
  *
- *  File: strux-driver/src/main/scala/proofparser/schema/Semantic.scala
- *  Package: proofparser.schema
+ *  File: strux-driver/src/main/scala/struxdriver/schema/Semantic.scala
+ *  Package: struxdriver.schema
  *
  *  Description
  *  -----------
@@ -13,7 +13,7 @@
  *
  *  Usage
  *  -----
- *      import proofparser.{DeclKind, SemanticInfo, Semantic}
+ *      import struxdriver.{DeclKind, SemanticInfo, Semantic}
  *      val info = Semantic.from(name, agdaType, module, proof)
  *
  *  Notes
@@ -26,7 +26,7 @@
  *  ============================================================================
  */
 
-package proofparser.schema
+package struxdriver.schema
 
 import upickle.default.{ReadWriter, macroRW}
 

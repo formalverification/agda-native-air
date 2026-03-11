@@ -2,8 +2,8 @@
  *  DatasetStats.scala
  *  -----------------------------------------------------------------------------
  *
- *  File: src/main/scala/proofparser/util/DatasetStats.scala
- *  Package: proofparser.util
+ *  File: src/main/scala/struxdriver/util/DatasetStats.scala
+ *  Package: struxdriver.util
  *
  *  Description
  *  -----------
@@ -21,7 +21,7 @@
  *
  *  This refactored version uses the **canonical schema**:
  *
- *      import proofparser.schema.Row   // type alias for AgdaData
+ *      import struxdriver.schema.Row   // type alias for AgdaData
  *
  *  It is fully functional:
  *
@@ -36,16 +36,16 @@
  *
  *  Usage
  *  -----
- *      sbt "runMain proofparser.util.DatasetStats data/train.jsonl --top 20"
+ *      sbt "runMain struxdriver.util.DatasetStats data/train.jsonl --top 20"
  *
  *  ============================================================================ */
 
-package proofparser.util
+package struxdriver.util
 
 import scala.io.Source
 
 import upickle.default._
-import proofparser.schema._                // brings Row = AgdaData into scope
+import struxdriver.schema._                // brings Row = AgdaData into scope
 
 object DatasetStats {
 

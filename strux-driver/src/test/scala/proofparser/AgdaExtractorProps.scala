@@ -2,8 +2,8 @@
  *  AgdaExtractorProps.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/test/scala/proofparser/AgdaExtractorProps.scala
- *  Package: proofparser
+ *  File: strux-driver/src/test/scala/struxdriver/AgdaExtractorProps.scala
+ *  Package: struxdriver
  *
  *  Description
  *  -----------
@@ -12,15 +12,15 @@
  *  Run: `sbt test`
  ** ============================================================================ */
 
-package proofparser
+package struxdriver
 
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import org.scalacheck.Gen
 
-import proofparser.extract.AgdaExtractor
-import proofparser.schema.AgdaData
+import struxdriver.extract.AgdaExtractor
+import struxdriver.schema.AgdaData
 
 /**
  * Property-based tests for AgdaExtractor.

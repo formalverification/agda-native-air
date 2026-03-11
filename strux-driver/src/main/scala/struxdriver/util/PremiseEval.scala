@@ -2,8 +2,8 @@
  *  PremiseEval.scala
  *  ----------------------------------------------------------------------------
  *
- *  File: strux-driver/src/main/scala/proofparser/util/PremiseEval.scala
- *  Package: proofparser.util
+ *  File: strux-driver/src/main/scala/struxdriver/util/PremiseEval.scala
+ *  Package: struxdriver.util
  *
  *  Description
  *  ----------
@@ -35,27 +35,27 @@
  *
  *  Schema
  *  ------
- *    - Row       = proofparser.schema.AgdaData
- *    - TrainGoal = proofparser.schema.TrainGoal
+ *    - Row       = struxdriver.schema.AgdaData
+ *    - TrainGoal = struxdriver.schema.TrainGoal
  *
  *  Usage
  *  -----
  *     # Mode 1 (single-file, baselines)
- *     sbt "runMain proofparser.util.PremiseEval data/train.jsonl --k 10 --split 90"
+ *     sbt "runMain struxdriver.util.PremiseEval data/train.jsonl --k 10 --split 90"
  *
  *     # Mode 2 (two-file retrieval)
- *     sbt "runMain proofparser.util.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
+ *     sbt "runMain struxdriver.util.PremiseEval data/agda.jsonl data/goals.jsonl --k 10"
  *
  *  ============================================================================
  */
 
-package proofparser.util
+package struxdriver.util
 
 import scala.io.Source
 import scala.util.Try
 
 import upickle.default._
-import proofparser.schema.{ AgdaData, TrainGoal}
+import struxdriver.schema.{ AgdaData, TrainGoal}
 
 object PremiseEval {
 

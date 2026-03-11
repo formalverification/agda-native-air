@@ -2,8 +2,8 @@
   *  AgdaJsonlDriver.scala
   *  ----------------------------------------------------------------------------
   *
-  *  File: strux-driver/src/main/scala/proofparser/extract/AgdaJsonlDriver.scala
-  *  Package: proofparser.extract
+  *  File: strux-driver/src/main/scala/struxdriver/extract/AgdaJsonlDriver.scala
+  *  Package: struxdriver.extract
   *
   *  Purpose
   *  -------
@@ -39,7 +39,7 @@
   *  ============================================================================
   */
 
-package proofparser.extract
+package struxdriver.extract
 
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.effect.implicits._
@@ -242,7 +242,7 @@ object AgdaJsonlDriver extends IOApp {
 
   private val usage: String =
     """Usage:
-      |  runMain proofparser.extract.AgdaJsonlDriver \
+      |  runMain struxdriver.extract.AgdaJsonlDriver \
       |    --project-root <repo-root> \
       |    --agda-dir     <repo-root>/agda-dojang/agda \
       |    --src-dir      <path-to-library-src> \
