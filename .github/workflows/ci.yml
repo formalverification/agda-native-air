@@ -1,0 +1,233 @@
+## =============================================================================
+#  ci.yml
+#  -----------------------------------------------------------------------------
+#
+#  File: .github/workflows/ci.yml
+#
+#  CI Pipeline for agda-ai-prover
+#  --------------------------------
+#  What this workflow does:
+#  1) Scala (proof-parser):
+#     - Set up Temurin JDK 21 (Spark 4.x + Scala 2.13 toolchain)
+#     - Use sbt/setup-sbt to install sbt on Ubuntu 24.04 runners
+#     - Cache sbt / ivy / coursier
+#     - Run `sbt test` in proof-parser/
+#     - OPTIONAL: Run a smoke test of Agda2TrainTransformer if the example input exists
+#
+#  2) Python (ml-pipeline):
+#     - Job runs ONLY if the ml-pipeline/ directory exists
+#     - Set up Python 3.12
+#     - Create a venv inside ml-pipeline/
+#     - If requirements.txt exists, install it
+#     - If tests exist, run pytest; otherwise skip gracefully
+#
+#  Notes:
+#  - We intentionally do NOT invoke Agda or long training in PR CI.
+#  - Add a separate nightly workflow for heavy jobs if desired.
+## =============================================================================
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Prevent duplicate runs on the same ref
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scala-proof-parser:
+    name: Scala • proof-parser build & tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        java-version: [ '21' ]
+
+    steps:
+      # --- Checkout ---
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- JDK 21 ---
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+          cache: sbt
+
+      # --- sbt (fix for 'Unable to locate package sbt' on Ubuntu 24.04) ---
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      # --- Optional extra caches (Ivy / Coursier) ---
+      - name: Cache Ivy/Coursier
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/.sbt
+          key: ${{ runner.os }}-ivycs-${{ hashFiles('**/*.sbt', 'proof-parser/project/build.properties', 'proof-parser/project/**/*.scala') }}
+          restore-keys: |
+            ${{ runner.os }}-ivycs-
+
+      # --- sbt test ---
+      - name: sbt test (proof-parser)
+        working-directory: proof-parser
+        run: sbt -v test
+
+      # --- OPTIONAL smoke test of Agda2TrainTransformer ---
+      # This step only runs if a plausible example JSON is present.
+      - name: Run Agda2TrainTransformer smoke test (optional)
+        working-directory: proof-parser
+        run: |
+          set -euxo pipefail
+          # Adjust this if your example lives elsewhere:
+          INPUT_JSON="src/test/resources/proofparser/agda-example.json"
+          if [ -f "$INPUT_JSON" ]; then
+            mkdir -p ../target
+            sbt "runMain proofparser.transform.Agda2TrainTransformer $INPUT_JSON ../target/a2t.sample.jsonl"
+            test -s ../target/a2t.sample.jsonl
+            echo "Smoke test OK: ../target/a2t.sample.jsonl"
+          else
+            echo "No example JSON at $INPUT_JSON; skipping smoke test."
+          fi
+
+      # Upload artifact if the smoke test produced one
+      - name: Upload transformer artifact (if present)
+        if: ${{ hashFiles('target/a2t.sample.jsonl') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: a2t-sample-jsonl
+          path: target/a2t.sample.jsonl
+          if-no-files-found: ignore
+
+  scala-ml-pipeline-etl:
+    name: Scala • ml-pipeline ETL smoke tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        java-version: [ '21' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+          cache: sbt
+          cache-dependency-path: |
+            ml-pipeline/**/*.sbt
+            ml-pipeline/project/build.properties
+            ml-pipeline/project/**/*.scala
+
+      - name: Set up sbt
+        uses: sbt/setup-sbt@v1
+
+      # ETL smoke test: runs quickly + deterministically (fixture-driven)
+      - name: sbt testOnly etl.PreprocessAgdaSpec (ml-pipeline/etl)
+        working-directory: ml-pipeline
+        run: |
+          set -euxo pipefail
+          sbt -v "project etl" "testOnly etl.PreprocessAgdaSpec"
+
+      # Proof-completion dataset builder smoke (fixture-driven)
+      # Uses committed fixture: ml-pipeline/etl/src/test/resources/proof-completion.smoke.jsonl
+      - name: make etl-proof-completion-dataset-smoke
+        run: |
+          set -euxo pipefail
+          make etl-proof-completion-dataset-smoke PROOF_COMPLETION_SMOKE_LIMIT=200
+
+
+  python-ml-pipeline:
+    name: Python • ml-pipeline tests
+    runs-on: ubuntu-latest
+    # Only run this job if the ml-pipeline directory exists in the repo
+    # if: ${{ hashFiles('ml-pipeline/**') != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          # NOTE: We omit cache-dependency-path because the file may not exist in all commits.
+          cache: 'pip'
+
+      - name: Set up virtualenv
+        working-directory: ml-pipeline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          if [ -f python/requirements.txt ]; then
+            pip install -r python/requirements.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt found; skipping dependency install."
+          fi
+          python -c "import pandas, pyarrow; print('pandas', pandas.__version__, 'pyarrow', pyarrow.__version__)"
+
+      - name: Run pytest if tests present
+        working-directory: ml-pipeline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          . .venv/bin/activate
+          if find python/tests \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit | grep -q .; then
+            pytest -q python/tests
+          else
+            echo "No Python tests found in ml-pipeline/python/tests; skipping pytest."
+          fi
+
+  haskell-backend-jsonl:
+    name: Haskell • agda-backend-jsonl tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Haskell (GHC + Cabal)
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.8.2'
+          cabal-version: 'latest'
+          cabal-update: true
+
+      - name: Cache Cabal store + dist-newstyle (backend)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal/store
+            ~/.cabal/packages
+            agda-backend-jsonl/dist-newstyle
+          key: ${{ runner.os }}-ghc9.8.2-cabal-${{ hashFiles('agda-backend-jsonl/*.cabal', 'agda-backend-jsonl/cabal.project', 'agda-backend-jsonl/cabal.project.freeze') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc9.8.2-cabal-
+
+      - name: backend-test
+        run: make backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
+
+  # Aggregate status (optional): mark the whole workflow green only if
+  # the Scala job passed and (if present) Python job passed.
+  all-green:
+    name: All checks
+    runs-on: ubuntu-latest
+    needs: [ scala-proof-parser, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl ]
+    steps:
+      - run: echo "All jobs passed ✅"

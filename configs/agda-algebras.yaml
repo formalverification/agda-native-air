@@ -1,0 +1,231 @@
+# agda-algebras.yaml
+#
+# File: configs/agda-algebras.yaml
+#
+# Description: Config file for ml-pipeline ETL processing of agda-algebras dataset.
+#
+# Purpose:
+#   Describes input JSONL paths and feature extraction settings for processing
+#   the agda-algebras corpus through the ml-pipeline ETL stage (PreprocessAgda.scala).
+#
+# Usage:
+#   Intended for future one-command orchestration tools. Currently documents the
+#   ETL configuration contract.
+#
+# Current reality (Jan 2026):
+# - The Spark ETL entrypoint (etl.PreprocessAgda) consumes:
+#     (1) a SINGLE input JSONL file
+#     (2) an output directory
+# - This config documents how an orchestrator SHOULD prepare that input
+#   (e.g. concatenating shard JSONLs), and where outputs should go.
+#
+# Anything marked PLACEHOLDER is not consumed by the current ETL runner.
+
+# ============================================================================
+# Pipeline Metadata
+# ============================================================================
+name: "agda-algebras"
+version: "0.4.1"
+description: "ETL configuration contract for agda-algebras (canonical backend JSONL → Parquet)"
+
+# ============================================================================
+# Input Data Configuration
+# ============================================================================
+input:
+  # Shard JSONLs produced by extraction (backend).
+  # These are *inputs to the orchestrator*; the current ETL expects a single merged JSONL.
+  shard_paths:
+    - "data/agda-algebras/raw/jsonl/Algebra.agda.jsonl"
+    - "data/agda-algebras/raw/jsonl/Algebras.agda.jsonl"
+    - "data/agda-algebras/raw/jsonl/Setoid.agda.jsonl"
+    - "data/agda-algebras/raw/jsonl/Homomorphisms.agda.jsonl"
+    - "data/agda-algebras/raw/jsonl/Terms.agda.jsonl"
+    - "data/agda-algebras/raw/jsonl/Subalgebras.agda.jsonl"
+    - "data/agda-algebras/raw/jsonl/Varieties.agda.jsonl"
+  
+  # Data format (canonical Agda backend JSONL)
+  format: "jsonl"
+  
+
+  # Merge strategy (how the orchestrator should combine shard_paths for ETL)
+  # "concat" (combine all files) or "separate" (process individually)
+  merge_strategy: "concat"
+
+  # The single JSONL file that the current ETL runner consumes.
+  # Orchestrator responsibility: create this file from shard_paths.
+  merged_path: "data/agda-algebras/raw/jsonl/combined.jsonl"
+
+  # PLACEHOLDER (not currently consumed by ETL):
+  # whether to deduplicate rows before writing merged_path.
+  # (If enabled, do it during merge or as a pre-ETL step.)
+  deduplicate:
+    enabled: true
+    by: "prettyQname"
+
+# ============================================================================
+# Filtering Configuration
+# ============================================================================
+# NOTE: Current ETL (PreprocessAgda.scala) only filters by `type.isNotNull && length(type) > 0`.
+# Future knobs belong here, but must remain commented until implemented.
+# filtering:
+#   min_type_length: 5
+#   min_body_length: 0
+#   min_ast_size: 3
+#   require_type_ast: true
+#   include_def_kinds: null
+
+# ============================================================================
+# Feature Extraction Configuration
+# ============================================================================
+features:
+  # Structural representation selector for downstream modeling.
+  # Current ETL stores `typeAst` as a JSON STRING column `typeAstJson`.
+  # Options: "typeAst" (use structural AST), "string" (use type/body strings only), "both"
+  structural_representation: "typeAst"
+  
+  # Type AST version to validate/filter
+  typeAst_version: "0.3-v0"
+  # ^ This is a contract-level check (future); current ETL does not enforce it.
+  #   Use canonical field naming to reduce confusion.
+
+  # Columns expected to exist in the ETL output schema.
+  # Keep this list conservative and aligned with PreprocessAgda.scala.
+  # (these are supposed to be guaranteed to be present in the output schema)
+  include_columns:
+    - "file"
+    - "module"
+    - "name"
+    - "qname"
+    - "prettyModule"
+    - "prettyName"
+    - "prettyQname"
+    - "defKind"
+    - "type"
+    - "body"
+    - "hasBody"
+    - "typeAstVersion"
+    - "typeAstJson"       # stored as JSON string for version stability
+    - "dependencies"
+    - "astSize"
+  
+  # Derived features computed by PreprocessAgda.scala
+  # (see ml-pipeline/etl/src/main/scala/PreprocessAgda.scala lines 107-113)
+  derived_features:
+    - "lenType"           # length(type)
+    - "lenBody"           # length(body)
+    - "lenProof"          # alias for lenBody (backward compatibility)
+    - "hasTypeAst"        # typeAstJson.isNotNull
+    - "typeAstBytes"      # length(typeAstJson)
+
+
+# ============================================================================
+# Data Splitting Configuration
+# ============================================================================
+# NOTE: Current ETL does randomSplit(train_ratio, test_ratio) with seed.
+#       PreprocessAgda.scala performs a simple 90/10 randomSplit with seed=42L.
+#       (Stratification and shuffle settings are not yet supported.)
+splitting:
+  train_ratio: 0.9
+  test_ratio: 0.1
+  seed: 42
+  # stratify_by: null      # not yet supported
+  # shuffle: true          # not yet supported
+
+# ============================================================================
+# ETL Output Configuration
+# ============================================================================
+output:
+  # Output format (parquet, as written by PreprocessAgda.scala)
+  format: "parquet"
+
+  # Output directory convention for this corpus (aligned with Issue #19).
+  base_path: "ml-pipeline/data/agda-algebras"
+  
+  # Individual split paths
+  train_path: "ml-pipeline/data/agda-algebras/train.parquet"
+  test_path: "ml-pipeline/data/agda-algebras/test.parquet"
+  
+  # Write mode: "overwrite" (hardcoded in PreprocessAgda.scala)
+  write_mode: "overwrite"
+  
+  # NOTE: Parquet compression codec is not configurable in current ETL
+  # compression: "snappy"
+
+# ============================================================================
+# PLACEHOLDERS (future orchestration)
+# Training, Evaluation, and Logging Configuration
+# ============================================================================
+# tokenization:
+#   vocab_selector: "dependencies"
+#   vocab_size: 5000
+#   min_token_frequency: 2
+#   include_special_tokens: true
+#   normalize_tokens: false
+
+# training: {}
+# evaluation: {}
+# logging: {}
+# NOTE: The sections below are PLACEHOLDERS for future one-command orchestration.
+#       They are NOT currently consumed by the ETL pipeline or training scripts.
+#       These settings are non-binding and may change as the pipeline evolves.
+#
+# training:
+#   input_parquet: "ml-pipeline/data/agda-algebras/train.parquet"
+#   model_path: "ml-pipeline/models/agda-algebras-model.pt"
+#   hyperparameters:
+#     epochs: 10
+#     batch_size: 32
+#     learning_rate: 0.01
+#     optimizer: "adam"
+#     loss_function: "cross_entropy"
+#   feature_columns:
+#     - "lenType"
+#     - "lenBody"
+#     - "astSize"
+#   label_column: null
+#   device: "cuda"
+#   mixed_precision: false
+#
+# evaluation:
+#   test_parquet: "ml-pipeline/data/agda-algebras/test.parquet"
+#   metrics:
+#     - "accuracy"
+#     - "precision"
+#     - "recall"
+#     - "f1"
+#   batch_size: 64
+#
+# logging:
+#   level: "INFO"
+#   log_dir: "ml-pipeline/logs/agda-algebras"
+#   tensorboard: false
+#   checkpoint_every: 5
+
+# ============================================================================
+# Notes / How to run today (manual)
+# ============================================================================
+# 
+# Current ETL workflow:
+# 
+# 1. Extraction (prerequisite):
+#    $ make extract-lib
+#    → Produces data/agda-algebras/raw/jsonl/*.jsonl files
+# 
+# 2. Merge (orchestrator step; today you can do it manually):
+#    $ cat data/agda-algebras/raw/jsonl/*.jsonl > data/agda-algebras/raw/jsonl/combined.jsonl
+#
+# 3. ETL (Spark JSONL → Parquet):
+#    $ cd ml-pipeline && sbt "project etl" "runMain etl.PreprocessAgda \
+#        ../data/agda-algebras/raw/jsonl/combined.jsonl data/agda-algebras"
+#    → Reads JSONL, extracts features, writes train.parquet and test.parquet
+# Outputs:
+# - ml-pipeline/data/agda-algebras/train.parquet
+# - ml-pipeline/data/agda-algebras/test.parquet
+# Future workflow (once one-command orchestration exists):
+#    $ ml-pipeline one-command etl --config configs/agda-algebras.yaml
+#    → Reads input.paths, merges, applies ETL, writes to output.{train,test}_path
+# 
+# Current Status:
+#   - ETL pipeline: PreprocessAgda.scala (implemented)
+#   - Config-driven orchestration: future work
+#   - This file documents the intended ETL configuration contract
