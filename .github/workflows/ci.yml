@@ -6,24 +6,28 @@
 #
 #  CI Pipeline for agda-ai-prover
 #  --------------------------------
-#  What this workflow does:
-#  1) Scala (proof-parser):
-#     - Set up Temurin JDK 21 (Spark 4.x + Scala 2.13 toolchain)
-#     - Use sbt/setup-sbt to install sbt on Ubuntu 24.04 runners
-#     - Cache sbt / ivy / coursier
-#     - Run `sbt test` in proof-parser/
-#     - OPTIONAL: Run a smoke test of Agda2TrainTransformer if the example input exists
 #
-#  2) Python (ml-pipeline):
-#     - Job runs ONLY if the ml-pipeline/ directory exists
-#     - Set up Python 3.12
-#     - Create a venv inside ml-pipeline/
-#     - If requirements.txt exists, install it
-#     - If tests exist, run pytest; otherwise skip gracefully
+#  What this workflow does:
+#
+#    1) Scala (strux-driver)
+#       - Set up Temurin JDK 21 (Spark 4.x + Scala 2.13 toolchain)
+#       - Use sbt/setup-sbt to install sbt on Ubuntu 24.04 runners
+#       - Cache sbt / ivy / coursier
+#       - Run `sbt test` in strux-driver/
+#       - OPTIONAL: Run a smoke test of Agda2TrainTransformer if the example input exists
+#
+#    2) Python (ml-pipeline)
+#       - Job runs ONLY if the ml-pipeline/ directory exists
+#       - Set up Python 3.12
+#       - Create a venv inside ml-pipeline/
+#       - If requirements.txt exists, install it
+#       - If tests exist, run pytest; otherwise skip gracefully
 #
 #  Notes:
-#  - We intentionally do NOT invoke Agda or long training in PR CI.
-#  - Add a separate nightly workflow for heavy jobs if desired.
+#
+#    - We intentionally do NOT invoke Agda or long training in PR CI.
+#    - Add a separate nightly workflow for heavy jobs if desired.
+#
 ## =============================================================================
 name: CI Pipeline
 
@@ -39,8 +43,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  scala-proof-parser:
-    name: Scala • proof-parser build & tests
+  scala-strux-driver:
+    name: Scala • strux-driver build & tests
     runs-on: ubuntu-latest
 
     strategy:
@@ -72,19 +76,19 @@ jobs:
             ~/.ivy2/cache
             ~/.cache/coursier
             ~/.sbt
-          key: ${{ runner.os }}-ivycs-${{ hashFiles('**/*.sbt', 'proof-parser/project/build.properties', 'proof-parser/project/**/*.scala') }}
+          key: ${{ runner.os }}-ivycs-${{ hashFiles('**/*.sbt', 'strux-driver/project/build.properties', 'strux-driver/project/**/*.scala') }}
           restore-keys: |
             ${{ runner.os }}-ivycs-
 
       # --- sbt test ---
-      - name: sbt test (proof-parser)
-        working-directory: proof-parser
+      - name: sbt test (strux-driver)
+        working-directory: strux-driver
         run: sbt -v test
 
       # --- OPTIONAL smoke test of Agda2TrainTransformer ---
       # This step only runs if a plausible example JSON is present.
       - name: Run Agda2TrainTransformer smoke test (optional)
-        working-directory: proof-parser
+        working-directory: strux-driver
         run: |
           set -euxo pipefail
           # Adjust this if your example lives elsewhere:
@@ -195,7 +199,7 @@ jobs:
           fi
 
   haskell-backend-jsonl:
-    name: Haskell • agda-backend-jsonl tests
+    name: Haskell • agda-strux tests
     runs-on: ubuntu-latest
 
     steps:
@@ -215,8 +219,8 @@ jobs:
           path: |
             ~/.cabal/store
             ~/.cabal/packages
-            agda-backend-jsonl/dist-newstyle
-          key: ${{ runner.os }}-ghc9.8.2-cabal-${{ hashFiles('agda-backend-jsonl/*.cabal', 'agda-backend-jsonl/cabal.project', 'agda-backend-jsonl/cabal.project.freeze') }}
+            agda-strux/dist-newstyle
+          key: ${{ runner.os }}-ghc9.8.2-cabal-${{ hashFiles('agda-strux/*.cabal', 'agda-strux/cabal.project', 'agda-strux/cabal.project.freeze') }}
           restore-keys: |
             ${{ runner.os }}-ghc9.8.2-cabal-
 
@@ -228,6 +232,6 @@ jobs:
   all-green:
     name: All checks
     runs-on: ubuntu-latest
-    needs: [ scala-proof-parser, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl ]
+    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl ]
     steps:
       - run: echo "All jobs passed ✅"
