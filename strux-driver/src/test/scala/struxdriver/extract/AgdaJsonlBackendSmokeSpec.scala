@@ -72,10 +72,12 @@ final class AgdaJsonlBackendSmokeSpec extends AnyFreeSpec with Matchers {
     if (!Files.exists(p)) fail(s"$label does not exist: $p")
 
   private def backendEnv(): BackendEnv = {
-    val repoRoot   = repoRootFromCwd()
-    val agdaDir    = Paths.get(envOrCancel("AGDA_DIR")).toAbsolutePath.normalize()
-    val agdaJson   = Paths.get(envOrCancel("AGDA_JSON_BIN")).toAbsolutePath.normalize()
-
+    val repoRoot = repoRootFromCwd()
+    // Prefer explicit AGDA_DIR; fall back to repo-local agda-dojang/agda/
+    val agdaDirStr = sys.env.get("AGDA_DIR").filter(_.trim.nonEmpty)
+      .getOrElse(repoRoot.resolve("agda-dojang").resolve("agda").toString)
+    val agdaDir  = Paths.get(agdaDirStr).toAbsolutePath.normalize()
+    val agdaJson = Paths.get(envOrCancel("AGDA_JSON_BIN")).toAbsolutePath.normalize()
     requireFile(agdaDir, "AGDA_DIR")
     requireFile(agdaJson, "AGDA_JSON_BIN")
     BackendEnv(repoRoot, agdaDir, agdaJson)

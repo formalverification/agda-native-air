@@ -2,12 +2,12 @@
 # Makefile
 # -----------------------------------------------------------------------------
 #
-# @file agda-ai-prover/Makefile
-# @version 0.3
+# @file agda-native-air/Makefile
+# @version 1.0
 #
 # Description
 # -----------
-# The top-level Makefile for the agda-ai-prover project.
+# The top-level Makefile for the agda-native-air project.
 #
 # Purpose
 # -------
@@ -334,7 +334,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
 # 1.1. `help`, `env/diag`
 help:
 	@echo ""
-	@echo "agda-ai-prover top-level targets:"
+	@echo "agda-native-air top-level targets:"
 	@echo "  make test                        - Run Scala unit tests in strux-driver/"
 	@echo "  make test-all                    - Run Scala, Python, and AgdaDojang tests (if available)"
 	@echo "  make metadata                    - Generate metadata for agda-algebras"
@@ -721,7 +721,7 @@ test-strux-driver: _check-sbt build-agda-json
 	@echo ">> [test-strux-driver] sbt test in strux-driver/ (with AGDA_JSON_BIN if available)"
 	@set -e; \
 	$(RESOLVE_AGDA_JSON_BIN); \
-	cd $(STRUX_DRIVER) && AGDA_JSON_BIN="$$AGDA_JSON_BIN" $(SBT) test
+	cd $(STRUX_DRIVER) && AGDA_JSON_BIN="$$AGDA_JSON_BIN" AGDA_DIR="$(AGDA_LIB_DIR)" $(SBT) test
 #
 # ==============================================================================
 
