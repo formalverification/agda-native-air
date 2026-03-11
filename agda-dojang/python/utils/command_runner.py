@@ -1,7 +1,10 @@
 """
-file: agda-native-air/agda-dojang/python/utils/command_runner.py
-description: functional command execution utilities for the build pipeline.
-copyright: 2025 Thmpr
+command_runner.py
+
+File: agda-native-air/agda-dojang/python/utils/command_runner.py
+
+Description:
+  Utility for running subprocess commands with a consistent interface and error handling.
 """
 from __future__ import annotations
 from pathlib import Path

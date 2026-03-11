@@ -4,7 +4,6 @@
  *
  *  File: strux-driver/src/main/scala/proofparser/transform/Agda2TrainTransformer.scala
  *  Package: proofparser.transform
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

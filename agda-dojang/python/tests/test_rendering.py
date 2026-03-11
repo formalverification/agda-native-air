@@ -3,7 +3,7 @@ test_rendering.py
 
 File: agda-dojang/python/tests/test_rendering.py
 
-Description: tests for the rendering.py utilities
+Description: Tests for the rendering.py utilities.
 """
 # -*- coding: utf-8 -*-
 from __future__ import annotations

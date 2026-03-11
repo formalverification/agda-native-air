@@ -1,7 +1,9 @@
 """
-file: agda-native-air/agda-dojang/python/utils/result.py
-description: tiny Result type
-copyright: 2025 Thmpr
+result.py
+
+File: agda-native-air/agda-dojang/python/utils/result.py
+
+Description: tiny Result type
 """
 from __future__ import annotations
 from dataclasses import dataclass

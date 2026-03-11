@@ -1,6 +1,8 @@
-# agda-native-air
+<!-- File: agda-native-air/README.md -->
 
-**Agda Native AI Reasoning environment**
+# Agda-native AIR
+
+*Agda-native Artificial Intelligence Reasoning environment*
 
 `agda-native-air` is a research project for building the interaction, retrieval, and
 evaluation infrastructure that allows modern AI agents to work effectively with

@@ -1,7 +1,11 @@
 """
-file: agda-dojang/python/utils/file_ops.py
-description: Provides pure, functional wrappers for file system operations.
-copyright: 2025 Thmpr
+file_ops.py
+
+File: agda-dojang/python/utils/file_ops.py
+
+Description:
+  Utilities for file operations, including atomic writes and temporary directories.
+  Provides pure, functional wrappers for file system operations.
 """
 from __future__ import annotations
 from contextlib import contextmanager

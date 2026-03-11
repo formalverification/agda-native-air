@@ -4,7 +4,6 @@
  *
  *  File: strux-driver/src/test/scala/proofparser/ModelSpec.scala
  *  Package: proofparser
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

@@ -4,7 +4,6 @@
  *
  *  File: strux-driver/src/main/scala/proofparser/reduce/Agda2TrainReducer.scala
  *  Package: proofparser.reduce
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

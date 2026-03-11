@@ -1,7 +1,12 @@
 """
-file: agda-dojang/python/utils/types.py
-description: data classes for configuration, command results, errors, and reports.
-copyright: 2025 Thmpr
+types.py
+
+File: agda-dojang/python/utils/types.py
+
+Description:
+  Types used across the command runner and pipeline, for better structure and
+  type safety.  Notably, these are all frozen dataclasses, so they can be safely
+  shared across the codebase without worrying about mutation or aliasing.
 """
 from __future__ import annotations
 from dataclasses import dataclass

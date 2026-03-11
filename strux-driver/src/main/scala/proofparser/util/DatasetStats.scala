@@ -4,7 +4,6 @@
  *
  *  File: src/main/scala/proofparser/util/DatasetStats.scala
  *  Package: proofparser.util
- *  Copyright: (c) 2024-2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

@@ -1,4 +1,4 @@
-<!-- File: agda-strux/README.md -->
+<!-- File: agda-native-air/agda-strux/README.md -->
 
 # agda-strux
 

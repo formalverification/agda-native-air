@@ -4,7 +4,6 @@
  *
  *  File: strux-driver/src/test/scala/proofparser/AgdaExtractorSpec.scala
  *  Package: proofparser
- *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

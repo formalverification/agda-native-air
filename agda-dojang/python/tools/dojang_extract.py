@@ -1,33 +1,27 @@
 #!/usr/bin/env python3
 """
-AgdaDojang Trace extractor (v0, safe CLI)
-=======================================
+dojang_extract.py
 
-FILE: python/tools/dojang_extract.py
+File: agda-dojang/python/tools/dojang_extract.py
 
-DESCRIPTION
+Description: AgdaDojang Trace extractor (v0, safe CLI)
 
   +  Walk `--root` for `.agda` files.
-
   +  For each file:
-
      +  Send a `load` command to Agda's JSON interaction.
-
      +  Request **goals/metas** and **constraints**.
-
      +  If a goal is already solved (e.g., after `C-c C-a`), we can reconstruct the
         term by asking Agda for the definition of the name or by parsing the file region.
         In v0, we focus on *holes filled during a session* and capture *final gives*.
-
      +  Record `(context, goal_type, solution_term)` when a goal gets solved via `give`.
 
-FEATURES
+Features:
 
   + Non-destructive: never opens the input for writing.
   + Flagged CLI: --input <.agda>  --output <.json>
   + Emits a minimal JSON object we can grow iteratively.
 
-NOTES
+Notes:
 
   Agda's JSON protocol provides:
 
@@ -45,7 +39,7 @@ NOTES
   parses the file to read `CANDIDATE` and the goal type around it. That's the
   quickest "walking skeleton."
 
-SCHEMA (v0)
+Schema (v0):
 
   {
     "version": "agda-dojang-extract-v0",

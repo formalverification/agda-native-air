@@ -6,7 +6,6 @@
  *
  * File: agda-native-air/ml-pipeline/build.sbt
  *
- * Copyright (c) 2025 Thmpr Lab, LLC.
  */
 
 name := "ml-pipeline"

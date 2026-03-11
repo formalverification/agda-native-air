@@ -6,7 +6,6 @@ package proofparser.schema
  *
  *  File: strux-driver/src/main/scala/proofparser/schema/AgdaSchema.scala
  *  Package: proofparser.schema
- *  Copyright: (c) 2025 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

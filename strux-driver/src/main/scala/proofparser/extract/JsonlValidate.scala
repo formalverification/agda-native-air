@@ -4,7 +4,6 @@
   *
   *  File: strux-driver/src/main/scala/proofparser/extract/JsonlValidate.scala
   *  Package: proofparser.extract
-  *  Copyright: (c) 2025--2026 Thmpr Lab, LLC.
   *
   *  Purpose
   *  -------

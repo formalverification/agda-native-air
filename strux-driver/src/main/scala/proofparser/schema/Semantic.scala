@@ -4,7 +4,6 @@
  *
  *  File: strux-driver/src/main/scala/proofparser/schema/Semantic.scala
  *  Package: proofparser.schema
- *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------

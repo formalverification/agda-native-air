@@ -1,12 +1,16 @@
 """
-file: agda-dojang/python/utils/rendering.py
-description: Pure Agda rendering helpers for building scratch modules.
-features:
+rendering.py
+
+File: agda-dojang/python/utils/rendering.py
+
+Description:
+  Utilities to render Agda code snippets for building scratch (TrySandbox) modules.
+
+Features:
   * no I/O, no subprocess—just string assembly;
   * ensures scratch module imports the AgdaDojang macros and user’s imports;
   * keeps tactic syntax ergonomic (`applyReport:_+_` → `applyReport⟨ _+_ ⟩`)
     unless user explicitly wrote `⟨…⟩`.
-copyright: 2025 Thmpr
 """
 from __future__ import annotations
 from typing import List

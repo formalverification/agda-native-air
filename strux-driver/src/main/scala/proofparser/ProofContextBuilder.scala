@@ -4,7 +4,6 @@
  *
  *  File: strux-driver/src/main/scala/proofparser/ProofContextBuilder.scala
  *  Package: proofparser
- *  Copyright: (c) 2024 Thmpr Lab, LLC.
  *
  *  Description
  *  -----------
