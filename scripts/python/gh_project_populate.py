@@ -141,9 +141,9 @@ def _parse_labels(text: str) -> list[Label]:
 
     # Try to find the label creation section
     defaults = [
-        Label("agda-dojang",    "0075ca", "AgdaDojang interaction layer"),
-        Label("agda-mcp",       "0075ca", "agda-mcp server"),
-        Label("agda-strux",     "0075ca", "agda-strux extraction"),
+        Label("agda-dojang",         "0075ca", "AgdaDojang interaction layer"),
+        Label("agda-mcp",            "0075ca", "agda-mcp server"),
+        Label("agda-strux",          "0075ca", "agda-strux extraction"),
         Label("eval",           "0075ca", "Evaluation and benchmarks"),
         Label("retrieval",      "5319e7", "Retrieval and search"),
         Label("local-models",   "5319e7", "Local specialized models"),
@@ -180,7 +180,7 @@ def _parse_issues(text: str) -> list[Issue]:
         # Extract milestone index from ID
         ms_idx = int(re.match(r"M(\d+)", issue_id).group(1))
 
-        # Body runs from after the header to the next issue header (or next --- ---)
+        # Body runs from after the header to the next issue header
         start = match.end()
         if idx + 1 < len(matches):
             end = matches[idx + 1].start()
@@ -190,6 +190,12 @@ def _parse_issues(text: str) -> list[Issue]:
             end = start + summary_match.start() if summary_match else len(text)
 
         raw_body = text[start:end].strip()
+
+        # Truncate at milestone section headers that leaked in
+        # (happens for the last issue in each milestone section)
+        ms_leak = re.search(r"\n---+\s*\n+## Milestone \d+", raw_body)
+        if ms_leak:
+            raw_body = raw_body[:ms_leak.start()].strip()
 
         # Remove trailing --- separators
         raw_body = re.sub(r"\n---+\s*$", "", raw_body).strip()
@@ -349,8 +355,12 @@ class GitHubClient:
 
     # ── Issues ────────────────────────────────────────────────────────────
 
-    def create_issue(self, issue: Issue, milestone_gh_number: Optional[int] = None) -> Optional[int]:
-        """Create an issue. Returns the GitHub issue number."""
+    def create_issue(self, issue: Issue, milestone_title: Optional[str] = None) -> Optional[int]:
+        """Create an issue. Returns the GitHub issue number.
+
+        Note: `gh issue create --milestone` expects the milestone TITLE (a string),
+        not the GitHub API milestone number.
+        """
         # Build the title with the issue ID prefix
         full_title = f"[{issue.id}] {issue.title}"
         print(f"  Creating issue: {full_title}")
@@ -366,9 +376,9 @@ class GitHubClient:
         for label in issue.labels:
             cmd.extend(["--label", label])
 
-        # Add milestone
-        if milestone_gh_number is not None and milestone_gh_number > 0:
-            cmd.extend(["--milestone", str(milestone_gh_number)])
+        # Add milestone (gh issue create expects the title, not the number)
+        if milestone_title:
+            cmd.extend(["--milestone", milestone_title])
 
         result = self._run(cmd)
 
@@ -485,7 +495,7 @@ def main():
         return
 
     # ── Milestones ────────────────────────────────────────────────────────
-    ms_map: dict[int, int] = {}  # milestone_idx → gh_number
+    ms_title_map: dict[int, str] = {}  # milestone_idx → milestone title (for gh issue create)
 
     if not args.issues_only:
         print("═" * 60)
@@ -494,20 +504,22 @@ def main():
         for ms in milestones:
             gh_num = gh.create_milestone(ms)
             if gh_num is not None:
-                ms_map[ms.number] = gh_num
+                ms_title_map[ms.number] = ms.title
                 ms.gh_number = gh_num
             if not args.dry_run:
                 time.sleep(args.delay)
         print()
     else:
-        # Need to fetch existing milestones to map issues
+        # Need to fetch existing milestones to verify they exist
         print("Fetching existing milestones...")
         existing = gh.get_existing_milestones()
         for ms in milestones:
             if ms.title in existing:
-                ms_map[ms.number] = existing[ms.title]
+                ms_title_map[ms.number] = ms.title
                 ms.gh_number = existing[ms.title]
-        print(f"  Found {len(ms_map)} existing milestones")
+        print(f"  Found {len(ms_title_map)} existing milestones")
+        for idx, title in sorted(ms_title_map.items()):
+            print(f"    M{idx} → \"{title}\"")
         print()
 
     if args.milestones_only:
@@ -532,8 +544,8 @@ def main():
                 print(f"  Skipping {issue.id} (before --start-from {args.start_from})")
                 continue
 
-        ms_gh_num = ms_map.get(issue.milestone_idx)
-        result = gh.create_issue(issue, milestone_gh_number=ms_gh_num)
+        ms_title = ms_title_map.get(issue.milestone_idx)
+        result = gh.create_issue(issue, milestone_title=ms_title)
 
         if result is not None:
             created += 1
