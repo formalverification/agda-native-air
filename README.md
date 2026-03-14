@@ -51,6 +51,7 @@ agda-native-air/
 ├── docs/
 │   ├── MANIFESTO.md
 │   ├── PLAN.md
+│   ├── roadmap.md
 │   ├── representation.md
 │   ├── architecture.md
 │   ├── HowToRun.md
@@ -112,11 +113,12 @@ The following is currently under development:
 +  retrieval over structured Agda corpora;
 +  local specialist models for narrow tasks such as premise selection and candidate ranking.
 
-For details, see:
+For details, see
 
-+  [`docs/MANIFESTO.md`](docs/MANIFESTO.md)
-+  [`docs/PLAN.md`](docs/PLAN.md)
-+  [`docs/public-history.md`](docs/public-history.md)
++  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) - motivation and vision for the project;
++  [`docs/PLAN.md`](docs/PLAN.md) - project plan;
++  [`docs/roadmap.md`](docs/roadmap.md) - detailed project roadmap (GitHub labels, milestones and issues);
++  [`docs/public-history.md`](docs/public-history.md) - notes on the early history of this repository.
 
 ---
 

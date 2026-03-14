@@ -1,10 +1,74 @@
-# agda-native-air — GitHub Project Plan
+# agda-native-air — GitHub Project Roadmap
 
 **Project Title:** Agda-Native AI Reasoning Environment  
 **Repository:** `formalverification/agda-native-air`  
 **Date:** 2026-03-13  
 
 ---
+
+
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [agda-native-air — GitHub Project Roadmap](#agda-native-air--github-project-roadmap)
+  - [Project Description](#project-description)
+  - [Milestones](#milestones)
+    - [Milestone 0 — Solid Infrastructure](#milestone-0--solid-infrastructure)
+    - [Milestone 1 — AgdaDojang + AgdaMCP + First End-to-End Proofs](#milestone-1--agdadojang--agdamcp--first-end-to-end-proofs)
+    - [Milestone 2 — Retrieval Layer + Local Models](#milestone-2--retrieval-layer--local-models)
+    - [Milestone 3 — Research Mathematics & Counterexample Workflows](#milestone-3--research-mathematics--counterexample-workflows)
+    - [Milestone 4 — Routine Local Proof Completion (Stretch)](#milestone-4--routine-local-proof-completion-stretch)
+  - [Issues](#issues)
+    - [Milestone 0 — Solid Infrastructure](#milestone-0--solid-infrastructure-1)
+      - [Issue M0-1: Complete migration cleanup — move non-core work to `experiments/`](#issue-m0-1-complete-migration-cleanup--move-non-core-work-to-experiments)
+      - [Issue M0-2: Verify and document the `clone → nix develop → test → eval` workflow](#issue-m0-2-verify-and-document-the-clone--nix-develop--test--eval-workflow)
+      - [Issue M0-3: Stabilize CI — add smoke target and ensure all jobs are green](#issue-m0-3-stabilize-ci--add-smoke-target-and-ensure-all-jobs-are-green)
+      - [Issue M0-4: Remove stale references and update docs for `agda-native-air` branding](#issue-m0-4-remove-stale-references-and-update-docs-for-agda-native-air-branding)
+      - [Issue M0-5: Preserve and verify deterministic fixture-based proof completion](#issue-m0-5-preserve-and-verify-deterministic-fixture-based-proof-completion)
+      - [Issue M0-6: Write `docs/architecture.md` — document the three-layer system](#issue-m0-6-write-docsarchitecturemd--document-the-three-layer-system)
+      - [Issue M0-7: Stub `agda-mcp/` directory with README and roadmap](#issue-m0-7-stub-agda-mcp-directory-with-readme-and-roadmap)
+      - [Issue M0-8: Seed labels and issue templates for the repo](#issue-m0-8-seed-labels-and-issue-templates-for-the-repo)
+    - [Milestone 1 — AgdaDojang + AgdaMCP + First End-to-End Proofs](#milestone-1--agdadojang--agdamcp--first-end-to-end-proofs-1)
+      - [Issue M1-1: Stabilize AgdaDojang — tighten tests and document the action space](#issue-m1-1-stabilize-agdadojang--tighten-tests-and-document-the-action-space)
+      - [Issue M1-2: Implement `agda-mcp` server — core proof-state tools](#issue-m1-2-implement-agda-mcp-server--core-proof-state-tools)
+      - [Issue M1-3: Implement `agda-mcp` search tools — name and type search](#issue-m1-3-implement-agda-mcp-search-tools--name-and-type-search)
+      - [Issue M1-4: Frontier agent integration — Claude Code + agda-mcp end-to-end demo](#issue-m1-4-frontier-agent-integration--claude-code--agda-mcp-end-to-end-demo)
+      - [Issue M1-5: Curate baseline benchmark — 20–50 proof obligations from `agda-algebras`](#issue-m1-5-curate-baseline-benchmark--2050-proof-obligations-from-agda-algebras)
+      - [Issue M1-6: Tool paper draft — "AgdaDojang / AgdaMCP: An Agda-Native Environment for AI-Assisted Proof Development"](#issue-m1-6-tool-paper-draft--agdadojang--agdamcp-an-agda-native-environment-for-ai-assisted-proof-development)
+    - [Milestone 2 — Retrieval Layer + Local Models](#milestone-2--retrieval-layer--local-models-1)
+      - [Issue M2-1: Emit `ports` + `wires` from agda-strux for knowledge-graph view](#issue-m2-1-emit-ports--wires-from-agda-strux-for-knowledge-graph-view)
+      - [Issue M2-2: Build corpus index and graph from `agda-strux` output](#issue-m2-2-build-corpus-index-and-graph-from-agda-strux-output)
+      - [Issue M2-3: Add retrieval tools to `agda-mcp` — corpus-backed search](#issue-m2-3-add-retrieval-tools-to-agda-mcp--corpus-backed-search)
+      - [Issue M2-4: Train type-aware embedding model for semantic search](#issue-m2-4-train-type-aware-embedding-model-for-semantic-search)
+      - [Issue M2-5: Train or integrate premise selection model (QUILL-like)](#issue-m2-5-train-or-integrate-premise-selection-model-quill-like)
+      - [Issue M2-6: Train proof-term ranker — cheap filter before Agda invocations](#issue-m2-6-train-proof-term-ranker--cheap-filter-before-agda-invocations)
+      - [Issue M2-7: Comparative retrieval evaluation — text vs. type vs. neural](#issue-m2-7-comparative-retrieval-evaluation--text-vs-type-vs-neural)
+      - [Issue M2-8: Empirical paper draft — "Structure-Aware Retrieval for AI-Assisted Proof Development in Agda"](#issue-m2-8-empirical-paper-draft--structure-aware-retrieval-for-ai-assisted-proof-development-in-agda)
+    - [Milestone 3 — Research Mathematics & Counterexample Workflows](#milestone-3--research-mathematics--counterexample-workflows-1)
+      - [Issue M3-1: AI-assisted extension of `agda-algebras` — case study](#issue-m3-1-ai-assisted-extension-of-agda-algebras--case-study)
+      - [Issue M3-2: Counterexample search hooks — integrate GAP / Mace4 / SMT as MCP tools](#issue-m3-2-counterexample-search-hooks--integrate-gap--mace4--smt-as-mcp-tools)
+      - [Issue M3-3: Conjecture exploration workflow — experimental](#issue-m3-3-conjecture-exploration-workflow--experimental)
+      - [Issue M3-4: Mathematics paper or case-study writeup](#issue-m3-4-mathematics-paper-or-case-study-writeup)
+    - [Milestone 4 — Routine Local Proof Completion (Stretch)](#milestone-4--routine-local-proof-completion-stretch-1)
+      - [Issue M4-1: Collect training data from successful proof completions](#issue-m4-1-collect-training-data-from-successful-proof-completions)
+      - [Issue M4-2: Train routine proof completion model (7B, QLoRA on Jetson)](#issue-m4-2-train-routine-proof-completion-model-7b-qlora-on-jetson)
+      - [Issue M4-3: Integrate local model into agda-mcp as optional completion backend](#issue-m4-3-integrate-local-model-into-agda-mcp-as-optional-completion-backend)
+    - [Summary: Issue Index by Milestone](#summary-issue-index-by-milestone)
+      - [M0 — Solid Infrastructure (8 issues)](#m0--solid-infrastructure-8-issues)
+      - [M1 — AgdaDojang + AgdaMCP + First Proofs (6 issues)](#m1--agdadojang--agdamcp--first-proofs-6-issues)
+      - [M2 — Retrieval + Local Models (8 issues)](#m2--retrieval--local-models-8-issues)
+      - [M3 — Research Mathematics (4 issues)](#m3--research-mathematics-4-issues)
+      - [M4 — Local Proof Completion (3 issues)](#m4--local-proof-completion-3-issues)
+  - [Dependency Graph (Mermaid)](#dependency-graph-mermaid)
+  - [Mapping from Old `agda-ai-prover` Issues](#mapping-from-old-agda-ai-prover-issues)
+  - [How to Create This Project on GitHub](#how-to-create-this-project-on-github)
+    - [Prerequisites](#prerequisites)
+    - [Quick start](#quick-start)
+    - [Notes](#notes)
+
+<!-- markdown-toc end -->
+
+
 
 ## Project Description
 
@@ -1084,25 +1148,24 @@ and issues from this file.
 
 The following commands assume the GitHub project/issue generation script is at
 `scripts/python/gh_project_populate.py` and the Markdown file containing the
-label/project/issue descriptions is `.github/agda-native-air-github-project.md`.
+label/project/issue descriptions is `docs/roadmap.md`.
 
 ```zsh
 # 1. Dry run — see what would be created:
-python3 scripts/python/gh_project_populate.py .github/agda-native-air-github-project.md --repo formalverification/agda-native-air --dry-run
+python3 scripts/python/gh_project_populate.py docs/roadmap.md --repo formalverification/agda-native-air --dry-run
 
 # 2. Create everything (will prompt for confirmation):
-python3 scripts/python/gh_project_populate.py .github/agda-native-air-github-project.md --repo formalverification/agda-native-air
+python3 scripts/python/gh_project_populate.py docs/roadmap.md --repo formalverification/agda-native-air
 
 # 3. Or create in stages:
-python3 scripts/python/gh_project_populate.py .github/agda-native-air-github-project.md --repo formalverification/agda-native-air --labels-only
+python3 scripts/python/gh_project_populate.py docs/roadmap.md --repo formalverification/agda-native-air --labels-only
 
-python3 scripts/python/gh_project_populate.py .github/agda-native-air-github-project.md --repo formalverification/agda-native-air --milestones-only
+python3 scripts/python/gh_project_populate.py docs/roadmap.md --repo formalverification/agda-native-air --milestones-only
 
-python3 scripts/python/gh_project_populate.py .github/agda-native-air-github-project.md --repo formalverification/agda-native-air --issues-only
+python3 scripts/python/gh_project_populate.py docs/roadmap.md --repo formalverification/agda-native-air --issues-only
 
 # 4. Resume if interrupted (e.g., start from issue M1-3):
-python3 scripts/python/gh_project_populate.py .github/agda-native-air-github-project.md \
-  --repo formalverification/agda-native-air --issues-only --start-from M1-3
+python3 scripts/python/gh_project_populate.py docs/roadmap.md --repo formalverification/agda-native-air --issues-only --start-from M1-3
 ```
 
 ### Notes
