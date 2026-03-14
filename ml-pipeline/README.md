@@ -92,36 +92,32 @@ These are under `ml-pipeline/python`.
 
 +  `conftest.py`: Pytest configuration for the ml-pipeline project.
 +  `requirements.txt`: Python package dependencies.
-+  `api/main.py`: sets up FastAPI app; loads pre-trained PyTorch model; endpoint for making predictions.
++  ~`api/main.py`: sets up FastAPI app; loads pre-trained PyTorch model; endpoint for making predictions.~[^1]
 +  `model/`
-
-   +  `batch_infer.py` performs batch inference using a pre-trained TorchScript model.
-
-   +  `build_finetune_dataset.py` converts a filtered AgdaData JSONL dataset into a
-      fine-tuning-ready JSONL file with instruction/input/output triples.
-
-   +  `export_onnx.py` loads a trained PyTorch model and exports it as ONNX file.
-
-   +  `export_script.py` loads a trained PyTorch model and exports it as TorchScript file.
 
    +  `filter_jsonl.py` reads a JSON Lines (JSONL) file containing records, applies
       a few simple *schema-aware* filters, writes the filtered result back as JSONL.
 
-   +  `train.py` is a PyTorch training script; reads data from Parquet file; trains
-      basic MLP model; saves trained model.
-
    +  `train_retrieval.py` builds a deterministic retrieval artifact for
       `agda-dojang/python/tools/policy_retrieval.py`.
+
+   +  **Deprecated**[^2]  
+      +  `batch_infer.py` performs batch inference using a pre-trained TorchScript model.
+      +  `build_finetune_dataset.py` converts a filtered AgdaData JSONL dataset into a fine-tuning-ready JSONL file with instruction/input/output triples.
+      +  `export_onnx.py` loads a trained PyTorch model and exports it as ONNX file.
+      +  `export_script.py` loads a trained PyTorch model and exports it as TorchScript file.
+      +  `train.py` is a PyTorch training script; reads data from Parquet file; trains basic MLP model; saves trained model.
 
 +  `scripts/inspect_runtime.py`: inspect and print the runtime environment.
 
 +  `tests/`
 
-   +  `test_main.py`: unit tests for FastAPI app defined in ../api/main.py.
+   +  ~`test_main.py`: unit tests for FastAPI app defined in ../api/main.py.~
    +  `test_train_retrieval.py`: tests ensuring retrieval model artifact is
       deterministic across runs and adheres to expected invariants.
    +  `test_dataset_pipeline.py`: tests for dataset processing pipeline, ensuring
       finetune dataset builder produces expected instruction/input/output format.
+
 
 
 ### Miscellaneous Scripts
@@ -252,15 +248,17 @@ The goal is not to optimize leaderboards, but to understand what information the
 
 ## Stage 4: Inference and Serving
 
-MLPipe includes early-stage support for model serving.
+??? info "Deprecated: MLPipe includes early-stage support for model serving [^1]"
 
-A lightweight **FastAPI** server can
+    A lightweight **FastAPI** server can
 
-+  load trained models,
-+  accept structured goal or premise queries,
-+  return ranked predictions or scores.
+    +  load trained models,
+    +  accept structured goal or premise queries,
+    +  return ranked predictions or scores.
 
-This server is intended to be called by interactive components such as AgdaDojang, closing the loop between learning and proof execution.
+    This server is intended to be called by interactive components such as AgdaDojang, closing the loop between learning and proof execution.
+
+Model serving will be handled by `agda-mcp`.[^1]
 
 ### Pre-training policy backend
 
@@ -477,6 +475,14 @@ Run `make help` for additional targets and configuration options.
 + [`agda-strux/README.md`][agda-strux/README]
 + [`agda-dojang/README.md`][agda-dojang/README]
 + [`strux-driver/README.md`][strux-driver/README]
+
+
+[^1]: **Note:** The FastAPI model server (`api/main.py`) and the legacy MLP trainer have been archived to `experiments/archive/ml-pipeline/`.  Model serving will be handled by `agda-mcp`; see `docs/PLAN.md` Phase 1 for the current architecture.
+
+
+[^2]: Archived deprecated files (see `experiments/archive/ml-pipeline/`): `api/`, `model/train.py`, `model/batch_infer.py`, `model/export_*.py`, `model/build_finetune_dataset.py`, `Dockerfile`, `Makefile`.
+
+
 
 [Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
 [agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
