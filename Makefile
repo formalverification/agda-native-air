@@ -16,7 +16,7 @@
 #     2) Transform (Scala)        : raw JSON -> ML rows (JSONL)
 #     3) ETL (Spark or PyArrow)   : JSONL -> Parquet features
 #     4) Train (Python)           : features -> model checkpoint
-#     5) Serve (FastAPI)          : REST API for suggestions
+#     5) Serve                    : [archived — see experiments/archive/]
 #     6) Bench (AgdaDojang)         : verify suggestions in Agda
 #
 # Usage
@@ -308,8 +308,8 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
                  etl-agda-algebras-smoke train-retrieval-smoke eval-proof-completion-smoke-retrieval \
-                 finetune-dataset serve bench pipeline filter test-strux-driver \
-                 train train-stdlib train-algebras train-categories train-jsonl train-jsonl-sample train-jsonl-head \
+                 bench pipeline filter test-strux-driver \
+                 train-jsonl train-jsonl-sample train-jsonl-head \
                  dataset-stats dataset-stats-sample premise-eval-quick-sample premise-eval premise-eval-quick \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
                  extract-algebras-legacy extract-lib-old clean wipe tree probe-all
@@ -349,8 +349,6 @@ help:
 	@echo "  make etl-proof-completion-smoke  - Build proof-completion dataset from fixture JSONL + validate"
 	@echo "  make train-retrieval-smoke       - Train a deterministic artifact from smoke dataset; write canonical pickle."
 	@echo "  make eval-proof-completion-smoke-retrieval - Run existing smoke evaluator using retrieval policy + model artifact."
-	@echo "  make train                       - Train a tiny model -> $(MODEL_CKPT)"
-	@echo "  make serve                       - Launch FastAPI server (uses trained model)"
 	@echo "  make bench                       - Run AgdaDojang tiny benchmark"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
@@ -1048,38 +1046,39 @@ etl-agda-algebras-smoke: _ensure-dirs _check-sbt _check-java-home _check-spark _
 	cd "$(ML_PIPE)" && \
 	  $(SBT) $(SBT_FLAGS) "project etl" "testOnly etl.PreprocessAgdaSpec"; \
 	echo "✅ smoke ETL + tests complete"
-
 # ------------------------------------------------------------------------------
 
 
+# === LEGACY — archived to experiments/archive/ (Issue M0-1) ====================
+## ------------------------------------------------------------------------------
+## 2.5.2.0. Legacy Python trainer (JSONL-based for now).
+# train: $(VENV_DEPS)
+#	@if [ ! -s "$(TRAIN_DATA)" ]; then \
+#	  echo "ERROR: no training data found at $(TRAIN_DATA)."; \
+#	  echo "       Run 'make extract' or override TRAIN_DATA=..."; \
+#	  exit 1; \
+#	fi
+#	@if [ ! -f "$(ML_PIPE_PY_MODEL)/train.py" ]; then \
+#	  echo "WARN: $(ML_PIPE_PY_MODEL)/train.py not found. Creating a stub model."; \
+#	  mkdir -p $(ML_PIPE_MODELS); \
+#	  echo "stub" > $(MODEL_CKPT); \
+#	  echo "✅ wrote stub $(MODEL_CKPT) (replace this with a real trainer)"; \
+#	else \
+#	  echo ">> [train] USE_VENV=$(USE_VENV) TORCH_MODE=$(TORCH_MODE)"; \
+#	  echo "   TRAIN_DATA=$(TRAIN_DATA)"; \
+#	  echo "🐍 inspecting Python / torch runtime..."; \
+#	  $(PY_RUN) $(ML_PIPE_PY_SCRIPTS)/inspect_runtime.py || true; \
+#	  echo ">> [train] training -> $(MODEL_CKPT) (input=$(TRAIN_DATA))"; \
+#	  $(PY_RUN) $(ML_PIPE_PY_MODEL)/train.py \
+#	    --input "$(TRAIN_DATA)" \
+#	    --out "$(MODEL_CKPT)" || { \
+#	      echo "TIP: trainer expects JSONL at --input (we passed $(TRAIN_DATA))."; \
+#	      exit 1; }; \
+#	fi
+#	@[ -s "$(MODEL_CKPT)" ] || { echo "❌ Expected model at $(MODEL_CKPT)."; exit 1; }
+#	@echo "✅ model ready: $(MODEL_CKPT)"
+# ==========================================================================
 
-# ------------------------------------------------------------------------------
-# 2.5.2.0. Legacy Python trainer (JSONL-based for now).
-train: $(VENV_DEPS)
-	@if [ ! -s "$(TRAIN_DATA)" ]; then \
-	  echo "ERROR: no training data found at $(TRAIN_DATA)."; \
-	  echo "       Run 'make extract' or override TRAIN_DATA=..."; \
-	  exit 1; \
-	fi
-	@if [ ! -f "$(ML_PIPE_PY_MODEL)/train.py" ]; then \
-	  echo "WARN: $(ML_PIPE_PY_MODEL)/train.py not found. Creating a stub model."; \
-	  mkdir -p $(ML_PIPE_MODELS); \
-	  echo "stub" > $(MODEL_CKPT); \
-	  echo "✅ wrote stub $(MODEL_CKPT) (replace this with a real trainer)"; \
-	else \
-	  echo ">> [train] USE_VENV=$(USE_VENV) TORCH_MODE=$(TORCH_MODE)"; \
-	  echo "   TRAIN_DATA=$(TRAIN_DATA)"; \
-	  echo "🐍 inspecting Python / torch runtime..."; \
-	  $(PY_RUN) $(ML_PIPE_PY_SCRIPTS)/inspect_runtime.py || true; \
-	  echo ">> [train] training -> $(MODEL_CKPT) (input=$(TRAIN_DATA))"; \
-	  $(PY_RUN) $(ML_PIPE_PY_MODEL)/train.py \
-	    --input "$(TRAIN_DATA)" \
-	    --out "$(MODEL_CKPT)" || { \
-	      echo "TIP: trainer expects JSONL at --input (we passed $(TRAIN_DATA))."; \
-	      exit 1; }; \
-	fi
-	@[ -s "$(MODEL_CKPT)" ] || { echo "❌ Expected model at $(MODEL_CKPT)."; exit 1; }
-	@echo "✅ model ready: $(MODEL_CKPT)"
 
 # 2.5.2.1. Python Filter (filter_jsonl.py): create cleaned dataset
 #        (non-empty type/proof, optional length thresholds)
@@ -1101,19 +1100,23 @@ filter: $(VENV_DEPS)
 	fi
 	@echo "✅ filtered dataset: $(DATA_FILTERED)"
 
-# 2.5.2.2. Python fine-tuning dataset builder (build_finetune_dataset.py): turn
-#        AgdaData into instruction/output pairs.
-finetune-dataset: $(VENV_DEPS)
-	@if [ ! -s "$(DATA_FILTERED)" ]; then \
-	  echo "ERROR: DATA_FILTERED missing at $(DATA_FILTERED). Run 'make filter' first."; \
-	  exit 1; \
-	fi
-	@echo ">> [finetune] $(DATA_FILTERED) -> $(DATA_FINE_TUNE)"
-	@$(PY_RUN) $(ML_PIPE_PY_MODEL)/build_finetune_dataset.py \
-	  --input "$(DATA_FILTERED)" \
-	  --out "$(DATA_FINE_TUNE)"
-	@[ -s "$(DATA_FINE_TUNE)" ] || { echo "❌ Expected $(DATA_FINE_TUNE)."; exit 1; }
-	@echo "✅ fine-tuning dataset: $(DATA_FINE_TUNE)"
+
+# === LEGACY — archived to experiments/archive/ (Issue M0-1) ====================
+## ------------------------------------------------------------------------------
+## 2.5.2.2. Python fine-tuning dataset builder (build_finetune_dataset.py): turn
+##          AgdaData into instruction/output pairs.
+#finetune-dataset: $(VENV_DEPS)
+#	@if [ ! -s "$(DATA_FILTERED)" ]; then \
+#	  echo "ERROR: DATA_FILTERED missing at $(DATA_FILTERED). Run 'make filter' first."; \
+#	  exit 1; \
+#	fi
+#	@echo ">> [finetune] $(DATA_FILTERED) -> $(DATA_FINE_TUNE)"
+#	@$(PY_RUN) $(ML_PIPE_PY_MODEL)/build_finetune_dataset.py \
+#	  --input "$(DATA_FILTERED)" \
+#	  --out "$(DATA_FINE_TUNE)"
+#	@[ -s "$(DATA_FINE_TUNE)" ] || { echo "❌ Expected $(DATA_FINE_TUNE)."; exit 1; }
+#	@echo "✅ fine-tuning dataset: $(DATA_FINE_TUNE)"
+# ==========================================================================
 
 
 # ------------------------------------------------------------------------------
@@ -1151,23 +1154,25 @@ eval-proof-completion-smoke-retrieval: train-retrieval-smoke
 	  EVAL_XFAIL=FixtureLambda
 
 
-# ------------------------------------------------------------------------------
-# 2.6. Python Serve (app.py): FastAPI (uvicorn) using trained model.
-serve:
-	@set -e; \
-	if [ ! -s "$(MODEL_CKPT)" ]; then \
-	  echo "ERROR: model missing at $(MODEL_CKPT). Run 'make train' first."; \
-	  exit 1; \
-	fi; \
-	if [ ! -f "$(ML_PIPE_API)/app.py" ]; then \
-	  echo "⚠️  $(ML_PIPE_API)/app.py not found; skipping serve."; \
-	  exit 0; \
-	fi; \
-	echo ">> [serve] starting FastAPI (Ctrl-C to stop)"; \
-	cd "$(ML_PIPE_PY)" && \
-	  PYTHONPATH="$(ML_PIPE_PY)" \
-	  MODEL_PATH="$(abspath $(MODEL_CKPT))" \
-	  $(UVICORN) api.app:app --reload
+# === LEGACY — archived to experiments/archive/ (Issue M0-1) ===============
+## ------------------------------------------------------------------------------
+## 2.6. Python Serve (app.py): FastAPI (uvicorn) using trained model.
+#serve:
+#	@set -e; \
+#	if [ ! -s "$(MODEL_CKPT)" ]; then \
+#	  echo "ERROR: model missing at $(MODEL_CKPT). Run 'make train' first."; \
+#	  exit 1; \
+#	fi; \
+#	if [ ! -f "$(ML_PIPE_API)/app.py" ]; then \
+#	  echo "⚠️  $(ML_PIPE_API)/app.py not found; skipping serve."; \
+#	  exit 0; \
+#	fi; \
+#	echo ">> [serve] starting FastAPI (Ctrl-C to stop)"; \
+#	cd "$(ML_PIPE_PY)" && \
+#	  PYTHONPATH="$(ML_PIPE_PY)" \
+#	  MODEL_PATH="$(abspath $(MODEL_CKPT))" \
+#	  $(UVICORN) api.app:app --reload
+# ==========================================================================
 
 # ------------------------------------------------------------------------------
 # 2.7. Bench: AgdaDojang dojo (still delegated for now)
@@ -1329,29 +1334,28 @@ pipeline:
 pipeline-smoke:
 	$(MAKE) pipeline MIN_TYPE_LEN=0 MIN_PROOF_LEN=0
 
-train-stdlib:
-	$(MAKE) pipeline \
-	  EXTRACT_INPUT="$(AGDA_STDLIB_SRC)" \
-	  TRAIN_DATA="$(DATA_STDLIB)" \
-	  DATA_FILTERED="$(DATA)/train-stdlib-2.2.filtered.jsonl" \
-	  DATA_FINE_TUNE="$(DATA)/train-stdlib-2.2.finetune.jsonl"
-
-train-algebras:
-	$(MAKE) pipeline \
-	  EXTRACT_INPUT="$(AGDA_ALGEBRAS_SRC)" \
-	  TRAIN_DATA="$(DATA_ALGEBRAS)" \
-	  DATA_FILTERED="$(DATA)/train-algebras.filtered.jsonl" \
-	  DATA_FINE_TUNE="$(DATA)/train-algebras.finetune.jsonl"
-
-train-categories:
-	$(MAKE) pipeline \
-	  EXTRACT_INPUT="$(AGDA_CATEGORIES_SRC)" \
-	  TRAIN_DATA="$(DATA_CATEGORIES)" \
-	  DATA_FILTERED="$(DATA)/train-categories.filtered.jsonl" \
-	  DATA_FINE_TUNE="$(DATA)/train-categories.finetune.jsonl"
-
-
-# ==============================================================================
+# === LEGACY — archived to experiments/archive/ (Issue M0-1) ===============
+#train-stdlib:
+#	$(MAKE) pipeline \
+#	  EXTRACT_INPUT="$(AGDA_STDLIB_SRC)" \
+#	  TRAIN_DATA="$(DATA_STDLIB)" \
+#	  DATA_FILTERED="$(DATA)/train-stdlib-2.2.filtered.jsonl" \
+#	  DATA_FINE_TUNE="$(DATA)/train-stdlib-2.2.finetune.jsonl"
+#
+#train-algebras:
+#	$(MAKE) pipeline \
+#	  EXTRACT_INPUT="$(AGDA_ALGEBRAS_SRC)" \
+#	  TRAIN_DATA="$(DATA_ALGEBRAS)" \
+#	  DATA_FILTERED="$(DATA)/train-algebras.filtered.jsonl" \
+#	  DATA_FINE_TUNE="$(DATA)/train-algebras.finetune.jsonl"
+#
+#train-categories:
+#	$(MAKE) pipeline \
+#	  EXTRACT_INPUT="$(AGDA_CATEGORIES_SRC)" \
+#	  TRAIN_DATA="$(DATA_CATEGORIES)" \
+#	  DATA_FILTERED="$(DATA)/train-categories.filtered.jsonl" \
+#	  DATA_FINE_TUNE="$(DATA)/train-categories.finetune.jsonl"
+# ==========================================================================
 
 
 
