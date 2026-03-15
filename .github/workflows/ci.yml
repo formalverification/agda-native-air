@@ -4,7 +4,7 @@
 #
 #  File: .github/workflows/ci.yml
 #
-#  CI Pipeline for agda-ai-prover
+#  CI Pipeline for agda-native-air
 #  --------------------------------
 #
 #  What this workflow does:
@@ -92,10 +92,10 @@ jobs:
         run: |
           set -euxo pipefail
           # Adjust this if your example lives elsewhere:
-          INPUT_JSON="src/test/resources/proofparser/agda-example.json"
+          INPUT_JSON="data/agda/agda-example.json"
           if [ -f "$INPUT_JSON" ]; then
             mkdir -p ../target
-            sbt "runMain proofparser.transform.Agda2TrainTransformer $INPUT_JSON ../target/a2t.sample.jsonl"
+            sbt "runMain struxdriver.transform.Agda2TrainTransformer $INPUT_JSON ../target/a2t.sample.jsonl"
             test -s ../target/a2t.sample.jsonl
             echo "Smoke test OK: ../target/a2t.sample.jsonl"
           else
