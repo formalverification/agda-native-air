@@ -11,7 +11,7 @@
 module FixtureFail01 where
 
 open import Agda.Builtin.Nat
-open import AgdaJang.Debug
+open import AgdaDojang.Debug
 
 -- If policy doesn’t know Nat yet (zero), this should remain unsolved deterministically.
 needNat : Nat

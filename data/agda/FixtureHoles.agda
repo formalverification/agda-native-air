@@ -12,7 +12,7 @@ module FixtureHoles where
 
 open import Agda.Builtin.Unit
 open import Agda.Builtin.Equality
-open import AgdaJang.Debug
+open import AgdaDojang.Debug
 
 -- Goal is A, context has x : A  -> policy proposes "x"
 id : {A : Set} → A → A

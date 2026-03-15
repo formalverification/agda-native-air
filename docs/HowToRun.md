@@ -149,7 +149,7 @@ There’s also an integration test target:
 make test-integration
 ```
 
-Run the whole suite (Scala + Python + AgdaJang + backend tests):
+Run the whole suite (Scala + Python + AgdaDojang + backend tests):
 
 ```sh
 make test-all
@@ -467,7 +467,7 @@ The Makefile already treats this as an error (exit code 2). Next steps:
 * check `data/<LIB>/raw/logs/` for per-module logs
 * check the manifest in `data/<LIB>/manifests/`
 * verify `JAVA_HOME` is set (the Makefile will fail loudly if empty)
-* verify `AGDA_LIB_DIR` points to the directory containing `agda-jang/agda/libraries`
+* verify `AGDA_LIB_DIR` points to the directory containing `agda-dojang/agda/libraries`
 
 ### 12.2 Backend binary resolution issues
 

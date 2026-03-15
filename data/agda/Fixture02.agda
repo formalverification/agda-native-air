@@ -6,7 +6,7 @@ module Fixture02 where
 
 open import Agda.Builtin.Unit
 open import Agda.Builtin.Equality
-open import AgdaJang.Debug
+open import AgdaDojang.Debug
 
 -- Multiple ctx vars of the same type; any is acceptable.
 useCtx1 : {A : Set} (a : A) (b : A) → A

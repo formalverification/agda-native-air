@@ -5,7 +5,7 @@
 module FixtureLet where
 
 open import Agda.Builtin.Unit
-open import AgdaJang.Debug
+open import AgdaDojang.Debug
 
 foo : {A : Set} → A → A
 foo {A} x =
