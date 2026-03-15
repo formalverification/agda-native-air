@@ -2,7 +2,7 @@
 
 # How To Run (Developer Guide)
 
-This is the “copy/paste runnable” guide to running **agda-ai-prover** end-to-end.
+This is the "copy/paste runnable" guide to running **agda-native-air** end-to-end.
 
 Companion docs:
 - `MANIFESTO.md` — vision
@@ -157,47 +157,43 @@ make test-all
 
 ---
 
-## 5) Corpus extraction (the “real” pipeline path)
+## 5) Corpus Extraction and Proof Completion
 
-This is the main, resumable extraction path that writes:
+### 5.1 Corpus Extraction (the "real" pipeline path)
+This is the main, resumable extraction path that writes
 
-* `data/<LIB_NAME>/raw/jsonl/*.jsonl`
-* `data/<LIB_NAME>/raw/logs/*`
-* `data/<LIB_NAME>/manifests/<timestamp>.json`
++  `data/<LIB_NAME>/raw/jsonl/*.jsonl`
++  `data/<LIB_NAME>/raw/logs/*`
++  `data/<LIB_NAME>/manifests/<timestamp>.json`
 
-### 5.1 Full corpus extraction (agda-algebras by default)
+#### 5.1.1 Full corpus extraction (agda-algebras by default)
 
 ```sh
 make extract-lib
 ```
 
-Key behavior:
+**Key behavior**.
 
-* builds `agda-json` (via nix if configured)
-* generates module list via `make agda-algebras-metadata`
-* runs Scala `AgdaJsonlDriver` with `--runner spark` and local master
-* writes a manifest JSON with exit code + Agda version + git rev
++  Builds `agda-json` (via nix if configured).
++  Generates module list via `make agda-algebras-metadata`.
++  Runs Scala `AgdaJsonlDriver` with `--runner spark` and local master.
++  Writes a manifest JSON with exit code + Agda version + git rev.
 
-### 5.2 Smoke extraction (first N modules)
-
-```sh
-make extract-lib-smoke
-```
-
-Control how many modules:
+#### 5.1.2 Smoke extraction (first N modules)
 
 ```sh
-make extract-lib-smoke SMOKE_N=25
+make extract-lib-smoke \
+  SMOKE_N=25              # (optional) controls how many modules
 ```
 
-### 5.3 Run extraction via Nix wrapper (from outside nix shell)
+#### 5.1.3 Run extraction via Nix wrapper (from outside nix shell)
 
 ```sh
 make extract-lib-nix
 make extract-lib-smoke-nix
 ```
 
-### 5.4 Fail-fast vs keep-going
+#### 5.1.4 Fail-fast vs keep-going
 
 By default the driver continues through failures (and records them). To fail fast:
 
@@ -205,7 +201,7 @@ By default the driver continues through failures (and records them). To fail fas
 make extract-lib FAIL_FAST=1
 ```
 
-### 5.5 Resume control
+#### 5.1.5 Resume control
 
 The top-level knob is `RESUME` (default `1`). To force no resume:
 
@@ -215,13 +211,101 @@ make extract-lib RESUME=0
 
 (Internally this adds `--no-resume` to driver args.)
 
-### 5.6 Parallelism
+#### 5.1.6 Parallelism
 
 ```sh
 make extract-lib PAR=16
 ```
 
+### 5.2 Proof-completion evaluator (AgdaDojang fixtures)
+
+The proof-completion evaluator is the core demo of the project's propose → check
+loop.  It runs AgdaDojang's `reportGoalCtx` macro to extract `(goal, context)`
+from each `{!!}` hole in a fixture file, calls a policy backend to get candidate
+terms, and typechecks each candidate in Agda.
+
+> **Prerequisite:** run inside `nix develop` (or `nix develop .#all`).
+> The evaluator requires Agda on PATH with the correct library configuration.
+
+#### 5.2.1 Smoke test (single fixture, fast)
+
+```sh
+make eval-proof-completion-smoke
+```
+
+This runs only `FixtureLambda.agda` with `--max-holes 1` and a 10-second timeout.
+Expected result: 1 hole solved.
+
+#### 5.2.2 Full fixture evaluation (all fixtures)
+
+```sh
+make eval-proof-completion
+```
+
+This runs all `data/agda/Fixture*.agda` files through the evaluator.
+Expected result: all fixtures pass except `FixtureFail01` (which is an expected
+failure, marked `xfail`).
+
+#### 5.2.3 What the evaluator does
+
+For each fixture file, the evaluator:
+
+1. Finds `{!!}` holes in the source.
+2. For each hole, injects `reportGoalCtx` and runs Agda to extract a structured
+   `(goal, context)` request from Agda's error output.
+3. Sends the request to the policy backend (default: `policy_fixture.py`).
+4. Tries each candidate term by substituting it into the hole and typechecking.
+5. If a candidate typechecks, the hole is marked solved and the source is patched.
+6. Repeats until all holes are solved or candidates are exhausted.
+
+#### 5.2.4 Output artifacts
+
+The following results are written to `agda-dojang/_build/eval-proof-completion/<run-id>/`:
+
++  `fixtures.jsonl` — one row per fixture with summary (holes, solved, final status, elapsed ms);
++  `results.jsonl` — one row per hole attempt with full details (goal, candidate, status, rc, log path);
++  `logs/<fixture>/hole-<N>/` — per-hole Agda output for debugging.
+
+Both JSONL files use schema version `eval-proof-completion.v0`.
+
+#### 5.2.5 Overriding evaluator knobs
+
+The evaluator is controlled by Makefile variables which may be overriden on the
+command line, as follows:
+
+```sh
+make eval-proof-completion \
+  EVAL_FIXTURES="../data/agda/Fixture01.agda" \
+  EVAL_MAX_HOLES=2 \
+  EVAL_K=3 \
+  EVAL_TIMEOUT=15 \
+  EVAL_POLICY="python3 python/tools/policy_fixture.py" \
+  EVAL_RUN_ID=my-run
+```
+
+#### 5.2.6 Fixture files
+
+Committed fixtures live in `data/agda/`.  Each fixture imports from
+`AgdaDojang.Debug` (for the `reportGoalCtx` macro) and contains one or more
+`{!!}` holes.  The fixture policy (`policy_fixture.py`) uses simple heuristics
+to solve them: assumption matching (goal type matches a context binder), `refl`
+for equality goals, and `tt` for unit goals.
+
+| Fixture | Holes | What it tests |
+|---------|-------|---------------|
+| `Fixture01` | 3 | assumption, ⊤ → tt, ≡ → refl |
+| `Fixture02–05` | 2–3 | variations on assumption and equality |
+| `FixtureHoles` | 4 | sequential multi-hole solving |
+| `FixtureLambda` | 1 | lambda introduction |
+| `FixtureLet` | 1 | let-bound context |
+| `FixtureWhere` | 1 | where-clause context |
+| `FixtureStdlibBooleanAlgebra` | 3 | stdlib boolean algebra obligations |
+| `FixtureStdlibBooleanAlgebraMinimal` | 3 | minimal variant of the above |
+| `FixtureFail01` | 1 | **expected failure** (no policy can solve it) |
+
+
 ---
+
 
 ## 6) “Small” extraction / transforms (non-corpus path)
 

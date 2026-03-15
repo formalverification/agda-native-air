@@ -1,5 +1,5 @@
 # =============================================================================
-# agda-ai-prover — Flake (Dev Shells for Agda, Scala/sbt/JDK, Python + PyTorch)
+# agda-native-air — Flake (Dev Shells for Agda, Scala/sbt/JDK, Python + PyTorch)
 #
 # Goals:
 #   1) One command dev env: `nix develop`. Batteries included.
@@ -35,7 +35,7 @@
 #   nix develop -c agda --version
 # =============================================================================
 {
-  description = "agda-ai-prover: reproducible dev shells for AgdaJang + Python/Scala (+ optional GPU)";
+  description = "agda-native-air: reproducible dev shells for AgdaJang + Python/Scala (+ optional GPU)";
 
   # ---- Inputs ---------------------------------------------------------------
   # Keep general tools on stable.
@@ -190,7 +190,7 @@
             ${exportWheelRuntimeLibs}
             ${exportJavaHome}
             ${exportLibPath}
-            echo "✅ agda-ai-prover (CPU dev shell)"
+            echo "✅ agda-native-air (CPU dev shell)"
             echo "   Agda : $(agda --version | head -n1 || true)"
             echo "   Java : $(java -version 2>&1 | head -n1 || true)"
             echo "   sbt  : $(sbt --version 2>&1 | head -n1 || true)"
@@ -407,7 +407,7 @@ PY
 
               shellHook = ''
                 ${exportLibPath}
-                echo "⚡ agda-ai-prover (GPU dev shell - native Nix build)"
+                echo "⚡ agda-native-air (GPU dev shell - native Nix build)"
                 unset LD_PRELOAD
 
                 if command -v nvidia-smi >/dev/null 2>&1; then

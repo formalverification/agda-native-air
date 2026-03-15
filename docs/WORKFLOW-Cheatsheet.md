@@ -28,12 +28,12 @@ Quick reference guide for the most common Git and GitHub workflow commands. For 
 
 ```bash
 # Clone with SSH (recommended)
-git clone git@github.com:formalverification/agda-ai-prover.git
+git clone git@github.com:formalverification/agda-native-air.git
 
 # Clone with HTTPS (alternative)
-git clone https://github.com/formalverification/agda-ai-prover.git
+git clone https://github.com/formalverification/agda-native-air.git
 
-cd agda-ai-prover
+cd agda-native-air
 ```
 
 ---
@@ -83,7 +83,7 @@ git push origin 99-fix-foobar                  # Push to remote.
 ### Method 1: Use the link shown after push
 
 ```
-remote: https://github.com/formalverification/agda-ai-prover/pull/new/99-fix-foobar
+remote: https://github.com/formalverification/agda-native-air/pull/new/99-fix-foobar
 ```
 
 Click the link shown after a push, or copy it into your browser, to create the PR.
