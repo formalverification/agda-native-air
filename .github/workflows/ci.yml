@@ -46,6 +46,7 @@ jobs:
   scala-strux-driver:
     name: Scala • strux-driver build & tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       matrix:
@@ -114,6 +115,7 @@ jobs:
   scala-ml-pipeline-etl:
     name: Scala • ml-pipeline ETL smoke tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       matrix:
@@ -157,6 +159,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only run this job if the ml-pipeline directory exists in the repo
     # if: ${{ hashFiles('ml-pipeline/**') != '' }}
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -201,6 +204,7 @@ jobs:
   haskell-backend-jsonl:
     name: Haskell • agda-strux tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -232,6 +236,7 @@ jobs:
   all-green:
     name: All checks
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl ]
     steps:
       - run: echo "All jobs passed ✅"
