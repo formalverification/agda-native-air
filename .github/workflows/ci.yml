@@ -42,6 +42,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Prevent jobs from using deprecated node version.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   scala-strux-driver:
     name: Scala • strux-driver build & tests
@@ -55,11 +59,11 @@ jobs:
     steps:
       # --- Checkout ---
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # --- JDK 21 ---
       - name: Set up JDK ${{ matrix.java-version }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ matrix.java-version }}
@@ -71,7 +75,7 @@ jobs:
 
       # --- Optional extra caches (Ivy / Coursier) ---
       - name: Cache Ivy/Coursier
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.ivy2/cache
@@ -106,7 +110,7 @@ jobs:
       # Upload artifact if the smoke test produced one
       - name: Upload transformer artifact (if present)
         if: ${{ hashFiles('target/a2t.sample.jsonl') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: a2t-sample-jsonl
           path: target/a2t.sample.jsonl
@@ -123,10 +127,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up JDK ${{ matrix.java-version }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ matrix.java-version }}
@@ -163,10 +167,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           # NOTE: We omit cache-dependency-path because the file may not exist in all commits.
@@ -208,7 +212,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Haskell (GHC + Cabal)
         uses: haskell-actions/setup@v2
@@ -218,7 +222,7 @@ jobs:
           cabal-update: true
 
       - name: Cache Cabal store + dist-newstyle (backend)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cabal/store
