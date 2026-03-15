@@ -11,27 +11,47 @@ Companion docs:
 
 ---
 
+## Quick Start
+
+```sh
+git clone git@github.com:formalverification/agda-native-air.git
+cd agda-native-air
+nix develop
+make check
+make eval-proof-completion-smoke
+```
+
+> **Note:** most targets require the Nix shell.  If a command fails with a
+> missing binary (e.g., `agda`, `sbt`), enter `nix develop` first.
+
+---
+
 ## 0) Repo mental model (what runs what)
 
-This repo has three “lanes” that connect:
+This repo has three "lanes" that connect:
 
-1) **Extraction (Scala driver + Haskell backend)**  
-   - Haskell backend (`agda-backend-jsonl`) builds `agda-json` (Agda-as-a-library → JSONL).
-   - Scala driver (`proof-parser`, main: `proofparser.extract.AgdaJsonlDriver`) runs `agda-json` per module, validates output, writes logs + manifests.
+1.  **Extraction (Scala driver + Haskell backend)**  
+    - Haskell backend (`agda-strux`) builds `agda-json` (Agda-as-a-library → JSONL).
+    - Scala driver (`strux-driver`, main: `struxdriver.extract.AgdaJsonlDriver`) runs `agda-json` per module, validates output, writes logs + manifests.
 
-2) **Transform / utilities (Scala, proof-parser)**  
-   - `extract`, `transform`, `a2t`, dataset stats, premise eval.
+2.  **Transform / utilities (Scala, strux-driver)**  
+    - `extract`, `transform`, `a2t`, dataset stats, premise eval.
 
-3) **ML / serving (Python + Spark ETL)**  
-   - `etl` in `ml-pipeline` (Spark) → Parquet features
-   - `train` / `filter` / `finetune-dataset` (Python) → model checkpoint
-   - `serve` (FastAPI)
+3.  **Proof completion (AgdaDojang + Python)**  
+    - `eval-proof-completion` / `eval-proof-completion-smoke` — the propose → check loop.
+    - Deterministic fixture policy + retrieval policy.
+
+4.  **ML / ETL (Python + Spark)**  
+    - `etl` in `ml-pipeline` (Spark) → Parquet features
+    - `train-retrieval-smoke` → deterministic retrieval artifact
+    - `filter` → cleaned dataset
+    - Legacy training and FastAPI server archived to `experiments/archive/`.
 
 ---
 
 ## 1) Recommended environment: Nix shells
 
-Most “it just works” runs are inside a Nix shell.
+Most "it just works" runs are inside a Nix shell.
 
 ### 1.1 All-in-one dev shell
 
@@ -45,16 +65,16 @@ nix develop .#all
 nix develop .#backend
 ```
 
-> The Makefile also provides “Nix wrappers” that scrub `LD_LIBRARY_PATH` so nested nix calls don’t explode:
+> The Makefile also provides "Nix wrappers" that scrub `LD_LIBRARY_PATH` so nested nix calls don't explode:
 
-* `make extract-lib-nix`
-* `make extract-lib-smoke-nix`
++  `make extract-lib-nix`
++  `make extract-lib-smoke-nix`
 
 ---
 
 ## 2) First commands to run (sanity)
 
-### 2.1 See what you’ve got
+### 2.1 See what you've got
 
 ```sh
 make help
@@ -69,17 +89,17 @@ Inside the right shell (e.g. `nix develop .#all`):
 make check
 ```
 
-Outside nix (Makefile will run checks inside the proper shells):
+Outside Nix (Makefile will run checks inside the proper shells):
 
 ```sh
 make check-nix
 ```
 
-What `check` does:
+`check` does the following:
 
-* `test-proof-parser`
-* `backend-test`
-* `backend-smoke`
++  `test-strux-driver` (Scala tests in `strux-driver/`);
++  `backend-test` (Haskell tests in `agda-strux/`);
++  `backend-smoke` (run `agda-json` on a sample file).
 
 ---
 
@@ -105,10 +125,10 @@ Run the Haskell backend test suite with:
 make backend-test
 ```
 
-By default, backend tests **preserve their JSONL outputs** for inspection under:
+By default, backend tests **preserve their JSONL outputs** for inspection under
 
 ```
-data/test-output/agda-backend-jsonl/
+data/test-output/agda-strux/
 ```
 
 To disable output retention: `make backend-test BACKEND_TEST_KEEP=0`  
@@ -128,22 +148,21 @@ make backend-clean
 
 ---
 
-## 4) Proof-parser tests (Scala)
+## 4) Strux driver tests (Scala)
 
 Canonical Scala test entrypoint:
 
 ```sh
-make test
-# (alias of test-proof-parser)
+make test     # (alias for test-strux-driver)
 ```
 
 Or explicitly:
 
 ```sh
-make test-proof-parser
+make test-strux-driver
 ```
 
-There’s also an integration test target:
+There's also an integration test target:
 
 ```sh
 make test-integration
@@ -307,7 +326,7 @@ for equality goals, and `tt` for unit goals.
 ---
 
 
-## 6) “Small” extraction / transforms (non-corpus path)
+## 6) "Small" extraction / transforms (non-corpus path)
 
 These targets run mains directly and are useful for quick demos.
 
@@ -315,7 +334,7 @@ These targets run mains directly and are useful for quick demos.
 
 Defaults:
 
-* input: `proof-parser/src/test/resources/agda-example.agda`
+* input: `strux-driver/src/test/resources/agda-example.agda`
 * output: `data/train.jsonl`
 
 ```sh
@@ -370,72 +389,63 @@ This runs:
 
 Default behavior: Makefile creates/uses `ml-pipeline/.venv` (unless `USE_VENV=0`).
 
-```sh
-make train
-```
-
 Useful knobs:
 
-* `USE_VENV=1` (default) → use repo venv
-* `USE_VENV=0` → assume you activated an env already
-* `TORCH_MODE=cpu` (default), `TORCH_MODE=pypi`, `TORCH_MODE=skip`
++ `USE_VENV=1` (default) → use repo venv
++ `USE_VENV=0` → assume you activated an env already
++ `TORCH_MODE=cpu` (default), `TORCH_MODE=pypi`, `TORCH_MODE=skip`
 
-Examples:
 
-```sh
-make train TORCH_MODE=pypi
-make train USE_VENV=0
-```
-
-### 7.3 Filter + finetune dataset builder
+### 7.3 Filter
 
 ```sh
 make filter
-make finetune-dataset
 ```
 
-You can enforce minimum lengths:
+You can enforce minimum lengths, as follows:
 
 ```sh
 make filter MIN_TYPE_LEN=10 MIN_PROOF_LEN=10
 ```
 
-### 7.4 Serve (FastAPI)
+### 7.4 Retrieval model (current ML path)
 
 ```sh
-make serve
+make train-retrieval-smoke
+make eval-proof-completion-smoke-retrieval
 ```
 
-This requires:
+The first command trains a deterministic retrieval artifact from committed
+fixture data; the second runs the proof-completion evaluator using it.
 
-* model checkpoint exists at `ml-pipeline/models/model.pt`
-* `ml-pipeline/python/api/app.py` exists
+> **Note:** The legacy MLP trainer (`make train`), FastAPI server (`make serve`),
+> and `finetune-dataset` target have been archived to `experiments/archive/`.
+> See `docs/PLAN.md` for the current architecture.
+
 
 ---
 
-## 8) One-command “pipeline” runs
+## 8) One-command workflows
 
-### 8.1 Default pipeline (uses `make extract` path)
-
-```sh
-make pipeline
-```
-
-Pipeline does:
-
-1. `extract`
-2. dataset stats
-3. `filter`
-4. `finetune-dataset`
-5. `train` (on filtered)
-
-### 8.2 Library-specific pipeline runs
+### 8.1 Quick confidence check
 
 ```sh
-make train-stdlib
-make train-algebras
-make train-categories
+nix develop
+make check
+make eval-proof-completion-smoke
 ```
+
+### 8.2 Extraction + evaluation (small path)
+
+```sh
+nix develop
+make extract-lib-smoke
+make eval-proof-completion
+```
+
+> **Note:** The legacy `make pipeline` target (which chained extract → filter →
+> finetune-dataset → train) has been archived along with the components it
+> depends on.  See `experiments/archive/` for details.
 
 ---
 
@@ -544,7 +554,7 @@ Default library: `LIB_NAME=agda-algebras`
 
 ## 12) Debugging playbook
 
-### 12.1 “AgdaJsonlDriver exited 0 but produced no JSONL”
+### 12.1 "AgdaJsonlDriver exited 0 but produced no JSONL"
 
 The Makefile already treats this as an error (exit code 2). Next steps:
 
@@ -560,7 +570,7 @@ The Makefile resolves `agda-json` by running:
 * `cabal list-bin exe:agda-json` (inside backend shell)
 * then filters to the last line that ends in `agda-json`
 
-If it can’t resolve:
+If it can't resolve:
 
 * run `make show-agda-json-bin`
 * run `command -v agda-json`
@@ -585,9 +595,9 @@ If you see `spark-submit not found`:
 * or install Spark and ensure `spark-submit` is on PATH
 * check with: `make _check-spark`
 
-### 12.5 GitHub CLI issue export fails (repo “not found”)
+### 12.5 GitHub CLI issue export fails (repo "not found")
 
-If `gh` mysteriously can’t see the repo, the fix is usually:
+If `gh` mysteriously can't see the repo, the fix is usually:
 
 ```sh
 env -u GH_TOKEN -u GITHUB_TOKEN gh auth status
@@ -607,7 +617,7 @@ make tree    # repo tree, excluding build dirs
 
 ---
 
-## 14) “Known good” sequences
+## 14) "Known good" sequences
 
 ### 14.1 Quick confidence check
 
@@ -617,19 +627,24 @@ make check
 make extract-lib-smoke
 ```
 
-### 14.2 End-to-end (small path)
+### 14.2 End-to-end proof completion
 
 ```sh
 nix develop .#all
-make pipeline
+make eval-proof-completion
 ```
 
-### 14.3 End-to-end (corpus path + ML later)
+### 14.3 Corpus extraction (requires agda-algebras cloned locally)
 
 ```sh
 nix develop .#all
 make extract-lib
-# (then once ETL/ML is ready for that corpus)
-make etl
-make train
+```
+
+### 14.4 Retrieval model + evaluation
+
+```sh
+nix develop .#all
+make train-retrieval-smoke
+make eval-proof-completion-smoke-retrieval
 ```
