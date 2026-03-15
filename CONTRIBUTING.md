@@ -60,7 +60,6 @@ docs.
 Good early contributions include
 
 - docs cleanup;
-- naming consistency (`AgdaJang` → `AgdaDojang`);
 - test improvements;
 - fixture additions;
 - benchmark curation;
@@ -109,7 +108,6 @@ Use descriptive names, ideally with an issue number when applicable.
 
 **Examples**.
 
-+  `12-rename-agda-jang-to-agda-dojang`
 +  `18-add-mcp-tool-schema`
 +  `22-fix-fixture-demo-docs`
 

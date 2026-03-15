@@ -151,7 +151,7 @@ def _parse_labels(text: str) -> list[Label]:
         Label("docs",           "0e8a16", "Documentation"),
         Label("ci",             "fbca04", "Continuous integration"),
         Label("infrastructure", "fbca04", "Build system and tooling"),
-        Label("migration",      "d93f0b", "Migration from agda-ai-prover"),
+        Label("migration",      "d93f0b", "Migration to agda-native-air"),
         Label("cleanup",        "d93f0b", "Code and doc cleanup"),
         Label("paper",          "c5def5", "Publication targets"),
         Label("good first issue", "7057ff", "Good for newcomers"),

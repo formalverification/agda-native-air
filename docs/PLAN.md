@@ -269,7 +269,7 @@ evaluation story without tribal knowledge.
 
 1.  **Rename and stabilize AgdaDojang**.
 
-    +  rename `agda-jang` → `agda-dojang`;
+    +  (completed) renamed to `agda-dojang`;
     +  preserve the existing deterministic bridge/evaluator behavior;
     +  tighten tests around the goal/context reporting and candidate-check loop.
 
@@ -426,7 +426,7 @@ We do **not** want to drag the entire old issue tracker into the public repo unc
 +  extraction reliability / resumability / docs;
 +  deterministic evaluator + fixture policy backend;
 +  ports / wires / graph-view experiments;
-+  AgdaJang-to-policy integration, reframed as AgdaDojang + MCP.
++  AgdaDojang-to-policy integration, reframed as AgdaDojang + MCP.
 
 ### Reframe or merge
 
@@ -512,7 +512,7 @@ graph TD
 
 1.  Finalize manifesto / plan / public narrative.
 2.  Decide the new public repository structure (`agda-native-air`).
-3.  Rename `agda-jang` → `agda-dojang` in docs and package names.
+3.  (Completed) Renamed `agda-dojang` package in docs and package names.
 4.  Preserve and verify the deterministic evaluator and fixture demo.
 5.  Finish or cleanly restate the extraction / ETL / representation chain: #57 → #58 → #59.
 6.  Sketch the `agda-mcp` server API (what operations, what MCP tool definitions, what

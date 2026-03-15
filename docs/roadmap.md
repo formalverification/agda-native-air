@@ -60,7 +60,7 @@
       - [M3 — Research Mathematics (4 issues)](#m3--research-mathematics-4-issues)
       - [M4 — Local Proof Completion (3 issues)](#m4--local-proof-completion-3-issues)
   - [Dependency Graph (Mermaid)](#dependency-graph-mermaid)
-  - [Mapping from Old `agda-ai-prover` Issues](#mapping-from-old-agda-ai-prover-issues)
+  - [Mapping from Prior-Repo Issues](#mapping-from-prior-repo-issues)
   - [How to Create This Project on GitHub](#how-to-create-this-project-on-github)
     - [Prerequisites](#prerequisites)
     - [Quick start](#quick-start)
@@ -85,7 +85,7 @@ where any sufficiently capable LLM can reason effectively with Agda.
 ### Milestone 0 — Solid Infrastructure
 
 **Description:**  
-Complete the migration from `agda-ai-prover` to `agda-native-air`.  Stabilize
+Complete the migration from the prior private codebase to `agda-native-air`.  Stabilize
 extraction, evaluation, CI, and documentation so that a new collaborator can
 reproduce the full workflow without tribal knowledge.
 
@@ -244,22 +244,22 @@ top-level smoke target that exercises the minimum end-to-end path.
 
 #### Description
 
-Scrub all docs, Makefiles, and source comments for residual `agda-ai-prover`,
-`AgdaJang`, `agda-jang`, `FastAPI model server`, and old issue numbers.  Replace
-with `agda-native-air`, `AgdaDojang`, `agda-dojang`, `agda-mcp` as appropriate.
+Scrub all docs, Makefiles, and source comments for residual stale branding
+and old issue numbers.  Replace with `agda-native-air`, `AgdaDojang`,
+`agda-dojang`, `agda-mcp` as appropriate.
 
 #### Tasks
 
-- [ ] `grep -r "agda-ai-prover\|agda-jang\|AgdaJang\|FastAPI" --include="*.md" --include="*.scala" --include="*.py" --include="*.hs" --include="Makefile"`
-- [ ] Fix all occurrences (rename or remove as appropriate)
-- [ ] Remove or update old issue references (e.g., `#23`, `#65` from the old repo)
-- [ ] Ensure `docs/representation.md` is current
-- [ ] Remove FastAPI-first framing from any surviving docs
+- [x] Search docs, Makefiles, and source files for stale references
+- [x] Fix all occurrences (rename or remove as appropriate)
+- [x] Remove or update old issue references (e.g., `#23`, `#65` from the old repo)
+- [x] Ensure `docs/representation.md` is current
+- [x] Remove FastAPI-first framing from any surviving docs
 
 #### Acceptance criteria
 
-- [ ] `grep -r "agda-ai-prover\|agda-jang\b\|AgdaJang\b"` returns zero results (outside `docs/public-history.md` and `CHANGELOG`)
-- [ ] No doc references to issue numbers from the old repo without context
+- [x] Stale branding (`agda-ai-prover`, old `agda-jang`, `AgdaJang`) returns zero results outside `docs/public-history.md` and `CHANGELOG`
+- [x] No doc references to issue numbers from the old repo without context
 
 ---
 
@@ -1112,13 +1112,13 @@ graph TD
 
 ---
 
-## Mapping from Old `agda-ai-prover` Issues
+## Mapping from Prior-Repo Issues
 
 For reference, here is how old issues map to the new project:
 
 | Old Issue | Status | New Issue | Notes |
 |-----------|--------|-----------|-------|
-| #6 (agda-jang tests) | Open → | M1-1 | Reframed for AgdaDojang |
+| #6 (dojang tests) | Open → | M1-1 | Reframed for AgdaDojang |
 | #8 (Nix flake) | Open → | M0-2 | Part of reproducibility |
 | #15 (FP refactor) | Open → | Defer | Nice-to-have, not blocking |
 | #20 (tactic vocabulary) | Open → | M1-1 | Merged into AgdaDojang stabilization |

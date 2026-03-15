@@ -796,7 +796,7 @@ test-strux-driver: _check-sbt build-agda-json
 # 2.5.a. train: Python trainer (JSONL-based for now).
 # 2.5.b. filter: create a cleaned dataset (non-empty type/proof, optional length thresholds)
 # 2.5.c. finetune-dataset: builder that turns AgdaData into instruction/output pairs
-# 2.6. serve: FastAPI (uvicorn) using trained model.
+# 2.6. serve: (archived) model server, superseded by agda-mcp.
 # 2.7. bench: AgdaDojang dojo (still delegated for now)
 # 2.8. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
 # 2.9. smoke: Top-level smoke tests
@@ -1215,7 +1215,7 @@ eval-proof-completion-smoke-retrieval: train-retrieval-smoke
 
 # === LEGACY — archived to experiments/archive/ (Issue M0-1) ===============
 ## ------------------------------------------------------------------------------
-## 2.6. Python Serve (app.py): FastAPI (uvicorn) using trained model.
+## 2.6. Python Serve (app.py): archived model server (superseded by agda-mcp).
 #serve:
 #	@set -e; \
 #	if [ ! -s "$(MODEL_CKPT)" ]; then \
@@ -1226,7 +1226,7 @@ eval-proof-completion-smoke-retrieval: train-retrieval-smoke
 #	  echo "⚠️  $(ML_PIPE_API)/app.py not found; skipping serve."; \
 #	  exit 0; \
 #	fi; \
-#	echo ">> [serve] starting FastAPI (Ctrl-C to stop)"; \
+#	echo ">> [serve] starting model server (Ctrl-C to stop)"; \
 #	cd "$(ML_PIPE_PY)" && \
 #	  PYTHONPATH="$(ML_PIPE_PY)" \
 #	  MODEL_PATH="$(abspath $(MODEL_CKPT))" \

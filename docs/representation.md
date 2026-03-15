@@ -60,8 +60,7 @@ This doc mainly specifies **Full**.
 +  **Canonical extraction**.  `agda-strux` backend emits Full JSONL format with
    `typeAst` structural encoding (version `0.3-v0`).
 +  **ETL alignment**.  Integration of `typeAst` and structural schema into downstream
-   ETL pipeline is tracked in [Issue
-   #58](https://github.com/formalverification/agda-ai-prover/issues/58).
+   ETL pipeline is tracked in Issue #58 (now closed).
 +  **Legacy migration**.  Issue #58 is complete, so legacy ETL components should no longer
    assume older field names or schemas; converter logic to normalize old → new
    formats is already developed. **TODO**: check/confirm.
@@ -100,7 +99,7 @@ This doc mainly specifies **Full**.
 |------:|------|---------|
 | `body` | null \| string | Pretty-printed clause bodies (Agda internal terms), if available. |
 | `hasBody` | bool | True iff `body` is present/non-empty. |
-| `ports` | object | **[Planned v1.0]** Optional interface extraction (`inputs`/`outputs`), see §6. May be emitted by backend or derived by ETL. Tracked in [Issue #61](https://github.com/formalverification/agda-ai-prover/issues/61). |
+| `ports` | object | **[Planned v1.0]** Optional interface extraction (`inputs`/`outputs`), see §6. May be emitted by backend or derived by ETL. Tracked in Issue #61. |
 | `refsFromBody` | array[string] | **[Planned v1.0]** Optional tokens extracted from `body` (body-level deps), see §6. May be emitted by backend or derived by ETL. |
 | `wires` | array[string] | **[Planned v1.0]** Optional union of type deps and body deps, deduped, see §6. May be emitted by backend or derived by ETL. |
 
@@ -163,7 +162,7 @@ Operators like `_+_` can surface naming/pathological normalization issues.
 
 This is a **derived-but-stored** view: it can be emitted by the backend (preferred) or computed in ETL from canonical data.
 
-**Tracking**.  Implementation tracked in [Issue #61](https://github.com/formalverification/agda-ai-prover/issues/61).
+**Tracking**.  Implementation tracked in Issue #61.
 
 
 ### 6.1 Ports schema (v0)

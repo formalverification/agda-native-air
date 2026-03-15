@@ -1,7 +1,7 @@
 # experiments/archive/
 
-This directory preserves code that was part of the original `agda-ai-prover`
-development but is not part of the current architecture.  It is kept for
+This directory preserves code from a prior private development phase that is
+not part of the current architecture.  It is kept for
 research continuity and may be revived in later phases.
 
 **Nothing here is maintained or tested in CI.**

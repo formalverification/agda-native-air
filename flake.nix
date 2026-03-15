@@ -35,7 +35,7 @@
 #   nix develop -c agda --version
 # =============================================================================
 {
-  description = "agda-native-air: reproducible dev shells for AgdaJang + Python/Scala (+ optional GPU)";
+  description = "agda-native-air: reproducible dev shells for AgdaDojang + Python/Scala (+ optional GPU)";
 
   # ---- Inputs ---------------------------------------------------------------
   # Keep general tools on stable.
