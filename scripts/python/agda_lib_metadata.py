@@ -8,7 +8,7 @@ Generate per-library metadata for Agda projects:
 - external-modules.txt / .json
 - dependency-graph.dot (from Agda --dependency-graph)
 
-Usage (from agda-ai-prover repo root):
+Usage (from agda-native-air root):
 
   python scripts/python/agda_lib_metadata.py /path/to/agda-algebras
 

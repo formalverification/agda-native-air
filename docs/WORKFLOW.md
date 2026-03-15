@@ -1,6 +1,6 @@
 # Development Workflow Guide
 
-This guide describes the recommended workflow for contributing to the agda-ai-prover project using GitHub issues, branches, and git worktrees.
+This guide describes the recommended workflow for contributing to the agda-native-air project using GitHub issues, branches, and git worktrees.
 
 **Looking for quick commands?** See the [Workflow Cheatsheet](WORKFLOW-Cheatsheet.md) for a condensed reference guide.
 
@@ -25,7 +25,7 @@ This guide describes the recommended workflow for contributing to the agda-ai-pr
 
 ### How to Create an Issue
 
-1. Navigate to the [agda-ai-prover repository](https://github.com/formalverification/agda-ai-prover) on GitHub.
+1. Navigate to the [agda-native-air repository](https://github.com/formalverification/agda-native-air) on GitHub.
 2. Click the **"Issues"** tab near the top of the page.
 3. Click the green **"New issue"** button.
 4. Fill in the issue form with a clear title and description.
@@ -125,10 +125,10 @@ SSH is the recommended method because it's more secure and doesn't require enter
 
 ```bash
 # Clone the repository using SSH
-git clone git@github.com:formalverification/agda-ai-prover.git
+git clone git@github.com:formalverification/agda-native-air.git
 
 # Navigate into the cloned repository
-cd agda-ai-prover
+cd agda-native-air
 ```
 
 ### Cloning with HTTPS (Alternative)
@@ -137,10 +137,10 @@ If you prefer HTTPS or don't have SSH keys set up:
 
 ```bash
 # Clone the repository using HTTPS
-git clone https://github.com/formalverification/agda-ai-prover.git
+git clone https://github.com/formalverification/agda-native-air.git
 
 # Navigate into the cloned repository
-cd agda-ai-prover
+cd agda-native-air
 ```
 
 **Note**: With HTTPS, you may need to enter your GitHub username and personal access token (not your password) when pushing changes.
@@ -154,8 +154,8 @@ After cloning, verify that everything worked:
 git remote -v
 
 # This should show:
-# origin  git@github.com:formalverification/agda-ai-prover.git (fetch)
-# origin  git@github.com:formalverification/agda-ai-prover.git (push)
+# origin  git@github.com:formalverification/agda-native-air.git (fetch)
+# origin  git@github.com:formalverification/agda-native-air.git (push)
 ```
 
 ---
@@ -180,7 +180,7 @@ Let's say you want to work on issue #99, which has a branch named `99-fix-foobar
 First, make sure you have the latest information about remote branches:
 
 ```bash
-cd agda-ai-prover  # Your main repository directory
+cd agda-native-air  # Your main repository directory
 git fetch origin
 ```
 
@@ -199,7 +199,7 @@ git worktree add -b 99-fix-foobar ../worktrees/99-fix-foobar origin/99-fix-fooba
 **Directory structure after this command:**
 ```
 your-projects/
-├── agda-ai-prover/          # Main repository (typically on main branch)
+├── agda-native-air/          # Main repository (typically on main branch)
 └── worktrees/
     └── 99-fix-foobar/       # Worktree for issue 99
 ```
@@ -236,7 +236,7 @@ git worktree list
 
 # Remove a worktree (after you're done with it)
 # First, navigate out of the worktree directory
-cd ../../agda-ai-prover
+cd ../../agda-native-air
 git worktree remove ../worktrees/99-fix-foobar
 
 # If the worktree directory was deleted manually, clean it up with:
@@ -294,7 +294,7 @@ After pushing, Git often displays a link in the terminal:
 
 ```
 remote: Create a pull request for '99-fix-foobar' on GitHub by visiting:
-remote:   https://github.com/formalverification/agda-ai-prover/pull/new/99-fix-foobar
+remote:   https://github.com/formalverification/agda-native-air/pull/new/99-fix-foobar
 ```
 
 Click or copy-paste this link into your browser to create the PR.
@@ -783,6 +783,6 @@ flowchart TD
 
 ## Questions or Feedback?
 
-If you have questions about this workflow or suggestions for improvement, please [open an issue](https://github.com/formalverification/agda-ai-prover/issues) or reach out to the maintainers.
+If you have questions about this workflow or suggestions for improvement, please [open an issue](https://github.com/formalverification/agda-native-air/issues) or reach out to the maintainers.
 
 Happy coding! 🚀

@@ -232,6 +232,10 @@ This is a **derived-but-stored** view: it can be emitted by the backend (preferr
 
 ---
 
+<!-- TODO: document eval-proof-completion.v0 schema (fixtures.jsonl, results.jsonl) -->
+
+---
+
 #### 7.2.1 Next-step dataset (planned)
 
 ---
