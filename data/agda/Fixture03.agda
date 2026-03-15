@@ -6,7 +6,7 @@ module Fixture03 where
 
 open import Agda.Builtin.Unit
 open import Agda.Builtin.Equality
-open import AgdaJang.Debug
+open import AgdaDojang.Debug
 
 -- Goal is A; ctx includes a : A, b : B → policy proposes "a"
 const : {A B : Set} → A → B → A

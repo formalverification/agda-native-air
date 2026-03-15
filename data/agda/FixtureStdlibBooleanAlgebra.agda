@@ -11,8 +11,8 @@
 
 module FixtureStdlibBooleanAlgebra where
 
--- AgdaJang reporting macro used by agent_bridge / eval_fixtures:
-open import AgdaJang.Debug using (reportGoalCtx)
+-- AgdaDojang reporting macro used by agent_bridge / eval_fixtures:
+open import AgdaDojang.Debug using (reportGoalCtx)
 
 open import Data.Bool.Base using (Bool; true; false)
 open import Data.Bool.Properties using  ( ∨-∧-booleanAlgebra

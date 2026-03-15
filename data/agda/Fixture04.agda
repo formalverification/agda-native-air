@@ -5,7 +5,7 @@
 module Fixture04 where
 
 open import Agda.Builtin.Equality
-open import AgdaJang.Debug
+open import AgdaDojang.Debug
 
 -- Implicit binders still appear in context in the report; goal is x ≡ x.
 reflImplicit : {A : Set} {x : A} → x ≡ x
