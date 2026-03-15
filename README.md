@@ -1,10 +1,9 @@
 <!-- File: agda-native-air/README.md -->
 
 # Agda-native AIR
+[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.7.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/Haskell-GHC_9.8-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
 
 *Agda-native Artificial Intelligence Reasoning environment*
-
-[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml)
 
 `agda-native-air` is a research project for building the interaction, retrieval, and
 evaluation infrastructure that allows modern AI agents to work effectively with
