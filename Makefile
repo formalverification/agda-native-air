@@ -329,6 +329,9 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
 # Usage:
 #   make ci-smoke                    # run all four lanes
 #   make ci-smoke CI_SKIP_ML=1       # skip Python (e.g., no venv yet)
+#
+# NOTE: CI provides GHC via haskell-actions/setup (BACKEND_USE_NIX=0);
+# locally, we rely on nix develop .#backend for the pinned GHC 9.8.2.
 # ------------------------------------------------------------------------------
 .PHONY: ci-smoke
 ci-smoke: ci-smoke-scala ci-smoke-etl ci-smoke-python ci-smoke-haskell
@@ -362,7 +365,7 @@ endif
 .PHONY: ci-smoke-haskell
 ci-smoke-haskell:
 	@echo "── [ci-smoke] Lane 4/4: Haskell agda-strux tests ──"
-	$(MAKE) --no-print-directory backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
+	$(MAKE) --no-print-directory backend-test BACKEND_TEST_KEEP=0
 # ------------------------------------------------------------------------------
 
 
