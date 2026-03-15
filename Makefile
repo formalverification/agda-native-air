@@ -493,7 +493,11 @@ probe-all:
 	  fi; \
 	done; \
 	exit "$$fail"
-#
+
+test-doc-howtorun:
+	@echo "→ testing documented commands from docs/HowToRun.md"
+	python3 scripts/python/doc_check.py docs/HowToRun.md --run -v
+
 # -------------------------------------------------------------------------------
 # 1.3. nix wrappers: convenience wrappers for running from outside Nix
 #

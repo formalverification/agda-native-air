@@ -17,7 +17,13 @@ Companion docs:
 git clone git@github.com:formalverification/agda-native-air.git
 cd agda-native-air
 nix develop
+```
+<!-- doc-test: quick-check -->
+```sh
 make check
+```
+<!-- doc-test: quick-eval-smoke -->
+```sh
 make eval-proof-completion-smoke
 ```
 
@@ -76,8 +82,12 @@ nix develop .#backend
 
 ### 2.1 See what you've got
 
+<!-- doc-test: help -->
 ```sh
 make help
+```
+<!-- doc-test: diag -->
+```sh
 make diag
 ```
 
@@ -107,12 +117,14 @@ make check-nix
 
 ### 3.1 Build the backend executable
 
+<!-- doc-test: build-agda-json -->
 ```sh
 make build-agda-json
 ```
 
 ### 3.2 Locate the backend binary
 
+<!-- doc-test: show-agda-json-bin -->
 ```sh
 make show-agda-json-bin
 ```
@@ -121,6 +133,7 @@ make show-agda-json-bin
 
 Run the Haskell backend test suite with:
 
+<!-- doc-test: backend-test -->
 ```sh
 make backend-test
 ```
@@ -136,12 +149,14 @@ To clean retained outputs: `make backend-test-clean`
 
 ### 3.4 Backend smoke
 
+<!-- doc-test: backend-smoke -->
 ```sh
 make backend-smoke
 ```
 
 ### 3.5 Clean backend artifacts
 
+<!-- doc-test: backend-clean -->
 ```sh
 make backend-clean
 ```
@@ -158,12 +173,14 @@ make test     # (alias for test-strux-driver)
 
 Or explicitly:
 
+<!-- doc-test: test-strux-driver -->
 ```sh
 make test-strux-driver
 ```
 
 There's also an integration test target:
 
+<!-- doc-test: test-integration -->
 ```sh
 make test-integration
 ```
@@ -187,6 +204,7 @@ This is the main, resumable extraction path that writes
 
 #### 5.1.1 Full corpus extraction (agda-algebras by default)
 
+<!-- doc-test: extract-lib -->
 ```sh
 make extract-lib
 ```
@@ -207,8 +225,12 @@ make extract-lib-smoke \
 
 #### 5.1.3 Run extraction via Nix wrapper (from outside nix shell)
 
+<!-- doc-test: extract-lib-nix -->
 ```sh
 make extract-lib-nix
+```
+<!-- doc-test: extract-lib-smoke-nix -->
+```sh
 make extract-lib-smoke-nix
 ```
 
@@ -334,7 +356,7 @@ These targets run mains directly and are useful for quick demos.
 
 Defaults:
 
-* input: `strux-driver/src/test/resources/agda-example.agda`
++ input: `data/agda/agda-example.agda`
 * output: `data/train.jsonl`
 
 ```sh
@@ -547,8 +569,8 @@ Default library: `LIB_NAME=agda-algebras`
 ### 11.3 ML outputs
 
 * Parquet: `ml-pipeline/features/train.parquet`
-* Models: `ml-pipeline/models/model.pt`
-* Finetune dataset: `data/finetune.jsonl` (or overridden)
+* Models: `ml-pipeline/models/model.pt`  (legacy)
+* Finetune dataset: `data/finetune.jsonl`  (legacy)
 
 ---
 
