@@ -4,6 +4,8 @@
 
 *Agda-native Artificial Intelligence Reasoning environment*
 
+[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml)
+
 `agda-native-air` is a research project for building the interaction, retrieval, and
 evaluation infrastructure that allows modern AI agents to work effectively with
 **Agda**.

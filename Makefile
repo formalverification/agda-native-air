@@ -316,6 +316,58 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
 
 .PHONY: $(PHONY_TARGETS)
 
+
+# =========================================================================================
+# Section 0 — ci/backend
+# =========================================================================================
+# ------------------------------------------------------------------------------
+# CI smoke target
+#
+# Mirrors the four CI lanes locally (no Nix required).
+# Use this to verify CI will pass before pushing.
+#
+# Usage:
+#   make ci-smoke                    # run all four lanes
+#   make ci-smoke CI_SKIP_ML=1       # skip Python (e.g., no venv yet)
+# ------------------------------------------------------------------------------
+.PHONY: ci-smoke
+ci-smoke: ci-smoke-scala ci-smoke-etl ci-smoke-python ci-smoke-haskell
+	@echo "✅ ci-smoke: all four lanes passed."
+
+.PHONY: ci-smoke-scala
+ci-smoke-scala: _check-sbt
+	@echo "── [ci-smoke] Lane 1/4: Scala strux-driver tests ──"
+	cd $(STRUX_DRIVER) && $(SBT) -v test
+
+.PHONY: ci-smoke-etl
+ci-smoke-etl: _check-sbt
+	@echo "── [ci-smoke] Lane 2/4: Scala ml-pipeline ETL smoke ──"
+	cd $(ML_PIPE) && $(SBT) -v "project etl" "testOnly etl.PreprocessAgdaSpec"
+	$(MAKE) --no-print-directory etl-proof-completion-dataset-smoke PROOF_COMPLETION_SMOKE_LIMIT=200
+
+.PHONY: ci-smoke-python
+ci-smoke-python:
+ifeq ($(CI_SKIP_ML),1)
+	@echo "── [ci-smoke] Lane 3/4: Python ml-pipeline tests (SKIPPED — CI_SKIP_ML=1) ──"
+else
+	@echo "── [ci-smoke] Lane 3/4: Python ml-pipeline tests ──"
+	@cd $(ML_PIPE) && \
+	  if [ -d python/tests ] && find python/tests \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit | grep -q .; then \
+	    $(PY) -m pytest -q python/tests; \
+	  else \
+	    echo "  No Python tests found; skipping."; \
+	  fi
+endif
+
+.PHONY: ci-smoke-haskell
+ci-smoke-haskell:
+	@echo "── [ci-smoke] Lane 4/4: Haskell agda-strux tests ──"
+	$(MAKE) --no-print-directory backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
+# ------------------------------------------------------------------------------
+
+
+
+
 # =========================================================================================
 # Section 1 — Core / current extraction + tests (top of file)
 # =========================================================================================
