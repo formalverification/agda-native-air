@@ -216,7 +216,14 @@ else:
 PY
 
             ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
-            echo "Tips: make extract && make etl && make train && make bench"
+            echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            echo "~ Examples (things you can try right now!)"
+            echo "    make eval-proof-completion                     # Demo: end-to-end proof completion "
+            echo "    make train-retrieval-smoke                     # Demo: retrieval model + evaluation "
+            echo "    make eval-proof-completion-smoke-retrieval "
+            echo "    make extract-lib                               # Corpus extraction (requires agda-algebras)"
+            echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+            echo "~ Happy proving! 🛸 "
           '';
         };
 
