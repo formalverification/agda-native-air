@@ -53,12 +53,12 @@ The tools are organized in three groups, corresponding to implementation phases.
 
 These are the minimum viable tools for an agent to do interactive proof development.
 
-| Tool               | Description                                                                                                                                                                        |
-|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Tool | Description |
+|------|-------------|
 | `get-goal`         | Given a file path and hole identifier, return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query. |
-| `fill-hole`        | Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location).              |
-| `check-file`       | Load or reload an Agda file and return all diagnostics — errors, warnings, unsolved meats, and remaining holes.                                                                    |
-| `get-diagnostics`  | Retrieve the current diagnostic state without reloading: error count, warning count, list of open holes with their types.                                                          |
+| `fill-hole`        | Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location). |
+| `check-file`       | Load or reload an Agda file and return all diagnostics — errors, warnings, unsolved meats, and remaining holes. |
+| `get-diagnostics`  | Retrieve the current diagnostic state without reloading: error count, warning count, list of open holes with their types. |
 
 
 ### Search and retrieval tools (Milestone 1 — [M1-3])
@@ -67,10 +67,10 @@ Basic corpus search, enabling the agent to find relevant definitions.  These are
 backed by `agda-strux` output initially; neural premise selection is added in
 Milestone 2.
 
-| Tool               | Description                                                                                                                                                 |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `search-by-name`   | Fuzzy search for definitions by qualified or unqualified name; returns matching definitions with their types, module paths, and source locations.           |
-| `search-by-type`   | Search for definitions whose type unifies with (or is similar to) a given type expression — essential for finding lemmas that might help discharge a goal.  |
+| Tool | Description |
+|------|-------------|
+| `search-by-name`   | Fuzzy search for definitions by qualified or unqualified name; returns matching definitions with their types, module paths, and source locations. |
+| `search-by-type`   | Search for definitions whose type unifies with (or is similar to) a given type expression — essential for finding lemmas that might help discharge a goal. |
 | `get-dependencies` | Given a definition name, return its dependency neighborhood: what it depends on (imports, referenced lemmas) and what depends on it (reverse dependencies). |
 
 
@@ -78,11 +78,11 @@ Milestone 2.
 
 These are lower priority and may be added as the system matures.
 
-| Tool                   | Description                                                                                                            |
-|------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `get-file-contents`    | Return the source text of an Agda file, optionally with hole markers annotated.                                        |
-| `get-module-structure` | List the definitions in a module with their types and kinds (data, record, function, postulate).                       |
-| `get-corpus-stats`     | Summary statistics about the loaded corpus: module count, definition count, hole count. Useful for agent orientation.  |
+| Tool | Description |
+|------|-------------|
+| `get-file-contents`    | Return the source text of an Agda file, optionally with hole markers annotated. |
+| `get-module-structure` | List the definitions in a module with their types and kinds (data, record, function, postulate). |
+| `get-corpus-stats`     | Summary statistics about the loaded corpus: module count, definition count, hole count. Useful for agent orientation. |
 
 
 ---
@@ -171,7 +171,7 @@ agda-mcp/
 ├── README.md              ← you are here
 ├── agda-mcp.cabal         ← Cabal package definition
 ├── src/
-│   └── AgdaMcp/
+│   └── AgdaMCP/
 │       ├── Main.hs        ← entry point; stdio transport setup
 │       ├── Server.hs      ← MCP server definition; tool registration
 │       ├── Tools/
@@ -179,7 +179,7 @@ agda-mcp/
 │       │   └── Search.hs       ← search-by-name, search-by-type, get-dependencies
 │       └── Types.hs       ← shared request/response types
 └── test/
-    └── AgdaMcp/
+    └── AgdaMCP/
         └── ...            ← integration tests
 ```
 
@@ -189,8 +189,8 @@ agda-mcp/
 
 ## Related Components
 
-| Component        | Role                                                                 | Link                                |
-|------------------|----------------------------------------------------------------------|-------------------------------------|
+| Component | Role | Link |
+|-----------|------|------|
 | **agda-dojang**  | Interaction layer — provides the proof actions that `agda-mcp` wraps | [`agda-dojang/`](../agda-dojang/)   |
 | **agda-strux**   | Extraction layer — produces the corpus data that backs search tools  | [`agda-strux/`](../agda-strux/)     |
 | **strux-driver** | ETL layer — processes extracted data into retrieval-friendly formats | [`strux-driver/`](../strux-driver/) |
@@ -234,4 +234,4 @@ agda-mcp/
 [AgdaDojang]: ../agda-dojang/
 [MANIFESTO]: ../MANIFESTO.md
 [PLAN]: ../docs/PLAN.md
-[M1-2]: https://github.com/formalverification/agda-native-air/issues/TODO
+[M1-2]: https://github.com/formalverification/agda-native-air/issues/10
