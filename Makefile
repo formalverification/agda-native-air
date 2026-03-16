@@ -314,7 +314,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
                  extract-algebras-legacy extract-lib-old clean wipe tree probe-all \
                  eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge \
-                 test-agda-dojang test-agda-dojang-integration
+                 test-agda-dojang-integration
 
 .PHONY: $(PHONY_TARGETS)
 
@@ -1395,6 +1395,7 @@ test-agda-dojang-integration:
 	@echo "✅ AgdaDojang integration tests passed."
 
 
+.PHONY: test-agda-dojang-all
 test-agda-dojang-all: test-agda-dojang test-agda-dojang-integration
 	@echo "✅ All AgdaDojang tests passed."
 
