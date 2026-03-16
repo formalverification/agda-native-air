@@ -309,7 +309,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       # -- Path-change detection --
       # We only install Nix / run Agda when files that could affect the
@@ -323,9 +323,11 @@ jobs:
           else
             BASE="${{ github.event.before }}"
           fi
-          CHANGED=$(git diff --name-only "$BASE" HEAD -- \
-            'agda-dojang/' 'data/agda/' 'flake.nix' 'flake.lock' \
-            || echo "")
+          if ! CHANGED=$(git diff --name-only "$BASE" HEAD -- \
+            'agda-dojang/' 'data/agda/' 'flake.nix' 'flake.lock'); then
+            echo "Error: failed to compute diff between $BASE and HEAD."
+            exit 1
+          fi
           if [ -n "$CHANGED" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "Changed files in scope:"

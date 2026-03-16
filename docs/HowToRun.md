@@ -316,17 +316,18 @@ command line, as follows:
 
 ```sh
 make eval-proof-completion \
-  EVAL_FIXTURES="agda-dojang/data/fixtures/Fixture01.agda" \
+  EVAL_FIXTURES="data/fixtures/Fixture01.agda" \
   EVAL_MAX_HOLES=2 \
   EVAL_K=3 \
   EVAL_TIMEOUT=15 \
-  EVAL_POLICY="python3 agda-dojang/python/tools/policy_fixture.py" \
+  EVAL_POLICY="python3 python/tools/policy_fixture.py" \
   EVAL_RUN_ID=my-run
 ```
 
 #### 5.2.6 Fixture files
 
-Committed fixtures live in `data/agda/`.  Each fixture imports from
+Committed fixtures live in `agda-dojang/data/fixtures/` (or `data/fixtures/` when
+running via `make -C agda-dojang`). Each fixture imports from
 `AgdaDojang.Debug` (for the `reportGoalCtx` macro) and contains one or more
 `{!!}` holes.  The fixture policy (`policy_fixture.py`) uses simple heuristics
 to solve them: assumption matching (goal type matches a context binder), `refl`
