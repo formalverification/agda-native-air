@@ -1,13 +1,14 @@
 ## =============================================================================
-#  ci.yml
+#  ci.yml - CI Pipeline for agda-native-air
 #  -----------------------------------------------------------------------------
 #
 #  File: .github/workflows/ci.yml
 #
-#  CI Pipeline for agda-native-air
-#  --------------------------------
+#  Description:
+#    Several CI lanes, all running in parallel.  The `all-green` aggregator
+#    gate ensures PRs are only mergeable when every non-skipped lane passes.
 #
-#  What this workflow does:
+#    What this workflow does:
 #
 #    1) Scala (strux-driver)
 #       - Set up Temurin JDK 21 (Spark 4.x + Scala 2.13 toolchain)
@@ -23,10 +24,44 @@
 #       - If requirements.txt exists, install it
 #       - If tests exist, run pytest; otherwise skip gracefully
 #
-#  Notes:
+#    3) Python (agda-dojang unit tests)
+#       - Set up Python 3.12
+#       - Run pytest on the pure Python tests (report parser, policy contract,
+#         rendering, agent bridge utilities).  No Agda or Nix required.
 #
+#    4) Python (ml-pipeline tests)
+#       - Set up Python 3.12 + venv
+#       - Install ml-pipeline dependencies
+#       - Run pytest if tests are present
+#
+#    5) Haskell (agda-strux backend tests)
+#       - Set up GHC 9.8.2 + Cabal
+#       - Cache ~/.cabal/store + dist-newstyle
+#       - Run `make backend-test`
+#
+#    6) Agda (proof-completion smoke — conditional on agda-dojang/ changes)
+#       - Install Nix via cachix/install-nix-action
+#       - Restore/push Nix store artifacts via Cachix (see notes below)
+#       - Run eval-proof-completion-smoke inside nix develop
+#       - Verify determinism by running twice and diffing output
+#
+#    7) all-green (aggregator gate)
+#       - Waits for lanes 1–6.  Uses `if: always()` so that skipped
+#         conditional jobs (e.g. lane 6 when no agda-dojang/ changes)
+#         don't block the gate.  Fails on `failure` or `cancelled`.
+#
+#  Notes:
 #    - We intentionally do NOT invoke Agda or long training in PR CI.
 #    - Add a separate nightly workflow for heavy jobs if desired.
+#    - Lane 6 uses Cachix (https://cachix.org) to cache Nix store paths.
+#      One-time setup:
+#        1.  Install the cachix CLI:  `nix profile install github:cachix/cachix`  (answer yes to cli the questions)
+#        2.  On the cli, enter: `cachix authtoken <paste-your-token-here>`
+#        3.  Go to [https://app.cachix.org](https://app.cachix.org) → click "Create Cache"
+#        4.  Add auth token in the GitHub repo's Actions secrets
+#            (Settings → Secrets and variables → Actions → New repository secret).
+#            Name it `CACHIX_AUTH_TOKEN`. Without this secret, CI will still work but
+#            cold Nix builds will take ~10–15 min instead of ~2–3 min.
 #
 ## =============================================================================
 name: CI Pipeline
@@ -256,12 +291,141 @@ jobs:
       - name: backend-test
         run: make backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
 
-  # Aggregate status (optional): mark the whole workflow green only if
-  # the Scala job passed and (if present) Python job passed.
+  # ---------------------------------------------------------------------------
+  # Agda • proof-completion smoke (requires Nix → Agda + stdlib)
+  #
+  # Conditional: only runs when agda-dojang/ or data/agda/ files change.
+  #
+  # Runtime with warm Cachix cache: ~2–3 min.
+  # First ever run (or after flake.lock bump): ~10–15 min, but the built
+  # paths are pushed to Cachix automatically so subsequent runs are fast.
+  # ---------------------------------------------------------------------------
+  agda-dojang-eval:
+    name: Agda • proof-completion smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      # -- Path-change detection --
+      # We only install Nix / run Agda when files that could affect the
+      # evaluator have changed.  This keeps unrelated PRs fast.
+      # Trigger paths: agda-dojang/, data/agda/, flake.nix, flake.lock.
+      - name: Detect relevant changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD -- \
+            'agda-dojang/' 'data/agda/' 'flake.nix' 'flake.lock' \
+            || echo "")
+          if [ -n "$CHANGED" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Changed files in scope:"
+            echo "$CHANGED"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No agda-dojang or fixture changes detected; skipping."
+          fi
+
+      # -- Nix + Cachix --
+      - name: Install Nix
+        if: steps.changes.outputs.run == 'true'
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      # Cachix provides a shared binary cache for Nix store paths.
+      # On cache hit, `nix develop` resolves in seconds instead of
+      # building Agda + stdlib from source (~12 min).
+      # If CACHIX_AUTH_TOKEN is missing, this step is a no-op read-only
+      # pull from the public cache (safe for external contributor PRs).
+      - name: Set up Cachix
+
+        if: steps.changes.outputs.run == 'true'
+        uses: cachix/cachix-action@v16
+        with:
+          name: formalverification
+          # Push built paths so future runs are fast.  Falls back to
+          # read-only if the secret is not set (e.g. external forks).
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      # -- Smoke test --
+      - name: Run eval-proof-completion-smoke
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          set -euxo pipefail
+          nix develop .#all --command bash -c '
+            echo "Agda: $(agda --version)"
+            echo "Python: $(python3 --version)"
+            make eval-proof-completion-smoke
+          '
+
+      # -- Determinism verification --
+      - name: Verify deterministic output
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          set -euxo pipefail
+          nix develop .#all --command bash -c '
+            cp agda-dojang/_build/eval-proof-completion/smoke/fixtures.jsonl \
+               /tmp/fixtures-run1.jsonl
+            make eval-proof-completion-smoke
+            python3 -c "
+          import json, sys
+          def normalize(path):
+              with open(path) as f:
+                  rows = [json.loads(line) for line in f if line.strip()]
+              for r in rows:
+                  r.pop(\"elapsedMs\", None)
+              return rows
+          r1 = normalize(\"/tmp/fixtures-run1.jsonl\")
+          r2 = normalize(\"agda-dojang/_build/eval-proof-completion/smoke/fixtures.jsonl\")
+          if r1 == r2:
+              print(\"Determinism check passed.\")
+          else:
+              print(\"DETERMINISM FAILURE\", file=sys.stderr)
+              print(\"Run 1:\", json.dumps(r1, indent=2), file=sys.stderr)
+              print(\"Run 2:\", json.dumps(r2, indent=2), file=sys.stderr)
+              sys.exit(1)
+            "
+          '
+
+      - name: Skip notice
+        if: steps.changes.outputs.run != 'true'
+        run: echo "agda-dojang-eval skipped (no relevant file changes)."
+
+  # ---------------------------------------------------------------------------
+  # Aggregate status: all required jobs must pass.
+  # Uses if: always() so that skipped conditional jobs don't block the gate.
+  # ---------------------------------------------------------------------------
   all-green:
     name: All checks
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl, python-agda-dojang ]
+    if: always()
+    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl, python-agda-dojang, agda-dojang-eval ]
     steps:
-      - run: echo "All jobs passed ✅"
+      - name: Check results
+        run: |
+          results=( \
+            "${{ needs.scala-strux-driver.result }}" \
+            "${{ needs.scala-ml-pipeline-etl.result }}" \
+            "${{ needs.python-ml-pipeline.result }}" \
+            "${{ needs.haskell-backend-jsonl.result }}" \
+            "${{ needs.python-agda-dojang.result }}" \
+            "${{ needs.agda-dojang-eval.result }}" \
+          )
+          for r in "${results[@]}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "A required job failed or was cancelled: $r"
+              exit 1
+            fi
+          done
+          echo "All jobs passed (skipped jobs are OK). ✅"
