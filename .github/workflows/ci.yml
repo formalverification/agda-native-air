@@ -157,6 +157,27 @@ jobs:
           set -euxo pipefail
           make etl-proof-completion-dataset-smoke PROOF_COMPLETION_SMOKE_LIMIT=200
 
+  python-agda-dojang:
+    name: Python • agda-dojang unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run pure unit tests (no Agda required)
+        working-directory: agda-dojang
+        run: |
+          PYTHONPATH=python python3 -m pytest -q \
+            python/tests/test_rendering.py \
+            python/tests/test_parse_request.py \
+            python/tests/test_policy_contract.py \
+            python/tests/test_report_parser.py
 
   python-ml-pipeline:
     name: Python • ml-pipeline tests
@@ -241,6 +262,6 @@ jobs:
     name: All checks
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl ]
+    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl, python-agda-dojang ]
     steps:
       - run: echo "All jobs passed ✅"

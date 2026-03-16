@@ -374,7 +374,7 @@ wipe: clean
 
 
 ###########################################################################
-# Legacy definitions and targets
+# Legacy definitions and targets (may be removed later)
 # ROWS_IN  := $(REPO_ROOT)/data/tasks.jsonl
 # ROWS_OUT := $(REPO_ROOT)/data/rows.jsonl
 #

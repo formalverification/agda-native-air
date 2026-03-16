@@ -1,6 +1,6 @@
 -- FixtureStdlibBooleanAlgebraMinimal.agda
 --
--- File: data/agda/FixtureStdlibBooleanAlgebraMinimal.agda
+-- File: agda-dojang/data/fixtures/FixtureStdlibBooleanAlgebraMinimal.agda
 --
 
 module FixtureStdlibBooleanAlgebraMinimal where

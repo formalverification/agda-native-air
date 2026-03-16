@@ -41,11 +41,11 @@ CLI examples:
 
     PYTHONPATH=agda-dojang/python \
     python3 agda-dojang/python/tools/agent_bridge.py \
-      --file data/agda/FixtureHoles.agda \
+      --file agda-dojang/data/fixtures/FixtureHoles.agda \
       --policy "python3 agda-dojang/python/tools/policy_fixture.py" \
       --agda-bin agda \
       --agda-flags "-i agda --library-file=agda/libraries -l agda-dojang" \
-      --include "data/agda" \
+      --include "agda-dojang/data/fixtures" \
       --max-holes 4 \
       --k 5
 

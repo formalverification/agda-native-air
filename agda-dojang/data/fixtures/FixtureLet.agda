@@ -1,6 +1,6 @@
 -- FixtureLet.agda
 --
--- File: data/agda/FixtureLet.agda
+-- File: agda-dojang/data/fixtures/FixtureLet.agda
 --
 module FixtureLet where
 

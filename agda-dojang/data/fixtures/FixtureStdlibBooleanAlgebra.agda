@@ -1,6 +1,6 @@
 -- FixtureStdlibBooleanAlgebra.agda
 --
--- File: data/agda/FixtureStdlibBooleanAlgebra.agda
+-- File: agda-dojang/data/fixtures/FixtureStdlibBooleanAlgebra.agda
 --
 -- Description:
 --   Tiny fixture for deterministic Agda-check evaluation.  Intended to be solved by
