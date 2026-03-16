@@ -50,9 +50,9 @@ look up definitions by name or type.
 | Component | Layer | Description |
 |-----------|-------|-------------|
 | [`agda-mcp`](../agda-mcp/README.md) | Bridge | MCP server exposing Agda proof-state interaction to any MCP-compatible agent; see its README for the planned tool surface, language choice, transport, and roadmap. |
-| `agda-dojang` | Interaction | Haskell library that wraps Agda-as-a-library; provides goal inspection, hole filling, and diagnostics. |
-| `agda-strux` | Retrieval | Extracts JSONL from Agda source; backs the name/type search tools in `agda-mcp`. |
-| `strux-driver` | Retrieval | ETL pipeline that converts `agda-strux` JSONL into retrieval-friendly indices. |
+| [`agda-dojang`](../agda-dojang/README.md) | Interaction | Haskell library that wraps Agda-as-a-library; provides goal inspection, hole filling, and diagnostics. |
+| [`agda-strux`](../agda-strux/README.md) | Retrieval | Extracts JSONL from Agda source; backs the name/type search tools in `agda-mcp`. |
+| [`strux-driver`](../strux-driver/README.md) | Retrieval | ETL pipeline that converts `agda-strux` JSONL into retrieval-friendly indices. |
 
 ---
 
