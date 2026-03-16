@@ -8,7 +8,52 @@ This is the interactive execution and experimentation layer of the **agda-native
 
 AgdaDojang provides a small, carefully designed vocabulary of *safe proof actions* inside Agda, together with external tooling that allows AI agents (and humans) to **interact with Agda's typechecker**, propose proof steps, and observe precise semantic feedback.
 
-AgdaDojang is where learned policies are *executed*, *validated*, and *debugged*.
+This is where learned policies are *executed*, *validated*, and *debugged*.
+
+
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [Role in the Overall System](#role-in-the-overall-system)
+- [Design Principles](#design-principles)
+- [Agda-side Components — Action Space Reference](#agda-side-components--action-space-reference)
+  - [Phase 1: Observe — `reportGoalCtx`](#phase-1-observe--reportgoalctx)
+  - [Phase 2: Propose — policy request/response](#phase-2-propose--policy-requestresponse)
+  - [Phase 3: Validate — fill-hole round-trip](#phase-3-validate--fill-hole-round-trip)
+  - [Worked Example: full round-trip on `Fixture01`](#worked-example-full-round-trip-on-fixture01)
+  - [TC Monad Macros: detailed reference](#tc-monad-macros-detailed-reference)
+  - [How These Map to `agda-mcp` Tools](#how-these-map-to-agda-mcp-tools)
+  - [Evaluator Output Artifacts](#evaluator-output-artifacts)
+  - [AgdaDojang Layout](#agdadojang-layout)
+- [Python-side Tooling](#python-side-tooling)
+  - [`dojang_try.py`](#dojang_trypy)
+  - [`agent_bridge.py`](#agent_bridgepy)
+  - [`eval_fixtures.py`](#eval_fixturespy)
+  - [`search.py`](#searchpy)
+  - [`policy_fixture.py`](#policy_fixturepy)
+- [Running AgdaDojang](#running-agdadojang)
+  - [With Nix (recommended)](#with-nix-recommended)
+  - [Demo Targets](#demo-targets)
+- [Proof-completion evaluator (Issue #85)](#proof-completion-evaluator-issue-85)
+  - [Run it](#run-it)
+  - [Output artifacts](#output-artifacts)
+- [Result schema (v0)](#result-schema-v0)
+  - [`results.jsonl` (per-candidate attempts)](#resultsjsonl-per-candidate-attempts)
+  - [`fixtures.jsonl` (per-fixture summaries)](#fixturesjsonl-per-fixture-summaries)
+  - [Compatibility promise](#compatibility-promise)
+- [Research Notes and Future Directions](#research-notes-and-future-directions)
+- [Appendix](#appendix)
+  - [Tutorial: TC monad, macros and Kleisli arrows (for a category theorist)](#tutorial-tc-monad-macros-and-kleisli-arrows-for-a-category-theorist)
+    - [What the `TC` monad *is*](#what-the-tc-monad-is)
+    - [What these macros *do*](#what-these-macros-do)
+  - [An Aside: `do` vs `>>=` (bind)](#an-aside-do-vs--bind)
+  - [Kleisli arrows: composition of effectful maps](#kleisli-arrows-composition-of-effectful-maps)
+  - [Why `do` and Kleisli composition are *the same*](#why-do-and-kleisli-composition-are-the-same)
+- [See Also](#see-also)
+
+<!-- markdown-toc end -->
+
+
 
 ---
 
@@ -37,29 +82,392 @@ AgdaDojang is not intended to compete with mature tactic languages; it is intend
 
 ---
 
-## Agda-side Components
+## Agda-side Components — Action Space Reference
 
-### TC Monad Macros
+AgdaDojang exposes a small, well-defined vocabulary of TC-monad macros that serve as
+the **action space** for AI agents.
 
-At the core of AgdaDojang is a collection of macros implemented in Agda's **TC monad**.
+Each macro is designed to be *deterministic*, *locally scoped*, and *easy to reason
+about in isolation*.
 
-These macros operate *inside* Agda's type theory and can
+Every action is checked by Agda's typechecker; there is no way to produce an unsound
+result.
 
-+  inspect the current goal,
-+  query the local context,
-+  attempt to construct or apply terms,
-+  report subgoals in a structured way.
+This section documents each macro with concrete before/after examples.  It is
+intended as the specification for `agda-mcp` tool schemas (Issue #10 [M1-2]).
 
-Key macros include:
+The interaction loop has three phases:
 
-+  `refine⟨_⟩` — insert a candidate term into the goal,
-+  `apply⟨_⟩` — apply a function or lemma and generate subgoals,
-+  `applyWith⟨_,_⟩` — apply with explicit arguments,
-+  `applyReport⟨_⟩` / `applySolveReport⟨_⟩` — apply while emitting structured goal reports,
-+  `reportGoalCtx` — emit a stable `(goal, context)` request block for external tools,
-+  `intro` — introduce a lambda when the goal is a function type.
+1. **Observe** — extract the goal type and local context from a hole.
+2. **Propose** — query a policy backend for candidate proof terms.
+3. **Validate** — substitute a candidate into the hole and typecheck.
 
-Each macro is designed to be *deterministic*, *locally scoped*, and *easy to reason about in isolation*.
+---
+
+### Phase 1: Observe — `reportGoalCtx`
+
+The primary observation action.  When injected into a hole, it causes Agda to emit a
+structured `(goal, context)` block on stderr, then abort (via `typeError`).  The
+bridge parses this block and forwards it to the policy backend.
+
+**Defined in**: `AgdaDojang.Debug`
+
+**Agda source (before)**:
+
+```agda
+module Fixture01 where
+
+open import Agda.Builtin.Unit
+open import Agda.Builtin.Equality
+open import AgdaDojang.Debug
+
+id : {A : Set} → A → A
+id x = {!!}                     -- ← hole to solve
+```
+
+**Injected source (bridge replaces `{!!}` with the reporting expression)**:
+
+```agda
+id x = reportGoalCtx ?          -- ← reporting macro + fresh hole
+```
+
+**Agda stderr output (abridged)**:
+
+```
+AGDADOJANG_REQ_BEGIN
+AGDADOJANG_GOAL: A
+AGDADOJANG_CTX_BEGIN
+AGDADOJANG_CTX:0:visible:x: A
+AGDADOJANG_CTX:1:hidden:A: Set₀
+AGDADOJANG_REQ_END
+```
+
+**Parsed result** (what `report_parser.extract_policy_request_from_output` returns):
+
+```json
+{
+  "goal": "A",
+  "context": [
+    {"index": 0, "visibility": "visible", "name": "x", "type": "A"},
+    {"index": 1, "visibility": "hidden",  "name": "A", "type": "Set₀"}
+  ]
+}
+```
+
+**Implementation note**.  `reportGoalCtx` normalizes the goal type and raises
+de Bruijn indices on context binder types before pretty-printing, so that `x : A`
+prints as `x : A` rather than `x : x` (a subtlety when the context contains dependent
+binders).
+
+---
+
+### Phase 2: Propose — policy request/response
+
+The bridge wraps the parsed observation into a versioned **policy request** and calls
+the policy backend as a subprocess.
+
+**Policy request** (`agda-native-air/policy-request@v0`):
+
+```json
+{
+  "schema": "agda-native-air/policy-request@v0",
+  "goal": "A",
+  "context": [
+    {"name": "x", "type": "A"},
+    {"name": "A", "type": "Set₀"}
+  ],
+  "module": "Fixture01",
+  "meta": {
+    "fixtureId": "Fixture01",
+    "holeIndex": 0
+  }
+}
+```
+
+**Policy response** (`agda-native-air/policy-response@v0`):
+
+```json
+{
+  "schema": "agda-native-air/policy-response@v0",
+  "candidates": [
+    {"term": "x", "score": 1.0, "meta": {"rule": "assumption"}},
+    {"term": "tt", "score": 0.3, "meta": {"rule": "tt-for-top"}}
+  ],
+  "meta": {
+    "policy": "fixture",
+    "deterministic": true
+  }
+}
+```
+
+The contract is defined in `policy_contract.py`.  Any backend that speaks this JSON
+contract can be swapped in (scripted heuristic, LLM, fine-tuned model, MCP tool,
+etc.) without changing the bridge.
+
+**CLI invocation**:
+
+```sh
+python3 python/tools/policy_fixture.py --in request.json --out - --k 5
+```
+
+---
+
+### Phase 3: Validate — fill-hole round-trip
+
+The bridge substitutes the top candidate into the hole and runs Agda to typecheck.
+
+**Before (hole present)**:
+
+```agda
+id : {A : Set} → A → A
+id x = {!!}
+```
+
+**After (candidate `x` substituted)**:
+
+```agda
+id : {A : Set} → A → A
+id x = x
+```
+
+**Agda typecheck result**: exit code 0 (success) → hole is marked solved.
+
+If the candidate fails to typecheck, the bridge tries the next candidate in rank
+order.  If all candidates are exhausted, the hole remains unsolved.
+
+---
+
+### Worked Example: full round-trip on `Fixture01`
+
+`Fixture01.agda` has three holes.
+
+```agda
+-- Hole 0: goal is A, context has x : A
+id : {A : Set} → A → A
+id x = {!!}
+
+-- Hole 1: goal is ⊤
+trivial : ⊤
+trivial = {!!}
+
+-- Hole 2: goal is x ≡ x
+reflExample : {A : Set} (x : A) → x ≡ x
+reflExample x = {!!}
+```
+
+The evaluator processes holes sequentially.
+
+| Hole | Goal    | Key context     | Policy rule  | Candidate | Result       |
+|------|---------|-----------------|--------------|-----------|--------------|
+| 0    | `A`     | `x : A`         | assumption   | `x`       | ✓ typechecks |
+| 1    | `⊤`     | (empty visible) | ⊤ → tt       | `tt`      | ✓ typechecks |
+| 2    | `x ≡ x` | `x : A`         | `_≡_` → refl | `refl`    | ✓ typechecks |
+
+
+**Final solved file** (written to `_build/eval-proof-completion/<run-id>/solved/Fixture01.agda`):
+
+```agda
+id : {A : Set} → A → A
+id x = x
+
+trivial : ⊤
+trivial = tt
+
+reflExample : {A : Set} (x : A) → x ≡ x
+reflExample x = refl
+```
+
+---
+
+### TC Monad Macros: detailed reference
+
+#### `refine⟨_⟩` — Direct Hole Filling
+
+**Defined in**: `AgdaDojang.Refine`
+
+Insert a candidate term into the goal.  If the candidate typechecks against the goal
+type, the hole is unified with the candidate.  Otherwise, Agda raises a type error.
+
+```agda
+-- Before:
+trivial : ⊤
+trivial = refine⟨ tt ⟩       -- ← candidate is tt
+
+-- After (if tt : ⊤ checks):  hole is solved with tt
+```
+
+**Semantics**: `inferType hole >>= checkType cand >>= unify hole cand`
+
+This is the macro that the bridge uses internally: it substitutes the candidate term
+directly in the source (no macro wrapper needed for the evaluator's validate step —
+it simply replaces `{!!}` with the candidate text).
+
+---
+
+#### `try⟨_⟩` — Non-Committing Probe
+
+**Defined in**: `AgdaDojang.Refine`
+
+Check whether a candidate *would* typecheck without actually solving the hole.
+Reports `AGDADOJANG_TRY:OK` or `AGDADOJANG_TRY:FAIL` via a `typeError` message.
+
+```agda
+-- In a hole:
+trivial : ⊤
+trivial = try⟨ tt ⟩
+
+-- Agda stderr will contain: AGDADOJANG_TRY:OK
+-- The hole is NOT solved — this is probe-only.
+```
+
+**Use case**: batch-testing multiple candidates without rewriting the source each time.
+
+---
+
+#### `apply⟨_⟩` — Function/Lemma Application
+
+**Defined in**: `AgdaDojang.Apply`
+
+Apply a named function or constructor to the current goal.  Agda infers as many
+arguments as possible; remaining arguments become subgoals (unsolved metas).
+
+```agda
+-- If the goal is `Nat` and we apply `suc`:
+example : Nat
+example = apply⟨ suc ⟩        -- solves the goal with `suc ?`, leaving `? : Nat`
+```
+
+**Semantics**: Builds `(def f [unknown, …, unknown])` from the `Π`-shape of `f`'s type,
+checks against the goal, and unifies.  Metas for unresolvable arguments remain as
+subgoals.
+
+---
+
+#### `applyReport⟨_⟩` — Report Subgoals Without Solving
+
+**Defined in**: `AgdaDojang.Apply`
+
+Like `apply⟨_⟩`, but instead of solving, it reports the subgoal types that would be
+generated.  Emits structured lines between `AGDADOJANG_SUBGOALS_BEGIN` / `END` markers.
+
+```agda
+example : Nat
+example = applyReport⟨ _+_ ⟩
+```
+
+**Agda stderr**:
+
+```
+AGDADOJANG_SUBGOALS_BEGIN
+AGDADOJANG_GOAL:0:visible: Nat
+AGDADOJANG_GOAL:1:visible: Nat
+AGDADOJANG_SUBGOALS_END
+```
+
+**Use case**: previewing what subgoals a tactic would generate before committing.
+
+---
+
+#### `applySolveReport⟨_⟩` — Apply Then Report Remaining Obligations
+
+**Defined in**: `AgdaDojang.Apply`
+
+Apply `f`, let Agda unify, then report the *instantiated* types of remaining unsolved
+meta-arguments.
+
+```agda
+-- If goal is `3 + ?₁ ≡ 5`:
+example = applySolveReport⟨ refl ⟩
+-- Reports the post-unification obligations (e.g., ?₁ = 2)
+```
+
+---
+
+#### `applyWith⟨_,_⟩` / `applyWith1⟨_,_⟩` — Apply with Explicit Arguments
+
+**Defined in**: `AgdaDojang.Apply`
+
+Supply explicit arguments to the first visible binders of `f`; hidden/instance
+binders are left as metas.
+
+```agda
+example = applyWith1⟨ _+_ , (lit (nat 3)) ⟩   -- applies _+_ with first visible arg = 3
+```
+
+---
+
+#### `intro` / `intro₂` / `intros⟨_⟩` — Lambda Introduction
+
+**Defined in**: `AgdaDojang.Apply`
+
+If the goal is a `Π`/`→` type, introduce one (or more) lambda abstractions and leave
+the codomain as the new goal.
+
+```agda
+-- Before:
+foo : {A : Set} → A → A
+foo = {!!}                     -- goal: {A : Set} → A → A
+
+-- After `intro`:
+foo = λ x → {!!}              -- goal: A   (with x : A in context)
+```
+
+`intro₂` introduces exactly two lambdas; `intros⟨ n ⟩` introduces `n` lambdas in one shot.
+
+---
+
+#### `showGoalType` / `showTypeNFvsWHNF` — Debugging Helpers
+
+**Defined in**: `AgdaDojang.Debug`
+
+Inspect the goal type (raw, WHNF, and fully normalised forms).  Useful for debugging
+but not part of the automated loop.
+
+```agda
+example : ⊤
+example = showGoalType          -- stderr: "GOAL TYPE: ⊤"
+```
+
+---
+
+### How These Map to `agda-mcp` Tools
+
+The macros above correspond to the planned `agda-mcp` tool surface as follows:
+
+| `agda-mcp` tool             | Underlying macro / action                            | Phase            |
+|-----------------------------|------------------------------------------------------|------------------|
+| `get-goal`                  | `reportGoalCtx`                                      | Observe          |
+| `fill-hole`                 | direct substitution + Agda typecheck (≈ `refine⟨_⟩`) | Validate         |
+| `check-file`                | `agda <file>` (full typecheck)                       | Validate         |
+| `get-diagnostics`           | parse Agda stderr for errors/warnings                | Observe          |
+| `apply-tactic` (future)     | `apply⟨_⟩`, `intro`, `intros⟨_⟩`                     | Propose+Validate |
+| `preview-subgoals` (future) | `applyReport⟨_⟩`                                     | Observe          |
+
+The first four tools constitute the v0 tool surface for M1-2.  The remaining two are
+candidates for v1 once the basic loop is stable.
+
+---
+
+### Evaluator Output Artifacts
+
+Running `make eval-proof-completion` produces the following in
+`agda-dojang/_build/eval-proof-completion/<run-id>/`:
+
+```
+<run-id>/
+├── fixtures.jsonl              # one row per fixture (summary)
+├── results.jsonl               # one row per candidate attempt (detail)
+├── logs/
+│   └── <FixtureId>/
+│       └── hole-<N>/
+│           ├── policy_request.json    # exact request sent to policy
+│           ├── policy_response.json   # exact response from policy
+│           └── cand-01.txt            # Agda output for candidate #1
+└── solved/
+    └── <FixtureId>.agda        # hole-free file (only if fully solved)
+```
+
+See the "Result schema (v0)" section below for the JSONL field definitions.
 
 ---
 
@@ -131,7 +539,7 @@ This is a tiny deterministic **integration bridge**:
 +  call a policy backend (local process) to get top-k candidates,
 +  try candidates in Agda and patch the first that typechecks.
 
-This is the v0 deliverable for “policy ↔ AgdaDojang integration” (Issue #23).
+This is the v0 deliverable for "policy ↔ AgdaDojang integration" (Issue #23).
 
 ### `eval_fixtures.py`
 
@@ -164,19 +572,6 @@ safe heuristics:
 
 ---
 
-## Typical Workflow
-
-A typical AgdaDojang session looks like this.
-
-1.  Start from a goal (an Agda hole),
-2.  Propose an action (e.g. `intro`, `apply⟨lemma⟩`),
-3.  Let Agda check the result,
-4.  Observe new goals or failure reports,
-5.  Repeat until the proof is complete or abandoned.
-
-Every step is validated by Agda.
-
----
 
 ## Running AgdaDojang
 
@@ -209,7 +604,7 @@ These demos serve as executable documentation.
 
 ## Proof-completion evaluator (Issue #85)
 
-AgdaDojang includes a deterministic **Agda-check evaluator** for “proof completion” fixtures.
+AgdaDojang includes a deterministic **Agda-check evaluator** for "proof completion" fixtures.
 It runs a small **propose → check** loop:
 
 1. For each `{!!}` hole in a fixture module, inject a reporting macro (e.g. `reportGoalCtx`)
@@ -221,8 +616,6 @@ It runs a small **propose → check** loop:
 
 
 ### Run it
-
-From `agda-dojang/`:
 
 ```bash
 make eval-proof-completion
@@ -240,7 +633,7 @@ The Make target uses `run-id = latest` and cleans it each run.
 
 Key outputs:
 
-+ `results.jsonl` — **one JSON object per candidate attempt** (the main “score log”)
++ `results.jsonl` — **one JSON object per candidate attempt** (the main "score log")
 + `fixtures.jsonl` — **one JSON object per fixture module** (summary rows)
 + `logs/` — captured Agda output per hole/candidate
 + `solved/` — fully solved fixture modules (canonical filenames), only when strict check passes
