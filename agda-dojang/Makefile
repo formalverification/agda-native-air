@@ -83,9 +83,6 @@ AGDAI_FIND_PATH := $(AGDA_DIR)
 # Nice clean tree: hide transient/build stuff
 TREE_IGNORE := '_build|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache'
 
-ROWS_IN  := $(REPO_ROOT)/data/tasks.jsonl
-ROWS_OUT := $(REPO_ROOT)/data/rows.jsonl
-
 .PHONY: help check demo demo1 demo2 extract transform solve test \
         eval-proof-completion demo-proof-completion eval-proof-completion-smoke demo-agent-bridge \
         probe-all clean clean-scratch clean-pycache clean-agda clean-build clean-data \
@@ -132,7 +129,7 @@ help:
 PROBE_JOBS ?= 1
 PROBE_TARGETS := check peek-extract test-python-unittest test-python \
                  eval-proof-completion eval-proof-completion-smoke demo-agent-bridge \
-                 extract demo demo1 demo2 rows help tree transform solve test
+                 extract demo demo1 demo2 help tree transform solve test
 
 LOG_DIR := probe-logs
 probe-all:
@@ -172,7 +169,7 @@ demo2:
 
 # 2) The agent bridge is a sanity check for the whole loop (Agda → Python agent → Agda)
 #    on a fixed example before we add any model.
-FIXTURE_DIR := $(REPO_ROOT)/data/agda
+FIXTURE_DIR := $(REPO_ROOT)/agda-dojang/data/fixtures
 FIXTURE_IN  := $(FIXTURE_DIR)/FixtureHoles.agda
 FIXTURE_OUT := $(abspath _build/FixtureHoles.agda)
 #
@@ -337,22 +334,6 @@ tree:
 	      }'; \
 	fi
 
-# 7) Generate baseline rows from a tiny seed tasks.jsonl (if missing)
-rows:
-	@command -v $(PYTHON) >/dev/null || { echo "Python not found"; exit 1; }
-	@if [ ! -f "$(ROWS_IN)" ]; then \
-	  echo 'Creating a tiny seed tasks.jsonl...'; \
-	  mkdir -p $(DATA_DIR); \
-	  printf '{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "candidate":"suc zero"}\n' > $(ROWS_IN); \
-	  printf '{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "tactic":"applyReport:_+_"}\n' >> $(ROWS_IN); \
-	  printf '{"imports":["open import Agda.Builtin.Nat","open import Agda.Builtin.Bool"], "goal":"Nat", "candidate":"true"}\n' >> $(ROWS_IN); \
-	fi
-	$(PYTHON) $(PYTHON_TOOLS)/prompt_baseline.py \
-	  $(ROWS_IN) $(ROWS_OUT) \
-	  --agda-flags "$(AGDA_FLAGS)"
-	@echo "✅ Wrote $(ROWS_OUT)"
-
-
 ## test-python: Run Python unittests with friendly output.
 test-python-unittest:
 	PYTHONPATH=python python3 python/utils/run_unittests.py
@@ -390,3 +371,24 @@ wipe: clean
 	@if [ -f "$(TRAIN_JSONL)"  ]; then rm -f "$(TRAIN_JSONL)";  fi
 	@if [ -f "$(SOLVE_JSONL)"  ]; then rm -f "$(SOLVE_JSONL)";  fi
 	@echo "🧹 wipe complete"
+
+
+###########################################################################
+# Legacy definitions and targets
+# ROWS_IN  := $(REPO_ROOT)/data/tasks.jsonl
+# ROWS_OUT := $(REPO_ROOT)/data/rows.jsonl
+#
+# # 7) Generate baseline rows from a tiny seed tasks.jsonl (if missing)
+# rows:
+# 	@command -v $(PYTHON) >/dev/null || { echo "Python not found"; exit 1; }
+# 	@if [ ! -f "$(ROWS_IN)" ]; then \
+# 	  echo 'Creating a tiny seed tasks.jsonl...'; \
+# 	  mkdir -p $(DATA_DIR); \
+# 	  printf '{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "candidate":"suc zero"}\n' > $(ROWS_IN); \
+# 	  printf '{"imports":["open import Agda.Builtin.Nat"], "goal":"Nat", "tactic":"applyReport:_+_"}\n' >> $(ROWS_IN); \
+# 	  printf '{"imports":["open import Agda.Builtin.Nat","open import Agda.Builtin.Bool"], "goal":"Nat", "candidate":"true"}\n' >> $(ROWS_IN); \
+# 	fi
+# 	$(PYTHON) $(PYTHON_TOOLS)/prompt_baseline.py \
+# 	  $(ROWS_IN) $(ROWS_OUT) \
+# 	  --agda-flags "$(AGDA_FLAGS)"
+# 	@echo "✅ Wrote $(ROWS_OUT)"
