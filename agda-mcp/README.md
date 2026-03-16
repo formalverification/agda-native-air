@@ -57,7 +57,7 @@ These are the minimum viable tools for an agent to do interactive proof developm
 |------|-------------|
 | `get-goal`         | Given a file path and hole identifier, return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query. |
 | `fill-hole`        | Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location). |
-| `check-file`       | Load or reload an Agda file and return all diagnostics — errors, warnings, unsolved meats, and remaining holes. |
+| `check-file`       | Load or reload an Agda file and return all diagnostics — errors, warnings, unsolved metas, and remaining holes. |
 | `get-diagnostics`  | Retrieve the current diagnostic state without reloading: error count, warning count, list of open holes with their types. |
 
 
@@ -91,7 +91,7 @@ These are lower priority and may be added as the system matures.
 ## Language Choice: Haskell
 
 `agda-mcp` will be implemented in **Haskell**.   Our rationale for this choice was
-based on a number of factor, including the following considerations.
+based on a number of factors, including the following considerations.
 
 1.  **Zero-cost Agda integration**.  Agda is implemented in Haskell and can be used
     as a library.  A Haskell MCP server can call AgdaDojang's Haskell API directly —
@@ -107,7 +107,7 @@ based on a number of factor, including the following considerations.
 
 4.  **MCP SDK availability**.  There are now Haskell MCP libraries on Hackage
     ([`mcp`][hackage-mcp], [`mcp-server`][hackage-mcp-server]) supporting the
-    MCP 2025-06-18 specification with stdio and HTTP transports.  We are not
+    MCP 2025-11-25 specification with stdio and HTTP transports.  We are not
     starting from scratch.
 
 5.  **Type safety.**  Haskell's type system provides compile-time guarantees that
