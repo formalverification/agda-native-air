@@ -1,0 +1,53 @@
+-- File: agda-native-air/agda-mcp/agda-mcp.cabal
+--
+-- Cabal package definition for the agda-mcp MCP server.
+--
+-- STATUS: Stub only.  No buildable code yet.  This file exists to
+-- establish the package identity, reserve the name in the build system,
+-- and document the planned dependency structure.  Implementation begins
+-- in Milestone 1 (Issue M1-2).
+
+cabal-version: 3.0
+name:          agda-mcp
+version:       0.0.0
+synopsis:      MCP server for AI-assisted Agda proof development
+description:
+  An MCP (Model Context Protocol) server that wraps AgdaDojang to expose
+  Agda's proof engine to frontier coding agents (Claude Code, Codex CLI,
+  Cursor, etc.).  See README.md for the planned tool surface and design.
+license:       Apache-2.0
+license-file:  ../LICENSE
+author:        William DeMeo
+maintainer:    williamdemeo@gmail.com
+category:      Development, Formal Methods
+build-type:    Simple
+
+-- NOTE: The executable and library sections below are commented out until
+-- implementation begins.  They document the planned structure.
+
+-- library
+--   hs-source-dirs: src
+--   exposed-modules:
+--     AgdaMcp.Server
+--     AgdaMcp.Tools.ProofState
+--     AgdaMcp.Tools.Search
+--     AgdaMcp.Types
+--   build-depends:
+--     base         >= 4.18 && < 5
+--   , aeson        >= 2.1
+--   , bytestring
+--   , text
+--   -- MCP library (choose one during M1-2):
+--   -- , mcp-server
+--   -- , mcp
+--   -- AgdaDojang (once it exposes a Haskell library interface):
+--   -- , agda-dojang
+--   default-language: GHC2021
+
+-- executable agda-mcp
+--   hs-source-dirs: src
+--   main-is:        AgdaMcp/Main.hs
+--   build-depends:
+--     base         >= 4.18 && < 5
+--   , agda-mcp
+--   default-language: GHC2021
