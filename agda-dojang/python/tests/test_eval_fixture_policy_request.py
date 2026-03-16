@@ -32,7 +32,7 @@ def test_policy_request_for_boolean_algebra_deMorgan1(tmp_path: Path):
 
     repo = Path(__file__).resolve().parents[3]          # adjust if your layout differs
     agda_jang = repo / "agda-dojang"
-    fixture = repo / "data" / "agda" / "FixtureStdlibBooleanAlgebra.agda"
+    fixture = repo / "agda-dojang" / "data" / "fixtures" / "FixtureStdlibBooleanAlgebra.agda"
 
     out_dir = tmp_path / "eval-out"
     run_id = "t"
@@ -51,7 +51,7 @@ def test_policy_request_for_boolean_algebra_deMorgan1(tmp_path: Path):
             "--k 5",
             "--timeout 20",
             '--agda-bin "agda"',
-            '--agda-flags "-i agda --library-file=agda/libraries -l agda-dojang -i ../data/agda"',
+            '--agda-flags "-i agda --library-file=agda/libraries -l agda-dojang -i data/fixtures"',
             '--report-expr "reportGoalCtx"',
         ])
     ]

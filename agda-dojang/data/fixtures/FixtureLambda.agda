@@ -1,6 +1,6 @@
 -- FixtureLambda.agda
 --
--- File: data/agda/FixtureLambda.agda
+-- File: agda-dojang/data/fixtures/FixtureLambda.agda
 --
 module FixtureLambda where
 

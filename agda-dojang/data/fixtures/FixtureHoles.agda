@@ -1,6 +1,6 @@
 -- FixtureHoles.agda
 --
--- File: data/agda/FixtureHoles.agda
+-- File: agda-dojang/data/fixtures/FixtureHoles.agda
 --
 -- Description:
 --   This module contains some simple examples of holes that we can use to test

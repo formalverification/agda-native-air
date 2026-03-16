@@ -1,6 +1,6 @@
 -- FixtureWhere.agda
 --
--- File: data/agda/FixtureWhere.agda
+-- File: agda-dojang/data/fixtures/FixtureWhere.agda
 --
 
 module FixtureWhere where

@@ -229,7 +229,7 @@ make eval-proof-completion
 ```
 
 This uses the scripted fixture policy backend (`python/tools/policy_fixture.py`) and runs
-over the committed fixtures (default glob: `../data/agda/Fixture*.agda`).
+over the committed fixtures (default glob: `data/fixtures/Fixture*.agda`).
 
 
 ### Output artifacts

@@ -316,11 +316,11 @@ command line, as follows:
 
 ```sh
 make eval-proof-completion \
-  EVAL_FIXTURES="../data/agda/Fixture01.agda" \
+  EVAL_FIXTURES="agda-dojang/data/fixtures/Fixture01.agda" \
   EVAL_MAX_HOLES=2 \
   EVAL_K=3 \
   EVAL_TIMEOUT=15 \
-  EVAL_POLICY="python3 python/tools/policy_fixture.py" \
+  EVAL_POLICY="python3 agda-dojang/python/tools/policy_fixture.py" \
   EVAL_RUN_ID=my-run
 ```
 

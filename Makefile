@@ -312,7 +312,9 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  train-jsonl train-jsonl-sample train-jsonl-head \
                  dataset-stats dataset-stats-sample premise-eval-quick-sample premise-eval premise-eval-quick \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
-                 extract-algebras-legacy extract-lib-old clean wipe tree probe-all
+                 extract-algebras-legacy extract-lib-old clean wipe tree probe-all \
+                 eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge \
+                 test-agda-dojang test-agda-dojang-integration
 
 .PHONY: $(PHONY_TARGETS)
 
@@ -1332,7 +1334,6 @@ smoke-sample:
 # -----------------------------------------------------------------------------
 # 2.10. Proof Completion
 #
-.PHONY: eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge
 #
 eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge:
 	$(MAKE) -C agda-dojang $@
@@ -1358,16 +1359,45 @@ test-ml-pipeline: $(VENV_DEPS)
 endif
 
 test-agda-dojang:
-	@if ! command -v agda >/dev/null 2>&1; then \
-	  echo "⚠️  Agda not found on PATH; skipping AgdaDojang tests."; \
-	else \
-	  if [ -d "$(AGDA_DOJANG)" ]; then \
-	    echo ">> [test-agda-dojang] make -C $(AGDA_DOJANG) check"; \
-	    $(MAKE) -C $(AGDA_DOJANG) check; \
-	  else \
-	    echo "⚠️  AgdaDojang directory $(AGDA_DOJANG) not found; skipping."; \
-	  fi; \
+	@if [ ! -d "$(AGDA_DOJANG)" ]; then \
+	  echo "⚠️  AgdaDojang directory $(AGDA_DOJANG) not found; skipping."; \
+	  exit 0; \
 	fi
+	@echo "── [test-agda-dojang] Pure Python unit tests (no Agda required) ──"
+	cd $(AGDA_DOJANG) && PYTHONPATH=python $(PY) -m pytest -q \
+	  python/tests/test_rendering.py \
+	  python/tests/test_parse_request.py \
+	  python/tests/test_policy_contract.py \
+	  python/tests/test_report_parser.py
+	@if command -v agda >/dev/null 2>&1; then \
+	  echo "── [test-agda-dojang] Agda typecheck (AgdaDojang macros) ──"; \
+	  $(MAKE) -C $(AGDA_DOJANG) check; \
+	  echo "✅ Agda typecheck passed."; \
+	else \
+	  echo "⚠️  Agda not found on PATH; skipping macro typecheck."; \
+	fi
+
+
+test-agda-dojang-integration:
+	@if [ ! -d "$(AGDA_DOJANG)" ]; then \
+	  echo "⚠️  AgdaDojang directory $(AGDA_DOJANG) not found; skipping."; \
+	  exit 0; \
+	fi
+	@if ! command -v agda >/dev/null 2>&1; then \
+	  echo "⚠️  Agda not found on PATH; skipping AgdaDojang integration tests."; \
+	  exit 0; \
+	fi
+	@echo "── [test-agda-dojang-integration] Python integration tests (requires Agda) ──"
+	cd $(AGDA_DOJANG) && PYTHONPATH=python $(PY) -m pytest -q \
+	  python/tests/test_agent_bridge.py \
+	  python/tests/test_eval_fixture_policy_request.py \
+	  python/tests/test_policy_fixture.py
+	@echo "✅ AgdaDojang integration tests passed."
+
+
+test-agda-dojang-all: test-agda-dojang test-agda-dojang-integration
+	@echo "✅ All AgdaDojang tests passed."
+
 
 test-all: test-strux-driver test-ml-pipeline test-agda-dojang backend-test
 	@echo "✅ test-all completed."

@@ -1,6 +1,6 @@
 -- Fixture01.agda
 --
--- File: data/agda/Fixture01.agda
+-- File: agda-dojang/data/fixtures/Fixture01.agda
 --
 -- Description:
 --   Tiny fixture for deterministic Agda-check evaluation.  Intended to be solved by

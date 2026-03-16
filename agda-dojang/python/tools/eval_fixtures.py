@@ -795,7 +795,7 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
         "--fixtures",
         action="append",
         default=None,
-        help="Repeatable file/glob spec. If omitted, defaults to ../data/agda/Fixture*.agda",
+        help="Repeatable file/glob spec. If omitted, defaults to data/fixtures/Fixture*.agda",
     )
     ap.add_argument("--out-dir", default="_build/eval-proof-completion", help="Output root directory.")
     ap.add_argument("--run-id", default="latest", help="Subdirectory under out-dir (deterministic).")
@@ -836,7 +836,7 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
         raise SystemExit("ERROR: --policy parsed to empty argv.")
 
     cwd = Path(args.cwd).resolve() if args.cwd else None
-    fixture_specs = args.fixtures if (args.fixtures is not None) else ["../data/agda/Fixture*.agda"]
+    fixture_specs = args.fixtures if (args.fixtures is not None) else ["data/fixtures/Fixture*.agda"]
     fixtures = _discover_fixtures(fixture_specs)
 
     # XFAIL ids:

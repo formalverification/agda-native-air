@@ -1,6 +1,6 @@
 -- Fixture03.agda
 --
--- File: data/agda/Fixture03.agda
+-- File: agda-dojang/data/fixtures/Fixture03.agda
 --
 module Fixture03 where
 
