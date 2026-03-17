@@ -4,10 +4,11 @@
 
 This is the "copy/paste runnable" guide to running **agda-native-air** end-to-end.
 
-Companion docs:
-- `MANIFESTO.md` — vision
-- `PLAN.md` — roadmap + milestones
-- `docs/representation.md` — data contracts / schemas
+**Companion docs**.  
++ [`MANIFESTO.md`](MANIFESTO.md) — vision
++ [`PLAN.md`](PLAN.md) — roadmap + milestones
++ [`representation.md`](representation.md) — data contracts / schemas
++ [`architecture.md`](architecture.md) — system architecture overview
 
 ---
 
@@ -630,13 +631,107 @@ because env tokens can shadow your stored auth.
 
 ---
 
-## 13) Cleaning
+
+## 13) agda-mcp — AI-assisted proof development 
+
+`agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
+Cursor, etc.) interact with Agda through standard tool calls.
+
+This section walks you through building, testing, running, and connecting an agent.
+
+### 13.1 Build & Test
+
+From inside a Nix shell (e.g., `nix develop` at the cli in the main directory),
 
 ```sh
-make clean   # remove a few generated files
-make wipe    # remove generated artifacts (features/models/etc.)
-make tree    # repo tree, excluding build dirs
+# build
+cd agda-mcp
+cabal build
 ```
+```sh
+# test
+cd agda-mcp
+cabal test
+```
+
+Currently only pure tests (marker parsing, hole finding) are included.
+Integration tests calling Agda are planned and will require `nix develop`.
+
+
+### 13.2 Run the server manually
+
+You can start `agda-mcp` and send it JSON-RPC requests on stdin to verify
+everything is wired up.
+
+From the repo root, inside the Nix shell,
+
+```sh
+cabal run agda-mcp -- \
+  --agda-flags "-i agda-dojang/agda \
+    --library-file=agda-dojang/agda/libraries \
+    -l agda-dojang -l standard-library"
+```
+
+The server prints a startup banner to stderr and waits for input.  Paste a JSON-RPC
+request (one per line) to stdin, as follows:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}
+```
+
+You should get back a JSON response with `protocolVersion` and `serverInfo`.
+
+Press Ctrl-C to stop the server.
+
+For a pre-built sequence of test requests, see `agda-mcp/test/resources/mcp-test-input.jsonl`.
+
+
+### 13.3 Connect Claude Code
+
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is a CLI coding agent
+that can connect to `agda-mcp`, giving you an interactive AI assistant that can
+inspect goals, fill holes, and check Agda files through natural language.
+
+1.  **Install Claude Code** (requires Node.js 18+).
+
+    ```sh
+    npm install -g @anthropic-ai/claude-code
+    ```
+
+2.  **Navigate to the repo root** (`cd agda-native-air`).  The `.mcp.json`
+    file there configures the agda MCP server connection.
+
+3.  **Run `claude`**.  Claude Code will detect `.mcp.json` and start the
+    agda MCP server.  You may need to approve the connection when prompted.
+
+4.  **Try a proof-state query**.  Once connected, ask Claude Code something
+    like
+
+    > *"Use the get_goal tool on agda-dojang/data/fixtures/Fixture01.agda hole 0"*
+
+
+### 13.4 Connect other MCP clients
+
+Any MCP-compatible agent can connect to `agda-mcp`.  The general pattern is to
+configure the agent to start `cabal run agda-mcp -- --agda-flags "..."` as a
+subprocess with the repo root as working directory.
+
+See [`agda-mcp/README.md` § Configuring MCP Clients](../agda-mcp/README.md#configuring-mcp-clients)
+for JSON configuration examples for Claude Desktop, Cursor, and Codex CLI.
+
+### 13.5 Troubleshooting
+
+**Server won't start / "agda not found"**.  Make sure you are inside `nix develop`
+(or `nix develop .#backend`).  The Nix shell provides the pinned `agda` binary.
+
+**"ModuleNameDoesntMatchFileName" errors**.  The `--agda-flags` must include
+`-i agda-dojang/agda` so that Agda can find the AgdaDojang macros.  Double-check the
+flags match the example above.
+
+**Claude Code doesn't see the MCP server**.  Verify that `.mcp.json` exists in the
+repo root and that the `cwd` field (if present) points to the correct absolute path.
+Run `claude` from the repo root directory.
+
 
 ---
 
@@ -671,3 +766,13 @@ nix develop .#all
 make train-retrieval-smoke
 make eval-proof-completion-smoke-retrieval
 ```
+---
+
+## 15) Cleaning
+
+```sh
+make clean   # remove a few generated files
+make wipe    # remove generated artifacts (features/models/etc.)
+make tree    # repo tree, excluding build dirs
+```
+
