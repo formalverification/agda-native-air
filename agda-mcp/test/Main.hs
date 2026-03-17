@@ -19,13 +19,11 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
-import System.Process (readProcessWithExitCode)
 import Control.Exception (catch, SomeException)
 
 import AgdaMCP.Agda
-  ( HoleSpan (..), findHoles, findNthHole
-  , injectReportExpr, substituteHole, parseGoalContext
-  , defaultConfig
+  ( findHoles , findNthHole , injectReportExpr , substituteHole
+  , parseGoalContext , defaultConfig
   )
 import AgdaMCP.Types (CtxEntry (..))
 
@@ -115,7 +113,6 @@ pureTests = do
         case substituteHole 0 "x" fixture01 of
           Nothing -> pure (Fail "substituteHole returned Nothing")
           Just patched -> do
-            let noHoleAtOrig = not ("{!!}" `T.isPrefixOf` T.drop 6 patched)
             assert "should contain 'x' in place of hole"
               ("id x = x" `T.isInfixOf` patched)
 
@@ -141,6 +138,7 @@ pureTests = do
                 case r2 of
                   Fail m -> pure (Fail m)
                   Pass ->
+                    -- TODO: don't use `head` on possible empty list
                     assertEqual "ctx[0].name" "x" (ctxName (head ctx))
 
     , runTest "parseGoalContext: multiline goal" $ do

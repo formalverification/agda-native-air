@@ -2,63 +2,83 @@
 
 # agda-mcp
 
-> **Status: not yet implemented.**  This directory is a stub created during
-> Milestone 0 to give the MCP server a home and document its planned design.
-> Implementation begins in Milestone 1 ([M1-2]).
+> **Status: v0 implementation (M1-2).** Four core proof-state tools over stdio transport.
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
 [AgdaDojang]'s proof-state interaction to any MCP-compatible coding agent —
 Claude Code, Codex CLI, Cursor, or any other tool that speaks MCP.
-
-It is the **bridge layer** in the agda-native-air architecture:
 
 ```
   ┌──────────────────────────────────┐
   │  Frontier AI Agent               │
   │  (Claude Code / Codex CLI / ...) │
   └────────────┬─────────────────────┘
+               │
                │  MCP (JSON-RPC over stdio)
                ▼
   ┌──────────────────────────────────┐
   │  agda-mcp                        │  ◄── this component
   │  Haskell MCP server              │
   └────────────┬─────────────────────┘
-               │  Haskell library calls
-               ▼
-  ┌──────────────────────────────────┐
-  │  agda-dojang                     │
-  │  Agda interaction layer          │
-  └────────────┬─────────────────────┘
-               │  Agda as a library
+               │
+               │  subprocess calls
                ▼
   ┌──────────────────────────────────┐
   │  Agda type-checker               │
+  │  (agda binary + AgdaDojang       │
+  │   macros on the library path)    │
   └──────────────────────────────────┘
 ```
 
-The design principle is **thinness**: `agda-mcp` translates MCP tool calls into
-AgdaDojang operations and formats the responses.  It does not contain proof-search
-logic, heuristics, or strategy — those belong to the agent.
+`agda-mcp` translates MCP tool calls into AgdaDojang operations and formats the
+responses.  It does not contain proof-search logic, heuristics, or strategy — those
+belong to the agent.
 
 
 ---
 
 
-## Planned Tool Surface
+## Quick Start
+
+### Build
+
+```sh
+nix develop .#backend   # or .#all for the full environment
+cd agda-mcp
+cabal build
+```
+### Run
+
+```sh
+cabal run agda-mcp -- \
+  --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+```
+
+The server reads JSON-RPC from stdin and writes to stdout.  It will wait for an MCP client to connect.
+
+### Test
+
+```sh
+cabal test
+```
+Pure tests (marker parsing, hole finding) run without Agda.  Integration tests that call Agda require `nix develop`.
+
+
+---
+## Tool Surface (v0)
 
 The tools are organized in three groups, corresponding to implementation phases.
 
-
 ### Core proof-state tools (Milestone 1 — [M1-2])
 
-These are the minimum viable tools for an agent to do interactive proof development.
+This is the minimum tooling required for an agent to do interactive proof development.
 
 | Tool | Description |
 |------|-------------|
-| `get-goal`         | Given a file path and hole identifier, return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query. |
-| `fill-hole`        | Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location). |
-| `check-file`       | Load or reload an Agda file and return all diagnostics — errors, warnings, unsolved metas, and remaining holes. |
-| `get-diagnostics`  | Retrieve the current diagnostic state without reloading: error count, warning count, list of open holes with their types. |
+| `get_goal`         | Inspect the goal type and local context at a hole. |
+| `fill_hole`        | Substitute a candidate term into a hole and typecheck. |
+| `check_file`       | Load/reload an Agda file and return all diagnostics. |
+| `get_diagnostics`  | Lightweight summary: error/warning counts, open holes. |
 
 
 ### Search and retrieval tools (Milestone 1 — [M1-3])
@@ -87,6 +107,111 @@ These are lower priority and may be added as the system matures.
 
 ---
 
+## What we've implemented so far
+
+### Core proof-state tools (Milestone 1 — [M1-2])
+
+#### `get_goal`
+
+Given a file path and hole identifier, return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query.
+
+**Input**.  
+```json
+{
+  "filePath": "/path/to/Fixture01.agda",
+  "holeIndex": 0
+}
+```
+
+**Output**.  
+```json
+{
+  "goal": "A",
+  "context": [
+    {"name": "x", "type": "A", "visibility": "visible", "index": 0},
+    {"name": "A", "type": "Set₀", "visibility": "hidden", "index": 1}
+  ],
+  "module": "Fixture01.agda"
+}
+```
+
+**How it works**.  Injects the `reportGoalCtx` macro into the hole, runs Agda, and parses the `AGDADOJANG_REQ_BEGIN/END` marker block from stderr.
+
+
+#### `fill_hole`
+
+Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location).
+
+**Input**.  
+```json
+{
+  "filePath": "/path/to/Fixture01.agda",
+  "holeIndex": 0,
+  "candidate": "x"
+}
+```
+**Output (success)**.  
+```json
+{
+  "status": "ok",
+  "candidate": "x",
+  "newHoles": 1
+}
+```
+
+**Output (failure)**.  
+```json
+{
+  "status": "type_error",
+  "candidate": "tt",
+  "message": "A !=< ⊤ when checking that the expression tt has type A"
+}
+```
+
+#### `check_file`
+
+Load or reload an Agda file and return all diagnostics — errors, warnings, unsolved metas, and remaining holes.
+
+**Input**.  
+```json
+{
+  "filePath": "/path/to/Fixture01.agda"
+}
+```
+
+**Output**.  
+```json
+{
+  "success": false,
+  "diagnostics": [
+    {"severity": "error", "message": "...", "line": 7}
+  ],
+  "holesCount": 3
+}
+```
+
+#### `get_diagnostics`
+
+Retrieve the current diagnostic state without reloading: error count, warning count, list of open holes with their types.
+
+**Input**.  
+```json
+{
+  "filePath": "/path/to/Fixture01.agda"
+}
+```
+
+**Output**.  
+```json
+{
+  "filePath": "/path/to/Fixture01.agda",
+  "errors": 0,
+  "warnings": 1,
+  "holes": [{"goal": "?", "context": []}]
+}
+ ```
+
+---
 
 ## Language Choice: Haskell
 
@@ -129,7 +254,6 @@ implementation — the protocol is simple enough that this is feasible.
 
 ---
 
-
 ## Transport
 
 The initial implementation will use **stdio** transport (JSON-RPC over stdin/stdout).
@@ -141,7 +265,6 @@ not planned for Milestone 1.
 
 
 ---
-
 
 ## Interaction Model
 
@@ -213,6 +336,126 @@ agda-mcp/
 
 
 ---
+
+## Installing Claude Code
+
+Claude Code is a CLI tool, which is set it up as follows:
+
+1.  Install Claude Code (requires Node.js 18+)
+
+    ```sh
+    npm install -g @anthropic-ai/claude-code
+    ```
+
+2.  Navigate to the repo root; e.g., `cd agda-native-air`, or wherever you cloned it.
+    (That's where the `.mcp.json` file lives.)
+
+3.  Start Claude Code by entering `claude`.
+
+    Claude Code will detect .mcp.json and attempt to start the agda MCP server.
+
+    You may need to approve the MCP server connection when prompted.
+
+4.  Once connected, you can ask Claude Code things like:
+    "Use the get_goal tool on agda-dojang/data/fixtures/Fixture01.agda hole 0"
+```
+
+---
+
+
+## Example Tests
+
+``` sh
+cabal run agda-mcp -- \
+  --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library" \
+  < test/resources/mcp-test-input.jsonl
+```
+
+
+
+
+## Configuring MCP Clients
+
+### Claude Code / Claude Desktop
+
+Add to your MCP configuration (`claude_desktop_config.json` or project `.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "agda": {
+      "command": "cabal",
+      "args": [
+        "run", "-v0", "agda-mcp", "--",
+        "--agda-flags", "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+      ],
+      "cwd": "/path/to/agda-native-air"
+    }
+  }
+}
+```
+
+### Cursor / Codex CLI
+
+Similar configuration — point the MCP client at the `agda-mcp` binary with the appropriate `--agda-flags`.
+
+---
+
+## Architecture Notes
+
+### v0: Subprocess-based
+
+The v0 implementation calls the `agda` binary as a subprocess for each
+tool invocation.  This mirrors how `agda-dojang`'s Python tooling
+(`agent_bridge.py`) works and reuses the established marker protocol
+(`AGDADOJANG_REQ_BEGIN/END`).
+
+**Advantages:** simple, decoupled from Agda's GHC version, reuses all
+existing AgdaDojang macros without modification.
+
+**Limitations:** each tool call spawns a new Agda process (cold
+typechecking, no persistent state).  This is acceptable for the v0 demo
+and benchmark fixtures, but will need optimization for larger files.
+
+### Future: Agda-as-a-library
+
+The long-term plan is to use Agda as a Haskell library (persistent
+interaction state, warm caches, sub-second latency).  This requires
+AgdaDojang to expose a Haskell API, which is tracked in the roadmap.
+ 
+### MCP Transport
+
+We implement a minimal MCP stdio transport (~200 lines in `AgdaMCP.Server`)
+rather than using the `mcp-server` Hackage library, because that library
+requires `base >= 4.20` (GHC 9.10+) and the project pins GHC 9.8.2 for
+Agda compatibility.  The transport handles the three methods we need:
+`initialize`, `tools/list`, `tools/call`.
+
+## Module Structure
+
+```
+agda-mcp/
+├── agda-mcp.cabal
+├── README.md
+├── src/
+│   └── AgdaMCP/
+│       ├── Main.hs              ← CLI entry point
+│       ├── Server.hs            ← MCP stdio transport (JSON-RPC)
+│       ├── Types.hs             ← Stable JSON schema types
+│       ├── Agda.hs              ← Agda subprocess interaction + marker parsing
+│       └── Tools/
+│           └── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
+└── test/
+    └── Main.hs                  ← Pure + integration tests
+```
+
+---
+
+## Related Documents
+
+- [`agda-dojang/README.md`](../agda-dojang/README.md) — Action space reference (the macros this server wraps).
+- [`docs/policy_contract.md`](../docs/policy_contract.md) — Policy backend JSON contract (compatible with our tool schemas).
+- [`docs/architecture.md`](../docs/architecture.md) — System architecture overview.
 
 
 ## References

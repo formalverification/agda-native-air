@@ -24,24 +24,27 @@ module AgdaMCP.Server
   , ServerConfig (..)
   ) where
 
-import Control.Monad (forever, when)
+-- import Control.Monad (forever, when)
+import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
   , decode, encode, object, withObject
   )
 import qualified Data.Aeson as Aeson
+
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
+import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
-import System.IO (hFlush, hSetBuffering, stdin, stdout, BufferMode (..))
+
+import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, BufferMode (..), isEOF)
 
 import AgdaMCP.Agda (AgdaConfig)
-import AgdaMCP.Types
 import AgdaMCP.Tools.ProofState
 
 
@@ -147,26 +150,30 @@ prop name typ desc = (name, object ["type" .= typ, "description" .= desc])
 -- Main server loop
 -- ---------------------------------------------------------------------------
 
--- | Run the MCP server on stdio.  Blocks forever, reading JSON-RPC
--- requests from stdin and writing responses to stdout.
+-- | Run the MCP server on stdio.  Reads JSON-RPC
+-- requests from stdin and writes responses to stdout.
 runServer :: ServerConfig -> IO ()
 runServer cfg = do
   -- Ensure line buffering for correct MCP framing.
   hSetBuffering stdin  LineBuffering
   hSetBuffering stdout LineBuffering
-  forever $ do
-    line <- LBS.fromStrict <$> BS8.hGetLine stdin
-    when (not $ LBS.null line) $
-      case decode line of
-        Nothing  -> do
-          -- Malformed JSON — send a parse error.
-          let resp = mkError Nothing (-32700) "Parse error"
-          sendResponse resp
-        Just req -> do
-          resp <- handleRequest cfg req
-          case resp of
-            Just r  -> sendResponse r
-            Nothing -> pure ()  -- Notification — no response.
+  loop
+  where
+    loop = do
+      eof <- isEOF
+      if eof
+        then hPutStrLn stderr "agda-mcp: stdin closed, shutting down."
+        else do
+          line <- LBS.fromStrict <$> BS8.hGetLine stdin
+          when (not $ LBS.null line) $
+            case decode line of
+              Nothing -> sendResponse $ mkError Nothing (-32700) "Parse error"
+              Just req -> do
+                resp <- handleRequest cfg req
+                case resp of
+                  Just r  -> sendResponse r
+                  Nothing -> pure ()
+          loop
 
 sendResponse :: Value -> IO ()
 sendResponse v = do
@@ -256,9 +263,10 @@ dispatchTool _ name _ =
 -- | Wrap a tool handler result as an MCP tool response.
 eitherToMcp :: ToJSON a => Either Text a -> Value
 eitherToMcp (Left err) = toolError err
+
 eitherToMcp (Right a)  = object
   [ "content" .= [ object [ "type" .= ("text" :: Text)
-                           , "text" .= show (toJSON a)
+                           , "text" .= decodeUtf8 (LBS.toStrict (encode (toJSON a)))
                            ] ]
   ]
 
