@@ -99,7 +99,7 @@ agda-native-air/
 
 ## Current status
 
-This repository is the public continuation of a longer private development effort.
+This repository is the public continuation of a private proof-of-concept development effort.
 
 The following already exist in working form:
 
@@ -116,10 +116,12 @@ The following is currently under development:
 
 For details, see
 
-+  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) - motivation and vision for the project;
-+  [`docs/PLAN.md`](docs/PLAN.md) - project plan;
-+  [`docs/roadmap.md`](docs/roadmap.md) - detailed project roadmap (GitHub labels, milestones and issues);
-+  [`docs/public-history.md`](docs/public-history.md) - notes on the early history of this repository.
++  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) - motivation and vision for the project
++  [`docs/PLAN.md`](docs/PLAN.md) - project plan
++  [`docs/roadmap.md`](docs/roadmap.md) - detailed project roadmap (GitHub labels, milestones and issues)
++  [`docs/representation.md`](docs/representation.md) — data contracts / schemas
++  [`docs/architecture.md`](docs/architecture.md) — system architecture overview
++  [`docs/public-history.md`](docs/public-history.md) - notes on the early history of this repository
 
 ---
 

@@ -72,18 +72,25 @@ Good early contributions include
 
 ## Development setup
 
-See `docs/HowToRun.md`.
+See [`docs/HowToRun.md`](docs/HowToRun.md) for the full developer guide,
+including how to build, test, run the MCP server, and connect a coding
+agent.
 
-Typical setup:
+**The short version**.
 
 ```sh
 git clone git@github.com:formalverification/agda-native-air.git
 cd agda-native-air
-nix develop
-make test
-```
+nix develop          # provides GHC 9.8.2, Agda 2.8.0, Cabal, etc.
+make check           # build + test all components
+ ```
 
-If a workflow depends on the Nix shell, say so clearly in docs and PR descriptions.
+For `agda-mcp` specifically (build, run, connect Claude Code), see
+[HowToRun.md §13](docs/HowToRun.md#13-agda-mcp--ai-assisted-proof-development).
+
+If a workflow depends on the Nix shell, please say so in docs and PR
+descriptions.
+
 
 ---
 
@@ -146,17 +153,18 @@ If a change affects reproducibility or setup, please mention exactly what you ra
 
 ## Documentation expectations
 
-Relevant docs include
+Relevant docs include the following:
 
-+  `README.md`
-+  `docs/MANIFESTO.md`
-+  `docs/PLAN.md`
-+  `docs/representation.md`
-+  `docs/HowToRun.md`
-+  `docs/architecture.md`
-+  `docs/public-history.md`
++  [`README.md`](README.md)
++  [`docs/HowToRun.md`](docs/HowToRun.md)
++  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) — vision
++  [`docs/PLAN.md`](docs/PLAN.md) — roadmap + milestones
++  [`docs/roadmap.md`](docs/roadmap.md) - detailed project roadmap (GitHub labels, milestones and issues)
++  [`docs/representation.md`](docs/representation.md) — data contracts / schemas
++  [`docs/architecture.md`](docs/architecture.md) — system architecture overview
++  [`docs/public-history.md`](docs/public-history.md)
 
-If your change affects any of these, please update them in the same PR.
+If your change affects, or is relevant to, any of these, please update them in the same PR.
 
 ---
 

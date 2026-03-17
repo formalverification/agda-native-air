@@ -37,10 +37,8 @@ module AgdaMCP.Agda
   ) where
 
 import Control.Exception (catch, SomeException)
-import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
 
@@ -140,16 +138,36 @@ ctxPrefix  = "AGDADOJANG_CTX:"
 -- Returns @Nothing@ if the markers are not found.
 parseGoalContext :: Text -> Maybe (Text, [CtxEntry])
 parseGoalContext output = do
-  -- Extract block between REQ_BEGIN and REQ_END (last occurrence).
-  let afterBegin = snd <$> lastSplitOn reqBegin output
-  block <- afterBegin >>= fstSplitOn reqEnd
-  let ls = T.lines block
-      goal = mconcat
-           . map (T.strip . T.drop (T.length goalPrefix))
-           . filter (\l -> T.isPrefixOf goalPrefix (T.strip l))
-           $ ls
-      ctx  = mapMaybe parseCtxLine ls
-  if T.null goal then Nothing else Just (normaliseWs goal, ctx)
+  block <- lastSplitOn reqBegin output >>= fstSplitOn reqEnd . snd
+  let (goal, ctx) = foldl' accumulate ("", []) (T.lines block)
+  if T.null goal then Nothing else Just (normaliseWs goal, reverse ctx)
+  where
+    accumulate :: (Text, [CtxEntry]) -> Text -> (Text, [CtxEntry])
+    accumulate (goal, ctx) raw
+      -- Goal line: starts with the prefix → begin/replace goal text.
+      | T.isPrefixOf goalPrefix (T.strip raw) =
+          (T.strip raw & T.drop (T.length goalPrefix) & T.strip, ctx)
+      -- Context line: parse it.
+      | Just entry <- parseCtxLine raw =
+          (goal, entry : ctx)
+      -- Marker line: skip.
+      | isMarkerLine (T.strip raw) =
+          (goal, ctx)
+      -- Continuation line: append to goal (if we have one).
+      | not (T.null goal) && not (T.null (T.strip raw)) =
+          (goal <> " " <> T.strip raw, ctx)
+      | otherwise =
+          (goal, ctx)
+
+    isMarkerLine s =
+      s == "AGDADOJANG_CTX_BEGIN" || s == "AGDADOJANG_CTX_END"
+      || T.isPrefixOf reqBegin s || T.isPrefixOf reqEnd s
+
+    -- flip-style helper since we don't have (&) in all base versions
+    (&) :: a -> (a -> b) -> b
+    x & f = f x
+    infixl 1 &
+
 
 -- | Parse one AGDADOJANG_CTX:<i>:<vis>:<name>: <type> line.
 parseCtxLine :: Text -> Maybe CtxEntry
