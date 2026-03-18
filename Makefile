@@ -798,7 +798,7 @@ test-strux-driver: _check-sbt build-agda-json
 # 2.5.a. train: Python trainer (JSONL-based for now).
 # 2.5.b. filter: create a cleaned dataset (non-empty type/proof, optional length thresholds)
 # 2.5.c. finetune-dataset: builder that turns AgdaData into instruction/output pairs
-# 2.6. serve: FastAPI (uvicorn) using trained model.
+# 2.6. serve: agda-mcp
 # 2.7. bench: AgdaDojang dojo (still delegated for now)
 # 2.8. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
 # 2.9. smoke: Top-level smoke tests
