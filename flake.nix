@@ -168,6 +168,7 @@
         #   - keeps our Python/PyTorch + Scala toolchain intact
         # -----------------------------------------------------------------------
         default = pkgsStable.mkShell {
+          name = "agda-native-air";
           packages = [
             pkgsStable.jdk21
             agdaPinnedEnv
@@ -186,6 +187,7 @@
           LC_ALL = "C.UTF-8";
 
           shellHook = ''
+            export AGDA_NATIVE_AIR_SHELL="default"
             # Make pip wheels work inside this shell (torch/numpy/pandas).
             ${exportWheelRuntimeLibs}
             ${exportJavaHome}
@@ -232,6 +234,7 @@ PY
         #   - pins GHC/Cabal to the SAME pkgsAgda universe as Agda itself
         # -----------------------------------------------------------------------
         backend = pkgsStable.mkShell {
+          name = "backend";
           packages = [
             pkgsStable.jdk21
             pkgsStable.scala_2_13
@@ -260,6 +263,7 @@ PY
           LC_ALL = "C.UTF-8";
 
           shellHook = ''
+            export AGDA_NATIVE_AIR_SHELL="backend"
             # ---------------------------------------------------------------------------
             # Ensure AGDA_DIR points at the repo-local Agda config, even from subdirs.
             # Prefer git to locate the repo root; fall back to current dir.

@@ -1,11 +1,14 @@
 cabal-version: 3.0
--- | File: agda-native-air/agda-mcp/agda-mcp.cabal
+-- | agda-mcp.cabal
 --
--- Cabal package definition for the agda-mcp MCP server.
+-- File: agda-native-air/agda-mcp/agda-mcp.cabal
 --
--- v0 implementation (M1-2): four core proof-state tools over stdio transport.
+-- Description:
+--   Cabal package definition for the agda-mcp MCP server.
 --
--- Design note (GHC version):
+--   v0 implementation (M1-2): four core proof-state tools over stdio transport.
+--
+--   Design note (GHC version):
 --   The `mcp-server` Hackage library requires base >= 4.20 (GHC 9.10+), but
 --   agda-strux pins GHC 9.8.2 for Agda-as-a-library compatibility.  Rather
 --   than introduce a second GHC version, we implement a minimal MCP stdio
@@ -76,4 +79,6 @@ test-suite agda-mcp-test
     , bytestring
     , text          >= 2.0
     , process       >= 1.6
+    , directory
+    , filepath
   ghc-options:      -threaded -rtsopts "-with-rtsopts=-N"
