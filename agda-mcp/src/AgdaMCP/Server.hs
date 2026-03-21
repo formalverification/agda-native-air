@@ -2,7 +2,7 @@
 --
 -- File: agda-native-air/agda-mcp/src/AgdaMCP/Server.hs
 --
--- Decription:
+-- Description:
 --   Minimal MCP stdio transport for agda-mcp; implements the subset of the Model
 --   Context Protocol (MCP 2024-11-05) needed for tool-based interaction:
 --
@@ -103,14 +103,14 @@ toolDefinitions :: Value
 toolDefinitions = toJSON
   [ toolDef "get_goal"
       "Inspect the goal type and local context at a hole."
-      [ prop "filePath"  "string" "Absolute path to the Agda file."
+      [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
       , prop "holeIndex" "integer" "0-based index of the {!!} hole."
       ]
       ["filePath", "holeIndex"]
 
   , toolDef "fill_hole"
       "Substitute a candidate term into a hole and typecheck."
-      [ prop "filePath"  "string" "Absolute path to the Agda file."
+      [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
       , prop "holeIndex" "integer" "0-based index of the {!!} hole."
       , prop "candidate" "string" "The candidate proof term to try."
       ]
@@ -118,13 +118,13 @@ toolDefinitions = toJSON
 
   , toolDef "check_file"
       "Load/reload an Agda file and return all diagnostics."
-      [ prop "filePath" "string" "Absolute path to the Agda file."
+      [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
       ]
       ["filePath"]
 
   , toolDef "get_diagnostics"
       "Retrieve diagnostic summary: error/warning counts, open holes."
-      [ prop "filePath" "string" "Absolute path to the Agda file."
+      [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
       ]
       ["filePath"]
   ]

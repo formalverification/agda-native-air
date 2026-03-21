@@ -1,13 +1,12 @@
 {
   "mcpServers": {
     "agda": {
-      "command": "nix",
+      "command": "cabal",
       "args": [
-        "develop", ".#backend", "--command",
-        "cabal", "run", "-v0", "agda-mcp", "--",
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+        "run", "-v0", "agda-mcp", "--",
+        "--agda-flags", "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
       ],
-      "cwd": "."
+      "cwd": "agda-mcp"
     }
   }
 }
