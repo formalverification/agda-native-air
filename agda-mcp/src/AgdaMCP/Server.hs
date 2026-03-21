@@ -25,7 +25,6 @@ module AgdaMCP.Server
   , ServerConfig (..)
   ) where
 
--- import Control.Monad (forever, when)
 import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
@@ -185,6 +184,20 @@ sendResponse v = do
 
 -- | handleRequest: dispatcher
 handleRequest :: ServerConfig -> JsonRpcRequest -> IO (Maybe Value)
+
+-- Copilot suggested, "JSON-RPC notifications (requests without an id) must not
+-- receive a response. Currently handleRequest will still return Just ... for methods
+-- like tools/list / tools/call even when rpcId is Nothing, which can break strict
+-- MCP clients. Consider returning Nothing whenever rpcId is Nothing (except the
+-- parse-error case where id must be null)."
+-- SEE: https://github.com/formalverification/agda-native-air/pull/38#discussion_r2969684715
+--
+-- Copilot is technically right that per JSON-RPC spec, notifications (no `id`)
+-- should not get responses. In practice, MCP clients (Claude Code, Cursor) only send
+-- notifications for `notifications/initialized` (which we already handle correctly
+-- by returning `Nothing`). The risk of a client sending `tools/call` without an `id`
+-- is essentially zero — that would be a client bug. The suggested refactor adds a
+-- lot of boilerplate for no practical gain right now.
 
 -- | MCP handshake: initialize
 handleRequest cfg req | rpcMethod req == "initialize" = do
