@@ -24,14 +24,15 @@ module AgdaMCP.Tools.ProofState
   , handleGetDiagnostics
   ) where
 
+import Control.Exception (SomeException, catch)
+import Control.Monad (forM_)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
-import Control.Exception (SomeException, catch)
-
-import System.Directory (createDirectoryIfMissing, createFileLink, getTemporaryDirectory,
-                          listDirectory, makeAbsolute, removeDirectoryRecursive)
+import System.Directory ( copyFile, createDirectoryIfMissing, doesDirectoryExist
+                        , getTemporaryDirectory, listDirectory, makeAbsolute
+                        , removeDirectoryRecursive )
 
 import System.FilePath ((</>), takeFileName, takeDirectory, takeBaseName)
 import System.IO (hPutStrLn, stderr)
@@ -161,7 +162,8 @@ handleCheckFile cfg params = do
   let extraFlags = ["-i", takeDirectory absPath]
       cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
   result <- runAgda cfgWithDir absPath
-  let diags   = parseDiagnostics (arStderr result)
+  let combined = arStdout result <> "\n" <> arStderr result
+      diags   = parseDiagnostics combined
       nHoles  = length (findHoles src)
       success = arExitCode result == 0
   pure . Right $ FileCheckResult
@@ -183,7 +185,8 @@ handleGetDiagnostics cfg params = do
   let extraFlags = ["-i", takeDirectory absPath]
       cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
   result <- runAgda cfgWithDir absPath
-  let diags    = parseDiagnostics (arStderr result)
+  let combined = arStdout result <> "\n" <> arStderr result
+      diags    = parseDiagnostics combined
       nErrors  = length [() | Diagnostic DiagError _ _ _ <- diags]
       nWarns   = length [() | Diagnostic DiagWarning _ _ _ <- diags]
       holes    = findHoles src
@@ -282,19 +285,28 @@ makeOverlay tmpDir srcDir excludeFile = do
   createDirectoryIfMissing True overlay
   entries <- listDirectory srcDir
   let keep = [ e | e <- entries, e /= excludeFile ]
-  mapM_ (safeLink overlay) keep
+  mapM_ (copyEntry overlay) keep
   pure overlay
   where
-    safeLink overlay name = do
+    copyEntry overlay name = do
       let target = srcDir </> name
           link   = overlay </> name
-      createFileLink target link
-        `catch` \(e :: SomeException) ->
-          hPutStrLn stderr $ "agda-mcp: overlay link failed for " <> name <> ": " <> show e
-        -- Copilot suggests the `catch` swallowing all exceptions is fragile.  This
-        -- is true, but on most Linux filesystems `createFileLink` works fine (these
-        -- are hard links, not symlinks).
-        --
-        -- The full copy fallback Copilot suggests is ~20 lines of recursive
-        -- directory copy, which is overkill for v0.  The easy fix above merely
-        -- logs a warning to stderr on failure rather than silently swallowing.
+      isDir <- doesDirectoryExist target
+      if isDir
+        then copyDirectoryRecursive target link
+        else copyFile target link
+          `catch` \(e :: SomeException) ->
+            hPutStrLn stderr $ "agda-mcp: overlay copy failed for " <> name <> ": " <> show e
+
+    -- | Recursively copy a directory tree from @src@ to @dst@.
+    copyDirectoryRecursive :: FilePath -> FilePath -> IO ()
+    copyDirectoryRecursive src dst = do
+      createDirectoryIfMissing True dst
+      entries <- listDirectory src
+      forM_ entries $ \entry -> do
+        let srcPath = src </> entry
+            dstPath = dst </> entry
+        isSubDir <- doesDirectoryExist srcPath
+        if isSubDir
+          then copyDirectoryRecursive srcPath dstPath
+          else copyFile srcPath dstPath

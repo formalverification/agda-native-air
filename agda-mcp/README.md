@@ -132,7 +132,7 @@ Given a file path and hole identifier, return the hole's expected type and its l
     {"name": "x", "type": "A", "visibility": "visible", "index": 0},
     {"name": "A", "type": "Set₀", "visibility": "hidden", "index": 1}
   ],
-  "module": "Fixture01.agda"
+  "module": "Fixture01"
 }
 ```
 
@@ -267,9 +267,9 @@ Add to your MCP configuration (`claude_desktop_config.json` or project `.mcp.jso
       "command": "cabal",
       "args": [
         "run", "-v0", "agda-mcp", "--",
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+        "--agda-flags", "-i agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
       ],
-      "cwd": "/path/to/agda-native-air"
+      "cwd": "/path/to/agda-native-air/agda-mcp"
     }
   }
 }

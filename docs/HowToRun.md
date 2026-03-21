@@ -33,7 +33,32 @@ make eval-proof-completion-smoke
 
 ---
 
-## 0) Repo mental model (what runs what)
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [0.  Repo mental model (what runs what)](#0--repo-mental-model-what-runs-what)
+- [1.  Recommended environment: Nix shells](#1--recommended-environment-nix-shells)
+- [2.  First commands to run (sanity)](#2--first-commands-to-run-sanity)
+- [3.  Backend (Haskell) build + tests](#3--backend-haskell-build--tests)
+- [4.  Strux driver tests (Scala)](#4--strux-driver-tests-scala)
+- [5.  Corpus Extraction and Proof Completion](#5--corpus-extraction-and-proof-completion)
+- [6.  "Small" extraction / transforms (non-corpus path)](#6--small-extraction--transforms-non-corpus-path)
+- [7.  ETL (Spark) and ML (Python)](#7--etl-spark-and-ml-python)
+- [8.  One-command workflows](#8--one-command-workflows)
+- [9.  Dataset utilities](#9--dataset-utilities)
+- [10.  Smoke, audit, probe-all](#10--smoke-audit-probe-all)
+- [11.  Where outputs land](#11--where-outputs-land)
+- [12.  Debugging playbook](#12--debugging-playbook)
+- [13.  agda-mcp — AI-assisted proof development ](#13--agda-mcp--ai-assisted-proof-development)
+- [14.  Known good sequences](#14--known-good-sequences)
+- [15.  Cleaning](#15--cleaning)
+
+<!-- markdown-toc end -->
+
+
+
+
+## 0.  Repo mental model (what runs what)
 
 This repo has three "lanes" that connect:
 
@@ -56,17 +81,17 @@ This repo has three "lanes" that connect:
 
 ---
 
-## 1) Recommended environment: Nix shells
+## 1.  Recommended environment: Nix shells
 
 Most "it just works" runs are inside a Nix shell.
 
-### 1.1 All-in-one dev shell
+### 1.1.  All-in-one dev shell
 
 ```sh
 nix develop .#all
 ```
 
-### 1.2 Backend-only shell
+### 1.2.  Backend-only shell
 
 ```sh
 nix develop .#backend
@@ -79,9 +104,9 @@ nix develop .#backend
 
 ---
 
-## 2) First commands to run (sanity)
+## 2.  First commands to run (sanity)
 
-### 2.1 See what you've got
+### 2.1.  See what you've got
 
 <!-- doc-test: help -->
 ```sh
@@ -92,7 +117,7 @@ make help
 make diag
 ```
 
-### 2.2 Fast correctness check (recommended)
+### 2.2.  Fast correctness check (recommended)
 
 Inside the right shell (e.g. `nix develop .#all`):
 
@@ -114,23 +139,23 @@ make check-nix
 
 ---
 
-## 3) Backend (Haskell) build + tests
+## 3.  Backend (Haskell) build + tests
 
-### 3.1 Build the backend executable
+### 3.1.  Build the backend executable
 
 <!-- doc-test: build-agda-json -->
 ```sh
 make build-agda-json
 ```
 
-### 3.2 Locate the backend binary
+### 3.2.  Locate the backend binary
 
 <!-- doc-test: show-agda-json-bin -->
 ```sh
 make show-agda-json-bin
 ```
 
-### 3.3 Run backend tests
+### 3.3.  Run backend tests
 
 Run the Haskell backend test suite with:
 
@@ -148,14 +173,14 @@ data/test-output/agda-strux/
 To disable output retention: `make backend-test BACKEND_TEST_KEEP=0`  
 To clean retained outputs: `make backend-test-clean`
 
-### 3.4 Backend smoke
+### 3.4.  Backend smoke
 
 <!-- doc-test: backend-smoke -->
 ```sh
 make backend-smoke
 ```
 
-### 3.5 Clean backend artifacts
+### 3.5.  Clean backend artifacts
 
 <!-- doc-test: backend-clean -->
 ```sh
@@ -164,7 +189,7 @@ make backend-clean
 
 ---
 
-## 4) Strux driver tests (Scala)
+## 4.  Strux driver tests (Scala)
 
 Canonical Scala test entrypoint:
 
@@ -194,16 +219,16 @@ make test-all
 
 ---
 
-## 5) Corpus Extraction and Proof Completion
+## 5.  Corpus Extraction and Proof Completion
 
-### 5.1 Corpus Extraction (the "real" pipeline path)
+### 5.1.  Corpus Extraction (the "real" pipeline path)
 This is the main, resumable extraction path that writes
 
 +  `data/<LIB_NAME>/raw/jsonl/*.jsonl`
 +  `data/<LIB_NAME>/raw/logs/*`
 +  `data/<LIB_NAME>/manifests/<timestamp>.json`
 
-#### 5.1.1 Full corpus extraction (agda-algebras by default)
+#### 5.1.1.  Full corpus extraction (agda-algebras by default)
 
 <!-- doc-test: extract-lib -->
 ```sh
@@ -217,14 +242,14 @@ make extract-lib
 +  Runs Scala `AgdaJsonlDriver` with `--runner spark` and local master.
 +  Writes a manifest JSON with exit code + Agda version + git rev.
 
-#### 5.1.2 Smoke extraction (first N modules)
+#### 5.1.2.  Smoke extraction (first N modules)
 
 ```sh
 make extract-lib-smoke \
   SMOKE_N=25              # (optional) controls how many modules
 ```
 
-#### 5.1.3 Run extraction via Nix wrapper (from outside nix shell)
+#### 5.1.3.  Run extraction via Nix wrapper (from outside nix shell)
 
 <!-- doc-test: extract-lib-nix -->
 ```sh
@@ -235,7 +260,7 @@ make extract-lib-nix
 make extract-lib-smoke-nix
 ```
 
-#### 5.1.4 Fail-fast vs keep-going
+#### 5.1.4.  Fail-fast vs keep-going
 
 By default the driver continues through failures (and records them). To fail fast:
 
@@ -243,7 +268,7 @@ By default the driver continues through failures (and records them). To fail fas
 make extract-lib FAIL_FAST=1
 ```
 
-#### 5.1.5 Resume control
+#### 5.1.5.  Resume control
 
 The top-level knob is `RESUME` (default `1`). To force no resume:
 
@@ -253,13 +278,13 @@ make extract-lib RESUME=0
 
 (Internally this adds `--no-resume` to driver args.)
 
-#### 5.1.6 Parallelism
+#### 5.1.6.  Parallelism
 
 ```sh
 make extract-lib PAR=16
 ```
 
-### 5.2 Proof-completion evaluator (AgdaDojang fixtures)
+### 5.2.  Proof-completion evaluator (AgdaDojang fixtures)
 
 The proof-completion evaluator is the core demo of the project's propose → check
 loop.  It runs AgdaDojang's `reportGoalCtx` macro to extract `(goal, context)`
@@ -269,7 +294,7 @@ terms, and typechecks each candidate in Agda.
 > **Prerequisite:** run inside `nix develop` (or `nix develop .#all`).
 > The evaluator requires Agda on PATH with the correct library configuration.
 
-#### 5.2.1 Smoke test (single fixture, fast)
+#### 5.2.1.  Smoke test (single fixture, fast)
 
 ```sh
 make eval-proof-completion-smoke
@@ -278,7 +303,7 @@ make eval-proof-completion-smoke
 This runs only `FixtureLambda.agda` with `--max-holes 1` and a 10-second timeout.
 Expected result: 1 hole solved.
 
-#### 5.2.2 Full fixture evaluation (all fixtures)
+#### 5.2.2.  Full fixture evaluation (all fixtures)
 
 ```sh
 make eval-proof-completion
@@ -288,7 +313,7 @@ This runs all `data/agda/Fixture*.agda` files through the evaluator.
 Expected result: all fixtures pass except `FixtureFail01` (which is an expected
 failure, marked `xfail`).
 
-#### 5.2.3 What the evaluator does
+#### 5.2.3.  What the evaluator does
 
 For each fixture file, the evaluator:
 
@@ -300,7 +325,7 @@ For each fixture file, the evaluator:
 5. If a candidate typechecks, the hole is marked solved and the source is patched.
 6. Repeats until all holes are solved or candidates are exhausted.
 
-#### 5.2.4 Output artifacts
+#### 5.2.4.  Output artifacts
 
 The following results are written to `agda-dojang/_build/eval-proof-completion/<run-id>/`:
 
@@ -310,7 +335,7 @@ The following results are written to `agda-dojang/_build/eval-proof-completion/<
 
 Both JSONL files use schema version `eval-proof-completion.v0`.
 
-#### 5.2.5 Overriding evaluator knobs
+#### 5.2.5.  Overriding evaluator knobs
 
 The evaluator is controlled by Makefile variables which may be overriden on the
 command line, as follows:
@@ -325,7 +350,7 @@ make eval-proof-completion \
   EVAL_RUN_ID=my-run
 ```
 
-#### 5.2.6 Fixture files
+#### 5.2.6.  Fixture files
 
 Committed fixtures live in `agda-dojang/data/fixtures/` (or `data/fixtures/` when
 running via `make -C agda-dojang`). Each fixture imports from
@@ -350,11 +375,11 @@ for equality goals, and `tt` for unit goals.
 ---
 
 
-## 6) "Small" extraction / transforms (non-corpus path)
+## 6.  "Small" extraction / transforms (non-corpus path)
 
 These targets run mains directly and are useful for quick demos.
 
-### 6.1 Extract a single file/dir using `AgdaExtractorMain`
+### 6.1.  Extract a single file/dir using `AgdaExtractorMain`
 
 Defaults:
 
@@ -378,13 +403,13 @@ make extract-stdlib
 make extract-categories
 ```
 
-### 6.2 Transform Agda2Train reflection JSON → JSONL
+### 6.2.  Transform Agda2Train reflection JSON → JSONL
 
 ```sh
 make transform
 ```
 
-### 6.3 Legacy reducer path
+### 6.3.  Legacy reducer path
 
 ```sh
 make a2t
@@ -392,9 +417,9 @@ make a2t
 
 ---
 
-## 7) ETL (Spark) and ML (Python)
+## 7.  ETL (Spark) and ML (Python)
 
-### 7.1 Spark ETL: JSONL → Parquet
+### 7.1.  Spark ETL: JSONL → Parquet
 
 Requires `DATA_TRAIN` to exist (run `make extract` first):
 
@@ -409,7 +434,7 @@ This runs:
   and expects:
 * output at `ml-pipeline/features/train.parquet`
 
-### 7.2 Python venv management
+### 7.2.  Python venv management
 
 Default behavior: Makefile creates/uses `ml-pipeline/.venv` (unless `USE_VENV=0`).
 
@@ -420,7 +445,7 @@ Useful knobs:
 + `TORCH_MODE=cpu` (default), `TORCH_MODE=pypi`, `TORCH_MODE=skip`
 
 
-### 7.3 Filter
+### 7.3.  Filter
 
 ```sh
 make filter
@@ -432,7 +457,7 @@ You can enforce minimum lengths, as follows:
 make filter MIN_TYPE_LEN=10 MIN_PROOF_LEN=10
 ```
 
-### 7.4 Retrieval model (current ML path)
+### 7.4.  Retrieval model (current ML path)
 
 ```sh
 make train-retrieval-smoke
@@ -449,20 +474,20 @@ fixture data; the second runs the proof-completion evaluator using it.
 
 ---
 
-## 8) One-command workflows
+## 8.  One-command workflows
 
-### 8.1 Quick confidence check
+These assume you're in the default Nix shell (`nix develop`). 
+
+### 8.1.  Quick confidence check
 
 ```sh
-nix develop
 make check
 make eval-proof-completion-smoke
 ```
 
-### 8.2 Extraction + evaluation (small path)
+### 8.2.  Extraction + evaluation (small path)
 
 ```sh
-nix develop
 make extract-lib-smoke
 make eval-proof-completion
 ```
@@ -473,9 +498,9 @@ make eval-proof-completion
 
 ---
 
-## 9) Dataset utilities
+## 9.  Dataset utilities
 
-### 9.1 Stats
+### 9.1.  Stats
 
 ```sh
 make dataset-stats
@@ -487,7 +512,7 @@ Override dataset:
 make dataset-stats DATASET=/path/to/train.jsonl TOP=50
 ```
 
-### 9.2 Premise evaluation
+### 9.2.  Premise evaluation
 
 ```sh
 make premise-eval
@@ -510,9 +535,9 @@ make smoke-sample
 
 ---
 
-## 10) Smoke, audit, probe-all
+## 10.  Smoke, audit, probe-all
 
-### 10.1 Curated smoke suite (writes logs)
+### 10.1.  Curated smoke suite (writes logs)
 
 ```sh
 make smoke
@@ -530,14 +555,14 @@ Customize smoke targets:
 make smoke SMOKE_TARGETS="gen-sample extract test backend-smoke"
 ```
 
-### 10.2 Audit (curated always-works targets)
+### 10.2.  Audit (curated always-works targets)
 
 ```sh
 make audit
 make audit-nix
 ```
 
-### 10.3 Probe-all (attempts many targets, writes logs)
+### 10.3.  Probe-all (attempts many targets, writes logs)
 
 ```sh
 make probe-all
@@ -545,9 +570,9 @@ make probe-all
 
 ---
 
-## 11) Where outputs land
+## 11.  Where outputs land
 
-### 11.1 Corpus extraction outputs
+### 11.1.  Corpus extraction outputs
 
 Default library: `LIB_NAME=agda-algebras`
 
@@ -564,11 +589,11 @@ Default library: `LIB_NAME=agda-algebras`
 
   * `data/agda-algebras/manifests/<timestamp>.json`
 
-### 11.2 Non-corpus extract outputs
+### 11.2.  Non-corpus extract outputs
 
 * `data/train.jsonl` (default)
 
-### 11.3 ML outputs
+### 11.3.  ML outputs
 
 * Parquet: `ml-pipeline/features/train.parquet`
 * Models: `ml-pipeline/models/model.pt`  (legacy)
@@ -576,9 +601,9 @@ Default library: `LIB_NAME=agda-algebras`
 
 ---
 
-## 12) Debugging playbook
+## 12.  Debugging playbook
 
-### 12.1 "AgdaJsonlDriver exited 0 but produced no JSONL"
+### 12.1.  "AgdaJsonlDriver exited 0 but produced no JSONL"
 
 The Makefile already treats this as an error (exit code 2). Next steps:
 
@@ -587,7 +612,7 @@ The Makefile already treats this as an error (exit code 2). Next steps:
 * verify `JAVA_HOME` is set (the Makefile will fail loudly if empty)
 * verify `AGDA_LIB_DIR` points to the directory containing `agda-dojang/agda/libraries`
 
-### 12.2 Backend binary resolution issues
+### 12.2.  Backend binary resolution issues
 
 The Makefile resolves `agda-json` by running:
 
@@ -600,7 +625,7 @@ If it can't resolve:
 * run `command -v agda-json`
 * run `make backend-test` (ensures build is sane)
 
-### 12.3 sbt / JDK weirdness
+### 12.3.  sbt / JDK weirdness
 
 Targets `extract-lib` and `extract-algebras-backend` expect a pinned JDK:
 
@@ -611,7 +636,7 @@ If sbt launches the wrong java:
 * confirm `JAVA_HOME` inside your `nix develop .#all`
 * try `make diag`
 
-### 12.4 Spark not found
+### 12.4.  Spark not found
 
 If you see `spark-submit not found`:
 
@@ -619,7 +644,7 @@ If you see `spark-submit not found`:
 * or install Spark and ensure `spark-submit` is on PATH
 * check with: `make _check-spark`
 
-### 12.5 GitHub CLI issue export fails (repo "not found")
+### 12.5.  GitHub CLI issue export fails (repo "not found")
 
 If `gh` mysteriously can't see the repo, the fix is usually:
 
@@ -632,70 +657,76 @@ because env tokens can shadow your stored auth.
 ---
 
 
-## 13) agda-mcp — AI-assisted proof development 
+## 13.  agda-mcp — AI-assisted proof development
 
 `agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
 Cursor, etc.) interact with Agda through standard tool calls.
 
 This section walks you through building, testing, running, and connecting an agent.
 
-### 13.1 Build & Test
+### 13.1.  Build & Test
 
-Enter the `backend` Nix shell. 
+Enter the `backend` Nix shell.[^1]
 
 ```sh
-nix develop .#backend   # required!  
+nix develop .#backend   # required!
 ```
-
-For `agda-mcp`, the `backend` shell is required at the moment since the default Nix
-shell has wrong GHC version.
 
 Once in the `backend` Nix shell, do
 
 ```sh
-# build
 cd agda-mcp
 cabal build
-```
-```sh
-# test
-cd agda-mcp
 cabal test
 ```
 
-Currently only pure tests (marker parsing, hole finding) are included.
-Integration tests calling Agda are planned and will require `nix develop`.
+The test suite includes both pure tests (marker parsing, hole finding) and tier-2
+integration tests that invoke a real `agda` binary.  For the integration tests, you
+must be in the Nix `backend` shell (`nix develop .#backend`) or have `agda` in
+your `PATH`; if Agda is not found, tier-2 tests are skipped.
 
 
-### 13.2 Run the server manually
+### 13.2.  Run the server manually
 
-You can start `agda-mcp` and send it JSON-RPC requests on stdin to verify
-everything is wired up.
+You can start `agda-mcp` and send it JSON-RPC requests on stdin to verify everything
+is wired up.
 
-From the repo root, inside the Nix shell,
+In the `agda-mcp` directory,
 
 ```sh
-cabal run agda-mcp -- \
-  --agda-flags "-i agda-dojang/agda \
-    --library-file=agda-dojang/agda/libraries \
-    -l agda-dojang -l standard-library"
+cabal run agda-mcp -- --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
 ```
 
-The server prints a startup banner to stderr and waits for input.  Paste a JSON-RPC
-request (one per line) to stdin, as follows:
+The server prints a startup banner and "Waiting for MCP client..."
 
-```json
+The server is now ready and waiting for your JSON-RPC input on stdin!
+
+Type or paste a JSON-RPC request (one per line) to stdin; e.g.,
+
+ ```json
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}
 ```
 
-You should get back a JSON response with `protocolVersion` and `serverInfo`.
+You should see a JSON response immediately on the next line; e.g.,
+
+```json
+{"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"agda-mcp","version":"0.1.0"}}}
+```
 
 Press Ctrl-C to stop the server.
+
+Alternatively, you can pipe input directly to the server, as follows:
+
+```sh
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}' \
+  | cabal run agda-mcp -- \
+      --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+```
 
 For a pre-built sequence of test requests, see `agda-mcp/test/resources/mcp-test-input.jsonl`.
 
 
-### 13.3 Connect Claude Code
+### 13.3.  Connect Claude Code
 
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is a CLI coding agent
 that can connect to `agda-mcp`, giving you an interactive AI assistant that can
@@ -707,8 +738,8 @@ inspect goals, fill holes, and check Agda files through natural language.
     npm install -g @anthropic-ai/claude-code
     ```
 
-2.  **Navigate to the repo root** (`cd agda-native-air`).  The `.mcp.json`
-    file there configures the agda MCP server connection.
+2.  **Navigate to the repo root** (`cd agda-native-air`).  The `.mcp.json` file there
+    configures the agda MCP server connection.
 
 3.  **Run `claude`**.  Claude Code will detect `.mcp.json` and start the
     agda MCP server.  You may need to approve the connection when prompted.
@@ -719,7 +750,7 @@ inspect goals, fill holes, and check Agda files through natural language.
     > *"Use the get_goal tool on agda-dojang/data/fixtures/Fixture01.agda hole 0"*
 
 
-### 13.4 Connect other MCP clients
+### 13.4.  Connect other MCP clients
 
 Any MCP-compatible agent can connect to `agda-mcp`.  The general pattern is to
 configure the agent to start `cabal run agda-mcp -- --agda-flags "..."` as a
@@ -728,7 +759,7 @@ subprocess with the repo root as working directory.
 See [`agda-mcp/README.md` § Configuring MCP Clients](../agda-mcp/README.md#configuring-mcp-clients)
 for JSON configuration examples for Claude Desktop, Cursor, and Codex CLI.
 
-### 13.5 Troubleshooting
+### 13.5.  Troubleshooting
 
 **Server won't start / "agda not found"**.  Make sure you are inside `nix develop`
 (or `nix develop .#backend`).  The Nix shell provides the pinned `agda` binary.
@@ -744,44 +775,47 @@ Run `claude` from the repo root directory.
 
 ---
 
-## 14) "Known good" sequences
+## 14.  Known good sequences
 
-### 14.1 Quick confidence check
+Each of these assume you are in the `all` Nix shell (`nix develop .#all`).
+
+### 14.1.  Quick confidence check
 
 ```sh
-nix develop .#all
 make check
 make extract-lib-smoke
 ```
 
-### 14.2 End-to-end proof completion
+### 14.2.  End-to-end proof completion
 
 ```sh
-nix develop .#all
 make eval-proof-completion
 ```
 
-### 14.3 Corpus extraction (requires agda-algebras cloned locally)
+### 14.3.  Corpus extraction (requires agda-algebras cloned locally)
 
 ```sh
-nix develop .#all
 make extract-lib
 ```
 
-### 14.4 Retrieval model + evaluation
+### 14.4.  Retrieval model + evaluation
 
 ```sh
-nix develop .#all
 make train-retrieval-smoke
 make eval-proof-completion-smoke-retrieval
 ```
+
 ---
 
-## 15) Cleaning
+## 15.  Cleaning
 
 ```sh
 make clean   # remove a few generated files
 make wipe    # remove generated artifacts (features/models/etc.)
 make tree    # repo tree, excluding build dirs
 ```
+
+---
+
+[^1]: For `agda-mcp`, the `backend` shell is required at the moment since the default Nix shell has wrong GHC version.
 

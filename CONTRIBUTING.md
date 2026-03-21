@@ -86,7 +86,7 @@ make check           # build + test all components
  ```
 
 For `agda-mcp` specifically (build, run, connect Claude Code), see
-[HowToRun.md §13](docs/HowToRun.md#13-agda-mcp--ai-assisted-proof-development).
+[HowToRun §13](docs/HowToRun.md#13--agda-mcp--ai-assisted-proof-development).
 
 If a workflow depends on the Nix shell, please say so in docs and PR
 descriptions.

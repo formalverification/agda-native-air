@@ -227,8 +227,8 @@ data DiagnosticsResult = DiagnosticsResult
   { drFilePath    :: FilePath
   , drErrors      :: Int
   , drWarnings    :: Int
-  , drHoles       :: [GoalInfo]     -- ^ Open holes with their goal types.
-  } deriving (Eq, Show)
+  , drHoles       :: [GoalInfo]  -- ^ Open holes (v0: giGoal is "?")
+  } deriving (Eq, Show)          --   (per-hole goal extraction is a future enhancement).
 
 instance ToJSON DiagnosticsResult where
   toJSON r = object

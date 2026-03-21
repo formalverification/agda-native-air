@@ -5,13 +5,20 @@
 -- Description:
 --   Integration tests for agda-mcp.
 --
---   Tests are organized in three tiers:
+--   Tests are organized in two tiers (v0):
 --   1. Pure unit tests (no IO, no Agda) — hole finding, marker parsing.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips.
---   3. MCP protocol tests (needs agda on PATH) — send JSON-RPC, verify response.
 --
---   Tier 2 and 3 tests are skipped gracefully if Agda is not available,
---   making the test suite safe to run in CI without a Nix shell.
+--   Tier 2 tests are skipped gracefully if Agda is not available, making the test
+--   suite safe to run in CI without a Nix shell.
+--
+--   Planned Tests (v1):
+--     We will add a third tier of tests that run the full MCP server and send
+--     JSON-RPC requests to it, verifying end-to-end behavior from the client side.
+--     Once third tier tests are added, remove this paragraph and add the following
+--     to the list above:
+--     3. MCP protocol tests (needs agda on PATH) — send JSON-RPC, verify response.
+--
 
 {-# LANGUAGE OverloadedStrings #-}
 
