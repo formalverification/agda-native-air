@@ -29,11 +29,10 @@
 module Main where
 
 import Control.Monad (when)
-import Data.Text (Text)
-import qualified Data.Text as T
 import System.Environment (getArgs)
 import System.Exit (exitSuccess)
 import System.IO (hPutStrLn, stderr)
+import Text.Read (readMaybe)
 
 import AgdaMCP.Agda (AgdaConfig (..), defaultConfig)
 import AgdaMCP.Server (ServerConfig (..), runServer)
@@ -72,8 +71,13 @@ parseArgs ("--agda-bin" : path : rest) cfg =
 parseArgs ("--agda-flags" : flags : rest) cfg =
   parseArgs rest cfg { agdaFlags = words flags }
 parseArgs ("--timeout" : n : rest) cfg =
-  parseArgs rest cfg { agdaTimeout = Just (read n) }
-parseArgs (unknown : rest) cfg =
+  case readMaybe n of
+    Just secs -> parseArgs rest cfg { agdaTimeout = Just secs }
+    Nothing   -> parseArgs rest cfg  -- silently ignore bad value; keep default
+parseArgs ("--verbose" : rest) cfg =
+  parseArgs rest cfg { agdaVerbose = True }
+parseArgs ("--help" : _) _ = error usage
+parseArgs (_ : rest) cfg =
   -- do
   parseArgs rest cfg
   -- -- Skip unknown flags with a warning (lenient for forward-compat).
@@ -94,6 +98,7 @@ usage = unlines
   , "  --agda-bin PATH       Path to the agda binary (default: agda)"
   , "  --agda-flags \"...\"    Space-separated Agda flags"
   , "  --timeout N           Typecheck timeout in seconds (default: 30)"
+  , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""
   , "The server reads JSON-RPC (MCP) from stdin and writes to stdout."

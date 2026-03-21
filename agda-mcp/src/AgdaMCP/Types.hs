@@ -1,16 +1,19 @@
--- | File: agda-native-air/agda-mcp/src/AgdaMCP/Types.hs
+-- | Types.hs
 --
--- Shared types for the agda-mcp MCP server.
+-- File: agda-native-air/agda-mcp/src/AgdaMCP/Types.hs
 --
--- This module defines the JSON schema contract for tool requests and responses.
--- Every type has a hand-written Aeson instance to ensure the wire format is
--- stable across code changes (no Generic-derived surprises).
+-- Description:
+--   Shared types for the agda-mcp MCP server.
 --
--- Schema version: agda-mcp/v0
+--   This module defines the JSON schema contract for tool requests and responses.
+--   Every type has a hand-written Aeson instance to ensure the wire format is
+--   stable across code changes (no Generic-derived surprises).
 --
--- These types correspond 1-to-1 with the policy contract defined in
--- agda-dojang/python/tools/policy_contract.py, ensuring interoperability
--- between the Haskell MCP server and the Python evaluator/policy backends.
+--   Schema version: agda-mcp/v0
+--
+--   These types correspond 1-to-1 with the policy contract defined in
+--   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
+--   between the Haskell MCP server and the Python evaluator/policy backends.
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
@@ -171,7 +174,7 @@ data FillResult = FillResult
   { frStatus    :: FillStatus
   , frCandidate :: Text           -- ^ The candidate that was tried.
   , frMessage   :: Maybe Text     -- ^ Agda error message on failure; Nothing on success.
-  , frNewHoles  :: Maybe Int      -- ^ Number of new holes introduced (if any).
+  , frRemainingHoles :: Maybe Int -- ^ Number of remaining holes after filling (if determinable).
   } deriving (Eq, Show)
 
 instance ToJSON FillResult where
@@ -179,7 +182,7 @@ instance ToJSON FillResult where
     [ "status"    .= frStatus r
     , "candidate" .= frCandidate r
     ] <> maybe [] (\m -> ["message"  .= m]) (frMessage r)
-      <> maybe [] (\n -> ["newHoles" .= n]) (frNewHoles r)
+      <> maybe [] (\n -> ["remainingHoles" .= n]) (frRemainingHoles r)
 
 -- | Severity level for a diagnostic.
 data DiagSeverity = DiagError | DiagWarning | DiagInfo

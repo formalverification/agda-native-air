@@ -27,6 +27,8 @@ module AgdaMCP.Agda
   ( -- * Configuration
     AgdaConfig (..)
   , defaultConfig
+    -- * Debug output
+  , debugLog
     -- * Hole operations (pure)
   , HoleSpan (..)
   , findHoles
@@ -41,10 +43,11 @@ module AgdaMCP.Agda
   ) where
 
 import Control.Exception (catch, SomeException)
-import Data.List (foldl')
+import Data.Text.IO as TIO
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.Exit (ExitCode (..))
+import System.IO (stderr)
 import System.Process (readProcessWithExitCode)
 
 import AgdaMCP.Types (CtxEntry (..))
@@ -60,6 +63,7 @@ data AgdaConfig = AgdaConfig
   , agdaFlags     :: [String]     -- ^ Extra flags (e.g. @["-i", "agda", "--library-file=..."]@).
   , agdaTimeout   :: Maybe Int    -- ^ Timeout in seconds (Nothing = no timeout).
   , reportExpr    :: Text         -- ^ Reporting expression to inject (default: "reportGoalCtx").
+  , agdaVerbose   :: Bool         -- ^ Emit debug output to stderr.
   } deriving (Eq, Show)
 
 -- | Sensible defaults; the caller should override @agdaFlags@ for their project.
@@ -69,7 +73,14 @@ defaultConfig = AgdaConfig
   , agdaFlags   = []
   , agdaTimeout = Just 30
   , reportExpr  = "reportGoalCtx"
+  , agdaVerbose = False
   }
+
+-- | Emit a debug message to stderr, gated by 'agdaVerbose'.
+debugLog :: AgdaConfig -> Text -> IO ()
+debugLog cfg msg
+  | agdaVerbose cfg = TIO.hPutStrLn stderr msg
+  | otherwise       = pure ()
 
 
 -- ---------------------------------------------------------------------------
@@ -78,8 +89,8 @@ defaultConfig = AgdaConfig
 
 -- | A located hole token in source text.
 data HoleSpan = HoleSpan
-  { hsStart :: Int    -- ^ 0-based byte offset of '{' in "{!!}".
-  , hsEnd   :: Int    -- ^ 0-based byte offset one past '}'.
+  { hsStart :: Int    -- ^ 0-based character offset (Text index) of '{' in "{!!}".
+  , hsEnd   :: Int    -- ^ 0-based character offset (Text index) one past '}'.
   , hsLine  :: Int    -- ^ 1-based line number.
   , hsCol   :: Int    -- ^ 1-based column number.
   } deriving (Eq, Show)
@@ -145,6 +156,8 @@ ctxPrefix  = "AGDADOJANG_CTX:"
 parseGoalContext :: Text -> Maybe (Text, [CtxEntry])
 parseGoalContext output = do
   block <- lastSplitOn reqBegin output >>= fstSplitOn reqEnd . snd
+  -- Note: foldl' is re-exported from Prelude in GHC 9.10+ (base 4.20+).
+  -- If building with GHC 9.8.x, add: import Data.List (foldl')
   let (goal, ctx) = foldl' accumulate ("", []) (T.lines block)
   if T.null goal then Nothing else Just (normaliseWs goal, reverse ctx)
   where
@@ -249,6 +262,8 @@ runAgda cfg path = do
       , arStderr   = "agda-mcp: failed to run agda: " <> T.pack (show err)
       }
     Right (ec, out, err) ->
+      -- TODO: enforce agdaTimeout via System.Timeout.timeout
+      -- SEE: https://github.com/formalverification/agda-native-air/pull/38#discussion_r2969684706
       let code = case ec of
             ExitSuccess   -> 0
             ExitFailure n -> n

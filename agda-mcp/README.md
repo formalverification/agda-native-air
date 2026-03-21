@@ -43,7 +43,7 @@ belong to the agent.
 ### Build
 
 ```sh
-nix develop .#backend   # or .#all for the full environment
+nix develop .#backend   # required!  (default Nix shell has wrong GHC version)
 cd agda-mcp
 cabal build
 ```
@@ -61,7 +61,8 @@ The server reads JSON-RPC from stdin and writes to stdout.  It will wait for an 
 ```sh
 cabal test
 ```
-Currently only pure tests (marker parsing, hole finding) are included and run without Agda.  Integration tests calling Agda are planned and will require `nix develop`.
+Pure tests (marker parsing, hole finding) run without Agda.  Integration tests that
+call Agda require `nix develop .#backend`.
 
 For Claude Code setup and MCP client configuration, see [Configuring MCP Clients](#configuring-mcp-clients) below.
 
@@ -155,7 +156,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 {
   "status": "ok",
   "candidate": "x",
-  "newHoles": 1
+  "remainingHoles": 1
 }
 ```
 
@@ -248,6 +249,10 @@ cabal run agda-mcp -- \
   < test/resources/mcp-test-input.jsonl
 ```
 
+> **Note:** The test input uses paths relative to `agda-mcp/` (e.g. `../agda-dojang/...`).
+> Run from the `agda-mcp/` directory, or adjust paths if running from elsewhere.
+
+---
 
 ## Configuring MCP Clients
 

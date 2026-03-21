@@ -641,7 +641,16 @@ This section walks you through building, testing, running, and connecting an age
 
 ### 13.1 Build & Test
 
-From inside a Nix shell (e.g., `nix develop` at the cli in the main directory),
+Enter the `backend` Nix shell. 
+
+```sh
+nix develop .#backend   # required!  
+```
+
+For `agda-mcp`, the `backend` shell is required at the moment since the default Nix
+shell has wrong GHC version.
+
+Once in the `backend` Nix shell, do
 
 ```sh
 # build

@@ -33,11 +33,11 @@ import Control.Exception (SomeException, catch)
 import System.Directory (createDirectoryIfMissing, createFileLink, getTemporaryDirectory,
                           listDirectory, makeAbsolute, removeDirectoryRecursive)
 
-import System.FilePath ((</>), takeFileName, takeDirectory)
-import System.IO (stderr)
+import System.FilePath ((</>), takeFileName, takeDirectory, takeBaseName)
+import System.IO (hPutStrLn, stderr)
 
 import AgdaMCP.Agda
-  ( AgdaConfig, AgdaResult (..), agdaFlags
+  ( AgdaConfig, AgdaResult (..), agdaFlags, debugLog
   , findHoles, injectReportExpr, substituteHole
   , parseGoalContext, runAgda
   )
@@ -80,9 +80,9 @@ handleGetGoal cfg params = do
           cfgWithDir = cfg { agdaFlags = baseFlags <> extraFlags }
       result <- runAgda cfgWithDir tmpFile
       -- DEBUG: show what Agda actually returned
-      TIO.hPutStrLn stderr $ "DEBUG get_goal: exit=" <> T.pack (show (arExitCode result))
-      TIO.hPutStrLn stderr $ "DEBUG stdout: " <> T.take 500 (arStdout result)
-      TIO.hPutStrLn stderr $ "DEBUG stderr: " <> T.take 500 (arStderr result)
+      debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
+      debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
+      debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
       -- Agda may emit markers on stdout or stderr; check both.
       let combined = arStdout result <> "\n" <> arStderr result
       case parseGoalContext combined of
@@ -93,7 +93,7 @@ handleGetGoal cfg params = do
           pure . Right $ GoalInfo
             { giGoal    = goal
             , giContext = ctx
-            , giModule  = Just . T.pack . takeFileName $ ggFilePath params
+            , giModule  = Just . T.pack . takeBaseName $ ggFilePath params
             }
 
 
@@ -140,12 +140,12 @@ handleFillHole cfg params = do
                      then Nothing
                      else Just (T.take 2000 combined)
           -- Count remaining holes in the patched source after substitution.
-          newHoleCount = length (findHoles patched)
+          remainingHoles = length (findHoles patched)
       pure . Right $ FillResult
         { frStatus    = status
         , frCandidate = fhCandidate params
         , frMessage   = msg
-        , frNewHoles  = Just newHoleCount
+        , frRemainingHoles = Just remainingHoles
         }
 
 
@@ -261,6 +261,9 @@ makeTmpDir :: String -> IO FilePath
 makeTmpDir label = do
   tmp <- getTemporaryDirectory
   let dir = tmp </> label
+  -- NOTE: v0 uses a fixed name (sequential requests only).
+  -- TODO: switch to createTempDirectory for concurrent safety.
+  -- SEE: https://github.com/formalverification/agda-native-air/pull/38#discussion_r2969684711
   createDirectoryIfMissing True dir
   pure dir
 
@@ -288,4 +291,12 @@ makeOverlay tmpDir srcDir excludeFile = do
       let target = srcDir </> name
           link   = overlay </> name
       createFileLink target link
-        `catch` \(_ :: SomeException) -> pure ()
+        `catch` \(e :: SomeException) ->
+          hPutStrLn stderr $ "agda-mcp: overlay link failed for " <> name <> ": " <> show e
+        -- Copilot suggests the `catch` swallowing all exceptions is fragile.  This
+        -- is true, but on most Linux filesystems `createFileLink` works fine (these
+        -- are hard links, not symlinks).
+        --
+        -- The full copy fallback Copilot suggests is ~20 lines of recursive
+        -- directory copy, which is overkill for v0.  The easy fix above merely
+        -- logs a warning to stderr on failure rather than silently swallowing.
