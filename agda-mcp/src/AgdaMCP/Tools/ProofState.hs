@@ -161,7 +161,8 @@ handleCheckFile cfg params = do
   let extraFlags = ["-i", takeDirectory absPath]
       cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
   result <- runAgda cfgWithDir absPath
-  let diags   = parseDiagnostics (arStderr result)
+  let combined = arStdout result <> "\n" <> arStderr result
+      diags   = parseDiagnostics combined
       nHoles  = length (findHoles src)
       success = arExitCode result == 0
   pure . Right $ FileCheckResult
@@ -183,7 +184,8 @@ handleGetDiagnostics cfg params = do
   let extraFlags = ["-i", takeDirectory absPath]
       cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
   result <- runAgda cfgWithDir absPath
-  let diags    = parseDiagnostics (arStderr result)
+  let combined = arStdout result <> "\n" <> arStderr result
+      diags    = parseDiagnostics combined
       nErrors  = length [() | Diagnostic DiagError _ _ _ <- diags]
       nWarns   = length [() | Diagnostic DiagWarning _ _ _ <- diags]
       holes    = findHoles src

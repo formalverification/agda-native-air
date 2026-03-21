@@ -1,33 +1,38 @@
-{-# LANGUAGE OverloadedStrings #-}
-
--- | File: agda-native-air/agda-mcp/app/Main.hs
+-- | Main.hs
 --
--- Entry point for the agda-mcp MCP server.
+-- File: agda-native-air/agda-mcp/app/Main.hs
 --
--- Parses command-line options and starts the MCP server on stdio transport.
+-- Description:
+--   Entry point for the agda-mcp MCP server.
+--   Parses command-line options and starts the MCP server on stdio transport.
+--
+--   The server reads JSON-RPC requests from stdin and writes responses to stdout.
+--   Configure it as an MCP server in Claude Code (or Cursor, etc.) by pointing
+--   the MCP client at this binary.
+--
+--   Example claude_desktop_config.json:
+--     {
+--       "mcpServers": {
+--         "agda": {
+--           "command": "agda-mcp",
+--           "args": ["--agda-flags", "-i agda --library-file=agda/libraries -l agda-dojang -l standard-library"]
+--         }
+--       }
+--     }
 --
 -- Usage:
 --   agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 --
--- The server reads JSON-RPC requests from stdin and writes responses to stdout.
--- Configure it as an MCP server in Claude Code / Cursor / etc. by pointing
--- the MCP client at this binary.
---
--- Example claude_desktop_config.json:
---   {
---     "mcpServers": {
---       "agda": {
---         "command": "agda-mcp",
---         "args": ["--agda-flags", "-i agda --library-file=agda/libraries -l agda-dojang -l standard-library"]
---       }
---     }
---   }
+
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
+import Control.Monad (when)
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.Environment (getArgs)
+import System.Exit (exitSuccess)
 import System.IO (hPutStrLn, stderr)
 
 import AgdaMCP.Agda (AgdaConfig (..), defaultConfig)
@@ -37,6 +42,9 @@ import AgdaMCP.Server (ServerConfig (..), runServer)
 main :: IO ()
 main = do
   args <- getArgs
+  when ("--help" `elem` args) $ do
+    putStrLn usage
+    exitSuccess
   let cfg = parseArgs args defaultConfig
       serverCfg = ServerConfig
         { scAgdaConfig = cfg
@@ -65,12 +73,16 @@ parseArgs ("--agda-flags" : flags : rest) cfg =
   parseArgs rest cfg { agdaFlags = words flags }
 parseArgs ("--timeout" : n : rest) cfg =
   parseArgs rest cfg { agdaTimeout = Just (read n) }
-parseArgs ("--help" : _) _ = error usage
-parseArgs (unknown : rest) cfg = do
-  -- Skip unknown flags with a warning (lenient for forward-compat).
+parseArgs (unknown : rest) cfg =
+  -- do
   parseArgs rest cfg
-  where
-    _ = hPutStrLn stderr $ "agda-mcp: ignoring unknown flag: " <> unknown
+  -- -- Skip unknown flags with a warning (lenient for forward-compat).
+  -- where _ = hPutStrLn stderr $ "agda-mcp: ignoring unknown flag: " <> unknown
+  -- --        ^ NOTE: this is a dead binding inside a pure function; it compiles but the
+  -- --        warning is never emitted (it's a thunk bound to `_`, never forced).
+  -- --        Copilot's suggestion of just silently skipping is fine for v0. A cleaner
+  -- --        approach would be to return `IO AgdaConfig`, but that's more refactoring
+  -- --        than we need right now.
 
 usage :: String
 usage = unlines

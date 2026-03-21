@@ -1,22 +1,26 @@
--- | File: agda-native-air/agda-mcp/src/AgdaMCP/Agda.hs
+-- | Agda.hs
 --
--- Agda subprocess interaction layer.
+-- File: agda-native-air/agda-mcp/src/AgdaMCP/Agda.hs
 --
--- This module provides pure and IO functions for:
+-- Description:
+--   Agda subprocess interaction layer.
+--
+--   This module provides pure and IO functions for:
 --   1. Finding {!!} holes in Agda source text.
 --   2. Injecting the reportGoalCtx macro to extract (goal, context).
 --   3. Parsing AGDADOJANG marker output from Agda's stderr.
 --   4. Substituting candidate terms into holes and running Agda to typecheck.
 --
--- It is a Haskell port of the essential logic in:
---   agda-dojang/python/tools/agent_bridge.py
---   agda-dojang/python/tools/report_parser.py
+--   It is a Haskell port of the essential logic in legacy Python tools:
+--     agda-dojang/python/tools/agent_bridge.py
+--     agda-dojang/python/tools/report_parser.py
 --
--- The functions here call the @agda@ binary as a subprocess.  The long-term
--- plan is to replace this with Agda-as-a-library calls once the Haskell
--- interface to AgdaDojang matures.
+--   The functions here call the @agda@ binary as a subprocess.  The long-term
+--   plan is to replace this with Agda-as-a-library calls once the Haskell
+--   interface to AgdaDojang matures.
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE StrictData        #-}
 
 module AgdaMCP.Agda
@@ -37,6 +41,7 @@ module AgdaMCP.Agda
   ) where
 
 import Control.Exception (catch, SomeException)
+import Data.List (foldl')
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.Exit (ExitCode (..))
@@ -98,9 +103,10 @@ findHoles src = go 0 1 1 src
 
 -- | Find the n-th hole (0-indexed) in source text.
 findNthHole :: Int -> Text -> Maybe HoleSpan
-findNthHole n src =
-  let holes = findHoles src
-  in  if n < length holes then Just (holes !! n) else Nothing
+findNthHole n src
+  | n < 0     = Nothing
+  | otherwise = let holes = findHoles src
+                in  if n < length holes then Just (holes !! n) else Nothing
 
 -- | Replace the n-th hole with the reporting expression (e.g. "reportGoalCtx ?").
 injectReportExpr :: AgdaConfig -> Int -> Text -> Maybe Text
@@ -230,8 +236,8 @@ data AgdaResult = AgdaResult
 
 -- | Run the Agda binary on the given file path.
 --
--- Merges stdout and stderr into @arStderr@ for convenience, since Agda
--- emits most diagnostics on stderr.
+-- Captures stdout and stderr separately, since Agda emits most diagnostics
+-- on stderr.
 runAgda :: AgdaConfig -> FilePath -> IO AgdaResult
 runAgda cfg path = do
   let args = agdaFlags cfg <> [path]

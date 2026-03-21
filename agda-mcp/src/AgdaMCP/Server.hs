@@ -2,7 +2,7 @@
 --
 -- File: agda-native-air/agda-mcp/src/AgdaMCP/Server.hs
 --
--- Decription:
+-- Description:
 --   Minimal MCP stdio transport for agda-mcp; implements the subset of the Model
 --   Context Protocol (MCP 2024-11-05) needed for tool-based interaction:
 --

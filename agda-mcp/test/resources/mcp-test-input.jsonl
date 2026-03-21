@@ -1,4 +1,6 @@
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 {"jsonrpc":"2.0","id":2,"method":"tools/list"}
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_goal","arguments":{"filePath":"/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/10-m1-2-implement-agda-mcp-server-core/agda-dojang/data/fixtures/Fixture01.agda","holeIndex":0}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_goal","arguments":{"filePath":"agda-dojang/data/fixtures/Fixture01.agda","holeIndex":0}}}
+// Note: The server currently calls `makeAbsolute` on the path, which will resolve relative paths against cwd.
+//       This should work if the test runner's cwd is the repo root.
