@@ -72,8 +72,9 @@ look up definitions by name or type.
 
 `agda-mcp` is implemented in Haskell for three reasons.
 
-1.  Agda itself is implemented in Haskell, so the MCP server can call AgdaDojang's
-    Haskell API directly with no subprocess boundary;
+1.  Agda itself is implemented in Haskell, so future iterations of the MCP server
+    can call AgdaDojang's Haskell API directly with no subprocess boundary (the
+    v0 implementation still shells out to the `agda` binary per tool call);
 2.  the extraction backend (`agda-strux`) is already Haskell, giving shared types,
     shared build infrastructure (Cabal/Nix), and a single GHC version;
 3.  key collaborators work primarily in Haskell and Agda.
