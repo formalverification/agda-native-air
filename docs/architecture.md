@@ -68,9 +68,51 @@ look up definitions by name or type.
 
 ---
 
+## Language choice: Haskell
+
+`agda-mcp` is implemented in Haskell for three reasons.
+
+1.  Agda itself is implemented in Haskell, so the MCP server can call AgdaDojang's
+    Haskell API directly with no subprocess boundary;
+2.  the extraction backend (`agda-strux`) is already Haskell, giving shared types,
+    shared build infrastructure (Cabal/Nix), and a single GHC version;
+3.  key collaborators work primarily in Haskell and Agda.
+
+### Alternatives considered and rejected
+
++  Rust (no Agda-as-library access)
++  Python (dynamically typed)
++  TypeScript (alien to the team).
+
+See [PLAN.md §1](PLAN.md) for broader architectural context.
+
+The v0 implementation uses a minimal hand-written MCP stdio transport rather than the
+`mcp-server` Hackage library, which requires GHC 9.10+ while the project pins GHC
+9.8.2 for Agda compatibility.
+
+---
+
+## Interaction model
+
+A typical agent session follows a **propose–check–refine** loop.
+
+1.  Agent calls `check_file` to load an Agda file with holes.
+2.  Agent calls `get_goal` for a specific hole to inspect its type and context.
+3.  Agent reasons about the goal (using its own knowledge, optionally augmented
+    by search tools to find relevant lemmas).
+4.  Agent calls `fill_hole` with a candidate term.
+5.  If the term typechecks, the hole is filled (possibly creating sub-holes; go to 2).
+6.  If the term fails, the agent reads the error, revises, and retries (go to 3).
+7.  Repeat until all holes are filled or the agent gives up.
+
+This is the same loop that AgdaDojang's scripted policy backend demo implements, but
+driven by a frontier LLM instead of a fixed script.
+
+---
+
 ## Related documents
 
-- [`agda-mcp/README.md`](../agda-mcp/README.md) — Bridge layer: MCP tool surface, Haskell rationale, transport, interaction model, directory structure, and roadmap.
+- [`agda-mcp/README.md`](../agda-mcp/README.md) — Bridge layer: tool surface, transport, and module structure.
 - [`docs/representation.md`](representation.md) — Data contract for `agda-strux` JSONL output and derived views.
 - [`docs/PLAN.md`](PLAN.md) — Project plan with milestone breakdown and component descriptions.
 - [`docs/roadmap.md`](roadmap.md) — GitHub project roadmap with issue-level detail.

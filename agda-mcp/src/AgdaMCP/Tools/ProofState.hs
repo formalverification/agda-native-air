@@ -1,17 +1,19 @@
--- | File: agda-native-air/agda-mcp/src/AgdaMCP/Tools/ProofState.hs
+-- | ProofState.hs
 --
--- Core proof-state tools for the agda-mcp MCP server (M1-2).
+-- File: agda-native-air/agda-mcp/src/AgdaMCP/Tools/ProofState.hs
 --
--- Each function implements one MCP tool.  They share an 'AgdaConfig' and
--- call the Agda binary via 'AgdaMCP.Agda'.  The agent invokes these
--- through JSON-RPC tool calls; the MCP server layer (AgdaMCP.Server)
--- dispatches to the appropriate handler.
+-- Description:
+--   Core proof-state tools for the agda-mcp server.
 --
--- Tools:
---   * get_goal        — inspect goal type + context at a hole
---   * fill_hole       — try a candidate term and report typecheck result
---   * check_file      — load/reload a file and return all diagnostics
---   * get_diagnostics — lightweight summary (hole count, error count)
+--   Each function implements one MCP tool.  They share an 'AgdaConfig' and call the
+--   Agda binary via 'AgdaMCP.Agda'.  The agent invokes these through JSON-RPC tool calls;
+--   the MCP server layer (AgdaMCP.Server) dispatches to the appropriate handler.
+--
+--   Tools:
+--   * get_goal        - inspect goal type + context at a hole
+--   * fill_hole       - try a candidate term and report typecheck result
+--   * check_file      - load/reload a file and return all diagnostics
+--   * get_diagnostics - lightweight summary (hole count, error count)
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -45,14 +47,13 @@ import AgdaMCP.Types
 -- get_goal
 -- ---------------------------------------------------------------------------
 
--- | Inspect the goal type and local context at hole @n@ in the given file.
+-- | handleGetGoal: inspect goal type and local context at hole @n@ in given file.
 --
--- Workflow:
---   1. Read the source file.
---   2. Replace hole @n@ with @reportGoalCtx ?@.
---   3. Write a temporary copy and run Agda on it.
---   4. Parse the AGDADOJANG_REQ_BEGIN/END block from stderr.
---   5. Return structured (goal, context).
+-- 1. Read source file.
+-- 2. Replace hole @n@ with @reportGoalCtx ?@.
+-- 3. Write a temporary copy and run Agda on it.
+-- 4. Parse AGDADOJANG_REQ_BEGIN/END block from stderr.
+-- 5. Return structured (goal, context).
 handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either Text GoalInfo)
 handleGetGoal cfg params = do
   absPath <- makeAbsolute (ggFilePath params)
@@ -100,12 +101,11 @@ handleGetGoal cfg params = do
 -- fill_hole
 -- ---------------------------------------------------------------------------
 
--- | Try substituting @candidate@ into hole @n@ and typecheck.
+-- | handleFillHole: try substituting @candidate@ into hole @n@ and typecheck.
 --
--- Workflow:
---   1. Read source, substitute candidate into hole n.
---   2. Write temp copy, run Agda.
---   3. If exit 0 → success; otherwise → type error.
+-- 1. Read source, substitute candidate into hole n.
+-- 2. Write temp copy, run Agda.
+-- 3. If exit 0 → success; otherwise → type error.
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either Text FillResult)
 handleFillHole cfg params = do
   absPath <- makeAbsolute (fhFilePath params)
@@ -153,7 +153,7 @@ handleFillHole cfg params = do
 -- check_file
 -- ---------------------------------------------------------------------------
 
--- | Load/reload an Agda file and return all diagnostics.
+-- | handleCheckFile: load/reload an Agda file and return all diagnostics.
 handleCheckFile :: AgdaConfig -> CheckFileParams -> IO (Either Text FileCheckResult)
 handleCheckFile cfg params = do
   absPath <- makeAbsolute (cfFilePath params)
@@ -175,7 +175,7 @@ handleCheckFile cfg params = do
 -- get_diagnostics
 -- ---------------------------------------------------------------------------
 
--- | Lightweight diagnostic summary: run Agda, count errors/warnings/holes.
+-- | handleGetDiagnostics: diagnostic summary; run Agda, count errors/warnings/holes.
 handleGetDiagnostics :: AgdaConfig -> GetDiagnosticsParams -> IO (Either Text DiagnosticsResult)
 handleGetDiagnostics cfg params = do
   absPath <- makeAbsolute (gdFilePath params)
@@ -206,7 +206,7 @@ handleGetDiagnostics cfg params = do
 -- Internal helpers
 -- ---------------------------------------------------------------------------
 
--- | Parse Agda stderr into a list of diagnostics.
+-- | parseDiagnostics: parse Agda stderr into a list of diagnostics.
 --
 -- This is a best-effort heuristic parser.  Agda error messages typically
 -- look like:
@@ -241,11 +241,11 @@ parseDiagnostics stderr' =
         _ -> Nothing
 
 
--- | Strip @-i <dir>@ token pairs from a flag list when @dir@ matches @dropDir@.
+-- | stripIncludeDir: strip @-i <dir>@ token pairs from flag list when @dir@ matches @dropDir@.
 --
--- Port of agent_bridge.py's @_drop_include_dir_tokens@.  In shadow mode we
--- typecheck a temp copy; if the original directory is also on the include path,
--- Agda sees two files for the same module → AmbiguousTopLevelModuleName.
+-- In shadow mode we typecheck a temp copy; if the original directory is also on the
+-- include path, Agda sees two files for the same module → AmbiguousTopLevelModuleName.
+-- (Port of agent_bridge.py's @_drop_include_dir_tokens@.)
 stripIncludeDir :: FilePath -> [String] -> [String]
 stripIncludeDir _       []                    = []
 stripIncludeDir dropDir ("-i" : dir : rest)
@@ -254,7 +254,7 @@ stripIncludeDir dropDir ("-i" : dir : rest)
 stripIncludeDir dropDir (x : rest)            = x : stripIncludeDir dropDir rest
 
 
--- | Create a temporary directory for scratch Agda files.
+-- | makeTmpDir: create a temp directory for scratch Agda files.
 makeTmpDir :: String -> IO FilePath
 makeTmpDir label = do
   tmp <- getTemporaryDirectory
@@ -265,11 +265,11 @@ makeTmpDir label = do
 -- Bring concatMap into scope for the list comprehension in parseDiagnostics.
 -- (It's in Prelude, but explicit for clarity with GHC2021.)
 
--- | Create an overlay directory that mirrors @srcDir@ except for @excludeFile@.
+-- | makeOverlay: create overlay directory mirroring @srcDir@ except for @excludeFile@.
 --
--- This avoids Agda's @ModuleDefinedInOtherFile@ error when we typecheck a
--- patched copy of a file while still needing sibling imports to resolve.
--- Same strategy as agda-dojang/python/tools/agent_bridge.py's _ensure_overlay_dir.
+-- This avoids Agda's @ModuleDefinedInOtherFile@ error when we typecheck a patched
+-- copy of a file while still needing sibling imports to resolve.
+-- (Port of agent_bridge.py's _ensure_overlay_dir.)
 makeOverlay :: FilePath -> FilePath -> String -> IO FilePath
 makeOverlay tmpDir srcDir excludeFile = do
   let overlay = tmpDir </> "_overlay"

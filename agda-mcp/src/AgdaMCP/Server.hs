@@ -1,15 +1,16 @@
--- | File: agda-native-air/agda-mcp/src/AgdaMCP/Server.hs
+-- | Server.hs
 --
--- Minimal MCP stdio transport for agda-mcp.
+-- File: agda-native-air/agda-mcp/src/AgdaMCP/Server.hs
 --
--- Implements the subset of the Model Context Protocol (MCP 2024-11-05)
--- needed for tool-based interaction:
+-- Decription:
+--   Minimal MCP stdio transport for agda-mcp; implements the subset of the Model
+--   Context Protocol (MCP 2024-11-05) needed for tool-based interaction:
 --
 --   * @initialize@ / @initialized@ handshake
 --   * @tools/list@ — enumerate available tools with JSON Schema parameters
 --   * @tools/call@ — dispatch a tool invocation to the appropriate handler
 --
--- Communication is line-delimited JSON-RPC 2.0 over stdin/stdout.
+--   Communication is line-delimited JSON-RPC 2.0 over stdin/stdout.
 --
 -- Design note:
 --   We implement this by hand (~200 lines) rather than using the @mcp-server@
@@ -52,7 +53,7 @@ import AgdaMCP.Tools.ProofState
 -- Configuration
 -- ---------------------------------------------------------------------------
 
--- | Server-level configuration.
+-- | ServerConfig: server-level configuration.
 data ServerConfig = ServerConfig
   { scAgdaConfig :: AgdaConfig
   , scServerName :: Text
@@ -129,7 +130,7 @@ toolDefinitions = toJSON
       ["filePath"]
   ]
 
--- | Build a tool definition object (MCP tools/list schema).
+-- | toolDef: build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
 toolDef name desc props required = object
   [ "name"        .= name
@@ -150,8 +151,9 @@ prop name typ desc = (name, object ["type" .= typ, "description" .= desc])
 -- Main server loop
 -- ---------------------------------------------------------------------------
 
--- | Run the MCP server on stdio.  Reads JSON-RPC
--- requests from stdin and writes responses to stdout.
+-- | runServer: run the MCP server on stdio.
+--
+-- Reads JSON-RPC requests from stdin and writes responses to stdout.
 runServer :: ServerConfig -> IO ()
 runServer cfg = do
   -- Ensure line buffering for correct MCP framing.
@@ -181,13 +183,10 @@ sendResponse v = do
   hFlush stdout
 
 
--- ---------------------------------------------------------------------------
--- Request dispatch
--- ---------------------------------------------------------------------------
-
+-- | handleRequest: dispatcher
 handleRequest :: ServerConfig -> JsonRpcRequest -> IO (Maybe Value)
 
--- MCP handshake: initialize
+-- | MCP handshake: initialize
 handleRequest cfg req | rpcMethod req == "initialize" = do
   let result = object
         [ "protocolVersion" .= ("2024-11-05" :: Text)
@@ -232,10 +231,7 @@ handleRequest _ req =
   pure . Just $ mkError (rpcId req) (-32601) ("Method not found: " <> rpcMethod req)
 
 
--- ---------------------------------------------------------------------------
--- Tool dispatch
--- ---------------------------------------------------------------------------
-
+-- | dispatchTool: tool dispatcher
 dispatchTool :: AgdaConfig -> Text -> Value -> IO Value
 dispatchTool cfg "get_goal" args =
   case Aeson.fromJSON args of
@@ -260,7 +256,7 @@ dispatchTool cfg "get_diagnostics" args =
 dispatchTool _ name _ =
   pure $ toolError ("Unknown tool: " <> name)
 
--- | Wrap a tool handler result as an MCP tool response.
+-- | eitherToMcp: wrap a tool handler result as an MCP tool response.
 eitherToMcp :: ToJSON a => Either Text a -> Value
 eitherToMcp (Left err) = toolError err
 
