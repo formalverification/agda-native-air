@@ -27,7 +27,6 @@ module AgdaMCP.Tools.Search
   , handleGetDependencies
   ) where
 
-import Data.Aeson (ToJSON (..), object, (.=))
 import Data.Text (Text)
 
 import AgdaMCP.Corpus (searchByName, searchByType, getDeps)

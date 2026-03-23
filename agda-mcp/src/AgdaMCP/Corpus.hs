@@ -40,7 +40,6 @@ module AgdaMCP.Corpus
 import Data.Aeson (eitherDecodeStrict')
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
