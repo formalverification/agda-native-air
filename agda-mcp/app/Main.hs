@@ -15,14 +15,18 @@
 --       "mcpServers": {
 --         "agda": {
 --           "command": "agda-mcp",
---           "args": ["--agda-flags", "-i agda --library-file=agda/libraries -l agda-dojang -l standard-library"]
+--           "args": ["--agda-flags", "...", "--corpus", "data/agda-algebras.jsonl"]
 --         }
 --       }
 --     }
 --
 -- Usage:
 --   agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
+--            [--corpus PATH]   [--timeout N] [--verbose]
 --
+-- M1-3 additions:
+--   --corpus PATH   Load agda-strux JSONL corpus for search tools.
+--                   Without this flag, search tools are not registered.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -30,12 +34,26 @@ module Main where
 
 import Control.Monad (when)
 import System.Environment (getArgs)
-import System.Exit (exitSuccess)
+import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import Text.Read (readMaybe)
 
 import AgdaMCP.Agda (AgdaConfig (..), defaultConfig)
+import AgdaMCP.Corpus (loadCorpus)
 import AgdaMCP.Server (ServerConfig (..), runServer)
+
+-- | Parsed CLI options.  Separates Agda config from corpus path since
+-- corpus loading happens before the server loop starts.
+data CliOpts = CliOpts
+  { cliAgdaConfig :: AgdaConfig
+  , cliCorpusPath :: Maybe FilePath
+  } deriving (Show)
+
+defaultCliOpts :: CliOpts
+defaultCliOpts = CliOpts
+  { cliAgdaConfig = defaultConfig
+  , cliCorpusPath = Nothing
+  }
 
 
 main :: IO ()
@@ -44,14 +62,32 @@ main = do
   when ("--help" `elem` args) $ do
     putStrLn usage
     exitSuccess
-  let cfg = parseArgs args defaultConfig
-      serverCfg = ServerConfig
-        { scAgdaConfig = cfg
-        , scServerName = "agda-mcp"
-        , scVersion    = "0.1.0"
+  let opts = parseArgs args defaultCliOpts
+      cfg  = cliAgdaConfig opts
+
+  -- Load corpus if --corpus was provided.
+  corpusIdx <- case cliCorpusPath opts of
+    Nothing   -> do
+      hPutStrLn stderr "agda-mcp: no --corpus flag; search tools disabled."
+      pure Nothing
+    Just path -> do
+      result <- loadCorpus path
+      case result of
+        Left err -> do
+          hPutStrLn stderr $ "agda-mcp: ERROR loading corpus: " <> show err
+          exitFailure
+        Right idx -> pure (Just idx)
+
+  let serverCfg = ServerConfig
+        { scAgdaConfig  = cfg
+        , scServerName  = "agda-mcp"
+        , scVersion     = "0.2.0"
+        , scCorpusIndex = corpusIdx
         }
-  hPutStrLn stderr $ "agda-mcp v0.1.0 starting (agda-bin: " <> agdaBin cfg <> ")"
+
+  hPutStrLn stderr $ "agda-mcp v0.2.0 starting (agda-bin: " <> agdaBin cfg <> ")"
   hPutStrLn stderr $ "  flags: " <> unwords (agdaFlags cfg)
+  hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
   hPutStrLn stderr   "  transport: stdio"
   hPutStrLn stderr   "  Waiting for MCP client..."
   runServer serverCfg
@@ -62,24 +98,25 @@ main = do
 -- Supports:
 --   --agda-bin PATH       Override the agda binary path (default: "agda").
 --   --agda-flags "..."    Space-separated Agda flags.
+--   --corpus PATH         Load agda-strux JSONL corpus for search tools.
 --   --timeout N           Timeout in seconds (default: 30).
+--   --verbose             Emit debug output to stderr.
 --   --help                Print usage and exit.
-parseArgs :: [String] -> AgdaConfig -> AgdaConfig
-parseArgs [] cfg = cfg
-parseArgs ("--agda-bin" : path : rest) cfg =
-  parseArgs rest cfg { agdaBin = path }
-parseArgs ("--agda-flags" : flags : rest) cfg =
-  parseArgs rest cfg { agdaFlags = words flags }
-parseArgs ("--timeout" : n : rest) cfg =
-  case readMaybe n of
-    Just secs -> parseArgs rest cfg { agdaTimeout = Just secs }
-    Nothing   -> parseArgs rest cfg  -- silently ignore bad value; keep default
-parseArgs ("--verbose" : rest) cfg =
-  parseArgs rest cfg { agdaVerbose = True }
+parseArgs :: [String] -> CliOpts -> CliOpts
+parseArgs [] opts = opts
+parseArgs ("--agda-bin" : path : rest) opts =
+  parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaBin = path } }
+parseArgs ("--agda-flags" : flags : rest) opts =
+  parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaFlags = words flags } }
+parseArgs ("--corpus" : path : rest) opts =
+  parseArgs rest opts { cliCorpusPath = Just path }
+parseArgs ("--timeout" : n : rest) opts = case readMaybe n of
+  Just secs -> parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaTimeout = Just secs } }
+  Nothing   -> parseArgs rest opts
+parseArgs ("--verbose" : rest) opts =
+  parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaVerbose = True } }
 parseArgs ("--help" : _) _ = error usage
-parseArgs (_ : rest) cfg =
-  -- do
-  parseArgs rest cfg
+parseArgs (_ : rest) opts = parseArgs rest opts
   -- -- Skip unknown flags with a warning (lenient for forward-compat).
   -- where _ = hPutStrLn stderr $ "agda-mcp: ignoring unknown flag: " <> unknown
   -- --        ^ NOTE: this is a dead binding inside a pure function; it compiles but the
@@ -97,9 +134,15 @@ usage = unlines
   , "Options:"
   , "  --agda-bin PATH       Path to the agda binary (default: agda)"
   , "  --agda-flags \"...\"    Space-separated Agda flags"
+  , "  --corpus PATH         Load agda-strux JSONL corpus for search tools"
   , "  --timeout N           Typecheck timeout in seconds (default: 30)"
   , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""
   , "The server reads JSON-RPC (MCP) from stdin and writes to stdout."
+  , ""
+  , "When --corpus is provided, three additional tools are registered:"
+  , "  search_by_name      Find definitions by name pattern"
+  , "  search_by_type      Find definitions by type signature pattern"
+  , "  get_dependencies    Retrieve the dependency neighborhood of a definition"
   ]

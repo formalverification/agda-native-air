@@ -5,8 +5,10 @@
 -- Description:
 --   Integration tests for agda-mcp.
 --
---   Tests are organized in two tiers (v0):
---   1. Pure unit tests (no IO, no Agda) — hole finding, marker parsing.
+--   Tests are organized in three tiers:
+--   0. Pure unit tests (no IO, no Agda) — hole finding, marker parsing.
+--   1. Corpus/search tests (IO for file read, no Agda) — corpus loading,
+--      search_by_name, search_by_type, get_dependencies.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips.
 --
 --   Tier 2 tests are skipped gracefully if Agda is not available, making the test
@@ -25,6 +27,8 @@
 module Main (main) where
 
 import Control.Exception (catch, SomeException)
+import Data.Either (isLeft)
+import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -38,10 +42,12 @@ import AgdaMCP.Agda
   , parseGoalContext , defaultConfig
   , AgdaConfig (..)
   )
-import AgdaMCP.Types
+import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics )
-
+import AgdaMCP.Tools.Search
+  ( handleSearchByName, handleSearchByType, handleGetDependencies )
+import AgdaMCP.Types
 
 
 -- ---------------------------------------------------------------------------
@@ -97,7 +103,7 @@ fixtureLambda = T.unlines
 
 
 -- ---------------------------------------------------------------------------
--- Tier 1: Pure tests (no Agda required)
+-- Tier 0: Pure tests (no Agda required)
 -- ---------------------------------------------------------------------------
 
 pureTests :: IO [Bool]
@@ -174,6 +180,128 @@ pureTests = do
 
     , runTest "parseGoalContext: no markers → Nothing" $
         assert "should be Nothing" (isNothing $ parseGoalContext "no markers here")
+    ]
+
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 1b: Corpus / search tests (IO for file read, no Agda required)
+--
+-- These tests load a synthetic JSONL fixture and exercise the three search
+-- tools: search_by_name, search_by_type, get_dependencies.
+-- ---------------------------------------------------------------------------
+-- | Path to the synthetic JSONL fixture (relative to agda-mcp/).
+corpusFixturePath :: FilePath
+corpusFixturePath = "test/resources/corpus-fixture.jsonl"
+-- | Helper: load the corpus fixture and run a test against the index.
+withCorpus :: String -> (CorpusIndex -> IO TestResult) -> IO Bool
+withCorpus name f = runTest name $ do
+  result <- loadCorpus corpusFixturePath
+  case result of
+    Left err  -> pure (Fail $ "loadCorpus failed: " <> T.unpack err)
+    Right idx -> f idx
+corpusTests :: IO [Bool]
+corpusTests = do
+  hPutStrLn stderr "\n── Corpus / search tests (tier 1b: no Agda) ──"
+  sequence
+    [ -- Corpus loading
+      withCorpus "loadCorpus: fixture has 24 entries" $ \idx ->
+        assertEqual "entry count" 24 (ciSize idx)
+    , withCorpus "loadCorpus: expected keys present" $ \idx ->
+        let entries = ciEntries idx
+        in assert "Algebra, hom, Con should be present"
+             (  Map.member "Algebras.Basic.Algebra" entries
+             && Map.member "Homomorphisms.Basic.hom" entries
+             && Map.member "Congruences.Basic.Con" entries
+             )
+    , withCorpus "loadCorpus: entry fields correct (Algebra)" $ \idx ->
+        case Map.lookup "Algebras.Basic.Algebra" (ciEntries idx) of
+          Nothing -> pure (Fail "Algebra entry not found")
+          Just e  -> assert "field checks"
+            (  cePrettyName e == "Algebra"
+            && cePrettyModule e == "Algebras.Basic"
+            && ceDefKind e == "record"
+            && "Signature" `elem` ceDependencies e
+            && not (ceHasBody e)
+            )
+    , withCorpus "loadCorpus: entry with body (Domain)" $ \idx ->
+        case Map.lookup "Algebras.Basic.Domain" (ciEntries idx) of
+          Nothing -> pure (Fail "Domain entry not found")
+          Just e  -> assert "should have body" (ceHasBody e && isJust (ceBody e))
+      -- search_by_name
+    , withCorpus "search_by_name: 'Algebra' finds ≥1" $ \idx ->
+        let results = searchByName "Algebra" Nothing idx
+        in assert ("got " <> show (length results)) (length results >= 1)
+    , withCorpus "search_by_name: 'hom' finds ≥3 (hom, is-homomorphism, ∘-hom)" $ \idx ->
+        let results = searchByName "hom" Nothing idx
+        in assert ("got " <> show (length results)) (length results >= 3)
+    , withCorpus "search_by_name: case insensitive" $ \idx ->
+        let upper = searchByName "ALGEBRA" Nothing idx
+            lower = searchByName "algebra" Nothing idx
+        in assertEqual "count should match" (length upper) (length lower)
+    , withCorpus "search_by_name: no results for nonexistent" $ \idx ->
+        let results = searchByName "nonexistent_xyz_999" Nothing idx
+        in assert "should be empty" (null results)
+    , withCorpus "search_by_name: respects limit" $ \idx ->
+        let results = searchByName "a" (Just 3) idx
+        in assert ("got " <> show (length results)) (length results <= 3)
+    , withCorpus "search_by_name: unicode '≅' finds ≥4" $ \idx ->
+        let results = searchByName "≅" Nothing idx
+        in assert ("got " <> show (length results)) (length results >= 4)
+    , withCorpus "search_by_name: module prefix 'Congruences'" $ \idx ->
+        let results = searchByName "Congruences" Nothing idx
+        in assert ("got " <> show (length results)) (length results >= 3)
+      -- search_by_type
+    , withCorpus "search_by_type: 'Algebra' in type finds ≥10" $ \idx ->
+        let results = searchByType "Algebra" Nothing idx
+        in assert ("got " <> show (length results)) (length results >= 10)
+    , withCorpus "search_by_type: '→ Domain' finds ≥1" $ \idx ->
+        let results = searchByType "→ Domain" Nothing idx
+        in assert ("got " <> show (length results)) (length results >= 1)
+    , withCorpus "search_by_type: 'Monad' finds 0" $ \idx ->
+        let results = searchByType "Monad" Nothing idx
+        in assert "should be empty" (null results)
+    , withCorpus "search_by_type: case insensitive" $ \idx ->
+        let upper = searchByType "SET" Nothing idx
+            lower = searchByType "set" Nothing idx
+        in assertEqual "count should match" (length upper) (length lower)
+      -- get_dependencies
+    , withCorpus "get_dependencies: ∘-hom depends on Algebra and hom" $ \idx ->
+        case getDeps "Homomorphisms.Basic.∘-hom" Nothing idx of
+          Left err  -> pure (Fail $ T.unpack err)
+          Right dep -> assert "deps check"
+            ("Algebra" `elem` depDependencies dep && "hom" `elem` depDependencies dep)
+    , withCorpus "get_dependencies: not found → Left" $ \idx ->
+        assert "should be Left" (isLeft $ getDeps "Nonexistent.foo" Nothing idx)
+    , withCorpus "get_dependencies: expand=true includes Algebra neighbor" $ \idx ->
+        case getDeps "Homomorphisms.Basic.∘-hom" (Just True) idx of
+          Left err  -> pure (Fail $ T.unpack err)
+          Right dep ->
+            let names = map srPrettyQname (depNeighbors dep)
+            in assert ("neighbors: " <> show names)
+                 (any ("Algebra" `T.isInfixOf`) names)
+    , withCorpus "get_dependencies: expand=false → empty neighbors" $ \idx ->
+        case getDeps "Homomorphisms.Basic.hom" (Just False) idx of
+          Left err  -> pure (Fail $ T.unpack err)
+          Right dep -> assert "should be empty" (null (depNeighbors dep))
+      -- Tool handler layer
+    , withCorpus "handleSearchByName: 'Term' finds ≥2" $ \idx ->
+        let params = SearchByNameParams { sbnPattern = "Term", sbnLimit = Just 10 }
+        in case handleSearchByName idx params of
+             Left err -> pure (Fail $ T.unpack err)
+             Right rs -> assert ("got " <> show (length rs)) (length rs >= 2)
+    , withCorpus "handleSearchByType: 'Pred' finds ≥1" $ \idx ->
+        let params = SearchByTypeParams { sbtPattern = "Pred", sbtLimit = Just 5 }
+        in case handleSearchByType idx params of
+             Left err -> pure (Fail $ T.unpack err)
+             Right rs -> assert ("got " <> show (length rs)) (length rs >= 1)
+    , withCorpus "handleGetDependencies: free-lift depends on Term" $ \idx ->
+        let params = GetDependenciesParams
+              { gdpName = "Terms.Operations.free-lift", gdpExpand = Just True }
+        in case handleGetDependencies idx params of
+             Left err -> pure (Fail $ T.unpack err)
+             Right dep -> assert "should depend on Term"
+               ("Term" `elem` depDependencies dep)
     ]
 
 
@@ -298,8 +426,10 @@ main :: IO ()
 main = do
   hPutStrLn stderr "agda-mcp test suite"
 
+  -- Tier 0: pure unit tests — hole finding, marker parsing.
   pureResults <- pureTests
-
+  -- Tier 1: corpus / search tests (no Agda, but needs fixture file).
+  corpusResults <- corpusTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -308,7 +438,7 @@ main = do
       pure []
     Just (cfg, fixture) -> integrationTests cfg fixture
 
-  let allResults = pureResults <> integrationResults
+  let allResults = pureResults <> corpusResults <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed
