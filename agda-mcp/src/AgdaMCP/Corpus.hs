@@ -37,9 +37,11 @@ module AgdaMCP.Corpus
   , entryToSearchResult
   ) where
 
+import Control.Exception (IOException, try)
 import Data.Aeson (eitherDecodeStrict')
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
+import Data.List (foldl')
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -55,36 +57,47 @@ import AgdaMCP.Types
 -- | Load an agda-strux JSONL file into a 'CorpusIndex'.
 --
 -- Each line is parsed as a 'CorpusEntry'; lines that fail to parse are
--- reported to stderr and skipped.  Duplicate @prettyQname@ keys are
--- resolved by keeping the last occurrence (consistent with how Agda
--- resolves re-exported names).
+-- skipped and counted.  The first few parse errors are logged to stderr
+-- for debugging.  Duplicate @prettyQname@ keys are resolved by keeping
+-- the last occurrence (consistent with how Agda resolves re-exported names).
 --
--- Returns 'Nothing' if the file cannot be read at all.
+-- Returns @Left msg@ if the file cannot be read; @Right idx@ on success.
 loadCorpus :: FilePath -> IO (Either Text CorpusIndex)
 loadCorpus path = do
   hPutStrLn stderr $ "agda-mcp: loading corpus from " <> path
-  contents <- BS.readFile path
-  let lns      = filter (not . BS8.null) (BS8.lines contents)
-      (ok, bad) = foldl' parseLine ([], 0 :: Int) (zip [1 :: Int ..] lns)
-      entryMap = Map.fromList [ (cePrettyQname e, e) | e <- reverse ok ]
-      idx      = CorpusIndex { ciEntries = entryMap, ciSize = Map.size entryMap }
-  if bad > 0
-    then hPutStrLn stderr $
-           "agda-mcp: corpus loaded: " <> show (ciSize idx)
-           <> " entries (" <> show bad <> " lines skipped due to parse errors)"
-    else hPutStrLn stderr $
-           "agda-mcp: corpus loaded: " <> show (ciSize idx) <> " entries"
-  pure (Right idx)
+  result <- try (BS.readFile path)
+  case result of
+    Left (e :: IOException) ->
+      pure . Left . T.pack $ "Failed to read corpus: " <> show e
+    Right contents -> do
+      let lns      = filter (not . BS8.null) (BS8.lines contents)
+          (ok, bad) = foldl' parseLine ([], 0 :: Int) (zip [1 :: Int ..] lns)
+          entryMap = Map.fromList [ (cePrettyQname e, e) | e <- reverse ok ]
+          idx      = CorpusIndex { ciEntries = entryMap, ciSize = Map.size entryMap }
+      if bad > 0
+        then do
+          hPutStrLn stderr $
+            "agda-mcp: corpus loaded: " <> show (ciSize idx)
+            <> " entries (" <> show bad <> " lines skipped due to parse errors)"
+          -- Re-scan the first few failures for diagnostic output.
+          -- Cost is negligible: we only do this when errors exist, and stop at 3.
+          let firstErrors = take 3
+                [ (ln, err)
+                | (ln, bs) <- zip [1 :: Int ..] lns
+                , Left err <- [eitherDecodeStrict' bs :: Either String CorpusEntry]
+                ]
+          mapM_ (\(ln, err) ->
+            hPutStrLn stderr $ "  line " <> show ln <> ": " <> err) firstErrors
+        else
+          hPutStrLn stderr $
+            "agda-mcp: corpus loaded: " <> show (ciSize idx) <> " entries"
+      pure (Right idx)
   where
     parseLine :: ([CorpusEntry], Int) -> (Int, BS.ByteString) -> ([CorpusEntry], Int)
-    parseLine (!acc, !errCount) (lineNum, bs) =
+    parseLine (!acc, !errCount) (_lineNum, bs) =
       case eitherDecodeStrict' bs of
         Right entry -> (entry : acc, errCount)
-        Left err    -> do
-          -- We can't do IO inside a fold, so we use a strict pair.
-          -- Parse errors are counted; first few are logged after loading.
-          let !_ = lineNum `seq` err `seq` ()
-          (acc, errCount + 1)
+        Left _err   -> (acc, errCount + 1)
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -104,7 +117,8 @@ searchByName pattern limit idx =
     . Map.elems
     $ ciEntries idx
   where
-    lim      = maybe 20 (max 1) limit
+    lim = maybe 20 (max 1) limit  -- a positive integer
+    -- ^ Minimum 1: a limit of 0 is treated as 1.
     patLower = T.toLower pattern
     matchesName e =
       patLower `T.isInfixOf` T.toLower (cePrettyQname e)
