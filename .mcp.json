@@ -1,12 +1,12 @@
 {
   "mcpServers": {
     "agda": {
-      "command": "cabal",
+      "command": "./scripts/run-server.sh",
       "args": [
-        "run", "-v0", "agda-mcp", "--",
-        "--agda-flags", "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
-      ],
-      "cwd": "agda-mcp"
+        "--agda-flags", "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library",
+        "--corpus", "test/resources/corpus-fixture.jsonl",
+        "--verbose"
+      ]
     }
   }
 }
