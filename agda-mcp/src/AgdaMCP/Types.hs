@@ -14,6 +14,9 @@
 --   These types correspond 1-to-1 with the policy contract defined in
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
+--
+--   The corpus types track the agda-strux JSONL schema (v0.01) documented in
+--   docs/representation.md.  They are used by the search tools (M1-3).
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
@@ -36,18 +39,29 @@ module AgdaMCP.Types
   , DiagnosticsResult (..)
     -- * Hole location
   , HoleLocation (..)
+    -- * Corpus types (agda-strux JSONL schema)
+  , CorpusEntry (..)
+  , CorpusIndex (..)
+    -- * Tool parameters (inbound) — search
+  , SearchByNameParams (..)
+  , SearchByTypeParams (..)
+  , GetDependenciesParams (..)
+    -- * Tool results (outbound) — search
+  , SearchResult (..)
+  , DependenciesResult (..)
   ) where
 
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
   , object, withObject, withText
   )
+import Data.Map.Strict (Map)
 import Data.Text (Text)
 
 
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Hole location
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 
 -- | Identifies a hole in a source file.
 data HoleLocation = HoleLocation
@@ -63,9 +77,9 @@ instance ToJSON HoleLocation where
   toJSON h = object ["filePath" .= holePath h, "holeIndex" .= holeIndex h]
 
 
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Context entry (matches agda-dojang's AGDADOJANG_CTX line protocol)
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 
 -- | A single binder in the local context of a hole.
 data CtxEntry = CtxEntry
@@ -90,9 +104,9 @@ instance ToJSON CtxEntry where
       <> maybe [] (\i -> ["index" .= i])      (ctxIndex e)
 
 
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Tool parameters (inbound from agent)
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 
 -- | Parameters for the @get_goal@ tool.
 data GetGoalParams = GetGoalParams
@@ -134,9 +148,9 @@ instance FromJSON GetDiagnosticsParams where
     GetDiagnosticsParams <$> o .: "filePath"
 
 
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Tool results (outbound to agent)
--- ---------------------------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════
 
 -- | Result of @get_goal@: the hole's goal type and local context.
 data GoalInfo = GoalInfo
@@ -236,4 +250,153 @@ instance ToJSON DiagnosticsResult where
     , "errors"   .= drErrors r
     , "warnings" .= drWarnings r
     , "holes"    .= drHoles r
+    ]
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § Corpus types (agda-strux JSONL schema v0.01)
+--
+-- These types track the canonical JSONL output; see docs/representation.md §3.
+-- The primary key is @prettyQname@.
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+
+-- | CorpusEntry: a single definition from the agda-strux JSONL corpus.
+--
+-- Corresponds to one line of the "Full" format output.
+-- We parse all required fields; optional fields (@body@, @hasBody@) are
+-- best-effort.  The @typeAst@ is stored as opaque JSON — we do not
+-- interpret its structure in M1-3 (structural matching is an M2 goal).
+data CorpusEntry = CorpusEntry
+  { ceFile          :: Text           -- ^ Source file path used by extractor.
+  , ceModule        :: Text           -- ^ Raw Agda module name.
+  , ceName          :: Text           -- ^ Unqualified name component.
+  , ceQname         :: Text           -- ^ Raw qualified name (Agda internal).
+  , cePrettyModule  :: Text           -- ^ Normalized module name.
+  , cePrettyName    :: Text           -- ^ Normalized unqualified name.
+  , cePrettyQname   :: Text           -- ^ @prettyModule.prettyName@ — primary key.
+  , ceType          :: Text           -- ^ Pretty-printed type signature.
+  , ceTypeAstVer    :: Text           -- ^ Version tag for typeAst encoding.
+  , ceTypeAst       :: Value          -- ^ Structural AST (opaque JSON for now).
+  , ceDefKind       :: Text           -- ^ function | data | record | constructor | postulate | primitive | other
+  , ceDependencies  :: [Text]         -- ^ Heuristic tokens from type (type-level deps).
+  , ceAstSize       :: Int            -- ^ Character length of the @type@ string.
+  , ceBody          :: Maybe Text     -- ^ Pretty-printed clause bodies (may be absent).
+  , ceHasBody       :: Bool           -- ^ True iff body is present/non-empty.
+  } deriving (Eq, Show)
+instance FromJSON CorpusEntry where
+  parseJSON = withObject "CorpusEntry" $ \o ->
+    CorpusEntry
+      <$> o .:  "file"
+      <*> o .:  "module"
+      <*> o .:  "name"
+      <*> o .:  "qname"
+      <*> o .:  "prettyModule"
+      <*> o .:  "prettyName"
+      <*> o .:  "prettyQname"
+      <*> o .:  "type"
+      <*> o .:  "typeAstVersion"
+      <*> o .:  "typeAst"
+      <*> o .:  "defKind"
+      <*> o .:  "dependencies"
+      <*> o .:  "astSize"
+      <*> o .:? "body"
+      <*> (maybe False id <$> o .:? "hasBody")
+instance ToJSON CorpusEntry where
+  toJSON e = object $
+    [ "file"           .= ceFile e
+    , "module"         .= ceModule e
+    , "name"           .= ceName e
+    , "qname"          .= ceQname e
+    , "prettyModule"   .= cePrettyModule e
+    , "prettyName"     .= cePrettyName e
+    , "prettyQname"    .= cePrettyQname e
+    , "type"           .= ceType e
+    , "typeAstVersion" .= ceTypeAstVer e
+    , "typeAst"        .= ceTypeAst e
+    , "defKind"        .= ceDefKind e
+    , "dependencies"   .= ceDependencies e
+    , "astSize"        .= ceAstSize e
+    , "hasBody"        .= ceHasBody e
+    ] <> maybe [] (\b -> ["body" .= b]) (ceBody e)
+
+
+-- | CorpusIndex: in-memory corpus index.
+--
+-- The primary structure is a 'Map' from @prettyQname@ to 'CorpusEntry'.
+-- For M1-3, name and type search are O(n) linear scans over 'ciEntries'.
+-- M2-2 will add inverted indices and a graph adjacency list.
+data CorpusIndex = CorpusIndex
+  { ciEntries :: Map Text CorpusEntry
+    -- ^ All entries, keyed by @prettyQname@.
+  , ciSize    :: Int
+    -- ^ Number of entries (cached for diagnostics).
+  } deriving (Eq, Show)
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § Tool parameters (inbound from agent) — search
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | Parameters for the @search_by_name@ tool.
+data SearchByNameParams = SearchByNameParams
+  { sbnPattern :: Text       -- ^ Substring pattern to match against prettyQname / prettyName.
+  , sbnLimit   :: Maybe Int  -- ^ Maximum results (default: 20).
+  } deriving (Eq, Show)
+instance FromJSON SearchByNameParams where
+  parseJSON = withObject "SearchByNameParams" $ \o ->
+    SearchByNameParams <$> o .: "pattern" <*> o .:? "limit"
+
+-- | Parameters for the @search_by_type@ tool.
+data SearchByTypeParams = SearchByTypeParams
+  { sbtPattern :: Text       -- ^ Substring pattern to match against the type signature.
+  , sbtLimit   :: Maybe Int  -- ^ Maximum results (default: 20).
+  } deriving (Eq, Show)
+instance FromJSON SearchByTypeParams where
+  parseJSON = withObject "SearchByTypeParams" $ \o ->
+    SearchByTypeParams <$> o .: "pattern" <*> o .:? "limit"
+
+-- | Parameters for the @get_dependencies@ tool.
+data GetDependenciesParams = GetDependenciesParams
+  { gdpName   :: Text        -- ^ The prettyQname of the definition to look up.
+  , gdpExpand :: Maybe Bool  -- ^ If true, also return entries for each dependency (1-hop).
+  } deriving (Eq, Show)
+instance FromJSON GetDependenciesParams where
+  parseJSON = withObject "GetDependenciesParams" $ \o ->
+    GetDependenciesParams <$> o .: "name" <*> o .:? "expand"
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § Tool results (outbound to agent) — search
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | A single search hit, returned by @search_by_name@ and @search_by_type@.
+data SearchResult = SearchResult
+  { srPrettyQname  :: Text    -- ^ Fully-qualified normalized name.
+  , srType         :: Text    -- ^ Pretty-printed type signature.
+  , srDefKind      :: Text    -- ^ function | data | record | ...
+  , srModule       :: Text    -- ^ Module the definition lives in.
+  , srHasBody      :: Bool    -- ^ Whether a body/proof is available.
+  } deriving (Eq, Show)
+instance ToJSON SearchResult where
+  toJSON r = object
+    [ "prettyQname" .= srPrettyQname r
+    , "type"        .= srType r
+    , "defKind"     .= srDefKind r
+    , "module"      .= srModule r
+    , "hasBody"     .= srHasBody r
+    ]
+
+-- | Result of @get_dependencies@.
+data DependenciesResult = DependenciesResult
+  { depName         :: Text           -- ^ The looked-up definition's prettyQname.
+  , depType         :: Text           -- ^ Its type signature (for context).
+  , depDependencies :: [Text]         -- ^ Direct dependency tokens from the type.
+  , depNeighbors    :: [SearchResult] -- ^ Expanded entries (if @expand@ was true).
+  } deriving (Eq, Show)
+instance ToJSON DependenciesResult where
+  toJSON r = object
+    [ "name"         .= depName r
+    , "type"         .= depType r
+    , "dependencies" .= depDependencies r
+    , "neighbors"    .= depNeighbors r
     ]

@@ -6,7 +6,9 @@ cabal-version: 3.0
 -- Description:
 --   Cabal package definition for the agda-mcp MCP server.
 --
---   v0 implementation (M1-2): four core proof-state tools over stdio transport.
+--   v0.2.0 (M1-3): adds search tools (search_by_name, search_by_type,
+--   get_dependencies) backed by an in-memory corpus index from agda-strux JSONL.
+--   v0.1.0 (M1-2): four core proof-state tools over stdio transport.
 --
 --   Design note (GHC version):
 --   The `mcp-server` Hackage library requires base >= 4.20 (GHC 9.10+), but
@@ -16,7 +18,7 @@ cabal-version: 3.0
 --   we need (initialize, tools/list, tools/call) and can be swapped for the
 --   Hackage library once GHC versions converge.
 name:          agda-mcp
-version:       0.1.0
+version:       0.2.0
 synopsis:      MCP server for AI-assisted Agda proof development
 description:
   An MCP (Model Context Protocol) server that wraps AgdaDojang to expose
@@ -43,7 +45,9 @@ library
     AgdaMCP.Server
     AgdaMCP.Types
     AgdaMCP.Agda
+    AgdaMCP.Corpus
     AgdaMCP.Tools.ProofState
+    AgdaMCP.Tools.Search
   build-depends:
       base          >= 4.18 && < 5
     , aeson         >= 2.1  && < 3
@@ -77,6 +81,7 @@ test-suite agda-mcp-test
     , agda-mcp
     , aeson         >= 2.1
     , bytestring
+    , containers    >= 0.6
     , text          >= 2.0
     , process       >= 1.6
     , directory

@@ -17,6 +17,11 @@
 --   Hackage library because that library requires base >= 4.20 (GHC 9.10+),
 --   and the project pins GHC 9.8.2 for Agda compatibility.  This module can
 --   be replaced by @mcp-server@ once GHC versions converge.
+--
+-- M1-3 additions:
+--   * Optional 'CorpusIndex' in 'ServerConfig' (loaded via @--corpus@ flag).
+--   * Three search tools: search_by_name, search_by_type, get_dependencies.
+--   * Search tools appear in tools/list only when a corpus is loaded.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -34,7 +39,7 @@ import qualified Data.Aeson as Aeson
 
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text as T
@@ -46,7 +51,8 @@ import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, Buffe
 
 import AgdaMCP.Agda (AgdaConfig)
 import AgdaMCP.Tools.ProofState
-
+import AgdaMCP.Tools.Search
+import AgdaMCP.Types (CorpusIndex)
 
 -- ---------------------------------------------------------------------------
 -- Configuration
@@ -54,9 +60,12 @@ import AgdaMCP.Tools.ProofState
 
 -- | ServerConfig: server-level configuration.
 data ServerConfig = ServerConfig
-  { scAgdaConfig :: AgdaConfig
-  , scServerName :: Text
-  , scVersion    :: Text
+  { scAgdaConfig  :: AgdaConfig
+  , scServerName  :: Text
+  , scVersion     :: Text
+  , scCorpusIndex :: Maybe CorpusIndex
+    -- ^ In-memory corpus index, loaded at startup via @--corpus@.
+    --   When 'Nothing', search tools are not registered.
   } deriving (Show)
 
 
@@ -99,37 +108,67 @@ mkError reqId code msg = object
 -- Tool definitions (JSON Schema for tools/list)
 -- ---------------------------------------------------------------------------
 
-toolDefinitions :: Value
-toolDefinitions = toJSON
-  [ toolDef "get_goal"
-      "Inspect the goal type and local context at a hole."
-      [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
-      , prop "holeIndex" "integer" "0-based index of the {!!} hole."
-      ]
-      ["filePath", "holeIndex"]
+-- | Build the tool definitions list.
+--
+-- Proof-state tools are always available.
+-- Search tools are only registered when a corpus is loaded.
+toolDefinitions :: ServerConfig -> Value
+toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
+  where
+    proofStateTools =
+      [ toolDef "get_goal"
+          "Inspect the goal type and local context at a hole."
+          [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
+          , prop "holeIndex" "integer" "0-based index of the {!!} hole."
+          ]
+          ["filePath", "holeIndex"]
 
-  , toolDef "fill_hole"
-      "Substitute a candidate term into a hole and typecheck."
-      [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
-      , prop "holeIndex" "integer" "0-based index of the {!!} hole."
-      , prop "candidate" "string" "The candidate proof term to try."
-      ]
-      ["filePath", "holeIndex", "candidate"]
+      , toolDef "fill_hole"
+          "Substitute a candidate term into a hole and typecheck."
+          [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
+          , prop "holeIndex" "integer" "0-based index of the {!!} hole."
+          , prop "candidate" "string" "The candidate proof term to try."
+          ]
+          ["filePath", "holeIndex", "candidate"]
 
-  , toolDef "check_file"
-      "Load/reload an Agda file and return all diagnostics."
-      [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
-      ]
-      ["filePath"]
+      , toolDef "check_file"
+          "Load/reload an Agda file and return all diagnostics."
+          [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
+          ]
+          ["filePath"]
 
-  , toolDef "get_diagnostics"
-      "Retrieve diagnostic summary: error/warning counts, open holes."
-      [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
-      ]
-      ["filePath"]
-  ]
+      , toolDef "get_diagnostics"
+          "Retrieve diagnostic summary: error/warning counts, open holes."
+          [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
+          ]
+          ["filePath"]
+       ]
+    searchTools
+      | isJust (scCorpusIndex cfg) =
+          [ toolDef "search_by_name"
+              "Find definitions matching a name pattern (case-insensitive substring on qualified/unqualified name)."
+              [ prop "pattern" "string" "Substring to search for in definition names."
+              , prop "limit"   "integer" "Maximum number of results (default: 20)."
+              ]
+              ["pattern"]
 
--- | toolDef: build a tool definition object (MCP tools/list schema).
+          , toolDef "search_by_type"
+              "Find definitions whose type signature contains the given pattern (case-insensitive substring match)."
+              [ prop "pattern" "string" "Substring to search for in type signatures."
+              , prop "limit"   "integer" "Maximum number of results (default: 20)."
+              ]
+              ["pattern"]
+
+          , toolDef "get_dependencies"
+              "Retrieve the dependency neighborhood of a definition. Returns dependency tokens and optionally expands them to full entries."
+              [ prop "name"   "string"  "The prettyQname of the definition to look up."
+              , prop "expand" "boolean" "If true, also return corpus entries for each dependency (1-hop neighborhood)."
+              ]
+              ["name"]
+          ]
+      | otherwise = []
+
+-- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
 toolDef name desc props required = object
   [ "name"        .= name
@@ -218,14 +257,13 @@ handleRequest _ req | rpcMethod req == "notifications/initialized" =
   pure Nothing
 
 -- MCP: tools/list
-handleRequest _ req | rpcMethod req == "tools/list" = do
-  let result = object ["tools" .= toolDefinitions]
+handleRequest cfg req | rpcMethod req == "tools/list" = do
+  let result = object ["tools" .= toolDefinitions cfg]
   pure . Just $ mkResult (rpcId req) result
 
 -- MCP: tools/call
 handleRequest cfg req | rpcMethod req == "tools/call" = do
-  let acfg    = scAgdaConfig cfg
-      params  = fromMaybe (Object mempty) (rpcParams req)
+  let params = fromMaybe (Object mempty) (rpcParams req)
   case params of
     Object o -> do
       let toolName = case KM.lookup "name" o of
@@ -234,7 +272,7 @@ handleRequest cfg req | rpcMethod req == "tools/call" = do
           args = case KM.lookup "arguments" o of
             Just v  -> v
             Nothing -> Object mempty
-      result <- dispatchTool acfg toolName args
+      result <- dispatchTool cfg toolName args
       pure . Just $ mkResult (rpcId req) result
     _ ->
       pure . Just $ mkError (rpcId req) (-32602) "Invalid params"
@@ -244,32 +282,72 @@ handleRequest _ req =
   pure . Just $ mkError (rpcId req) (-32601) ("Method not found: " <> rpcMethod req)
 
 
--- | dispatchTool: tool dispatcher
-dispatchTool :: AgdaConfig -> Text -> Value -> IO Value
+-- ---------------------------------------------------------------------------
+-- Tool dispatch
+-- ---------------------------------------------------------------------------
+
+-- | dispatchTool: route a tool call to the appropriate handler.
+--
+-- Proof-state tools delegate to AgdaMCP.Tools.ProofState (IO, calls Agda).
+-- Search tools delegate to AgdaMCP.Tools.Search (pure, uses CorpusIndex).
+dispatchTool :: ServerConfig -> Text -> Value -> IO Value
+
+-- Proof-state tools (existing M1-2)
 dispatchTool cfg "get_goal" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleGetGoal cfg p
+    Aeson.Success p -> eitherToMcp <$> handleGetGoal (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg "fill_hole" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleFillHole cfg p
+    Aeson.Success p -> eitherToMcp <$> handleFillHole (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg "check_file" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleCheckFile cfg p
+    Aeson.Success p -> eitherToMcp <$> handleCheckFile (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg "get_diagnostics" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleGetDiagnostics cfg p
+    Aeson.Success p -> eitherToMcp <$> handleGetDiagnostics (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
+-- Search tools (new M1-3)
+dispatchTool cfg "search_by_name" args =
+  case scCorpusIndex cfg of
+    Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
+    Just idx ->
+      case Aeson.fromJSON args of
+        Aeson.Success p -> pure . eitherToMcp $ handleSearchByName idx p
+        Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+dispatchTool cfg "search_by_type" args =
+  case scCorpusIndex cfg of
+    Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
+    Just idx ->
+      case Aeson.fromJSON args of
+        Aeson.Success p -> pure . eitherToMcp $ handleSearchByType idx p
+        Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+dispatchTool cfg "get_dependencies" args =
+  case scCorpusIndex cfg of
+    Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
+    Just idx ->
+      case Aeson.fromJSON args of
+        Aeson.Success p -> pure . eitherToMcp $ handleGetDependencies idx p
+        Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+-- Unknown tool
 dispatchTool _ name _ =
   pure $ toolError ("Unknown tool: " <> name)
 
--- | eitherToMcp: wrap a tool handler result as an MCP tool response.
+
+-- ---------------------------------------------------------------------------
+-- MCP response helpers
+-- ---------------------------------------------------------------------------
+
+-- | Wrap an IO-based tool handler result (Either Text a) as an MCP content response.
 eitherToMcp :: ToJSON a => Either Text a -> Value
 eitherToMcp (Left err) = toolError err
 
