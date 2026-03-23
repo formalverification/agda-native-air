@@ -115,7 +115,6 @@ parseArgs ("--timeout" : n : rest) opts = case readMaybe n of
   Nothing   -> parseArgs rest opts
 parseArgs ("--verbose" : rest) opts =
   parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaVerbose = True } }
-parseArgs ("--help" : _) _ = error usage
 parseArgs (_ : rest) opts = parseArgs rest opts
   -- -- Skip unknown flags with a warning (lenient for forward-compat).
   -- where _ = hPutStrLn stderr $ "agda-mcp: ignoring unknown flag: " <> unknown
