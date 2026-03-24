@@ -4,6 +4,7 @@ about: Suggest a new feature or improvement
 title: "[FEAT] "
 labels: enhancement
 assignees: ''
+milestone: ''
 ---
 
 ## Problem Statement
