@@ -1,0 +1,13 @@
+# Syntax: <path pattern>  <owner(s)>
+
+# Default owner for everything
+*  @williamdemeo
+
+# Core source code — requires senior review
+/src/  @williamdemeo @hyeyoungshin
+
+# Docs can be reviewed by anyone on the docs team
+/docs/  @williamdemeo
+
+# CI/CD config — only leads should approve
+/.github/  @williamdemeo
