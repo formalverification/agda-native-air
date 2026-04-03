@@ -7,7 +7,7 @@
 /src/  @williamdemeo @hyeyoungshin
 
 # Docs can be reviewed by anyone on the docs team
-/docs/  @williamdemeo
+/docs/  @williamdemeo @hyeyoungshin
 
 # CI/CD config — only leads should approve
 /.github/  @williamdemeo
