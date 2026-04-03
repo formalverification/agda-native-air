@@ -30,6 +30,7 @@ module AgdaMCP.Server
   , ServerConfig (..)
   ) where
 
+import Control.Exception (SomeException, try)
 import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
@@ -59,6 +60,9 @@ import AgdaMCP.Types (CorpusIndex)
 -- ---------------------------------------------------------------------------
 
 -- | ServerConfig: server-level configuration.
+--
+-- M1-4: the server loop is now crash-proof — uncaught exceptions in tool
+-- handlers are caught and returned as JSON-RPC error responses.
 data ServerConfig = ServerConfig
   { scAgdaConfig  :: AgdaConfig
   , scServerName  :: Text
@@ -192,6 +196,7 @@ prop name typ desc = (name, object ["type" .= typ, "description" .= desc])
 -- | runServer: run the MCP server on stdio.
 --
 -- Reads JSON-RPC requests from stdin and writes responses to stdout.
+-- All request handling is wrapped in 'try' so that no exception can kill the loop.
 runServer :: ServerConfig -> IO ()
 runServer cfg = do
   -- Ensure line buffering for correct MCP framing.
@@ -209,10 +214,16 @@ runServer cfg = do
             case decode line of
               Nothing -> sendResponse $ mkError Nothing (-32700) "Parse error"
               Just req -> do
-                resp <- handleRequest cfg req
-                case resp of
-                  Just r  -> sendResponse r
-                  Nothing -> pure ()
+                result <- try (handleRequest cfg req)
+                case result of
+                  Left (e :: SomeException) -> do
+                    hPutStrLn stderr $
+                      "agda-mcp: uncaught exception handling "
+                      <> T.unpack (rpcMethod req) <> ": " <> show e
+                    sendResponse $ mkError (rpcId req) (-32603)
+                      ("Internal error: " <> T.pack (show e))
+                  Right (Just r)  -> sendResponse r
+                  Right Nothing   -> pure ()
           loop
 
 sendResponse :: Value -> IO ()

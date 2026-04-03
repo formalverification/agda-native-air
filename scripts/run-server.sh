@@ -28,7 +28,9 @@ exec 3>&1 1>&2
 
 exec nix develop "${REPO_ROOT}#backend" --command \
   bash -c '
-    # Restore real stdout from fd 3 (for JSON-RPC), then close fd 3.
     exec 1>&3 3>&-
-    cd "'"${REPO_ROOT}/agda-mcp"'" && exec cabal run -v0 agda-mcp -- "$@"
+    cd "'"${REPO_ROOT}/agda-mcp"'"
+    BIN=$(cabal list-bin agda-mcp 2>/dev/null)
+    cd "'"${REPO_ROOT}"'"
+    exec "$BIN" "$@"
   ' -- "$@"
