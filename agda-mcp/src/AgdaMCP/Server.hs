@@ -30,7 +30,7 @@ module AgdaMCP.Server
   , ServerConfig (..)
   ) where
 
-import Control.Exception (SomeException, try)
+import Control.Exception (SomeException, try, throwIO, fromException, AsyncException)
 import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
@@ -216,12 +216,15 @@ runServer cfg = do
               Just req -> do
                 result <- try (handleRequest cfg req)
                 case result of
-                  Left (e :: SomeException) -> do
-                    hPutStrLn stderr $
-                      "agda-mcp: uncaught exception handling "
-                      <> T.unpack (rpcMethod req) <> ": " <> show e
-                    sendResponse $ mkError (rpcId req) (-32603)
-                      ("Internal error: " <> T.pack (show e))
+                  Left (e :: SomeException) ->
+                    case fromException e of
+                      Just ae -> throwIO (ae :: AsyncException)
+                      Nothing -> do
+                        hPutStrLn stderr $
+                          "agda-mcp: uncaught exception handling "
+                          <> T.unpack (rpcMethod req) <> ": " <> show e
+                        sendResponse $ mkError (rpcId req) (-32603)
+                          "Internal error"
                   Right (Just r)  -> sendResponse r
                   Right Nothing   -> pure ()
           loop
