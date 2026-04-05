@@ -30,7 +30,10 @@ exec nix develop "${REPO_ROOT}#backend" --command \
   bash -c '
     exec 1>&3 3>&-
     cd "'"${REPO_ROOT}/agda-mcp"'"
-    BIN=$(cabal list-bin agda-mcp 2>/dev/null)
+    BIN=$(cabal list-bin exe:agda-mcp 2>&1) || {
+      echo "agda-mcp: failed to resolve binary: $BIN" >&2
+      exit 1
+    }
     cd "'"${REPO_ROOT}"'"
     exec "$BIN" "$@"
   ' -- "$@"
