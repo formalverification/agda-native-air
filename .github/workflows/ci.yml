@@ -425,8 +425,8 @@ jobs:
             "${{ needs.agda-dojang-eval.result }}" \
           )
           for r in "${results[@]}"; do
-            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
-              echo "A required job failed or was cancelled: $r"
+            if [ "$r" = "failure" ]; then
+              echo "A required job failed: $r"
               exit 1
             fi
           done

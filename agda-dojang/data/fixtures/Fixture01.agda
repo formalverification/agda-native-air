@@ -13,10 +13,10 @@ open import Agda.Builtin.Equality
 open import AgdaDojang.Debug
 
 id : {A : Set} → A → A
-id x = x
+id x = {!!}
 
 trivial : ⊤
-trivial = tt
+trivial = {!!}
 
 reflExample : {A : Set} (x : A) → x ≡ x
-reflExample x = refl
+reflExample x = {!!}
