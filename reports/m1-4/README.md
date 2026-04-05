@@ -19,14 +19,13 @@ MCP server to inspect and solve proof obligations in Agda.
 
 | Fixture | Holes | Solved | Attempts | Wall-clock | Notes |
 |---------|-------|--------|----------|------------|-------|
-| `Fixture01.agda` | 3 | 3/3 | 7 | ~3 min | Holes 1,2 required a failed attempt to expose concrete types |
-| `FixtureStdlibBooleanAlgebra.agda` | 3 | 3/3 | 3 | ~1m 40s | All solved on first attempt; agent studied oracle proofs |
+| `Fixture01.agda` | 3 | 3/3 | 7 | 1m 42s | All solved on first attempt. |
+| `FixtureStdlibBooleanAlgebra.agda` | 3 | 3/3 | 3 | ~1m 40s | All solved on first attempt; agent studied oracle proofs. |
 
 
 ## Session Transcripts
 
-+  `2026-04-03-Fixture01.md` — identity, unit, reflexivity (simple).  
-   **TODO**: regenerate and add this file.
++  `2026-04-04-222457-ClaudeCode-Fixture01.txt` — identity, unit, reflexivity (simple).  
 +  `2026-04-03-213713-ClaudeCode-StdlibBooleanAlgebra.txt` — Boolean algebra
    complements, de Morgan laws (moderate).
 
@@ -98,13 +97,14 @@ MCP server to inspect and solve proof obligations in Agda.
    ```
 
 4. Verify the server works (outside any Nix shell):
+
    ```sh
    echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}' \
      | ./scripts/run-server.sh \
          --agda-flags "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library" \
          2>/dev/null
    ```
-   You should see a JSON-RPC response with `serverInfo.name: "agda-mcp"`.
+   After a few seconds, you should see a JSON-RPC response tht includes `serverInfo.name: "agda-mcp"`.
 
 5. Launch Claude Code:
    ```sh

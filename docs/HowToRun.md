@@ -688,18 +688,31 @@ your `PATH`; if Agda is not found, tier-2 tests are skipped.
 
 ### 13.2.  Run the server manually
 
-You can start `agda-mcp` and send it JSON-RPC requests on stdin to verify everything
-is wired up.
+#### Outside the Nix shell
 
-In the `agda-mcp` directory,
+To verify that the server works, enter the following on the command line
+(from the top-level project directory, outside the Nix shell):
 
 ```sh
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}' \
+  | ./scripts/run-server.sh \
+      --agda-flags "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library" \
+      2>/dev/null
+```
+
+After a few seconds, you should see a JSON-RPC response tht includes `serverInfo.name: "agda-mcp"`.
+
+#### Inside the Nix shell
+
+Start `agda-mcp`, send it JSON-RPC requests on stdin, and verify everything is wired up. 
+
+```sh
+nix develop .#backend
+cd agda-mcp
 cabal run agda-mcp -- --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
 ```
 
-The server prints a startup banner and "Waiting for MCP client..."
-
-The server is now ready and waiting for your JSON-RPC input on stdin!
+The server prints a startup banner and "Waiting for MCP client..." signaling that it is ready for your JSON-RPC input!
 
 Type or paste a JSON-RPC request (one per line) to stdin; e.g.,
 
@@ -710,7 +723,7 @@ Type or paste a JSON-RPC request (one per line) to stdin; e.g.,
 You should see a JSON response immediately on the next line; e.g.,
 
 ```json
-{"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"agda-mcp","version":"0.1.0"}}}
+{"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"agda-mcp","version":"0.2.0"}}}
 ```
 
 Press Ctrl-C to stop the server.
@@ -725,6 +738,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 For a pre-built sequence of test requests, see `agda-mcp/test/resources/mcp-test-input.jsonl`.
 
+
+---
 
 ### 13.3.  Connect Claude Code
 
@@ -741,13 +756,28 @@ inspect goals, fill holes, and check Agda files through natural language.
 2.  **Navigate to the repo root** (`cd agda-native-air`).  The `.mcp.json` file there
     configures the agda MCP server connection.
 
-3.  **Run `claude`**.  Claude Code will detect `.mcp.json` and start the
-    agda MCP server.  You may need to approve the connection when prompted.
+3.  **Launch Claude Code**.
 
-4.  **Try a proof-state query**.  Once connected, ask Claude Code something
-    like
+    ```sh
+    MCP_TIMEOUT=120000 claude
+    ```
 
-    > *"Use the get_goal tool on agda-dojang/data/fixtures/Fixture01.agda hole 0"*
+    Claude Code will detect `.mcp.json` and start the agda MCP server.  You may need
+    to approve the connection when prompted.
+
+4.  **Verify Connection**.  Enter `/mcp` at the Claude Code prompt and confirm `agda · ✔ connected`.
+
+5.  **Try a proof-state query**.  Once connected, start by entering a simple query at the Claude Code prompt, such as
+
+    ```
+    Use ONLY the agda MCP tool `get_goal` with filePath "agda-dojang/data/fixtures/Fixture01.agda" and holeIndex 0. Show me the raw result.
+    ```
+
+    If that works, try something a bit harder, such as
+
+    ```
+    Use ONLY the agda MCP tools (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`) to solve all holes in `agda-dojang/data/fixtures/Fixture01.agda`.  For each hole, inspect with `get_goal`, propose a candidate, and verify with `fill_hole`.  If a candidate fails, read the error message and adjust. Note: `fill_hole` validates candidates without modifying the file — once all candidates are verified, use your Edit tool to write them into the source, then confirm with `check_file`.
+    ```
 
 
 ### 13.4.  Connect other MCP clients
