@@ -270,26 +270,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Haskell (GHC + Cabal)
-        uses: haskell-actions/setup@v2
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
         with:
-          ghc-version: '9.8.2'
-          cabal-version: 'latest'
-          cabal-update: true
+          nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: Cache Cabal store + dist-newstyle (backend)
-        uses: actions/cache@v5
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v16
         with:
-          path: |
-            ~/.cabal/store
-            ~/.cabal/packages
-            agda-strux/dist-newstyle
-          key: ${{ runner.os }}-ghc9.8.2-cabal-${{ hashFiles('agda-strux/*.cabal', 'agda-strux/cabal.project') }}
-          restore-keys: |
-            ${{ runner.os }}-ghc9.8.2-cabal-
+          name: formalverification
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: backend-test
-        run: make backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
+        run: |
+          set -euxo pipefail
+          nix develop .#backend --command bash -c '
+            echo "GHC: $(ghc --version)"
+            echo "Cabal: $(cabal --version | head -1)"
+            make backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
+          '
+
 
   # ---------------------------------------------------------------------------
   # Agda • proof-completion smoke (requires Nix → Agda + stdlib)
