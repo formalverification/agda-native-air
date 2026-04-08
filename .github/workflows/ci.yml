@@ -287,6 +287,7 @@ jobs:
           nix develop .#backend --command bash -c '
             echo "GHC: $(ghc --version)"
             echo "Cabal: $(cabal --version | head -1)"
+            cabal update
             make backend-test BACKEND_USE_NIX=0 BACKEND_TEST_KEEP=0
           '
 

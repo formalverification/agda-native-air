@@ -247,6 +247,7 @@ PY
               aeson           # JSON encoding for your exporter
               text bytestring vector unordered-containers
               filepath directory
+              tasty tasty-hunit  # test deps — avoids cabal rebuilding from Hackage
             ]))
             pkgsAgda.haskellPackages.cabal-install
             pkgsAgda.haskellPackages.haskell-language-server
