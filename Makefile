@@ -325,15 +325,16 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
 # ------------------------------------------------------------------------------
 # CI smoke target
 #
-# Mirrors the four CI lanes locally (no Nix required).
 # Use this to verify CI will pass before pushing.
 #
 # Usage:
 #   make ci-smoke                    # run all four lanes
 #   make ci-smoke CI_SKIP_ML=1       # skip Python (e.g., no venv yet)
 #
-# NOTE: CI provides GHC via haskell-actions/setup (BACKEND_USE_NIX=0);
-# locally, we rely on nix develop .#backend for the pinned GHC 9.8.2.
+# NOTE: CI now uses Nix + Cachix for the Haskell backend (same as the
+# agda-dojang-eval lane).  Both CI and local use nix develop .#backend
+# for the pinned GHC 9.8.2; CI passes BACKEND_USE_NIX=0 because the
+# nix develop wrapper is the outer invocation (avoids nesting).
 # ------------------------------------------------------------------------------
 .PHONY: ci-smoke
 ci-smoke: ci-smoke-scala ci-smoke-etl ci-smoke-python ci-smoke-haskell
