@@ -806,6 +806,8 @@ test-strux-driver: _check-sbt build-agda-json
 # 2.7. bench: AgdaDojang dojo (still delegated for now)
 # 2.8. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
 # 2.9. smoke: Top-level smoke tests
+# 2.10. Proof Completion: end-to-end smoke test for proof completion
+# 2.11. Proof Benchmarks: proof completion benchmarks testing
 #
 # ------------------------------------------------------------------------------
 # 2.1. AgdaExtractorMain
@@ -1343,6 +1345,24 @@ eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-age
 	$(MAKE) -C agda-dojang $@
 
 # ------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# 2.11. Proof Benchmarks
+#
+.PHONY: eval-benchmark-gold
+eval-benchmark-gold:
+	@echo ">> [eval-benchmark-gold] verifying gold solutions..."
+	@cd "$(STRUX_DRIVER)" && \
+	  $(SBT) $(SBT_FLAGS) \
+	    "runMain struxdriver.benchmark.EvalBenchmark \
+	     --verify-gold \
+	     --index $(CURDIR)/$(BENCHMARK_INDEX) \
+	     --out-dir $(CURDIR)/$(BENCHMARK_REPORT_DIR) \
+	     --project-root $(CURDIR)"
+
+
+
+
 ifeq ($(CI_SKIP_ML),1)
 test-ml-pipeline:
 	@echo ">> [test-ml-pipeline] skipped (CI_SKIP_ML=1)"

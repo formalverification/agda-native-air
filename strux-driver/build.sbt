@@ -1,12 +1,23 @@
 // File: agda-native-air/strux-driver/build.sbt
 
-// Define Scala version for the entire build
 ThisBuild / scalaVersion := "2.13.17"
 
 Compile / run / fork := true
 
-// Spark 3.5.1 uses json4s 3.7.0-M11; keep them aligned.
-val json4sV = "3.7.0-M11"
+val catsCoreVersion = "2.12.0"
+
+val circeVersion = "0.14.9"
+
+val fs2Version = "3.10.2"
+
+// json4s pinned to match Spark's transitive dependency.
+// Verify alignment after Spark upgrades with `sbt "show dependencyTree"`
+// or, check for version evictions of all dependencies at once:
+//   sbt dependencyTree | grep evicted | grep -E \
+//   'cats-core|cats-effect|json4s|fs2|circe|upickle|scalatest|scalacheck'
+val json4sV = "4.0.7"
+
+val sparkVersion = "4.1.0"
 
 // Root project definition
 lazy val StruxDriver = project.in(file("."))
@@ -15,22 +26,23 @@ lazy val StruxDriver = project.in(file("."))
     version := "0.1.0",
 
     // Main class setting:
-    // Compile / run / mainClass := Some("struxdriver.AgdaExtractorMain")
     Compile / mainClass := Some("struxdriver.extract.AgdaJsonlDriver"),
-    // All library dependencies consolidated here
     libraryDependencies ++= Seq(
-      "com.lihaoyi" %% "upickle"    % "3.1.2",
-      "org.scalatest" %% "scalatest" % "3.2.19" % Test,
-      "org.scalacheck" %% "scalacheck" % "1.17.0"  % Test,
-      "org.json4s" %% "json4s-jackson" % json4sV,
-      "org.json4s" %% "json4s-native" % json4sV,
+      "com.lihaoyi"       %% "upickle"         % "3.1.2",
+      "org.scalatest"     %% "scalatest"       % "3.2.19" % Test,
+      "org.scalacheck"    %% "scalacheck"      % "1.17.0"  % Test,
+      "org.json4s"        %% "json4s-jackson"  % json4sV,
+      "org.json4s"        %% "json4s-native"   % json4sV,
       "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test,
-      "org.typelevel" %% "cats-core"   % "2.10.0",
-      "org.typelevel" %% "cats-effect" % "3.5.4",
-      "co.fs2" %% "fs2-core" % "3.9.3",
-      "co.fs2" %% "fs2-io" % "3.9.3",
-      "org.apache.spark" %% "spark-sql" % "4.1.0",
-      "org.apache.spark" %% "spark-core" % "4.1.0"
+      "org.typelevel"     %% "cats-core"       % catsCoreVersion,
+      "org.typelevel"     %% "cats-effect"     % "3.5.4",
+      "co.fs2"            %% "fs2-core"        % fs2Version,
+      "co.fs2"            %% "fs2-io"          % fs2Version,
+      "org.apache.spark"  %% "spark-sql"       % sparkVersion,
+      "org.apache.spark"  %% "spark-core"      % sparkVersion,
+      "io.circe"          %% "circe-core"      % circeVersion,
+      "io.circe"          %% "circe-generic"   % circeVersion,
+      "io.circe"          %% "circe-parser"    % circeVersion
     ),
 
   // Nice defaults
