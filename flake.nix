@@ -218,6 +218,19 @@ else:
 PY
 
             ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
+
+            # Override Agda to use repo-local library config.
+            # The withPackages wrapper bakes in --library-file pointing at the
+            # Nix store (stdlib only).  We need agda-dojang too.
+            agda() {
+              command agda --no-default-libraries \
+                           --library-file "$AGDA_DIR/libraries" \
+                           --library standard-library \
+                           --library agda-dojang \
+                           "$@"
+            }
+            export -f agda
+
             echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             echo "~ Examples (things you can try right now!)"
             echo "    make eval-proof-completion                     # Demo: end-to-end proof completion "
@@ -285,6 +298,18 @@ PY
             # Write repo-local libraries file at $AGDA_DIR/libraries (NOT ~/.config/agda)
             ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
             ${exportLibPath}
+
+            # Override Agda to use repo-local library config.
+            # The withPackages wrapper bakes in --library-file pointing at the
+            # Nix store (stdlib only).  We need agda-dojang too.
+            agda() {
+              command agda --no-default-libraries \
+                           --library-file "$AGDA_DIR/libraries" \
+                           --library standard-library \
+                           --library agda-dojang \
+                           "$@"
+            }
+            export -f agda
 
             echo "🛠  backend shell — Agda + GHC/Cabal are pinned together"
             echo "   ROOT      : $ROOT"
@@ -382,6 +407,19 @@ PY
             ${exportLibPath}
             echo "🧩 all-in-one (CPU) — Agda + Scala + Python ready to go"
             ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
+
+            # Override Agda to use repo-local library config.
+            # The withPackages wrapper bakes in --library-file pointing at the
+            # Nix store (stdlib only).  We need agda-dojang too.
+            agda() {
+              command agda --no-default-libraries \
+                           --library-file "$AGDA_DIR/libraries" \
+                           --library standard-library \
+                           --library agda-dojang \
+                           "$@"
+            }
+            export -f agda
+
             echo "   ROOT      : $ROOT"
             echo "   AGDA_DIR  : $AGDA_DIR"
             echo "   Agda      : $(agda --version | head -n1 || true)"
