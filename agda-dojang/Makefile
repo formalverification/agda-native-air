@@ -37,12 +37,14 @@
 #
 # ==============================================================================
 
+REPO_ROOT   := ..
+
 # --- Tools / flags (overridable via environment) ---
 AGDA            ?= agda
 AGDA_DIR        := agda
 HAVE_IFACE_DIR  := $(shell $(AGDA) --help 2>/dev/null | grep -q -- '--interface-dir' && echo yes || echo no)
 AGDA_IFACE_DIR  ?= _build/agda
-BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=agda/libraries -l agda-dojang
+BASE_AGDA_FLAGS := -i $(AGDA_DIR) --library-file=$(REPO_ROOT)/agda/libraries -l agda-dojang
 AGDA_FLAGS      := $(BASE_AGDA_FLAGS) $(if $(filter $(HAVE_IFACE_DIR),yes),--interface-dir=$(AGDA_IFACE_DIR),)
 PYTHON          ?= python3
 SBT             ?= sbt
@@ -60,7 +62,6 @@ DEMO1 := --goal Nat --candidate "suc zero" --imports "open import Agda.Builtin.N
 DEMO2 := --goal Nat --tactic applyReport:_+_ --imports "open import Agda.Builtin.Nat"
 
 # --- Data / transform paths ---
-REPO_ROOT   := ..
 DATA_DIR    := $(REPO_ROOT)/data
 EXAMPLE_AGDA:= $(DATA_DIR)/agda/agda-example.agda
 RAW_JSON    := $(DATA_DIR)/agda-example.json

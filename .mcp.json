@@ -3,7 +3,7 @@
     "agda": {
       "command": "./scripts/run-server.sh",
       "args": [
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library",
+        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library",
         "--corpus", "agda-mcp/test/resources/corpus-fixture.jsonl",
         "--verbose"
       ]

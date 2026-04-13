@@ -610,7 +610,7 @@ The Makefile already treats this as an error (exit code 2). Next steps:
 * check `data/<LIB>/raw/logs/` for per-module logs
 * check the manifest in `data/<LIB>/manifests/`
 * verify `JAVA_HOME` is set (the Makefile will fail loudly if empty)
-* verify `AGDA_LIB_DIR` points to the directory containing `agda-dojang/agda/libraries`
+* verify `AGDA_LIB_DIR` points to the directory containing `agda/libraries`
 
 ### 12.2.  Backend binary resolution issues
 
@@ -696,7 +696,7 @@ To verify that the server works, enter the following on the command line
 ```sh
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}' \
   | ./scripts/run-server.sh \
-      --agda-flags "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library" \
+      --agda-flags "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library" \
       2>/dev/null
 ```
 
@@ -709,7 +709,7 @@ Start `agda-mcp`, send it JSON-RPC requests on stdin, and verify everything is w
 ```sh
 nix develop .#backend
 cd agda-mcp
-cabal run agda-mcp -- --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+cabal run agda-mcp -- --agda-flags "-i ../agda-dojang/agda --library-file=../agda/libraries -l agda-dojang -l standard-library"
 ```
 
 The server prints a startup banner and "Waiting for MCP client..." signaling that it is ready for your JSON-RPC input!
@@ -733,7 +733,7 @@ Alternatively, you can pipe input directly to the server, as follows:
 ```sh
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}' \
   | cabal run agda-mcp -- \
-      --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+      --agda-flags "-i ../agda-dojang/agda --library-file=../agda/libraries -l agda-dojang -l standard-library"
 ```
 
 For a pre-built sequence of test requests, see `agda-mcp/test/resources/mcp-test-input.jsonl`.

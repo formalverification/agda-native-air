@@ -74,7 +74,7 @@
  *      sbt "runMain struxdriver.extract.AgdaSimplifiedExtractor \
  *        ../agda-dojang/agda output/goals.jsonl \
  *        --include ../agda-dojang/agda --lib standard-library \
- *        --library-file ../agda-dojang/agda/libraries \
+ *        --library-file ../agda/libraries \
  *        --dump-raw-goals output/raw-goals --verbose"
  *
  *  ============================================================================
