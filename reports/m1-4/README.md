@@ -101,7 +101,7 @@ MCP server to inspect and solve proof obligations in Agda.
    ```sh
    echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","clientInfo":{"name":"test","version":"0.1"}}}' \
      | ./scripts/run-server.sh \
-         --agda-flags "-i agda-dojang/agda --library-file=agda-dojang/agda/libraries -l agda-dojang -l standard-library" \
+         --agda-flags "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library" \
          2>/dev/null
    ```
    After a few seconds, you should see a JSON-RPC response tht includes `serverInfo.name: "agda-mcp"`.

@@ -1,38 +1,80 @@
 # =============================================================================
 # agda-native-air — Flake (Dev Shells for Agda, Scala/sbt/JDK, Python + PyTorch)
 #
-# Goals:
+# File: flake.nix
+#
+# GOALS
+#
 #   1) One command dev env: `nix develop`. Batteries included.
 #   2) CPU-first by default (portable), GPU opt-in (Linux/NVIDIA).
-#   3) Agda works out-of-the-box with stdlib registered *project-locally*.
-#   4) Keep things explicit & well-commented for future edits.
+#   3) Agda works out-of-the-box with stdlib + agda-dojang registered
+#      *project-locally* (no ~/.agda needed).
+#   4) Optional external Agda libraries (agda-algebras, agda-categories,
+#      TypeTopology) via environment variables — no flake edits required.
+#   5) Keep things explicit & well-commented for future edits.
+#
+#
+# AGDA LIBRARY CONFIGURATION
+#
+#   Every Agda-capable shell (default, backend, all) uses `mkAgdaShellSetup`
+#   to perform all Agda configuration in one place:
+#     - Sets AGDA_DIR to a *top-level* `agda/` directory in the repo root
+#       (not inside agda-dojang — Agda configuration is project-wide).
+#     - Writes a project-local $AGDA_DIR/libraries file (stdlib + agda-dojang).
+#     - Optionally registers external Agda libraries if their *_ROOT env vars
+#       are set (see "External Agda libraries" below).
+#     - Defines an `agda()` shell function that passes --no-default-libraries
+#       and --library flags for all registered libraries.
+#
+#   External Agda libraries:
+#     Set these env vars *before* entering the shell (in .envrc, shell profile,
+#     or inline).  Each should point at the **root** of the library checkout —
+#     i.e., the directory that contains the `.agda-lib` file:
+#
+#       AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master  nix develop
+#       AGDA_CATEGORIES_ROOT=~/git/agda-categories           nix develop
+#       AGDA_TYPETOPOLOGY_ROOT=~/git/TypeTopology            nix develop
+#
+#     If the `.agda-lib` file is found, the library is registered and the
+#     agda() wrapper passes `--library <name>` automatically.
+#
 #
 # IMPORTANT NOTE ABOUT PYTHON WHEELS ON NIX
+#
 #   Many pip wheels (torch, numpy, pandas, etc.) are built for "normal Linux"
 #   layouts where runtime libs (libstdc++.so.6, libgcc_s.so.1, zlib, openssl…)
 #   are in /usr/lib. Inside a Nix shell they are NOT visible unless we provide
-#   them. If we don’t, imports fail with “cannot open shared object file…”.
+#   them. If we don't, imports fail with "cannot open shared object file…".
 #
 #   Therefore, in the CPU shells below we:
-#     • include pkgsStable.stdenv.cc.cc.lib in packages
-#     • export LD_LIBRARY_PATH to point at those runtime libs
+#     • include pkgsStable.stdenv.cc.cc.lib in packages;
+#     • export LD_LIBRARY_PATH to point at those runtime libs.
 #
-# This is scoped to the devShell, not global on your machine.
+#   This is scoped to the devShell, not global on your machine.
 #
-# Pinning policy (important):
+#
+# PINNING POLICY
+#
 #   - nixpkgs        : general toolchain (Scala/sbt/JDK/Python/etc.)
 #   - nixpkgs-agda   : *dedicated* pin for Agda + stdlib (and backend dev tooling)
 #
-# Why a dedicated Agda pin?
-#   Backend work is sensitive to Agda version and its Haskell dependency graph.
-#   Keeping Agda on its own pin avoids breakage when you update general tooling.
+#   Why a dedicated Agda pin:
+#     Backend work is sensitive to Agda version and its Haskell dependency graph.
+#     Keeping Agda on its own pin avoids breakage when updating general tooling.
 #
-# Updating pins (regenerates flake.lock):
-#   nix flake lock --update-input nixpkgs
-#   nix flake lock --update-input nixpkgs-agda
+#   Updating pins (regenerates flake.lock):
+#     nix flake lock --update-input nixpkgs
+#     nix flake lock --update-input nixpkgs-agda
 #
-# Checking Agda version:
-#   nix develop -c agda --version
+#
+# AVAILABLE SHELLS
+#
+#   nix develop            — default: CPU, Agda + Scala + Python (day-to-day)
+#   nix develop .#backend  — Agda backend dev: GHC/Cabal pinned to pkgsAgda
+#   nix develop .#all      — monolithic: everything including Spark
+#   nix develop .#proofParser — minimal Scala/sbt/JDK
+#   nix develop .#mlPipeline  — Scala + Python (CPU), no Agda
+#   nix develop .#gpu      — native Nix CUDA build (Linux only, slow first build)
 # =============================================================================
 {
   description = "agda-native-air: reproducible dev shells for AgdaDojang + Python/Scala (+ optional GPU)";
@@ -71,8 +113,35 @@
     # but we still write a project-local libraries file so users don't need ~/.agda.
     mkAgdaEnv = pkgs: pkgs.agda.withPackages (p: [ p.standard-library ]);
 
-    # ---- Helper: write a project-local libraries file for Agda ----------------
-    mkAgdaLibrariesFile = agdaStdlibPkg: ''
+    # ---- Helper: complete Agda shell setup ------------------------------------
+    # Single entry-point for all Agda configuration in any devShell.
+    # Call as: ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
+    #
+    # What it does (in order):
+    #   1. Locates the repo root via git (falls back to $PWD).
+    #   2. Sets AGDA_DIR to a top-level `agda/` directory in the repo root.
+    #      (Project-wide Agda config lives here, not inside any subproject.)
+    #   3. Writes $AGDA_DIR/libraries with stdlib + agda-dojang paths.
+    #   4. Writes $AGDA_DIR/defaults (agda-dojang, standard-library).
+    #   5. Checks AGDA_ALGEBRAS_ROOT, AGDA_CATEGORIES_ROOT, and
+    #      AGDA_TYPETOPOLOGY_ROOT; if set, locates the .agda-lib file in
+    #      that directory and appends it to the libraries file.
+    #   6. Defines an `agda()` shell function that invokes `command agda`
+    #      with --no-default-libraries, --library-file, and --library flags
+    #      for every successfully registered library.
+    #   7. Prints a summary showing which libraries are active vs. available.
+    #
+    # NOTE on shell quoting:
+    #   - $AGDA_DEFAULT_LIBS is intentionally *unquoted* in the agda() function
+    #     so it word-splits into separate --library arguments.
+    #   - We avoid ${...} for shell variables (use $VAR instead) to prevent
+    #     Nix string interpolation from eating them.
+    #   - The Nix interpolation ${agdaStdlibPkg} is the one exception — it
+    #     resolves to the Nix store path of the standard library at eval time.
+    mkAgdaShellSetup = agdaStdlibPkg: ''
+      # ==== Locate repo root ====
+      # Fall back to $PWD if not in a git repo.
+
       ROOT="$PWD"
       if command -v git >/dev/null 2>&1; then
         if git rev-parse --show-toplevel >/dev/null 2>&1; then
@@ -80,16 +149,23 @@
         fi
       fi
 
-      export AGDA_DIR="$ROOT/agda-dojang/agda"
+      # ==== Set AGDA_DIR (project-wide Agda configuration) ====
+      # Lives at the repo top level — NOT inside agda-dojang or any other
+      # subproject, because this config governs all Agda work across the
+      # entire repository (stdlib, agda-dojang, agda-algebras, etc.).
+      export AGDA_DIR="$ROOT/agda"
       mkdir -p "$AGDA_DIR"
 
+      # ==== Phase 1: write the base libraries file ====
+      # Two always-present libraries:
+      #   - agda-dojang : repo-local (source lives at $ROOT/agda-dojang)
+      #   - standard-library : Nix-managed (resolved from the Nix store)
       cat > "$AGDA_DIR/libraries" <<EOF
     $ROOT/agda-dojang/agda-dojang.agda-lib
     ${agdaStdlibPkg}/standard-library.agda-lib
     EOF
 
-      # IMPORTANT: choose which libraries are active by default.
-      # These names must match the `name:` fields inside the .agda-lib files.
+      # Default libraries — names must match `name:` fields in the .agda-lib files.
       cat > "$AGDA_DIR/defaults" <<EOF
     agda-dojang
     standard-library
@@ -97,7 +173,104 @@
 
       echo "[agda] AGDA_DIR=$AGDA_DIR"
       echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
+
+      # ==== Phase 2: optional external Agda library registration ====
+      # Set these env vars in your shell profile, .envrc, or on the command
+      # line before entering the shell.  Each should point at the **root**
+      # of the library checkout — the directory containing the .agda-lib file:
+      #
+      #   AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master    nix develop
+      #   AGDA_CATEGORIES_ROOT=~/git/agda-categories             nix develop
+      #   AGDA_TYPETOPOLOGY_ROOT=~/git/TypeTopology              nix develop
+      #
+      # The accumulator AGDA_DEFAULT_LIBS collects --library flags for all
+      # registered libraries.  It starts with the two base libraries and grows
+      # as external ones are successfully detected.
+      AGDA_DEFAULT_LIBS="--library standard-library --library agda-dojang"
+
+      # Track registration results for the summary.  Each is set to "yes"
+      # on success inside _register_agda_lib.
+      _AGDA_REG_agda_algebras=""
+      _AGDA_REG_agda_categories=""
+      _AGDA_REG_TypeTopology=""
+
+      # _register_agda_lib VAR_NAME DISPLAY_NAME LIB_ROOT REG_VAR_SUFFIX
+      #   Searches LIB_ROOT for a *.agda-lib file.
+      #   If found, appends it to $AGDA_DIR/libraries and adds a --library
+      #   flag to AGDA_DEFAULT_LIBS.  Sets _AGDA_REG_<suffix>=yes on success.
+      _register_agda_lib() {
+        local var_name="$1"
+        local display_name="$2"
+        local lib_root="$3"
+        local reg_suffix="$4"
+        if [ -n "$lib_root" ]; then
+          local lib_file
+          lib_file="$(find "$lib_root" -maxdepth 1 -name '*.agda-lib' | head -1)"
+          if [ -n "$lib_file" ]; then
+            echo "$lib_file" >> "$AGDA_DIR/libraries"
+            AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
+            eval "_AGDA_REG_$reg_suffix=yes"
+            echo "[agda] registered $display_name from $lib_file"
+          else
+            echo "[agda] WARNING: $var_name is set but no .agda-lib found in $lib_root"
+            echo "[agda]          (expected a *.agda-lib file in that directory)"
+          fi
+        fi
+      }
+
+      # Register each supported external library.
+      # The env var values are double-quoted: if unset, the empty string is
+      # passed and the -n test inside _register_agda_lib skips it.
+      _register_agda_lib AGDA_ALGEBRAS_ROOT     agda-algebras   "$AGDA_ALGEBRAS_ROOT"     agda_algebras
+      _register_agda_lib AGDA_CATEGORIES_ROOT   agda-categories "$AGDA_CATEGORIES_ROOT"   agda_categories
+      _register_agda_lib AGDA_TYPETOPOLOGY_ROOT TypeTopology     "$AGDA_TYPETOPOLOGY_ROOT" TypeTopology
+
+      # ==== Agda shell function ====
+      # Override the Nix-wrapped `agda` binary.  The withPackages wrapper
+      # bakes in --library-file pointing at the Nix store (stdlib only).
+      # We need agda-dojang and any external libraries too, so we bypass
+      # that with --no-default-libraries and supply our own --library-file
+      # and --library flags.
+      #
+      # $AGDA_DEFAULT_LIBS is intentionally unquoted so it word-splits into
+      # separate arguments (e.g., "--library standard-library --library agda-dojang").
+      agda() {
+        command agda --no-default-libraries \
+                     --library-file "$AGDA_DIR/libraries" \
+                     $AGDA_DEFAULT_LIBS \
+                     "$@"
+      }
+      export -f agda
+
+      # ==== Agda library summary ====
+      # Uses the _AGDA_REG_* flags to accurately reflect which libraries
+      # were *successfully* registered (not just whether the env var was set).
+      echo "   Agda libraries:"
+      echo "     * standard-library (Nix-managed)"
+      echo "     * agda-dojang (repo-local)"
+      if [ -n "$_AGDA_REG_agda_algebras" ]; then
+        echo "     * agda-algebras ($AGDA_ALGEBRAS_ROOT)"
+      elif [ -n "$AGDA_ALGEBRAS_ROOT" ]; then
+        echo "     ! agda-algebras: FAILED to register (see warning above)"
+      else
+        echo "     - agda-algebras: set AGDA_ALGEBRAS_ROOT to enable"
+      fi
+      if [ -n "$_AGDA_REG_agda_categories" ]; then
+        echo "     * agda-categories ($AGDA_CATEGORIES_ROOT)"
+      elif [ -n "$AGDA_CATEGORIES_ROOT" ]; then
+        echo "     ! agda-categories: FAILED to register (see warning above)"
+      else
+        echo "     - agda-categories: set AGDA_CATEGORIES_ROOT to enable"
+      fi
+      if [ -n "$_AGDA_REG_TypeTopology" ]; then
+        echo "     * TypeTopology ($AGDA_TYPETOPOLOGY_ROOT)"
+      elif [ -n "$AGDA_TYPETOPOLOGY_ROOT" ]; then
+        echo "     ! TypeTopology: FAILED to register (see warning above)"
+      else
+        echo "     - TypeTopology: set AGDA_TYPETOPOLOGY_ROOT to enable"
+      fi
     '';
+
     # ---- Helper: Python env (CPU vs native CUDA) ------------------------------
     # NOTE:
     #   This env is only for interactive work *inside* nix develop.
@@ -140,7 +313,7 @@
         pythonCPU          = mkPythonEnv { pkgs = pkgsStable; cuda = false; };
         pythonGPU_NixBuild = mkPythonEnv { pkgs = pkgsStable; cuda = true;  };  # slow initial build
 
-        # Common CLI tools
+        # Common CLI tools shared across all shells
         commonTools = with pkgsStable; [ git ripgrep ];
 
         # Runtime libs for pip wheels (torch/numpy/pandas) inside the shell
@@ -164,8 +337,10 @@
       in {
         # -----------------------------------------------------------------------
         # default: CPU-only, day-to-day everything shell
-        #   - uses PINNED Agda
-        #   - keeps our Python/PyTorch + Scala toolchain intact
+        #   - uses PINNED Agda (from pkgsAgda)
+        #   - includes Python/PyTorch (CPU) + Scala toolchain
+        #   - Agda is configured via mkAgdaShellSetup (stdlib + agda-dojang +
+        #     optional external libraries)
         # -----------------------------------------------------------------------
         default = pkgsStable.mkShell {
           name = "agda-native-air";
@@ -217,19 +392,9 @@ else:
     print(f"   torch: IMPORT FAILED ({torch_err})")
 PY
 
-            ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
-
-            # Override Agda to use repo-local library config.
-            # The withPackages wrapper bakes in --library-file pointing at the
-            # Nix store (stdlib only).  We need agda-dojang too.
-            agda() {
-              command agda --no-default-libraries \
-                           --library-file "$AGDA_DIR/libraries" \
-                           --library standard-library \
-                           --library agda-dojang \
-                           "$@"
-            }
-            export -f agda
+            # Configure Agda: project-local libraries, external lib registration,
+            # and the agda() wrapper function.
+            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
 
             echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             echo "~ Examples (things you can try right now!)"
@@ -243,8 +408,10 @@ PY
         };
 
         # -----------------------------------------------------------------------
-        # backend: for custom Agda backend development
+        # backend: for custom Agda backend development (agda-strux / agda-json)
         #   - pins GHC/Cabal to the SAME pkgsAgda universe as Agda itself
+        #   - includes Agda-as-a-library + JSON deps in ghcWithPackages
+        #   - Agda is configured via mkAgdaShellSetup (same as default)
         # -----------------------------------------------------------------------
         backend = pkgsStable.mkShell {
           name = "backend";
@@ -253,11 +420,9 @@ PY
             pkgsStable.scala_2_13
             pkgsStable.sbt
             agdaPinnedEnv
-
-            #pkgsAgda.haskellPackages.ghc
             (pkgsAgda.haskellPackages.ghcWithPackages (ps: with ps; [
               Agda            # Agda as a Haskell library
-              aeson           # JSON encoding for your exporter
+              aeson           # JSON encoding for exporter
               text bytestring vector unordered-containers
               filepath directory
               tasty tasty-hunit  # test deps — avoids cabal rebuilding from Hackage
@@ -278,38 +443,11 @@ PY
 
           shellHook = ''
             export AGDA_NATIVE_AIR_SHELL="backend"
-            # ---------------------------------------------------------------------------
-            # Ensure AGDA_DIR points at the repo-local Agda config, even from subdirs.
-            # Prefer git to locate the repo root; fall back to current dir.
-            # ---------------------------------------------------------------------------
-            ROOT="$(
-              git rev-parse --show-toplevel 2>/dev/null || pwd
-            )"
-
-            export AGDA_DIR="$ROOT/agda-dojang/agda"
-
-            # If the repo structure ever differs, fail loudly:
-            if [ ! -d "$AGDA_DIR" ]; then
-              echo "ERROR: AGDA_DIR does not exist: $AGDA_DIR"
-              echo "       (computed ROOT=$ROOT)"
-              exit 1
-            fi
-
-            # Write repo-local libraries file at $AGDA_DIR/libraries (NOT ~/.config/agda)
-            ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
             ${exportLibPath}
 
-            # Override Agda to use repo-local library config.
-            # The withPackages wrapper bakes in --library-file pointing at the
-            # Nix store (stdlib only).  We need agda-dojang too.
-            agda() {
-              command agda --no-default-libraries \
-                           --library-file "$AGDA_DIR/libraries" \
-                           --library standard-library \
-                           --library agda-dojang \
-                           "$@"
-            }
-            export -f agda
+            # Configure Agda: project-local libraries, external lib registration,
+            # and the agda() wrapper function.
+            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
 
             echo "🛠  backend shell — Agda + GHC/Cabal are pinned together"
             echo "   ROOT      : $ROOT"
@@ -329,7 +467,7 @@ PY
 
 
         # -----------------------------------------------------------------------
-        # proofParser: minimal Scala/sbt/JDK shell (fast startup)
+        # proofParser: minimal Scala/sbt/JDK shell (fast startup, no Agda)
         # -----------------------------------------------------------------------
         proofParser = pkgsStable.mkShell {
           packages =
@@ -345,7 +483,6 @@ PY
             ${exportJavaHome}
             ${exportLibPath}
             echo "🧰 proof-parser shell — try: cd proof-parser && sbt test"
-            echo "   ROOT      : $ROOT"
             echo "   JAVA_HOME : $(echo "$JAVA_HOME")"
             echo "   Java      : $(java -version 2>&1 | head -n1 || true)"
             echo "   sbt       : $(sbt --version 2>&1 | head -n1 || true)"
@@ -356,6 +493,7 @@ PY
 
         # -----------------------------------------------------------------------
         # mlPipeline: Scala + Python (CPU) shell targeting ETL/tests/model
+        # (no Agda — use default or backend shell for Agda work)
         # -----------------------------------------------------------------------
         mlPipeline = pkgsStable.mkShell {
           packages = [
@@ -382,7 +520,9 @@ PY
 
         # -----------------------------------------------------------------------
         # all: monolithic “everything” shell (CPU)
-        #   - also uses PINNED Agda
+        #   - uses PINNED Agda (from pkgsAgda)
+        #   - includes Spark
+        #   - Agda is configured via mkAgdaShellSetup (same as default)
         # -----------------------------------------------------------------------
         all = pkgsStable.mkShell {
           packages = [
@@ -406,19 +546,10 @@ PY
             ${exportJavaHome}
             ${exportLibPath}
             echo "🧩 all-in-one (CPU) — Agda + Scala + Python ready to go"
-            ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
 
-            # Override Agda to use repo-local library config.
-            # The withPackages wrapper bakes in --library-file pointing at the
-            # Nix store (stdlib only).  We need agda-dojang too.
-            agda() {
-              command agda --no-default-libraries \
-                           --library-file "$AGDA_DIR/libraries" \
-                           --library standard-library \
-                           --library agda-dojang \
-                           "$@"
-            }
-            export -f agda
+            # Configure Agda: project-local libraries, external lib registration,
+            # and the agda() wrapper function.
+            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
 
             echo "   ROOT      : $ROOT"
             echo "   AGDA_DIR  : $AGDA_DIR"
@@ -438,6 +569,8 @@ PY
 
         # -----------------------------------------------------------------------
         # gpu: Native Nix CUDA build (slow first build, but fully Nix-managed)
+        #   NOTE: This shell does NOT include Agda.  It is intended for GPU
+        #   model training/inference only.  Use `default` or `backend` for Agda.
         # -----------------------------------------------------------------------
         gpu =
           if pkgsStable.stdenv.isLinux then
@@ -484,7 +617,6 @@ try:
 except Exception as e:
     print("  torch import failed:", e)
 PY
-                ${mkAgdaLibrariesFile pkgsAgda.agdaPackages.standard-library}
              '';
             }
           else

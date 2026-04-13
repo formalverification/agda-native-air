@@ -250,12 +250,12 @@ AGDA_ALGEBRAS_MODULES_FILE  ?= $(AGDA_LIB_METADATA_OUT)/everything-modules.txt
 #
 # What the driver calls "--agda-dir".
 # Should be "directory containing the Agda libraries file".
-# flake.nix writes: $(PROJECT_ROOT)/agda-dojang/agda/libraries
-AGDA_DOJANG               := $(PROJECT_ROOT)/agda-dojang
-AGDA_DOJANG_AGDA          ?= $(AGDA_DOJANG)/agda
-AGDA_DOJANG_AGDA_APPLY    ?= $(AGDA_DATA)/ApplyDemo.agda
-AGDA_LIB_DIR            ?= $(AGDA_DOJANG_AGDA)
-AGDA_STRUX_DIR  ?= $(PROJECT_ROOT)/agda-strux
+# flake.nix writes: $(PROJECT_ROOT)/agda/libraries
+AGDA_DOJANG             := $(PROJECT_ROOT)/agda-dojang
+AGDA_DOJANG_AGDA        ?= $(AGDA_DOJANG)/agda
+AGDA_DOJANG_AGDA_APPLY  ?= $(AGDA_DATA)/ApplyDemo.agda
+AGDA_LIB_DIR            ?= $(PROJECT_ROOT)/agda
+AGDA_STRUX_DIR          ?= $(PROJECT_ROOT)/agda-strux
 #
 # Resolve agda-json executable path from backend shell.
 # Important: nix shell hooks print banners to stdout; filter to the last line

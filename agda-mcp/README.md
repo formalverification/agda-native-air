@@ -51,7 +51,7 @@ cabal build
 
 ```sh
 cabal run agda-mcp -- \
-  --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+  --agda-flags "-i ../agda-dojang/agda --library-file=../agda/libraries -l agda-dojang -l standard-library"
 ```
 
 The server reads JSON-RPC from stdin and writes to stdout.  It will wait for an MCP client to connect.
@@ -244,8 +244,9 @@ See [roadmap.md](../docs/roadmap.md) for milestones and issue tracking.
 ## Example Tests
 
 ``` sh
+cd agda-mcp
 cabal run agda-mcp -- \
-  --agda-flags "-i ../agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library" \
+  --agda-flags "-i ../agda-dojang/agda --library-file=../agda/libraries -l agda-dojang -l standard-library" \
   < test/resources/mcp-test-input.jsonl
 ```
 
@@ -267,7 +268,7 @@ Add to your MCP configuration (`claude_desktop_config.json` or project `.mcp.jso
       "command": "cabal",
       "args": [
         "run", "-v0", "agda-mcp", "--",
-        "--agda-flags", "-i agda-dojang/agda --library-file=../agda-dojang/agda/libraries -l agda-dojang -l standard-library"
+        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library"
       ],
       "cwd": "/path/to/agda-native-air/agda-mcp"
     }
