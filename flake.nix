@@ -204,16 +204,21 @@
         local lib_root="$3"
         local reg_suffix="$4"
         if [ -n "$lib_root" ]; then
-          local lib_file
-          lib_file="$(find "$lib_root" -maxdepth 1 -name '*.agda-lib' | head -1)"
-          if [ -n "$lib_file" ]; then
-            echo "$lib_file" >> "$AGDA_DIR/libraries"
-            AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
-            eval "_AGDA_REG_$reg_suffix=yes"
-            echo "[agda] registered $display_name from $lib_file"
+          if [ -d "$lib_root" ]; then
+            local lib_file
+            lib_file="$(find "$lib_root" -maxdepth 1 -name '*.agda-lib' 2>/dev/null | head -1)"
+            if [ -n "$lib_file" ]; then
+              echo "$lib_file" >> "$AGDA_DIR/libraries"
+              AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
+              eval "_AGDA_REG_$reg_suffix=yes"
+              echo "[agda] registered $display_name from $lib_file"
+            else
+              echo "[agda] WARNING: $var_name is set but no .agda-lib found in $lib_root"
+              echo "[agda]          (expected a *.agda-lib file in that directory)"
+            fi
           else
-            echo "[agda] WARNING: $var_name is set but no .agda-lib found in $lib_root"
-            echo "[agda]          (expected a *.agda-lib file in that directory)"
+            echo "[agda] WARNING: $var_name is set but $lib_root is not an existing directory"
+            echo "[agda]          (expected the root of a library checkout containing a *.agda-lib file)"
           fi
         fi
       }
