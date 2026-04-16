@@ -245,7 +245,6 @@
                      $AGDA_DEFAULT_LIBS \
                      "$@"
       }
-      export -f agda
 
       # ==== Agda library summary ====
       # Uses the _AGDA_REG_* flags to accurately reflect which libraries
