@@ -1,10 +1,29 @@
 # Benchmark Suite — `data/benchmarks/`
 
-**Issue:** M1-5 — Curate baseline benchmark
-**Agda:** 2.8.0
-**stdlib:** as pinned by `nixpkgs-agda` (Agda 2.8.0 from `nixos-unstable`)
+**Issue:** M1-5 — Curate baseline benchmark (#13)
+**Agda:** 2.8.0  **standard-library:** 2.3  (both pinned by `flake.lock`)
+
+The baseline benchmark is a set of Agda proof obligations with committed gold
+solutions, used as the standard evaluation set for subsequent experiments.
+Every gold solution type-checks under the pinned toolchain; type-checking is the
+ground truth for a benchmark entry.
 
 ---
+
+## Contents (v0)
+
+The current suite has **22 obligations**, all drawn from `agda-stdlib`, spanning
+the three difficulty tiers of `docs/benchmarks/taxonomy.md`:
+
+| Tier | Count | Examples |
+|---|---|---|
+| `routine` | 7 | `+-identityˡ` (`refl`), `not-involutive`, `tt : ⊤`, `0 < suc n` |
+| `compositional` | 10 | `+-comm`, `+-assoc`, `*-zeroʳ`, `length-++`, `map-id`, `++-assoc` |
+| `non-obvious` | 5 | `*-comm`, `*-distribʳ-+`, `*-distribˡ-+`, `*-assoc`, `map′` (`Dec`) |
+
+Domains covered: arithmetic, list, logic, maybe, order.  `agda-algebras`
+obligations are planned for a later round (see `docs/benchmarks/obligations.md`);
+they require a local `agda-algebras` checkout and so are tracked separately.
 
 ## Directory Layout
 
@@ -12,33 +31,33 @@
 data/benchmarks/
 ├── README.md                          # this file
 ├── benchmark-index.jsonl              # machine-readable index of all obligations
-├── difficulty-taxonomy.md             # tier definitions and selection criteria
 ├── agda-stdlib-v0/
-│   ├── obligations/                   # .agda files with {!!} holes (one per obligation)
-│   │   ├── Nat-plus-identityR.agda
+│   ├── obligations/                   # .agda files with one {!!} hole each
+│   │   ├── Nat-plus-identityL.agda
 │   │   ├── Nat-plus-comm.agda
 │   │   └── ...
 │   └── gold/                          # solved .agda files (gold solutions)
-│       ├── Nat-plus-identityR.agda
+│       ├── Nat-plus-identityL.agda
 │       ├── Nat-plus-comm.agda
 │       └── ...
-├── agda-algebras-v0/
-│   ├── obligations/                   # .agda files with {!!} holes
-│   │   └── ...
-│   └── gold/                          # solved .agda files
-│       └── ...
-└── reports/                           # evaluation output (gitignored)
-    └── ...
+└── agda-algebras-v0/                  # planned — requires a local agda-algebras checkout
+    ├── obligations/
+    └── gold/
 ```
+
+Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
+the proposed obligation catalog (including the planned `agda-algebras` entries)
+lives in `docs/benchmarks/obligations.md`.
 
 ## Fixture Convention
 
 Each obligation is a self-contained Agda module:
 
-- Imports `AgdaDojang.Debug` (for the `reportGoalCtx` macro)
-- Imports exactly the stdlib / agda-algebras modules needed
-- Contains exactly **one** `{!!}` hole to be filled
-- The module name matches the filename stem
++  It imports `AgdaDojang.Debug` and exactly the stdlib modules it needs.
++  It contains exactly **one** `{!!}` hole to be filled.
++  The module name matches the filename stem.
++  Any prerequisite lemmas are provided as explicit imports — the obligation may
+   import lemmas, just not the definition it is asked to prove.
 
 The corresponding gold file is identical except the hole is replaced with the
 correct proof term.
@@ -54,33 +73,46 @@ Each line is a JSON object with the following fields:
 | `module` | string | Fully qualified source module (e.g., `Data.Nat.Properties`) |
 | `obligation` | string | Path to the obligation `.agda` file (relative to repo root) |
 | `gold` | string | Path to the gold solution `.agda` file (relative to repo root) |
-| `goldTerm` | string | The proof term that fills the hole |
-| `hole` | string | Pretty-printed name of the definition with the hole |
+| `goldTerm` | string | The proof term (or a short sketch) that fills the hole |
+| `hole` | string | Name of the definition with the hole |
 | `type` | string | Pretty-printed type signature of the obligation |
 | `difficulty` | string | One of `"routine"`, `"compositional"`, `"non-obvious"` |
-| `domain` | string | Mathematical domain tag (e.g., `"arithmetic"`, `"algebra"`) |
+| `domain` | string | Domain tag (e.g., `"arithmetic"`, `"list"`, `"logic"`) |
 | `proofStrategy` | string | Primary proof technique (e.g., `"refl"`, `"induction"`) |
-| `tags` | list[string] | Additional tags for slicing (e.g., `["universe-poly"]`) |
+| `tags` | list[string] | Additional tags for slicing (e.g., `["standalone"]`) |
 
 Example line:
 
 ```json
-{"id":"stdlib-nat-plus-comm","source":"agda-stdlib","module":"Data.Nat.Properties","obligation":"data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-comm.agda","gold":"data/benchmarks/agda-stdlib-v0/gold/Nat-plus-comm.agda","goldTerm":"...","hole":"+-comm","type":"∀ m n → m + n ≡ n + m","difficulty":"compositional","domain":"arithmetic","proofStrategy":"induction","tags":[]}
+{"id":"stdlib-nat-plus-identity-r","source":"agda-stdlib","module":"Data.Nat.Properties","obligation":"data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityR.agda","gold":"data/benchmarks/agda-stdlib-v0/gold/Nat-plus-identityR.agda","goldTerm":"induction on n; base refl, step cong suc IH","hole":"+-identityʳ","type":"∀ (n : ℕ) → n + 0 ≡ n","difficulty":"compositional","domain":"arithmetic","proofStrategy":"induction","tags":[]}
 ```
 
-## Evaluation
+## Type-checking the gold solutions
 
-- `make eval-benchmark-gold` — typecheck all gold solutions (regression guard)
-- `make eval-benchmark` — run the propose→check evaluator on all obligations;
-  produce a JSON report under `data/benchmarks/reports/`
-
-## agda-algebras Setup
-
-Unlike stdlib (which is Nix-managed), agda-algebras requires a local clone.
-Set `AGDA_ALGEBRAS_SRC` to point at your `agda-algebras/src/` directory:
+A gold solution counts only if Agda accepts it.  Inside the flake shell, the
+`agda` wrapper registers `standard-library` and the repo-local `agda-dojang`
+library, so a gold file checks directly:
 
 ```sh
-make eval-benchmark AGDA_ALGEBRAS_SRC=~/git/ualib/agda-algebras/master/src
+nix develop .#backend --command agda data/benchmarks/agda-stdlib-v0/gold/Nat-plus-comm.agda
 ```
 
-Obligations that require agda-algebras are skipped if `AGDA_ALGEBRAS_SRC` is unset.
+To check the whole suite, iterate the `gold` paths in `benchmark-index.jsonl`.
+The Scala runner `struxdriver.benchmark.EvalBenchmark --verify-gold` performs the
+same regression check over the index; wiring it into a `make eval-benchmark`
+target that emits a deterministic JSON report is the remaining M1-5 task tracked
+on #13.
+
+## agda-algebras obligations (planned)
+
+`agda-algebras` is not Nix-managed; it requires a local clone.  Set
+`AGDA_ALGEBRAS_ROOT` to the checkout root (the directory containing the
+`.agda-lib` file) before entering the shell, and the flake registers the library
+so its modules become importable:
+
+```sh
+AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master nix develop .#backend
+```
+
+Until those obligations are authored and committed, the suite is `agda-stdlib`
+only.

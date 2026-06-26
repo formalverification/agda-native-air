@@ -1,7 +1,20 @@
-# Proposed Benchmark Obligations (M1-5)
+# Benchmark Obligations (M1-5)
 
-**Status:** DRAFT — awaiting review  
-**Agda:** 2.8.0  |  **stdlib:** as pinned by nixpkgs-agda
+**Status:** stdlib obligations COMMITTED and verified; `agda-algebras` obligations DEFERRED  
+**Agda:** 2.8.0  |  **standard-library:** 2.3 (pinned by `flake.lock`)
+
+The committed v0 suite — 22 `agda-stdlib` obligations, every gold solution
+type-checking under the pinned toolchain — is the source of truth in
+`../../data/benchmarks/benchmark-index.jsonl`.  This document is the broader
+design catalog and diverges from the committed set in a few places:
+
++  Committed, beyond the original list below: `*-distribʳ-+`, `*-distribˡ-+`,
+   `*-assoc`, `*-identityʳ`, and `++-assoc` (rounding out the arithmetic and
+   list families).
++  Proposed below but deferred — more setup or version-drift risk:
+   `reverse-involutive`, `deMorgan₁` over `BooleanAlgebra`, `lookup-replicate`
+   over `Vec`, and all `agda-algebras` obligations (21–30), which require a
+   local `agda-algebras` checkout.
 
 ---
 
