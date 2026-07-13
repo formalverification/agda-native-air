@@ -71,8 +71,11 @@ CONF
 
 # ---- 2. Install Nix if absent --------------------------------------------
 install_nix() {
-  if [ -x "$PROFILE_NIX" ] && "$PROFILE_NIX" --version >/dev/null 2>&1; then
-    log "Nix already installed ($("$PROFILE_NIX" --version))."
+  # Idempotent: skip if Nix is already resolvable, whether on PATH (e.g. via
+  # /nix/var/nix/profiles/default/bin) or at the single-user profile path.
+  if command -v nix >/dev/null 2>&1 \
+     || { [ -x "$PROFILE_NIX" ] && "$PROFILE_NIX" --version >/dev/null 2>&1; }; then
+    log "Nix already installed ($( { command -v nix >/dev/null 2>&1 && nix --version; } || "$PROFILE_NIX" --version ))."
     return 0
   fi
 
@@ -128,8 +131,12 @@ setup_env() {
     [ -f "$cert" ] && export NIX_SSL_CERT_FILE="$cert" && break
   done
 
-  if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  # Idempotent: append our block only once, even if the hook runs again on a
+  # warm container, so PATH/SSL lines don't accumulate in the env file.
+  if [ -n "${CLAUDE_ENV_FILE:-}" ] \
+     && ! grep -q 'agda-native-air:nix-env' "$CLAUDE_ENV_FILE" 2>/dev/null; then
     {
+      echo "# agda-native-air:nix-env (managed by session-start.sh)"
       echo "export PATH=\"/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:\$PATH\""
       [ -n "${NIX_SSL_CERT_FILE:-}" ] && echo "export NIX_SSL_CERT_FILE=\"${NIX_SSL_CERT_FILE}\""
     } >> "$CLAUDE_ENV_FILE"

@@ -19,11 +19,11 @@ Guidance for Claude Code working in this repository.  Keep changes consistent wi
 ## Repository architecture
 
 +  `agda-strux/` is the Haskell backend: it links Agda-as-a-library and exposes the `agda-json` executable, which exports proof state and reflection JSON.  Built and tested with Cabal inside `nix develop .#backend` (`make backend-test`).
-+  `strux-driver/` is the Scala driver (cats-effect / circe / fs2): it invokes `agda-json`, parses and transforms the JSON into JSONL, and hosts the M1-5 benchmark runner (`struxdriver.benchmark.EvalBenchmark`).  Tests run with sbt (`make test`).
++  `strux-driver/` is the Scala driver (cats-effect / circe / fs2): it invokes `agda-json`, parses and transforms the JSON into JSONL, and hosts the M1-5 benchmark runner (`struxdriver.benchmark.EvalBenchmark`, added by Issue #13).  Tests run with sbt (`make test`).
 +  `ml-pipeline/` is the ETL and training/eval layer: a Scala Spark `etl` subproject (JSONL → Parquet features) and Python training/retrieval/evaluation code.
-+  `agda-dojang/` is the repo-local Agda library (`agda-dojang.agda-lib`).  It provides `AgdaDojang.Debug` (the reflection / `reportGoalCtx` macros the benchmark fixtures import) and the proof-completion evaluation harness.
-+  `data/benchmarks/` is the M1-5 baseline benchmark suite: paired obligation/gold Agda fixtures, the `benchmark-index.jsonl` manifest, and difficulty docs.  See `data/benchmarks/README.md` and `docs/benchmarks/taxonomy.md`.
-+  `docs/` holds design notes, the roadmap, and the benchmark taxonomy; `experiments/archive/` is frozen prior work — treat it as read-only.
++  `agda-dojang/` is the repo-local Agda library (`agda-dojang.agda-lib`).  It provides `AgdaDojang.Debug` (the reflection / `reportGoalCtx` macros that Agda fixtures and benchmark obligations import), example fixtures under `agda-dojang/data/fixtures/`, and the proof-completion evaluation harness.
++  `data/benchmarks/` is the M1-5 baseline benchmark suite — paired obligation/gold Agda fixtures, the `benchmark-index.jsonl` manifest, and difficulty docs (`docs/benchmarks/taxonomy.md`) — introduced by Issue #13 (PR #50); its `README.md` documents the layout once that lands.
++  `docs/` holds design notes and the roadmap (`docs/roadmap.md`); the benchmark taxonomy (`docs/benchmarks/taxonomy.md`) arrives with Issue #13.  `experiments/archive/` is frozen prior work — treat it as read-only.
 +  `flake.nix` defines the dev shells; the top-level `Makefile` is the single CLI for the extract → transform → ETL → train → eval loop (`make help`).
 
 ## Conventions
@@ -35,7 +35,9 @@ These proof terms, datasets, and drivers are research artifacts; optimize for le
 +  Prefer small, focused, named definitions over large opaque ones; keep one canonical form per concept.
 +  Makefile targets use the `$(SBT)`, `$(PYTHON)`, and `$(PY_RUN)` variables, declare `.PHONY`, and carry a `make help` line.
 
-## Benchmark fixtures (`data/benchmarks/`)
+## Benchmark fixtures (`data/benchmarks/`, Issue #13)
+
+The M1-5 baseline benchmark is introduced by Issue #13 (PR #50); the `data/benchmarks/` paths below live on that branch until it merges.
 
 +  Each obligation is a self-contained Agda module under `data/benchmarks/<lib>-v0/obligations/` with exactly one `{!!}` hole; its gold solution is the same module with the hole filled, under `.../gold/`.  The module name matches the file stem, and the file imports `AgdaDojang.Debug` plus the minimal stdlib needed.
 +  Every obligation has one line in `data/benchmarks/benchmark-index.jsonl` (schema in `data/benchmarks/README.md`); its difficulty tier follows `docs/benchmarks/taxonomy.md` (`routine` / `compositional` / `non-obvious`).
