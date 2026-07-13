@@ -411,6 +411,8 @@ help:
 	@echo "  make train-retrieval-smoke       - Train a deterministic artifact from smoke dataset; write canonical pickle."
 	@echo "  make eval-proof-completion-smoke-retrieval - Run existing smoke evaluator using retrieval policy + model artifact."
 	@echo "  make bench                       - Run AgdaDojang tiny benchmark"
+	@echo "  make eval-benchmark              - Typecheck all benchmark gold solutions -> JSON report"
+	@echo "  make eval-benchmark-smoke        - CI slice (one obligation per tier) + determinism check"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1349,16 +1351,56 @@ eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-age
 # -----------------------------------------------------------------------------
 # 2.11. Proof Benchmarks
 #
-.PHONY: eval-benchmark-gold
-eval-benchmark-gold:
-	@echo ">> [eval-benchmark-gold] verifying gold solutions..."
-	@cd "$(STRUX_DRIVER)" && \
-	  $(SBT) $(SBT_FLAGS) \
-	    "runMain struxdriver.benchmark.EvalBenchmark \
-	     --verify-gold \
-	     --index $(CURDIR)/$(BENCHMARK_INDEX) \
-	     --out-dir $(CURDIR)/$(BENCHMARK_REPORT_DIR) \
-	     --project-root $(CURDIR)"
+# Gold verification for the M1-5 baseline benchmark (data/benchmarks/): typecheck
+# every committed gold solution with Agda and emit a JSON report.  Requires the
+# Agda-capable dev shell, e.g.:
+#
+#     nix develop .#backend --command make eval-benchmark
+#     nix develop .#backend --command make eval-benchmark-smoke
+#
+# The report records wall-clock timing (a top-level `timestamp` and a per-
+# obligation `elapsedMs`) as a metric; the run is deterministic *modulo* those
+# fields.  eval-benchmark-smoke strips them (scripts/python/normalize_bench_report.py)
+# before checking that two runs are byte-identical — matching the agda-dojang
+# determinism lane in CI.
+BENCHMARK_INDEX        ?= data/benchmarks/benchmark-index.jsonl
+BENCHMARK_REPORT_DIR   ?= data/benchmarks/reports
+BENCHMARK_REPORT       ?= $(BENCHMARK_REPORT_DIR)/gold-verification.json
+# CI smoke slice: one obligation per difficulty tier.
+BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map
+
+.PHONY: eval-benchmark eval-benchmark-gold eval-benchmark-smoke
+
+# Full run: verify every committed gold solution; write $(BENCHMARK_REPORT).
+eval-benchmark eval-benchmark-gold: _check-sbt
+	@mkdir -p "$(BENCHMARK_REPORT_DIR)"
+	@echo ">> [eval-benchmark] verifying gold solutions from $(BENCHMARK_INDEX)"
+	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.benchmark.EvalBenchmark --verify-gold --index $(CURDIR)/$(BENCHMARK_INDEX) --out-dir $(CURDIR)/$(BENCHMARK_REPORT_DIR) --project-root $(CURDIR)"
+	@echo ">> [eval-benchmark] report written to $(BENCHMARK_REPORT)"
+
+# Smoke slice for CI: a 3-obligation subset (one per tier), plus a determinism
+# check that the report is byte-identical across two runs once the wall-clock
+# fields are stripped.
+eval-benchmark-smoke: _check-sbt
+	@set -euo pipefail; \
+	sel="$$(printf '%s\n' $(BENCHMARK_SMOKE_IDS) | sed 's/.*/"id":"&"/' | paste -sd'|' -)"; \
+	smoke_index="$$(mktemp)"; out1="$$(mktemp -d)"; out2="$$(mktemp -d)"; \
+	trap 'rm -rf "$$smoke_index" "$$out1" "$$out2"' EXIT; \
+	grep -E "$$sel" "$(BENCHMARK_INDEX)" > "$$smoke_index"; \
+	n="$$(wc -l < "$$smoke_index" | tr -d ' ')"; \
+	echo ">> [eval-benchmark-smoke] $$n obligations: $(BENCHMARK_SMOKE_IDS)"; \
+	( cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	    "runMain struxdriver.benchmark.EvalBenchmark --verify-gold --index $$smoke_index --out-dir $$out1 --project-root $(CURDIR)" \
+	    "runMain struxdriver.benchmark.EvalBenchmark --verify-gold --index $$smoke_index --out-dir $$out2 --project-root $(CURDIR)" ); \
+	$(PY) scripts/python/normalize_bench_report.py "$$out1/gold-verification.json" > "$$out1/norm.json"; \
+	$(PY) scripts/python/normalize_bench_report.py "$$out2/gold-verification.json" > "$$out2/norm.json"; \
+	if ! diff -u "$$out1/norm.json" "$$out2/norm.json"; then \
+	  echo "[eval-benchmark-smoke] FAIL: report is not deterministic (modulo wall-clock)"; exit 1; \
+	fi; \
+	$(PY) -c "import json,sys; sys.exit(0 if json.load(open('$$out1/gold-verification.json')).get('allPassed') else 1)" || { \
+	  echo "[eval-benchmark-smoke] FAIL: a gold solution did not typecheck"; exit 1; }; \
+	echo "[eval-benchmark-smoke] OK: $$n/$$n gold solutions verified; report deterministic (modulo wall-clock)"
 
 
 

@@ -280,10 +280,18 @@ object GoldVerifier {
         errorMsg     = Some(s"Gold file missing: $goldAbs")
       ))
     } else {
+      // Mirror the flake's `agda` wrapper (flake.nix mkAgdaShellSetup): the raw
+      // `agda` binary this subprocess invokes does not see the shell function, so
+      // the registered libraries must be named explicitly, and the gold file's own
+      // directory must be added to the include path (-i) for its top-level module
+      // name to resolve.
       val cmd = Vector(
         "agda",
         "--no-default-libraries",
         "--library-file", librariesFile,
+        "--library", "standard-library",
+        "--library", "agda-dojang",
+        "-i", goldAbs.getParent.toString,
         goldAbs.toString
       )
 
