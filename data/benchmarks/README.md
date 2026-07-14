@@ -97,11 +97,20 @@ library, so a gold file checks directly:
 nix develop .#backend --command agda data/benchmarks/agda-stdlib-v0/gold/Nat-plus-comm.agda
 ```
 
-To check the whole suite, iterate the `gold` paths in `benchmark-index.jsonl`.
-The Scala runner `struxdriver.benchmark.EvalBenchmark --verify-gold` performs the
-same regression check over the index; wiring it into a `make eval-benchmark`
-target that emits a deterministic JSON report is the remaining M1-5 task tracked
-on #13.
+To verify the whole suite in one step, use the Makefile targets from inside the
+Agda-capable dev shell:
+
+```sh
+nix develop .#backend --command make eval-benchmark        # all committed golds
+nix develop .#backend --command make eval-benchmark-smoke  # one-per-tier CI slice
+```
+
+`make eval-benchmark` runs `struxdriver.benchmark.EvalBenchmark --verify-gold`
+over the index and writes a JSON report to
+`data/benchmarks/reports/gold-verification.json` (gitignored).  The report
+records a wall-clock `timestamp` and per-obligation `elapsedMs`; the run is
+deterministic modulo those fields, and `eval-benchmark-smoke` strips them before
+checking that two runs match.
 
 ## agda-algebras obligations (planned)
 

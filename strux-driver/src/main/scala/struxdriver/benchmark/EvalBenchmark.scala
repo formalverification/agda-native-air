@@ -25,7 +25,7 @@
   *  - Pure ADTs for the domain model (sealed traits, case classes).
   *  - cats-effect IO for all effects (subprocess, file IO, clock).
   *  - circe for JSON parsing and generation.
-  *  - fs2 for streaming JSONL reads (memory-bounded for large indices).
+  *  - Eager JSONL index reads via Files.readAllLines (the index is small).
   *  - No mutable state anywhere.
   *
   *  Integration
@@ -231,7 +231,8 @@ object Filter {
   /** Partition obligations into available and skipped.
     *
     * agda-algebras obligations are skipped when agdaAlgebrasSrc is None.
-    * Obligations whose files don't exist are also skipped.
+    * Obligations whose gold file is missing are also skipped — verify-gold only
+    * consumes the gold, so the obligation file's presence is not checked here.
     */
   def filterAvailable(
     obligations:     Vector[Obligation],
@@ -301,15 +302,24 @@ object GoldVerifier {
                     val pb = new ProcessBuilder(cmd.asJava)
                     pb.environment().put("AGDA_DIR", agdaDir)
                     pb.redirectErrorStream(true)
-                    val proc = pb.start()
-                    val output = new String(
-                      proc.getInputStream.readAllBytes(),
-                      StandardCharsets.UTF_8
-                    )
-                    val exited = proc.waitFor()
-                    (exited, output)
-                  }.timeout(120.seconds)
-                   .handleError(e => (-1, s"Exception: ${e.getMessage}"))
+                    pb.start()
+                  }.bracket { proc =>
+                    IO.blocking {
+                      val output = new String(
+                        proc.getInputStream.readAllBytes(),
+                        StandardCharsets.UTF_8
+                      )
+                      (proc.waitFor(), output)
+                    }.timeout(120.seconds)
+                  } { proc =>
+                    // The Agda process must not outlive this fiber.  IO cancellation
+                    // (e.g. on timeout) cannot interrupt the blocking read, so destroy
+                    // the process explicitly — that closes its output and unblocks the
+                    // reader.  Runs on success, error, and cancellation.
+                    IO.blocking {
+                      if (proc.isAlive) { proc.destroyForcibly().waitFor(); () }
+                    }
+                  }.handleError(e => (-1, s"Exception: ${e.getMessage}"))
         t1     <- IO.monotonic
         elapsedMs = (t1 - t0).toMillis
         (exitCode, output) = result
@@ -427,8 +437,12 @@ object CliParser {
       val projectRoot =
         Paths.get(m.getOrElse("project-root", ".")).toAbsolutePath.normalize()
 
+      // Accept AGDA_ALGEBRAS_ROOT (the name the flake and Makefile use) as well as
+      // the legacy AGDA_ALGEBRAS_SRC; either signals that agda-algebras is available.
       val agdaAlgebrasSrc =
-        sys.env.get("AGDA_ALGEBRAS_SRC").map(s => Paths.get(s).toAbsolutePath.normalize())
+        sys.env.get("AGDA_ALGEBRAS_ROOT")
+          .orElse(sys.env.get("AGDA_ALGEBRAS_SRC"))
+          .map(s => Paths.get(s).toAbsolutePath.normalize())
 
       for {
         md <- mode

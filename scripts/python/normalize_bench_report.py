@@ -37,7 +37,7 @@ except (AttributeError, ValueError):  # SIGPIPE is unavailable on some platforms
 
 
 def normalize(report: dict) -> dict:
-    """Return a copy of the report with volatile wall-clock fields removed."""
+    """Strip the volatile wall-clock fields from the report (in place) and return it."""
     report.pop("timestamp", None)
     for result in report.get("results", []):
         if isinstance(result, dict):
