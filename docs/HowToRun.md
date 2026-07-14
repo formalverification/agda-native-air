@@ -662,6 +662,14 @@ because env tokens can shadow your stored auth.
 `agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
 Cursor, etc.) interact with Agda through standard tool calls.
 
+The server exposes **seven tools**: four core proof-state tools — `get_goal`,
+`fill_hole`, `check_file`, `get_diagnostics` — that are always available, plus
+three corpus-backed search tools — `search_by_name`, `search_by_type`,
+`get_dependencies` — that are registered only when you start the server with
+`--corpus PATH` (an agda-strux JSONL corpus).  For the full command-line
+reference (`--agda-bin`, `--agda-flags`, `--corpus`, `--timeout`, `--verbose`),
+see [`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
+
 This section walks you through building, testing, running, and connecting an agent.
 
 ### 13.1.  Build & Test
@@ -777,6 +785,13 @@ inspect goals, fill holes, and check Agda files through natural language.
 
     ```
     Use ONLY the agda MCP tools (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`) to solve all holes in `agda-dojang/data/fixtures/Fixture01.agda`.  For each hole, inspect with `get_goal`, propose a candidate, and verify with `fill_hole`.  If a candidate fails, read the error message and adjust. Note: `fill_hole` validates candidates without modifying the file — once all candidates are verified, use your Edit tool to write them into the source, then confirm with `check_file`.
+    ```
+
+    If you started the server with `--corpus` (the shipped `.mcp.json` does, using
+    the bundled fixture corpus), you can also exercise the search tools:
+
+    ```
+    Use ONLY the agda MCP tool `search_by_name` to find definitions whose name contains "hom", then `get_dependencies` on the most relevant result. Show me the raw results.
     ```
 
 
