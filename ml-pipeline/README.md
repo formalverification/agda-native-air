@@ -109,7 +109,7 @@ These are under `ml-pipeline/python`.
 The FastAPI serving app and the legacy PyTorch/MLP tooling (`api/`, `model/train.py`,
 `model/batch_infer.py`, `model/export_*.py`, `model/build_finetune_dataset.py`, and
 their tests) have been archived to `experiments/archive/ml-pipeline/`; model serving
-is now handled by `agda-mcp`.[^1]
+will be handled by `agda-mcp`.[^1]
 
 ---
 
@@ -356,8 +356,10 @@ make smoke                  # End-to-end sanity checks.
 committed retrieval artifact from the smoke dataset.  `make smoke` runs the top-level
 sanity lane (sample generation, dataset stats, extraction, and tests).
 
-(ETL commands may emit many Spark-generated `[error]` log lines; these are Spark's own
-logging and can be ignored.)
+(sbt prefixes everything a forked process writes to stderr with `[error]`, so Spark's
+own INFO/WARN logs surface as `[error]` lines even on a successful run.  Judge the run
+by its exit code and the `✅ wrote ...` success marker, not by the presence of `[error]`
+lines.)
 
 
 ---

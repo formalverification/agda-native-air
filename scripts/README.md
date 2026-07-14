@@ -3,8 +3,10 @@
 # scripts
 
 Repository-level utility scripts that support the build, the MCP server, and the
-project's Python tooling.  These are wired into `Makefile` targets and `.mcp.json`;
-they are not part of the extraction, ETL, or evaluation pipelines themselves.
+project's Python tooling.  They are wrappers and helpers around the extraction,
+ETL, and evaluation pipelines — sbt invocation, the MCP server launch, metadata and
+report generation — rather than pipeline stages themselves, and are wired into
+`Makefile` targets and `.mcp.json`.
 
 ## Shell wrappers
 
