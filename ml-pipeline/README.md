@@ -75,7 +75,6 @@ Each stage can be run independently.
 
 + `etl`: Scala/Spark ETL programs.
 + `python`: Python modeling and training programs.
-+ `scripts`: various utility scripts.
 
 ### Scala/Spark Programs
 
@@ -92,7 +91,6 @@ These are under `ml-pipeline/python`.
 
 +  `conftest.py`: Pytest configuration for the ml-pipeline project.
 +  `requirements.txt`: Python package dependencies.
-+  ~`api/main.py`: sets up FastAPI app; loads pre-trained PyTorch model; endpoint for making predictions.~[^1]
 +  `model/`
 
    +  `filter_jsonl.py` reads a JSON Lines (JSONL) file containing records, applies
@@ -101,33 +99,17 @@ These are under `ml-pipeline/python`.
    +  `train_retrieval.py` builds a deterministic retrieval artifact for
       `agda-dojang/python/tools/policy_retrieval.py`.
 
-   +  **Deprecated**[^2]  
-      +  `batch_infer.py` performs batch inference using a pre-trained TorchScript model.
-      +  `build_finetune_dataset.py` converts a filtered AgdaData JSONL dataset into a fine-tuning-ready JSONL file with instruction/input/output triples.
-      +  `export_onnx.py` loads a trained PyTorch model and exports it as ONNX file.
-      +  `export_script.py` loads a trained PyTorch model and exports it as TorchScript file.
-      +  `train.py` is a PyTorch training script; reads data from Parquet file; trains basic MLP model; saves trained model.
-
 +  `scripts/inspect_runtime.py`: inspect and print the runtime environment.
 
 +  `tests/`
 
-   +  ~`test_main.py`: unit tests for FastAPI app defined in ../api/main.py.~
    +  `test_train_retrieval.py`: tests ensuring retrieval model artifact is
       deterministic across runs and adheres to expected invariants.
-   +  `test_dataset_pipeline.py`: tests for dataset processing pipeline, ensuring
-      finetune dataset builder produces expected instruction/input/output format.
 
-
-
-### Miscellaneous Scripts
-
-These are in `ml-pipeline/scripts`.
-
-+ `run_etl.sh`:
-+ `start_server.sh`:
-+ `train_model.sh`:
-+ `venv-gpu.sh`:
+The FastAPI serving app and the legacy PyTorch/MLP tooling (`api/`, `model/train.py`,
+`model/batch_infer.py`, `model/export_*.py`, `model/build_finetune_dataset.py`, and
+their tests) have been archived to `experiments/archive/ml-pipeline/`; model serving
+is now handled by `agda-mcp`.[^1]
 
 ---
 
@@ -359,95 +341,24 @@ string and structural fields.
 
 ---
 
-### ETL, Train, Serve, and Smoke Tests
+### ETL, Train, and Smoke Tests
 
 From the repository root:
 
 ```bash
-make etl          # JSONL → Parquet features.
-make train        # Train a baseline model.
-make serve        # Start the inference server (placeholder; yet to be implemented).
-make smoke        # End-to-end sanity checks.
+make etl                    # JSONL → Parquet features.
+make train-retrieval-smoke  # Train the deterministic retrieval artifact.
+make smoke                  # End-to-end sanity checks.
 ```
 
-What success looks like:
+`make etl` runs the Spark ETL (`etl.PreprocessAgda`) and writes
+`ml-pipeline/features/{train,test}.parquet`.  `make train-retrieval-smoke` builds the
+committed retrieval artifact from the smoke dataset.  `make smoke` runs the top-level
+sanity lane (sample generation, dataset stats, extraction, and tests).
 
-``` bash
-$ make etl
->> [etl] Spark: JSONL -> Parquet -> /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
-cd ml-pipeline && \
-  sbt -Dsbt.supershell=false "project etl" "runMain etl.PreprocessAgda"
-[info] welcome to sbt 1.10.11 (N/A Java 21.0.3)
-[info] loading settings for project ml-pipeline-build-build from metals.sbt...
-[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/project/project
-[info] loading settings for project ml-pipeline-build from metals.sbt...
-[info] loading project definition from /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/project
-[success] Generated .bloop/ml-pipeline-build.json
-[success] Total time: 2 s, completed Feb 1, 2026, 2:38:18 PM
-[info] loading settings for project root from build.sbt...
-[info] set current project to ml-pipeline (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/)
-[info] set current project to ETL (in build file:/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/)
-[info] running (fork) etl.PreprocessAgda 
-[error] Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-[error] 26/02/01 14:38:20 WARN Utils: Your hostname, alonzo resolves to a loopback address: 127.0.1.1; using 192.168.1.34 instead (on interface wlp0s20f3)
-...
-[error] 26/02/01 14:38:26 INFO ShutdownHookManager: Shutdown hook called
-[error] 26/02/01 14:38:26 INFO ShutdownHookManager: Deleting directory /tmp/spark-73102be6-e849-4ce6-8a1a-02aadd609d99
-[success] Total time: 8 s, completed Feb 1, 2026, 2:38:26 PM
-✅ wrote /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/features/train.parquet
+(ETL commands may emit many Spark-generated `[error]` log lines; these are Spark's own
+logging and can be ignored.)
 
-$ make train
->> [train] USE_VENV=1 TORCH_MODE=cpu
-   TRAIN_DATA=/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/data/train.jsonl
-🐍 inspecting Python / torch runtime...
-Python executable : /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/bin/python
-torch version     : 2.6.0+cu124
-/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
-  return torch._C._cuda_getDeviceCount() > 0
-CUDA available    : False
-🧊 USING CPU-ONLY TORCH
->> [train] training -> /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt (input=/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/data/train.jsonl)
-/home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:129: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
-  return torch._C._cuda_getDeviceCount() > 0
-epoch 1/10  loss=0.0085
-epoch 2/10  loss=0.0039
-epoch 3/10  loss=0.0019
-epoch 4/10  loss=0.0010
-epoch 5/10  loss=0.0006
-epoch 6/10  loss=0.0004
-epoch 7/10  loss=0.0002
-epoch 8/10  loss=0.0001
-epoch 9/10  loss=0.0001
-epoch 10/10  loss=0.0001
-✅ saved model to /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
-✅ model ready: /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/models/model.pt
-
-$ make serve
-⚠️  /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/ml-pipeline/python/api/app.py not found; skipping serve.
-
-$ make smoke
-→ Top-level smoke on "2026-02-01T21:39:16Z"
-→ logs: /home/williamdemeo/git/AI/PROJECTS/agda-native-air/worktrees/william/58-integrate-into-etl/data/make-logs/20260201T213916Z
-------------------------------------------------------------
->>> make gen-sample
-✓ gen-sample (17s)
-------------------------------------------------------------
->>> make dataset-stats-sample
-✓ dataset-stats-sample (12s)
-------------------------------------------------------------
->>> make premise-eval-quick-sample
-✓ premise-eval-quick-sample (13s)
-------------------------------------------------------------
->>> make extract
-✓ extract (7s)
-------------------------------------------------------------
->>> make test
-✓ test (27s)
-------------------------------------------------------------
->>> make backend-smoke
-✓ backend-smoke (12s)
-✓ smoke passed: gen-sample dataset-stats-sample premise-eval-quick-sample extract test backend-smoke
-```
 
 ---
 
@@ -478,9 +389,6 @@ Run `make help` for additional targets and configuration options.
 
 
 [^1]: **Note:** The FastAPI model server (`api/main.py`) and the legacy MLP trainer have been archived to `experiments/archive/ml-pipeline/`.  Model serving will be handled by `agda-mcp`; see `docs/PLAN.md` Phase 1 for the current architecture.
-
-
-[^2]: Archived deprecated files (see `experiments/archive/ml-pipeline/`): `api/`, `model/train.py`, `model/batch_infer.py`, `model/export_*.py`, `model/build_finetune_dataset.py`, `Dockerfile`, `Makefile`.
 
 
 
