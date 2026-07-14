@@ -308,7 +308,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
                  etl-agda-algebras-smoke train-retrieval-smoke eval-proof-completion-smoke-retrieval \
-                 bench pipeline filter test-strux-driver \
+                 bench filter test-strux-driver \
                  train-jsonl train-jsonl-sample train-jsonl-head \
                  dataset-stats dataset-stats-sample premise-eval-quick-sample premise-eval premise-eval-quick \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
@@ -432,11 +432,6 @@ help:
 	@echo "  TORCH_MODE=skip       -> don't touch torch at all"
 	@echo "  PIP_QUIET=-q (default) or PIP_QUIET= for full pip output"
 	@echo ""
-	@echo "Examples:"
-	@echo "  make train-stdlib"
-	@echo "  make train-stdlib TORCH_MODE=pypi"
-	@echo "  source ~/venvs/mlpipeline/bin/activate && make train-stdlib USE_VENV=0"
-	@echo ""
 #
 # -------------------------------------------------------------------------------
 # + 1.2. `env/diag` (Environment setup and diagnostics)
@@ -461,7 +456,7 @@ env diag: $(VENV_DEPS)
 	@$(PY) -c 'import sys; print(sys.version)' 2>/dev/null || echo "  ($(PY) not available)"
 	@echo ""
 	@echo "→ Python / torch runtime (training Python):"
-	@$(PY_RUN) ml-pipeline/scripts/inspect_runtime.py 2>/dev/null || echo "  (could not run inspect_runtime.py)"
+	@$(PY_RUN) $(ML_PIPE_PY_SCRIPTS)/inspect_runtime.py 2>/dev/null || echo "  (could not run inspect_runtime.py)"
 	@echo "========================================================="
 #
 # --- Create directories we write to (defensive) -----------------------------
@@ -532,10 +527,10 @@ PROBE_TARGETS := env diag _ensure-dirs _check-sbt _check-python _check-spark \
                  extract-algebras-backend extract-algebras agda-algebras-metadata metadata extract-lib \
                  check check-nix audit audit-nix test test-strux-driver \
                  extract extract-stdlib extract-categories transform a2t etl \
-                 train filter finetune-dataset serve bench \
+                 filter bench \
                  dataset-stats dataset-stats-sample premise-eval-quick-sample premise-eval premise-eval-quick \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
-                 pipeline train-stdlib train-algebras train-categories extract-algebras-legacy
+                 extract-algebras-legacy
 probe-all:
 	@mkdir -p "$(LOG_DIR)"
 	@echo "→ probe-all: attempting (almost) all targets; logs in $(LOG_DIR)"
@@ -801,15 +796,12 @@ test-strux-driver: _check-sbt build-agda-json
 # 2.2. transform: Scala Agda2TrainTransformer (reflection JSON → AgdaData JSONL)
 # 2.3. a2t: legacy reducer (Agda2Train JSON → canonical AgdaData)
 # 2.4. etl: Spark ETL (JSONL -> Parquet)
-# 2.5.a. train: Python trainer (JSONL-based for now).
-# 2.5.b. filter: create a cleaned dataset (non-empty type/proof, optional length thresholds)
-# 2.5.c. finetune-dataset: builder that turns AgdaData into instruction/output pairs
-# 2.6. serve: agda-mcp
-# 2.7. bench: AgdaDojang dojo (still delegated for now)
-# 2.8. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
-# 2.9. smoke: Top-level smoke tests
-# 2.10. Proof Completion: end-to-end smoke test for proof completion
-# 2.11. Proof Benchmarks: proof completion benchmarks testing
+# 2.5. ETL corpora + Python tooling: agda-algebras ETL, filter, retrieval trainer
+# 2.6. bench: AgdaDojang dojo (still delegated for now)
+# 2.7. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
+# 2.8. smoke: Top-level smoke tests
+# 2.9. Proof Completion: end-to-end smoke test for proof completion
+# 2.10. Proof Benchmarks: proof completion benchmarks testing
 #
 # ------------------------------------------------------------------------------
 # 2.1. AgdaExtractorMain
@@ -1118,38 +1110,7 @@ etl-agda-algebras-smoke: _ensure-dirs _check-sbt _check-java-home _check-spark _
 # ------------------------------------------------------------------------------
 
 
-# === LEGACY — archived to experiments/archive/ (Issue M0-1) ====================
-## ------------------------------------------------------------------------------
-## 2.5.2.0. Legacy Python trainer (JSONL-based for now).
-# train: $(VENV_DEPS)
-#	@if [ ! -s "$(TRAIN_DATA)" ]; then \
-#	  echo "ERROR: no training data found at $(TRAIN_DATA)."; \
-#	  echo "       Run 'make extract' or override TRAIN_DATA=..."; \
-#	  exit 1; \
-#	fi
-#	@if [ ! -f "$(ML_PIPE_PY_MODEL)/train.py" ]; then \
-#	  echo "WARN: $(ML_PIPE_PY_MODEL)/train.py not found. Creating a stub model."; \
-#	  mkdir -p $(ML_PIPE_MODELS); \
-#	  echo "stub" > $(MODEL_CKPT); \
-#	  echo "✅ wrote stub $(MODEL_CKPT) (replace this with a real trainer)"; \
-#	else \
-#	  echo ">> [train] USE_VENV=$(USE_VENV) TORCH_MODE=$(TORCH_MODE)"; \
-#	  echo "   TRAIN_DATA=$(TRAIN_DATA)"; \
-#	  echo "🐍 inspecting Python / torch runtime..."; \
-#	  $(PY_RUN) $(ML_PIPE_PY_SCRIPTS)/inspect_runtime.py || true; \
-#	  echo ">> [train] training -> $(MODEL_CKPT) (input=$(TRAIN_DATA))"; \
-#	  $(PY_RUN) $(ML_PIPE_PY_MODEL)/train.py \
-#	    --input "$(TRAIN_DATA)" \
-#	    --out "$(MODEL_CKPT)" || { \
-#	      echo "TIP: trainer expects JSONL at --input (we passed $(TRAIN_DATA))."; \
-#	      exit 1; }; \
-#	fi
-#	@[ -s "$(MODEL_CKPT)" ] || { echo "❌ Expected model at $(MODEL_CKPT)."; exit 1; }
-#	@echo "✅ model ready: $(MODEL_CKPT)"
-# ==========================================================================
-
-
-# 2.5.2.1. Python Filter (filter_jsonl.py): create cleaned dataset
+# 2.5.2. Python Filter (filter_jsonl.py): create cleaned dataset
 #        (non-empty type/proof, optional length thresholds)
 filter: $(VENV_DEPS)
 	@if [ ! -s "$(TRAIN_DATA)" ]; then \
@@ -1168,24 +1129,6 @@ filter: $(VENV_DEPS)
 	  exit 2; \
 	fi
 	@echo "✅ filtered dataset: $(DATA_FILTERED)"
-
-
-# === LEGACY — archived to experiments/archive/ (Issue M0-1) ====================
-## ------------------------------------------------------------------------------
-## 2.5.2.2. Python fine-tuning dataset builder (build_finetune_dataset.py): turn
-##          AgdaData into instruction/output pairs.
-#finetune-dataset: $(VENV_DEPS)
-#	@if [ ! -s "$(DATA_FILTERED)" ]; then \
-#	  echo "ERROR: DATA_FILTERED missing at $(DATA_FILTERED). Run 'make filter' first."; \
-#	  exit 1; \
-#	fi
-#	@echo ">> [finetune] $(DATA_FILTERED) -> $(DATA_FINE_TUNE)"
-#	@$(PY_RUN) $(ML_PIPE_PY_MODEL)/build_finetune_dataset.py \
-#	  --input "$(DATA_FILTERED)" \
-#	  --out "$(DATA_FINE_TUNE)"
-#	@[ -s "$(DATA_FINE_TUNE)" ] || { echo "❌ Expected $(DATA_FINE_TUNE)."; exit 1; }
-#	@echo "✅ fine-tuning dataset: $(DATA_FINE_TUNE)"
-# ==========================================================================
 
 
 # ------------------------------------------------------------------------------
@@ -1223,34 +1166,14 @@ eval-proof-completion-smoke-retrieval: train-retrieval-smoke
 	  EVAL_XFAIL=FixtureLambda
 
 
-# === LEGACY — archived to experiments/archive/ (Issue M0-1) ===============
-## ------------------------------------------------------------------------------
-## 2.6. Python Serve (app.py): FastAPI (uvicorn) using trained model.
-#serve:
-#	@set -e; \
-#	if [ ! -s "$(MODEL_CKPT)" ]; then \
-#	  echo "ERROR: model missing at $(MODEL_CKPT). Run 'make train' first."; \
-#	  exit 1; \
-#	fi; \
-#	if [ ! -f "$(ML_PIPE_API)/app.py" ]; then \
-#	  echo "⚠️  $(ML_PIPE_API)/app.py not found; skipping serve."; \
-#	  exit 0; \
-#	fi; \
-#	echo ">> [serve] starting FastAPI (Ctrl-C to stop)"; \
-#	cd "$(ML_PIPE_PY)" && \
-#	  PYTHONPATH="$(ML_PIPE_PY)" \
-#	  MODEL_PATH="$(abspath $(MODEL_CKPT))" \
-#	  $(UVICORN) api.app:app --reload
-# ==========================================================================
-
 # ------------------------------------------------------------------------------
-# 2.7. Bench: AgdaDojang dojo (still delegated for now)
+# 2.6. Bench: AgdaDojang dojo (still delegated for now)
 bench:
 	@echo ">> [bench] running AgdaDojang tiny benchmark"
 	@$(MAKE) -C $(AGDA_DOJANG) solve
 
 # ------------------------------------------------------------------------------
-# 2.8. Scala Dataset Utilities (DatasetStats, PremiseEval)
+# 2.7. Scala Dataset Utilities (DatasetStats, PremiseEval)
 DATASET ?= $(DATA_TRAIN)
 
 dataset-stats:
@@ -1283,7 +1206,7 @@ premise-eval-quick:
 	  $(SBT) $(SBT_FLAGS) "runMain struxdriver.util.PremiseEval $(DATASET) --k $(K) --split $(SPLIT)"
 
 # ------------------------------------------------------------------------------
-# 2.9. Top-level smoke tests
+# 2.8. Top-level smoke tests
 SMOKE_TARGETS  ?= gen-sample dataset-stats-sample premise-eval-quick-sample extract test backend-smoke
 LOG_DIR        ?= $(DATA)/make-logs/$(shell date -u +"%Y%m%dT%H%M%SZ")
 export LOG_DIR
@@ -1340,7 +1263,7 @@ smoke-sample:
 	@$(MAKE) premise-eval-quick-sample
 
 # -----------------------------------------------------------------------------
-# 2.10. Proof Completion
+# 2.9. Proof Completion
 #
 #
 eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge:
@@ -1349,7 +1272,7 @@ eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-age
 # ------------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-# 2.11. Proof Benchmarks
+# 2.10. Proof Benchmarks
 #
 # Gold verification for the M1-5 baseline benchmark (data/benchmarks/): typecheck
 # every committed gold solution with Agda and emit a JSON report.  Requires the
@@ -1474,47 +1397,6 @@ test-integration: ## Run strux-driver end-to-end integration tests
 	cd strux-driver && sbt "testOnly *AgdaEndToEndSpec"
 
 
-#--------------------------------------------
-# Library-specific train targets + `pipeline`
-pipeline:
-	@echo "→ Pipeline starting (EXTRACT_INPUT=$(EXTRACT_INPUT), TRAIN_DATA=$(TRAIN_DATA))"
-	@echo "   USE_VENV=$(USE_VENV) TORCH_MODE=$(TORCH_MODE)"
-	@echo "   SBT=$(SBT) SPARK_SUBMIT=$(SPARK_SUBMIT) PY=$(PY)"
-	$(MAKE) extract
-	$(MAKE) dataset-stats DATASET="$(TRAIN_DATA)"
-	$(MAKE) filter TRAIN_DATA="$(TRAIN_DATA)"
-	$(MAKE) finetune-dataset DATA_FILTERED="$(DATA_FILTERED)"
-	$(MAKE) train TRAIN_DATA="$(DATA_FILTERED)"
-	@echo "✓ Pipeline complete (TRAIN_DATA=$(TRAIN_DATA), DATA_FILTERED=$(DATA_FILTERED), DATA_FINE_TUNE=$(DATA_FINE_TUNE))"
-
-pipeline-smoke:
-	$(MAKE) pipeline MIN_TYPE_LEN=0 MIN_PROOF_LEN=0
-
-# === LEGACY — archived to experiments/archive/ (Issue M0-1) ===============
-#train-stdlib:
-#	$(MAKE) pipeline \
-#	  EXTRACT_INPUT="$(AGDA_STDLIB_SRC)" \
-#	  TRAIN_DATA="$(DATA_STDLIB)" \
-#	  DATA_FILTERED="$(DATA)/train-stdlib-2.2.filtered.jsonl" \
-#	  DATA_FINE_TUNE="$(DATA)/train-stdlib-2.2.finetune.jsonl"
-#
-#train-algebras:
-#	$(MAKE) pipeline \
-#	  EXTRACT_INPUT="$(AGDA_ALGEBRAS_SRC)" \
-#	  TRAIN_DATA="$(DATA_ALGEBRAS)" \
-#	  DATA_FILTERED="$(DATA)/train-algebras.filtered.jsonl" \
-#	  DATA_FINE_TUNE="$(DATA)/train-algebras.finetune.jsonl"
-#
-#train-categories:
-#	$(MAKE) pipeline \
-#	  EXTRACT_INPUT="$(AGDA_CATEGORIES_SRC)" \
-#	  TRAIN_DATA="$(DATA_CATEGORIES)" \
-#	  DATA_FILTERED="$(DATA)/train-categories.filtered.jsonl" \
-#	  DATA_FINE_TUNE="$(DATA)/train-categories.finetune.jsonl"
-# ==========================================================================
-
-
-
 # ==============================================================================
 # Section 3 — Legacy and misc
 # ==============================================================================
@@ -1548,7 +1430,7 @@ wipe:
 
 # ------------------------------------------------------------------------------
 # 11) Utility: tree
-TREE_IGNORE := .gitignore|.venv-cu121|.vscode|_build|.metals|.bloop|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache|target|project|node_modules
+TREE_IGNORE := .gitignore|.vscode|_build|.metals|.bloop|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache|target|project|node_modules
 
 tree:
 	@echo ">> Clean directory tree (excluding: '$(TREE_IGNORE)')"
