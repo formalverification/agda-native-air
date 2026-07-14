@@ -456,7 +456,7 @@ env diag: $(VENV_DEPS)
 	@$(PY) -c 'import sys; print(sys.version)' 2>/dev/null || echo "  ($(PY) not available)"
 	@echo ""
 	@echo "→ Python / torch runtime (training Python):"
-	@$(PY_RUN) ml-pipeline/scripts/inspect_runtime.py 2>/dev/null || echo "  (could not run inspect_runtime.py)"
+	@$(PY_RUN) $(ML_PIPE_PY_SCRIPTS)/inspect_runtime.py 2>/dev/null || echo "  (could not run inspect_runtime.py)"
 	@echo "========================================================="
 #
 # --- Create directories we write to (defensive) -----------------------------
@@ -796,12 +796,12 @@ test-strux-driver: _check-sbt build-agda-json
 # 2.2. transform: Scala Agda2TrainTransformer (reflection JSON → AgdaData JSONL)
 # 2.3. a2t: legacy reducer (Agda2Train JSON → canonical AgdaData)
 # 2.4. etl: Spark ETL (JSONL -> Parquet)
-# 2.5.b. filter: create a cleaned dataset (non-empty type/proof, optional length thresholds)
-# 2.7. bench: AgdaDojang dojo (still delegated for now)
-# 2.8. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
-# 2.9. smoke: Top-level smoke tests
-# 2.10. Proof Completion: end-to-end smoke test for proof completion
-# 2.11. Proof Benchmarks: proof completion benchmarks testing
+# 2.5. ETL corpora + Python tooling: agda-algebras ETL, filter, retrieval trainer
+# 2.6. bench: AgdaDojang dojo (still delegated for now)
+# 2.7. dataset-stats: Dataset utilities (Scala mains in strux-driver/)
+# 2.8. smoke: Top-level smoke tests
+# 2.9. Proof Completion: end-to-end smoke test for proof completion
+# 2.10. Proof Benchmarks: proof completion benchmarks testing
 #
 # ------------------------------------------------------------------------------
 # 2.1. AgdaExtractorMain
@@ -1110,7 +1110,7 @@ etl-agda-algebras-smoke: _ensure-dirs _check-sbt _check-java-home _check-spark _
 # ------------------------------------------------------------------------------
 
 
-# 2.5.2.1. Python Filter (filter_jsonl.py): create cleaned dataset
+# 2.5.2. Python Filter (filter_jsonl.py): create cleaned dataset
 #        (non-empty type/proof, optional length thresholds)
 filter: $(VENV_DEPS)
 	@if [ ! -s "$(TRAIN_DATA)" ]; then \
@@ -1167,13 +1167,13 @@ eval-proof-completion-smoke-retrieval: train-retrieval-smoke
 
 
 # ------------------------------------------------------------------------------
-# 2.7. Bench: AgdaDojang dojo (still delegated for now)
+# 2.6. Bench: AgdaDojang dojo (still delegated for now)
 bench:
 	@echo ">> [bench] running AgdaDojang tiny benchmark"
 	@$(MAKE) -C $(AGDA_DOJANG) solve
 
 # ------------------------------------------------------------------------------
-# 2.8. Scala Dataset Utilities (DatasetStats, PremiseEval)
+# 2.7. Scala Dataset Utilities (DatasetStats, PremiseEval)
 DATASET ?= $(DATA_TRAIN)
 
 dataset-stats:
@@ -1206,7 +1206,7 @@ premise-eval-quick:
 	  $(SBT) $(SBT_FLAGS) "runMain struxdriver.util.PremiseEval $(DATASET) --k $(K) --split $(SPLIT)"
 
 # ------------------------------------------------------------------------------
-# 2.9. Top-level smoke tests
+# 2.8. Top-level smoke tests
 SMOKE_TARGETS  ?= gen-sample dataset-stats-sample premise-eval-quick-sample extract test backend-smoke
 LOG_DIR        ?= $(DATA)/make-logs/$(shell date -u +"%Y%m%dT%H%M%SZ")
 export LOG_DIR
@@ -1263,7 +1263,7 @@ smoke-sample:
 	@$(MAKE) premise-eval-quick-sample
 
 # -----------------------------------------------------------------------------
-# 2.10. Proof Completion
+# 2.9. Proof Completion
 #
 #
 eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge:
@@ -1272,7 +1272,7 @@ eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-age
 # ------------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-# 2.11. Proof Benchmarks
+# 2.10. Proof Benchmarks
 #
 # Gold verification for the M1-5 baseline benchmark (data/benchmarks/): typecheck
 # every committed gold solution with Agda and emit a JSON report.  Requires the
@@ -1430,7 +1430,7 @@ wipe:
 
 # ------------------------------------------------------------------------------
 # 11) Utility: tree
-TREE_IGNORE := .gitignore|.venv-cu121|.vscode|_build|.metals|.bloop|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache|target|project|node_modules
+TREE_IGNORE := .gitignore|.vscode|_build|.metals|.bloop|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache|target|project|node_modules
 
 tree:
 	@echo ">> Clean directory tree (excluding: '$(TREE_IGNORE)')"

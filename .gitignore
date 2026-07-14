@@ -57,7 +57,6 @@ __pycache__/
 .pytest_cache/
 *.so
 .venv/
-.venv-cu121/
 env/
 ENV/
 pip-wheel-metadata/
