@@ -13,7 +13,7 @@ agda/
 
 # === Data outputs ===
 ml-pipeline/data/
-strux-driver/output/theorems.jsonl
+strux-driver/output/
 data/agda-algebras/
 data/corpora-metadata/
 data/*.jsonl
@@ -102,7 +102,6 @@ agda/libraries
 
 strux-driver/agda-example-transformed.jsonl
 strux-driver/agda-example.json
-strux-driver/output/theorems-old.jsonl
 strux-driver/package-lock.json
 strux-driver/src/test/resources/agda-example-orig.json
 strux-driver/src/test/resources/agda-example.json
