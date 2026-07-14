@@ -1,13 +1,38 @@
+<!-- File: scripts/README.md -->
+
 # scripts
 
-This directory contains miscellaneous utility scripts.  In particular, there are two
-**tiny, nix-free** helper scripts that should work reliably across "weird" env machines.
+Repository-level utility scripts that support the build, the MCP server, and the
+project's Python tooling.  These are wired into `Makefile` targets and `.mcp.json`;
+they are not part of the extraction, ETL, or evaluation pipelines themselves.
 
-+  `setup_gpu_venv.sh` -- POSIX-safe setup of `.venv-cu121` with PyTorch CUDA 12.1 wheels and
-   PyArrow using the host's (local) Python.
+## Shell wrappers
 
-+  `pycuda.sh` -- Run the `venv` Python with a local `LD_LIBRARY_PATH` that prefers wheel CUDA libs.
++  `run-sbt.sh` runs sbt in a reproducible, pinned-JDK environment (`JAVA_HOME`
+   pinning, Spark/Java 17+ `--add-opens` flags, optional `AGDA_JSON_BIN` injection).
+   It is the Makefile's `SBT_RUNNER`, so every sbt-driven target goes through it.
 
-They avoid all the Nix/Bash headaches and keep state **local to the commands that need it**.
++  `run-server.sh` launches the `agda-mcp` server inside the `nix develop .#backend`
+   shell, routing the Nix banner to stderr so it does not corrupt the MCP JSON-RPC
+   framing on stdout.  It is the command configured in `.mcp.json`.
 
-They don’t modify your shell globally and don’t fight conda; they just neutralize it when needed.
+## Python tooling
+
+These live under `scripts/python/` and are invoked by Makefile targets or run
+directly during development.
+
++  `agda_lib_metadata.py` generates library metadata; it backs `make metadata`.
+
++  `normalize_bench_report.py` strips non-deterministic fields from a benchmark
+   report so two runs can be compared byte-for-byte; it backs the determinism
+   check in `make eval-benchmark-smoke`.
+
++  `doc_check.py` lints documentation; see `doc_check_guide.md` for the rules.
+
++  `gh_project_populate.py` is roadmap tooling that populates the GitHub project
+   board and labels.
+
++  `utils/` holds shared helpers (config, command running, file operations, text
+   processing) plus fixture and dataset tooling for the proof-completion work.
+
++  `tests/` holds the pytest suite for the Python tooling above.
