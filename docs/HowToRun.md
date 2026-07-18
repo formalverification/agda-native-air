@@ -102,6 +102,40 @@ nix develop .#backend
 +  `make extract-lib-nix`
 +  `make extract-lib-smoke-nix`
 
+### 1.3.  Registering external Agda libraries (optional)
+
+Every Agda-equipped shell registers `standard-library` and the repo-local
+`agda-dojang` by default.  To type-check against an external library from a local
+checkout — `agda-algebras`, `agda-categories`, or `TypeTopology` — point the
+matching `*_ROOT` environment variable at the **library root** (the directory that
+contains the `.agda-lib` file) before entering the shell:
+
+```sh
+AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master  nix develop .#backend
+AGDA_CATEGORIES_ROOT=~/git/agda-categories           nix develop .#backend
+AGDA_TYPETOPOLOGY_ROOT=~/git/TypeTopology            nix develop .#backend
+```
+
+The shell hook searches each root for a `.agda-lib`, registers what it finds, and
+prints a summary.  Libraries that are not registered show how to enable them:
+
+```
+   Agda libraries:
+     * standard-library (Nix-managed)
+     * agda-dojang (repo-local)
+     - agda-algebras: set AGDA_ALGEBRAS_ROOT to enable
+     - agda-categories: set AGDA_CATEGORIES_ROOT to enable
+     - TypeTopology: set AGDA_TYPETOPOLOGY_ROOT to enable
+```
+
+Once a library is registered (its line changes to a `*` entry), a module that
+imports it type-checks directly — e.g. `agda MyModule.agda` or
+`nix develop .#backend --command agda MyModule.agda`.
+
+Reproducible, no-clone registration (pinning the library in the flake so
+collaborators need no local checkout) is deferred future work, tracked in
+[#54](https://github.com/formalverification/agda-native-air/issues/54).
+
 ---
 
 ## 2.  First commands to run (sanity)
