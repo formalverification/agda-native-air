@@ -45,8 +45,15 @@
 #       - Run eval-proof-completion-smoke inside nix develop
 #       - Verify determinism by running twice and diffing output
 #
-#    7) all-green (aggregator gate)
-#       - Waits for lanes 1–6.  Uses `if: always()` so that skipped
+#    7) Benchmark (gold verification smoke — conditional on benchmark/runner changes)
+#       - Nix + Cachix; run eval-benchmark-smoke inside nix develop .#backend
+#
+#    8) Haskell (agda-mcp build & tests — conditional on agda-mcp/ changes)
+#       - Nix + Cachix; cabal build + cabal test inside nix develop .#backend
+#       - Tier-2 integration tests drive a real Agda subprocess
+#
+#    9) all-green (aggregator gate)
+#       - Waits for lanes 1–8.  Uses `if: always()` so that skipped
 #         conditional jobs (e.g. lane 6 when no agda-dojang/ changes)
 #         don't block the gate.  Fails on `failure` or `cancelled`.
 #
@@ -470,6 +477,81 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
+  # Haskell • agda-mcp build & tests (requires Nix → GHC 9.10.3 + Agda)
+  #
+  # Conditional: only runs when the MCP server, the agda-dojang fixtures/macros
+  # it drives, or the pinned toolchain change.  agda-mcp does NOT link
+  # Agda-as-a-library (it calls the `agda` binary as a subprocess), so the build
+  # itself is light; Nix is needed to put `agda` + the repo-root agda/libraries
+  # file (written by the flake shellHook) on the path so the tier-2 integration
+  # tests exercise real get_goal / fill_hole / check_file round-trips rather than
+  # skipping.  Runtime with warm Cachix cache: ~5–8 min.
+  # ---------------------------------------------------------------------------
+  agda-mcp:
+    name: Haskell • agda-mcp build & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect relevant changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if ! CHANGED=$(git diff --name-only "$BASE" HEAD -- \
+            'agda-mcp/' 'agda-dojang/' 'flake.nix' 'flake.lock'); then
+            echo "Error: failed to compute diff between $BASE and HEAD."
+            exit 1
+          fi
+          if [ -n "$CHANGED" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Changed files in scope:"
+            echo "$CHANGED"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No agda-mcp, agda-dojang, or toolchain changes detected; skipping."
+          fi
+
+      - name: Install Nix
+        if: steps.changes.outputs.run == 'true'
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Set up Cachix
+        if: steps.changes.outputs.run == 'true'
+        uses: cachix/cachix-action@v16
+        with:
+          name: formalverification
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Build & test agda-mcp
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          set -euxo pipefail
+          nix develop .#backend --command bash -c '
+            echo "GHC: $(ghc --version)"
+            echo "Agda: $(agda --version)"
+            cabal update
+            cd agda-mcp
+            cabal build exe:agda-mcp
+            cabal test
+          '
+
+      - name: Skip notice
+        if: steps.changes.outputs.run != 'true'
+        run: echo "agda-mcp skipped (no relevant file changes)."
+
+
+  # ---------------------------------------------------------------------------
   # Aggregate status: all required jobs must pass.
   # Uses if: always() so that skipped conditional jobs don't block the gate.
   # ---------------------------------------------------------------------------
@@ -478,7 +560,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     if: always()
-    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl, python-agda-dojang, agda-dojang-eval, benchmark-gold ]
+    needs: [ scala-strux-driver, scala-ml-pipeline-etl, python-ml-pipeline, haskell-backend-jsonl, python-agda-dojang, agda-dojang-eval, benchmark-gold, agda-mcp ]
     steps:
       - name: Check results
         run: |
@@ -490,6 +572,7 @@ jobs:
             "${{ needs.python-agda-dojang.result }}" \
             "${{ needs.agda-dojang-eval.result }}" \
             "${{ needs.benchmark-gold.result }}" \
+            "${{ needs.agda-mcp.result }}" \
           )
           for r in "${results[@]}"; do
             if [ "$r" = "failure" ]; then
