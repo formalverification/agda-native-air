@@ -1,0 +1,8 @@
+# File: .github/ISSUE_TEMPLATE/config.yml
+# Configures the "New issue" chooser.  Blank issues stay enabled as an escape
+# hatch for anything the forms below do not fit.
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/formalverification/agda-native-air/blob/main/CONTRIBUTING.md
+    about: How to set up, build, test, and propose changes before opening an issue.

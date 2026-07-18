@@ -1,0 +1,10 @@
+# File: .github/CODEOWNERS
+#
+# Default code owner for the repository.  Listed owners are automatically
+# requested for review on pull requests that touch matching paths.  This is
+# advisory unless the `main` branch ruleset also requires Code Owner review
+# (see docs/branch-protection-setup.md).
+#
+# See https://docs.github.com/articles/about-code-owners
+
+*       @williamdemeo
