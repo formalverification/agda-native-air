@@ -65,6 +65,19 @@ cabal test
 Pure tests (marker parsing, hole finding) run without Agda.  Integration tests that
 call Agda require `nix develop .#backend`.
 
+### Via `make` (from the repo root)
+
+The top-level Makefile wraps the build/test above in the backend Nix shell, so you
+do not have to enter it or `cd` first:
+
+```sh
+make agda-mcp-smoke   # build + a fast JSON-RPC round-trip sanity check
+make agda-mcp-test    # full cabal test (unit + corpus + Agda integration)
+make agda-mcp-serve   # launch the server (the same invocation as .mcp.json)
+```
+
+Already inside `nix develop .#backend`?  Add `BACKEND_USE_NIX=0` to skip the nested shell (this is what CI does).
+
 For Claude Code setup and MCP client configuration, see [Configuring MCP Clients](#configuring-mcp-clients) below.
 
 ---

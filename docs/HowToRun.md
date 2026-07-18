@@ -693,6 +693,16 @@ integration tests that invoke a real `agda` binary.  For the integration tests, 
 must be in the Nix `backend` shell (`nix develop .#backend`) or have `agda` in
 your `PATH`; if Agda is not found, tier-2 tests are skipped.
 
+Or, from the repo root (no shell entry or `cd` needed — the Makefile enters the
+backend shell for you):
+
+```sh
+make agda-mcp-smoke   # build + a fast JSON-RPC round-trip sanity check
+make agda-mcp-test    # full cabal test (unit + corpus + Agda integration)
+```
+
+Already inside `nix develop .#backend`?  Pass `BACKEND_USE_NIX=0` to skip the nested shell (as CI does).
+
 
 ### 13.2.  Run the server manually
 

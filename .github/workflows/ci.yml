@@ -541,9 +541,8 @@ jobs:
             echo "GHC: $(ghc --version)"
             echo "Agda: $(agda --version)"
             cabal update
-            cd agda-mcp
-            cabal build exe:agda-mcp
-            cabal test
+            make agda-mcp-smoke BACKEND_USE_NIX=0
+            make agda-mcp-test  BACKEND_USE_NIX=0
           '
 
       - name: Skip notice

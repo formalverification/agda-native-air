@@ -256,6 +256,7 @@ AGDA_DOJANG_AGDA        ?= $(AGDA_DOJANG)/agda
 AGDA_DOJANG_AGDA_APPLY  ?= $(AGDA_DATA)/ApplyDemo.agda
 AGDA_LIB_DIR            ?= $(PROJECT_ROOT)/agda
 AGDA_STRUX_DIR          ?= $(PROJECT_ROOT)/agda-strux
+AGDA_MCP_DIR            ?= $(PROJECT_ROOT)/agda-mcp
 #
 # Resolve agda-json executable path from backend shell.
 # Important: nix shell hooks print banners to stdout; filter to the last line
@@ -305,6 +306,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  extract-lib extract-lib-nix extract-lib-smoke extract-lib-smoke-nix \
                  extract-algebras-backend extract-algebras agda-algebras-metadata metadata \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
+                 agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-serve agda-mcp-clean \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
                  etl-agda-algebras-smoke train-retrieval-smoke eval-proof-completion-smoke-retrieval \
@@ -411,6 +413,9 @@ help:
 	@echo "  make train-retrieval-smoke       - Train a deterministic artifact from smoke dataset; write canonical pickle."
 	@echo "  make eval-proof-completion-smoke-retrieval - Run existing smoke evaluator using retrieval policy + model artifact."
 	@echo "  make bench                       - Run AgdaDojang tiny benchmark"
+	@echo "  make agda-mcp-smoke              - Build agda-mcp + JSON-RPC round-trip sanity (fast)"
+	@echo "  make agda-mcp-test               - Full agda-mcp cabal test (unit + corpus + Agda integration)"
+	@echo "  make agda-mcp-build / -serve / -clean - Build / launch / clean the agda-mcp server"
 	@echo "  make eval-benchmark              - Typecheck all benchmark gold solutions -> JSON report"
 	@echo "  make eval-benchmark-smoke        - CI slice (one obligation per tier) + determinism check"
 	@echo "  make tree                        - Pretty tree view"
@@ -612,6 +617,66 @@ backend-smoke:
 backend-clean:
 	@echo ">> [backend-clean] clean backend build artifacts (cabal)"
 	@$(call run_backend,cd "$(AGDA_STRUX_DIR)" && cabal clean)
+
+# ------------------------------------------------------------------------------
+# 1.4.1. agda-mcp (Haskell MCP server) — build / test / smoke / serve
+#
+# Like the agda-strux targets above, these run cabal inside the flake backend
+# shell (GHC 9.10.3 + Agda 2.8.0) via run_backend, so `make agda-mcp-test` works
+# from outside a Nix shell.  When already inside `nix develop .#backend` (or in
+# CI, whose outer step is `nix develop`), pass BACKEND_USE_NIX=0 to avoid nesting.
+#
+# agda-mcp does NOT link Agda-as-a-library — it calls the `agda` binary as a
+# subprocess — so the build is light.  The Nix shell is needed to build with the
+# pinned GHC and, for `agda-mcp-test`, to put `agda` + the repo-root
+# `agda/libraries` on PATH so the tier-2 integration tests run instead of
+# skipping.  `cd`-ing into $(AGDA_MCP_DIR) first also sidesteps the ambiguous
+# `exe:agda-mcp` target selector that cabal reports at the repo root.
+#
+# Paths below are relative to $(AGDA_MCP_DIR) (build/test/smoke run there);
+# the serve target goes through scripts/run-server.sh, which cd's to the repo
+# root, so its paths are repo-root-relative.
+# ------------------------------------------------------------------------------
+AGDA_MCP_CORPUS       ?= test/resources/corpus-fixture.jsonl
+AGDA_MCP_SMOKE_INPUT  ?= test/resources/mcp-smoke-input.jsonl
+AGDA_MCP_SERVE_FLAGS  ?= -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library
+AGDA_MCP_SERVE_CORPUS ?= agda-mcp/test/resources/corpus-fixture.jsonl
+
+agda-mcp-build:
+	@echo ">> [agda-mcp-build] cabal build in $(AGDA_MCP_DIR)"
+	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build exe:agda-mcp)
+
+agda-mcp-test:
+	@echo ">> [agda-mcp-test] cabal test in $(AGDA_MCP_DIR) — unit + corpus + Agda integration"
+	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal test)
+
+# Fast end-to-end sanity: build the server, then drive the real binary with a
+# canned JSON-RPC sequence (initialize + tools/list) and assert it answers and
+# registers all seven tools.  Complements agda-mcp-test, which exercises the tool
+# handlers directly but not the server's stdio JSON-RPC loop.  No Agda needed.
+agda-mcp-smoke:
+	@echo ">> [agda-mcp-smoke] JSON-RPC round-trip through the agda-mcp server binary"
+	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:agda-mcp && \
+	  BIN=$$(cabal list-bin exe:agda-mcp) && \
+	  OUT=$$("$$BIN" --corpus "$(AGDA_MCP_CORPUS)" < "$(AGDA_MCP_SMOKE_INPUT)" || true) && \
+	  if echo "$$OUT" | grep -q serverInfo && echo "$$OUT" | grep -q get_goal && echo "$$OUT" | grep -q search_by_name; then \
+	    echo "agda-mcp-smoke: OK — server responds and registers core + search tools"; \
+	  else \
+	    echo "agda-mcp-smoke: FAILED — server did not answer as expected; see its stderr above. stdout was:"; \
+	    echo "$$OUT"; \
+	    exit 1; \
+	  fi)
+
+# Launch the server for manual/interactive use (Ctrl-C to stop).  Goes through
+# scripts/run-server.sh (the same launcher wired into .mcp.json), which enters
+# the backend shell itself — so this target does NOT use run_backend.
+agda-mcp-serve:
+	@echo ">> [agda-mcp-serve] launching agda-mcp via scripts/run-server.sh (Ctrl-C to stop)"
+	@./scripts/run-server.sh --agda-flags "$(AGDA_MCP_SERVE_FLAGS)" --corpus "$(AGDA_MCP_SERVE_CORPUS)"
+
+agda-mcp-clean:
+	@echo ">> [agda-mcp-clean] clean agda-mcp build artifacts (cabal)"
+	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal clean)
 #
 #
 # -------------------------------------------------------------------------------
