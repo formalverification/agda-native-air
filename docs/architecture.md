@@ -20,39 +20,39 @@ is the oracle that decides what is actually correct; the layers in between let t
 agent inspect proof state, propose terms, and retrieve relevant definitions.
 
 ```
-  ┌───────────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────┐
   │  User / editor  (Emacs agda-mode, VS Code, …)  │
-  └───────────────────────┬───────────────────────┘
+  └───────────────────────┬────────────────────────┘
                           ▼
-  ┌───────────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────┐
   │  Frontier LLM agent  (Claude Code, Codex, …)   │  strategy, planning,
   │                                                │  error interpretation
-  └───────────────────────┬───────────────────────┘
+  └───────────────────────┬────────────────────────┘
                           │  MCP  (JSON-RPC over stdio)
                           ▼
-  ┌───────────────────────────────────────────────┐     ┌────────────────────────────┐
+  ┌────────────────────────────────────────────────┐     ┌────────────────────────────┐
   │  agda-mcp   — Bridge layer                     │◀────│  Retrieval corpus          │
   │  Haskell MCP server                            │ srch│  agda-strux → strux-driver │
   │  proof-state tools + corpus search tools       │     └────────────────────────────┘
-  └───────────────────────┬───────────────────────┘
+  └───────────────────────┬────────────────────────┘
                           │  injects AgdaDojang macros and runs the agda binary
                           │  (v0: one subprocess per call)
                           ▼
-  ┌───────────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────┐
   │  agda-dojang  — Interaction layer              │  reportGoalCtx / reflection
   │  repo-local Agda library + Python harness      │  macros on the library path
-  └───────────────────────┬───────────────────────┘
+  └───────────────────────┬────────────────────────┘
                           ▼
-  ┌───────────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────┐
   │  Agda type-checker  — the oracle               │
-  └───────────────────────────────────────────────┘
+  └────────────────────────────────────────────────┘
 
   Optional (the system runs end-to-end without these):
-  ┌───────────────────────────────────────────────┐
+  ┌────────────────────────────────────────────────┐
   │  Local specialist models  (GPU / Jetson)       │  premise selection, type-aware
   │  wired into agda-mcp as extra tools            │  embeddings, proof-term ranking,
   │                                                │  routine completion
-  └───────────────────────────────────────────────┘
+  └────────────────────────────────────────────────┘
 ```
 
 ---
