@@ -110,7 +110,7 @@ MCP tool interface.
 +  **Inputs**.  An Agda source file with a `{!!}` hole, plus a macro injection
    (`reportGoalCtx`) on the Agda library path.
 +  **Outputs**.  Marker blocks (`AGDADOJANG_REQ_BEGIN/END`) parsed from Agda's
-   output into structured goal/context data, and typecheck pass/fail results.
+   stderr output into structured goal/context data, and typecheck pass/fail results.
 +  **Status**.  Implemented, including a deterministic scripted policy backend and
    the proof-completion evaluation harness used by the fixtures and benchmark.
 
