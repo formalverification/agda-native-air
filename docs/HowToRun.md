@@ -848,7 +848,77 @@ subprocess with the repo root as working directory.
 See [`agda-mcp/README.md` § Configuring MCP Clients](../agda-mcp/README.md#configuring-mcp-clients)
 for JSON configuration examples for Claude Desktop, Cursor, and Codex CLI.
 
-### 13.5.  Troubleshooting
+### 13.5.  Using agda-mcp on another Agda project
+
+You can point Claude Code at another Agda project (for example `agda-algebras`) while
+still giving it agda-mcp from *this* repository.  The recommended setup: **launch
+Claude Code from the other project's worktree** — so that project is the working
+directory, with its own `CLAUDE.md`, git, and permissions — and **attach agda-mcp as a
+local-scoped MCP server**.  agda-mcp does not need to be the working directory;
+`scripts/run-server.sh` resolves everything by absolute path into agda-native-air, so
+it works from any cwd.
+
+(Launching from agda-native-air and using `/add-dir` to reach the other project also
+works, but then agda-native-air stays the project root, so committing the other
+project's work through that session is awkward.  Prefer the setup below.)
+
+#### Recipe (terminal)
+
+From the worktree of the project you are editing:
+
+```sh
+cd /path/to/agda-algebras/<your-branch-worktree>
+
+claude mcp add agda --scope local \
+  --env AGDA_ALGEBRAS_ROOT=/path/to/agda-algebras/<your-branch-worktree> \
+  -- /abs/path/to/agda-native-air/scripts/run-server.sh \
+     --agda-flags "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras" \
+     --timeout 600
+
+nix develop   # optional: gives Claude's own Bash the agda-algebras toolchain
+claude        # then run /mcp and confirm  agda · ✔ connected
+```
+
+`--scope local` keeps the registration in your per-project config — it is not committed
+to the other repository.  `--env AGDA_ALGEBRAS_ROOT=…` is the load-bearing part:
+`run-server.sh` enters this repo's `.#backend` shell, whose hook then registers
+agda-algebras into `agda/libraries` (see [§1.3](#13--registering-external-agda-libraries-optional)),
+so `-l agda-algebras` resolves.  `--timeout 600` matters — the first typecheck of a
+large module is cold and builds `.agdai` interfaces, which overruns the 30 s default.
+For the search tools, also pass
+`--corpus /abs/path/to/agda-native-air/data/agda-algebras/raw/jsonl/combined.jsonl`
+(build it once with `make extract-lib`); omit it for a first trial.
+
+#### Three things to know
+
++  **`get_goal` needs the target file to `open import AgdaDojang.Debug`.**  It injects
+   the `reportGoalCtx` macro without adding an import, so a library file that does not
+   import it will fail that one tool.  For new work, develop in a **scratch module** in
+   your worktree that imports both `AgdaDojang.Debug` and the modules you are building
+   on — then all four proof-state tools work, and this is the natural way to draft a new
+   proof anyway.  For `get_goal` on an existing file, temporarily add the import
+   (agda-dojang is registered, so it resolves), or lean on `fill_hole` / `check_file` /
+   `get_diagnostics`, which inject no macro and need no import.
++  **Use absolute file paths.**  The server's working directory is agda-native-air, not
+   your project, so tool calls resolve paths from there.  Claude passes absolute paths
+   automatically from its own Read/Edit tools; just avoid hand-typing relative paths in
+   prompts.
++  **Match the toolchain.**  agda-mcp typechecks with this repo's pinned Agda 2.8.0 and
+   standard-library 2.3.  That is only correct if the other project is compatible with
+   those versions — confirm `agda --version` and the std-lib version line up.  If the
+   project pins a different std-lib you will see mismatch errors; the fix is then to add
+   `--agda-bin` pointing at that project's own `agda` (advanced — the macro must still
+   typecheck there, with agda-dojang registered).
+
+#### Web UI
+
+Doing this in the "Claude Code on the web" UI is possible but heavier: the container
+needs *both* repositories as sources, agda-mcp built in-container (the Nix backend
+build — several minutes, and the container is ephemeral), and an MCP config wired to
+absolute container paths.  That is worth setting up via an environment setup script
+once the workflow is proven, but for a first sanity test the terminal is far simpler.
+
+### 13.6.  Troubleshooting
 
 **Server won't start / "agda not found"**.  Make sure you are inside `nix develop`
 (or `nix develop .#backend`).  The Nix shell provides the pinned `agda` binary.
