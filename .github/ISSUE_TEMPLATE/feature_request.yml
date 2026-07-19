@@ -1,0 +1,56 @@
+# File: .github/ISSUE_TEMPLATE/feature_request.yml
+name: Feature request
+description: Propose a new capability, improvement, or piece of work.
+title: "[feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A good request has a clear problem statement, motivation and scope, and
+        acceptance criteria — see [CONTRIBUTING.md](https://github.com/formalverification/agda-native-air/blob/main/CONTRIBUTING.md).
+        Listing non-goals helps keep the work bounded.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What is missing or hard today, and who does it affect?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution and scope
+      description: What should change, and roughly how?  What is in scope for this issue?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How will we know this is done?  A checklist is ideal.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: false
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Target milestone
+      description: Which roadmap milestone does this belong to?  See docs/roadmap.md.
+      options:
+        - "M0 — Public bootstrap / infrastructure"
+        - "M1 — AgdaDojang + AgdaMCP + first proofs"
+        - "M2 — Structure-aware retrieval"
+        - "M3 — AI-assisted mathematics"
+        - "M4 — Local models"
+        - "Unsure / not milestone-specific"
+    validations:
+      required: false
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals (optional)
+      description: Anything explicitly out of scope for this issue.
+    validations:
+      required: false
