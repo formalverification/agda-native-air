@@ -134,6 +134,17 @@ A good PR should answer the following questions:
 +  What docs were updated?
 +  Does it close or relate to an issue?
 
+The repository ships a PR template that prompts for these.
+
+### Merging
+
+We keep a **semi-linear history**.  Before merge, rebase your branch onto `main`
+and tidy the commit history, then land the PR as a merge commit (the "Create a
+merge commit" button).  Do the rebase and cleanup *before* the approving review —
+a later force-push dismisses the approval.  See
+[`docs/branch-protection-setup.md`](docs/branch-protection-setup.md) for the full
+workflow and the `main` protection rules.
+
 ---
 
 ## Testing expectations
