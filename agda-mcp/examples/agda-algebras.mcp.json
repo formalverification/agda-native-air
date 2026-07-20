@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "agda": {
+      "command": "/ABS/PATH/TO/agda-native-air/scripts/run-server.sh",
+      "args": [
+        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+        "--timeout", "600"
+      ],
+      "env": {
+        "AGDA_ALGEBRAS_ROOT": "/ABS/PATH/TO/agda-algebras/<your-worktree>"
+      }
+    }
+  }
+}

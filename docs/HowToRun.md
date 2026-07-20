@@ -853,8 +853,8 @@ for JSON configuration examples for Claude Desktop, Cursor, and Codex CLI.
 You can point Claude Code at another Agda project (for example `agda-algebras`) while
 still giving it agda-mcp from *this* repository.  The recommended setup: **launch
 Claude Code from the other project's worktree** — so that project is the working
-directory, with its own `CLAUDE.md`, git, and permissions — and **attach agda-mcp as a
-local-scoped MCP server**.  agda-mcp does not need to be the working directory;
+directory, with its own `CLAUDE.md`, git, and permissions — and **attach agda-mcp to
+that session**.  agda-mcp does not need to be the working directory;
 `scripts/run-server.sh` resolves everything by absolute path into agda-native-air, so
 it works from any cwd.
 
@@ -862,32 +862,57 @@ it works from any cwd.
 works, but then agda-native-air stays the project root, so committing the other
 project's work through that session is awkward.  Prefer the setup below.)
 
-#### Recipe (terminal)
+There are two ways to attach the server.  **Option A is recommended** — it is a plain
+file, immune to shell aliasing, and self-documenting.
 
-From the worktree of the project you are editing:
+#### Option A — a project `.mcp.json` (recommended)
+
+Copy the committed template
+[`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
+into the worktree you are editing as `.mcp.json`, replace the two `/ABS/PATH/TO/...`
+placeholders with real absolute paths, and keep it out of that project's history:
 
 ```sh
 cd /path/to/agda-algebras/<your-branch-worktree>
+cp /abs/path/to/agda-native-air/agda-mcp/examples/agda-algebras.mcp.json ./.mcp.json
+# edit ./.mcp.json — set `command` to this repo's scripts/run-server.sh, and
+#                    env.AGDA_ALGEBRAS_ROOT to your agda-algebras worktree path
+echo '.mcp.json' >> .git/info/exclude   # local-only ignore; leaves tracked .gitignore alone
 
+nix develop   # optional: gives Claude's own Bash the agda-algebras toolchain
+claude        # approve the "agda" server when prompted, then /mcp → agda · ✔ connected
+```
+
+Claude Code auto-loads `.mcp.json` from the working directory (asking once to approve
+it).  The `env.AGDA_ALGEBRAS_ROOT` entry is load-bearing: `run-server.sh` enters this
+repo's `.#backend` shell, whose hook then registers agda-algebras into `agda/libraries`
+(see [§1.3](#13--registering-external-agda-libraries-optional)), so `-l agda-algebras`
+resolves.  `--timeout 600` matters — the first typecheck of a large module is cold and
+builds `.agdai` interfaces, which overruns the 30 s default.  For the search tools, add
+`--corpus /abs/path/to/agda-native-air/data/agda-algebras/raw/jsonl/combined.jsonl` to
+`args` (build the corpus once with `make extract-lib`); omit it for a first trial.
+
+#### Option B — `claude mcp add`
+
+Equivalently, register the server on the command line from the worktree:
+
+```sh
 claude mcp add agda --scope local \
   --env AGDA_ALGEBRAS_ROOT=/path/to/agda-algebras/<your-branch-worktree> \
   -- /abs/path/to/agda-native-air/scripts/run-server.sh \
      --agda-flags "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras" \
      --timeout 600
-
-nix develop   # optional: gives Claude's own Bash the agda-algebras toolchain
-claude        # then run /mcp and confirm  agda · ✔ connected
 ```
 
-`--scope local` keeps the registration in your per-project config — it is not committed
-to the other repository.  `--env AGDA_ALGEBRAS_ROOT=…` is the load-bearing part:
-`run-server.sh` enters this repo's `.#backend` shell, whose hook then registers
-agda-algebras into `agda/libraries` (see [§1.3](#13--registering-external-agda-libraries-optional)),
-so `-l agda-algebras` resolves.  `--timeout 600` matters — the first typecheck of a
-large module is cold and builds `.agdai` interfaces, which overruns the 30 s default.
-For the search tools, also pass
-`--corpus /abs/path/to/agda-native-air/data/agda-algebras/raw/jsonl/combined.jsonl`
-(build it once with `make extract-lib`); omit it for a first trial.
+`--scope local` keeps the registration in your per-project config — not committed to the
+other repository.
+
+> **If this errors with `script: unrecognized option '--scope'`** (or similar), your
+> shell has `claude` aliased or wrapped — e.g. under `script` for session logging — so
+> the subcommand arguments reach the wrapper instead of Claude Code.  Run `type claude`
+> to confirm, then either prefix the command with `command` (`command claude mcp add …`
+> bypasses the alias/function) or just use Option A, which avoids the `claude` CLI for
+> configuration entirely.
 
 #### Three things to know
 
