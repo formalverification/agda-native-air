@@ -884,13 +884,11 @@ claude        # approve the "agda" server when prompted, then /mcp → agda · �
 ```
 
 Claude Code auto-loads `.mcp.json` from the working directory (asking once to approve
-it).  The `env.AGDA_ALGEBRAS_ROOT` entry is load-bearing: `run-server.sh` enters this
-repo's `.#backend` shell, whose hook then registers agda-algebras into `agda/libraries`
-(see [§1.3](#13--registering-external-agda-libraries-optional)), so `-l agda-algebras`
-resolves.  `--timeout 600` matters — the first typecheck of a large module is cold and
-builds `.agdai` interfaces, which overruns the 30 s default.  For the search tools, add
-`--corpus /abs/path/to/agda-native-air/data/agda-algebras/raw/jsonl/combined.jsonl` to
-`args` (build the corpus once with `make extract-lib`); omit it for a first trial.
+it).  Two entries in it do the real work — `env.AGDA_ALGEBRAS_ROOT`, which registers
+your library so the proof-state tools resolve it, and (optionally) `--corpus`, which
+turns on the search tools.  Both are covered in *Library registration and the search
+corpus* below.  Keep `--timeout 600`: the first typecheck of a large module is cold and
+builds `.agdai` interfaces, which overruns the 30 s default.
 
 #### Option B — `claude mcp add`
 
@@ -914,16 +912,73 @@ other repository.
 > bypasses the alias/function) or just use Option A, which avoids the `claude` CLI for
 > configuration entirely.
 
+#### Library registration and the search corpus
+
+Two things in the config carry the machine-specific setup.  The templates above already
+include both; this is what they do and how to get them right.
+
+**Register your library — `env.AGDA_ALGEBRAS_ROOT` (needed for the proof-state tools).**
+agda-mcp answers *every* tool call with **this repository's** Agda, inside its `.#backend`
+shell — not your project's shell.  (`run-server.sh` does `nix develop <agda-native-air>#backend
+--command …`; your own `nix develop` before launching `claude` only equips Claude's Bash,
+not the server.)  So `-l agda-algebras` has to resolve in *this* repo's `agda/libraries`,
+and setting `AGDA_ALGEBRAS_ROOT` is exactly what puts it there: `run-server.sh` passes the
+variable into the `.#backend` shell, whose hook appends your library's `.agda-lib` to
+`agda/libraries` (see [§1.3](#13--registering-external-agda-libraries-optional)).  This is
+verified to propagate through `run-server.sh`; when registration seems not to happen it is
+almost always one of two things:
+
++  **The path points at the wrong worktree.**  `AGDA_ALGEBRAS_ROOT` must be the *exact*
+   worktree you are editing and must contain a `*.agda-lib` at its top level.  If it is
+   stale or wrong, the hook prints a warning to **stderr** — which the MCP client hides —
+   and silently skips registration, so `-l agda-algebras` then fails with "library not
+   found".
++  **The server was not restarted after editing `.mcp.json`.**  The server reads the
+   variable and rewrites `agda/libraries` once, at startup; changes to `.mcp.json` take
+   effect only after a full restart of Claude Code.
+
+Do **not** hand-edit `agda/libraries` to work around this: the hook regenerates that file
+on every shell entry, so a manual line is wiped the next time the server starts.
+`AGDA_ALGEBRAS_ROOT` is the durable fix.  For a different library, set the matching
+`*_ROOT` variable and `-l <name>` — see [§1.3](#13--registering-external-agda-libraries-optional)
+for the supported set.
+
+**Add a corpus — `--corpus <abs-path>.jsonl` (turns on the search tools).**  The
+`search_by_name` / `search_by_type` / `get_dependencies` tools appear in `tools/list` only
+when a corpus is loaded; the proof-state tools do not need one.  Build a corpus of your
+library once, then point `--corpus` at it:
+
+```sh
+# in agda-native-air, in the .#all shell (Spark), see §5.1 for detail:
+make extract-lib LIB_NAME=agda-algebras \
+     AGDA_ALGEBRAS_ROOT=/abs/path/to/agda-algebras/<your-worktree>
+# collect the per-module JSONL the extractor writes into one file:
+find data/agda-algebras/raw -name '*.jsonl' -print0 | xargs -0 cat \
+     > /abs/path/to/agda-algebras-corpus.jsonl
+```
+
+Then add `"--corpus", "/abs/path/to/agda-algebras-corpus.jsonl"` to the server's `args`.
+`make extract-lib` emits exactly the agda-strux JSONL schema that `--corpus` reads (one
+entry per line: name, type, kind, dependencies, …), and the server logs how many entries
+it loaded at startup, so you can confirm it took.  Retrieval is independent of the
+proof-state tools — it neither requires nor affects library registration.
+
 #### Three things to know
 
-+  **`get_goal` needs the target file to `open import AgdaDojang.Debug`.**  It injects
-   the `reportGoalCtx` macro without adding an import, so a library file that does not
-   import it will fail that one tool.  For new work, develop in a **scratch module** in
-   your worktree that imports both `AgdaDojang.Debug` and the modules you are building
-   on — then all four proof-state tools work, and this is the natural way to draft a new
-   proof anyway.  For `get_goal` on an existing file, temporarily add the import
-   (agda-dojang is registered, so it resolves), or lean on `fill_hole` / `check_file` /
-   `get_diagnostics`, which inject no macro and need no import.
++  **`get_goal` and `fill_hole` do not yet work on library-embedded modules.**  Both
+   typecheck a temporary copy of the file; for a module that lives inside a library at a
+   hierarchical path (e.g. `FLRP.Bridge` at `src/FLRP/Bridge.lagda.md`) that copy
+   collides with the module's canonical file once the library is on the include path,
+   and Agda reports `ModuleDefinedInOtherFile`.  Only flat, top-level modules work today.
+   `check_file` and `get_diagnostics` are unaffected — they typecheck **in place**, so a
+   real library file loads and verifies correctly.  A fix that runs `get_goal` /
+   `fill_hole` in place too is tracked in
+   [#66](https://github.com/formalverification/agda-native-air/issues/66).  Until it
+   lands, the reliable workflow on a real library is one of: draft in a **scratch,
+   top-level module** in your worktree that imports `AgdaDojang.Debug` plus the modules
+   you build on (there all four proof-state tools work, and `get_goal` finds
+   `reportGoalCtx` because the import is present); or edit the library file directly and
+   verify each change with `check_file` / `get_diagnostics`.
 +  **Use absolute file paths.**  The server's working directory is agda-native-air, not
    your project, so tool calls resolve paths from there.  Claude passes absolute paths
    automatically from its own Read/Edit tools; just avoid hand-typing relative paths in
@@ -951,6 +1006,19 @@ once the workflow is proven, but for a first sanity test the terminal is far sim
 **"ModuleNameDoesntMatchFileName" errors**.  The `--agda-flags` must include
 `-i agda-dojang/agda` so that Agda can find the AgdaDojang macros.  Double-check the
 flags match the example above.
+
+**"Library 'agda-algebras' not found" on another project**.  The library is not
+registered in this repo's `agda/libraries`.  Set `env.AGDA_ALGEBRAS_ROOT` in your
+`.mcp.json` to the exact worktree you are editing (it must contain a `*.agda-lib`) and
+**fully restart** Claude Code — see *Library registration and the search corpus* in
+§13.5 for the two common causes.
+
+**"ModuleDefinedInOtherFile" from `get_goal` / `fill_hole` on a library file**.  This is
+the known limitation tracked in
+[#66](https://github.com/formalverification/agda-native-air/issues/66): those two tools
+typecheck a temp copy that collides with the module's canonical location.  Use
+`check_file` / `get_diagnostics` (which load in place), or work in a scratch top-level
+module — see the first item under *Three things to know* in §13.5.
 
 **Claude Code doesn't see the MCP server**.  Verify that `.mcp.json` exists in the
 repo root and that the `cwd` field (if present) points to the correct absolute path.
