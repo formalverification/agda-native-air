@@ -14,6 +14,21 @@
 --   * fill_hole       - try a candidate term and report typecheck result
 --   * check_file      - load/reload a file and return all diagnostics
 --   * get_diagnostics - lightweight summary (hole count, error count)
+--
+--   Design note — all four tools typecheck the file IN PLACE.
+--     Agda decides a module's name from where its file sits relative to the include
+--     path, so a module embedded in a library at a hierarchical path (e.g. FLRP.Bridge
+--     at src/FLRP/Bridge.lagda.md) only resolves when it is checked at its real
+--     location, with the library's src root on the include path (supplied by the
+--     caller's `-l <lib>` flag).  An earlier version copied the file to a scratch
+--     directory before checking it; that works for flat top-level modules but collides
+--     with the module's canonical file for library-embedded ones (ModuleDefinedInOtherFile
+--     / ModuleNameDoesntMatchFileName).  See issue #66.
+--
+--     get_goal and fill_hole must still alter the source (inject the reporting macro,
+--     or substitute a candidate), so they patch the real file transiently and restore
+--     it under 'Control.Exception.bracket_' — the original bytes are written back even
+--     if Agda errors or the call is interrupted.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -24,18 +39,14 @@ module AgdaMCP.Tools.ProofState
   , handleGetDiagnostics
   ) where
 
-import Control.Exception (SomeException, catch)
-import Control.Monad (forM_)
+import Control.Exception (bracket_)
+import Data.List (findIndex)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
-import System.Directory ( copyFile, createDirectoryIfMissing, doesDirectoryExist
-                        , getTemporaryDirectory, listDirectory, makeAbsolute
-                        , removeDirectoryRecursive )
-
-import System.FilePath ((</>), takeFileName, takeDirectory, takeBaseName)
-import System.IO (hPutStrLn, stderr)
+import System.Directory (makeAbsolute)
+import System.FilePath (takeDirectory, takeBaseName)
 
 import AgdaMCP.Agda
   ( AgdaConfig, AgdaResult (..), agdaFlags, debugLog
@@ -51,35 +62,23 @@ import AgdaMCP.Types
 -- | handleGetGoal: inspect goal type and local context at hole @n@ in given file.
 --
 -- 1. Read source file.
--- 2. Replace hole @n@ with @reportGoalCtx ?@.
--- 3. Write a temporary copy and run Agda on it.
--- 4. Parse AGDADOJANG_REQ_BEGIN/END block from stderr.
--- 5. Return structured (goal, context).
+-- 2. Ensure @open import AgdaDojang.Debug@ is in scope (inject it if absent) so the
+--    @reportGoalCtx@ macro resolves.
+-- 3. Replace hole @n@ with @reportGoalCtx ?@.
+-- 4. Typecheck the patched file IN PLACE (restoring the original afterwards).
+-- 5. Parse the AGDADOJANG_REQ_BEGIN/END block from Agda's output.
+-- 6. Return structured (goal, context).
 handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either Text GoalInfo)
 handleGetGoal cfg params = do
   absPath <- makeAbsolute (ggFilePath params)
   src <- TIO.readFile absPath
-  case injectReportExpr cfg (ggHoleIndex params) src of
+  let withImport = ensureDebugImport src
+  case injectReportExpr cfg (ggHoleIndex params) withImport of
     Nothing -> pure . Left $
       "Hole index " <> T.pack (show (ggHoleIndex params))
       <> " not found in " <> T.pack absPath
     Just patched -> do
-      tmpDir <- makeTmpDir "agda-mcp-goal"
-      let tmpFile = tmpDir </> takeFileName absPath
-          srcDir  = takeDirectory absPath
-      TIO.writeFile tmpFile patched
-      -- Create an overlay of the source directory WITHOUT the file being
-      -- checked, to avoid Agda's ModuleDefinedInOtherFile error.
-      overlay <- makeOverlay tmpDir srcDir (takeFileName absPath)
-      -- Port of agent_bridge.py's include-path strategy:
-      --   1. Strip -i <srcDir> from base flags (avoids AmbiguousTopLevelModuleName
-      --      if srcDir happens to be on the include path).
-      --   2. Add -i <tmpDir> (where the patched file lives — resolves
-      --      ModuleNameDoesntMatchFileName) and -i <overlay> (sibling modules).
-      let baseFlags  = stripIncludeDir srcDir (agdaFlags cfg)
-          extraFlags = ["-i", tmpDir, "-i", overlay]
-          cfgWithDir = cfg { agdaFlags = baseFlags <> extraFlags }
-      result <- runAgda cfgWithDir tmpFile
+      result <- runInPlace cfg absPath src patched
       -- DEBUG: show what Agda actually returned
       debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
       debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
@@ -105,8 +104,9 @@ handleGetGoal cfg params = do
 -- | handleFillHole: try substituting @candidate@ into hole @n@ and typecheck.
 --
 -- 1. Read source, substitute candidate into hole n.
--- 2. Write temp copy, run Agda.
--- 3. If exit 0 → success; otherwise → type error.
+-- 2. Typecheck the patched file IN PLACE (restoring the original afterwards).
+-- 3. If exit 0 → success; otherwise → type error (tolerating unsolved metas from
+--    the file's other, still-open holes).
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either Text FillResult)
 handleFillHole cfg params = do
   absPath <- makeAbsolute (fhFilePath params)
@@ -116,16 +116,8 @@ handleFillHole cfg params = do
       "Hole index " <> T.pack (show (fhHoleIndex params))
       <> " not found in " <> T.pack (fhFilePath params)
     Just patched -> do
-      tmpDir <- makeTmpDir "agda-mcp-fill"
-      let tmpFile = tmpDir </> takeFileName absPath
-          srcDir  = takeDirectory absPath
-      TIO.writeFile tmpFile patched
-      overlay <- makeOverlay tmpDir srcDir (takeFileName absPath)
-      let baseFlags  = stripIncludeDir srcDir (agdaFlags cfg)
-          extraFlags = ["-i", tmpDir, "-i", overlay]
-          cfgWithDir = cfg { agdaFlags = baseFlags <> extraFlags }
-      result <- runAgda cfgWithDir tmpFile
-          -- Agda 2.8.0 emits some errors on stdout; check both streams.
+      result <- runInPlace cfg absPath src patched
+      -- Agda 2.8.0 emits some errors on stdout; check both streams.
       let combined = arStdout result <> "\n" <> arStderr result
           -- A non-zero exit is acceptable if the *only* errors are unsolved
           -- interaction metas (from other holes we haven't filled yet).
@@ -209,6 +201,69 @@ handleGetDiagnostics cfg params = do
 -- Internal helpers
 -- ---------------------------------------------------------------------------
 
+-- | runInPlace: typecheck a transiently-patched version of a file at its real path.
+--
+-- Writes @patched@ over @absPath@, runs Agda there with the same include strategy
+-- 'handleCheckFile' uses (base flags — which carry the caller's @-l \<lib\>@, hence the
+-- library's src root — plus @-i \<dir-of-file\>@), then restores @original@.  The
+-- restore runs under 'bracket_', so the file is returned to its original bytes even if
+-- Agda errors or the call is interrupted.  Checking at the real path (rather than a
+-- scratch copy) is what lets hierarchically-named library modules resolve — see the
+-- module header and issue #66.
+runInPlace :: AgdaConfig -> FilePath -> Text -> Text -> IO AgdaResult
+runInPlace cfg absPath original patched =
+  bracket_
+    (TIO.writeFile absPath patched)
+    (TIO.writeFile absPath original)
+    (runAgda cfgInPlace absPath)
+  where
+    cfgInPlace = cfg { agdaFlags = agdaFlags cfg <> ["-i", takeDirectory absPath] }
+
+
+-- | ensureDebugImport: guarantee @open import AgdaDojang.Debug@ is in scope.
+--
+-- The @reportGoalCtx@ macro get_goal injects lives in @AgdaDojang.Debug@; a library
+-- file being inspected will not normally import it.  If the module already imports it
+-- this is a no-op; otherwise the import is inserted immediately after the module
+-- header — i.e. after the header's closing @where@, which may be several lines below
+-- the @module@ keyword when the module is parameterised (common in agda-algebras).
+-- Placing it there is valid for both @.agda@ and literate @.lagda.md@ sources, since
+-- the header sits in code context in both.  agda-dojang is on the library path
+-- (@-l agda-dojang@), so the import resolves.
+--
+-- Both the "already imported?" test and the header search look at real import/module
+-- lines (not mere substrings), so a passing mention of @AgdaDojang.Debug@ or @module@
+-- in a comment neither suppresses the injection nor misplaces it.
+ensureDebugImport :: Text -> Text
+ensureDebugImport src
+  | any isDebugImportLine ls = src
+  | otherwise =
+      case splitAfterModuleHeader ls of
+        Nothing           -> src   -- no single-line-terminated module header found
+        Just (hdr, rest)  ->
+          T.unlines (hdr <> ["open import AgdaDojang.Debug"] <> rest)
+  where
+    ls = T.lines src
+
+    -- A genuine import line: after stripping leading space it begins with
+    -- @open@ or @import@ and names the module.
+    isDebugImportLine ln =
+      let s = T.stripStart ln
+      in  ("open" `T.isPrefixOf` s || "import" `T.isPrefixOf` s)
+          && "AgdaDojang.Debug" `T.isInfixOf` ln
+
+-- | splitAfterModuleHeader: split source lines just after the top-level module
+-- header.  The header runs from the first line whose code begins with @module@
+-- through the first subsequent line that carries a standalone @where@ token
+-- (they may be the same line, or several apart for a parameterised module).
+-- Returns @Nothing@ if no such header is found.
+splitAfterModuleHeader :: [Text] -> Maybe ([Text], [Text])
+splitAfterModuleHeader ls = do
+  i <- findIndex (\l -> "module" `T.isPrefixOf` T.stripStart l) ls
+  jRel <- findIndex (\l -> "where" `elem` T.words l) (drop i ls)
+  pure (splitAt (i + jRel + 1) ls)
+
+
 -- | parseDiagnostics: parse Agda stderr into a list of diagnostics.
 --
 -- This is a best-effort heuristic parser.  Agda error messages typically
@@ -242,71 +297,3 @@ parseDiagnostics stderr' =
               _         -> Nothing
             _ -> Nothing
         _ -> Nothing
-
-
--- | stripIncludeDir: strip @-i <dir>@ token pairs from flag list when @dir@ matches @dropDir@.
---
--- In shadow mode we typecheck a temp copy; if the original directory is also on the
--- include path, Agda sees two files for the same module → AmbiguousTopLevelModuleName.
--- (Port of agent_bridge.py's @_drop_include_dir_tokens@.)
-stripIncludeDir :: FilePath -> [String] -> [String]
-stripIncludeDir _       []                    = []
-stripIncludeDir dropDir ("-i" : dir : rest)
-  | norm dir == norm dropDir                  = stripIncludeDir dropDir rest
-  where norm p = reverse $ dropWhile (== '/') $ reverse p
-stripIncludeDir dropDir (x : rest)            = x : stripIncludeDir dropDir rest
-
-
--- | makeTmpDir: create a temp directory for scratch Agda files.
-makeTmpDir :: String -> IO FilePath
-makeTmpDir label = do
-  tmp <- getTemporaryDirectory
-  let dir = tmp </> label
-  -- NOTE: v0 uses a fixed name (sequential requests only).
-  -- TODO: switch to createTempDirectory for concurrent safety.
-  -- SEE: https://github.com/formalverification/agda-native-air/pull/38#discussion_r2969684711
-  createDirectoryIfMissing True dir
-  pure dir
-
--- Bring concatMap into scope for the list comprehension in parseDiagnostics.
--- (It's in Prelude, but explicit for clarity with GHC2021.)
-
--- | makeOverlay: create overlay directory mirroring @srcDir@ except for @excludeFile@.
---
--- This avoids Agda's @ModuleDefinedInOtherFile@ error when we typecheck a patched
--- copy of a file while still needing sibling imports to resolve.
--- (Port of agent_bridge.py's _ensure_overlay_dir.)
-makeOverlay :: FilePath -> FilePath -> String -> IO FilePath
-makeOverlay tmpDir srcDir excludeFile = do
-  let overlay = tmpDir </> "_overlay"
-  -- Remove stale overlay from previous invocations — a prior call may have
-  -- excluded a different file, leaving entries that must now be absent.
-  removeDirectoryRecursive overlay `catch` \(_ :: SomeException) -> pure ()
-  createDirectoryIfMissing True overlay
-  entries <- listDirectory srcDir
-  let keep = [ e | e <- entries, e /= excludeFile ]
-  mapM_ (copyEntry overlay) keep
-  pure overlay
-  where
-    copyEntry overlay name = do
-      let target = srcDir </> name
-          link   = overlay </> name
-      isDir <- doesDirectoryExist target
-      if isDir
-        then copyDirectoryRecursive target link
-        else copyFile target link
-          `catch` \(e :: SomeException) ->
-            hPutStrLn stderr $ "agda-mcp: overlay copy failed for " <> name <> ": " <> show e
-
-    -- | Recursively copy a directory tree from @src@ to @dst@.
-    copyDirectoryRecursive :: FilePath -> FilePath -> IO ()
-    copyDirectoryRecursive src dst = do
-      createDirectoryIfMissing True dst
-      entries <- listDirectory src
-      forM_ entries $ \entry -> do
-        let srcPath = src </> entry
-            dstPath = dst </> entry
-        isSubDir <- doesDirectoryExist srcPath
-        if isSubDir
-          then copyDirectoryRecursive srcPath dstPath
-          else copyFile srcPath dstPath

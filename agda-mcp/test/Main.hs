@@ -32,6 +32,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import System.Directory (findExecutable, doesFileExist, getCurrentDirectory)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>), takeDirectory)
@@ -316,7 +317,7 @@ corpusTests = do
 --   2. fixture file exists
 --   3. agda-dojang libraries file exists
 -- Returns Just AgdaConfig if everything is available, Nothing otherwise.
-probeAgdaEnv :: IO (Maybe (AgdaConfig, FilePath))
+probeAgdaEnv :: IO (Maybe (AgdaConfig, FilePath, FilePath))
 probeAgdaEnv = do
   mAgda <- findExecutable "agda"
   case mAgda of
@@ -354,15 +355,15 @@ probeAgdaEnv = do
                       , "-l", "standard-library"
                       ]
                   }
-            pure (Just (cfg, fixturePath))
+            pure (Just (cfg, fixturePath, repoRoot))
 
 
 -- | integrationTests: Tier 2 tests that call tool handlers on real fixture files
 -- with a real Agda binary.
-integrationTests :: AgdaConfig -> FilePath -> IO [Bool]
-integrationTests cfg fixturePath = do
+integrationTests :: AgdaConfig -> FilePath -> FilePath -> IO [Bool]
+integrationTests cfg fixturePath repoRoot = do
   hPutStrLn stderr "\n── Integration tests (tier 2: Agda subprocess) ──"
-  sequence
+  base <- sequence
     [ runTest "get_goal: Fixture01 hole 0 returns a non-empty goal" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
@@ -418,7 +419,71 @@ integrationTests cfg fixturePath = do
           Right dr ->
             assert "should report at least 1 hole" (not . null $ drHoles dr)
     ]
+  hier <- hierIntegrationTests cfg repoRoot
+  pure (base <> hier)
 
+
+-- | hierIntegrationTests: issue #66 regression.
+--
+-- get_goal / fill_hole must work on a hierarchically-named module embedded in a
+-- library that imports across directories (the shape that broke the old temp-copy
+-- path with ModuleDefinedInOtherFile).  The fixture library's src root is placed on
+-- the include path via @-i@, the way a caller's @-l \<lib\>@ supplies it in real use.
+-- The fixture deliberately does not import @AgdaDojang.Debug@, so get_goal here also
+-- exercises the transient import injection.  Skipped (with a note) if absent.
+hierIntegrationTests :: AgdaConfig -> FilePath -> IO [Bool]
+hierIntegrationTests cfg repoRoot = do
+  let hierSrc = repoRoot </> "agda-dojang" </> "data" </> "fixtures"
+                        </> "hier-lib" </> "src"
+      useFile = hierSrc </> "Proofs" </> "Use.agda"
+      hierCfg = cfg { agdaFlags = agdaFlags cfg <> ["-i", hierSrc] }
+  exists <- doesFileExist useFile
+  if not exists
+    then do
+      hPutStrLn stderr $ "\n  [skip] hier fixture not found: " <> useFile
+      pure []
+    else do
+      hPutStrLn stderr
+        "\n── Integration tests (tier 2b: library-embedded module, #66) ──"
+      before <- TIO.readFile useFile
+      results <- sequence
+        [ runTest "get_goal: Proofs.Use (hierarchical) returns a non-empty goal" $ do
+            let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
+            result <- handleGetGoal hierCfg params
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
+
+        , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
+            let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
+            result <- handleGetGoal hierCfg params
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Right info ->
+                assert "'x' should be in context"
+                  ("x" `elem` map ctxName (giContext info))
+
+        , runTest "fill_hole: Proofs.Use with cross-directory 'thing' succeeds" $ do
+            let params = FillHoleParams
+                  { fhFilePath = useFile, fhHoleIndex = 0, fhCandidate = "thing" }
+            result <- handleFillHole hierCfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> assertEqual "status" FillOk (frStatus fr)
+
+        , runTest "fill_hole: Proofs.Use with ill-typed 'tt' is a type error" $ do
+            let params = FillHoleParams
+                  { fhFilePath = useFile, fhHoleIndex = 0, fhCandidate = "tt" }
+            result <- handleFillHole hierCfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack err)
+              Right fr -> assertEqual "status" FillTypeError (frStatus fr)
+        ]
+      -- The transiently-patched source must be restored byte-for-byte.
+      after <- TIO.readFile useFile
+      restored <- runTest "get_goal/fill_hole restore the source file exactly" $
+        assert "file should be unchanged after in-place tools" (before == after)
+      pure (results <> [restored])
 
 
 -- ---------------------------------------------------------------------------
@@ -439,7 +504,7 @@ main = do
     Nothing           -> do
       hPutStrLn stderr "\n── Integration tests (tier 2): SKIPPED ──"
       pure []
-    Just (cfg, fixture) -> integrationTests cfg fixture
+    Just (cfg, fixture, repoRoot) -> integrationTests cfg fixture repoRoot
 
   let allResults = pureResults <> corpusResults <> integrationResults
       total  = length allResults

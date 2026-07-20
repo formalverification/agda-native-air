@@ -185,7 +185,7 @@ Given a file path and hole identifier, return the hole's expected type and its l
 }
 ```
 
-**How it works**.  Injects the `reportGoalCtx` macro into the hole, runs Agda, and parses the `AGDADOJANG_REQ_BEGIN/END` marker block from stderr.
+**How it works**.  Ensures `AgdaDojang.Debug` is imported (injecting the import transiently if the file does not already import it), replaces the hole with the `reportGoalCtx` macro, typechecks the file **in place**, and parses the `AGDADOJANG_REQ_BEGIN/END` marker block.  Checking at the file's real path (rather than a scratch copy) lets hierarchically-named modules embedded in a library resolve normally; the original source is restored after the call.
 
 
 #### `fill_hole`
@@ -217,6 +217,8 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
   "message": "A !=< ⊤ when checking that the expression tt has type A"
 }
 ```
+
+**How it works**.  Substitutes the candidate into the hole, typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating unsolved metas from the file's other open holes — or the type error.  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
 
 #### `check_file`
 
@@ -406,6 +408,17 @@ tool invocation.  This mirrors how `agda-dojang`'s Python tooling
 
 **Advantages:** simple, decoupled from Agda's GHC version, reuses all
 existing AgdaDojang macros without modification.
+
+**In-place typechecking.**  All four tools typecheck the file at its real
+path on disk.  `get_goal` and `fill_hole` must alter the source (inject the
+reporting macro, or substitute a candidate), so they patch the file
+transiently and restore it afterwards under `bracket_` — the original bytes
+are written back even if Agda errors or the call is interrupted.  Checking
+in place, rather than against a scratch copy, is what lets a
+hierarchically-named module embedded in a library resolve its own name and
+cross-directory imports the same way it does for the developer; an earlier
+scratch-copy approach failed on such modules with `ModuleDefinedInOtherFile`
+(issue #66).
 
 **Limitations:** each tool call spawns a new Agda process (cold
 typechecking, no persistent state).  This is acceptable for the v0 demo
