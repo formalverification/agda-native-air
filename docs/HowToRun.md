@@ -855,8 +855,7 @@ still giving it agda-mcp from *this* repository.  The recommended setup: **launc
 Claude Code from the other project's worktree** — so that project is the working
 directory, with its own `CLAUDE.md`, git, and permissions — and **attach agda-mcp to
 that session**.  agda-mcp does not need to be the working directory;
-`scripts/run-server.sh` resolves everything by absolute path into agda-native-air, so
-it works from any cwd.
+`scripts/run-server.sh` computes the agda-native-air repo root and `cd`s there before launching the server, so it works from any cwd.
 
 (Launching from agda-native-air and using `/add-dir` to reach the other project also
 works, but then agda-native-air stays the project root, so committing the other

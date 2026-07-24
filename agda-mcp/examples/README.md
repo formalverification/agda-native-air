@@ -8,7 +8,7 @@ comments, so the templates use `/ABS/PATH/TO/...` placeholders; copy one into th
 worktree you are editing, replace the placeholders with absolute paths, and keep it
 out of that project's git history.
 
-See [`docs/HowToRun.md` §13.5](../../docs/HowToRun.md) for the full walkthrough,
+See [`docs/HowToRun.md` §13.5](../../docs/HowToRun.md#135--using-agda-mcp-on-another-agda-project) for the full walkthrough,
 the caveats (`get_goal` needs `AgdaDojang.Debug`; absolute paths; toolchain match),
 and the alternative `claude mcp add` command.
 
