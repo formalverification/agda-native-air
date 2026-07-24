@@ -236,7 +236,7 @@ runInPlace cfg absPath originalBytes patched =
     cfgInPlace = cfg { agdaFlags = agdaFlags cfg <> ["-i", takeDirectory absPath] }
 
 
--- | ensureDebugImport: guarantee @open import AgdaDojang.Debug@ is in scope.
+-- | ensureDebugImport: ensure @open import AgdaDojang.Debug@ is in scope (best-effort).
 --
 -- The @reportGoalCtx@ macro get_goal injects lives in @AgdaDojang.Debug@; a library
 -- file being inspected will not normally import it.  If the module already imports it
