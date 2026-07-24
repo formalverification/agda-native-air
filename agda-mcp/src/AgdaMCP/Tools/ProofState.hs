@@ -40,18 +40,20 @@ module AgdaMCP.Tools.ProofState
   , handleGetDiagnostics
     -- * Exposed for testing
   , ensureDebugImport
+  , moduleNameOf
   ) where
 
 import Control.Exception (bracket_)
 import qualified Data.ByteString as BS
-import Data.List (findIndex)
+import Data.List (find, findIndex)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import Data.Text.Encoding.Error (UnicodeException)
 import qualified Data.Text.IO as TIO
 
 import System.Directory (makeAbsolute)
-import System.FilePath (takeDirectory, takeBaseName)
+import System.FilePath (takeDirectory)
 
 import AgdaMCP.Agda
   ( AgdaConfig, AgdaResult (..), agdaFlags, debugLog
@@ -77,30 +79,33 @@ handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either Text GoalInfo)
 handleGetGoal cfg params = do
   absPath <- makeAbsolute (ggFilePath params)
   origBytes <- BS.readFile absPath
-  let src        = TE.decodeUtf8 origBytes
-      withImport = ensureDebugImport src
-  case injectReportExpr cfg (ggHoleIndex params) withImport of
-    Nothing -> pure . Left $
-      "Hole index " <> T.pack (show (ggHoleIndex params))
-      <> " not found in " <> T.pack absPath
-    Just patched -> do
-      result <- runInPlace cfg absPath origBytes patched
-      -- DEBUG: show what Agda actually returned
-      debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
-      debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
-      debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
-      -- Agda may emit markers on stdout or stderr; check both.
-      let combined = arStdout result <> "\n" <> arStderr result
-      case parseGoalContext combined of
+  case TE.decodeUtf8' origBytes of
+    Left err  -> pure (Left (decodeError absPath err))
+    Right src ->
+      case injectReportExpr cfg (ggHoleIndex params) (ensureDebugImport src) of
         Nothing -> pure . Left $
-          "Could not parse goal/context markers from Agda output.\n"
-          <> "output:\n" <> T.take 2000 combined
-        Just (goal, ctx) ->
-          pure . Right $ GoalInfo
-            { giGoal    = goal
-            , giContext = ctx
-            , giModule  = Just . T.pack . takeBaseName $ ggFilePath params
-            }
+          "Hole index " <> T.pack (show (ggHoleIndex params))
+          <> " not found in " <> T.pack absPath
+        Just patched -> do
+          result <- runInPlace cfg absPath origBytes patched
+          -- DEBUG: show what Agda actually returned
+          debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
+          debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
+          debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
+          -- Agda may emit markers on stdout or stderr; check both.
+          let combined = arStdout result <> "\n" <> arStderr result
+          case parseGoalContext combined of
+            Nothing -> pure . Left $
+              "Could not parse goal/context markers from Agda output.\n"
+              <> "output:\n" <> T.take 2000 combined
+            Just (goal, ctx) ->
+              pure . Right $ GoalInfo
+                { giGoal    = goal
+                , giContext = ctx
+                -- The declared module name (e.g. FLRP.Bridge), parsed from the
+                -- header — not the file's base name.
+                , giModule  = moduleNameOf src
+                }
 
 
 -- ---------------------------------------------------------------------------
@@ -117,36 +122,38 @@ handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either Text FillResult)
 handleFillHole cfg params = do
   absPath <- makeAbsolute (fhFilePath params)
   origBytes <- BS.readFile absPath
-  let src = TE.decodeUtf8 origBytes
-  case substituteHole (fhHoleIndex params) (fhCandidate params) src of
-    Nothing -> pure . Left $
-      "Hole index " <> T.pack (show (fhHoleIndex params))
-      <> " not found in " <> T.pack (fhFilePath params)
-    Just patched -> do
-      result <- runInPlace cfg absPath origBytes patched
-      -- Agda 2.8.0 emits some errors on stdout; check both streams.
-      let combined = arStdout result <> "\n" <> arStderr result
-          -- A non-zero exit is acceptable if the *only* errors are unsolved
-          -- interaction metas (from other holes we haven't filled yet).
-          -- This mirrors agent_bridge.py's _only_unsolved_metas logic.
-          onlyMetas = arExitCode result /= 0
-                   && "[UnsolvedInteractionMetas]" `T.isInfixOf` combined
-                   && not ("[GenericDocError]"      `T.isInfixOf` combined)
-                   && not ("[UnequalTerms]"         `T.isInfixOf` combined)
-                   && not ("[TypeMismatch]"          `T.isInfixOf` combined)
-                   && not ("[ModuleNameDoesntMatchFileName]" `T.isInfixOf` combined)
-          status = if arExitCode result == 0 || onlyMetas then FillOk else FillTypeError
-          msg    = if status == FillOk
-                     then Nothing
-                     else Just (T.take 2000 combined)
-          -- Count remaining holes in the patched source after substitution.
-          remainingHoles = length (findHoles patched)
-      pure . Right $ FillResult
-        { frStatus    = status
-        , frCandidate = fhCandidate params
-        , frMessage   = msg
-        , frRemainingHoles = Just remainingHoles
-        }
+  case TE.decodeUtf8' origBytes of
+    Left err  -> pure (Left (decodeError absPath err))
+    Right src ->
+      case substituteHole (fhHoleIndex params) (fhCandidate params) src of
+        Nothing -> pure . Left $
+          "Hole index " <> T.pack (show (fhHoleIndex params))
+          <> " not found in " <> T.pack (fhFilePath params)
+        Just patched -> do
+          result <- runInPlace cfg absPath origBytes patched
+          -- Agda 2.8.0 emits some errors on stdout; check both streams.
+          let combined = arStdout result <> "\n" <> arStderr result
+              -- A non-zero exit is acceptable if the *only* errors are unsolved
+              -- interaction metas (from other holes we haven't filled yet).
+              -- This mirrors agent_bridge.py's _only_unsolved_metas logic.
+              onlyMetas = arExitCode result /= 0
+                       && "[UnsolvedInteractionMetas]" `T.isInfixOf` combined
+                       && not ("[GenericDocError]"      `T.isInfixOf` combined)
+                       && not ("[UnequalTerms]"         `T.isInfixOf` combined)
+                       && not ("[TypeMismatch]"          `T.isInfixOf` combined)
+                       && not ("[ModuleNameDoesntMatchFileName]" `T.isInfixOf` combined)
+              status = if arExitCode result == 0 || onlyMetas then FillOk else FillTypeError
+              msg    = if status == FillOk
+                         then Nothing
+                         else Just (T.take 2000 combined)
+              -- Count remaining holes in the patched source after substitution.
+              remainingHoles = length (findHoles patched)
+          pure . Right $ FillResult
+            { frStatus    = status
+            , frCandidate = fhCandidate params
+            , frMessage   = msg
+            , frRemainingHoles = Just remainingHoles
+            }
 
 
 -- ---------------------------------------------------------------------------
@@ -283,6 +290,26 @@ splitAfterModuleHeader ls = do
 -- @where@ scans above; block comments (@{- … -}@) are not handled.
 stripLineComment :: Text -> Text
 stripLineComment = fst . T.breakOn "--"
+
+-- | moduleNameOf: the declared top-level module name, parsed from the @module …@
+-- header line (with any line comment stripped).  This is the *declared* name — e.g.
+-- @FLRP.Bridge@ — not the file's base name, which would mangle a hierarchical module
+-- to its last segment and strip only one extension from a literate @.lagda.md@ file.
+-- Returns @Nothing@ when no @module@ header is found.
+moduleNameOf :: Text -> Maybe Text
+moduleNameOf src = do
+  hdr <- find (\l -> "module" `T.isPrefixOf` T.stripStart (stripLineComment l)) (T.lines src)
+  case dropWhile (/= "module") (T.words (stripLineComment hdr)) of
+    (_ : name : _) -> Just name
+    _              -> Nothing
+
+-- | decodeError: a structured error for a file whose bytes are not valid UTF-8.  Agda
+-- source is required to be UTF-8, so this should not arise in practice, but returning a
+-- 'Left' is friendlier than letting a 'UnicodeException' escape the tool call.
+decodeError :: FilePath -> UnicodeException -> Text
+decodeError path err =
+  "Could not decode " <> T.pack path <> " as UTF-8 (Agda source must be UTF-8): "
+  <> T.pack (show err)
 
 
 -- | parseDiagnostics: parse Agda stderr into a list of diagnostics.

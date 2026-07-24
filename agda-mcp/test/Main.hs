@@ -46,7 +46,7 @@ import AgdaMCP.Agda
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
-  , ensureDebugImport )
+  , ensureDebugImport, moduleNameOf )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
 import AgdaMCP.Types
@@ -220,6 +220,20 @@ pureTests = do
           Fail m -> pure (Fail m)
           Pass   -> assert "import sits just after the real where"
                       (length out > 4 && out !! 4 == "open import AgdaDojang.Debug")
+
+    -- moduleNameOf: the goal's `module` field is the declared name, not the base name.
+    , runTest "moduleNameOf: hierarchical name from the header" $
+        assertEqual "name" (Just "FLRP.Bridge")
+          (moduleNameOf (T.unlines [ "module FLRP.Bridge where", "foo = {!!}" ]))
+
+    , runTest "moduleNameOf: parameterised header, comment ignored" $
+        assertEqual "name" (Just "M")
+          (moduleNameOf (T.unlines
+            [ "module M {a : Level} where  -- not FLRP.Bridge", "x = {!!}" ]))
+
+    , runTest "moduleNameOf: no header → Nothing" $
+        assertEqual "name" Nothing
+          (moduleNameOf (T.unlines [ "-- just a comment", "x = 1" ]))
     ]
 
 
@@ -493,6 +507,13 @@ hierIntegrationTests cfg repoRoot = do
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
               Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
+
+        , runTest "get_goal: Proofs.Use reports its declared (hierarchical) module name" $ do
+            let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
+            result <- handleGetGoal hierCfg params
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Right info -> assertEqual "module" (Just "Proofs.Use") (giModule info)
 
         , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
