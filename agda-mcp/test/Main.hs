@@ -32,7 +32,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+import qualified Data.ByteString as BS
 import System.Directory (findExecutable, doesFileExist, getCurrentDirectory)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>), takeDirectory)
@@ -45,7 +45,8 @@ import AgdaMCP.Agda
   )
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Tools.ProofState
-  ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics )
+  ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
+  , ensureDebugImport )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
 import AgdaMCP.Types
@@ -181,6 +182,44 @@ pureTests = do
 
     , runTest "parseGoalContext: no markers → Nothing" $
         assert "should be Nothing" (isNothing $ parseGoalContext "no markers here")
+
+    -- ensureDebugImport: the get_goal import-injection heuristic (issue #66 review).
+    , runTest "ensureDebugImport: no-op when already imported" $ do
+        let s = T.unlines
+              [ "module M where", "open import AgdaDojang.Debug", "foo = {!!}" ]
+        assertEqual "unchanged" s (ensureDebugImport s)
+
+    , runTest "ensureDebugImport: recognizes a private-qualified import (no duplicate)" $ do
+        let s = T.unlines
+              [ "module M where", "private open import AgdaDojang.Debug", "foo = {!!}" ]
+        assertEqual "unchanged" s (ensureDebugImport s)
+
+    , runTest "ensureDebugImport: a longer name (.Debug.Extra) is not the module" $ do
+        let s = T.unlines
+              [ "module M where", "open import AgdaDojang.Debug.Extra", "foo = {!!}" ]
+        assert "injects the real import"
+          ("open import AgdaDojang.Debug" `elem` T.lines (ensureDebugImport s))
+
+    , runTest "ensureDebugImport: a comment mention does not count as an import" $ do
+        let s = T.unlines
+              [ "module M where"
+              , "open import Data.Nat  -- also see AgdaDojang.Debug"
+              , "foo = {!!}" ]
+        assert "injects the real import"
+          ("open import AgdaDojang.Debug" `elem` T.lines (ensureDebugImport s))
+
+    , runTest "ensureDebugImport: 'where' in a header comment does not misplace the import" $ do
+        let inp = [ "module M"
+                  , "  {a : Level}  -- a level where needed"
+                  , "  (X : Set a)"
+                  , "  where"
+                  , "foo = {!!}" ]
+            out = T.lines (ensureDebugImport (T.unlines inp))
+        r1 <- assert "header block is intact" (take 4 out == take 4 inp)
+        case r1 of
+          Fail m -> pure (Fail m)
+          Pass   -> assert "import sits just after the real where"
+                      (length out > 4 && out !! 4 == "open import AgdaDojang.Debug")
     ]
 
 
@@ -316,7 +355,8 @@ corpusTests = do
 --   1. agda binary is on PATH
 --   2. fixture file exists
 --   3. agda-dojang libraries file exists
--- Returns Just AgdaConfig if everything is available, Nothing otherwise.
+-- Returns @Just (cfg, fixturePath, repoRoot)@ if everything is available,
+-- @Nothing@ otherwise.
 probeAgdaEnv :: IO (Maybe (AgdaConfig, FilePath, FilePath))
 probeAgdaEnv = do
   mAgda <- findExecutable "agda"
@@ -445,7 +485,7 @@ hierIntegrationTests cfg repoRoot = do
     else do
       hPutStrLn stderr
         "\n── Integration tests (tier 2b: library-embedded module, #66) ──"
-      before <- TIO.readFile useFile
+      before <- BS.readFile useFile
       results <- sequence
         [ runTest "get_goal: Proofs.Use (hierarchical) returns a non-empty goal" $ do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
@@ -480,9 +520,10 @@ hierIntegrationTests cfg repoRoot = do
               Right fr -> assertEqual "status" FillTypeError (frStatus fr)
         ]
       -- The transiently-patched source must be restored byte-for-byte.
-      after <- TIO.readFile useFile
+      after <- BS.readFile useFile
       restored <- runTest "get_goal/fill_hole restore the source file exactly" $
-        assert "file should be unchanged after in-place tools" (before == after)
+        assert "file should be byte-for-byte unchanged after in-place tools"
+               (before == after)
       pure (results <> [restored])
 
 

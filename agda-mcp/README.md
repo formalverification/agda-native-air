@@ -412,13 +412,14 @@ existing AgdaDojang macros without modification.
 **In-place typechecking.**  All four tools typecheck the file at its real
 path on disk.  `get_goal` and `fill_hole` must alter the source (inject the
 reporting macro, or substitute a candidate), so they patch the file
-transiently and restore it afterwards under `bracket_` — the original bytes
-are written back even if Agda errors or the call is interrupted.  Checking
-in place, rather than against a scratch copy, is what lets a
-hierarchically-named module embedded in a library resolve its own name and
-cross-directory imports the same way it does for the developer; an earlier
-scratch-copy approach failed on such modules with `ModuleDefinedInOtherFile`
-(issue #66).
+transiently and restore it afterwards under `bracket_`.  The original is
+captured and rewritten as raw bytes (`Data.ByteString`), so the file is
+returned byte-for-byte — no encoding or newline round-trip — even if Agda
+errors or the call is interrupted.  Checking in place, rather than against a
+scratch copy, is what lets a hierarchically-named module embedded in a
+library resolve its own name and cross-directory imports the same way it does
+for the developer; an earlier scratch-copy approach failed on such modules
+with `ModuleDefinedInOtherFile` (issue #66).
 
 **Limitations:** each tool call spawns a new Agda process (cold
 typechecking, no persistent state).  This is acceptable for the v0 demo

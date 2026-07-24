@@ -27,8 +27,9 @@
 --
 --     get_goal and fill_hole must still alter the source (inject the reporting macro,
 --     or substitute a candidate), so they patch the real file transiently and restore
---     it under 'Control.Exception.bracket_' — the original bytes are written back even
---     if Agda errors or the call is interrupted.
+--     it under 'Control.Exception.bracket_'.  The original is captured and restored as
+--     raw bytes ('Data.ByteString'), so the file is returned byte-for-byte even if Agda
+--     errors or the call is interrupted — no encoding or newline round-trip is involved.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -37,12 +38,16 @@ module AgdaMCP.Tools.ProofState
   , handleFillHole
   , handleCheckFile
   , handleGetDiagnostics
+    -- * Exposed for testing
+  , ensureDebugImport
   ) where
 
 import Control.Exception (bracket_)
+import qualified Data.ByteString as BS
 import Data.List (findIndex)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 
 import System.Directory (makeAbsolute)
@@ -71,14 +76,15 @@ import AgdaMCP.Types
 handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either Text GoalInfo)
 handleGetGoal cfg params = do
   absPath <- makeAbsolute (ggFilePath params)
-  src <- TIO.readFile absPath
-  let withImport = ensureDebugImport src
+  origBytes <- BS.readFile absPath
+  let src        = TE.decodeUtf8 origBytes
+      withImport = ensureDebugImport src
   case injectReportExpr cfg (ggHoleIndex params) withImport of
     Nothing -> pure . Left $
       "Hole index " <> T.pack (show (ggHoleIndex params))
       <> " not found in " <> T.pack absPath
     Just patched -> do
-      result <- runInPlace cfg absPath src patched
+      result <- runInPlace cfg absPath origBytes patched
       -- DEBUG: show what Agda actually returned
       debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
       debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
@@ -110,13 +116,14 @@ handleGetGoal cfg params = do
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either Text FillResult)
 handleFillHole cfg params = do
   absPath <- makeAbsolute (fhFilePath params)
-  src <- TIO.readFile absPath
+  origBytes <- BS.readFile absPath
+  let src = TE.decodeUtf8 origBytes
   case substituteHole (fhHoleIndex params) (fhCandidate params) src of
     Nothing -> pure . Left $
       "Hole index " <> T.pack (show (fhHoleIndex params))
       <> " not found in " <> T.pack (fhFilePath params)
     Just patched -> do
-      result <- runInPlace cfg absPath src patched
+      result <- runInPlace cfg absPath origBytes patched
       -- Agda 2.8.0 emits some errors on stdout; check both streams.
       let combined = arStdout result <> "\n" <> arStderr result
           -- A non-zero exit is acceptable if the *only* errors are unsolved
@@ -203,18 +210,20 @@ handleGetDiagnostics cfg params = do
 
 -- | runInPlace: typecheck a transiently-patched version of a file at its real path.
 --
--- Writes @patched@ over @absPath@, runs Agda there with the same include strategy
--- 'handleCheckFile' uses (base flags — which carry the caller's @-l \<lib\>@, hence the
--- library's src root — plus @-i \<dir-of-file\>@), then restores @original@.  The
--- restore runs under 'bracket_', so the file is returned to its original bytes even if
--- Agda errors or the call is interrupted.  Checking at the real path (rather than a
--- scratch copy) is what lets hierarchically-named library modules resolve — see the
--- module header and issue #66.
-runInPlace :: AgdaConfig -> FilePath -> Text -> Text -> IO AgdaResult
-runInPlace cfg absPath original patched =
+-- Writes @patched@ (as UTF-8) over @absPath@, runs Agda there with the same include
+-- strategy 'handleCheckFile' uses (base flags — which carry the caller's @-l \<lib\>@,
+-- hence the library's src root — plus @-i \<dir-of-file\>@), then restores
+-- @originalBytes@.  Both the write and the restore go through 'Data.ByteString', and
+-- the restore runs under 'bracket_', so the file is returned to its exact original
+-- bytes even if Agda errors or the call is interrupted — no encoding or newline
+-- round-trip is involved.  Checking at the real path (rather than a scratch copy) is
+-- what lets hierarchically-named library modules resolve — see the module header and
+-- issue #66.
+runInPlace :: AgdaConfig -> FilePath -> BS.ByteString -> Text -> IO AgdaResult
+runInPlace cfg absPath originalBytes patched =
   bracket_
-    (TIO.writeFile absPath patched)
-    (TIO.writeFile absPath original)
+    (BS.writeFile absPath (TE.encodeUtf8 patched))
+    (BS.writeFile absPath originalBytes)
     (runAgda cfgInPlace absPath)
   where
     cfgInPlace = cfg { agdaFlags = agdaFlags cfg <> ["-i", takeDirectory absPath] }
@@ -245,23 +254,35 @@ ensureDebugImport src
   where
     ls = T.lines src
 
-    -- A genuine import line: after stripping leading space it begins with
-    -- @open@ or @import@ and names the module.
+    -- A genuine import of the module: with any line comment stripped, the first
+    -- token is an import-introducing keyword, @import@ is present, and
+    -- @AgdaDojang.Debug@ appears as a whole module token — so none of a comment
+    -- mention, an inline @-- … AgdaDojang.Debug@ trailer, or a longer name such as
+    -- @AgdaDojang.Debug.Extra@ is mistaken for the import.
     isDebugImportLine ln =
-      let s = T.stripStart ln
-      in  ("open" `T.isPrefixOf` s || "import" `T.isPrefixOf` s)
-          && "AgdaDojang.Debug" `T.isInfixOf` ln
+      case T.words (stripLineComment ln) of
+        ws@(w : _) -> w `elem` ["import", "open", "private"]
+                   && "import"           `elem` ws
+                   && "AgdaDojang.Debug"  `elem` ws
+        []         -> False
 
 -- | splitAfterModuleHeader: split source lines just after the top-level module
 -- header.  The header runs from the first line whose code begins with @module@
--- through the first subsequent line that carries a standalone @where@ token
--- (they may be the same line, or several apart for a parameterised module).
--- Returns @Nothing@ if no such header is found.
+-- through the first subsequent line that carries a standalone @where@ token (they may
+-- be the same line, or several apart for a parameterised module).  Line comments are
+-- stripped before the scan, so a @where@ (or @module@) sitting inside a @--@ comment on
+-- a header line is ignored.  Returns @Nothing@ if no such header is found.
 splitAfterModuleHeader :: [Text] -> Maybe ([Text], [Text])
 splitAfterModuleHeader ls = do
-  i <- findIndex (\l -> "module" `T.isPrefixOf` T.stripStart l) ls
-  jRel <- findIndex (\l -> "where" `elem` T.words l) (drop i ls)
+  i    <- findIndex (\l -> "module" `T.isPrefixOf` T.stripStart (stripLineComment l)) ls
+  jRel <- findIndex (\l -> "where" `elem` T.words (stripLineComment l)) (drop i ls)
   pure (splitAt (i + jRel + 1) ls)
+
+-- | stripLineComment: drop an Agda @--@ line comment (best-effort: treats the first
+-- @--@ as the comment start).  Enough to keep comment text out of the keyword and
+-- @where@ scans above; block comments (@{- … -}@) are not handled.
+stripLineComment :: Text -> Text
+stripLineComment = fst . T.breakOn "--"
 
 
 -- | parseDiagnostics: parse Agda stderr into a list of diagnostics.
