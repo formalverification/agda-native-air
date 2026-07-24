@@ -221,6 +221,20 @@ pureTests = do
           Pass   -> assert "import sits just after the real where"
                       (length out > 4 && out !! 4 == "open import AgdaDojang.Debug")
 
+    , runTest "ensureDebugImport: a nested-module import does not suppress injection" $ do
+        let s = T.unlines
+              [ "module Top where"
+              , "module Inner where"
+              , "  open import AgdaDojang.Debug"
+              , "foo = {!!}" ]
+            out = T.lines (ensureDebugImport s)
+        r1 <- assert "injects at top level, right after the header"
+                (length out > 1 && out !! 1 == "open import AgdaDojang.Debug")
+        case r1 of
+          Fail m -> pure (Fail m)
+          Pass   -> assert "the nested import is left in place"
+                      ("  open import AgdaDojang.Debug" `elem` out)
+
     -- moduleNameOf: the goal's `module` field is the declared name, not the base name.
     , runTest "moduleNameOf: hierarchical name from the header" $
         assertEqual "name" (Just "FLRP.Bridge")

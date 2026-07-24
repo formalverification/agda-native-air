@@ -226,6 +226,14 @@ handleGetDiagnostics cfg params = do
 -- round-trip is involved.  Checking at the real path (rather than a scratch copy) is
 -- what lets hierarchically-named library modules resolve — see the module header and
 -- issue #66.
+--
+-- Only the file's /contents/ are restored, not its modification time: the restore write
+-- deliberately leaves a fresh mtime.  That is intentional — a newer mtime forces Agda to
+-- re-typecheck from the restored source on its next load under any interface-freshness
+-- rule, whereas resetting mtime to the original (older) value could let Agda reuse an
+-- @.agdai@ built from the transiently-patched content (e.g. a fill_hole candidate that
+-- completed the module).  Editors that compare content, not mtime alone, will not prompt,
+-- since the bytes are unchanged.
 runInPlace :: AgdaConfig -> FilePath -> BS.ByteString -> Text -> IO AgdaResult
 runInPlace cfg absPath originalBytes patched =
   bracket_
@@ -236,30 +244,39 @@ runInPlace cfg absPath originalBytes patched =
     cfgInPlace = cfg { agdaFlags = agdaFlags cfg <> ["-i", takeDirectory absPath] }
 
 
--- | ensureDebugImport: ensure @open import AgdaDojang.Debug@ is in scope (best-effort).
+-- | ensureDebugImport: ensure @open import AgdaDojang.Debug@ is in scope at the top
+-- level (best-effort).
 --
 -- The @reportGoalCtx@ macro get_goal injects lives in @AgdaDojang.Debug@; a library
--- file being inspected will not normally import it.  If the module already imports it
--- this is a no-op; otherwise the import is inserted immediately after the module
--- header — i.e. after the header's closing @where@, which may be several lines below
--- the @module@ keyword when the module is parameterised (common in agda-algebras).
+-- file being inspected will not normally import it.  If the top-level module already
+-- imports it this is a no-op; otherwise the import is inserted immediately after the
+-- module header — i.e. after the header's closing @where@, which may be several lines
+-- below the @module@ keyword when the module is parameterised (common in agda-algebras).
 -- Placing it there is valid for both @.agda@ and literate @.lagda.md@ sources, since
 -- the header sits in code context in both.  agda-dojang is on the library path
 -- (@-l agda-dojang@), so the import resolves.
 --
--- Both the "already imported?" test and the header search look at real import/module
--- lines (not mere substrings), so a passing mention of @AgdaDojang.Debug@ or @module@
--- in a comment neither suppresses the injection nor misplaces it.
+-- The "already imported?" scan is restricted to the *top-level* prelude — the lines
+-- after the top-level module header, up to the first nested @module@ — so an import
+-- inside a nested module (which does not bring names into the surrounding scope) does
+-- not suppress injection.  Both that scan and the header search look at real
+-- import/module lines (not mere substrings), so a passing mention of @AgdaDojang.Debug@
+-- or @module@ in a comment neither suppresses the injection nor misplaces it.  When no
+-- @module … where@ header is found the source is returned unchanged (get_goal then
+-- surfaces the resulting scope error), so injection is best-effort, not guaranteed.
 ensureDebugImport :: Text -> Text
-ensureDebugImport src
-  | any isDebugImportLine ls = src
-  | otherwise =
-      case splitAfterModuleHeader ls of
-        Nothing           -> src   -- no single-line-terminated module header found
-        Just (hdr, rest)  ->
-          T.unlines (hdr <> ["open import AgdaDojang.Debug"] <> rest)
+ensureDebugImport src =
+  case splitAfterModuleHeader ls of
+    Nothing -> src   -- no top-level module header found; leave as-is (best-effort)
+    Just (hdr, rest)
+      | any isDebugImportLine (takeWhile (not . startsModule) rest) -> src
+      | otherwise -> T.unlines (hdr <> ["open import AgdaDojang.Debug"] <> rest)
   where
     ls = T.lines src
+
+    -- A nested `module …` line ends the top-level prelude; imports below it are not in
+    -- the surrounding scope, so they must not count as "already imported".
+    startsModule l = "module" `T.isPrefixOf` T.stripStart (stripLineComment l)
 
     -- A genuine import of the module: with any line comment stripped, the first
     -- token is an import-introducing keyword, @import@ is present, and
