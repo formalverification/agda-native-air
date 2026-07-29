@@ -425,7 +425,7 @@ but not part of the automated loop.
 
 ```agda
 example : ⊤
-example = showGoalType          -- stderr: "GOAL TYPE: ⊤"
+example = showGoalType ?        -- stderr: "GOAL TYPE: ⊤"
 ```
 
 ---
@@ -794,7 +794,7 @@ We're using Agda's error channel as a "structured side-channel" to export `{goal
 In Agda, a `do _ ← _` block is syntactic sugar for chaining `>>=`; for example,
 
 ```agda
-reportGoalCtx hole = do
+reportGoalCtx _ hole = do
   goalTy  ← inferType hole
   goalNF  ← normalise goalTy
   goalStr ← formatErrorParts (termErr goalNF ∷ [])
@@ -804,7 +804,7 @@ reportGoalCtx hole = do
 desugars (morally) to
 
 ```agda
-reportGoalCtx hole =
+reportGoalCtx _ hole =
   inferType hole >>= λ goalTy →
   normalise goalTy >>= λ goalNF →
   formatErrorParts (termErr goalNF ∷ []) >>= λ goalStr →

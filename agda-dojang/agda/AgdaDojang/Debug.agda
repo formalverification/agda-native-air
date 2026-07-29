@@ -16,6 +16,18 @@
 --   Note that these macros will raise a type error with the information, so they
 --   should be used for debugging and not included in final code.
 --
+--   Design note (issue #70): every macro here takes an explicit first argument for
+--   the `?` written at the call site, so that `reportGoalCtx ?` is a *saturated*
+--   macro application and the `hole` the type checker supplies is the metavariable
+--   of the actual goal type.  With the earlier `Term → TC ⊤` signatures, writing
+--   `reportGoalCtx ?` over-applied the macro: Agda elaborated the bare head against
+--   a fresh function meta `(x : _A) → _B x`, handed *that* meta to the macro, and
+--   only afterwards applied it to `?` — so `inferType hole` reported the
+--   uninstantiated function type instead of the goal.  The quoted `?` argument
+--   itself carries no information and is ignored; it exists purely to make the
+--   documented calling convention the well-typed one (a bare `reportGoalCtx` now
+--   fails loudly instead of silently misreporting).
+--
 {-# OPTIONS --safe --cubical-compatible #-}
 
 module AgdaDojang.Debug where
@@ -69,22 +81,25 @@ raiseTerm k t = raiseFrom zero k t
 -- Basic debugging macros
 ------------------------------------------------------------------------
 
+-- Print the raw Term of the current goal hole.  Invoke as `showGoal ?`; the
+-- quoted `?` argument is ignored (see the design note in the file header).
 macro
-  showGoal : Term → TC ⊤
-  showGoal hole =
+  showGoal : Term → Term → TC ⊤
+  showGoal _ hole =
     typeError (strErr "GOAL HOLE TERM (raw): " ∷ termErr hole ∷ [])
 
--- Print the type of the current goal (elaborated).
+-- Print the type of the current goal (elaborated).  Invoke as `showGoalType ?`.
 macro
-  showGoalType : Term → TC ⊤
-  showGoalType hole =
+  showGoalType : Term → Term → TC ⊤
+  showGoalType _ hole =
     inferType hole >>= λ ty →
     typeError (strErr "GOAL TYPE: " ∷ termErr ty ∷ [])
 
 -- Compare the raw type, its 'whnf' (alias defined in Prelude), and full 'normalise'.
+-- Invoke as `showTypeNFvsWHNF ?`.
 macro
-  showTypeNFvsWHNF : Term → TC ⊤
-  showTypeNFvsWHNF hole =
+  showTypeNFvsWHNF : Term → Term → TC ⊤
+  showTypeNFvsWHNF _ hole =
     inferType hole  >>= λ A  →
     whnf A          >>= λ A' →
     normalise A     >>= λ A'' →
@@ -128,9 +143,12 @@ mkCtxParts i ((nm , arg (arg-info v _) t) ∷ rest) tail =
         ∷ strErr ":" ∷ strErr nm ∷ strErr ": " ∷ strErr tyStr ∷ strErr "\n"
         ∷ tail′ )
 
+-- Emit the AGDADOJANG_REQ_BEGIN/END marker block describing the current goal and
+-- context.  Invoke as `reportGoalCtx ?`: the quoted `?` argument is ignored, and
+-- `hole` is the metavariable of the goal type (see the file-header design note).
 macro
-  reportGoalCtx : Term → TC ⊤
-  reportGoalCtx hole =
+  reportGoalCtx : Term → Term → TC ⊤
+  reportGoalCtx _ hole =
     -- Build goal string: inferType >=> normalise >=> termToString
     (inferType >=> normalise >=> termToString) hole >>= λ goalStr →
     getContext >>= λ ctx →

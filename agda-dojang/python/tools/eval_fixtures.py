@@ -812,7 +812,7 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[EvalConfig, bool]:
     ap.add_argument("--timeout", type=float, default=None, help="Timeout (seconds) per process invocation.")
     ap.add_argument("--cwd", default=None, help="Working directory (recommended: repo root).")
     ap.add_argument("--keep-workdir", action="store_true", help="Keep per-fixture work dirs under out-dir.")
-    ap.add_argument("--report-expr", default="reportGoalCtx", help="Expression injected for reporting.")
+    ap.add_argument("--report-expr", default="reportGoalCtx ?", help="Expression injected for reporting.")
 
 
     # XFAIL support (negative fixtures that are expected to remain unsolved).
