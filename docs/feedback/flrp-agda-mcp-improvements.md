@@ -4,9 +4,9 @@
   formalizing RP-2 of the FLRP program (agda-algebras issue #459, PR #507)
   with agda-mcp configured but unused; imported here verbatim (only this
   header comment adjusted).  Section 7 is an addendum written in this
-  repository: it re-tests each claim against the server at HEAD, as the
-  document's own §0 requests, and records what reproduced, what did not,
-  and what new defects the re-test uncovered.
+  repository: it re-tests each claim against the server at commit 911ae18,
+  as the document's own §0 requests, and records what reproduced, what did
+  not, and what new defects the re-test uncovered.
 -->
 
 # agda-mcp: deficiencies observed and improvement proposals
@@ -35,7 +35,7 @@ Four tools, each keyed on `filePath`:
 | `get_goal` | Inspect the goal type and local context at a hole | `filePath`, `holeIndex` |
 | `fill_hole` | Substitute a candidate term into a hole and typecheck | `filePath`, `holeIndex`, `candidate` |
 
-Server config in the project's `.mcp.json`:
+Server config in the `.mcp.json` file of the `ualib/agda-algebras` project:
 
 ```
 command: …/agda-native-air/main/scripts/run-server.sh
