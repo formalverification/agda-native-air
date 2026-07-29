@@ -128,7 +128,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           ["filePath", "holeIndex"]
 
       , toolDef "fill_hole"
-          "Substitute a candidate term into a hole and typecheck."
+          "Substitute a candidate term into a hole and typecheck. Returns ok only if the file then passes batch agda, tolerating only [UnsolvedInteractionMetas] from open holes (the file's other holes, or new sub-holes inside the candidate); a candidate that leaves unsolved metas or constraints behind is a type_error."
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
           , prop "holeIndex" "integer" "0-based index of the {!!} hole."
           , prop "candidate" "string" "The candidate proof term to try."

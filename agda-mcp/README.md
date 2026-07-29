@@ -218,7 +218,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 }
 ```
 
-**How it works**.  Substitutes the candidate into the hole, typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating unsolved metas from the file's other open holes — or the type error.  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
+**How it works**.  Substitutes the candidate into the hole, typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating only the `[UnsolvedInteractionMetas]` of the file's other open holes, or of new sub-holes inside the candidate — or the type error.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` behind is reported as a type error (issue #69).  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
 
 #### `check_file`
 
