@@ -648,6 +648,23 @@ fillVerdictTests cfg = do
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
               Right fr -> assertEqual "status" FillOk (frStatus fr)
+
+        -- Pins the documented tolerance/tracking asymmetry: a `?` sub-hole is
+        -- excused by the verdict (Agda reports it as an interaction meta) but
+        -- remainingHoles counts only literal {!!} tokens — here just hole h.
+        -- Issue #71 will widen tracking to the full hole syntax.
+        , runTest "fill_hole: a '?' sub-hole is tolerated but not counted" $ do
+            let params = FillHoleParams
+                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc ?" }
+            result <- handleFillHole cfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> do
+                r1 <- assertEqual "status" FillOk (frStatus fr)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> assertEqual "remainingHoles counts only literal {!!} tokens"
+                              (Just 1) (frRemainingHoles fr)
         ]
       after <- BS.readFile fixture
       restored <- runTest "fill_hole verdict tests restore the fixture exactly" $
