@@ -182,7 +182,7 @@ EVAL_POLICY     ?= $(PYTHON) python/tools/policy_fixture.py
 EVAL_MAX_HOLES  ?= 4
 EVAL_K          ?= 5
 EVAL_TIMEOUT    ?= 20
-EVAL_REPORT_EXPR?= reportGoalCtx
+EVAL_REPORT_EXPR?= reportGoalCtx ?
 EVAL_CLEAN      ?= 1
 EVAL_XFAIL      ?=
 # ^ after support for this is added in eval_fixtures.py

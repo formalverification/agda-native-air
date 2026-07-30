@@ -51,8 +51,10 @@ def test_policy_request_for_boolean_algebra_deMorgan1(tmp_path: Path):
             "--k 5",
             "--timeout 20",
             '--agda-bin "agda"',
-            '--agda-flags "-i agda --library-file=agda/libraries -l agda-dojang -i data/fixtures"',
-            '--report-expr "reportGoalCtx"',
+            # The generated libraries file lives at the repo root (agda/libraries),
+            # one level above the agda-dojang/ cwd this test runs in.
+            '--agda-flags "-i agda --library-file=../agda/libraries -l agda-dojang -i data/fixtures"',
+            '--report-expr "reportGoalCtx ?"',
         ])
     ]
 

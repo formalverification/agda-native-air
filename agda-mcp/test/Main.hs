@@ -465,13 +465,30 @@ integrationTests :: AgdaConfig -> FilePath -> FilePath -> IO [Bool]
 integrationTests cfg fixturePath repoRoot = do
   hPutStrLn stderr "\n── Integration tests (tier 2: Agda subprocess) ──"
   base <- sequence
-    [ runTest "get_goal: Fixture01 hole 0 returns a non-empty goal" $ do
+    [ -- Issue #70 regression: the goal must be the hole's actual expected type,
+      -- not the reporting macro's own unsolved application type.  Asserting the
+      -- exact strings (rather than mere non-emptiness) is what catches a macro
+      -- that "reports something" but reports the wrong thing.
+      runTest "get_goal: Fixture01 hole 0 goal is exactly \"A\" (#70)" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
-          Right info ->
-            assert "goal should be non-empty" (not . T.null $ giGoal info)
+          Right info -> assertEqual "goal" "A" (giGoal info)
+
+    , runTest "get_goal: Fixture01 hole 1 goal is exactly \"⊤\" (#70)" $ do
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 1 }
+        result <- handleGetGoal cfg params
+        case result of
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Right info -> assertEqual "goal" "⊤" (giGoal info)
+
+    , runTest "get_goal: Fixture01 hole 2 goal is exactly \"x ≡ x\" (#70)" $ do
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 2 }
+        result <- handleGetGoal cfg params
+        case result of
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Right info -> assertEqual "goal" "x ≡ x" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 0 context contains 'x : A'" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
