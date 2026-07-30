@@ -6,8 +6,10 @@
 --   This module contains macros that can be used to print out the current goal, its
 --   type, and the results of normalisation and whnf.
 --
---   These macros can be invoked by writing `showGoal ?` or `showGoalType ?` in the
---   source code, where `?` is a hole that will be replaced by the current goal term.
+--   These macros are invoked by writing `showGoal ?` or `showGoalType ?` in the
+--   source code.  The `?` argument itself is an ignored dummy: it saturates the
+--   macro application so that the metavariable Agda supplies as the macro's `hole`
+--   is the actual goal (see the design note below).
 --
 --   The `showTypeNFvsWHNF` macro compares the raw type, its whnf, and its normal
 --   form, which can be useful for understanding how the type is being processed by
