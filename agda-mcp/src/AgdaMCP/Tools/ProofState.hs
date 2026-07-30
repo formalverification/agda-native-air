@@ -41,6 +41,8 @@ module AgdaMCP.Tools.ProofState
     -- * Exposed for testing
   , ensureDebugImport
   , moduleNameOf
+  , errorTagsOf
+  , onlyOpenHoleErrors
   ) where
 
 import Control.Exception (bracket_)
@@ -116,8 +118,10 @@ handleGetGoal cfg params = do
 --
 -- 1. Read source, substitute candidate into hole n.
 -- 2. Typecheck the patched file IN PLACE (restoring the original afterwards).
--- 3. If exit 0 → success; otherwise → type error (tolerating unsolved metas from
---    the file's other, still-open holes).
+-- 3. Exit 0 → ok.  A non-zero exit is ok only when 'onlyOpenHoleErrors' holds,
+--    i.e. every reported error is an open hole's @[UnsolvedInteractionMetas]@;
+--    a candidate that leaves @[UnsolvedMetaVariables]@ or
+--    @[UnsolvedConstraints]@ behind is a type error (issue #69).
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either Text FillResult)
 handleFillHole cfg params = do
   absPath <- makeAbsolute (fhFilePath params)
@@ -133,16 +137,15 @@ handleFillHole cfg params = do
           result <- runInPlace cfg absPath origBytes patched
           -- Agda 2.8.0 emits some errors on stdout; check both streams.
           let combined = arStdout result <> "\n" <> arStderr result
-              -- A non-zero exit is acceptable if the *only* errors are unsolved
-              -- interaction metas (from other holes we haven't filled yet).
-              -- This mirrors agent_bridge.py's _only_unsolved_metas logic.
-              onlyMetas = arExitCode result /= 0
-                       && "[UnsolvedInteractionMetas]" `T.isInfixOf` combined
-                       && not ("[GenericDocError]"      `T.isInfixOf` combined)
-                       && not ("[UnequalTerms]"         `T.isInfixOf` combined)
-                       && not ("[TypeMismatch]"          `T.isInfixOf` combined)
-                       && not ("[ModuleNameDoesntMatchFileName]" `T.isInfixOf` combined)
-              status = if arExitCode result == 0 || onlyMetas then FillOk else FillTypeError
+              -- Verdict (issue #69).  A non-zero exit is ok only when every
+              -- reported error is an open hole's [UnsolvedInteractionMetas];
+              -- 'onlyOpenHoleErrors' explains why this is a whitelist.  An
+              -- exit code of -1 means the agda binary could not be run at all.
+              status
+                | arExitCode result == 0      = FillOk
+                | arExitCode result == (-1)   = FillCrash
+                | onlyOpenHoleErrors combined = FillOk
+                | otherwise                   = FillTypeError
               msg    = if status == FillOk
                          then Nothing
                          else Just (T.take 2000 combined)
@@ -327,6 +330,46 @@ decodeError :: FilePath -> UnicodeException -> Text
 decodeError path err =
   "Could not decode " <> T.pack path <> " as UTF-8 (Agda source must be UTF-8): "
   <> T.pack (show err)
+
+
+-- | errorTagsOf: every bracketed error name in Agda's output, in order of
+-- appearance.  Agda (≥ 2.6.4) prints one @…: error: [TagName]@ header line per
+-- error; warning headers say @warning: [TagName]@ and are deliberately not
+-- collected — a warning never flips a fill verdict.
+errorTagsOf :: Text -> [Text]
+errorTagsOf out =
+  [ tag
+  | ln <- T.lines out
+  , let (_, rest) = T.breakOn marker ln
+  , not (T.null rest)
+  , let tag = T.takeWhile (/= ']') (T.drop (T.length marker) rest)
+  , not (T.null tag)
+  ]
+  where
+    marker = "error: ["
+
+-- | onlyOpenHoleErrors: does a failed typecheck fail /only/ because of open
+-- holes?
+--
+-- Interaction metas are always visible holes in the source — the file's other,
+-- still-open holes, or new sub-holes the candidate itself introduced (a
+-- successful refinement, per the tool contract).  So a non-zero exit is
+-- attributable to open holes exactly when every reported error is
+-- @[UnsolvedInteractionMetas]@.  Anything else — @[UnsolvedMetaVariables]@,
+-- @[UnsolvedConstraints]@, a scope or type error — is a defect the strict gate
+-- (@agda \<file\>@) would report, and calling it ok is the trust failure of
+-- issue #69: a candidate that "typechecks" per fill_hole yet fails the build.
+--
+-- This replaces an earlier tag /blacklist/, which reported ok whenever an open
+-- hole's interaction metas appeared alongside an unlisted error class (e.g.
+-- [UnsolvedMetaVariables] from an implicit nothing constrains).  As a
+-- whitelist, unrecognized error classes fail closed — including a failure
+-- whose output carries no parsable error header at all.
+onlyOpenHoleErrors :: Text -> Bool
+onlyOpenHoleErrors combined =
+  case errorTagsOf combined of
+    []   -> False
+    tags -> all (== "UnsolvedInteractionMetas") tags
 
 
 -- | parseDiagnostics: parse Agda stderr into a list of diagnostics.

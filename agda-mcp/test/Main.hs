@@ -46,7 +46,7 @@ import AgdaMCP.Agda
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
-  , ensureDebugImport, moduleNameOf )
+  , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
 import AgdaMCP.Types
@@ -248,6 +248,39 @@ pureTests = do
     , runTest "moduleNameOf: no header → Nothing" $
         assertEqual "name" Nothing
           (moduleNameOf (T.unlines [ "-- just a comment", "x = 1" ]))
+
+    -- fill_hole verdict classification (issue #69): whitelist, not blacklist.
+    , runTest "errorTagsOf: collects error names in order, skips warnings" $
+        assertEqual "tags" ["UnsolvedMetaVariables", "UnsolvedInteractionMetas"]
+          (errorTagsOf (T.unlines
+            [ "Checking M (/tmp/M.agda)."
+            , "/tmp/M.agda:11.5-17: error: [UnsolvedMetaVariables]"
+            , "Unsolved metas at the following locations:"
+            , "  /tmp/M.agda:11.5-17"
+            , "/tmp/M.agda:3.1-10: warning: [UnknownFixityInMixfixDecl]"
+            , "/tmp/M.agda:14.5-9: error: [UnsolvedInteractionMetas]"
+            ]))
+
+    , runTest "onlyOpenHoleErrors: only interaction metas → tolerated" $
+        assert "should tolerate" (onlyOpenHoleErrors (T.unlines
+          [ "/tmp/M.agda:14.5-9: error: [UnsolvedInteractionMetas]"
+          , "Unsolved interaction metas at the following locations:"
+          , "  /tmp/M.agda:14.5-9"
+          ]))
+
+    , runTest "onlyOpenHoleErrors: candidate-left metas are NOT tolerated (#69)" $
+        assert "should not tolerate" (not (onlyOpenHoleErrors (T.unlines
+          [ "/tmp/M.agda:11.5-17: error: [UnsolvedMetaVariables]"
+          , "/tmp/M.agda:14.5-9: error: [UnsolvedInteractionMetas]"
+          ])))
+
+    , runTest "onlyOpenHoleErrors: a type error is NOT tolerated" $
+        assert "should not tolerate" (not (onlyOpenHoleErrors
+          "/tmp/M.agda:7.9-11: error: [UnequalTerms]"))
+
+    , runTest "onlyOpenHoleErrors: unparsable failure output fails closed" $
+        assert "should not tolerate" (not (onlyOpenHoleErrors
+          "agda: internal panic, no error header here"))
     ]
 
 
@@ -488,7 +521,8 @@ integrationTests cfg fixturePath repoRoot = do
             assert "should report at least 1 hole" (not . null $ drHoles dr)
     ]
   hier <- hierIntegrationTests cfg repoRoot
-  pure (base <> hier)
+  verdict <- fillVerdictTests cfg
+  pure (base <> hier <> verdict)
 
 
 -- | hierIntegrationTests: issue #66 regression.
@@ -559,6 +593,82 @@ hierIntegrationTests cfg repoRoot = do
       restored <- runTest "get_goal/fill_hole restore the source file exactly" $
         assert "file should be byte-for-byte unchanged after in-place tools"
                (before == after)
+      pure (results <> [restored])
+
+
+-- | fillVerdictTests: issue #69 regression.
+--
+-- A candidate that typechecks but leaves an unsolved implicit meta must be a
+-- type_error, not ok — the old tag blacklist reported ok whenever the other
+-- open hole's [UnsolvedInteractionMetas] appeared alongside an unlisted error
+-- class.  The fixture's @implicitOnly : {n : Nat} → Nat@ leaves @_n@ unsolved
+-- when used bare, which is exactly the FLRP "implicits under a defined
+-- function" pattern from the field report (docs/feedback/, § 7.2.2).  The
+-- companion cases pin the tolerance that must survive: a well-typed candidate
+-- with another hole still open, and a candidate that introduces its own
+-- sub-hole (a refinement).
+fillVerdictTests :: AgdaConfig -> IO [Bool]
+fillVerdictTests cfg = do
+  let fixture = "test" </> "resources" </> "TwoHoles.agda"
+  exists <- doesFileExist fixture
+  if not exists
+    then do
+      hPutStrLn stderr $ "\n  [skip] fixture not found: " <> fixture
+      pure []
+    else do
+      hPutStrLn stderr
+        "\n── Integration tests (tier 2c: fill_hole verdict, #69) ──"
+      before <- BS.readFile fixture
+      results <- sequence
+        [ runTest "fill_hole: candidate leaving an unsolved meta is a type error" $ do
+            let params = FillHoleParams
+                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "implicitOnly" }
+            result <- handleFillHole cfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack err)
+              Right fr -> do
+                r1 <- assertEqual "status" FillTypeError (frStatus fr)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> assert "message should name the unsolved metas"
+                    (maybe False ("UnsolvedMetaVariables" `T.isInfixOf`) (frMessage fr))
+
+        , runTest "fill_hole: well-typed candidate with another hole open stays ok" $ do
+            let params = FillHoleParams
+                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "zero" }
+            result <- handleFillHole cfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> assertEqual "status" FillOk (frStatus fr)
+
+        , runTest "fill_hole: candidate introducing a new sub-hole stays ok" $ do
+            let params = FillHoleParams
+                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc {!!}" }
+            result <- handleFillHole cfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> assertEqual "status" FillOk (frStatus fr)
+
+        -- Pins the documented tolerance/tracking asymmetry: a `?` sub-hole is
+        -- excused by the verdict (Agda reports it as an interaction meta) but
+        -- remainingHoles counts only literal {!!} tokens — here just hole h.
+        -- Issue #71 will widen tracking to the full hole syntax.
+        , runTest "fill_hole: a '?' sub-hole is tolerated but not counted" $ do
+            let params = FillHoleParams
+                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc ?" }
+            result <- handleFillHole cfg params
+            case result of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> do
+                r1 <- assertEqual "status" FillOk (frStatus fr)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> assertEqual "remainingHoles counts only literal {!!} tokens"
+                              (Just 1) (frRemainingHoles fr)
+        ]
+      after <- BS.readFile fixture
+      restored <- runTest "fill_hole verdict tests restore the fixture exactly" $
+        assert "file should be byte-for-byte unchanged" (before == after)
       pure (results <> [restored])
 
 
