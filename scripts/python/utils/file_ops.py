@@ -1,6 +1,12 @@
-# utils/file_ops.py
 """
-Provides pure, functional wrappers for file system operations.
+File: scripts/python/utils/file_ops.py
+
+Description:
+  Provides pure, functional wrappers for file system operations.
+
+Provenance:
+  Upstream of the adapted copies in ualib/agda-algebras and
+  williamdemeo/williamdemeo.github.io (scripts/python/_utils/).
 """
 from __future__ import annotations
 import json
@@ -8,12 +14,7 @@ import shutil
 from pathlib import Path
 from typing import List, Dict
 
-# Add path for our functional imports
-current_dir = Path(__file__).parent.parent
-if str(current_dir) not in __import__('sys').path:
-    __import__('sys').path.insert(0, str(current_dir))
-
-from utils.pipeline_types import Result, PipelineError, ErrorType, FileMetadata
+from .pipeline_types import Result, PipelineError, ErrorType, FileMetadata
 
 def ensure_dir_exists(path: Path) -> Result[Path, PipelineError]:
     """Pure function: Creates a directory if it doesn't exist."""

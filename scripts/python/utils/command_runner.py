@@ -1,6 +1,12 @@
-# utils/command_runner.py
 """
-Functional command execution utilities for the build pipeline.
+File: scripts/python/utils/command_runner.py
+
+Description:
+  Functional command execution utilities for the build pipeline.
+
+Provenance:
+  Upstream of the adapted copies in ualib/agda-algebras and
+  williamdemeo/williamdemeo.github.io (scripts/python/_utils/).
 """
 from __future__ import annotations
 import subprocess
@@ -8,12 +14,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-# Add path for our functional imports
-current_dir = Path(__file__).parent.parent
-if str(current_dir) not in __import__('sys').path:
-    __import__('sys').path.insert(0, str(current_dir))
-
-from utils.pipeline_types import Result, PipelineError, ErrorType
+from .pipeline_types import Result, PipelineError, ErrorType
 
 def run_command(
     command: List[str],

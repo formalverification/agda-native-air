@@ -1,9 +1,15 @@
-# utils/__init__.py
 """
-Utility modules for functional programming and mathematical pipeline operations.
+File: scripts/python/utils/__init__.py
 
-This package provides the mathematical foundations for the documentation build pipeline,
-including immutable data structures, functional error handling, and pure transformations.
+Description:
+  Utility modules for functional programming and mathematical pipeline operations.
+
+  This package provides the mathematical foundations for the documentation build pipeline,
+  including immutable data structures, functional error handling, and pure transformations.
+
+Provenance:
+  Upstream of the adapted copies in ualib/agda-algebras and
+  williamdemeo/williamdemeo.github.io (scripts/python/_utils/).
 """
 
 from .pipeline_types import (

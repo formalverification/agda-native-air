@@ -1,6 +1,12 @@
-# utils/text_processing.py
 """
-Pure text processing utilities for the documentation pipeline.
+File: scripts/python/utils/text_processing.py
+
+Description:
+  Pure text processing utilities for the documentation pipeline.
+
+Provenance:
+  Upstream of the adapted copies in ualib/agda-algebras and
+  williamdemeo/williamdemeo.github.io (scripts/python/_utils/).
 """
 import re
 import logging
