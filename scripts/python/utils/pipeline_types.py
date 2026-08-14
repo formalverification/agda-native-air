@@ -1,16 +1,21 @@
-# utils/pipeline_types.py
 """
-Types for the documentation build pipeline.
+File: scripts/python/utils/pipeline_types.py
 
-This module provides functional programming primitives and immutable data structures
-that make the pipeline more functional, robust, and predictable.
+Description: Types for the documentation build pipeline.
 
-Design principles:
-- Immutable data structures everywhere
-- Functional error handling with Result types
-- Algebraic data types for domain modeling
-- Pure transformations between states
-- Composable operations
+  This module provides functional programming primitives and immutable data structures
+  that make the pipeline more functional, robust, and predictable.
+
+Design Principles:
+  - Immutable data structures everywhere
+  - Functional error handling with Result types
+  - Algebraic data types for domain modeling
+  - Pure transformations between states
+  - Composable operations
+
+Provenance:
+  Upstream of the adapted copies in ualib/agda-algebras and
+  williamdemeo/williamdemeo.github.io (scripts/python/_utils/).
 """
 
 from __future__ import annotations
@@ -61,9 +66,9 @@ class Result(Generic[T, E]):
 
     @classmethod
     def err(cls, error: E) -> Result[T, E]:
-        if error is None:  # prevent creating error with None value
-            raise ValueError("Cannot create an Err result with a None value. Errors must be non-null.")
         """Construct a failed result."""
+        if error is None:
+            raise ValueError("Cannot create an Err result with a None value. Errors must be non-null.")
         return cls(_is_ok=False, _value=None, _error=error)
 
     @property
