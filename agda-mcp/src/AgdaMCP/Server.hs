@@ -133,7 +133,10 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
 
     proofStateTools =
       [ toolDef "get_goal"
-          ("Inspect the goal type and local context at a hole. " <> holeModel)
+          ("Inspect the goal type and local context at a hole."
+           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
+           <> " On timeout this returns an error naming the bound, since no goal was reported. "
+           <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
           , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
           ]
@@ -146,7 +149,10 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            \from open holes — the file's other holes, or new sub-holes \
            \inside the candidate; a candidate that leaves unsolved metas or \
            \constraints behind is a type_error. holeIndex and remainingHoles \
-           \cover every hole syntax. " <> holeModel)
+           \cover every hole syntax."
+           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
+           <> " On timeout the status is \"timeout\" (not type_error — the candidate was never judged) with a message naming the bound; the source file is restored either way. "
+           <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
           , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
           , prop "candidate" "string" "The candidate proof term to try."
@@ -154,14 +160,20 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           ["filePath", "holeIndex", "candidate"]
 
       , toolDef "check_file"
-          ("Load/reload an Agda file and return all diagnostics. " <> holeModel)
+          ("Load/reload an Agda file and return all diagnostics."
+           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
+           <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
+           <> holeModel)
           [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
           ]
           ["filePath"]
 
       , toolDef "get_diagnostics"
           ("Retrieve diagnostic summary: error/warning counts, and each open \
-           \hole's index and (line, col) position. " <> holeModel)
+           \hole's index and (line, col) position."
+           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
+           <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
+           <> holeModel)
           [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
           ]
           ["filePath"]
@@ -190,6 +202,21 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
               ["name"]
           ]
       | otherwise = []
+
+-- | latencyNote: the shared latency/timeout sentence appended to every
+-- proof-state tool description.
+--
+-- Agents plan around a tool's advertised cost, so the cold-subprocess model has
+-- to be stated where they will read it: each call is a fresh @agda@ process, and
+-- the only warmth available comes from Agda's own @.agdai@ interface files, not
+-- from any caching in this server.  @checkedFromSource@ in the response says
+-- which of the two happened on that call.
+latencyNote :: Text
+latencyNote =
+  "each call spawns a cold agda subprocess (no warm session), so a first check of a"
+  <> " large library builds its .agdai interfaces and can take minutes, while later"
+  <> " calls that reuse those interfaces are far faster."
+  <> " Calls are bounded by the server's --timeout (default 300s)."
 
 -- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value

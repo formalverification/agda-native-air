@@ -15,6 +15,16 @@
 --   * check_file      - load/reload a file and return all diagnostics
 --   * get_diagnostics - lightweight summary (hole count, error count)
 --
+--   Design note — every call is bounded and timed (issue #77).
+--     Each tool spawns a cold @agda@ subprocess, bounded by 'AgdaConfig''s
+--     @agdaTimeout@.  When that bound is hit the subprocess (and its process
+--     group) is killed and the tool reports the timeout in its own vocabulary:
+--     fill_hole as @status: "timeout"@, check_file and get_diagnostics as
+--     @success: false@ with an explanatory error diagnostic, get_goal as a Left
+--     naming the bound.  Every response also carries @elapsedMs@ and
+--     @checkedFromSource@, so an agent can distinguish a slow cold call that
+--     built @.agdai@ interfaces from a genuinely slow one.
+--
 --   Design note — all four tools typecheck the file IN PLACE.
 --     Agda decides a module's name from where its file sits relative to the include
 --     path, so a module embedded in a library at a hierarchical path (e.g. FLRP.Bridge
@@ -58,8 +68,8 @@ import System.Directory (makeAbsolute)
 import System.FilePath (takeDirectory)
 
 import AgdaMCP.Agda
-  ( AgdaConfig, AgdaResult (..), agdaFlags, debugLog, reportExpr
-  , parseGoalContext, runAgda
+  ( AgdaConfig, AgdaResult (..), agdaFlags, checkedFromSourceOf, debugLog
+  , parseGoalContext, reportExpr, runAgda, timeoutMessage
   )
 import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
@@ -98,22 +108,33 @@ handleGetGoal cfg params = do
           result <- runInPlace cfg absPath origBytes patched
           -- DEBUG: show what Agda actually returned
           debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
+            <> " timedOut=" <> T.pack (show (arTimedOut result))
+            <> " elapsedMs=" <> T.pack (show (arElapsedMs result))
           debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
           debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
           -- Agda may emit markers on stdout or stderr; check both.
           let combined = arStdout result <> "\n" <> arStderr result
-          case parseGoalContext combined of
-            Nothing -> pure . Left $
-              "Could not parse goal/context markers from Agda output.\n"
-              <> "output:\n" <> T.take 2000 combined
-            Just (goal, ctx) ->
-              pure . Right $ GoalInfo
-                { giGoal    = goal
-                , giContext = ctx
-                -- The declared module name (e.g. FLRP.Bridge), parsed from the
-                -- header — not the file's base name.
-                , giModule  = moduleNameOf src
-                }
+          if arTimedOut result
+            -- A timeout is reported as such rather than as "could not parse
+            -- markers": the markers are missing because Agda was killed, and
+            -- saying so is what tells the caller to raise the bound.
+            then pure . Left $
+              timeoutMessage cfg <> "; no goal was reported for hole "
+              <> T.pack (show (ggHoleIndex params)) <> " in " <> T.pack absPath
+            else case parseGoalContext combined of
+              Nothing -> pure . Left $
+                "Could not parse goal/context markers from Agda output.\n"
+                <> "output:\n" <> T.take 2000 combined
+              Just (goal, ctx) ->
+                pure . Right $ GoalInfo
+                  { giGoal    = goal
+                  , giContext = ctx
+                  -- The declared module name (e.g. FLRP.Bridge), parsed from the
+                  -- header — not the file's base name.
+                  , giModule  = moduleNameOf src
+                  , giElapsedMs         = Just (arElapsedMs result)
+                  , giCheckedFromSource = Just (checkedFromSourceOf combined)
+                  }
 
 
 -- ---------------------------------------------------------------------------
@@ -143,18 +164,24 @@ handleFillHole cfg params = do
           result <- runInPlace cfg absPath origBytes patched
           -- Agda 2.8.0 emits some errors on stdout; check both streams.
           let combined = arStdout result <> "\n" <> arStderr result
-              -- Verdict (issue #69).  A non-zero exit is ok only when every
-              -- reported error is an open hole's [UnsolvedInteractionMetas];
-              -- 'onlyOpenHoleErrors' explains why this is a whitelist.  An
-              -- exit code of -1 means the agda binary could not be run at all.
+              -- Verdict (issues #69, #77).  The timeout arm comes first: a killed
+              -- process exits on its signal (-2 SIGINT, -15 SIGTERM), which is
+              -- otherwise indistinguishable from an ordinary failure, and calling
+              -- an unfinished typecheck a type_error would be a false verdict.
+              -- Below it, a non-zero exit is ok only when every reported error is
+              -- an open hole's [UnsolvedInteractionMetas]; 'onlyOpenHoleErrors'
+              -- explains why this is a whitelist.  An exit code of -1 means the
+              -- agda binary could not be run at all.
               status
+                | arTimedOut result           = FillTimeout
                 | arExitCode result == 0      = FillOk
                 | arExitCode result == (-1)   = FillCrash
                 | onlyOpenHoleErrors combined = FillOk
                 | otherwise                   = FillTypeError
-              msg    = if status == FillOk
-                         then Nothing
-                         else Just (T.take 2000 combined)
+              msg
+                | arTimedOut result = Just (timeoutMessage cfg)
+                | status == FillOk  = Nothing
+                | otherwise         = Just (T.take 2000 combined)
               -- Count remaining holes (every Agda hole syntax, code regions
               -- only) in the patched source after substitution.
               remainingHoles = length (findHoles (flavourOf absPath) patched)
@@ -163,6 +190,8 @@ handleFillHole cfg params = do
             , frCandidate = fhCandidate params
             , frMessage   = msg
             , frRemainingHoles = Just remainingHoles
+            , frElapsedMs = arElapsedMs result
+            , frCheckedFromSource = checkedFromSourceOf combined
             }
 
 
@@ -179,13 +208,21 @@ handleCheckFile cfg params = do
       cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
   result <- runAgda cfgWithDir absPath
   let combined = arStdout result <> "\n" <> arStderr result
-      diags   = parseDiagnostics combined
+      -- On a timeout the parsed diagnostics describe only what Agda managed to
+      -- print before it was killed, so the timeout itself is prepended as an
+      -- error.  Without it the response would be an empty diagnostics list next
+      -- to success:false — accurate but unactionable.
+      diags   = [ timeoutDiagnostic cfg | arTimedOut result ]
+                  <> parseDiagnostics combined
       nHoles  = length (findHoles (flavourOf absPath) src)
-      success = arExitCode result == 0
+      success = arExitCode result == 0 && not (arTimedOut result)
   pure . Right $ FileCheckResult
     { fcrSuccess     = success
     , fcrDiagnostics = diags
     , fcrHolesCount  = nHoles
+    , fcrTimedOut    = arTimedOut result
+    , fcrElapsedMs   = arElapsedMs result
+    , fcrCheckedFromSource = checkedFromSourceOf combined
     }
 
 
@@ -206,7 +243,11 @@ handleGetDiagnostics cfg params = do
       cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
   result <- runAgda cfgWithDir absPath
   let combined = arStdout result <> "\n" <> arStderr result
-      diags    = parseDiagnostics combined
+      -- As in check_file: a timeout is itself an error diagnostic, so it lands in
+      -- both the list and the error count rather than vanishing into a summary
+      -- that reads "0 errors" because Agda never finished reporting any.
+      diags    = [ timeoutDiagnostic cfg | arTimedOut result ]
+                   <> parseDiagnostics combined
       nErrors  = length [() | Diagnostic DiagError _ _ _ <- diags]
       nWarns   = length [() | Diagnostic DiagWarning _ _ _ <- diags]
       holes    = findHoles (flavourOf absPath) src
@@ -223,6 +264,11 @@ handleGetDiagnostics cfg params = do
     , drErrors   = nErrors
     , drWarnings = nWarns
     , drHoles    = holeInfo
+    , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
+    , drDiagnostics = diags
+    , drTimedOut = arTimedOut result
+    , drElapsedMs = arElapsedMs result
+    , drCheckedFromSource = checkedFromSourceOf combined
     }
 
 
@@ -242,6 +288,13 @@ handleGetDiagnostics cfg params = do
 -- what lets hierarchically-named library modules resolve — see the module header and
 -- issue #66.
 --
+-- The timeout path restores exactly like every other path, and by construction
+-- rather than by luck: 'AgdaMCP.Agda.runAgda' reports a timeout as a /value/
+-- ('arTimedOut') after it has killed and reaped the subprocess, so it returns
+-- normally and 'bracket_' runs its restore action the same way it does after a
+-- clean typecheck.  A timed-out @fill_hole@ therefore leaves the fixture
+-- byte-identical (issue #77); the test suite pins this.
+--
 -- Only the file's /contents/ are restored, not its modification time: the restore write
 -- deliberately leaves a fresh mtime.  That is intentional — a newer mtime forces Agda to
 -- re-typecheck from the restored source on its next load under any interface-freshness
@@ -257,6 +310,18 @@ runInPlace cfg absPath originalBytes patched =
     (runAgda cfgInPlace absPath)
   where
     cfgInPlace = cfg { agdaFlags = agdaFlags cfg <> ["-i", takeDirectory absPath] }
+
+
+-- | timeoutDiagnostic: the timeout rendered as an ordinary error diagnostic, so
+-- callers that already walk @diagnostics@ see it without special-casing the
+-- @timedOut@ flag.
+timeoutDiagnostic :: AgdaConfig -> Diagnostic
+timeoutDiagnostic cfg = Diagnostic
+  { diagSeverity = DiagError
+  , diagMessage  = timeoutMessage cfg
+  , diagLine     = Nothing
+  , diagCol      = Nothing
+  }
 
 
 -- | ensureDebugImport: ensure @open import AgdaDojang.Debug@ is in scope at the top
