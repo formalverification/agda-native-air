@@ -119,30 +119,49 @@ mkError reqId code msg = object
 toolDefinitions :: ServerConfig -> Value
 toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
   where
+    -- The hole model shared by all four tool descriptions (issues #71/#73):
+    -- every Agda hole syntax is enumerated, comments and prose never count,
+    -- and positions/indices are coordinates in the file as written.
+    holeModel =
+      "Holes are enumerated in source order across every Agda hole syntax \
+      \({!!}, {! ... !} with nesting, and standalone ?); tokens inside \
+      \comments, string literals, or literate prose are never holes. \
+      \Literate flavours (.lagda, .lagda.tex, .lagda.md, .lagda.typ, \
+      \.lagda.rst, .lagda.org, .lagda.tree) are recognized by extension and \
+      \scanned in their code regions only, with positions reported in \
+      \literate-file coordinates."
+
     proofStateTools =
       [ toolDef "get_goal"
-          "Inspect the goal type and local context at a hole."
+          ("Inspect the goal type and local context at a hole. " <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
-          , prop "holeIndex" "integer" "0-based index of the {!!} hole."
+          , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
           ]
           ["filePath", "holeIndex"]
 
       , toolDef "fill_hole"
-          "Substitute a candidate term into a hole and typecheck. Returns ok only if the file then passes batch agda, tolerating only [UnsolvedInteractionMetas] from open holes — the file's other holes, or new sub-holes inside the candidate, in any hole syntax; a candidate that leaves unsolved metas or constraints behind is a type_error. Note: holeIndex and remainingHoles track only literal {!!} holes, so ? and {! ... !} holes are tolerated by the verdict but not counted or addressable (see issue #71)."
+          ("Substitute a candidate term into a hole (replacing the hole's \
+           \actual span) and typecheck. Returns ok only if the file then \
+           \passes batch agda, tolerating only [UnsolvedInteractionMetas] \
+           \from open holes — the file's other holes, or new sub-holes \
+           \inside the candidate; a candidate that leaves unsolved metas or \
+           \constraints behind is a type_error. holeIndex and remainingHoles \
+           \cover every hole syntax. " <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
-          , prop "holeIndex" "integer" "0-based index of the {!!} hole."
+          , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
           , prop "candidate" "string" "The candidate proof term to try."
           ]
           ["filePath", "holeIndex", "candidate"]
 
       , toolDef "check_file"
-          "Load/reload an Agda file and return all diagnostics."
+          ("Load/reload an Agda file and return all diagnostics. " <> holeModel)
           [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
           ]
           ["filePath"]
 
       , toolDef "get_diagnostics"
-          "Retrieve diagnostic summary: error/warning counts, open holes."
+          ("Retrieve diagnostic summary: error/warning counts, and each open \
+           \hole's index and (line, col) position. " <> holeModel)
           [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
           ]
           ["filePath"]

@@ -1,0 +1,19 @@
+# LiterateOrg.lagda.org
+# File: agda-native-air/agda-mcp/test/resources/LiterateOrg.lagda.org
+# Regression fixture for issues #71/#73 (Org literate flavour): prose above
+# and below the source block carries decoy hole tokens that must never be
+# counted.
+
+Prose above the code with decoy hole tokens: {!!} and {! zero !} and a
+lone ? that must never be counted.
+
+#+begin_src agda2
+module LiterateOrg where
+
+open import Agda.Builtin.Nat
+
+n : Nat
+n = {! zero !}
+#+end_src
+
+Prose below the hole with another decoy {!!} token.

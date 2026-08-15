@@ -98,7 +98,16 @@ This is the minimum tooling required for an agent to do interactive proof develo
 | `get_goal`         | Inspect the goal type and local context at a hole. |
 | `fill_hole`        | Substitute a candidate term into a hole and typecheck. |
 | `check_file`       | Load/reload an Agda file and return all diagnostics. |
-| `get_diagnostics`  | Lightweight summary: error/warning counts, open holes. |
+| `get_diagnostics`  | Lightweight summary: error/warning counts, open holes with positions. |
+
+### The hole model (issues #71 and #73)
+
+All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` and kept in sync with what Agda itself reports:
+
++  Every Agda hole syntax is recognized: `{!!}`, `{! ... !}` (with nesting), and standalone `?` — where `?` counts only as a lexically separate token, so names like `op?` or `_≟_` never match.
++  Tokens inside comments (`--` lines, nested `{- ... -}` blocks), pragmas, string/character literals, and literate prose are never holes.
++  Literate files are recognized by extension — `.lagda` / `.lagda.tex`, `.lagda.md` / `.lagda.typ`, `.lagda.rst`, `.lagda.org`, and `.lagda.tree` — and only their code regions are scanned, following the code-block rules of Agda 2.8.0's own literate preprocessor.
++  `holeIndex` addresses holes in source order under this model, and all reported positions are 1-based (line, col) coordinates in the file as written — literate-file coordinates for literate sources, matching what an editor or Agda's error messages show.
 
 ### Corpus-backed search tools (Milestone 1 — [M1-3])
 
@@ -151,6 +160,7 @@ agda-mcp/
 │       ├── Server.hs            ← MCP stdio transport (JSON-RPC)
 │       ├── Types.hs             ← Stable JSON schema types
 │       ├── Agda.hs              ← Agda subprocess interaction + marker parsing
+│       ├── Holes.hs             ← The hole model: literate masking + lexical hole scan
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
 │       └── Tools/
 │           ├── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
@@ -218,7 +228,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 }
 ```
 
-**How it works**.  Substitutes the candidate into the hole, typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating only the `[UnsolvedInteractionMetas]` of the file's other open holes, or of new sub-holes inside the candidate — or the type error.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` behind is reported as a type error (issue #69).  Hole *tracking* is narrower than hole *tolerance*: `holeIndex` and `remainingHoles` count only literal `{!!}` tokens, so a `?` or `{! ... !}` sub-hole introduced by the candidate is tolerated by the verdict but not counted or addressable until issue #71 lands.  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
+**How it works**.  Substitutes the candidate over the hole's actual span (four characters for `{!!}`, one for `?`, arbitrary for `{! e !}`), typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating only the `[UnsolvedInteractionMetas]` of the file's other open holes, or of new sub-holes inside the candidate — or the type error.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` behind is reported as a type error (issue #69).  Hole *tracking* matches hole *tolerance* (issue #71): `holeIndex` and `remainingHoles` cover every hole syntax, so a `?` or `{! ... !}` sub-hole introduced by the candidate is counted and addressable like any other hole.  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
 
 #### `check_file`
 
@@ -259,9 +269,11 @@ Retrieve the current diagnostic state without reloading: error count, warning co
   "filePath": "/path/to/Fixture01.agda",
   "errors": 0,
   "warnings": 1,
-  "holes": [{"goal": "?", "context": []}]
+  "holes": [{"index": 0, "line": 7, "col": 8, "goal": "?"}]
 }
  ```
+
+Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.
 
 ### Corpus-backed search tools (Milestone 1 — [M1-3])
 

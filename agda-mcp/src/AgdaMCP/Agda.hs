@@ -6,10 +6,10 @@
 --   Agda subprocess interaction layer.
 --
 --   This module provides pure and IO functions for:
---   1. Finding {!!} holes in Agda source text.
---   2. Injecting the reportGoalCtx macro to extract (goal, context).
---   3. Parsing AGDADOJANG marker output from Agda's stderr.
---   4. Substituting candidate terms into holes and running Agda to typecheck.
+--   1. Parsing AGDADOJANG marker output from Agda's stderr.
+--   2. Running the Agda binary to typecheck a file.
+--
+--   Hole enumeration and splicing live in AgdaMCP.Holes (issues #71/#73).
 --
 --   It is a Haskell port of the essential logic in legacy Python tools:
 --     agda-dojang/python/tools/agent_bridge.py
@@ -29,12 +29,6 @@ module AgdaMCP.Agda
   , defaultConfig
     -- * Debug output
   , debugLog
-    -- * Hole operations (pure)
-  , HoleSpan (..)
-  , findHoles
-  , findNthHole
-  , injectReportExpr
-  , substituteHole
     -- * Marker parsing (pure)
   , parseGoalContext
     -- * Agda subprocess (IO)
@@ -81,60 +75,6 @@ debugLog :: AgdaConfig -> Text -> IO ()
 debugLog cfg msg
   | agdaVerbose cfg = TIO.hPutStrLn stderr msg
   | otherwise       = pure ()
-
-
--- ---------------------------------------------------------------------------
--- Hole finding (pure)
--- ---------------------------------------------------------------------------
-
--- | A located hole token in source text.
-data HoleSpan = HoleSpan
-  { hsStart :: Int    -- ^ 0-based character offset (Text index) of '{' in "{!!}".
-  , hsEnd   :: Int    -- ^ 0-based character offset (Text index) one past '}'.
-  , hsLine  :: Int    -- ^ 1-based line number.
-  , hsCol   :: Int    -- ^ 1-based column number.
-  } deriving (Eq, Show)
-
-holeToken :: Text
-holeToken = "{!!}"
-
--- | Find all @{!!}@ holes in source text, in order.
-findHoles :: Text -> [HoleSpan]
-findHoles src = go 0 1 1 src
-  where
-    go !off !ln !col txt
-      | T.null txt = []
-      | Just rest <- T.stripPrefix holeToken txt =
-          let span' = HoleSpan off (off + 4) ln col
-          in  span' : go (off + 4) ln (col + 4) rest
-      | T.head txt == '\n' =
-          go (off + 1) (ln + 1) 1 (T.tail txt)
-      | otherwise =
-          go (off + 1) ln (col + 1) (T.tail txt)
-
--- | Find the n-th hole (0-indexed) in source text.
-findNthHole :: Int -> Text -> Maybe HoleSpan
-findNthHole n src
-  | n < 0     = Nothing
-  | otherwise = let holes = findHoles src
-                in  if n < length holes then Just (holes !! n) else Nothing
-
--- | Replace the n-th hole with the reporting expression (e.g. "reportGoalCtx ?").
-injectReportExpr :: AgdaConfig -> Int -> Text -> Maybe Text
-injectReportExpr cfg n src = do
-  hole <- findNthHole n src
-  let (before, rest) = T.splitAt (hsStart hole) src
-      after          = T.drop 4 rest  -- drop "{!!}"
-      replacement    = reportExpr cfg <> " ?"
-  pure $ before <> replacement <> after
-
--- | Replace the n-th hole with a candidate term.
-substituteHole :: Int -> Text -> Text -> Maybe Text
-substituteHole n candidate src = do
-  hole <- findNthHole n src
-  let (before, rest) = T.splitAt (hsStart hole) src
-      after          = T.drop 4 rest  -- drop "{!!}"
-  pure $ before <> candidate <> after
 
 
 -- ---------------------------------------------------------------------------
