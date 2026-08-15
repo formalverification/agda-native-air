@@ -95,6 +95,24 @@ assertEqual label expected actual
   | otherwise = pure . Fail $
       label <> ": expected " <> show expected <> ", got " <> show actual
 
+-- | failureText: flatten a structured 'ToolFailure' to its message, for test
+-- diagnostics that only want the prose.
+failureText :: ToolFailure -> Text
+failureText (FailMessage m)  = m
+failureText (FailTimeout tf) = tfMessage tf
+
+-- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
+-- tests — exit code, timed-out flag, and stdout, with the fields the signal
+-- never reads left inert.
+fakeResult :: Int -> Bool -> Text -> AgdaResult
+fakeResult ec timedOut out = AgdaResult
+  { arExitCode  = ec
+  , arStdout    = out
+  , arStderr    = ""
+  , arTimedOut  = timedOut
+  , arElapsedMs = 0
+  }
+
 
 -- ---------------------------------------------------------------------------
 -- Fixture source texts
@@ -300,28 +318,49 @@ pureTests = do
         assert "should not tolerate" (not (onlyOpenHoleErrors
           "agda: internal panic, no error header here"))
 
-    -- checkedFromSourceOf: the coarse cache signal (issue #77).  Agda announces
-    -- the two cases distinctly, and telling them apart is what explains a call
-    -- that took three minutes once and 200 ms the next time.
+    -- checkedFromSourceOf: the coarse cache signal (issue #77).  A @Checking@
+    -- line is positive evidence of a source re-check; a run that completed
+    -- successfully in silence is the interface-reuse signature (a warm Agda
+    -- 2.8.0 prints nothing at default verbosity); and a run that died without
+    -- producing evidence either way is unknown — a Copilot review catch on
+    -- PR #89: defaulting that case to False would misread a killed cold call
+    -- as a warm one.
     , runTest "checkedFromSourceOf: a 'Checking' line means a source re-check" $
-        assert "should be True" (checkedFromSourceOf (T.unlines
-          [ "Checking Algebras.Basic (/lib/Algebras/Basic.agda)."
-          , "Finished Algebras.Basic."
-          ]))
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf (fakeResult 0 False (T.unlines
+            [ "Checking Algebras.Basic (/lib/Algebras/Basic.agda)."
+            , "Finished Algebras.Basic."
+            ])))
 
-    , runTest "checkedFromSourceOf: only 'Loading' lines means interfaces were reused" $
-        assert "should be False" (not (checkedFromSourceOf (T.unlines
-          [ "Loading Algebras.Basic (/lib/_build/Algebras/Basic.agdai)."
-          , "Loading Homomorphisms.Basic (/lib/_build/Homomorphisms/Basic.agdai)."
-          ])))
+    , runTest "checkedFromSourceOf: a failed run that reached 'Checking' still counts" $
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf (fakeResult 42 False
+            "Checking Broken (/x/Broken.agda).\nerror: [MissingTypeSignature]"))
+
+    , runTest "checkedFromSourceOf: silent success is the interface-reuse signature" $
+        assertEqual "signal" (Just False)
+          (checkedFromSourceOf (fakeResult 0 False ""))
+
+    , runTest "checkedFromSourceOf: 'Loading' lines (verbose runs) also read as reuse" $
+        assertEqual "signal" (Just False)
+          (checkedFromSourceOf (fakeResult 42 False (T.unlines
+            [ "Loading Algebras.Basic (/lib/_build/Algebras/Basic.agdai)."
+            , "Loading Homomorphisms.Basic (/lib/_build/Homomorphisms/Basic.agdai)."
+            ])))
 
     , runTest "checkedFromSourceOf: indented 'Checking' still counts" $
-        assert "should be True"
-          (checkedFromSourceOf "  Checking Proofs.Use (/lib/src/Proofs/Use.agda).")
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf (fakeResult 0 False
+            "  Checking Proofs.Use (/lib/src/Proofs/Use.agda)."))
 
-    , runTest "checkedFromSourceOf: no evidence reads as False, not as a guess" $
-        assert "should be False"
-          (not (checkedFromSourceOf "agda: some unrelated failure"))
+    , runTest "checkedFromSourceOf: a failure with no evidence is unknown, not a guess" $
+        assertEqual "signal" Nothing
+          (checkedFromSourceOf (fakeResult 42 False
+            "error: [LibraryError]\nLibrary 'agda-dojang' not found."))
+
+    , runTest "checkedFromSourceOf: a timeout before any output is unknown, not warm" $
+        assertEqual "signal" Nothing
+          (checkedFromSourceOf (fakeResult (-15) True ""))
 
     -- The default bound is enforced now (issue #77), so its value is a real
     -- decision: a cold agda-algebras call builds .agdai interfaces and takes
@@ -739,9 +778,11 @@ timeoutTests = do
 
         , runTest "runAgda: output written before the kill is still captured" $
             -- Proves partial output survives, and that the cache signal is
-            -- derived from what the process actually printed.
+            -- derived from what the process actually printed: the fake echoes
+            -- its "Checking" line before sleeping, so even this killed run
+            -- carries positive evidence of a source re-check.
             assert ("stdout was " <> show (arStdout slow))
-              (checkedFromSourceOf (arStdout slow))
+              (checkedFromSourceOf slow == Just True)
         ]
 
       -- Outwait the fake's own sleep.  If the subprocess had merely been
@@ -789,6 +830,28 @@ timeoutTests = do
                    (before == after)
         ]
 
+      -- get_goal is the one tool whose timeout cannot ride inside a
+      -- success-shaped response, so its failure must be the structured kind
+      -- that still carries the call's measurements (a Copilot review catch on
+      -- PR #89: a plain error string dropped elapsedMs on the floor).
+      gg <- handleGetGoal slowCfg GetGoalParams
+        { ggFilePath  = timeoutFixturePath
+        , ggHoleIndex = 0
+        }
+      resultsGoal <- sequence
+        [ runTest "get_goal: a timeout is a structured failure carrying elapsedMs" $
+            case gg of
+              Right gi -> pure (Fail $ "expected a timeout failure, got a goal: " <> show gi)
+              Left (FailMessage m) ->
+                pure (Fail $ "expected FailTimeout, got FailMessage: " <> T.unpack m)
+              Left (FailTimeout tf) -> do
+                r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> assert ("message was " <> show (tfMessage tf))
+                              ("timed out after 1s" `T.isInfixOf` tfMessage tf)
+        ]
+
       -- check_file / get_diagnostics report the timeout as a failed check with an
       -- explanatory diagnostic, rather than as a silent "0 errors" summary of
       -- output Agda never produced.
@@ -826,6 +889,20 @@ timeoutTests = do
                                   (drErrors dr >= 1)
         ]
 
+      -- Second orphan sweep.  The slow runs after the first sweep (fill_hole,
+      -- get_goal, check_file, get_diagnostics) each spawned their own fake with
+      -- its own marker subshell; outwait the longest of their sleeps so a
+      -- leader-only kill on any of those paths — the exact failure mode of
+      -- signalling agda but not its descendants — has had time to surface as a
+      -- marker drop.
+      threadDelay ((fakeSleepSecs + 2) * 1000 * 1000)
+      lateOrphan <- doesFileExist marker
+      resultsLate <- sequence
+        [ runTest "runAgda: no timed-out tool call leaves a descendant behind" $
+            assert "a fake agda descendant outlived its tool call and wrote the marker"
+                   (not lateOrphan)
+        ]
+
       -- The fast path: a run that finishes inside its bound must not be reported
       -- as a timeout, and must still be timed.
       setEnv "AGDA_MCP_FAKE_SLEEP" "1"
@@ -848,7 +925,8 @@ timeoutTests = do
         ]
 
       removeIfExists marker
-      pure (results1 <> results2 <> results3 <> results4 <> results5)
+      pure (results1 <> results2 <> results3 <> resultsGoal <> results4
+              <> resultsLate <> results5)
 
 -- | ensureExecutable: restore the executable bit on the fake agda script.
 -- Git tracks the mode, so this is belt-and-braces for checkouts (or archive
@@ -933,28 +1011,28 @@ integrationTests cfg fixturePath repoRoot = do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "A" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 1 goal is exactly \"⊤\" (#70)" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 1 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "⊤" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 2 goal is exactly \"x ≡ x\" (#70)" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 2 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "x ≡ x" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 0 context contains 'x : A'" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info ->
             let names = map ctxName (giContext info)
             in  assert "'x' should be in context" ("x" `elem` names)
@@ -1009,7 +1087,7 @@ integrationTests cfg fixturePath repoRoot = do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
         case result of
-          Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assert ("elapsedMs = " <> show (giElapsedMs info))
                           (maybe False (> 0) (giElapsedMs info))
 
@@ -1068,21 +1146,21 @@ hierIntegrationTests cfg repoRoot = do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
             result <- handleGetGoal hierCfg params
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
 
         , runTest "get_goal: Proofs.Use reports its declared (hierarchical) module name" $ do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
             result <- handleGetGoal hierCfg params
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "module" (Just "Proofs.Use") (giModule info)
 
         , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
             result <- handleGetGoal hierCfg params
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info ->
                 assert "'x' should be in context"
                   ("x" `elem` map ctxName (giContext info))
@@ -1227,7 +1305,7 @@ holeModelIntegrationTests cfg = do
             result <- handleGetGoal cfg GetGoalParams
               { ggFilePath = variants, ggHoleIndex = 3 }
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "goal" "Nat" (giGoal info)
 
         , runTest "fill_hole: comment decoys do not shift hole indices (#71)" $ do
@@ -1266,8 +1344,8 @@ holeModelIntegrationTests cfg = do
                 case r1 of
                   Fail m -> pure (Fail m)
                   Pass   -> assertEqual "goal" "Nat" (giGoal md)
-              (Left err, _) -> pure (Fail $ "get_goal (.lagda.md) failed: " <> T.unpack err)
-              (_, Left err) -> pure (Fail $ "get_goal (.agda) failed: " <> T.unpack err)
+              (Left err, _) -> pure (Fail $ "get_goal (.lagda.md) failed: " <> T.unpack (failureText err))
+              (_, Left err) -> pure (Fail $ "get_goal (.agda) failed: " <> T.unpack (failureText err))
 
         , runTest "fill_hole: {! zero !} in a .lagda.md fills like in a .agda" $ do
             mdFill    <- handleFillHole cfg FillHoleParams

@@ -58,6 +58,9 @@ library
     , filepath      >= 1.4  && < 1.6
     , process       >= 1.6  && < 1.8
     , text          >= 2.0  && < 2.2
+      -- unix: group-wide SIGTERM/SIGKILL escalation on timeout ('signalProcessGroup');
+      -- 'System.Process.interruptProcessGroupOf' covers only SIGINT.
+    , unix          >= 2.8  && < 2.9
     , vector        >= 0.12 && < 0.14
 
 executable agda-mcp

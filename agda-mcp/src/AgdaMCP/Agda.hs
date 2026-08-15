@@ -26,9 +26,10 @@
 --   behind.  Instead we spawn @agda@ in its own process group
 --   (@create_group = True@), drain its stdout and stderr concurrently on
 --   dedicated threads, and race the process against a timer.  On expiry we
---   'interruptProcessGroupOf' (SIGINT to the whole group, so any descendant
---   dies too), then 'terminateProcess', then reap with 'waitForProcess' — so no
---   zombie and no orphan survives the call.  A timeout is reported as a /value/
+--   escalate group-wide — SIGINT (so agda unwinds and may still print), then
+--   SIGTERM, then SIGKILL, each rung taken while the process group still has
+--   members — and reap with 'waitForProcess', so no zombie and no orphan
+--   survives the call.  A timeout is reported as a /value/
 --   ('arTimedOut'), never an exception, which is what lets the in-place tools'
 --   'Control.Exception.bracket_' restore run on the timeout path exactly as it
 --   does on the success path.
@@ -58,7 +59,7 @@ import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
   (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, tryPutMVar)
 import Control.Exception (SomeException, bracket, catch, try)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import qualified Data.ByteString as BS
 import Data.Text.IO as TIO
 import Data.Text (Text)
@@ -68,9 +69,11 @@ import Data.Text.Encoding.Error (lenientDecode)
 import GHC.Clock (getMonotonicTimeNSec)
 import System.Exit (ExitCode (..))
 import System.IO (Handle, hClose, hSetBinaryMode, stderr)
+import System.Posix.Signals
+  (Signal, killProcess, nullSignal, signalProcessGroup, softwareTermination)
 import System.Process
-  ( CreateProcess (..), ProcessHandle, StdStream (..)
-  , createProcess, interruptProcessGroupOf, proc
+  ( CreateProcess (..), Pid, ProcessHandle, StdStream (..)
+  , createProcess, getPid, interruptProcessGroupOf, proc
   , terminateProcess, waitForProcess
   )
 
@@ -292,7 +295,7 @@ exitCodeToInt (ExitFailure n) = n
 runAgdaProcess
   :: AgdaConfig -> [String] -> IO (Maybe ExitCode, Text, Text)
 runAgdaProcess cfg args =
-  bracket (createProcess spec) cleanup $ \handles ->
+  bracket acquire cleanup $ \(handles, mPgid) ->
     case handles of
       (mIn, Just hOut, Just hErr, ph) -> do
         -- Agda reads nothing from stdin in batch mode; close our end at once so
@@ -300,7 +303,7 @@ runAgdaProcess cfg args =
         maybe (pure ()) (ignoringIOErrors . hClose) mIn
         outVar <- drainAsync hOut
         errVar <- drainAsync hErr
-        raceProcess cfg ph outVar errVar
+        raceProcess cfg ph mPgid outVar errVar
       -- createProcess with CreatePipe on both streams always yields both
       -- handles; this branch exists only to keep the match total.
       _ -> pure (Just (ExitFailure (-1)), "", "agda-mcp: could not open agda's output pipes")
@@ -309,10 +312,21 @@ runAgdaProcess cfg args =
       { std_in  = CreatePipe
       , std_out = CreatePipe
       , std_err = CreatePipe
-        -- Its own process group, so 'interruptProcessGroupOf' reaches any
-        -- descendant agda spawned rather than just agda itself.
+        -- Its own process group, so group-wide signals reach any descendant
+        -- agda spawned rather than just agda itself.
       , create_group = True
       }
+
+    -- The child's pgid is captured here, before any thread can 'waitForProcess'
+    -- it: 'getPid' reads Nothing once the leader has been reaped, and the
+    -- timeout ladder must still be able to reach *descendants* after the leader
+    -- itself has fallen (a leader dying to SIGINT while a SIGINT-ignoring
+    -- descendant survives is exactly the case the orphan test pins).
+    -- @create_group = True@ makes the child a group leader, so pid = pgid.
+    acquire = do
+      handles@(_, _, _, ph) <- createProcess spec
+      mPgid <- getPid ph
+      pure (handles, mPgid)
 
     -- Deliberately not 'System.Process.cleanupProcess': that closes the stdout
     -- and stderr handles, and closing a handle another thread is mid-read on
@@ -321,17 +335,28 @@ runAgdaProcess cfg args =
     -- themselves ('BS.hGetContents' closes at EOF), so all this needs to do is
     -- guarantee the child is signalled and reaped on every exit path, including
     -- an async exception mid-run.
-    cleanup (mIn, _, _, ph) = do
+    cleanup ((mIn, _, _, ph), mPgid) = do
       maybe (pure ()) (ignoringIOErrors . hClose) mIn
       ignoringIOErrors (interruptProcessGroupOf ph)
+      signalGroupVia mPgid softwareTermination
       ignoringIOErrors (terminateProcess ph)
-      void (forkIO (void (waitForProcess ph)))
+      -- Reap on a detached thread (a blocked 'waitForProcess' sits in a foreign
+      -- call, so doing it inline could stall an async-exception unwind), and
+      -- escalate to a group SIGKILL if anything ignores the SIGTERM above.
+      -- After the normal paths the group is already gone and the leader reaped,
+      -- so every step here is a no-op.
+      void . forkIO $ do
+        _ <- forkIO $ do
+          threadDelay termGraceMicros
+          alive <- groupAlive mPgid
+          when alive (signalGroupVia mPgid killProcess)
+        void (waitForProcess ph)
 
 -- | raceProcess: wait for the process, or for the timeout, whichever comes first.
 raceProcess
-  :: AgdaConfig -> ProcessHandle -> MVar Text -> MVar Text
+  :: AgdaConfig -> ProcessHandle -> Maybe Pid -> MVar Text -> MVar Text
   -> IO (Maybe ExitCode, Text, Text)
-raceProcess cfg ph outVar errVar = do
+raceProcess cfg ph mPgid outVar errVar = do
   -- 'exitVar' is the reaped exit status; 'raceVar' is the first-past-the-post
   -- signal, holding @Just ec@ if agda finished and @Nothing@ if the timer won.
   exitVar <- newEmptyMVar
@@ -359,14 +384,36 @@ raceProcess cfg ph outVar errVar = do
       err <- takeMVarWithin postExitDrainMicros errVar
       pure (Just ec, orEmpty out, orEmpty err)
     Nothing -> do
-      -- Timed out.  SIGINT the group first (agda unwinds and may print), then
-      -- SIGTERM as a backstop, then let 'waiter' reap it.
+      -- Timed out.  Escalate group-wide — SIGINT first (agda unwinds and may
+      -- still print), then SIGTERM, then SIGKILL — advancing a rung while the
+      -- process GROUP still has members, not merely while the leader remains
+      -- unreaped.  The distinction is load-bearing twice over: a descendant
+      -- can ignore SIGINT while the leader falls to it (POSIX starts the
+      -- background children of non-interactive shells with SIGINT ignored, so
+      -- the orphan fixture builds exactly this), and a ladder keyed on the
+      -- leader would then stop with the descendant still running; conversely a
+      -- leader that ignored SIGTERM must not stall the ladder short of
+      -- SIGKILL.  SIGKILL can be neither caught nor ignored, so past the last
+      -- rung only a kernel-stuck process can survive the bounded waits.  The
+      -- final reap goes through 'exitVar' rather than killing 'waiter': a
+      -- thread blocked in 'waitForProcess' sits in a foreign call, so
+      -- 'killThread' on it could block indefinitely.  Letting it complete is
+      -- what leaves no zombie.
       ignoringIOErrors (interruptProcessGroupOf ph)
-      threadDelay interruptGraceMicros
-      ignoringIOErrors (terminateProcess ph)
-      -- Wait for the reap rather than killing 'waiter': a thread blocked in
-      -- 'waitForProcess' sits in a foreign call, so 'killThread' on it could
-      -- block indefinitely.  Letting it complete is what leaves no zombie.
+      intGone <- waitGroupGone mPgid exitVar interruptGraceMicros
+      termGone <-
+        if intGone then pure True
+        else do
+          signalGroupVia mPgid softwareTermination
+          -- Belt and braces: reach the leader through the handle too, in case
+          -- the pgid was unavailable at spawn time.
+          ignoringIOErrors (terminateProcess ph)
+          waitGroupGone mPgid exitVar termGraceMicros
+      when (not termGone) $ do
+        signalGroupVia mPgid killProcess
+        void (waitGroupGone mPgid exitVar reapGraceMicros)
+      -- Reap the leader (bounded, so an unreapable process cannot hang the
+      -- call); with the group gone this returns immediately.
       _ <- takeMVarWithin reapGraceMicros exitVar
       out <- takeMVarWithin drainGraceMicros outVar
       err <- takeMVarWithin drainGraceMicros errVar
@@ -386,9 +433,58 @@ boundedTimeout cfg = case agdaTimeout cfg of
 interruptGraceMicros :: Int
 interruptGraceMicros = 250_000
 
--- | How long to wait for the killed process to be reaped.
+-- | How long SIGTERM gets to work before SIGKILL follows.
+termGraceMicros :: Int
+termGraceMicros = 2_000_000
+
+-- | How long to wait for the SIGKILLed process to be reaped.
 reapGraceMicros :: Int
 reapGraceMicros = 5_000_000
+
+-- | signalGroupVia: send @sig@ to the child's whole process group, best-effort,
+-- through the pgid captured at spawn time.  A group that has since emptied
+-- makes 'signalProcessGroup' fail with ESRCH, which 'ignoringIOErrors'
+-- swallows; a group that emptied *and* had its pgid recycled between the probe
+-- and the signal is the standard, vanishingly-narrow @killpg@ race every
+-- timeout implementation accepts (the kernel does not reuse a pgid while the
+-- group still has members).
+signalGroupVia :: Maybe Pid -> Signal -> IO ()
+signalGroupVia mPgid sig = case mPgid of
+  Just pgid -> ignoringIOErrors (signalProcessGroup sig pgid)
+  Nothing   -> pure ()
+
+-- | groupAlive: does the child's process group still have members?  Probed
+-- with the null signal (@kill(-pgid, 0)@), which delivers nothing but reports
+-- ESRCH on an empty group.  Without a pgid the probe cannot be asked, and
+-- "assume dead" is the reading that keeps the caller from signalling blindly.
+groupAlive :: Maybe Pid -> IO Bool
+groupAlive Nothing     = pure False
+groupAlive (Just pgid) =
+  (signalProcessGroup nullSignal pgid >> pure True)
+    `catch` \(_ :: SomeException) -> pure False
+
+-- | waitGroupGone: wait (bounded) for the child's process group to empty;
+-- True iff it did.  This polls, which the module otherwise avoids on latency
+-- grounds — but it runs only on the timeout path, never on a healthy call,
+-- and group death has no blocking primitive to wait on the way a single
+-- process does.  Without a pgid it falls back to the leader's reap, the best
+-- signal still available.
+waitGroupGone :: Maybe Pid -> MVar ExitCode -> Int -> IO Bool
+waitGroupGone Nothing exitVar budget = do
+  r <- takeMVarWithin budget exitVar
+  pure (case r of Just _ -> True; Nothing -> False)
+waitGroupGone mPgid _ budget = go budget
+  where
+    stepMicros = 50_000
+    go b = do
+      alive <- groupAlive mPgid
+      if not alive
+        then pure True
+        else if b <= 0
+          then pure False
+          else do
+            threadDelay (min stepMicros b)
+            go (b - stepMicros)
 
 -- | How long to wait for a stream drainer to reach EOF after the kill.
 drainGraceMicros :: Int
@@ -466,12 +562,28 @@ timeoutMessage cfg =
 --
 -- A coarse but reliable cache signal, and the one an agent actually needs: it
 -- explains why the same call took 200 ms once and three minutes the time before.
--- Agda announces the two cases distinctly — @Checking M (…/M.agda).@ when it
--- typechecks source, @Loading M (…/M.agdai).@ when it reads an interface — so we
--- report 'True' exactly when a @Checking@ line is present.  Absence of any such
--- line (a run that failed before it got that far, or a timeout killed early)
--- reports 'False': this is a hint, not a verdict, and the conservative reading is
--- "no evidence of a source re-check".
-checkedFromSourceOf :: Text -> Bool
-checkedFromSourceOf out =
-  any (T.isPrefixOf "Checking " . T.stripStart) (T.lines out)
+-- The evidence, in order of authority (Agda 2.8.0 at default verbosity):
+--
+--   * A @Checking M (…/M.agda).@ line is printed the moment Agda starts
+--     re-typechecking a module from source — including runs that then fail or
+--     are killed mid-check — and reads as @Just True@.
+--   * A run that /completed successfully/ without one reads as @Just False@:
+--     a warm @agda@ exits 0 printing nothing at all, so silent success is
+--     itself the interface-reuse signature.
+--   * A @Loading M (…/M.agdai).@ line (emitted only at raised verbosity) is
+--     direct evidence of an interface read, so it also reads as @Just False@
+--     when no source re-check was observed.
+--   * Anything else — a run that failed or timed out before producing any
+--     evidence — is @Nothing@, and the response omits the field.  Defaulting
+--     to a Bool here would misread a startup failure or an early-killed cold
+--     call as a warm one.
+checkedFromSourceOf :: AgdaResult -> Maybe Bool
+checkedFromSourceOf r
+  | sawPrefix "Checking " = Just True
+  | completedOk           = Just False
+  | sawPrefix "Loading "  = Just False
+  | otherwise             = Nothing
+  where
+    combined    = arStdout r <> "\n" <> arStderr r
+    sawPrefix p = any (T.isPrefixOf p . T.stripStart) (T.lines combined)
+    completedOk = not (arTimedOut r) && arExitCode r == 0

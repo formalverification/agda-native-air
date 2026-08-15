@@ -26,19 +26,30 @@
 #
 #   The marker file is the zombie/orphan check.  A test sets a sleep longer than
 #   the timeout, waits past that sleep, and asserts the marker never appears: if
-#   it does, the subprocess outlived the tool call, which is exactly the leak
+#   it does, some process outlived the tool call, which is exactly the leak
 #   that killing only the waiting Haskell thread (System.Timeout.timeout over
 #   readProcessWithExitCode) would have produced.
+#
+#   Crucially, the marker is written by a *backgrounded subshell*, not by this
+#   leader shell after its own sleep returns.  Written by the leader, the marker
+#   could only ever prove the leader survived: a kill that took down the leader
+#   but orphaned a descendant would leave no one to write it, and the test would
+#   pass with the orphan still running.  The subshell sleeps out the full
+#   duration on its own, so it reports whichever kill mode actually happened —
+#   a whole-group kill takes it down with everything else (no marker), while a
+#   leader-only kill leaves it alive to drop the marker the test then catches.
+#   On natural completion the `wait` below holds the leader until the subshell
+#   has written the marker, keeping the fast-path runs deterministic.
 # =============================================================================
 
 echo "Checking FakeSlow (fake-slow-agda.agda)."
 
-sleep "${AGDA_MCP_FAKE_SLEEP:-30}"
-
-# Only reached if we were NOT killed: this is what the test asserts against.
 if [ -n "${AGDA_MCP_FAKE_MARKER:-}" ]; then
-  : > "${AGDA_MCP_FAKE_MARKER}"
+  ( sleep "${AGDA_MCP_FAKE_SLEEP:-30}"; : > "${AGDA_MCP_FAKE_MARKER}" ) &
 fi
+
+sleep "${AGDA_MCP_FAKE_SLEEP:-30}"
+wait
 
 echo "fake-slow-agda: completed normally"
 exit "${AGDA_MCP_FAKE_EXIT:-0}"

@@ -90,18 +90,23 @@ import AgdaMCP.Types
 -- 4. Typecheck the patched file IN PLACE (restoring the original afterwards).
 -- 5. Parse the AGDADOJANG_REQ_BEGIN/END block from Agda's output.
 -- 6. Return structured (goal, context).
-handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either Text GoalInfo)
+--
+-- Failures are 'ToolFailure' rather than bare 'Text' because this is the one
+-- proof-state tool whose timeout cannot ride inside a success-shaped response —
+-- there is no goal to report — and the measurements the call did produce
+-- (@elapsedMs@, the cache signal) must not be dropped with it (issue #77).
+handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either ToolFailure GoalInfo)
 handleGetGoal cfg params = do
   absPath <- makeAbsolute (ggFilePath params)
   origBytes <- BS.readFile absPath
   case TE.decodeUtf8' origBytes of
-    Left err  -> pure (Left (decodeError absPath err))
+    Left err  -> pure (Left (FailMessage (decodeError absPath err)))
     Right src ->
       -- ensureDebugImport runs BEFORE hole finding, so injectReportExpr
       -- locates the hole in the already-shifted (import-injected) source.
       case injectReportExpr (reportExpr cfg) (flavourOf absPath)
              (ggHoleIndex params) (ensureDebugImport (flavourOf absPath) src) of
-        Nothing -> pure . Left $
+        Nothing -> pure . Left . FailMessage $
           "Hole index " <> T.pack (show (ggHoleIndex params))
           <> " not found in " <> T.pack absPath
         Just patched -> do
@@ -117,12 +122,17 @@ handleGetGoal cfg params = do
           if arTimedOut result
             -- A timeout is reported as such rather than as "could not parse
             -- markers": the markers are missing because Agda was killed, and
-            -- saying so is what tells the caller to raise the bound.
-            then pure . Left $
-              timeoutMessage cfg <> "; no goal was reported for hole "
-              <> T.pack (show (ggHoleIndex params)) <> " in " <> T.pack absPath
+            -- saying so is what tells the caller to raise the bound.  It is a
+            -- structured failure so the response still carries the timing and
+            -- cache metadata the call produced on the way down.
+            then pure . Left . FailTimeout $ TimeoutFailure
+              { tfMessage = timeoutMessage cfg <> "; no goal was reported for hole "
+                  <> T.pack (show (ggHoleIndex params)) <> " in " <> T.pack absPath
+              , tfElapsedMs         = arElapsedMs result
+              , tfCheckedFromSource = checkedFromSourceOf result
+              }
             else case parseGoalContext combined of
-              Nothing -> pure . Left $
+              Nothing -> pure . Left . FailMessage $
                 "Could not parse goal/context markers from Agda output.\n"
                 <> "output:\n" <> T.take 2000 combined
               Just (goal, ctx) ->
@@ -133,7 +143,7 @@ handleGetGoal cfg params = do
                   -- header — not the file's base name.
                   , giModule  = moduleNameOf src
                   , giElapsedMs         = Just (arElapsedMs result)
-                  , giCheckedFromSource = Just (checkedFromSourceOf combined)
+                  , giCheckedFromSource = checkedFromSourceOf result
                   }
 
 
@@ -191,7 +201,7 @@ handleFillHole cfg params = do
             , frMessage   = msg
             , frRemainingHoles = Just remainingHoles
             , frElapsedMs = arElapsedMs result
-            , frCheckedFromSource = checkedFromSourceOf combined
+            , frCheckedFromSource = checkedFromSourceOf result
             }
 
 
@@ -222,7 +232,7 @@ handleCheckFile cfg params = do
     , fcrHolesCount  = nHoles
     , fcrTimedOut    = arTimedOut result
     , fcrElapsedMs   = arElapsedMs result
-    , fcrCheckedFromSource = checkedFromSourceOf combined
+    , fcrCheckedFromSource = checkedFromSourceOf result
     }
 
 
@@ -268,7 +278,7 @@ handleGetDiagnostics cfg params = do
     , drDiagnostics = diags
     , drTimedOut = arTimedOut result
     , drElapsedMs = arElapsedMs result
-    , drCheckedFromSource = checkedFromSourceOf combined
+    , drCheckedFromSource = checkedFromSourceOf result
     }
 
 

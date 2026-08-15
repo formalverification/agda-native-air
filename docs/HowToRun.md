@@ -893,7 +893,8 @@ import graph, which can take minutes and overruns even the 300 s default.  Sizin
 bound too small is not a graceful degradation: it aborts exactly the call that would
 have built those interfaces, so the next call starts cold again.  Every proof-state
 response reports `elapsedMs` and `checkedFromSource`, so you can tell a slow cold call
-from a slow warm one.
+from a slow warm one (`checkedFromSource` is omitted when the run died before
+producing evidence either way — absent means unknown, not warm).
 
 #### Option B — `claude mcp add`
 

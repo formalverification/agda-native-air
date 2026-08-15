@@ -164,16 +164,20 @@ Every proof-state response reports what actually happened:
 | Field | Meaning |
 |-------|---------|
 | `elapsedMs`         | Wall-clock time in the `agda` subprocess, from a monotonic clock. |
-| `checkedFromSource` | `true` if Agda re-typechecked the module from source, `false` if it loaded `.agdai` interfaces — the coarse signal that explains why the same call took three minutes once and 200 ms the next time. |
+| `checkedFromSource` | `true` if Agda re-typechecked the module from source (a `Checking` line was observed — including runs that then failed or were killed mid-check), `false` if it reused `.agdai` interfaces (the run completed successfully in silence, which is Agda's warm signature, or printed `Loading` lines at raised verbosity) — the coarse signal that explains why the same call took three minutes once and 200 ms the next time.  **Omitted** when the run died before producing evidence either way (a startup failure, or a timeout before any output): an absent field means *unknown*, never a guess. |
 
-On expiry the subprocess and its whole process group are killed and reaped — no
-runaway `agda` is left behind — and the tool reports the timeout in its own
-vocabulary: `fill_hole` returns `"status": "timeout"` (*not* `type_error`: the
-candidate was never judged) with a message naming the bound, `check_file` and
-`get_diagnostics` return `"success": false` with `"timedOut": true` and an
+On expiry the subprocess and its whole process group are killed and reaped —
+escalating SIGINT → SIGTERM → SIGKILL group-wide, so no runaway `agda` and no
+descendant it spawned is left behind — and the tool reports the timeout in its
+own vocabulary: `fill_hole` returns `"status": "timeout"` (*not* `type_error`:
+the candidate was never judged) with a message naming the bound, `check_file`
+and `get_diagnostics` return `"success": false` with `"timedOut": true` and an
 `agda timed out after Ns` error diagnostic, and `get_goal` returns an error
-naming the bound.  Files patched in place by `get_goal` and `fill_hole` are
-restored byte-for-byte on the timeout path exactly as on every other path.
+whose text is a JSON object — `{"error": …, "timedOut": true, "elapsedMs": …,
+"checkedFromSource": …?}` — naming the bound while preserving the measurements
+the killed call still produced.  Files patched in place by `get_goal` and
+`fill_hole` are restored byte-for-byte on the timeout path exactly as on every
+other path.
 
 
 ---

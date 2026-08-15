@@ -53,7 +53,7 @@ import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, Buffe
 import AgdaMCP.Agda (AgdaConfig)
 import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
-import AgdaMCP.Types (CorpusIndex)
+import AgdaMCP.Types (CorpusIndex, ToolFailure (..))
 
 -- ---------------------------------------------------------------------------
 -- Configuration
@@ -135,7 +135,9 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
       [ toolDef "get_goal"
           ("Inspect the goal type and local context at a hole."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
-           <> " On timeout this returns an error naming the bound, since no goal was reported. "
+           <> " On timeout this returns an error whose text is a JSON object —"
+           <> " {error, timedOut: true, elapsedMs, checkedFromSource?} — naming the"
+           <> " bound, since no goal was reported. "
            <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
           , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
@@ -217,6 +219,8 @@ latencyNote =
   <> " large library builds its .agdai interfaces and can take minutes, while later"
   <> " calls that reuse those interfaces are far faster."
   <> " Calls are bounded by the server's --timeout (default 300s)."
+  <> " checkedFromSource is omitted when the run died before producing evidence"
+  <> " either way (e.g. a startup failure, or a timeout before any output)."
 
 -- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
@@ -355,7 +359,7 @@ dispatchTool :: ServerConfig -> Text -> Value -> IO Value
 -- Proof-state tools (existing M1-2)
 dispatchTool cfg "get_goal" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleGetGoal (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleGetGoal (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg "fill_hole" args =
@@ -409,9 +413,27 @@ dispatchTool _ name _ =
 
 -- | Wrap an IO-based tool handler result (Either Text a) as an MCP content response.
 eitherToMcp :: ToJSON a => Either Text a -> Value
-eitherToMcp (Left err) = toolError err
+eitherToMcp = either toolError okToMcp
 
-eitherToMcp (Right a)  = object
+-- | As 'eitherToMcp', for handlers whose failures are structured 'ToolFailure's.
+-- A 'FailMessage' renders exactly as it always did — prose with @isError@ — while
+-- a 'FailTimeout' serializes its payload as the error text, so the timing and
+-- cache metadata a timed-out call produced still reach the agent (issue #77).
+failureToMcp :: ToJSON a => Either ToolFailure a -> Value
+failureToMcp = either render okToMcp
+  where
+    render (FailMessage msg) = toolError msg
+    render (FailTimeout tf)  = object
+      [ "content" .= [ object [ "type" .= ("text" :: Text)
+                               , "text" .= decodeUtf8 (LBS.toStrict (encode (toJSON tf)))
+                               ] ]
+      , "isError" .= True
+      ]
+
+-- | The success shape shared by every tool: one text content item holding the
+-- result's JSON.
+okToMcp :: ToJSON a => a -> Value
+okToMcp a = object
   [ "content" .= [ object [ "type" .= ("text" :: Text)
                            , "text" .= decodeUtf8 (LBS.toStrict (encode (toJSON a)))
                            ] ]
