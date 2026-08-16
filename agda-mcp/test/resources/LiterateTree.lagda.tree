@@ -1,0 +1,18 @@
+% LiterateTree.lagda.tree
+% File: agda-native-air/agda-mcp/test/resources/LiterateTree.lagda.tree
+% Regression fixture for issues #71/#73 (Forester literate flavour, new in
+% Agda 2.8): prose above and below the \agda{ } block carries decoy hole
+% tokens that must never be counted.
+
+\p{Prose above the code with decoy hole tokens: {!!} and a lone ? that must never be counted.}
+
+\agda{
+module LiterateTree where
+
+open import Agda.Builtin.Nat
+
+n : Nat
+n = {! zero !}
+}
+
+\p{Prose below the hole with another decoy {!!} token.}

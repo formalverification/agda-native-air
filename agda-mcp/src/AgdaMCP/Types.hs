@@ -31,6 +31,7 @@ module AgdaMCP.Types
   , GetDiagnosticsParams (..)
     -- * Tool results (outbound)
   , GoalInfo (..)
+  , HoleInfo (..)
   , FillResult (..)
   , FillStatus (..)
   , Diagnostic (..)
@@ -66,7 +67,7 @@ import Data.Text (Text)
 -- | Identifies a hole in a source file.
 data HoleLocation = HoleLocation
   { holePath  :: FilePath   -- ^ Absolute or repo-relative path to the Agda file.
-  , holeIndex :: Int        -- ^ 0-based index of the {!!} hole (in source order).
+  , holeIndex :: Int        -- ^ 0-based index of the hole, in source order (any hole syntax: @{!!}@, @{! … !}@, @?@).
   } deriving (Eq, Show)
 
 instance FromJSON HoleLocation where
@@ -165,6 +166,25 @@ instance ToJSON GoalInfo where
     , "context" .= giContext g
     ] <> maybe [] (\m -> ["module" .= m]) (giModule g)
 
+-- | One open hole in a file, as listed by @get_diagnostics@.  The index is
+-- the 0-based @holeIndex@ that @get_goal@ / @fill_hole@ accept; line and
+-- column are 1-based positions in the file as written, so for literate
+-- sources they are literate-file coordinates (issue #73).
+data HoleInfo = HoleInfo
+  { hiIndex :: Int    -- ^ 0-based hole index (source order).
+  , hiLine  :: Int    -- ^ 1-based line of the hole's first character.
+  , hiCol   :: Int    -- ^ 1-based column of the hole's first character.
+  , hiGoal  :: Text   -- ^ Goal type placeholder (v0: "?"; per-hole goal extraction is a future enhancement).
+  } deriving (Eq, Show)
+
+instance ToJSON HoleInfo where
+  toJSON h = object
+    [ "index" .= hiIndex h
+    , "line"  .= hiLine h
+    , "col"   .= hiCol h
+    , "goal"  .= hiGoal h
+    ]
+
 -- | Outcome of a @fill_hole@ attempt.
 data FillStatus = FillOk | FillTypeError | FillTimeout | FillCrash
   deriving (Eq, Show)
@@ -226,7 +246,7 @@ instance ToJSON Diagnostic where
 data FileCheckResult = FileCheckResult
   { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0 with no errors.
   , fcrDiagnostics :: [Diagnostic]
-  , fcrHolesCount  :: Int           -- ^ Number of remaining {!!} holes.
+  , fcrHolesCount  :: Int           -- ^ Number of open holes (any hole syntax, code regions only).
   } deriving (Eq, Show)
 
 instance ToJSON FileCheckResult where
@@ -241,8 +261,8 @@ data DiagnosticsResult = DiagnosticsResult
   { drFilePath    :: FilePath
   , drErrors      :: Int
   , drWarnings    :: Int
-  , drHoles       :: [GoalInfo]  -- ^ Open holes (v0: giGoal is "?")
-  } deriving (Eq, Show)          --   (per-hole goal extraction is a future enhancement).
+  , drHoles       :: [HoleInfo]  -- ^ Open holes with index and (line, col).
+  } deriving (Eq, Show)
 
 instance ToJSON DiagnosticsResult where
   toJSON r = object

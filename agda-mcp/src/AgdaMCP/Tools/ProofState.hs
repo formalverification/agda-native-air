@@ -58,9 +58,12 @@ import System.Directory (makeAbsolute)
 import System.FilePath (takeDirectory)
 
 import AgdaMCP.Agda
-  ( AgdaConfig, AgdaResult (..), agdaFlags, debugLog
-  , findHoles, injectReportExpr, substituteHole
+  ( AgdaConfig, AgdaResult (..), agdaFlags, debugLog, reportExpr
   , parseGoalContext, runAgda
+  )
+import AgdaMCP.Holes
+  ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
+  , injectReportExpr, substituteHole
   )
 import AgdaMCP.Types
 
@@ -84,7 +87,10 @@ handleGetGoal cfg params = do
   case TE.decodeUtf8' origBytes of
     Left err  -> pure (Left (decodeError absPath err))
     Right src ->
-      case injectReportExpr cfg (ggHoleIndex params) (ensureDebugImport src) of
+      -- ensureDebugImport runs BEFORE hole finding, so injectReportExpr
+      -- locates the hole in the already-shifted (import-injected) source.
+      case injectReportExpr (reportExpr cfg) (flavourOf absPath)
+             (ggHoleIndex params) (ensureDebugImport (flavourOf absPath) src) of
         Nothing -> pure . Left $
           "Hole index " <> T.pack (show (ggHoleIndex params))
           <> " not found in " <> T.pack absPath
@@ -129,7 +135,7 @@ handleFillHole cfg params = do
   case TE.decodeUtf8' origBytes of
     Left err  -> pure (Left (decodeError absPath err))
     Right src ->
-      case substituteHole (fhHoleIndex params) (fhCandidate params) src of
+      case substituteHole (flavourOf absPath) (fhHoleIndex params) (fhCandidate params) src of
         Nothing -> pure . Left $
           "Hole index " <> T.pack (show (fhHoleIndex params))
           <> " not found in " <> T.pack (fhFilePath params)
@@ -149,8 +155,9 @@ handleFillHole cfg params = do
               msg    = if status == FillOk
                          then Nothing
                          else Just (T.take 2000 combined)
-              -- Count remaining holes in the patched source after substitution.
-              remainingHoles = length (findHoles patched)
+              -- Count remaining holes (every Agda hole syntax, code regions
+              -- only) in the patched source after substitution.
+              remainingHoles = length (findHoles (flavourOf absPath) patched)
           pure . Right $ FillResult
             { frStatus    = status
             , frCandidate = fhCandidate params
@@ -173,7 +180,7 @@ handleCheckFile cfg params = do
   result <- runAgda cfgWithDir absPath
   let combined = arStdout result <> "\n" <> arStderr result
       diags   = parseDiagnostics combined
-      nHoles  = length (findHoles src)
+      nHoles  = length (findHoles (flavourOf absPath) src)
       success = arExitCode result == 0
   pure . Right $ FileCheckResult
     { fcrSuccess     = success
@@ -187,6 +194,10 @@ handleCheckFile cfg params = do
 -- ---------------------------------------------------------------------------
 
 -- | handleGetDiagnostics: diagnostic summary; run Agda, count errors/warnings/holes.
+--
+-- Each hole is reported with its 0-based index (the @holeIndex@ accepted by
+-- get_goal / fill_hole) and its 1-based line/column in the file as written —
+-- literate-file coordinates for literate sources (issue #73).
 handleGetDiagnostics :: AgdaConfig -> GetDiagnosticsParams -> IO (Either Text DiagnosticsResult)
 handleGetDiagnostics cfg params = do
   absPath <- makeAbsolute (gdFilePath params)
@@ -198,13 +209,14 @@ handleGetDiagnostics cfg params = do
       diags    = parseDiagnostics combined
       nErrors  = length [() | Diagnostic DiagError _ _ _ <- diags]
       nWarns   = length [() | Diagnostic DiagWarning _ _ _ <- diags]
-      holes    = findHoles src
-      holeInfo = [ GoalInfo
-                     { giGoal    = "?"  -- Lightweight: no goal extraction here.
-                     , giContext = []
-                     , giModule  = Nothing
+      holes    = findHoles (flavourOf absPath) src
+      holeInfo = [ HoleInfo
+                     { hiIndex = i
+                     , hiLine  = hsLine h
+                     , hiCol   = hsCol h
+                     , hiGoal  = "?"  -- Lightweight: no goal extraction here.
                      }
-                 | _ <- holes
+                 | (i, h) <- zip [0 ..] holes
                  ]
   pure . Right $ DiagnosticsResult
     { drFilePath = gdFilePath params
@@ -255,9 +267,16 @@ runInPlace cfg absPath originalBytes patched =
 -- imports it this is a no-op; otherwise the import is inserted immediately after the
 -- module header — i.e. after the header's closing @where@, which may be several lines
 -- below the @module@ keyword when the module is parameterised (common in agda-algebras).
--- Placing it there is valid for both @.agda@ and literate @.lagda.md@ sources, since
--- the header sits in code context in both.  agda-dojang is on the library path
--- (@-l agda-dojang@), so the import resolves.
+-- agda-dojang is on the library path (@-l agda-dojang@), so the import resolves.
+--
+-- Literate awareness (issues #71/#73): all line scans run over the source with its
+-- non-code regions masked out ('maskNonCode'), so a prose line that happens to start
+-- with @module@ (or mention the import) can neither misplace the injection nor
+-- suppress it — the header is found inside a code region, where the inserted line is
+-- Agda-visible.  The import also inherits the header line's indentation, which keeps
+-- it inside indentation-delimited code blocks (@.lagda.rst@); an unindented insert
+-- there would terminate the block.  Masking preserves the line structure, so line
+-- indices found on the masked text splice correctly into the original.
 --
 -- The "already imported?" scan is restricted to the *top-level* prelude — the lines
 -- after the top-level module header, up to the first nested @module@ — so an import
@@ -267,15 +286,20 @@ runInPlace cfg absPath originalBytes patched =
 -- or @module@ in a comment neither suppresses the injection nor misplaces it.  When no
 -- @module … where@ header is found the source is returned unchanged (get_goal then
 -- surfaces the resulting scope error), so injection is best-effort, not guaranteed.
-ensureDebugImport :: Text -> Text
-ensureDebugImport src =
-  case splitAfterModuleHeader ls of
+ensureDebugImport :: LiterateFlavour -> Text -> Text
+ensureDebugImport flav src =
+  case moduleHeaderSpan maskedLs of
     Nothing -> src   -- no top-level module header found; leave as-is (best-effort)
-    Just (hdr, rest)
-      | any isDebugImportLine (takeWhile (not . startsModule) rest) -> src
-      | otherwise -> T.unlines (hdr <> ["open import AgdaDojang.Debug"] <> rest)
+    Just (hdrLine, afterHdr)
+      | any isDebugImportLine (takeWhile (not . startsModule) (drop afterHdr maskedLs)) -> src
+      | otherwise ->
+          let indent          = T.takeWhile isIndentChar (maskedLs !! hdrLine)
+              (before, after) = splitAt afterHdr (T.lines src)
+          in  T.unlines (before <> [indent <> "open import AgdaDojang.Debug"] <> after)
   where
-    ls = T.lines src
+    maskedLs = T.lines (maskNonCode flav src)
+
+    isIndentChar c = c == ' ' || c == '\t'
 
     -- A nested `module …` line ends the top-level prelude; imports below it are not in
     -- the surrounding scope, so they must not count as "already imported".
@@ -293,17 +317,17 @@ ensureDebugImport src =
                    && "AgdaDojang.Debug"  `elem` ws
         []         -> False
 
--- | splitAfterModuleHeader: split source lines just after the top-level module
--- header.  The header runs from the first line whose code begins with @module@
--- through the first subsequent line that carries a standalone @where@ token (they may
--- be the same line, or several apart for a parameterised module).  Line comments are
--- stripped before the scan, so a @where@ (or @module@) sitting inside a @--@ comment on
--- a header line is ignored.  Returns @Nothing@ if no such header is found.
-splitAfterModuleHeader :: [Text] -> Maybe ([Text], [Text])
-splitAfterModuleHeader ls = do
+-- | moduleHeaderSpan: locate the top-level module header in (masked) source lines.
+-- Returns the 0-based index of the @module@ line and the index just past the header's
+-- closing line — the first subsequent line carrying a standalone @where@ token (they
+-- may be the same line, or several apart for a parameterised module).  Line comments
+-- are stripped before the scan, so a @where@ (or @module@) sitting inside a @--@
+-- comment on a header line is ignored.  Returns @Nothing@ if no header is found.
+moduleHeaderSpan :: [Text] -> Maybe (Int, Int)
+moduleHeaderSpan ls = do
   i    <- findIndex (\l -> "module" `T.isPrefixOf` T.stripStart (stripLineComment l)) ls
   jRel <- findIndex (\l -> "where" `elem` T.words (stripLineComment l)) (drop i ls)
-  pure (splitAt (i + jRel + 1) ls)
+  pure (i, i + jRel + 1)
 
 -- | stripLineComment: drop an Agda @--@ line comment (best-effort: treats the first
 -- @--@ as the comment start).  Enough to keep comment text out of the keyword and
