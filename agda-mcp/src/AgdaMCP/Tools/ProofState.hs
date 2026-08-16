@@ -103,7 +103,7 @@ import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
   , injectReportExpr, substituteHole
   )
-import AgdaMCP.Project (projectExtraFlags, resolveProject)
+import AgdaMCP.Project (projectExtraFlags, resolveProject, withEffectiveFlags)
 import AgdaMCP.Types
 
 -- ---------------------------------------------------------------------------
@@ -272,9 +272,7 @@ handleCheckFile cfg0 params = do
   absPath <- makeAbsolute (cfFilePath params)
   withProject cfg0 absPath $ \pc cfg -> do
     src <- TIO.readFile absPath
-    let extraFlags = ["-i", takeDirectory absPath]
-        cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
-    result <- runAgda cfgWithDir absPath
+    result <- runAgda cfg absPath
     let combined = arStdout result <> "\n" <> arStderr result
         -- On a timeout the parsed diagnostics describe only what Agda managed to
         -- print before it was killed, so the timeout itself is prepended as an
@@ -326,9 +324,7 @@ handleGetDiagnostics cfg0 params = do
   absPath <- makeAbsolute (gdFilePath params)
   withProject cfg0 absPath $ \pc cfg -> do
     src <- TIO.readFile absPath
-    let extraFlags = ["-i", takeDirectory absPath]
-        cfgWithDir = cfg { agdaFlags = agdaFlags cfg <> extraFlags }
-    result <- runAgda cfgWithDir absPath
+    result <- runAgda cfg absPath
     let combined = arStdout result <> "\n" <> arStderr result
         -- As in check_file: a timeout is itself an error diagnostic, so it lands in
         -- both the list and the error count rather than vanishing into a summary
@@ -376,6 +372,15 @@ handleGetDiagnostics cfg0 params = do
 -- before any in-place patching, so a wrong-tree answer is not merely unreported
 -- but impossible.  On the ordinary path the body gets the resolved context to
 -- echo and a config whose flags reach the file's own tree.
+--
+-- This is also the /only/ place the effective flags are assembled: the server's
+-- own, plus whatever resolution implies ('projectExtraFlags'), plus the
+-- requested file's directory — the @-i@ that lets a flat top-level module
+-- resolve at its real path (issue #66).  Assembling them anywhere else is how
+-- the echo and the invocation drift apart: 'withEffectiveFlags' restates the
+-- context from the very list handed to Agda, so @project.selectedLibraries@ and
+-- @project.includePaths@ cannot describe a context Agda did not see, and a
+-- client trusting @project@ gets the same answer as one parsing @command.args@.
 withProject
   :: AgdaConfig
   -> FilePath
@@ -385,7 +390,11 @@ withProject cfg absPath body = do
   resolved <- resolveProject cfg absPath
   case resolved of
     Left mismatch -> pure (Left (FailProject mismatch))
-    Right pc      -> body pc cfg { agdaFlags = agdaFlags cfg <> projectExtraFlags pc }
+    Right pc      -> do
+      let effFlags = agdaFlags cfg
+                       <> projectExtraFlags pc
+                       <> ["-i", takeDirectory absPath]
+      body (withEffectiveFlags effFlags pc) cfg { agdaFlags = effFlags }
 
 -- | plainVerdict: the verdict for a tool that checked the file as it stands.
 plainVerdict :: AgdaResult -> Text -> Verdict
@@ -458,10 +467,12 @@ goalVerdictMeaning =
 
 -- | runInPlace: typecheck a transiently-patched version of a file at its real path.
 --
--- Writes @patched@ (as UTF-8) over @absPath@, runs Agda there with the same include
--- strategy 'handleCheckFile' uses (base flags — which carry the caller's @-l \<lib\>@,
--- hence the library's src root — plus @-i \<dir-of-file\>@), then restores
--- @originalBytes@.  Both the write and the restore go through 'Data.ByteString', and
+-- Writes @patched@ (as UTF-8) over @absPath@, runs Agda there on the flags
+-- 'withProject' assembled — the caller's @-l \<lib\>@, hence the library's src root,
+-- plus whatever resolution added, plus @-i \<dir-of-file\>@ — then restores
+-- @originalBytes@.  It adds no flags of its own, so what the response echoes under
+-- @command@ and @project@ is exactly what ran here too.
+-- Both the write and the restore go through 'Data.ByteString', and
 -- the restore runs under 'bracket_', so the file is returned to its exact original
 -- bytes even if Agda errors or the call is interrupted — no encoding or newline
 -- round-trip is involved.  Checking at the real path (rather than a scratch copy) is
@@ -487,9 +498,7 @@ runInPlace cfg absPath originalBytes patched =
   bracket_
     (BS.writeFile absPath (TE.encodeUtf8 patched))
     (BS.writeFile absPath originalBytes)
-    (runAgda cfgInPlace absPath)
-  where
-    cfgInPlace = cfg { agdaFlags = agdaFlags cfg <> ["-i", takeDirectory absPath] }
+    (runAgda cfg absPath)
 
 
 -- | timeoutDiagnostic: the timeout rendered as an ordinary error diagnostic, so

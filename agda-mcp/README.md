@@ -108,7 +108,7 @@ Every proof-state response — success, timeout, or refusal — carries three ke
 |-----|----------|
 | `verdict` | `equivalentTo` — the exact `agda` command this call is equivalent to, prefixed `equivalent-to:`; `meaning` — one sentence saying what the tool's verdict field means; `exitCode` — Agda's own exit status, which the verdict is derived from. |
 | `command` | `binary` (resolved against `PATH`, so you can see *which* `agda` ran), `args` (the full argument vector, ending in the file path), and `cwd`. |
-| `project` | `rootSource` (`nearest-agda-lib` or `server-config`), `root`, the file's own `library`, the `librariesFile` consulted, and what that registry declares (`registeredLibraries`) next to what the server selected (`selectedLibraries`, `includePaths`). |
+| `project` | `rootSource` (`nearest-agda-lib` or `server-config`), `root`, the file's own `library`, the `librariesFile` consulted, and what that registry declares (`registeredLibraries`) next to the libraries and include paths `agda` finally received (`selectedLibraries`, `includePaths`) — the *effective* set, including whatever resolution added, so `project` and `command.args` never disagree. |
 
 Two properties are contractual, not incidental.
 

@@ -1475,35 +1475,64 @@ withFakeExit code act = do
   setEnv "AGDA_MCP_FAKE_EXIT" (show code)
   act
 
--- | withTwoWorktrees: build two checkouts of one library plus a registry that
--- names only the first, run an action on them, and remove the scene.
+-- | The library scene the root-resolution tests run against.
 --
---   <tmp>/agda-mcp-roots/A/agda-algebras.agda-lib   (name: agda-algebras)
+-- Four roots, covering the three ways a file's library can relate to the
+-- server's registry, plus the conflict that must be refused.
+data LibraryScene = LibraryScene
+  { lsRootA     :: FilePath  -- ^ library @agda-algebras@; registered AND @-l@-selected.
+  , lsRootB     :: FilePath  -- ^ library @agda-algebras@ again — a second checkout, unregistered.
+  , lsRootC     :: FilePath  -- ^ library @c-lib@; unknown to the registry entirely.
+  , lsRootD     :: FilePath  -- ^ library @d-lib@; registered, but not @-l@-selected.
+  , lsLibraries :: FilePath  -- ^ the registry: A and D only.
+  }
+
+-- | withLibraryScene: build the scene under the temp directory, run an action on
+-- it, and remove it.
+--
+--   <tmp>/agda-mcp-roots/A/agda-algebras.agda-lib   (name: agda-algebras)  registered, selected
 --   <tmp>/agda-mcp-roots/A/src/Target.agda
---   <tmp>/agda-mcp-roots/B/agda-algebras.agda-lib   (name: agda-algebras)
+--   <tmp>/agda-mcp-roots/B/agda-algebras.agda-lib   (name: agda-algebras)  NOT registered
 --   <tmp>/agda-mcp-roots/B/src/Target.agda
---   <tmp>/agda-mcp-roots/libraries                  (registers A only)
---
--- The action receives @(rootA, rootB, librariesFile)@.
-withTwoWorktrees :: ((FilePath, FilePath, FilePath) -> IO a) -> IO a
-withTwoWorktrees act = do
+--   <tmp>/agda-mcp-roots/C/c-lib.agda-lib           (name: c-lib)          NOT registered
+--   <tmp>/agda-mcp-roots/C/src/Deep/Target.agda     (nested, so the library's
+--                                                    include dir and the file's
+--                                                    own directory differ)
+--   <tmp>/agda-mcp-roots/D/d-lib.agda-lib           (name: d-lib)          registered, unselected
+--   <tmp>/agda-mcp-roots/D/src/Target.agda
+--   <tmp>/agda-mcp-roots/libraries                  (registers A and D)
+withLibraryScene :: (LibraryScene -> IO a) -> IO a
+withLibraryScene act = do
   tmp <- getTemporaryDirectory
   let scene = tmp </> "agda-mcp-roots"
-      rootA = scene </> "A"
-      rootB = scene </> "B"
-      libs  = scene </> "libraries"
-  bracket_ (build scene rootA rootB libs) (removeTree scene) (act (rootA, rootB, libs))
+      ls = LibraryScene
+        { lsRootA     = scene </> "A"
+        , lsRootB     = scene </> "B"
+        , lsRootC     = scene </> "C"
+        , lsRootD     = scene </> "D"
+        , lsLibraries = scene </> "libraries"
+        }
+  bracket_ (build ls) (removeTree scene) (act ls)
   where
-    build scene rootA rootB libs = do
-      removeTree scene
-      mapM_ (createDirectoryIfMissing True) [rootA </> "src", rootB </> "src"]
-      mapM_ (\r -> TIO.writeFile (r </> "agda-algebras.agda-lib")
-                     "name: agda-algebras\ninclude: src\n")
-            [rootA, rootB]
-      mapM_ (\r -> TIO.writeFile (r </> "src" </> "Target.agda")
-                     "module Target where\n\nopen import Agda.Builtin.Nat\n\nm : Nat\nm = {!!}\n")
-            [rootA, rootB]
-      TIO.writeFile libs (T.pack (rootA </> "agda-algebras.agda-lib") <> "\n")
+    target = "module Target where\n\nopen import Agda.Builtin.Nat\n\nm : Nat\nm = {!!}\n"
+
+    build ls = do
+      removeTree (takeDirectory (lsLibraries ls))
+      mapM_ (createDirectoryIfMissing True)
+        [ lsRootA ls </> "src", lsRootB ls </> "src"
+        , lsRootC ls </> "src" </> "Deep", lsRootD ls </> "src" ]
+      mapM_ (\(r, n) -> TIO.writeFile (r </> (n <> ".agda-lib"))
+                          ("name: " <> T.pack n <> "\ninclude: src\n"))
+        [ (lsRootA ls, "agda-algebras"), (lsRootB ls, "agda-algebras")
+        , (lsRootC ls, "c-lib"),         (lsRootD ls, "d-lib") ]
+      mapM_ (\f -> TIO.writeFile f target)
+        [ lsRootA ls </> "src" </> "Target.agda"
+        , lsRootB ls </> "src" </> "Target.agda"
+        , lsRootC ls </> "src" </> "Deep" </> "Target.agda"
+        , lsRootD ls </> "src" </> "Target.agda" ]
+      TIO.writeFile (lsLibraries ls) . T.unlines . map T.pack $
+        [ lsRootA ls </> "agda-algebras.agda-lib"
+        , lsRootD ls </> "d-lib.agda-lib" ]
 
     removeTree d = removeDirectoryRecursive d `catch` \(_ :: SomeException) -> pure ()
 
@@ -1602,14 +1631,23 @@ echoTests = do
       -- Root resolution: two checkouts of one library, a registry naming only
       -- the first, and a binary that does not exist — so any call that reaches
       -- Agda is visible as a crash rather than as a refusal.
-      roots <- withTwoWorktrees $ \(rootA, rootB, libs) -> do
-        let rootCfg = defaultConfig
+      roots <- withLibraryScene $ \ls -> do
+        let rootA = lsRootA ls
+            rootB = lsRootB ls
+            rootC = lsRootC ls
+            rootD = lsRootD ls
+            libs  = lsLibraries ls
+            rootCfg = defaultConfig
               { agdaBin   = "/nonexistent/agda-must-not-run"
               , agdaFlags = ["--library-file=" <> libs, "-l", "agda-algebras"]
               }
             targetA = rootA </> "src" </> "Target.agda"
             targetB = rootB </> "src" </> "Target.agda"
+            targetC = rootC </> "src" </> "Deep" </> "Target.agda"
+            targetD = rootD </> "src" </> "Target.agda"
         okA     <- handleCheckFile rootCfg (CheckFileParams targetA Nothing)
+        okC     <- handleCheckFile rootCfg (CheckFileParams targetC Nothing)
+        okD     <- handleCheckFile rootCfg (CheckFileParams targetD Nothing)
         badB    <- handleCheckFile rootCfg (CheckFileParams targetB Nothing)
         badDiag <- handleGetDiagnostics rootCfg (GetDiagnosticsParams targetB Nothing)
         beforeB <- BS.readFile targetB
@@ -1677,6 +1715,44 @@ echoTests = do
                 Left other -> pure (Fail $ "expected FailProject, got: "
                                            <> T.unpack (failureText other))
                 Right _    -> pure (Fail "expected a refusal")
+
+            -- The echo must describe the flags Agda was actually given, not the
+            -- ones the server started with.  Resolution extends them two ways —
+            -- an unregistered library contributes its include dirs, a registered
+            -- but unselected one contributes a --library — and the requested
+            -- file's own directory is added on every call.  A project block
+            -- built before those additions would quietly describe a context Agda
+            -- never saw (Copilot's review of PR 95).
+          , runTest "project echo: includePaths cover the file's own directory" $
+              withRight okA $ \r ->
+                let pc = fcrProject r
+                    dir = rootA </> "src"
+                in  assert ("includePaths were " <> show (pcIncludePaths pc))
+                      (dir `elem` pcIncludePaths pc)
+
+          , runTest "project echo: an unregistered library's include dirs are reported" $
+              withRight okC $ \r ->
+                let pc   = fcrProject r
+                    want = [rootC </> "src", rootC </> "src" </> "Deep"]
+                    miss = [d | d <- want, d `notElem` pcIncludePaths pc]
+                in  assert ("missing from includePaths " <> show (pcIncludePaths pc)
+                            <> ": " <> show miss) (null miss)
+
+          , runTest "project echo: a registered-but-unselected library is reported as selected" $
+              withRight okD $ \r ->
+                let pc = fcrProject r
+                in  assert ("selectedLibraries were " <> show (pcSelected pc))
+                      ("d-lib" `elem` pcSelected pc)
+
+          , runTest "project echo: the echo agrees with the command that ran" $
+              -- The two views a client can take of the same call must not differ.
+              withRight okD $ \r ->
+                let pc   = fcrProject r
+                    args = ceArgs (fcrCommand r)
+                    ok   = all (`elem` map T.pack args) (pcSelected pc)
+                             && all (`elem` args) (pcIncludePaths pc)
+                in  assert ("project " <> show (pcSelected pc, pcIncludePaths pc)
+                            <> " not all present in args " <> show args) ok
           ]
 
       -- The upward walk itself, against this repository: a fixture inside

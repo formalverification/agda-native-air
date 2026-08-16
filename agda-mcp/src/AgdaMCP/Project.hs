@@ -55,6 +55,7 @@ module AgdaMCP.Project
   ( -- * Resolution (IO)
     resolveProject
   , projectExtraFlags
+  , withEffectiveFlags
     -- * Flag inspection (pure; exposed for testing)
   , librariesFileFlagOf
   , includePathsOf
@@ -179,6 +180,23 @@ projectExtraFlags pc = case pcLibrary pc of
     | any ((== leName own) . leName) (pcRegistered pc) ->
         ["--library", T.unpack (leName own)]
     | otherwise -> concat [ ["-i", inc] | inc <- libraryIncludeDirs own ]
+
+-- | withEffectiveFlags: restate a context's selected libraries and include
+-- paths in terms of the flags the call will actually run with.
+--
+-- 'resolveProject' can only describe the flags it was /given/, but the caller
+-- then extends them — with 'projectExtraFlags', and with the requested file's
+-- own directory.  Reporting the pre-extension view would make the @project@
+-- block describe a context that is not the one Agda saw, which is precisely
+-- the transparency the block exists to provide; a client reading @project@
+-- rather than parsing @command.args@ would be misled.  Applying this at the
+-- point where the final flag list is assembled keeps the two in step by
+-- construction.
+withEffectiveFlags :: [String] -> ProjectContext -> ProjectContext
+withEffectiveFlags flags pc = pc
+  { pcSelected     = selectedLibrariesOf flags
+  , pcIncludePaths = includePathsOf flags
+  }
 
 -- | libraryIncludeDirs: a library's @include:@ directories, resolved against
 -- its root.  A library declaring no @include:@ includes its own root, which is

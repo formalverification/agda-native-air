@@ -327,8 +327,13 @@ data ProjectContext = ProjectContext
   , pcLibrary       :: Maybe LibraryEntry -- ^ The file's own library, when it has one.
   , pcLibrariesFile :: Maybe FilePath     -- ^ The libraries registry consulted, if any.
   , pcRegistered    :: [LibraryEntry]     -- ^ What that registry declares.
-  , pcSelected      :: [Text]             -- ^ Library names selected by the server's @-l@ flags.
-  , pcIncludePaths  :: [FilePath]         -- ^ Include directories from the server's @-i@ flags.
+  , pcSelected      :: [Text]             -- ^ Library names Agda was given (@-l@), as
+                                          --   finally assembled: the server's, plus
+                                          --   anything resolution added.
+  , pcIncludePaths  :: [FilePath]         -- ^ Include directories Agda was given (@-i@),
+                                          --   likewise final — so these two always agree
+                                          --   with 'CommandEcho' rather than describing a
+                                          --   context Agda never saw.
   } deriving (Eq, Show)
 
 instance ToJSON ProjectContext where
