@@ -5,11 +5,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1786908470,
-        "narHash": "sha256-8QXmYUh4vabc4zyEf/yu6FwwXOKHzWV+gDPE1dNjnO4=",
+        "lastModified": 1786908852,
+        "narHash": "sha256-8bMamwpnJJ8eC+SL6EKcY2t+z2OB6fqNw8ZDQNklFyU=",
         "owner": "williamdemeo",
         "repo": "github-project",
-        "rev": "e15200a7668551ff65818441a999d39e79879295",
+        "rev": "446b51c9c2958684a8a2de522b7116ac55955ecf",
         "type": "github"
       },
       "original": {
