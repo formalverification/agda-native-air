@@ -65,8 +65,8 @@ import AgdaMCP.Holes
   )
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Diagnostics
-  ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageLines
-  , parseDiagnostics )
+  ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
+  , maxMessageLines, parseDiagnostics )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -596,8 +596,10 @@ diagnosticTests = do
               ] <> body
         case parseDiagnostics out of
           [d] -> allOf
-            [ assert ("message had " <> show (length (T.lines (diagMessage d))) <> " lines")
-                (length (T.lines (diagMessage d)) <= maxMessageLines + 1)
+            -- The bound is on what is emitted, elision marker included: a
+            -- client that budgets maxMessageLines gets no more than that.
+            [ assertEqual "message lines" maxMessageLines
+                (length (T.lines (diagMessage d)))
             , assert "the elision is stated" ("more lines" `T.isInfixOf` diagMessage d)
               -- Bounding the prose must not cost the structured payload: all 60
               -- constraints are still there under `involved`.
@@ -605,6 +607,30 @@ diagnosticTests = do
                 (length (invMetaTypes (diagInvolved d)))
             ]
           ds  -> pure . Fail $ "expected 1 diagnostic, got " <> show (length ds)
+
+    , runTest "message: the character bound counts the elision marker too" $ do
+        let out = T.unlines
+              [ "/r/M.agda:5.1-5: error: [UnequalTerms]"
+              , T.replicate 4000 "x"
+              ]
+        case parseDiagnostics out of
+          [d] -> allOf
+            [ assertEqual "message length" maxMessageChars (T.length (diagMessage d))
+            , assert "the elision is stated" ("…" `T.isSuffixOf` diagMessage d)
+            ]
+          ds  -> pure . Fail $ "expected 1 diagnostic, got " <> show (length ds)
+
+      -- Dedup keys off what Agda printed, not off what survived the message
+      -- bound: two diagnostics that agree for the first maxMessageLines lines
+      -- and differ only past it are different diagnostics, and collapsing them
+      -- would understate diagnosticsTotal and the error counts.
+    , runTest "dedup: two diagnostics differing only past the bound both survive" $ do
+        let shared = [ "  constraint " <> T.pack (show i) | i <- [1 :: Int .. 40] ]
+            block tl = [ "error: [UnsolvedConstraints]"
+                       , "Failed to solve the following constraints:"
+                       ] <> shared <> [ "  " <> tl ]
+            out = T.unlines (block "blocked on _a" <> block "blocked on _b")
+        assertEqual "diagnostics" 2 (length (parseDiagnostics out))
 
       -- The § 5 payloads, one test per error class.
     , runTest "involved: ModuleDoesntExport names the missing exports" $

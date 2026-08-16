@@ -50,7 +50,8 @@
 --   +  /Dedup/.  A warning-only run prints each warning twice — once as it is
 --      raised and again under the "All done; warnings encountered" banner — so
 --      identical diagnostics collapse to the first occurrence.  Without this the
---      counts double.
+--      counts double.  The comparison is over the whole block, before the
+--      message is bounded, so only true repeats collapse.
 --   +  /Root-cause ordering/.  'diagnosticRank' sorts scope errors ahead of type
 --      errors and the scope warnings that precede a hard error ahead of both, on
 --      the reasoning that Agda reports consequences as loudly as causes and the
@@ -104,9 +105,13 @@ import AgdaMCP.Types
 -- capture it): Agda 2.8.0 prints diagnostics on stdout, earlier versions on
 -- stderr, and the caller need not know which.  Nothing is capped here —
 -- 'capDiagnostics' does that, so the caller can report the true total.
+-- Dedup runs on the blocks, /before/ 'blockToDiagnostic' bounds the message:
+-- keying off the retained prose would make two diagnostics that agree for the
+-- first 'maxMessageLines' lines and differ only past them look identical, drop
+-- one, and understate both @diagnosticsTotal@ and the error counts.
 parseDiagnostics :: Text -> [Diagnostic]
 parseDiagnostics =
-  sortOn diagnosticRank . dedupe . map blockToDiagnostic . blocksOf . T.lines
+  sortOn diagnosticRank . map blockToDiagnostic . dedupeBlocks . blocksOf . T.lines
 
 
 -- ---------------------------------------------------------------------------
@@ -135,9 +140,12 @@ capDiagnostics :: Maybe Int -> [Diagnostic] -> ([Diagnostic], Int)
 capDiagnostics mMax ds =
   (maybe ds (`take` ds) (effectiveMaxDiagnostics mMax), length ds)
 
--- | How many lines of one diagnostic's message survive.  Chosen against the
--- field report's worst case: an @UnsolvedConstraints@ dump ran ~20 lines of
--- internal meta names, and its structured form is in 'Involved' anyway.
+-- | How long one diagnostic's message may be.  Chosen against the field
+-- report's worst case: an @UnsolvedConstraints@ dump ran ~20 lines of internal
+-- meta names, and its structured form is in 'Involved' anyway.
+--
+-- Both bounds are on the message /as emitted/, elision marker included, so a
+-- client that budgets @maxMessageChars@ is never handed one more.
 maxMessageLines :: Int
 maxMessageLines = 24
 
@@ -249,6 +257,11 @@ data Header = Header
 -- | blocksOf: split Agda's output into (header, detail-lines) blocks, in the
 -- order Agda printed them.  Lines before the first header, and lines after a
 -- boundary, belong to no block and are dropped.
+--
+-- Blocks come out canonical — trailing blank lines stripped — because 'dedupe'
+-- compares them: Agda separates a diagnostic from the next with a blank line
+-- but ends the last one at EOF, so the two copies of a repeated warning differ
+-- by exactly that blank and would otherwise not compare equal.
 -- Note: foldl' is re-exported from Prelude in GHC 9.10+ (base 4.20+), as
 -- 'AgdaMCP.Agda.parseGoalContext' already relies on.
 blocksOf :: [Text] -> [(Header, [Text])]
@@ -262,7 +275,7 @@ blocksOf = finish . foldl' step (Nothing, [])
           | otherwise         -> (fmap (\(h, body) -> (h, ln : body)) cur, done)
 
     close Nothing          done = done
-    close (Just (h, body)) done = (h, reverse body) : done
+    close (Just (h, body)) done = (h, dropTrailingBlanks (reverse body)) : done
 
     finish (cur, done) = reverse (close cur done)
 
@@ -419,8 +432,11 @@ readInt t
 -- ---------------------------------------------------------------------------
 
 -- | blockToDiagnostic: assemble the structured diagnostic from its block.
+--
+-- This is where the message is bounded, and so it is the last step: dedup has
+-- to compare what Agda printed, not what fit.
 blockToDiagnostic :: (Header, [Text]) -> Diagnostic
-blockToDiagnostic (h, rawBody) = Diagnostic
+blockToDiagnostic (h, body) = Diagnostic
   { diagSeverity = hdrSeverity h
   , diagCode     = hdrCode h
   , diagFile     = hdrFile h
@@ -431,7 +447,6 @@ blockToDiagnostic (h, rawBody) = Diagnostic
   , diagInvolved = involvedOf (hdrCode h) body
   }
   where
-    body    = dropTrailingBlanks rawBody
     message = boundMessage . T.intercalate "\n" $
                 filter (not . T.null) [hdrRest h] <> body
 
@@ -442,39 +457,47 @@ dropTrailingBlanks = reverse . dropWhile (T.null . T.strip) . reverse
 
 -- | boundMessage: the full body, bounded in lines and then in characters, with
 -- the elision stated rather than silent.
+--
+-- Each marker is paid for out of the bound it announces — one line of the line
+-- budget, one character of the character budget — so the result satisfies the
+-- documented limit rather than exceeding it by the width of the marker.
 boundMessage :: Text -> Text
 boundMessage t
-  | T.length capped > maxMessageChars = T.take maxMessageChars capped <> "…"
-  | otherwise                         = capped
+  | T.length capped > maxMessageChars =
+      T.take (maxMessageChars - T.length ellipsis) capped <> ellipsis
+  | otherwise = capped
   where
-    ls = T.lines t
+    ellipsis = "…"
+    ls       = T.lines t
+    kept     = maxMessageLines - 1   -- the last line is the marker
     capped
       | length ls > maxMessageLines =
-          T.intercalate "\n" (take maxMessageLines ls)
-            <> "\n… (" <> T.pack (show (length ls - maxMessageLines)) <> " more lines)"
+          T.intercalate "\n" (take kept ls)
+            <> "\n… (" <> T.pack (show (length ls - kept)) <> " more lines)"
       | otherwise = t
 
--- | dedupe: keep the first of each identical diagnostic.
+-- | dedupeBlocks: keep the first of each identical block.
 --
 -- A run that ends in warnings prints each of them twice — once where it was
 -- raised, once under the "All done; warnings encountered" banner — so without
 -- this every such warning is reported and counted twice.
-dedupe :: [Diagnostic] -> [Diagnostic]
-dedupe = go Set.empty
+--
+-- The comparison is over the whole block, header and full body, which is why
+-- this runs before the message is bounded: two diagnostics that agree for the
+-- first 'maxMessageLines' lines and differ only past them are different
+-- diagnostics, and dropping one would understate every count derived from the
+-- list.
+dedupeBlocks :: [(Header, [Text])] -> [(Header, [Text])]
+dedupeBlocks = go Set.empty
   where
     go _ [] = []
-    go seen (d : ds)
-      | k `Set.member` seen = go seen ds
-      | otherwise           = d : go (Set.insert k seen) ds
-      where k = dedupeKey d
+    go seen (b : bs)
+      | k `Set.member` seen = go seen bs
+      | otherwise           = b : go (Set.insert k seen) bs
+      where k = blockKey b
 
-    dedupeKey d = T.intercalate "\US"
-      [ T.pack (show (diagSeverity d))
-      , fromMaybe "" (diagCode d)
-      , maybe "" T.pack (diagFile d)
-      , maybe "" (T.pack . show) (diagRange d)
-      , diagMessage d
-      ]
+    blockKey (h, body) =
+      T.intercalate "\US" (T.pack (show h) : body)
 
 
 -- ---------------------------------------------------------------------------
