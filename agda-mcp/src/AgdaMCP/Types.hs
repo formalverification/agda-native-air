@@ -20,6 +20,12 @@
 --   additive — every pre-existing key keeps its name, type, and meaning — so the
 --   schema version is unchanged (issue #77).
 --
+--   'Diagnostic' carries the structured shape of issue #74: a machine-readable
+--   @code@, the source @file@ and @range@, the bounded full message body, and an
+--   @involved@ payload naming the expected/actual types, candidate names, or
+--   metas the diagnostic is about.  @line@ and @col@ are retained as aliases of
+--   the range start, so this too is additive.
+--
 --   These types correspond 1-to-1 with the policy contract defined in
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
@@ -47,6 +53,11 @@ module AgdaMCP.Types
   , FillStatus (..)
   , Diagnostic (..)
   , DiagSeverity (..)
+  , DiagRange (..)
+  , Involved (..)
+  , noInvolved
+  , hasInvolved
+  , plainDiagnostic
   , FileCheckResult (..)
   , DiagnosticsResult (..)
     -- * Hole location
@@ -142,22 +153,31 @@ instance FromJSON FillHoleParams where
     FillHoleParams <$> o .: "filePath" <*> o .: "holeIndex" <*> o .: "candidate"
 
 -- | Parameters for the @check_file@ tool.
-newtype CheckFileParams = CheckFileParams
-  { cfFilePath :: FilePath
+--
+-- 'cfMaxDiagnostics' caps how many diagnostics the response carries; the total
+-- found is always reported alongside, so a truncated list is never mistaken for
+-- a short one.  @Nothing@ means the server default
+-- ('AgdaMCP.Diagnostics.defaultMaxDiagnostics'); a non-positive number means
+-- "no cap", the same spelling @--timeout 0@ uses (issue #74).
+data CheckFileParams = CheckFileParams
+  { cfFilePath       :: FilePath
+  , cfMaxDiagnostics :: Maybe Int
   } deriving (Eq, Show)
 
 instance FromJSON CheckFileParams where
   parseJSON = withObject "CheckFileParams" $ \o ->
-    CheckFileParams <$> o .: "filePath"
+    CheckFileParams <$> o .: "filePath" <*> o .:? "maxDiagnostics"
 
--- | Parameters for the @get_diagnostics@ tool.
-newtype GetDiagnosticsParams = GetDiagnosticsParams
-  { gdFilePath :: FilePath
+-- | Parameters for the @get_diagnostics@ tool.  'gdMaxDiagnostics' is the cap
+-- described at 'CheckFileParams'.
+data GetDiagnosticsParams = GetDiagnosticsParams
+  { gdFilePath       :: FilePath
+  , gdMaxDiagnostics :: Maybe Int
   } deriving (Eq, Show)
 
 instance FromJSON GetDiagnosticsParams where
   parseJSON = withObject "GetDiagnosticsParams" $ \o ->
-    GetDiagnosticsParams <$> o .: "filePath"
+    GetDiagnosticsParams <$> o .: "filePath" <*> o .:? "maxDiagnostics"
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -279,25 +299,138 @@ instance ToJSON DiagSeverity where
   toJSON DiagWarning = String "warning"
   toJSON DiagInfo    = String "info"
 
--- | A single diagnostic (error, warning, or info) from Agda.
-data Diagnostic = Diagnostic
-  { diagSeverity :: DiagSeverity
-  , diagMessage  :: Text
-  , diagLine     :: Maybe Int     -- ^ 1-based line number (if available).
-  , diagCol      :: Maybe Int     -- ^ 1-based column (if available).
+-- | A source range, in 1-based (line, column) coordinates of the file as
+-- written — literate-file coordinates for literate sources, matching what an
+-- editor shows and what Agda's own messages print.
+--
+-- Agda prints a same-line range as @9.12-13@ (Agda ≥ 2.6.2) or @9,12-13@
+-- (older), and a multi-line one as @9.12-11.5@ / @9,12-11,3@; both spellings
+-- parse to the same four numbers here (issue #74).  A range that names a single
+-- position has @end == start@.
+data DiagRange = DiagRange
+  { rngStartLine :: Int
+  , rngStartCol  :: Int
+  , rngEndLine   :: Int
+  , rngEndCol    :: Int
   } deriving (Eq, Show)
 
+instance ToJSON DiagRange where
+  toJSON r = object
+    [ "startLine" .= rngStartLine r
+    , "startCol"  .= rngStartCol r
+    , "endLine"   .= rngEndLine r
+    , "endCol"    .= rngEndCol r
+    ]
+
+-- | The entities a diagnostic is about, lifted out of its prose so a client can
+-- act on them without a regex (feedback document § 3.4, error corpus § 5).
+--
+-- Which fields are populated depends on the diagnostic's 'diagCode'; the
+-- extraction is best-effort, and an absent field means "Agda did not print
+-- one", never "there is none".
+--
+-- +---------------------------+------------------------------------------------+
+-- | Code                      | Payload                                        |
+-- +===========================+================================================+
+-- | @UnequalTerms@ and other  | 'invActual' and 'invExpected': the two sides   |
+-- | mismatches                | of Agda's @A != B@ / @A !=< B@ line, in that   |
+-- |                           | order (Agda prints the actual type first).     |
+-- +---------------------------+------------------------------------------------+
+-- | @NotInScope@              | 'invCandidates': the "did you mean" names,     |
+-- |                           | qualified as Agda prints them (so the module   |
+-- |                           | that would export each one is visible).        |
+-- +---------------------------+------------------------------------------------+
+-- | @AmbiguousName@,          | 'invCandidates': the qualified names the       |
+-- | @AmbiguousModule@, …      | ambiguous one could refer to.                  |
+-- +---------------------------+------------------------------------------------+
+-- | @ModuleDoesntExport@      | 'invCandidates': the names the module does not |
+-- |                           | export.                                        |
+-- +---------------------------+------------------------------------------------+
+-- | @ClashingDefinition@, …   | 'invCandidates': the origin of the pre-existing|
+-- |                           | definition, as Agda's @file:range@ location.   |
+-- +---------------------------+------------------------------------------------+
+-- | @UnsolvedMetaVariables@,  | 'invMetaTypes': one entry per meta or          |
+-- | @UnsolvedConstraints@,    | constraint Agda lists — locations for the meta |
+-- | @UnsolvedInteractionMetas@| classes, and the blocked constraint with its   |
+-- |                           | type for @UnsolvedConstraints@.                |
+-- +---------------------------+------------------------------------------------+
+data Involved = Involved
+  { invExpected   :: Maybe Text  -- ^ The expected type, where Agda names one.
+  , invActual     :: Maybe Text  -- ^ The actual (inferred) type, where Agda names one.
+  , invCandidates :: [Text]      -- ^ The names involved, qualified as Agda prints them.
+  , invMetaTypes  :: [Text]      -- ^ One entry per unsolved meta or constraint.
+  } deriving (Eq, Show)
+
+-- | The empty payload: a diagnostic whose prose named nothing extractable.
+noInvolved :: Involved
+noInvolved = Involved
+  { invExpected   = Nothing
+  , invActual     = Nothing
+  , invCandidates = []
+  , invMetaTypes  = []
+  }
+
+-- | Did anything get extracted?  Drives omission of the @involved@ key, so an
+-- empty payload costs a client nothing to skip.
+hasInvolved :: Involved -> Bool
+hasInvolved i = i /= noInvolved
+
+instance ToJSON Involved where
+  toJSON i = object $
+    maybe [] (\e -> ["expected" .= e]) (invExpected i)
+    <> maybe [] (\a -> ["actual" .= a]) (invActual i)
+    <> (if null (invCandidates i) then [] else ["candidates" .= invCandidates i])
+    <> (if null (invMetaTypes i)  then [] else ["metaTypes"  .= invMetaTypes i])
+
+-- | A single diagnostic (error, warning, or info) from Agda.
+--
+-- The shape is issue #74's: 'diagCode' is Agda's own bracketed name, so a client
+-- branches on it instead of matching prose; 'diagFile' and 'diagRange' locate it
+-- without regexing the header; and 'diagMessage' is the bounded /full/ message
+-- body, not just the header line.  All four are optional because Agda does not
+-- always print them — @error: [UnsolvedConstraints]@, for one, carries no
+-- location at all.
+data Diagnostic = Diagnostic
+  { diagSeverity :: DiagSeverity
+  , diagCode     :: Maybe Text        -- ^ Agda's bracketed name, e.g. @UnsolvedMetaVariables@.
+  , diagFile     :: Maybe FilePath    -- ^ The file the position refers to (may differ from the checked file).
+  , diagRange    :: Maybe DiagRange   -- ^ Source range, 1-based, in the file as written.
+  , diagMessage  :: Text              -- ^ The full message body, bounded (see 'AgdaMCP.Diagnostics').
+  , diagInvolved :: Involved          -- ^ The entities named in the message.
+  } deriving (Eq, Show)
+
+-- | plainDiagnostic: a diagnostic that is ours rather than Agda's — severity and
+-- prose, with no code, position, or payload to report (the timeout notice).
+plainDiagnostic :: DiagSeverity -> Text -> Diagnostic
+plainDiagnostic sev msg = Diagnostic
+  { diagSeverity = sev
+  , diagCode     = Nothing
+  , diagFile     = Nothing
+  , diagRange    = Nothing
+  , diagMessage  = msg
+  , diagInvolved = noInvolved
+  }
+
+-- | The wire form.  @line@ and @col@ are the range's start, retained under their
+-- original names so pre-#74 clients keep working unchanged.
 instance ToJSON Diagnostic where
   toJSON d = object $
-    [ "severity" .= diagSeverity d
-    , "message"  .= diagMessage d
-    ] <> maybe [] (\l -> ["line" .= l]) (diagLine d)
-      <> maybe [] (\c -> ["col"  .= c]) (diagCol d)
+    [ "severity" .= diagSeverity d ]
+    <> maybe [] (\c -> ["code"  .= c]) (diagCode d)
+    <> maybe [] (\f -> ["file"  .= f]) (diagFile d)
+    <> maybe [] (\r -> [ "range" .= r
+                       , "line"  .= rngStartLine r
+                       , "col"   .= rngStartCol r
+                       ]) (diagRange d)
+    <> [ "message" .= diagMessage d ]
+    <> (if hasInvolved (diagInvolved d) then ["involved" .= diagInvolved d] else [])
 
 -- | Result of @check_file@.
 data FileCheckResult = FileCheckResult
   { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0 with no errors.
-  , fcrDiagnostics :: [Diagnostic]
+  , fcrDiagnostics :: [Diagnostic]  -- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
+  , fcrDiagnosticsTotal :: Int      -- ^ How many were found before the cap; equals
+                                    --   @length fcrDiagnostics@ when nothing was dropped.
   , fcrHolesCount  :: Int           -- ^ Number of open holes (any hole syntax, code regions only).
   , fcrTimedOut    :: Bool          -- ^ True iff the check hit the @--timeout@ bound.
                                     --   When set, 'fcrSuccess' is False and the timeout
@@ -312,6 +445,7 @@ instance ToJSON FileCheckResult where
   toJSON r = object $
     [ "success"           .= fcrSuccess r
     , "diagnostics"       .= fcrDiagnostics r
+    , "diagnosticsTotal"  .= fcrDiagnosticsTotal r
     , "holesCount"        .= fcrHolesCount r
     , "timedOut"          .= fcrTimedOut r
     , "elapsedMs"         .= fcrElapsedMs r
@@ -324,13 +458,18 @@ instance ToJSON FileCheckResult where
 -- timeout be reported the same way @check_file@ reports it — @success: false@
 -- plus an explanatory error entry — rather than as a silent zero-error summary
 -- of output Agda never got to produce.
+--
+-- The counts are over /every/ diagnostic found, not over the capped list, so
+-- @maxDiagnostics@ shortens the payload without ever understating how much is
+-- wrong (issue #74).
 data DiagnosticsResult = DiagnosticsResult
   { drFilePath    :: FilePath
   , drErrors      :: Int
   , drWarnings    :: Int
   , drHoles       :: [HoleInfo]  -- ^ Open holes with index and (line, col).
   , drSuccess     :: Bool        -- ^ True iff Agda exited 0, in time, with no errors.
-  , drDiagnostics :: [Diagnostic]-- ^ The diagnostics behind the counts above.
+  , drDiagnostics :: [Diagnostic]-- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
+  , drDiagnosticsTotal :: Int    -- ^ How many were found before the cap.
   , drTimedOut    :: Bool        -- ^ True iff the run hit the @--timeout@ bound.
   , drElapsedMs   :: Int         -- ^ Wall-clock ms spent in the Agda subprocess.
   , drCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
@@ -346,6 +485,7 @@ instance ToJSON DiagnosticsResult where
     , "holes"             .= drHoles r
     , "success"           .= drSuccess r
     , "diagnostics"       .= drDiagnostics r
+    , "diagnosticsTotal"  .= drDiagnosticsTotal r
     , "timedOut"          .= drTimedOut r
     , "elapsedMs"         .= drElapsedMs r
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (drCheckedFromSource r)

@@ -27,7 +27,7 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 ### P1. Reach beyond the shell
 
 +  **Enforced timeout with timing visibility** (#77, PR 89, merged).  `--timeout` was parsed and then ignored, so a hung Agda blocked a tool call forever.  The subprocess group is now killed on a SIGINT → SIGTERM → SIGKILL ladder at the bound, every response carries `elapsedMs` and a tri-state `checkedFromSource` cache signal, and the default bound was raised from 30 s to 300 s so cold interface builds are not aborted.
-+  **Structured diagnostics** (#74, open — next batch).  Diagnostics ship as severity plus prose with no source positions (the parser expects Agda's old `file:10,5-15` format; 2.8.0 emits `file:9.12-13`), and only the header line survives.  The plan: machine-readable `code`, a full `range`, the bounded message body, an `involved` payload (expected/actual/candidates), a cap of about ten with root-cause ordering, and one fixture per error class from the field report's § 5 corpus.
++  **Structured diagnostics** (#74, PR 94, merged).  Diagnostics shipped as severity plus prose with no source positions at all — the parser split on the comma of Agda's old `file:10,5-15` format while 2.8.0 emits `file:9.12-13` — it dropped any error printed without a location, and only the header line survived.  Each one now carries a machine-readable `code`, the `file` and `range`, the bounded full message body, and an `involved` payload (expected/actual, candidates, missing exports, the origin of a clashing definition, one entry per unsolved meta), capped by `maxDiagnostics` with the pre-cap total reported and ordered most likely root cause first.  One fixture per error class of the field report's § 5 corpus asserts the code, the range, and the payload § 5 names.
 +  **Root resolution and environment transparency** (#76, open — next batch, shares plumbing with #72).  No response says which tree was checked, and a stale `AGDA_ALGEBRAS_ROOT` can silently typecheck a different worktree while reporting success.  Resolve the library context from the requested file's nearest `*.agda-lib`, echo the resolved root and flags, and fail loudly when the file is outside every configured root.
 +  **Live scope, type, and definition queries** (#75, open — after the current batch).  `scope_at`, `resolve_name`, `type_of`, `normalize`, `exports_of`, `definition_of`: answers the shell cannot give without reading source, and the strongest reason for an agent to prefer the server.  The #71 hole-model groundwork (Agda's interaction points as source of truth) feeds directly into this.
 
@@ -44,8 +44,8 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 
 ## Near-term sequencing
 
-+  Just merged, in order: PR 88 (#71 + #73) and PR 89 (#77), the latter rebased over the former's hole-model rework.
-+  Next, as parallel work: #74 (structured diagnostics), #72 + #76 together (they share the response-echo plumbing), and #78 (`check_project`); then #79 and #75 on top of the new hole model; then the #83 re-run as the wave's acceptance measurement.
++  Just merged, in order: PR 88 (#71 + #73), PR 89 (#77), and PR 94 (#74), each rebased over the last.
++  Next, as parallel work: #72 + #76 together (they share the response-echo plumbing) and #78 (`check_project`); then #79 and #75 on top of the new hole model; then the #83 re-run as the wave's acceptance measurement.
 +  Related later work that builds on this surface: corpus-backed retrieval tools in the server (#17, M2-3), counterexample-search tools (#24, M3-2), a local completion backend (#29, M4-3), and `makeOverlay` performance (#43).
 
 ## Where the details live

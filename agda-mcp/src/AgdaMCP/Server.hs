@@ -162,21 +162,27 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           ["filePath", "holeIndex", "candidate"]
 
       , toolDef "check_file"
-          ("Load/reload an Agda file and return all diagnostics."
+          ("Load/reload an Agda file and return all diagnostics. "
+           <> diagnosticModel
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
           [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
+          , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           ]
           ["filePath"]
 
       , toolDef "get_diagnostics"
           ("Retrieve diagnostic summary: error/warning counts, and each open \
-           \hole's index and (line, col) position."
+           \hole's index and (line, col) position. "
+           <> diagnosticModel
+           <> " The errors and warnings counts are over every diagnostic found, \
+              \not over the (capped) diagnostics list."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
           [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
+          , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           ]
           ["filePath"]
        ]
@@ -204,6 +210,37 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
               ["name"]
           ]
       | otherwise = []
+
+-- | diagnosticModel: the shape of a diagnostic, stated where the client reads
+-- it (issue #74).
+--
+-- An agent decides whether to parse prose or branch on a field by reading the
+-- tool's description and nothing else — the § 6 meta-suggestion of the feedback
+-- document — so a @code@ and a @range@ the description does not mention may as
+-- well not exist.
+diagnosticModel :: Text
+diagnosticModel =
+  "Each diagnostic is structured: severity, code (Agda's own name, e.g. \
+  \NotInScope / AmbiguousName / UnsolvedMetaVariables — branch on this rather \
+  \than matching prose), file, range {startLine, startCol, endLine, endCol} in \
+  \1-based coordinates of the file as written, the bounded full message body, \
+  \and involved {expected?, actual?, candidates?, metaTypes?} naming what the \
+  \message is about (the mismatched types, the \"did you mean\" or ambiguity \
+  \candidates, the missing exports, the origin of a clashing definition, or one \
+  \entry per unsolved meta or constraint). line and col are kept as aliases of \
+  \the range start. Diagnostics are ordered most-likely-root-cause first — \
+  \unresolvable-file errors, then scope warnings that precede a hard error \
+  \(e.g. ModuleDoesntExport before the NotInScope it causes), then scope \
+  \errors, type errors, and unsolved metas — and identical repeats are \
+  \collapsed."
+
+-- | maxDiagnosticsDoc: the cap's contract, in the input schema where a client
+-- decides what to pass.
+maxDiagnosticsDoc :: Text
+maxDiagnosticsDoc =
+  "Maximum diagnostics to return (default 10; 0 means no limit). \
+  \diagnosticsTotal always reports how many were found before the cap, so a \
+  \truncated list is never mistaken for a short one."
 
 -- | latencyNote: the shared latency/timeout sentence appended to every
 -- proof-state tool description.

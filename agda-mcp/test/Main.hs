@@ -35,8 +35,9 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (catch, SomeException)
 import Data.Char (isDigit)
 import Data.Either (isLeft)
+import Data.List (find, sortOn)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (isJust, isNothing, listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -63,6 +64,9 @@ import AgdaMCP.Holes
   , injectReportExpr , substituteHole
   )
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
+import AgdaMCP.Diagnostics
+  ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
+  , maxMessageLines, parseDiagnostics )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -94,6 +98,18 @@ assertEqual label expected actual
   | expected == actual = pure Pass
   | otherwise = pure . Fail $
       label <> ": expected " <> show expected <> ", got " <> show actual
+
+-- | allOf: run assertions in sequence, stopping at the first failure.  A test
+-- that checks several things about one result (a diagnostic's code, then its
+-- range, then its payload) reads as a list rather than as a staircase of
+-- case-on-TestResult.
+allOf :: [IO TestResult] -> IO TestResult
+allOf []       = pure Pass
+allOf (a : as) = do
+  r <- a
+  case r of
+    Fail m -> pure (Fail m)
+    Pass   -> allOf as
 
 -- | failureText: flatten a structured 'ToolFailure' to its message, for test
 -- diagnostics that only want the prose.
@@ -372,6 +388,414 @@ pureTests = do
         assertEqual "timeout" (Just defaultTimeoutSeconds) (agdaTimeout defaultConfig)
     ]
 
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 0b: Structured-diagnostic tests (issue #74; pure)
+--
+-- These run the parser over Agda output captured verbatim from the pinned
+-- Agda 2.8.0 against the fixtures in test/resources/diagnostics/ (the tier-2e
+-- tests below re-derive the same facts from a live Agda, so drift between the
+-- two is a test failure rather than a silent divergence).  They also cover the
+-- old `LINE,COL` position spelling, which the pinned Agda cannot produce and
+-- which the pre-#74 extractor was written for.
+-- ---------------------------------------------------------------------------
+
+-- | Captured output: the § 5 pair — a [ModuleDoesntExport] warning on the
+-- import, and the [NotInScope] error it causes below.  Note the warning's
+-- `-W[no]Code` spelling of the code, and the interleaved `Checking` lines.
+outModuleDoesntExport :: Text
+outModuleDoesntExport = T.unlines
+  [ "Checking ModuleDoesntExport (/r/ModuleDoesntExport.agda)."
+  , " Checking DiagBarrel (/r/DiagBarrel.agda)."
+  , "/r/ModuleDoesntExport.agda:20.24-50: warning: -W[no]ModuleDoesntExport"
+  , "The module DiagBarrel doesn't export the following:"
+  , "  absentName"
+  , "when scope checking the declaration"
+  , "  open import DiagBarrel using (usable; absentName)"
+  , ""
+  , "/r/ModuleDoesntExport.agda:23.5-15: error: [NotInScope]"
+  , "Not in scope:"
+  , "  absentName"
+  , "  at /r/ModuleDoesntExport.agda:23.5-15"
+  , "when scope checking absentName"
+  ]
+
+-- | Captured output: [NotInScope] with a "did you mean" list.
+outNotInScope :: Text
+outNotInScope = T.unlines
+  [ "Checking NotInScope (/r/NotInScope.agda)."
+  , "/r/NotInScope.agda:16.9-14: error: [NotInScope]"
+  , "Not in scope:"
+  , "  zeroo"
+  , "  at /r/NotInScope.agda:16.9-14"
+  , "    (did you mean"
+  , "       'Agda.Builtin.Nat.Nat.zero' or"
+  , "       'Agda.Builtin.Nat.zero' or"
+  , "       'Nat.zero' or"
+  , "       'zero'?)"
+  , "when scope checking zeroo"
+  ]
+
+-- | Captured output: [AmbiguousName], whose candidate list interleaves names
+-- with the locations they are bound at.
+outAmbiguousName :: Text
+outAmbiguousName = T.unlines
+  [ "Checking AmbiguousName (/r/AmbiguousName.agda)."
+  , "/r/AmbiguousName.agda:19.5-11: error: [AmbiguousName]"
+  , "Ambiguous name shared. It could refer to any one of"
+  , "  DiagAmbigA.shared bound at"
+  , "    /r/DiagAmbigA.agda:13.1-7"
+  , "  DiagAmbigB.shared bound at"
+  , "    /r/DiagAmbigB.agda:12.1-7"
+  , "shared is in scope as"
+  , "  * a defined name DiagAmbigA.shared brought into scope by"
+  , "    - the opening of DiagAmbigA at /r/AmbiguousName.agda:15.13-23"
+  , "when scope checking shared"
+  ]
+
+-- | Captured output: [ClashingDefinition], whose sentence wraps across lines.
+outClashingDefinition :: Text
+outClashingDefinition = T.unlines
+  [ "Checking ClashingDefinition (/r/ClashingDefinition.agda)."
+  , "/r/ClashingDefinition.agda:22.1-6: error: [ClashingDefinition]"
+  , "Multiple definitions of least. Previous definition at"
+  , "/r/ClashingDefinition.agda:18.9-14"
+  , "when scope checking the declaration"
+  , "  least : Nat"
+  ]
+
+-- | Captured output: [UnequalTerms], with Agda's subtyping inequality.
+outUnequalTerms :: Text
+outUnequalTerms = T.unlines
+  [ "Checking UnequalTerms (/r/UnequalTerms.agda)."
+  , "/r/UnequalTerms.agda:17.5-9: error: [UnequalTerms]"
+  , "Bool !=< Nat"
+  , "when checking that the expression true has type Nat"
+  ]
+
+-- | Captured output: [UnsolvedConstraints] — which carries no position at all,
+-- so its header begins the line — followed by [UnsolvedMetaVariables].
+outUnsolvedMetas :: Text
+outUnsolvedMetas = T.unlines
+  [ "Checking UnsolvedMetas (/r/UnsolvedMetas.agda)."
+  , "error: [UnsolvedConstraints]"
+  , "Failed to solve the following constraints:"
+  , "  _n_4 + _m_5 = 3 : Nat (blocked on _n_4)"
+  , ""
+  , "/r/UnsolvedMetas.agda:26.9-16: error: [UnsolvedMetaVariables]"
+  , "Unsolved metas at the following locations:"
+  , "  /r/UnsolvedMetas.agda:26.9-16"
+  ]
+
+-- | byCode: the first diagnostic carrying a given code.
+byCode :: Text -> [Diagnostic] -> Maybe Diagnostic
+byCode c = find ((== Just c) . diagCode)
+
+-- | involvedOf: a diagnostic's payload, or the empty one when it is absent.
+involvedIn :: Maybe Diagnostic -> Involved
+involvedIn = maybe noInvolved diagInvolved
+
+-- | codesOf: the codes of a diagnostic list, in order — the shape the ordering
+-- tests assert on.
+codesOf :: [Diagnostic] -> [Maybe Text]
+codesOf = map diagCode
+
+-- | synthetic: a diagnostic with a code and severity and nothing else, for the
+-- ordering and capping tests.
+synthetic :: DiagSeverity -> Text -> Diagnostic
+synthetic sev code = (plainDiagnostic sev code) { diagCode = Just code }
+
+diagnosticTests :: IO [Bool]
+diagnosticTests = do
+  hPutStrLn stderr "\n── Structured-diagnostic tests (tier 0b: pure, #74) ──"
+  sequence
+    [ -- The bug this issue opens with: under Agda 2.8.0 the old extractor found
+      -- no positions at all, because it split on the comma of a spelling Agda
+      -- had already replaced.  Both spellings must parse.
+      runTest "position: Agda 2.8 'LINE.COL-COL' parses (the #74 bug)" $
+        case parseDiagnostics outNotInScope of
+          [d] -> allOf
+            [ assertEqual "code" (Just "NotInScope") (diagCode d)
+            , assertEqual "file" (Just "/r/NotInScope.agda") (diagFile d)
+            , assertEqual "range" (Just (DiagRange 16 9 16 14)) (diagRange d)
+            ]
+          ds  -> pure . Fail $ "expected 1 diagnostic, got " <> show (length ds)
+
+    , runTest "position: legacy 'LINE,COL-COL' still parses" $
+        case parseDiagnostics "/r/M.agda:10,5-15: error: [NotInScope]\nNot in scope:\n  x\n" of
+          [d] -> allOf
+            [ assertEqual "range" (Just (DiagRange 10 5 10 15)) (diagRange d)
+            , assertEqual "file" (Just "/r/M.agda") (diagFile d)
+            ]
+          ds  -> pure . Fail $ "expected 1 diagnostic, got " <> show (length ds)
+
+    , runTest "position: multi-line ranges, both spellings" $ do
+        let rangeOf out = diagRange =<< listToMaybe (parseDiagnostics out)
+        allOf
+          [ assertEqual "2.8 'L.C-L.C'" (Just (DiagRange 9 12 11 5))
+              (rangeOf "/r/M.agda:9.12-11.5: error: [UnequalTerms]\nBool !=< Nat\n")
+          , assertEqual "legacy 'L,C-L,C'" (Just (DiagRange 10 5 11 3))
+              (rangeOf "/r/M.agda:10,5-11,3: error: [UnequalTerms]\nBool !=< Nat\n")
+          , assertEqual "a bare position" (Just (DiagRange 7 3 7 3))
+              (rangeOf "/r/M.agda:7.3: error: [NotInScope]\nNot in scope:\n  x\n")
+          ]
+
+    , runTest "header: an error with no position at all is still a diagnostic" $
+        -- error: [UnsolvedConstraints] starts the line, so a parser keyed on
+        -- ": error:" dropped it entirely before #74.
+        case byCode "UnsolvedConstraints" (parseDiagnostics outUnsolvedMetas) of
+          Nothing -> pure (Fail "UnsolvedConstraints was not parsed")
+          Just d  -> allOf
+            [ assertEqual "file" Nothing (diagFile d)
+            , assertEqual "range" Nothing (diagRange d)
+            , assertEqual "severity" DiagError (diagSeverity d)
+            ]
+
+    , runTest "header: a warning's code is its -W[no]Name" $
+        case byCode "ModuleDoesntExport" (parseDiagnostics outModuleDoesntExport) of
+          Nothing -> pure (Fail "ModuleDoesntExport was not parsed")
+          Just d  -> allOf
+            [ assertEqual "severity" DiagWarning (diagSeverity d)
+            , assertEqual "range" (Just (DiagRange 20 24 20 50)) (diagRange d)
+            ]
+
+    , runTest "message: the full body is kept, not just the header line" $
+        case byCode "UnequalTerms" (parseDiagnostics outUnequalTerms) of
+          Nothing -> pure (Fail "UnequalTerms was not parsed")
+          Just d  -> assertEqual "message"
+            "Bool !=< Nat\nwhen checking that the expression true has type Nat"
+            (diagMessage d)
+
+    , runTest "message: progress lines and the end banner stay out of it" $ do
+        let out = T.unlines
+              [ "Checking M (/r/M.agda)."
+              , "/r/M.agda:6.1-8: warning: -W[no]UnreachableClauses"
+              , "Unreachable clause"
+              , "when checking the definition of f"
+              , ""
+              , "———— All done; warnings encountered ————————————————————————"
+              , ""
+              , "/r/M.agda:6.1-8: warning: -W[no]UnreachableClauses"
+              , "Unreachable clause"
+              , "when checking the definition of f"
+              ]
+        case parseDiagnostics out of
+          -- One diagnostic, not two: Agda prints every warning a second time
+          -- under the banner, and counting both would double every count.
+          [d] -> assertEqual "message"
+                   "Unreachable clause\nwhen checking the definition of f"
+                   (diagMessage d)
+          ds  -> pure . Fail $ "expected 1 diagnostic after dedup, got " <> show (length ds)
+
+    , runTest "message: a long body is bounded, and says so" $ do
+        let body = [ "  meta " <> T.pack (show i) | i <- [1 :: Int .. 60] ]
+            out  = T.unlines $
+              [ "error: [UnsolvedConstraints]"
+              , "Failed to solve the following constraints:"
+              ] <> body
+        case parseDiagnostics out of
+          [d] -> allOf
+            -- The bound is on what is emitted, elision marker included: a
+            -- client that budgets maxMessageLines gets no more than that.
+            [ assertEqual "message lines" maxMessageLines
+                (length (T.lines (diagMessage d)))
+            , assert "the elision is stated" ("more lines" `T.isInfixOf` diagMessage d)
+              -- Bounding the prose must not cost the structured payload: all 60
+              -- constraints are still there under `involved`.
+            , assertEqual "metaTypes are not bounded" 60
+                (length (invMetaTypes (diagInvolved d)))
+            ]
+          ds  -> pure . Fail $ "expected 1 diagnostic, got " <> show (length ds)
+
+    , runTest "message: the character bound counts the elision marker too" $ do
+        let out = T.unlines
+              [ "/r/M.agda:5.1-5: error: [UnequalTerms]"
+              , T.replicate 4000 "x"
+              ]
+        case parseDiagnostics out of
+          [d] -> allOf
+            [ assertEqual "message length" maxMessageChars (T.length (diagMessage d))
+            , assert "the elision is stated" ("…" `T.isSuffixOf` diagMessage d)
+            ]
+          ds  -> pure . Fail $ "expected 1 diagnostic, got " <> show (length ds)
+
+      -- Dedup keys off what Agda printed, not off what survived the message
+      -- bound: two diagnostics that agree for the first maxMessageLines lines
+      -- and differ only past it are different diagnostics, and collapsing them
+      -- would understate diagnosticsTotal and the error counts.
+    , runTest "dedup: two diagnostics differing only past the bound both survive" $ do
+        let shared = [ "  constraint " <> T.pack (show i) | i <- [1 :: Int .. 40] ]
+            block tl = [ "error: [UnsolvedConstraints]"
+                       , "Failed to solve the following constraints:"
+                       ] <> shared <> [ "  " <> tl ]
+            out = T.unlines (block "blocked on _a" <> block "blocked on _b")
+        assertEqual "diagnostics" 2 (length (parseDiagnostics out))
+
+      -- The § 5 payloads, one test per error class.
+    , runTest "involved: ModuleDoesntExport names the missing exports" $
+        assertEqual "candidates" ["absentName"]
+          (invCandidates (involvedIn
+            (byCode "ModuleDoesntExport" (parseDiagnostics outModuleDoesntExport))))
+
+    , runTest "involved: NotInScope carries the qualified 'did you mean' names" $
+        assertEqual "candidates"
+          [ "Agda.Builtin.Nat.Nat.zero", "Agda.Builtin.Nat.zero", "Nat.zero", "zero" ]
+          (invCandidates (involvedIn (byCode "NotInScope" (parseDiagnostics outNotInScope))))
+
+    , runTest "involved: AmbiguousName carries the candidates, not their locations" $
+        assertEqual "candidates" ["DiagAmbigA.shared", "DiagAmbigB.shared"]
+          (invCandidates (involvedIn
+            (byCode "AmbiguousName" (parseDiagnostics outAmbiguousName))))
+
+    , runTest "involved: ClashingDefinition carries the previous definition's origin" $
+        assertEqual "candidates" ["/r/ClashingDefinition.agda:18.9-14"]
+          (invCandidates (involvedIn
+            (byCode "ClashingDefinition" (parseDiagnostics outClashingDefinition))))
+
+    , runTest "involved: UnequalTerms carries actual and expected, in that order" $ do
+        let inv = involvedIn (byCode "UnequalTerms" (parseDiagnostics outUnequalTerms))
+        allOf
+          [ assertEqual "actual"   (Just "Bool") (invActual inv)
+          , assertEqual "expected" (Just "Nat")  (invExpected inv)
+          ]
+
+    , runTest "involved: UnequalTerms handles the 'A != B of type T' shape" $ do
+        let out = T.unlines
+              [ "/r/M.agda:5.5-9: error: [UnequalTerms]"
+              , "1 != 2 of type Nat"
+              , "when checking that the expression refl has type 1 ≡ 2"
+              ]
+            inv = involvedIn (byCode "UnequalTerms" (parseDiagnostics out))
+        allOf
+          [ assertEqual "actual"   (Just "1") (invActual inv)
+          , assertEqual "expected" (Just "2") (invExpected inv)
+          ]
+
+      -- Agda fills its sentences to the terminal width, so the phrase that
+      -- introduces a list can wrap onto the next line (a long module or name
+      -- does it).  The lists are found by their indentation, not by that
+      -- phrase, so wrapping must not lose the payload.
+    , runTest "involved: a wrapped introducing sentence still yields the list" $ do
+        let wrappedExport = T.unlines
+              [ "/r/M.agda:3.20-43: warning: -W[no]ModuleDoesntExport"
+              , "The module A.Very.Long.Qualified.Barrel.Module doesn't export the"
+              , "following:"
+              , "  absentName"
+              , "when scope checking the declaration"
+              ]
+            wrappedAmbig = T.unlines
+              [ "/r/M.agda:19.5-11: error: [AmbiguousName]"
+              , "Ambiguous name aLongEnoughNameToWrap. It could refer to any one"
+              , "of"
+              , "  A.aLongEnoughNameToWrap bound at"
+              , "    /r/A.agda:3.1-4"
+              , "  B.aLongEnoughNameToWrap bound at"
+              , "    /r/B.agda:3.1-4"
+              , "when scope checking aLongEnoughNameToWrap"
+              ]
+        allOf
+          [ assertEqual "missing exports" ["absentName"]
+              (invCandidates (involvedIn
+                (byCode "ModuleDoesntExport" (parseDiagnostics wrappedExport))))
+          , assertEqual "ambiguity candidates"
+              ["A.aLongEnoughNameToWrap", "B.aLongEnoughNameToWrap"]
+              (invCandidates (involvedIn
+                (byCode "AmbiguousName" (parseDiagnostics wrappedAmbig))))
+          ]
+
+    , runTest "involved: every 'did you mean' block contributes, not just the first" $ do
+        let out = T.unlines
+              [ "/r/M.agda:4.9-14: error: [NotInScope]"
+              , "Not in scope:"
+              , "  aa"
+              , "  at /r/M.agda:4.9-14"
+              , "    (did you mean 'ab'?)"
+              , "  ba"
+              , "  at /r/M.agda:5.9-14"
+              , "    (did you mean 'bb'?)"
+              , "when scope checking aa"
+              ]
+        assertEqual "candidates" ["ab", "bb"]
+          (invCandidates (involvedIn (byCode "NotInScope" (parseDiagnostics out))))
+
+    , runTest "involved: the unsolved classes carry one entry per meta" $ do
+        let ds = parseDiagnostics outUnsolvedMetas
+        allOf
+          [ assertEqual "constraints"
+              ["_n_4 + _m_5 = 3 : Nat (blocked on _n_4)"]
+              (invMetaTypes (involvedIn (byCode "UnsolvedConstraints" ds)))
+          , assertEqual "meta locations"
+              ["/r/UnsolvedMetas.agda:26.9-16"]
+              (invMetaTypes (involvedIn (byCode "UnsolvedMetaVariables" ds)))
+          ]
+
+      -- Root-cause ordering.
+    , runTest "order: the precursor warning comes before the error it causes" $
+        -- Agda prints ModuleDoesntExport first here anyway; what this pins is
+        -- that the ordering does not *undo* that by sinking warnings.
+        assertEqual "codes" [Just "ModuleDoesntExport", Just "NotInScope"]
+          (codesOf (parseDiagnostics outModuleDoesntExport))
+
+    , runTest "order: scope errors precede type errors, unsolved metas trail" $ do
+        let out = T.unlines
+              [ "/r/M.agda:30.1-5: error: [UnsolvedMetaVariables]"
+              , "Unsolved metas at the following locations:"
+              , "  /r/M.agda:30.1-5"
+              , "/r/M.agda:20.1-5: error: [UnequalTerms]"
+              , "Bool !=< Nat"
+              , "/r/M.agda:10.1-5: error: [NotInScope]"
+              , "Not in scope:"
+              , "  x"
+              , "/r/M.agda:5.1-5: warning: -W[no]ModuleDoesntExport"
+              , "The module B doesn't export the following:"
+              , "  x"
+              , "/r/M.agda:1.1-5: error: [LibraryError]"
+              , "Library 'nope' not found."
+              ]
+        assertEqual "codes"
+          [ Just "LibraryError", Just "ModuleDoesntExport", Just "NotInScope"
+          , Just "UnequalTerms", Just "UnsolvedMetaVariables" ]
+          (codesOf (parseDiagnostics out))
+
+    , runTest "order: within one rank Agda's own order survives (stable sort)" $ do
+        let ds = [ synthetic DiagError "NotInScope"
+                 , synthetic DiagError "AmbiguousName"
+                 , synthetic DiagError "ClashingDefinition"
+                 ]
+        assertEqual "codes" (codesOf ds) (codesOf (sortOn diagnosticRank ds))
+
+      -- The cap.
+    , runTest "cap: the default keeps ten and reports the total" $ do
+        let ds = [ synthetic DiagError ("E" <> T.pack (show i)) | i <- [1 :: Int .. 25] ]
+            (kept, total) = capDiagnostics Nothing ds
+        allOf
+          [ assertEqual "kept"  defaultMaxDiagnostics (length kept)
+          , assertEqual "total" 25 total
+          , assertEqual "kept the first ten, in order"
+              (codesOf (take defaultMaxDiagnostics ds)) (codesOf kept)
+          ]
+
+    , runTest "cap: an explicit bound is honoured; 0 means no bound" $ do
+        let ds = [ synthetic DiagError ("E" <> T.pack (show i)) | i <- [1 :: Int .. 25] ]
+        allOf
+          [ assertEqual "explicit 3"  3  (length (fst (capDiagnostics (Just 3) ds)))
+          , assertEqual "0 = no cap"  25 (length (fst (capDiagnostics (Just 0) ds)))
+          , assertEqual "total is pre-cap" 25 (snd (capDiagnostics (Just 3) ds))
+          ]
+
+    , runTest "cap: a list under the bound is untouched" $ do
+        let ds = [ synthetic DiagError "NotInScope" ]
+            (kept, total) = capDiagnostics Nothing ds
+        allOf [ assertEqual "kept" 1 (length kept), assertEqual "total" 1 total ]
+
+      -- Noise must not become diagnostics.
+    , runTest "parse: a clean run yields nothing" $
+        assertEqual "diagnostics" 0 . length . parseDiagnostics $ T.unlines
+          [ "Checking M (/r/M.agda)."
+          , "Finished M."
+          ]
+    ]
 
 
 -- ---------------------------------------------------------------------------
@@ -855,8 +1279,10 @@ timeoutTests = do
       -- check_file / get_diagnostics report the timeout as a failed check with an
       -- explanatory diagnostic, rather than as a silent "0 errors" summary of
       -- output Agda never produced.
-      chk  <- handleCheckFile slowCfg (CheckFileParams timeoutFixturePath)
-      diag <- handleGetDiagnostics slowCfg (GetDiagnosticsParams timeoutFixturePath)
+      chk  <- handleCheckFile slowCfg
+                (CheckFileParams timeoutFixturePath Nothing)
+      diag <- handleGetDiagnostics slowCfg
+                (GetDiagnosticsParams timeoutFixturePath Nothing)
       results4 <- sequence
         [ runTest "check_file: a timeout is success:false with a timeout diagnostic" $
             case chk of
@@ -1060,7 +1486,8 @@ integrationTests cfg fixturePath repoRoot = do
           Right fr -> assertEqual "status" FillTypeError (frStatus fr)
 
     , runTest "check_file: Fixture01 reports holes" $ do
-        let params = CheckFileParams { cfFilePath = fixturePath }
+        let params = CheckFileParams
+              { cfFilePath = fixturePath, cfMaxDiagnostics = Nothing }
         result <- handleCheckFile cfg params
         case result of
           Left err -> pure (Fail $ "check_file failed: " <> T.unpack err)
@@ -1072,7 +1499,8 @@ integrationTests cfg fixturePath repoRoot = do
       -- The tier-1c tests pin the same invariants against the fake binary; this
       -- one pins that the real subprocess is measured the same way.
     , runTest "check_file: a real check is not a timeout and carries elapsedMs" $ do
-        let params = CheckFileParams { cfFilePath = fixturePath }
+        let params = CheckFileParams
+              { cfFilePath = fixturePath, cfMaxDiagnostics = Nothing }
         result <- handleCheckFile cfg params
         case result of
           Left err -> pure (Fail $ "check_file failed: " <> T.unpack err)
@@ -1105,7 +1533,8 @@ integrationTests cfg fixturePath repoRoot = do
                           (frElapsedMs fr > 0)
 
     , runTest "get_diagnostics: Fixture01 reports holes" $ do
-        let params = GetDiagnosticsParams { gdFilePath = fixturePath }
+        let params = GetDiagnosticsParams
+              { gdFilePath = fixturePath, gdMaxDiagnostics = Nothing }
         result <- handleGetDiagnostics cfg params
         case result of
           Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
@@ -1115,7 +1544,8 @@ integrationTests cfg fixturePath repoRoot = do
   hier <- hierIntegrationTests cfg repoRoot
   verdict <- fillVerdictTests cfg
   holes <- holeModelIntegrationTests cfg
-  pure (base <> hier <> verdict <> holes)
+  diags <- diagnosticIntegrationTests cfg
+  pure (base <> hier <> verdict <> holes <> diags)
 
 
 -- | hierIntegrationTests: issue #66 regression.
@@ -1396,7 +1826,7 @@ holeModelIntegrationTests cfg = do
         , runTest "get_diagnostics: .lagda.md hole position is in literate coordinates" $ do
             src <- TIO.readFile lagdaMd
             result <- handleGetDiagnostics cfg GetDiagnosticsParams
-              { gdFilePath = lagdaMd }
+              { gdFilePath = lagdaMd, gdMaxDiagnostics = Nothing }
             case (result, expectedHolePos src) of
               (Left err, _)  -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
               (_, Nothing)   -> pure (Fail "fixture lacks the n = {! zero !} line")
@@ -1455,6 +1885,216 @@ interactionPointStarts file out =
 
 
 -- ---------------------------------------------------------------------------
+-- Tier 2e: Structured diagnostics against real Agda (issue #74)
+--
+-- One fixture per error class of the feedback document's § 5 corpus, each
+-- asserting the three things a client needs and could not get before: the
+-- machine-readable `code`, the `range` — which no diagnostic carried at all
+-- under Agda 2.8.0, the bug this issue opens with — and the `involved` payload
+-- that § 5's third column names for that class.
+--
+-- Every expected position is computed from the fixture's own text rather than
+-- written down, so editing a fixture's header comment cannot silently turn a
+-- position assertion into a lie.
+-- ---------------------------------------------------------------------------
+
+-- | Where the § 5 fixtures live (relative to agda-mcp/, as cabal test runs).
+diagnosticFixtureDir :: FilePath
+diagnosticFixtureDir = "test" </> "resources" </> "diagnostics"
+
+-- | posOfNth: the 1-based (line, col) of the k-th (0-based) occurrence of
+-- @needle@ — the coordinates Agda prints for a token at that spot.
+posOfNth :: Int -> Text -> Text -> Maybe (Int, Int)
+posOfNth k src needle = go k 0
+  where
+    go n from = case T.breakOn needle (T.drop from src) of
+      (_, r) | T.null r -> Nothing
+      (pre, _)
+        | n <= 0    -> Just (posAt (from + T.length pre))
+        | otherwise -> go (n - 1) (from + T.length pre + T.length needle)
+    posAt i =
+      let before = T.take i src
+      in  (T.count "\n" before + 1, T.length (T.takeWhileEnd (/= '\n') before) + 1)
+
+-- | rangeOfNth: the range Agda reports for that occurrence — starting at its
+-- first character and ending one past its last, which is how Agda spells spans.
+rangeOfNth :: Int -> Text -> Text -> Maybe DiagRange
+rangeOfNth k src needle = do
+  (ln, col) <- posOfNth k src needle
+  pure (DiagRange ln col ln (col + T.length needle))
+
+-- | showAgdaRange: a same-line range in Agda's own @LINE.COL-COL@ spelling, for
+-- the assertions that compare against a location Agda printed inside a message.
+showAgdaRange :: DiagRange -> Text
+showAgdaRange r = T.pack $
+  show (rngStartLine r) <> "." <> show (rngStartCol r) <> "-" <> show (rngEndCol r)
+
+-- | withFixtureDiagnostics: check one § 5 fixture with a real Agda, and hand the
+-- assertion the fixture's text alongside the diagnostics @check_file@ returned.
+withFixtureDiagnostics
+  :: AgdaConfig -> String -> FilePath
+  -> (Text -> [Diagnostic] -> IO TestResult) -> IO Bool
+withFixtureDiagnostics cfg name file k = runTest name $ do
+  let path = diagnosticFixtureDir </> file
+  src    <- TIO.readFile path
+  result <- handleCheckFile cfg
+    CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Nothing }
+  case result of
+    Left err  -> pure (Fail $ "check_file failed: " <> T.unpack err)
+    Right fcr -> k src (fcrDiagnostics fcr)
+
+-- | needCode: the diagnostic with this code, or a failure naming what did come
+-- back — which is the message you want when Agda's wording has moved.
+needCode :: Text -> [Diagnostic] -> (Diagnostic -> IO TestResult) -> IO TestResult
+needCode c ds k = case byCode c ds of
+  Just d  -> k d
+  Nothing -> pure . Fail $
+    "no [" <> T.unpack c <> "] diagnostic; got " <> show (codesOf ds)
+
+diagnosticIntegrationTests :: AgdaConfig -> IO [Bool]
+diagnosticIntegrationTests cfg = do
+  present <- doesFileExist (diagnosticFixtureDir </> "UnequalTerms.agda")
+  if not present
+    then do
+      hPutStrLn stderr $ "\n  [skip] diagnostic fixtures not found in "
+        <> diagnosticFixtureDir
+      pure []
+    else do
+      hPutStrLn stderr
+        "\n── Integration tests (tier 2e: structured diagnostics, #74) ──"
+      sequence
+        [ withFixtureDiagnostics cfg
+            "diagnostics: ModuleDoesntExport (warning) precedes its NotInScope"
+            "ModuleDoesntExport.agda" $ \src ds ->
+              allOf
+                [ -- Root cause first: the warning that says the name will not
+                  -- resolve, then the error that it did not.
+                  assertEqual "codes, root cause first"
+                    [Just "ModuleDoesntExport", Just "NotInScope"] (codesOf ds)
+                , needCode "ModuleDoesntExport" ds $ \d -> allOf
+                    [ assertEqual "severity" DiagWarning (diagSeverity d)
+                    , assertEqual "range" (rangeOfNth 0 src "using (usable; absentName)")
+                        (diagRange d)
+                    , assertEqual "involved.candidates" ["absentName"]
+                        (invCandidates (diagInvolved d))
+                    ]
+                , needCode "NotInScope" ds $ \d -> allOf
+                    [ assertEqual "severity" DiagError (diagSeverity d)
+                      -- The second occurrence: the use site, not the import.
+                    , assertEqual "range" (rangeOfNth 1 src "absentName") (diagRange d)
+                    ]
+                ]
+
+        , withFixtureDiagnostics cfg
+            "diagnostics: NotInScope carries range and 'did you mean' candidates"
+            "NotInScope.agda" $ \src ds ->
+              needCode "NotInScope" ds $ \d -> allOf
+                [ assertEqual "range" (rangeOfNth 0 src "zeroo") (diagRange d)
+                , assertEqual "involved.candidates"
+                    [ "Agda.Builtin.Nat.Nat.zero", "Agda.Builtin.Nat.zero"
+                    , "Nat.zero", "zero" ]
+                    (invCandidates (diagInvolved d))
+                  -- The body, not just the header line, is what makes the
+                  -- message worth reading.
+                , assert ("message was " <> show (diagMessage d))
+                    ("Not in scope" `T.isInfixOf` diagMessage d)
+                ]
+
+        , withFixtureDiagnostics cfg
+            "diagnostics: AmbiguousName carries the qualified candidates"
+            "AmbiguousName.agda" $ \src ds ->
+              needCode "AmbiguousName" ds $ \d -> allOf
+                [ assertEqual "range" (rangeOfNth 0 src "shared") (diagRange d)
+                , assertEqual "involved.candidates"
+                    ["DiagAmbigA.shared", "DiagAmbigB.shared"]
+                    (invCandidates (diagInvolved d))
+                ]
+
+        , withFixtureDiagnostics cfg
+            "diagnostics: ClashingDefinition carries the previous definition"
+            "ClashingDefinition.agda" $ \src ds ->
+              needCode "ClashingDefinition" ds $ \d ->
+                -- The clash is the second `least`; its origin is the first, the
+                -- record field re-exported into this scope.
+                case (rangeOfNth 1 src "least", rangeOfNth 0 src "least") of
+                  (Just clash, Just origin) -> allOf
+                    [ assertEqual "range" (Just clash) (diagRange d)
+                    , assert ("involved.candidates were "
+                               <> show (invCandidates (diagInvolved d)))
+                        (any ((("ClashingDefinition.agda:" <> showAgdaRange origin)
+                                `T.isSuffixOf`))
+                             (invCandidates (diagInvolved d)))
+                    ]
+                  _ -> pure (Fail "fixture no longer contains two `least` tokens")
+
+        , withFixtureDiagnostics cfg
+            "diagnostics: UnequalTerms carries actual, expected, and the range"
+            "UnequalTerms.agda" $ \src ds ->
+              needCode "UnequalTerms" ds $ \d -> allOf
+                [ assertEqual "range" (rangeOfNth 0 src "true") (diagRange d)
+                , assertEqual "involved.actual"   (Just "Bool")
+                    (invActual (diagInvolved d))
+                , assertEqual "involved.expected" (Just "Nat")
+                    (invExpected (diagInvolved d))
+                ]
+
+        , withFixtureDiagnostics cfg
+            "diagnostics: UnsolvedConstraints + UnsolvedMetaVariables"
+            "UnsolvedMetas.agda" $ \src ds ->
+              allOf
+                [ assertEqual "codes, in Agda's order"
+                    [Just "UnsolvedConstraints", Just "UnsolvedMetaVariables"]
+                    (codesOf ds)
+                , needCode "UnsolvedConstraints" ds $ \d -> allOf
+                    [ -- This one has no position at all: the header starts the
+                      -- line, and a parser keyed on ": error:" never saw it.
+                      assertEqual "range" Nothing (diagRange d)
+                    , assert ("metaTypes were " <> show (invMetaTypes (diagInvolved d)))
+                        (case invMetaTypes (diagInvolved d) of
+                           [c] -> "blocked on" `T.isInfixOf` c
+                           _   -> False)
+                    ]
+                , needCode "UnsolvedMetaVariables" ds $ \d -> allOf
+                    [ assertEqual "range" (rangeOfNth 1 src "blocked") (diagRange d)
+                    , assertEqual "metaTypes" 1
+                        (length (invMetaTypes (diagInvolved d)))
+                    ]
+                ]
+
+          -- The cap and the total, against a live check: one diagnostic kept out
+          -- of two, and the one kept is the root cause rather than the first
+          -- thing Agda happened to print.
+        , runTest "diagnostics: maxDiagnostics caps the list and reports the total" $ do
+            let path = diagnosticFixtureDir </> "ModuleDoesntExport.agda"
+            result <- handleCheckFile cfg
+              CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Just 1 }
+            case result of
+              Left err  -> pure (Fail $ "check_file failed: " <> T.unpack err)
+              Right fcr -> allOf
+                [ assertEqual "diagnostics" [Just "ModuleDoesntExport"]
+                    (codesOf (fcrDiagnostics fcr))
+                , assertEqual "diagnosticsTotal" 2 (fcrDiagnosticsTotal fcr)
+                ]
+
+          -- get_diagnostics counts every diagnostic, not just the kept ones:
+          -- a capped payload must never read as a cleaner file.
+        , runTest "get_diagnostics: counts are over all diagnostics, not the capped list" $ do
+            let path = diagnosticFixtureDir </> "ModuleDoesntExport.agda"
+            result <- handleGetDiagnostics cfg
+              GetDiagnosticsParams { gdFilePath = path, gdMaxDiagnostics = Just 1 }
+            case result of
+              Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
+              Right dr -> allOf
+                [ assertEqual "errors"           1 (drErrors dr)
+                , assertEqual "warnings"         1 (drWarnings dr)
+                , assertEqual "diagnostics kept" 1 (length (drDiagnostics dr))
+                , assertEqual "diagnosticsTotal" 2 (drDiagnosticsTotal dr)
+                , assert "success should be False" (not (drSuccess dr))
+                ]
+        ]
+
+
+-- ---------------------------------------------------------------------------
 -- Main
 -- ---------------------------------------------------------------------------
 
@@ -1464,6 +2104,8 @@ main = do
 
   -- Tier 0: pure unit tests — hole finding, marker parsing.
   pureResults <- pureTests
+  -- Tier 0b: structured diagnostics over captured Agda output (no Agda).
+  diagResults <- diagnosticTests
   -- Tier 1a: hole-model tests (no Agda, but needs fixture files).
   holeResults <- holeModelTests
   -- Tier 1b: corpus / search tests (no Agda, but needs fixture file).
@@ -1479,7 +2121,8 @@ main = do
     Just (cfg, fixture, repoRoot) -> integrationTests cfg fixture repoRoot
 
   let allResults =
-        pureResults <> holeResults <> corpusResults <> timeoutResults <> integrationResults
+        pureResults <> diagResults <> holeResults <> corpusResults
+          <> timeoutResults <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed
