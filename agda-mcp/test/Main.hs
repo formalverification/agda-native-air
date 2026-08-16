@@ -32,7 +32,8 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (catch, SomeException)
+import Control.Exception (bracket_, catch, SomeException)
+import qualified Data.Aeson as Aeson
 import Data.Char (isDigit)
 import Data.Either (isLeft)
 import Data.List (find, sortOn)
@@ -40,12 +41,14 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import System.Directory
-  ( Permissions, doesFileExist, findExecutable, getCurrentDirectory
-  , getPermissions, getTemporaryDirectory, makeAbsolute, removeFile
-  , setOwnerExecutable, setPermissions
+  ( Permissions, createDirectoryIfMissing, doesFileExist, findExecutable
+  , getCurrentDirectory, getPermissions, getTemporaryDirectory, makeAbsolute
+  , removeDirectoryRecursive, removeFile, setOwnerExecutable, setPermissions
   )
 import System.Environment (setEnv)
 import System.Exit (exitFailure, exitSuccess)
@@ -67,6 +70,10 @@ import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Diagnostics
   ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
   , maxMessageLines, parseDiagnostics )
+import AgdaMCP.Project
+  ( findNearestAgdaLib, includePathsOf, librariesFileFlagOf, libraryIncludeDirs
+  , libraryIncludesOf, libraryNameOf, parseLibrariesFile, selectedLibrariesOf
+  )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -116,6 +123,7 @@ allOf (a : as) = do
 failureText :: ToolFailure -> Text
 failureText (FailMessage m)  = m
 failureText (FailTimeout tf) = tfMessage tf
+failureText (FailProject pm) = mismatchMessage pm
 
 -- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
 -- tests — exit code, timed-out flag, and stdout, with the fields the signal
@@ -127,6 +135,7 @@ fakeResult ec timedOut out = AgdaResult
   , arStderr    = ""
   , arTimedOut  = timedOut
   , arElapsedMs = 0
+  , arCommand   = CommandEcho { ceBinary = "agda", ceArgs = [], ceCwd = "." }
   }
 
 
@@ -386,6 +395,67 @@ pureTests = do
 
     , runTest "defaultTimeoutSeconds: matches defaultConfig" $
         assertEqual "timeout" (Just defaultTimeoutSeconds) (agdaTimeout defaultConfig)
+
+    -- Issue #76: the project echo is only as trustworthy as the parsing behind
+    -- it.  These pin the two file formats the resolution reads (the libraries
+    -- registry and a *.agda-lib) and the flag spellings it has to recognize in
+    -- whatever the server was started with.
+    , runTest "parseLibrariesFile: skips blanks and comments, resolves relative paths" $
+        assertEqual "entries"
+          [ "/abs/one/one.agda-lib", "/base/two/two.agda-lib" ]
+          (parseLibrariesFile "/base"
+             "-- a comment\n/abs/one/one.agda-lib\n\n  two/two.agda-lib  \n")
+
+    , runTest "parseLibrariesFile: a double hyphen inside a path is not a comment" $
+        -- A naive breakOn "--" would truncate this to "/base/my", silently
+        -- pointing the registry at a directory that does not exist — in a
+        -- module whose whole purpose is getting path comparison right.
+        assertEqual "entries" ["/base/my--lib/my.agda-lib"]
+          (parseLibrariesFile "/base" "/base/my--lib/my.agda-lib -- trailing note\n")
+
+    , runTest "libraryNameOf: the name: field, comments ignored" $
+        assertEqual "name" (Just "agda-algebras")
+          (libraryNameOf "-- header\nname: agda-algebras  -- the library\ninclude: src\n")
+
+    , runTest "libraryNameOf: no name: field → Nothing" $
+        assertEqual "name" Nothing (libraryNameOf "include: src\n")
+
+    , runTest "libraryIncludesOf: several dirs, continuation lines, comments" $
+        assertEqual "includes" ["src", "test", "extra"]
+          (libraryIncludesOf "name: x\ninclude: src test\n  extra\n-- done\ndepend: y\n")
+
+    , runTest "libraryIncludeDirs: no include: field means the library root" $
+        assertEqual "dirs" ["/r"]
+          (libraryIncludeDirs LibraryEntry
+             { leName = "x", leRoot = "/r", leLibFile = "/r/x.agda-lib", leIncludes = [] })
+
+    , runTest "libraryIncludeDirs: include: dirs are resolved against the root" $
+        assertEqual "dirs" ["/r/src", "/r/test"]
+          (libraryIncludeDirs LibraryEntry
+             { leName = "x", leRoot = "/r", leLibFile = "/r/x.agda-lib"
+             , leIncludes = ["src", "test"] })
+
+    , runTest "librariesFileFlagOf: both spellings, and the last one wins" $
+        -- The last-wins rule is not academic: the Nix agda wrapper supplies a
+        -- --library-file of its own ahead of the caller's flags, so reading the
+        -- first would report the store's registry instead of the project's.
+        assertEqual "library file" (Just "/second/libraries")
+          (librariesFileFlagOf
+             [ "--library-file=/first/libraries", "-l", "std"
+             , "--library-file", "/second/libraries" ])
+
+    , runTest "librariesFileFlagOf: absent → Nothing" $
+        assertEqual "library file" Nothing (librariesFileFlagOf ["-i", "x", "-l", "y"])
+
+    , runTest "includePathsOf: -i DIR, -iDIR, and both --include-path spellings" $
+        assertEqual "includes" ["a", "b", "c", "d"]
+          (includePathsOf
+             ["-i", "a", "-ib", "--include-path=c", "--include-path", "d", "-l", "e"])
+
+    , runTest "selectedLibrariesOf: -l NAME, -lNAME, and both --library spellings" $
+        assertEqual "libraries" ["a", "b", "c", "d"]
+          (selectedLibrariesOf
+             ["-l", "a", "-lb", "--library=c", "--library", "d", "-i", "e"])
     ]
 
 
@@ -1234,18 +1304,18 @@ timeoutTests = do
       results3 <- sequence
         [ runTest "fill_hole: a timeout is status 'timeout', not a type error" $
             case fillRes of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> assertEqual "status" FillTimeout (frStatus fr)
 
         , runTest "fill_hole: the timeout message names the bound that was hit" $
             case fillRes of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> assert ("message was " <> show (frMessage fr))
                 (maybe False (\m -> "timed out after 1s" `T.isInfixOf` m) (frMessage fr))
 
         , runTest "fill_hole: a timed-out response still carries elapsedMs" $
             case fillRes of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> assert ("elapsedMs = " <> show (frElapsedMs fr))
                             (frElapsedMs fr > 0)
 
@@ -1268,6 +1338,9 @@ timeoutTests = do
               Right gi -> pure (Fail $ "expected a timeout failure, got a goal: " <> show gi)
               Left (FailMessage m) ->
                 pure (Fail $ "expected FailTimeout, got FailMessage: " <> T.unpack m)
+              Left (FailProject pm) ->
+                pure (Fail $ "expected FailTimeout, got FailProject: "
+                             <> T.unpack (mismatchMessage pm))
               Left (FailTimeout tf) -> do
                 r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
                 case r1 of
@@ -1286,7 +1359,7 @@ timeoutTests = do
       results4 <- sequence
         [ runTest "check_file: a timeout is success:false with a timeout diagnostic" $
             case chk of
-              Left err  -> pure (Fail $ "check_file failed: " <> T.unpack err)
+              Left err  -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
               Right fcr -> do
                 r1 <- assert "success should be False" (not (fcrSuccess fcr))
                 case r1 of
@@ -1302,7 +1375,7 @@ timeoutTests = do
 
         , runTest "get_diagnostics: a timeout is success:false and counts as an error" $
             case diag of
-              Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
               Right dr -> do
                 r1 <- assert "success should be False" (not (drSuccess dr))
                 case r1 of
@@ -1368,6 +1441,271 @@ removeIfExists :: FilePath -> IO ()
 removeIfExists path = do
   present <- doesFileExist path
   if present then removeFile path else pure ()
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 1d: the response echo and project-root resolution (issues #72, #76)
+--
+-- No Agda is needed here, and that is the point twice over.
+--
+-- For the verdict (#72), the claim under test is that @success@ is a function
+-- of the exit code and of nothing else.  A real Agda cannot demonstrate that,
+-- because its exit code and its message text always agree; the stand-in binary
+-- can, by exiting non-zero while printing nothing an error parser could latch
+-- onto.  A verdict derived from the diagnostics would report that run green.
+--
+-- For root resolution (#76), the scene is two checkouts of one library — the
+-- one-worktree-per-branch workflow the field report was written in — with a
+-- registry that names only the first.  The assertions are that a file in the
+-- registered checkout resolves to it, that a file in the other is refused by
+-- name, and that the refusal lands before @agda@ is spawned and before any
+-- in-place patching.
+-- ---------------------------------------------------------------------------
+
+-- | The stand-in agda used below: 'fakeAgdaPath', configured to return at once
+-- with a chosen exit status and to leave no marker behind.
+--
+-- @AGDA_MCP_FAKE_EXIT@ is deliberately left set to whatever a test last chose,
+-- so these tests must run after 'timeoutTests', whose fast-path case asserts
+-- the default exit status of 0.
+withFakeExit :: Int -> IO a -> IO a
+withFakeExit code act = do
+  setEnv "AGDA_MCP_FAKE_SLEEP" "0"
+  setEnv "AGDA_MCP_FAKE_MARKER" ""
+  setEnv "AGDA_MCP_FAKE_EXIT" (show code)
+  act
+
+-- | withTwoWorktrees: build two checkouts of one library plus a registry that
+-- names only the first, run an action on them, and remove the scene.
+--
+--   <tmp>/agda-mcp-roots/A/agda-algebras.agda-lib   (name: agda-algebras)
+--   <tmp>/agda-mcp-roots/A/src/Target.agda
+--   <tmp>/agda-mcp-roots/B/agda-algebras.agda-lib   (name: agda-algebras)
+--   <tmp>/agda-mcp-roots/B/src/Target.agda
+--   <tmp>/agda-mcp-roots/libraries                  (registers A only)
+--
+-- The action receives @(rootA, rootB, librariesFile)@.
+withTwoWorktrees :: ((FilePath, FilePath, FilePath) -> IO a) -> IO a
+withTwoWorktrees act = do
+  tmp <- getTemporaryDirectory
+  let scene = tmp </> "agda-mcp-roots"
+      rootA = scene </> "A"
+      rootB = scene </> "B"
+      libs  = scene </> "libraries"
+  bracket_ (build scene rootA rootB libs) (removeTree scene) (act (rootA, rootB, libs))
+  where
+    build scene rootA rootB libs = do
+      removeTree scene
+      mapM_ (createDirectoryIfMissing True) [rootA </> "src", rootB </> "src"]
+      mapM_ (\r -> TIO.writeFile (r </> "agda-algebras.agda-lib")
+                     "name: agda-algebras\ninclude: src\n")
+            [rootA, rootB]
+      mapM_ (\r -> TIO.writeFile (r </> "src" </> "Target.agda")
+                     "module Target where\n\nopen import Agda.Builtin.Nat\n\nm : Nat\nm = {!!}\n")
+            [rootA, rootB]
+      TIO.writeFile libs (T.pack (rootA </> "agda-algebras.agda-lib") <> "\n")
+
+    removeTree d = removeDirectoryRecursive d `catch` \(_ :: SomeException) -> pure ()
+
+-- | echoTests: tier 1d.
+echoTests :: IO [Bool]
+echoTests = do
+  hPutStrLn stderr "\n── Response echo and root resolution (tier 1d: #72/#76) ──"
+  fakeExists    <- doesFileExist fakeAgdaPath
+  fixtureExists <- doesFileExist timeoutFixturePath
+  if not (fakeExists && fixtureExists)
+    then do
+      hPutStrLn stderr $ "  [skip] fixtures not found: "
+        <> fakeAgdaPath <> " / " <> timeoutFixturePath
+      pure []
+    else do
+      fakeAgda <- makeAbsolute fakeAgdaPath
+      ensureExecutable fakeAgda
+      absFixture <- makeAbsolute timeoutFixturePath
+      cwd        <- getCurrentDirectory
+      let echoCfg = defaultConfig
+            { agdaBin     = fakeAgda
+            , agdaFlags   = ["-i", "test/resources", "-l", "agda-dojang"]
+            , agdaTimeout = Just 60
+            }
+      -- One red run and one green run, from the same file: only the stand-in's
+      -- exit status differs, so anything that changes between them is a
+      -- function of the exit code.
+      red      <- withFakeExit 42 $ handleCheckFile echoCfg (CheckFileParams timeoutFixturePath Nothing)
+      redDiags <- withFakeExit 42 $ handleGetDiagnostics echoCfg (GetDiagnosticsParams timeoutFixturePath Nothing)
+      green    <- withFakeExit 0  $ handleCheckFile echoCfg (CheckFileParams timeoutFixturePath Nothing)
+
+      shape <- sequence
+        [ runTest "check_file: success is read from the exit code, not from Agda's prose" $
+            -- The stand-in exits 42 having printed no "error:" line at all, so
+            -- the diagnostics list is empty.  A verdict derived from parsing
+            -- messages would call this run green; the exit code says otherwise,
+            -- and the exit code is what decides.
+            withRight red $ \r -> assert
+              ("success=" <> show (fcrSuccess r)
+               <> " with " <> show (length (fcrDiagnostics r)) <> " diagnostics")
+              (not (fcrSuccess r) && null (fcrDiagnostics r))
+
+        , runTest "check_file: the verdict carries agda's own exit code" $
+            withRight red $ \r ->
+              assertEqual "exitCode" 42 (vExitCode (fcrVerdict r))
+
+        , runTest "check_file: a silent exit 0 is success" $
+            withRight green $ \r -> do
+              r1 <- assert "success should be True" (fcrSuccess r)
+              case r1 of
+                Fail m -> pure (Fail m)
+                Pass   -> assertEqual "exitCode" 0 (vExitCode (fcrVerdict r))
+
+        , runTest "get_diagnostics: same success and exit code as check_file (#72)" $
+            withRight red $ \c -> withRight redDiags $ \d -> do
+              r1 <- assertEqual "success" (fcrSuccess c) (drSuccess d)
+              case r1 of
+                Fail m -> pure (Fail m)
+                Pass   -> assertEqual "exitCode"
+                            (vExitCode (fcrVerdict c)) (vExitCode (drVerdict d))
+
+        , runTest "check_file: the command echo is the invocation that ran" $
+            withRight red $ \r -> do
+              let c = fcrCommand r
+              r1 <- assertEqual "binary" "fake-slow-agda.sh" (takeFileName (ceBinary c))
+              case r1 of
+                Fail m -> pure (Fail m)
+                Pass   -> do
+                  r2 <- assert ("args were " <> show (ceArgs c))
+                          (not (null (ceArgs c)) && last (ceArgs c) == absFixture
+                           && "-l" `elem` ceArgs c)
+                  case r2 of
+                    Fail m -> pure (Fail m)
+                    Pass   -> assertEqual "cwd" cwd (ceCwd c)
+
+        , runTest "check_file: the verdict names the equivalent agda command" $
+            withRight red $ \r ->
+              assert ("equivalentTo was " <> show (vEquivalentTo (fcrVerdict r)))
+                (T.pack absFixture `T.isInfixOf` vEquivalentTo (fcrVerdict r)
+                 && "fake-slow-agda.sh" `T.isInfixOf` vEquivalentTo (fcrVerdict r))
+
+        , runTest "check_file: the response wire shape carries verdict, command, project" $
+            -- Asserted on the encoded JSON, because these key names are the
+            -- client-visible contract the tool descriptions advertise; a
+            -- refactor that renamed a field would otherwise pass silently.
+            withRight red $ \r -> do
+              let wire = encodeText r
+                  want = [ "\"verdict\":", "\"equivalent-to: ", "\"meaning\":"
+                         , "\"exitCode\":42", "\"command\":", "\"binary\":"
+                         , "\"args\":", "\"cwd\":", "\"project\":"
+                         , "\"rootSource\":", "\"root\":", "\"success\":false" ]
+                  missing = [k | k <- want, not (k `T.isInfixOf` wire)]
+              assert ("missing from the response: " <> show missing) (null missing)
+        ]
+
+      -- Root resolution: two checkouts of one library, a registry naming only
+      -- the first, and a binary that does not exist — so any call that reaches
+      -- Agda is visible as a crash rather than as a refusal.
+      roots <- withTwoWorktrees $ \(rootA, rootB, libs) -> do
+        let rootCfg = defaultConfig
+              { agdaBin   = "/nonexistent/agda-must-not-run"
+              , agdaFlags = ["--library-file=" <> libs, "-l", "agda-algebras"]
+              }
+            targetA = rootA </> "src" </> "Target.agda"
+            targetB = rootB </> "src" </> "Target.agda"
+        okA     <- handleCheckFile rootCfg (CheckFileParams targetA Nothing)
+        badB    <- handleCheckFile rootCfg (CheckFileParams targetB Nothing)
+        badDiag <- handleGetDiagnostics rootCfg (GetDiagnosticsParams targetB Nothing)
+        beforeB <- BS.readFile targetB
+        badFill <- handleFillHole rootCfg FillHoleParams
+          { fhFilePath = targetB, fhHoleIndex = 0, fhCandidate = "zero" }
+        afterB  <- BS.readFile targetB
+        sequence
+          [ runTest "root resolution: a file in the registered checkout resolves to it" $
+              -- agdaBin does not exist, so check_file reports a crash (exit -1)
+              -- rather than a refusal: the point is that resolution let it
+              -- through, and named the tree it would have checked.
+              withRight okA $ \r -> do
+                let pc = fcrProject r
+                r1 <- assertEqual "rootSource" RootFromAgdaLib (pcRootSource pc)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> do
+                    r2 <- assertEqual "root" rootA (pcRoot pc)
+                    case r2 of
+                      Fail m -> pure (Fail m)
+                      Pass   -> assertEqual "library"
+                                  (Just "agda-algebras") (leName <$> pcLibrary pc)
+
+          , runTest "root resolution: a file in another checkout of the same library is refused (#76)" $
+              case badB of
+                Right r -> pure (Fail $ "expected a refusal, got success=" <> show (fcrSuccess r))
+                Left (FailProject pm) -> do
+                  r1 <- assertEqual "fileRoot" rootB (pmFileRoot pm)
+                  case r1 of
+                    Fail m -> pure (Fail m)
+                    Pass   -> do
+                      r2 <- assertEqual "registeredRoot" rootA (pmRegisteredRoot pm)
+                      case r2 of
+                        Fail m -> pure (Fail m)
+                        Pass   -> assertEqual "libraryName" "agda-algebras" (pmLibraryName pm)
+                Left other ->
+                  pure (Fail $ "expected FailProject, got: " <> T.unpack (failureText other))
+
+          , runTest "root resolution: the refusal names both trees and the registry" $
+              case badB of
+                Left (FailProject pm) ->
+                  let msg = mismatchMessage pm
+                      want = [T.pack rootA, T.pack rootB, T.pack libs, "agda-algebras"]
+                      missing = [w | w <- want, not (w `T.isInfixOf` msg)]
+                  in  assert ("missing from the message: " <> show missing) (null missing)
+                _ -> pure (Fail "expected FailProject")
+
+          , runTest "root resolution: the refusal happens before agda is spawned" $
+              -- agdaBin is a path that cannot be executed.  Had the call run it,
+              -- the result would be a Right carrying exit code -1; a Left proves
+              -- resolution short-circuited first.
+              assert "expected a refusal rather than a failed agda run" (isLeft badB)
+
+          , runTest "root resolution: get_diagnostics refuses the same way" $
+              case badDiag of
+                Left (FailProject _) -> pure Pass
+                Left other -> pure (Fail $ "expected FailProject, got: "
+                                           <> T.unpack (failureText other))
+                Right _    -> pure (Fail "expected a refusal")
+
+          , runTest "root resolution: fill_hole refuses without touching the file" $
+              case badFill of
+                Left (FailProject _) ->
+                  assert "the source file was modified by a refused call" (beforeB == afterB)
+                Left other -> pure (Fail $ "expected FailProject, got: "
+                                           <> T.unpack (failureText other))
+                Right _    -> pure (Fail "expected a refusal")
+          ]
+
+      -- The upward walk itself, against this repository: a fixture inside
+      -- agda-dojang belongs to agda-dojang, and a file under agda-mcp belongs
+      -- to no library at all — the walk must stop at the repo root rather than
+      -- climbing into whatever sits above the checkout.
+      dojangRoot <- makeAbsolute (".." </> "agda-dojang")
+      nearDojang <- findNearestAgdaLib (".." </> "agda-dojang" </> "data" </> "fixtures")
+      nearHere   <- findNearestAgdaLib ("test" </> "resources")
+      walk <- sequence
+        [ runTest "findNearestAgdaLib: a fixture under agda-dojang resolves to that library" $
+            assertEqual "library" (Just ("agda-dojang", dojangRoot))
+              ((\e -> (leName e, leRoot e)) <$> nearDojang)
+
+        , runTest "findNearestAgdaLib: the walk stops at the repository boundary" $
+            assertEqual "library" Nothing (leName <$> nearHere)
+        ]
+
+      pure (shape <> roots <> walk)
+
+-- | withRight: run an assertion on a handler's success value, failing the test
+-- with the handler's own message when it returned a failure instead.
+withRight :: Either ToolFailure a -> (a -> IO TestResult) -> IO TestResult
+withRight (Left err) _ = pure (Fail $ "handler failed: " <> T.unpack (failureText err))
+withRight (Right a)  k = k a
+
+-- | encodeText: a value's JSON serialization, as Text, for wire-shape assertions.
+encodeText :: Aeson.ToJSON a => a -> Text
+encodeText = TE.decodeUtf8 . LBS.toStrict . Aeson.encode . Aeson.toJSON
 
 
 -- ---------------------------------------------------------------------------
@@ -1471,7 +1809,7 @@ integrationTests cfg fixturePath repoRoot = do
               }
         result <- handleFillHole cfg params
         case result of
-          Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
           Right fr -> assertEqual "status" FillOk (frStatus fr)
 
     , runTest "fill_hole: Fixture01 hole 0 with 'tt' fails (type error)" $ do
@@ -1482,7 +1820,7 @@ integrationTests cfg fixturePath repoRoot = do
               }
         result <- handleFillHole cfg params
         case result of
-          Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack err)
+          Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
           Right fr -> assertEqual "status" FillTypeError (frStatus fr)
 
     , runTest "check_file: Fixture01 reports holes" $ do
@@ -1490,7 +1828,7 @@ integrationTests cfg fixturePath repoRoot = do
               { cfFilePath = fixturePath, cfMaxDiagnostics = Nothing }
         result <- handleCheckFile cfg params
         case result of
-          Left err -> pure (Fail $ "check_file failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
           Right fcr ->
             assert "should report at least 1 hole" (fcrHolesCount fcr > 0)
 
@@ -1503,7 +1841,7 @@ integrationTests cfg fixturePath repoRoot = do
               { cfFilePath = fixturePath, cfMaxDiagnostics = Nothing }
         result <- handleCheckFile cfg params
         case result of
-          Left err -> pure (Fail $ "check_file failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
           Right fcr -> do
             r1 <- assert "timedOut should be False" (not (fcrTimedOut fcr))
             case r1 of
@@ -1524,7 +1862,7 @@ integrationTests cfg fixturePath repoRoot = do
               { fhFilePath = fixturePath, fhHoleIndex = 0, fhCandidate = "x" }
         result <- handleFillHole cfg params
         case result of
-          Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
           Right fr -> do
             r1 <- assert "status should not be timeout" (frStatus fr /= FillTimeout)
             case r1 of
@@ -1537,7 +1875,7 @@ integrationTests cfg fixturePath repoRoot = do
               { gdFilePath = fixturePath, gdMaxDiagnostics = Nothing }
         result <- handleGetDiagnostics cfg params
         case result of
-          Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
           Right dr ->
             assert "should report at least 1 hole" (not . null $ drHoles dr)
     ]
@@ -1600,7 +1938,7 @@ hierIntegrationTests cfg repoRoot = do
                   { fhFilePath = useFile, fhHoleIndex = 0, fhCandidate = "thing" }
             result <- handleFillHole hierCfg params
             case result of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> assertEqual "status" FillOk (frStatus fr)
 
         , runTest "fill_hole: Proofs.Use with ill-typed 'tt' is a type error" $ do
@@ -1608,7 +1946,7 @@ hierIntegrationTests cfg repoRoot = do
                   { fhFilePath = useFile, fhHoleIndex = 0, fhCandidate = "tt" }
             result <- handleFillHole hierCfg params
             case result of
-              Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
               Right fr -> assertEqual "status" FillTypeError (frStatus fr)
         ]
       -- The transiently-patched source must be restored byte-for-byte.
@@ -1648,7 +1986,7 @@ fillVerdictTests cfg = do
                   { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "implicitOnly" }
             result <- handleFillHole cfg params
             case result of
-              Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
               Right fr -> do
                 r1 <- assertEqual "status" FillTypeError (frStatus fr)
                 case r1 of
@@ -1661,7 +1999,7 @@ fillVerdictTests cfg = do
                   { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "zero" }
             result <- handleFillHole cfg params
             case result of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> assertEqual "status" FillOk (frStatus fr)
 
         , runTest "fill_hole: candidate introducing a new sub-hole stays ok" $ do
@@ -1669,7 +2007,7 @@ fillVerdictTests cfg = do
                   { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc {!!}" }
             result <- handleFillHole cfg params
             case result of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> assertEqual "status" FillOk (frStatus fr)
 
         -- Since issue #71, tracking matches tolerance: a `?` sub-hole the
@@ -1680,7 +2018,7 @@ fillVerdictTests cfg = do
                   { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc ?" }
             result <- handleFillHole cfg params
             case result of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
                 r1 <- assertEqual "status" FillOk (frStatus fr)
                 case r1 of
@@ -1745,7 +2083,7 @@ holeModelIntegrationTests cfg = do
             result <- handleFillHole cfg FillHoleParams
               { fhFilePath = variants, fhHoleIndex = 0, fhCandidate = "zero" }
             case result of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
                 r1 <- assertEqual "status" FillOk (frStatus fr)
                 case r1 of
@@ -1756,7 +2094,7 @@ holeModelIntegrationTests cfg = do
             result <- handleFillHole cfg FillHoleParams
               { fhFilePath = variants, fhHoleIndex = 3, fhCandidate = "zero" }
             case result of
-              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
                 r1 <- assertEqual "status" FillOk (frStatus fr)
                 case r1 of
@@ -1793,8 +2131,8 @@ holeModelIntegrationTests cfg = do
                       Fail m -> pure (Fail m)
                       Pass   -> assertEqual "remainingHoles agree"
                                   (frRemainingHoles plain) (frRemainingHoles md)
-              (Left err, _) -> pure (Fail $ "fill_hole (.lagda.md) failed: " <> T.unpack err)
-              (_, Left err) -> pure (Fail $ "fill_hole (.agda) failed: " <> T.unpack err)
+              (Left err, _) -> pure (Fail $ "fill_hole (.lagda.md) failed: " <> T.unpack (failureText err))
+              (_, Left err) -> pure (Fail $ "fill_hole (.agda) failed: " <> T.unpack (failureText err))
 
         -- get_goal on every remaining literate flavour: exercises the
         -- flavour-aware debug-import injection end-to-end — in particular
@@ -1820,7 +2158,7 @@ holeModelIntegrationTests cfg = do
               { fhFilePath = lagdaMd, fhHoleIndex = 1, fhCandidate = "zero" }
             case result of
               Left err -> assert "error names the missing index"
-                            ("Hole index 1" `T.isInfixOf` err)
+                            ("Hole index 1" `T.isInfixOf` failureText err)
               Right _  -> pure (Fail "expected Left for a prose decoy index")
 
         , runTest "get_diagnostics: .lagda.md hole position is in literate coordinates" $ do
@@ -1828,7 +2166,7 @@ holeModelIntegrationTests cfg = do
             result <- handleGetDiagnostics cfg GetDiagnosticsParams
               { gdFilePath = lagdaMd, gdMaxDiagnostics = Nothing }
             case (result, expectedHolePos src) of
-              (Left err, _)  -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
+              (Left err, _)  -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
               (_, Nothing)   -> pure (Fail "fixture lacks the n = {! zero !} line")
               (Right dr, Just (ln, col)) ->
                 case drHoles dr of
@@ -1940,7 +2278,7 @@ withFixtureDiagnostics cfg name file k = runTest name $ do
   result <- handleCheckFile cfg
     CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Nothing }
   case result of
-    Left err  -> pure (Fail $ "check_file failed: " <> T.unpack err)
+    Left err  -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
     Right fcr -> k src (fcrDiagnostics fcr)
 
 -- | needCode: the diagnostic with this code, or a failure naming what did come
@@ -2069,7 +2407,7 @@ diagnosticIntegrationTests cfg = do
             result <- handleCheckFile cfg
               CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Just 1 }
             case result of
-              Left err  -> pure (Fail $ "check_file failed: " <> T.unpack err)
+              Left err  -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
               Right fcr -> allOf
                 [ assertEqual "diagnostics" [Just "ModuleDoesntExport"]
                     (codesOf (fcrDiagnostics fcr))
@@ -2083,7 +2421,7 @@ diagnosticIntegrationTests cfg = do
             result <- handleGetDiagnostics cfg
               GetDiagnosticsParams { gdFilePath = path, gdMaxDiagnostics = Just 1 }
             case result of
-              Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
+              Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
               Right dr -> allOf
                 [ assertEqual "errors"           1 (drErrors dr)
                 , assertEqual "warnings"         1 (drWarnings dr)
@@ -2112,6 +2450,10 @@ main = do
   corpusResults <- corpusTests
   -- Tier 1c: timeout enforcement, driven by a fake agda (no real Agda needed).
   timeoutResults <- timeoutTests
+  -- Tier 1d: the response echo and root resolution (#72/#76).  Runs *after*
+  -- the timeout tests: it leaves AGDA_MCP_FAKE_EXIT set, and their fast-path
+  -- case asserts the stand-in's default exit status of 0.
+  echoResults <- echoTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -2122,7 +2464,7 @@ main = do
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
-          <> timeoutResults <> integrationResults
+          <> timeoutResults <> echoResults <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

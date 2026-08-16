@@ -26,6 +26,27 @@
 --   metas the diagnostic is about.  @line@ and @col@ are retained as aliases of
 --   the range start, so this too is additive.
 --
+--   All proof-state responses additionally carry the /response echo/ (issues
+--   #72 and #76) — three keys that say what was run, what the answer means, and
+--   which tree it was run against:
+--
+--   * @verdict@ ('Verdict') — the @agda@ command this call is equivalent to,
+--     a sentence stating what a green result means, and the exit code the
+--     verdict was derived from.  Success is read off that exit code, never off
+--     the prose of Agda's messages, so a change in Agda's message format can
+--     never silently turn a red build green.
+--   * @command@ ('CommandEcho') — the resolved command line: binary, argument
+--     vector, and working directory.
+--   * @project@ ('ProjectContext') — the library context that was in effect:
+--     the resolved root, where it came from, the file's own @*.agda-lib@, the
+--     libraries registry consulted, and what that registry declares.
+--
+--   The echo is what lets a client confirm "this equals my @agda \<file\>@ gate"
+--   and "this checked /my/ worktree" without reading Haskell.  It is additive
+--   like the issue-#77 fields before it — every pre-existing key keeps its name,
+--   type, and meaning, and the one new /failure/ shape ('FailProject') is a new
+--   kind rather than a changed one — so the schema version is unchanged.
+--
 --   These types correspond 1-to-1 with the policy contract defined in
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
@@ -44,6 +65,15 @@ module AgdaMCP.Types
   , FillHoleParams (..)
   , CheckFileParams (..)
   , GetDiagnosticsParams (..)
+    -- * Response echo (issues #72, #76)
+  , CommandEcho (..)
+  , commandLine
+  , Verdict (..)
+  , RootSource (..)
+  , LibraryEntry (..)
+  , ProjectContext (..)
+  , ProjectMismatch (..)
+  , mismatchMessage
     -- * Tool results (outbound)
   , ToolFailure (..)
   , TimeoutFailure (..)
@@ -80,6 +110,7 @@ import Data.Aeson
   )
 import Data.Map.Strict (Map)
 import Data.Text (Text)
+import qualified Data.Text as T
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -181,27 +212,223 @@ instance FromJSON GetDiagnosticsParams where
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- § Response echo — what was run, what it means, and against which tree
+--
+-- Issues #72 (explicit batch verdict and command echo) and #76 (project-root
+-- resolution and environment transparency).  These three records appear in
+-- every proof-state response, success or failure.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | CommandEcho: the @agda@ invocation this call actually made.
+--
+-- Built from the argument vector handed to 'System.Process.createProcess', not
+-- reconstructed afterwards, so it cannot drift from what ran.  @ceBinary@ is the
+-- resolved absolute path when the configured name was found on @PATH@, and the
+-- configured name otherwise; /which/ agda ran is a real question inside a Nix
+-- shell, where the binary on @PATH@ is a wrapper that itself supplies flags.
+data CommandEcho = CommandEcho
+  { ceBinary :: FilePath    -- ^ The agda binary, resolved against @PATH@ where possible.
+  , ceArgs   :: [String]    -- ^ The full argument vector, ending in the file path.
+  , ceCwd    :: FilePath    -- ^ Working directory of the agda subprocess.
+  } deriving (Eq, Show)
+
+instance ToJSON CommandEcho where
+  toJSON c = object
+    [ "binary" .= ceBinary c
+    , "args"   .= ceArgs c
+    , "cwd"    .= ceCwd c
+    ]
+
+-- | commandLine: a 'CommandEcho' rendered as a copy-pasteable shell command.
+--
+-- Quoting is minimal and conservative: an argument is wrapped in single quotes
+-- (with embedded quotes escaped) exactly when it contains a character a shell
+-- would treat specially.  The result is meant to be /run/ by a human checking
+-- the server against their own gate, so being over-cautious costs nothing and
+-- being under-cautious would hand them a command that does something else.
+commandLine :: CommandEcho -> Text
+commandLine c = T.unwords (map (shellQuote . T.pack) (ceBinary c : ceArgs c))
+  where
+    shellQuote t
+      | T.null t                = "''"
+      | T.any needsQuoting t    = "'" <> T.replace "'" "'\\''" t <> "'"
+      | otherwise               = t
+    needsQuoting ch = ch `elem` (" \t\n'\"\\$`*?[]{}()<>|&;#~!" :: String)
+
+-- | Verdict: what a green result from this call means, stated explicitly.
+--
+-- The field the whole of issue #72 is about.  An agent that reads only the
+-- response — never this source — must be able to answer "does green here mean
+-- my build passes?", and 'vEquivalentTo' answers it by naming the exact command
+-- the verdict is equivalent to.  'vExitCode' is that command's own exit status:
+-- @success@ is derived from it, never from parsing Agda's prose, so a change in
+-- Agda's message wording cannot turn a failing build green.
+data Verdict = Verdict
+  { vEquivalentTo :: Text   -- ^ The @agda@ command this call is equivalent to.
+                            --   Serialized behind an @equivalent-to:@ prefix,
+                            --   which is what the response actually shows.
+  , vMeaning      :: Text   -- ^ One sentence: what the tool's verdict field means.
+  , vExitCode     :: Int    -- ^ Agda's exit code (@-1@: the binary could not be run).
+  } deriving (Eq, Show)
+
+instance ToJSON Verdict where
+  toJSON v = object
+    [ "equivalentTo" .= ("equivalent-to: " <> vEquivalentTo v)
+    , "meaning"      .= vMeaning v
+    , "exitCode"     .= vExitCode v
+    ]
+
+-- | RootSource: where the effective library context came from.
+--
+-- @nearest-agda-lib@ means the file's own tree decided it — the server walked
+-- up from the requested path to the nearest @*.agda-lib@.  @server-config@
+-- means no such file exists above the requested path, so the flags fixed at
+-- server start (plus the file's own directory) are all the context there is.
+data RootSource = RootFromAgdaLib | RootFromServerConfig
+  deriving (Eq, Show)
+
+instance ToJSON RootSource where
+  toJSON RootFromAgdaLib      = String "nearest-agda-lib"
+  toJSON RootFromServerConfig = String "server-config"
+
+-- | LibraryEntry: one Agda library, as named by its @*.agda-lib@ file.
+--
+-- 'leIncludes' holds the library's @include:@ directories verbatim — relative
+-- to 'leRoot', as the file writes them — because that, not the root alone, is
+-- what actually lands on Agda's include path.
+data LibraryEntry = LibraryEntry
+  { leName     :: Text       -- ^ The library's @name:@ field.
+  , leRoot     :: FilePath   -- ^ Directory containing the @*.agda-lib@ file.
+  , leLibFile  :: FilePath   -- ^ Path of the @*.agda-lib@ file itself.
+  , leIncludes :: [FilePath] -- ^ Its @include:@ directories, relative to 'leRoot'.
+  } deriving (Eq, Show)
+
+instance ToJSON LibraryEntry where
+  toJSON e = object
+    [ "name"     .= leName e
+    , "root"     .= leRoot e
+    , "libFile"  .= leLibFile e
+    , "includes" .= leIncludes e
+    ]
+
+-- | ProjectContext: the library context a call was answered in — the @project@
+-- key of every proof-state response.
+--
+-- This is the "which tree did you check?" answer that issue #76 exists to make
+-- unmissable.  The registry ('pcLibrariesFile' and 'pcRegistered') is read
+-- fresh on every call rather than snapshotted at startup, because it is shared
+-- mutable state: the flake's shellHook rewrites the checkout-wide
+-- @agda/libraries@ on every shell entry, so the file a long-running server
+-- started with is not necessarily the file its next call will use.  Reporting
+-- what @agda@ will actually read is the only honest option.
+data ProjectContext = ProjectContext
+  { pcRootSource    :: RootSource         -- ^ How 'pcRoot' was decided.
+  , pcRoot          :: FilePath           -- ^ The effective root: the library's, or the file's directory.
+  , pcLibrary       :: Maybe LibraryEntry -- ^ The file's own library, when it has one.
+  , pcLibrariesFile :: Maybe FilePath     -- ^ The libraries registry consulted, if any.
+  , pcRegistered    :: [LibraryEntry]     -- ^ What that registry declares.
+  , pcSelected      :: [Text]             -- ^ Library names selected by the server's @-l@ flags.
+  , pcIncludePaths  :: [FilePath]         -- ^ Include directories from the server's @-i@ flags.
+  } deriving (Eq, Show)
+
+instance ToJSON ProjectContext where
+  toJSON p = object $
+    [ "rootSource"          .= pcRootSource p
+    , "root"                .= pcRoot p
+    , "registeredLibraries" .= pcRegistered p
+    , "selectedLibraries"   .= pcSelected p
+    , "includePaths"        .= pcIncludePaths p
+    ] <> maybe [] (\l -> ["library"       .= l]) (pcLibrary p)
+      <> maybe [] (\f -> ["librariesFile" .= f]) (pcLibrariesFile p)
+
+-- | ProjectMismatch: the requested file belongs to a different checkout of a
+-- library the server already has registered somewhere else.
+--
+-- The loud failure of issue #76.  Checking anyway would resolve the file's
+-- imports against 'pmRegisteredRoot' while the file itself lives under
+-- 'pmFileRoot' — a green answer about a tree the caller never asked about,
+-- which § 3.6 of the feedback document calls the worst possible outcome for an
+-- agent client: "a wrong answer, not an error".
+data ProjectMismatch = ProjectMismatch
+  { pmFilePath       :: FilePath   -- ^ The file that was requested.
+  , pmLibraryName    :: Text       -- ^ The library name both trees claim.
+  , pmFileRoot       :: FilePath   -- ^ Root of the file's own @*.agda-lib@.
+  , pmRegisteredRoot :: FilePath   -- ^ Root the registry gives that name.
+  , pmLibrariesFile  :: FilePath   -- ^ The registry that says so.
+  } deriving (Eq, Show)
+
+-- | mismatchMessage: the human-readable form of a 'ProjectMismatch'.
+--
+-- Names both trees and the registry that disagrees with the file, then says
+-- what to do about it.  An agent that can only read the error string still
+-- learns everything the structured payload carries.
+mismatchMessage :: ProjectMismatch -> Text
+mismatchMessage m = T.concat
+  [ "agda-mcp: refusing to check ", T.pack (pmFilePath m)
+  , " — it belongs to a different checkout than the one this server has registered.\n"
+  , "  the file's nearest *.agda-lib declares library '", pmLibraryName m
+  , "' rooted at ", T.pack (pmFileRoot m), "\n"
+  , "  but the libraries file ", T.pack (pmLibrariesFile m)
+  , " registers '", pmLibraryName m, "' at ", T.pack (pmRegisteredRoot m), "\n"
+  , "  Checking here would resolve this file's imports against "
+  , T.pack (pmRegisteredRoot m)
+  , " and report success about a tree you did not ask about.\n"
+  , "  Fix: restart the server against ", T.pack (pmFileRoot m)
+  , " (set the matching *_ROOT variable, or pass a --library-file whose '"
+  , pmLibraryName m, "' entry points there)."
+  ]
+
+instance ToJSON ProjectMismatch where
+  toJSON m = object
+    [ "error"        .= mismatchMessage m
+    , "rootMismatch" .= object
+        [ "filePath"       .= pmFilePath m
+        , "libraryName"    .= pmLibraryName m
+        , "fileRoot"       .= pmFileRoot m
+        , "registeredRoot" .= pmRegisteredRoot m
+        , "librariesFile"  .= pmLibrariesFile m
+        ]
+    ]
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Tool results (outbound to agent)
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- | A tool failure that still carries the call's measurements.
+-- | A tool failure that still carries whatever the call managed to establish.
 --
 -- @get_goal@ is the one proof-state tool whose timeout cannot be folded into a
 -- success-shaped response — there is no goal to report — so without this the
 -- timing and cache metadata the call did produce would be dropped on the floor
--- of a plain error string (issue #77).  'FailMessage' keeps every ordinary
+-- of a plain error string (issue #77).  'FailProject' generalizes the same idea
+-- to a failure that happens /before/ Agda is ever started (issue #76): the
+-- structured payload names both trees, so a client sees the mismatch as data
+-- rather than having to parse a sentence.  'FailMessage' keeps every ordinary
 -- failure exactly as it was: prose in, prose out.
+--
+-- All four proof-state tools fail through this type, so a client has one
+-- failure shape to handle rather than one per tool.
 data ToolFailure
   = FailMessage Text            -- ^ An ordinary failure; rendered as plain text.
   | FailTimeout TimeoutFailure  -- ^ The call hit @--timeout@; rendered as JSON.
+  | FailProject ProjectMismatch -- ^ The file belongs to a different checkout; rendered as JSON.
   deriving (Eq, Show)
 
 -- | The structured payload of a timed-out tool call: what went wrong, and what
 -- the call still managed to measure on the way down.
+--
+-- It carries the same 'Verdict' / 'CommandEcho' / 'ProjectContext' echo as a
+-- successful response, because a timeout is exactly the case where a caller
+-- most needs to know which command against which tree ran out of time — a cold
+-- interface build for a large library is the usual cause, and the answer is
+-- visible in the flags.
 data TimeoutFailure = TimeoutFailure
   { tfMessage           :: Text        -- ^ Human-readable explanation (names the bound).
   , tfElapsedMs         :: Int         -- ^ Wall-clock ms before the process was killed.
   , tfCheckedFromSource :: Maybe Bool  -- ^ Cache signal, when the killed run produced evidence.
+  , tfVerdict           :: Verdict        -- ^ What was run and what it would have meant (#72).
+  , tfCommand           :: CommandEcho    -- ^ The resolved agda command line (#72).
+  , tfProject           :: ProjectContext -- ^ The tree that was being checked (#76).
   } deriving (Eq, Show)
 
 instance ToJSON TimeoutFailure where
@@ -209,19 +436,27 @@ instance ToJSON TimeoutFailure where
     [ "error"     .= tfMessage t
     , "timedOut"  .= True
     , "elapsedMs" .= tfElapsedMs t
+    , "verdict"   .= tfVerdict t
+    , "command"   .= tfCommand t
+    , "project"   .= tfProject t
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (tfCheckedFromSource t)
 
 -- | Result of @get_goal@: the hole's goal type and local context.
 --
 -- 'giElapsedMs' and 'giCheckedFromSource' are optional so a 'GoalInfo' can be
 -- built without a timed Agda run (hole listings use 'HoleInfo' instead); the
--- top-level @get_goal@ response always populates both.
+-- top-level @get_goal@ response always populates both.  'giVerdict',
+-- 'giCommand', and 'giProject' are optional for the same reason and are always
+-- populated by the tool.
 data GoalInfo = GoalInfo
   { giGoal              :: Text         -- ^ Pretty-printed goal type.
   , giContext           :: [CtxEntry]   -- ^ Local context (bound variables with types).
   , giModule            :: Maybe Text   -- ^ Module name (if determinable).
   , giElapsedMs         :: Maybe Int    -- ^ Wall-clock ms spent in the Agda subprocess.
   , giCheckedFromSource :: Maybe Bool   -- ^ Did Agda re-check from source (vs. load @.agdai@)?
+  , giVerdict           :: Maybe Verdict        -- ^ What was run and what it means (#72).
+  , giCommand           :: Maybe CommandEcho    -- ^ The resolved agda command line (#72).
+  , giProject           :: Maybe ProjectContext -- ^ The tree that was checked (#76).
   } deriving (Eq, Show)
 
 instance ToJSON GoalInfo where
@@ -231,6 +466,9 @@ instance ToJSON GoalInfo where
     ] <> maybe [] (\m -> ["module"            .= m]) (giModule g)
       <> maybe [] (\m -> ["elapsedMs"         .= m]) (giElapsedMs g)
       <> maybe [] (\b -> ["checkedFromSource" .= b]) (giCheckedFromSource g)
+      <> maybe [] (\v -> ["verdict"           .= v]) (giVerdict g)
+      <> maybe [] (\c -> ["command"           .= c]) (giCommand g)
+      <> maybe [] (\p -> ["project"           .= p]) (giProject g)
 
 -- | One open hole in a file, as listed by @get_diagnostics@.  The index is
 -- the 0-based @holeIndex@ that @get_goal@ / @fill_hole@ accept; line and
@@ -279,6 +517,9 @@ data FillResult = FillResult
   , frCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
                                   --   @.agdai@)?  Nothing — and the field omitted —
                                   --   when the run died before producing evidence.
+  , frVerdict   :: Verdict        -- ^ What was run and what @status@ means (#72).
+  , frCommand   :: CommandEcho    -- ^ The resolved agda command line (#72).
+  , frProject   :: ProjectContext -- ^ The tree that was checked (#76).
   } deriving (Eq, Show)
 
 instance ToJSON FillResult where
@@ -286,6 +527,9 @@ instance ToJSON FillResult where
     [ "status"            .= frStatus r
     , "candidate"         .= frCandidate r
     , "elapsedMs"         .= frElapsedMs r
+    , "verdict"           .= frVerdict r
+    , "command"           .= frCommand r
+    , "project"           .= frProject r
     ] <> maybe [] (\m -> ["message"  .= m]) (frMessage r)
       <> maybe [] (\n -> ["remainingHoles" .= n]) (frRemainingHoles r)
       <> maybe [] (\b -> ["checkedFromSource" .= b]) (frCheckedFromSource r)
@@ -426,8 +670,14 @@ instance ToJSON Diagnostic where
     <> (if hasInvolved (diagInvolved d) then ["involved" .= diagInvolved d] else [])
 
 -- | Result of @check_file@.
+--
+-- 'fcrSuccess' is a function of Agda's exit code alone (echoed as
+-- @verdict.exitCode@) and the timeout flag — never of the diagnostics list.
+-- Deriving it from parsed messages instead would make the verdict hostage to
+-- Agda's prose: a format change would silently empty 'fcrDiagnostics' and
+-- report a passing build (issue #72).
 data FileCheckResult = FileCheckResult
-  { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0 with no errors.
+  { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0, in time.
   , fcrDiagnostics :: [Diagnostic]  -- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
   , fcrDiagnosticsTotal :: Int      -- ^ How many were found before the cap; equals
                                     --   @length fcrDiagnostics@ when nothing was dropped.
@@ -439,6 +689,9 @@ data FileCheckResult = FileCheckResult
   , fcrCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
                                     --   @.agdai@)?  Nothing — and the field omitted —
                                     --   when the run died before producing evidence.
+  , fcrVerdict     :: Verdict        -- ^ What was run and what @success@ means (#72).
+  , fcrCommand     :: CommandEcho    -- ^ The resolved agda command line (#72).
+  , fcrProject     :: ProjectContext -- ^ The tree that was checked (#76).
   } deriving (Eq, Show)
 
 instance ToJSON FileCheckResult where
@@ -449,6 +702,9 @@ instance ToJSON FileCheckResult where
     , "holesCount"        .= fcrHolesCount r
     , "timedOut"          .= fcrTimedOut r
     , "elapsedMs"         .= fcrElapsedMs r
+    , "verdict"           .= fcrVerdict r
+    , "command"           .= fcrCommand r
+    , "project"           .= fcrProject r
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (fcrCheckedFromSource r)
 
 -- | Result of @get_diagnostics@ (cached state from last check).
@@ -462,12 +718,18 @@ instance ToJSON FileCheckResult where
 -- The counts are over /every/ diagnostic found, not over the capped list, so
 -- @maxDiagnostics@ shortens the payload without ever understating how much is
 -- wrong (issue #74).
+--
+-- 'drSuccess' and 'drVerdict' are the same fields @check_file@ carries, with
+-- the same meaning and the same derivation from Agda's exit code (issue #72).
+-- The counts are a convenience over Agda's prose; the verdict is not, which is
+-- why a message-format drift can zero 'drErrors' but can never flip
+-- 'drSuccess'.
 data DiagnosticsResult = DiagnosticsResult
   { drFilePath    :: FilePath
   , drErrors      :: Int
   , drWarnings    :: Int
   , drHoles       :: [HoleInfo]  -- ^ Open holes with index and (line, col).
-  , drSuccess     :: Bool        -- ^ True iff Agda exited 0, in time, with no errors.
+  , drSuccess     :: Bool        -- ^ True iff Agda exited 0, in time.
   , drDiagnostics :: [Diagnostic]-- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
   , drDiagnosticsTotal :: Int    -- ^ How many were found before the cap.
   , drTimedOut    :: Bool        -- ^ True iff the run hit the @--timeout@ bound.
@@ -475,6 +737,9 @@ data DiagnosticsResult = DiagnosticsResult
   , drCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
                                  --   @.agdai@)?  Nothing — and the field omitted —
                                  --   when the run died before producing evidence.
+  , drVerdict     :: Verdict        -- ^ What was run and what @success@ means (#72).
+  , drCommand     :: CommandEcho    -- ^ The resolved agda command line (#72).
+  , drProject     :: ProjectContext -- ^ The tree that was checked (#76).
   } deriving (Eq, Show)
 
 instance ToJSON DiagnosticsResult where
@@ -488,6 +753,9 @@ instance ToJSON DiagnosticsResult where
     , "diagnosticsTotal"  .= drDiagnosticsTotal r
     , "timedOut"          .= drTimedOut r
     , "elapsedMs"         .= drElapsedMs r
+    , "verdict"           .= drVerdict r
+    , "command"           .= drCommand r
+    , "project"           .= drProject r
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (drCheckedFromSource r)
 
 -- ═══════════════════════════════════════════════════════════════════════════

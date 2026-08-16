@@ -47,6 +47,7 @@ library
     AgdaMCP.Agda
     AgdaMCP.Diagnostics
     AgdaMCP.Holes
+    AgdaMCP.Project
     AgdaMCP.Corpus
     AgdaMCP.Tools.ProofState
     AgdaMCP.Tools.Search

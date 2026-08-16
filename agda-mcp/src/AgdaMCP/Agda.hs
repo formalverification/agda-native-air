@@ -67,6 +67,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Text.Encoding.Error (lenientDecode)
 import GHC.Clock (getMonotonicTimeNSec)
+import System.Directory (findExecutable, getCurrentDirectory)
 import System.Exit (ExitCode (..))
 import System.IO (Handle, hClose, hSetBinaryMode, stderr)
 import System.Posix.Signals
@@ -77,7 +78,7 @@ import System.Process
   , terminateProcess, waitForProcess
   )
 
-import AgdaMCP.Types (CtxEntry (..))
+import AgdaMCP.Types (CommandEcho (..), CtxEntry (..))
 
 
 -- ---------------------------------------------------------------------------
@@ -242,6 +243,12 @@ data AgdaResult = AgdaResult
                              --   distinguishable from an ordinary failure.
   , arElapsedMs :: Int       -- ^ Wall-clock duration of the subprocess, in
                              --   milliseconds, from a monotonic clock.
+  , arCommand   :: CommandEcho
+                             -- ^ The invocation this result came from: binary,
+                             --   argument vector, and working directory.  Built
+                             --   from the very arguments handed to
+                             --   'createProcess', so the echo in a response
+                             --   cannot drift from what ran (issue #72).
   } deriving (Eq, Show)
 
 -- | Run the Agda binary on the given file path.
@@ -259,6 +266,7 @@ data AgdaResult = AgdaResult
 runAgda :: AgdaConfig -> FilePath -> IO AgdaResult
 runAgda cfg path = do
   let args = agdaFlags cfg <> [path]
+  echo    <- commandEchoFor cfg args
   start   <- getMonotonicTimeNSec
   outcome <- try (runAgdaProcess cfg args)
   end     <- getMonotonicTimeNSec
@@ -270,6 +278,7 @@ runAgda cfg path = do
       , arStderr    = "agda-mcp: failed to run agda: " <> T.pack (show err)
       , arTimedOut  = False
       , arElapsedMs = elapsed
+      , arCommand   = echo
       }
     Right (mExit, out, err) -> AgdaResult
       { arExitCode  = maybe (-1) exitCodeToInt mExit
@@ -277,10 +286,32 @@ runAgda cfg path = do
       , arStderr    = err
       , arTimedOut  = isNothing' mExit
       , arElapsedMs = elapsed
+      , arCommand   = echo
       }
   where
     isNothing' Nothing = True
     isNothing' _       = False
+
+-- | commandEchoFor: the 'CommandEcho' for an invocation about to be made.
+--
+-- Built before the run and from the same @args@ list 'runAgdaProcess' passes to
+-- 'createProcess', so the echo is the invocation rather than a description of
+-- it.  The binary is reported as its resolved absolute path when the configured
+-- name is on @PATH@ — inside a Nix shell that name is a wrapper script which
+-- supplies flags of its own, and an agent comparing the echo against its own
+-- @agda@ needs to know it is looking at the same one.  Resolution is for the
+-- report only: 'runAgdaProcess' still spawns @agdaBin cfg@, so no behaviour
+-- rides on it, and a name that cannot be resolved is echoed as configured.
+commandEchoFor :: AgdaConfig -> [String] -> IO CommandEcho
+commandEchoFor cfg args = do
+  mResolved <- findExecutable (agdaBin cfg)
+    `catch` \(_ :: SomeException) -> pure Nothing
+  cwd <- getCurrentDirectory `catch` \(_ :: SomeException) -> pure "."
+  pure CommandEcho
+    { ceBinary = maybe (agdaBin cfg) id mResolved
+    , ceArgs   = args
+    , ceCwd    = cwd
+    }
 
 exitCodeToInt :: ExitCode -> Int
 exitCodeToInt ExitSuccess     = 0
