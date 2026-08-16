@@ -31,9 +31,6 @@ directly during development.
 
 +  `doc_check.py` lints documentation; see `doc_check_guide.md` for the rules.
 
-+  `gh_project_populate.py` is roadmap tooling that populates the GitHub project
-   board and labels.
-
 +  `utils/` holds shared helpers (config, command running, file operations, text
    processing) plus fixture and dataset tooling for the proof-completion work.
 

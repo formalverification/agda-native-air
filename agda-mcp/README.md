@@ -87,7 +87,7 @@ For Claude Code setup and MCP client configuration, see [Configuring MCP Clients
 Seven tools are implemented: four core proof-state tools (Milestone [M1-2]) and
 three corpus-backed search tools (Milestone [M1-3]).  Navigation tools and neural
 premise selection are planned for later milestones; see
-[roadmap.md](../docs/roadmap.md).
+[GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
 
 ### Core proof-state tools (Milestone 1 — [M1-2])
 
@@ -413,7 +413,7 @@ not planned for Milestone 1.
 | **strux-driver** | ETL layer — processes extracted data into retrieval-friendly formats | [`strux-driver/`](../strux-driver/) |
 
 
-See [roadmap.md](../docs/roadmap.md) for milestones and issue tracking.
+See [GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md) for milestones and issue tracking.
 
 ---
 
