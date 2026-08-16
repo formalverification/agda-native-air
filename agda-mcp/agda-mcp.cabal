@@ -45,6 +45,7 @@ library
     AgdaMCP.Server
     AgdaMCP.Types
     AgdaMCP.Agda
+    AgdaMCP.Diagnostics
     AgdaMCP.Holes
     AgdaMCP.Corpus
     AgdaMCP.Tools.ProofState

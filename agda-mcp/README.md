@@ -109,6 +109,33 @@ All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` an
 +  Literate files are recognized by extension — `.lagda` / `.lagda.tex`, `.lagda.md` / `.lagda.typ`, `.lagda.rst`, `.lagda.org`, and `.lagda.tree` — and only their code regions are scanned, following the code-block rules of Agda 2.8.0's own literate preprocessor.
 +  `holeIndex` addresses holes in source order under this model, and all reported positions are 1-based (line, col) coordinates in the file as written — literate-file coordinates for literate sources, matching what an editor or Agda's error messages show.
 
+### Structured diagnostics (issue #74)
+
+`check_file` and `get_diagnostics` return diagnostics as *data*, so a client branches on a code and jumps to a range instead of regexing prose:
+
+```json
+{
+  "severity": "warning",
+  "code": "ModuleDoesntExport",
+  "file": "/abs/path/Consumer.agda",
+  "range": {"startLine": 20, "startCol": 24, "endLine": 20, "endCol": 50},
+  "line": 20,
+  "col": 24,
+  "message": "The module DiagBarrel doesn't export the following:\n  absentName\nwhen scope checking the declaration\n  open import DiagBarrel using (usable; absentName)",
+  "involved": {"candidates": ["absentName"]}
+}
+```
+
++  `code` is Agda's own name for the diagnostic — `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedMetaVariables`, and so on — read from the `[Code]` of an error header or the `-W[no]Code` of a warning header.  It is absent only when Agda printed no name.
++  `range` is 1-based (line, column) in the file as written, with `endCol` one past the last character, exactly as Agda spells a span.  Both of Agda's position formats parse: the current `file:9.12-13` and `file:9.12-11.5`, and the older `file:10,5-15` and `file:10,5-11,3`.  `line` and `col` are retained as aliases of the range start, so a pre-#74 client keeps working.  Some diagnostics genuinely have no position — `error: [UnsolvedConstraints]` is printed without one — and those omit `file` and `range` rather than inventing them.
++  `message` is the *full* message body, not just the header line, bounded at 24 lines and 2000 characters with the elision stated.
++  `involved` lifts out what the message is about, per code: `expected` and `actual` for a mismatch (`Bool !=< Nat`), `candidates` for a "did you mean" list, the ambiguity candidates, the missing exports, or the origin of a clashing definition, and `metaTypes` for one entry per unsolved meta or constraint.  It is omitted when nothing was extracted; the full message is always there to fall back on.
++  Diagnostics are ordered **most likely root cause first**: unresolvable-file errors, then the scope warnings that precede a hard error (`ModuleDoesntExport` before the `NotInScope` it causes), then scope errors, then type errors, then unsolved metas and constraints, then remaining warnings.  The sort is stable, so Agda's own order survives within a rank.
++  The list is capped by the optional `maxDiagnostics` argument (default 10; `0` means no limit), and `diagnosticsTotal` always reports how many were found before the cap — so a broken import list cannot return a hundred cascading errors, and a truncated list is never mistaken for a short one.  `get_diagnostics`' `errors` and `warnings` counts are over *every* diagnostic found, not over the capped list.
++  Identical diagnostics collapse to one.  A run that ends in warnings prints each of them twice — once where it was raised, once under Agda's `———— All done; warnings encountered ————` banner — and counting both would double every count.
+
+The regression suite under `test/resources/diagnostics/` has one fixture per error class of the field report's [§ 5 corpus](../docs/feedback/flrp-agda-mcp-improvements.md) — `ModuleDoesntExport`, `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, and `UnsolvedConstraints` + `UnsolvedMetaVariables` — each asserting the code, the range, and the payload § 5 asks for, against the pinned Agda.
+
 ### Corpus-backed search tools (Milestone 1 — [M1-3])
 
 These let the agent discover relevant definitions from an agda-strux JSONL corpus
@@ -197,6 +224,7 @@ agda-mcp/
 │       ├── Server.hs            ← MCP stdio transport (JSON-RPC)
 │       ├── Types.hs             ← Stable JSON schema types
 │       ├── Agda.hs              ← Agda subprocess interaction + marker parsing
+│       ├── Diagnostics.hs       ← Agda output → structured diagnostics: codes, ranges, involved
 │       ├── Holes.hs             ← The hole model: literate masking + lexical hole scan
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
 │       └── Tools/
@@ -291,7 +319,8 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
 **Input**.  
 ```json
 {
-  "filePath": "/path/to/Fixture01.agda"
+  "filePath": "/path/to/Fixture01.agda",
+  "maxDiagnostics": 10
 }
 ```
 
@@ -300,8 +329,18 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
 {
   "success": false,
   "diagnostics": [
-    {"severity": "error", "message": "...", "line": 7}
+    {
+      "severity": "error",
+      "code": "UnequalTerms",
+      "file": "/path/to/Fixture01.agda",
+      "range": {"startLine": 17, "startCol": 5, "endLine": 17, "endCol": 9},
+      "line": 17,
+      "col": 5,
+      "message": "Bool !=< Nat\nwhen checking that the expression true has type Nat",
+      "involved": {"expected": "Nat", "actual": "Bool"}
+    }
   ],
+  "diagnosticsTotal": 1,
   "holesCount": 3,
   "timedOut": false,
   "elapsedMs": 2140,
@@ -316,12 +355,15 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
   "diagnostics": [
     {"severity": "error", "message": "agda timed out after 300s (raise --timeout if this is a cold first check that must build .agdai interfaces for a large library)"}
   ],
+  "diagnosticsTotal": 1,
   "holesCount": 3,
   "timedOut": true,
   "elapsedMs": 300251,
   "checkedFromSource": true
 }
 ```
+
+The timeout notice is a diagnostic like any other, and stays first: it explains why the rest of the list is short.  See [Structured diagnostics](#structured-diagnostics-issue-74) for `code`, `range`, `involved`, the ordering, and the cap.
 
 #### `get_diagnostics`
 
@@ -330,7 +372,8 @@ Retrieve the current diagnostic state without reloading: error count, warning co
 **Input**.  
 ```json
 {
-  "filePath": "/path/to/Fixture01.agda"
+  "filePath": "/path/to/Fixture01.agda",
+  "maxDiagnostics": 10
 }
 ```
 
@@ -342,14 +385,25 @@ Retrieve the current diagnostic state without reloading: error count, warning co
   "warnings": 1,
   "holes": [{"index": 0, "line": 7, "col": 8, "goal": "?"}],
   "success": true,
-  "diagnostics": [],
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "UnreachableClauses",
+      "file": "/path/to/Fixture01.agda",
+      "range": {"startLine": 6, "startCol": 1, "endLine": 6, "endCol": 8},
+      "line": 6,
+      "col": 1,
+      "message": "Unreachable clause\nwhen checking the definition of f"
+    }
+  ],
+  "diagnosticsTotal": 1,
   "timedOut": false,
   "elapsedMs": 1980,
   "checkedFromSource": false
 }
  ```
 
-Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.
+Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.  `errors` and `warnings` count every diagnostic found, not just the ones `maxDiagnostics` kept.
 
 ### Corpus-backed search tools (Milestone 1 — [M1-3])
 

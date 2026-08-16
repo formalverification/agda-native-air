@@ -15,6 +15,15 @@
 --   * check_file      - load/reload a file and return all diagnostics
 --   * get_diagnostics - lightweight summary (hole count, error count)
 --
+--   Design note — diagnostics are structured (issue #74).
+--     check_file and get_diagnostics report each diagnostic with Agda's own
+--     @code@, its @file@ and @range@, the bounded full message body, and an
+--     @involved@ payload naming the types, candidates, or metas the message is
+--     about, ordered most-likely-root-cause first and capped by the call's
+--     @maxDiagnostics@ (with the pre-cap total reported).  All of that lives in
+--     'AgdaMCP.Diagnostics', which is pure; these handlers only prepend the
+--     timeout notice, apply the cap, and count.
+--
 --   Design note — every call is bounded and timed (issue #77).
 --     Each tool spawns a cold @agda@ subprocess, bounded by 'AgdaConfig''s
 --     @agdaTimeout@.  When that bound is hit the subprocess (and its process
@@ -71,6 +80,7 @@ import AgdaMCP.Agda
   ( AgdaConfig, AgdaResult (..), agdaFlags, checkedFromSourceOf, debugLog
   , parseGoalContext, reportExpr, runAgda, timeoutMessage
   )
+import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
   , injectReportExpr, substituteHole
@@ -210,6 +220,12 @@ handleFillHole cfg params = do
 -- ---------------------------------------------------------------------------
 
 -- | handleCheckFile: load/reload an Agda file and return all diagnostics.
+--
+-- The diagnostics are structured (issue #74): each carries Agda's own @code@,
+-- its @file@ and @range@, the bounded full message body, and the entities the
+-- message names.  They are ordered most-likely-root-cause first and capped at
+-- @maxDiagnostics@, with the pre-cap total reported alongside so a truncated
+-- list is never read as a short one.
 handleCheckFile :: AgdaConfig -> CheckFileParams -> IO (Either Text FileCheckResult)
 handleCheckFile cfg params = do
   absPath <- makeAbsolute (cfFilePath params)
@@ -221,14 +237,18 @@ handleCheckFile cfg params = do
       -- On a timeout the parsed diagnostics describe only what Agda managed to
       -- print before it was killed, so the timeout itself is prepended as an
       -- error.  Without it the response would be an empty diagnostics list next
-      -- to success:false — accurate but unactionable.
-      diags   = [ timeoutDiagnostic cfg | arTimedOut result ]
-                  <> parseDiagnostics combined
+      -- to success:false — accurate but unactionable.  It is prepended after
+      -- the root-cause sort rather than through it: it explains why the rest of
+      -- the list is short, so it belongs first whatever else was found.
+      allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
+                   <> parseDiagnostics combined
+      (diags, total) = capDiagnostics (cfMaxDiagnostics params) allDiags
       nHoles  = length (findHoles (flavourOf absPath) src)
       success = arExitCode result == 0 && not (arTimedOut result)
   pure . Right $ FileCheckResult
     { fcrSuccess     = success
     , fcrDiagnostics = diags
+    , fcrDiagnosticsTotal = total
     , fcrHolesCount  = nHoles
     , fcrTimedOut    = arTimedOut result
     , fcrElapsedMs   = arElapsedMs result
@@ -245,6 +265,11 @@ handleCheckFile cfg params = do
 -- Each hole is reported with its 0-based index (the @holeIndex@ accepted by
 -- get_goal / fill_hole) and its 1-based line/column in the file as written —
 -- literate-file coordinates for literate sources (issue #73).
+--
+-- The diagnostics are the structured ones of issue #74, root-cause ordered and
+-- capped at @maxDiagnostics@; the error and warning counts are over /every/
+-- diagnostic found, not over the capped list, so shortening the payload never
+-- understates how much is wrong.
 handleGetDiagnostics :: AgdaConfig -> GetDiagnosticsParams -> IO (Either Text DiagnosticsResult)
 handleGetDiagnostics cfg params = do
   absPath <- makeAbsolute (gdFilePath params)
@@ -256,10 +281,10 @@ handleGetDiagnostics cfg params = do
       -- As in check_file: a timeout is itself an error diagnostic, so it lands in
       -- both the list and the error count rather than vanishing into a summary
       -- that reads "0 errors" because Agda never finished reporting any.
-      diags    = [ timeoutDiagnostic cfg | arTimedOut result ]
+      allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
                    <> parseDiagnostics combined
-      nErrors  = length [() | Diagnostic DiagError _ _ _ <- diags]
-      nWarns   = length [() | Diagnostic DiagWarning _ _ _ <- diags]
+      (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
+      countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
       holes    = findHoles (flavourOf absPath) src
       holeInfo = [ HoleInfo
                      { hiIndex = i
@@ -271,11 +296,12 @@ handleGetDiagnostics cfg params = do
                  ]
   pure . Right $ DiagnosticsResult
     { drFilePath = gdFilePath params
-    , drErrors   = nErrors
-    , drWarnings = nWarns
+    , drErrors   = countOf DiagError
+    , drWarnings = countOf DiagWarning
     , drHoles    = holeInfo
     , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
     , drDiagnostics = diags
+    , drDiagnosticsTotal = total
     , drTimedOut = arTimedOut result
     , drElapsedMs = arElapsedMs result
     , drCheckedFromSource = checkedFromSourceOf result
@@ -324,14 +350,10 @@ runInPlace cfg absPath originalBytes patched =
 
 -- | timeoutDiagnostic: the timeout rendered as an ordinary error diagnostic, so
 -- callers that already walk @diagnostics@ see it without special-casing the
--- @timedOut@ flag.
+-- @timedOut@ flag.  It is ours rather than Agda's, so it carries no code,
+-- position, or payload — 'plainDiagnostic' is exactly that shape.
 timeoutDiagnostic :: AgdaConfig -> Diagnostic
-timeoutDiagnostic cfg = Diagnostic
-  { diagSeverity = DiagError
-  , diagMessage  = timeoutMessage cfg
-  , diagLine     = Nothing
-  , diagCol      = Nothing
-  }
+timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
 
 
 -- | ensureDebugImport: ensure @open import AgdaDojang.Debug@ is in scope at the top
@@ -469,38 +491,3 @@ onlyOpenHoleErrors combined =
   case errorTagsOf combined of
     []   -> False
     tags -> all (== "UnsolvedInteractionMetas") tags
-
-
--- | parseDiagnostics: parse Agda stderr into a list of diagnostics.
---
--- This is a best-effort heuristic parser.  Agda error messages typically
--- look like:
---   @/path/File.agda:10,5-15: error: [GenericDocError]@
--- followed by indented message lines.
---
--- For v0, we do a simple line-by-line scan for "error" and "warning".
-parseDiagnostics :: Text -> [Diagnostic]
-parseDiagnostics stderr' =
-  let ls = T.lines stderr'
-  in  concatMap classifyLine ls
-  where
-    classifyLine ln
-      | hasLocatedError ln = [Diagnostic DiagError (T.strip ln) (parseLine ln) Nothing]
-      | hasLocatedWarning ln = [Diagnostic DiagWarning (T.strip ln) (parseLine ln) Nothing]
-      | otherwise = []
-
-    hasLocatedError ln =
-      ": error:" `T.isInfixOf` ln || "[Error]" `T.isInfixOf` ln
-    hasLocatedWarning ln =
-      ": warning:" `T.isInfixOf` ln || "[Warning]" `T.isInfixOf` ln
-
-    -- Best-effort line number extraction from "File.agda:10,5-15:"
-    parseLine ln =
-      case T.splitOn ":" ln of
-        (_ : locPart : _) ->
-          case T.splitOn "," (T.strip locPart) of
-            (lineT : _) -> case reads (T.unpack lineT) of
-              [(n, "")] -> Just n
-              _         -> Nothing
-            _ -> Nothing
-        _ -> Nothing
