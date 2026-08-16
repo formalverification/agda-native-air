@@ -249,8 +249,10 @@ data Header = Header
 -- | blocksOf: split Agda's output into (header, detail-lines) blocks, in the
 -- order Agda printed them.  Lines before the first header, and lines after a
 -- boundary, belong to no block and are dropped.
+-- Note: foldl' is re-exported from Prelude in GHC 9.10+ (base 4.20+), as
+-- 'AgdaMCP.Agda.parseGoalContext' already relies on.
 blocksOf :: [Text] -> [(Header, [Text])]
-blocksOf = finish . foldl step (Nothing, [])
+blocksOf = finish . foldl' step (Nothing, [])
   where
     step (cur, done) ln =
       case parseHeaderLine ln of
