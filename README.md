@@ -52,6 +52,7 @@ agda-native-air/
 ├── docs/
 │   ├── MANIFESTO.md
 │   ├── PLAN.md
+│   ├── GITHUB_PROJECT.md
 │   ├── roadmap.md
 │   ├── representation.md
 │   ├── architecture.md
@@ -118,7 +119,8 @@ For details, see
 
 +  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) - motivation and vision for the project
 +  [`docs/PLAN.md`](docs/PLAN.md) - project plan
-+  [`docs/roadmap.md`](docs/roadmap.md) - detailed project roadmap (GitHub labels, milestones and issues)
++  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md) - living project roadmap (milestones and issues, synced with GitHub)
++  [`docs/roadmap.md`](docs/roadmap.md) - the frozen bootstrap plan the repository's issues were populated from
 +  [`docs/representation.md`](docs/representation.md) — data contracts / schemas
 +  [`docs/architecture.md`](docs/architecture.md) — system architecture overview
 +  [`docs/public-history.md`](docs/public-history.md) - notes on the early history of this repository

@@ -170,7 +170,7 @@ Relevant docs include the following:
 +  [`docs/HowToRun.md`](docs/HowToRun.md)
 +  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) — vision
 +  [`docs/PLAN.md`](docs/PLAN.md) — roadmap + milestones
-+  [`docs/roadmap.md`](docs/roadmap.md) - detailed project roadmap (GitHub labels, milestones and issues)
++  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md) - living project roadmap (milestones and issues, synced with GitHub)
 +  [`docs/representation.md`](docs/representation.md) — data contracts / schemas
 +  [`docs/architecture.md`](docs/architecture.md) — system architecture overview
 +  [`docs/public-history.md`](docs/public-history.md)

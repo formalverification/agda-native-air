@@ -6,6 +6,10 @@
 
 ---
 
+> **Historical document.**  This is the frozen bootstrap plan from which the repository's milestones, labels, and `[MN-k]` issues were originally populated in March 2026.  It is no longer updated; the living roadmap, whose issue listings are regenerated from GitHub state, is [`GITHUB_PROJECT.md`](GITHUB_PROJECT.md) (see the `project-*` targets in the top-level Makefile).  The populate script this file's final section refers to has been removed from `scripts/python/`; that tooling now lives, much refined, in the [williamdemeo/github-project](https://github.com/williamdemeo/github-project) template (issue #92).
+
+---
+
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**

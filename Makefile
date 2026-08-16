@@ -316,7 +316,8 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
                  extract-algebras-legacy extract-lib-old clean wipe tree probe-all \
                  eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge \
-                 test-agda-dojang-integration
+                 test-agda-dojang-integration \
+                 project-lint project-update project-update-check _check-ghproject
 
 .PHONY: $(PHONY_TARGETS)
 
@@ -416,6 +417,9 @@ help:
 	@echo "  make agda-mcp-smoke              - Build agda-mcp + JSON-RPC round-trip sanity (fast)"
 	@echo "  make agda-mcp-test               - Full agda-mcp cabal test (unit + corpus + Agda integration)"
 	@echo "  make agda-mcp-build / -serve / -clean - Build / launch / clean the agda-mcp server"
+	@echo "  make project-update              - Refresh docs/GITHUB_PROJECT.md generated regions from GitHub"
+	@echo "  make project-update-check        - Report whether docs/GITHUB_PROJECT.md is stale (no write)"
+	@echo "  make project-lint                - Validate docs/GITHUB_PROJECT.md structure (offline)"
 	@echo "  make eval-benchmark              - Typecheck all benchmark gold solutions -> JSON report"
 	@echo "  make eval-benchmark-smoke        - CI slice (one obligation per tier) + determinism check"
 	@echo "  make tree                        - Pretty tree view"
@@ -560,6 +564,33 @@ probe-all:
 test-doc-howtorun:
 	@echo "→ testing documented commands from docs/HowToRun.md"
 	python3 scripts/python/doc_check.py docs/HowToRun.md --run -v
+
+# -------------------------------------------------------------------------------
+# 1.2.1. Project plan (docs/GITHUB_PROJECT.md <-> GitHub)
+#
+# The roadmap engine lives in the williamdemeo/github-project repository and is
+# NOT vendored here (issue #92): these targets call it from a local checkout,
+# pointed to by GHPROJECT_DIR.  The engine is stdlib-only Python, so plain
+# python3 suffices — no venv, no nix shell.  update/update-check talk to GitHub
+# through an authenticated `gh`; lint is offline.  Once github-project exposes
+# the engine as a Nix flake package, these targets should migrate to a pinned
+# flake input instead of a checkout path.
+GHPROJECT_DIR ?= $(HOME)/git/williamdemeo/github-project/main
+
+_check-ghproject:
+	@test -f "$(GHPROJECT_DIR)/scripts/gh_project_update.py" || { \
+	  echo "error: github-project engine not found at $(GHPROJECT_DIR)"; \
+	  echo "       clone williamdemeo/github-project there, or set GHPROJECT_DIR"; \
+	  exit 1; }
+
+project-lint: _check-ghproject
+	python3 "$(GHPROJECT_DIR)/scripts/gh_project_lint.py" docs/GITHUB_PROJECT.md
+
+project-update: _check-ghproject
+	python3 "$(GHPROJECT_DIR)/scripts/gh_project_update.py" docs/GITHUB_PROJECT.md
+
+project-update-check: _check-ghproject
+	python3 "$(GHPROJECT_DIR)/scripts/gh_project_update.py" docs/GITHUB_PROJECT.md --check
 
 # -------------------------------------------------------------------------------
 # 1.3. nix wrappers: convenience wrappers for running from outside Nix

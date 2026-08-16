@@ -8,7 +8,7 @@ them, and what is implemented today versus planned.
 
 For the vision and rationale see [`MANIFESTO.md`](MANIFESTO.md); for the full
 plan and milestone schedule see [`PLAN.md`](PLAN.md) and
-[`roadmap.md`](roadmap.md).
+[`GITHUB_PROJECT.md`](GITHUB_PROJECT.md).
 
 ---
 
@@ -195,6 +195,6 @@ MCP library.
 
 +  [`MANIFESTO.md`](MANIFESTO.md) — vision and the frontier-agent-plus-environment thesis.
 +  [`PLAN.md`](PLAN.md) — architecture context, milestones, and the local-model plan.
-+  [`roadmap.md`](roadmap.md) — GitHub project roadmap with issue-level detail.
++  [`GITHUB_PROJECT.md`](GITHUB_PROJECT.md) — living GitHub project roadmap with issue-level detail.
 +  [`agda-mcp/README.md`](../agda-mcp/README.md) — Bridge layer: tool surface, flags, transport, and module structure.
 +  [`representation.md`](representation.md) — data contract for `agda-strux` JSONL output and derived views.

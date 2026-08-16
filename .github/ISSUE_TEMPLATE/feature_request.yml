@@ -37,7 +37,7 @@ body:
     id: milestone
     attributes:
       label: Target milestone
-      description: Which roadmap milestone does this belong to?  See docs/roadmap.md.
+      description: Which roadmap milestone does this belong to?  See docs/GITHUB_PROJECT.md.
       options:
         - "M0 — Public bootstrap / infrastructure"
         - "M1 — AgdaDojang + AgdaMCP + first proofs"
