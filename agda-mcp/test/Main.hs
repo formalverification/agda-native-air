@@ -1744,6 +1744,40 @@ echoTests = do
                 in  assert ("selectedLibraries were " <> show (pcSelected pc))
                       ("d-lib" `elem` pcSelected pc)
 
+          , runTest "project echo: a configured-but-missing registry is echoed, not omitted" $ do
+              -- A --library-file naming a path that is not there used to vanish
+              -- from the echo entirely, so the response read as "no registry
+              -- configured" while command.args still carried the flag — and the
+              -- caller lost the one clue explaining the failure (Copilot's
+              -- second review of PR 95).  It is also the case where the
+              -- wrong-tree check is silently inert, since there is nothing to
+              -- compare against, so the response has to say so.
+              let ghost   = takeDirectory libs </> "no-such-libraries"
+                  ghostCfg = defaultConfig
+                    { agdaBin   = "/nonexistent/agda-must-not-run"
+                    , agdaFlags = ["--library-file=" <> ghost, "-l", "agda-algebras"]
+                    }
+              res <- handleCheckFile ghostCfg (CheckFileParams targetA Nothing)
+              withRight res $ \r -> do
+                let pc = fcrProject r
+                r1 <- assertEqual "librariesFile" (Just ghost) (pcLibrariesFile pc)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> do
+                    r2 <- assert "librariesFileMissing should be True"
+                            (pcLibrariesFileMissing pc)
+                    case r2 of
+                      Fail m -> pure (Fail m)
+                      Pass   -> assert
+                        ("registeredLibraries should be empty, got "
+                         <> show (map leName (pcRegistered pc)))
+                        (null (pcRegistered pc))
+
+          , runTest "project echo: a readable registry is not flagged as missing" $
+              withRight okA $ \r ->
+                assert "librariesFileMissing should be False for a real registry"
+                  (not (pcLibrariesFileMissing (fcrProject r)))
+
           , runTest "project echo: the echo agrees with the command that ran" $
               -- The two views a client can take of the same call must not differ.
               withRight okD $ \r ->

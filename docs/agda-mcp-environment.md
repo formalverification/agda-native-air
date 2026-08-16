@@ -111,6 +111,8 @@ agda-mcp: refusing to check /home/w/git/ualib/agda-algebras/branch-B/src/FLRP/Br
 
 The refusal is returned **before** `agda` is spawned and before any in-place patching, which the test suite pins by pointing `agdaBin` at a path that does not exist and asserting the call still fails as a refusal rather than as a crash.
 
+One limit of the check is worth stating plainly, because it is invisible otherwise: the comparison is against the registry, so a configured `--library-file` that **does not exist** leaves nothing to compare against and no mismatch can be found.  The response says so — `project.librariesFile` still names the configured path (it is in `command.args`, so omitting it would make the echo read as "no registry configured") and `project.librariesFileMissing` is `true`.  A stale `.mcp.json` naming a deleted worktree's `agda/libraries` is exactly this case.
+
 One limit worth stating.  The name comparison is exact, so a library that declares `agda-algebras` in one checkout and `agda-algebras-2.0` in another reads as two different libraries rather than as a mismatch.  That is the right reading — Agda treats the suffix as a version — but it means the check catches stale *worktrees*, not stale *versions*.
 
 ## 5.  Operator checklist

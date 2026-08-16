@@ -325,7 +325,15 @@ data ProjectContext = ProjectContext
   { pcRootSource    :: RootSource         -- ^ How 'pcRoot' was decided.
   , pcRoot          :: FilePath           -- ^ The effective root: the library's, or the file's directory.
   , pcLibrary       :: Maybe LibraryEntry -- ^ The file's own library, when it has one.
-  , pcLibrariesFile :: Maybe FilePath     -- ^ The libraries registry consulted, if any.
+  , pcLibrariesFile :: Maybe FilePath     -- ^ The libraries registry that was configured
+                                          --   or found — echoed whether or not it exists,
+                                          --   so it never contradicts the @--library-file@
+                                          --   in 'CommandEcho'.
+  , pcLibrariesFileMissing :: Bool        -- ^ True when 'pcLibrariesFile' names a file that
+                                          --   is not there.  Then 'pcRegistered' is empty
+                                          --   not because the registry is empty but because
+                                          --   it could not be read — and with nothing to
+                                          --   contradict, wrong-tree detection cannot fire.
   , pcRegistered    :: [LibraryEntry]     -- ^ What that registry declares.
   , pcSelected      :: [Text]             -- ^ Library names Agda was given (@-l@), as
                                           --   finally assembled: the server's, plus
@@ -345,6 +353,9 @@ instance ToJSON ProjectContext where
     , "includePaths"        .= pcIncludePaths p
     ] <> maybe [] (\l -> ["library"       .= l]) (pcLibrary p)
       <> maybe [] (\f -> ["librariesFile" .= f]) (pcLibrariesFile p)
+      -- Emitted only when true: an absent key is the ordinary case, and a
+      -- present one is the caller's problem to fix.
+      <> [ "librariesFileMissing" .= True | pcLibrariesFileMissing p ]
 
 -- | ProjectMismatch: the requested file belongs to a different checkout of a
 -- library the server already has registered somewhere else.

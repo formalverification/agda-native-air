@@ -108,14 +108,24 @@ import AgdaMCP.Types
 resolveProject :: AgdaConfig -> FilePath -> IO (Either ProjectMismatch ProjectContext)
 resolveProject cfg path = do
   absPath    <- makeAbsolute path
-  mRegistry  <- resolveLibrariesFile (librariesFileFlagOf (agdaFlags cfg))
-  registered <- maybe (pure []) readRegistry mRegistry
+  mConfigured <- resolveLibrariesFile (librariesFileFlagOf (agdaFlags cfg))
+  -- Echo the registry that was configured whether or not it is readable; read
+  -- entries only from one that is.  Note the safety consequence: with no
+  -- entries there is nothing for the mismatch check below to contradict, so a
+  -- registry that is missing does not merely degrade the echo, it disables
+  -- wrong-tree detection entirely — which is why the response says so.
+  let mRegistry = fst <$> mConfigured
+      missing   = maybe False (not . snd) mConfigured
+  registered <- case mConfigured of
+    Just (p, True) -> readRegistry p
+    _              -> pure []
   mOwn       <- findNearestAgdaLib (takeDirectory absPath)
   let base = ProjectContext
         { pcRootSource    = RootFromServerConfig
         , pcRoot          = takeDirectory absPath
         , pcLibrary       = Nothing
         , pcLibrariesFile = mRegistry
+        , pcLibrariesFileMissing = missing
         , pcRegistered    = registered
         , pcSelected      = selectedLibrariesOf (agdaFlags cfg)
         , pcIncludePaths  = includePathsOf (agdaFlags cfg)
@@ -266,19 +276,30 @@ readLibraryEntry libFile = do
 -- The libraries registry
 -- ---------------------------------------------------------------------------
 
--- | resolveLibrariesFile: which libraries registry will @agda@ actually read?
+-- | resolveLibrariesFile: which libraries registry will @agda@ actually read,
+-- and is it there?
 --
 -- The explicit @--library-file@ from the server's flags wins, exactly as it
 -- does for Agda.  Failing that, Agda looks in its application directory, which
 -- is @$AGDA_DIR@ when set and @~/.agda@ otherwise — and @$AGDA_DIR@ is set by
 -- this repository's flake shellHook, so naming it here is not hypothetical.
--- A path that does not exist is reported as no registry at all rather than as
--- an empty one, since the two lead to different advice.
-resolveLibrariesFile :: Maybe FilePath -> IO (Maybe FilePath)
+--
+-- @Just (path, False)@ — a configured registry that is not there — is a case
+-- worth keeping distinct rather than collapsing into @Nothing@.  An earlier
+-- version dropped it, which left the response omitting @librariesFile@ while
+-- @command.args@ still carried the @--library-file@ flag: the echo then read as
+-- "no registry configured" in precisely the misconfiguration where the caller
+-- most needs to be told "the registry you configured is missing" (Copilot's
+-- review of PR 95).  A stale @.mcp.json@ naming a deleted worktree's
+-- @agda/libraries@ is exactly that case, and exactly the § 3.6 hazard.
+--
+-- The fallback probe has no configured path to report, so a miss there really
+-- is @Nothing@: nothing was asked for and nothing was found.
+resolveLibrariesFile :: Maybe FilePath -> IO (Maybe (FilePath, Bool))
 resolveLibrariesFile (Just explicit) = do
   abs'   <- makeAbsolute explicit
   exists <- doesFileExist abs'
-  pure (if exists then Just abs' else Nothing)
+  pure (Just (abs', exists))
 resolveLibrariesFile Nothing = do
   mAgdaDir <- lookupEnv "AGDA_DIR"
   mHome    <- either (const Nothing) Just
@@ -288,7 +309,7 @@ resolveLibrariesFile Nothing = do
     firstExisting []       = pure Nothing
     firstExisting (c : cs) = do
       ok <- doesFileExist c
-      if ok then Just <$> makeAbsolute c else firstExisting cs
+      if ok then (\p -> Just (p, True)) <$> makeAbsolute c else firstExisting cs
 
 -- | readRegistry: parse a libraries file into the entries it declares.
 readRegistry :: FilePath -> IO [LibraryEntry]

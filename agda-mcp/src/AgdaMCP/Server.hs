@@ -291,7 +291,10 @@ verdictNote =
   <> " when the flags fixed at server start did. If the file belongs to a"
   <> " different checkout of a library this server has registered elsewhere, the"
   <> " call FAILS with a rootMismatch object naming both roots rather than"
-  <> " quietly checking the other tree."
+  <> " quietly checking the other tree — with one limit worth knowing: that"
+  <> " detection compares against the libraries registry, so if the configured"
+  <> " one is missing there is nothing to compare against and no mismatch can be"
+  <> " found. The response says so as project.librariesFileMissing."
 
 -- | batchNote: what success means for the two whole-file tools.
 --
