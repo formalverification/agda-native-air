@@ -100,6 +100,23 @@ This is the minimum tooling required for an agent to do interactive proof develo
 | `check_file`       | Load/reload an Agda file and return all diagnostics. |
 | `get_diagnostics`  | Lightweight summary: error/warning counts, open holes with positions. |
 
+### The response echo: verdict, command, project (issues #72 and #76)
+
+Every proof-state response — success, timeout, or refusal — carries three keys that say what ran, what its answer means, and which tree it ran against.  They exist because a verdict an agent cannot check costs more than no verdict: § 2 of [the field report](../docs/feedback/flrp-agda-mcp-improvements.md) records a session in which the server was configured, listed, and never called, because nothing said whether green here meant the build passed.
+
+| Key | Contents |
+|-----|----------|
+| `verdict` | `equivalentTo` — the exact `agda` command this call is equivalent to, prefixed `equivalent-to:`; `meaning` — one sentence saying what the tool's verdict field means; `exitCode` — Agda's own exit status, which the verdict is derived from. |
+| `command` | `binary` (resolved against `PATH`, so you can see *which* `agda` ran), `args` (the full argument vector, ending in the file path), and `cwd`. |
+| `project` | `rootSource` (`nearest-agda-lib` or `server-config`), `root`, the file's own `library`, the `librariesFile` consulted, and what that registry declares (`registeredLibraries`) next to what the server selected (`selectedLibraries`, `includePaths`). |
+
+Two properties are contractual, not incidental.
+
++  **`success` is a function of the exit code alone.**  Never of the diagnostics text.  A change in Agda's message format can empty the `diagnostics` list — the position-parsing drift that #74 fixed had done exactly that — but it cannot turn a failing build green.  The test suite pins this with a stand-in binary that exits non-zero while printing nothing an error parser could latch onto.
++  **A wrong tree is an error, not a wrong answer.**  If the requested file belongs to a different checkout of a library this server has registered elsewhere, the call fails with a `rootMismatch` object naming both roots, *before* `agda` is spawned and before any in-place patching.  See [`docs/agda-mcp-environment.md`](../docs/agda-mcp-environment.md) for the resolution rules and the operator checklist.
+
+There is no `strict` option to opt into: this server shells out to batch `agda` per call, so unsolved metavariables, unsolved constraints, and open holes have always made it red.  What was missing was saying so.
+
 ### The hole model (issues #71 and #73)
 
 All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` and kept in sync with what Agda itself reports:
@@ -226,6 +243,7 @@ agda-mcp/
 │       ├── Agda.hs              ← Agda subprocess interaction + marker parsing
 │       ├── Diagnostics.hs       ← Agda output → structured diagnostics: codes, ranges, involved
 │       ├── Holes.hs             ← The hole model: literate masking + lexical hole scan
+│       ├── Project.hs           ← Root resolution: nearest *.agda-lib, registry, mismatch
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
 │       └── Tools/
 │           ├── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
@@ -258,9 +276,12 @@ Given a file path and hole identifier, return the hole's expected type and its l
   ],
   "module": "Fixture01",
   "elapsedMs": 1720,
-  "checkedFromSource": true
+  "checkedFromSource": true,
+  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
 }
 ```
+
+`verdict.exitCode` here is normally **non-zero even when the goal is right**: the injected macro leaves an interaction point behind, so this run is evidence about the introspection, not a judgement on the file.  Use `check_file` for that.
 
 **How it works**.  Ensures `AgdaDojang.Debug` is imported (injecting the import transiently if the file does not already import it), replaces the hole with the `reportGoalCtx` macro, typechecks the file **in place**, and parses the `AGDADOJANG_REQ_BEGIN/END` marker block.  Checking at the file's real path (rather than a scratch copy) lets hierarchically-named modules embedded in a library resolve normally; the original source is restored after the call.
 
@@ -324,7 +345,8 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
 }
 ```
 
-**Output**.  
+**Output**.  The `verdict` / `command` / `project` block below is the [response echo](#the-response-echo-verdict-command-project-issues-72-and-76); every proof-state tool carries it, and it is shown in full only here.
+
 ```json
 {
   "success": false,
@@ -344,7 +366,26 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
   "holesCount": 3,
   "timedOut": false,
   "elapsedMs": 2140,
-  "checkedFromSource": true
+  "checkedFromSource": true,
+  "verdict": {
+    "equivalentTo": "equivalent-to: /nix/store/…/bin/agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library /abs/Fixture01.agda",
+    "meaning": "success is true if and only if that command exited 0, so it means exactly what green means in a batch build. …",
+    "exitCode": 42
+  },
+  "command": {
+    "binary": "/nix/store/…-agdaWithPackages-2.8.0/bin/agda",
+    "args": ["-i", "agda-dojang/agda", "--library-file=agda/libraries", "-l", "agda-dojang", "-l", "standard-library", "-i", "/abs/dir", "/abs/Fixture01.agda"],
+    "cwd": "/abs/agda-native-air"
+  },
+  "project": {
+    "rootSource": "nearest-agda-lib",
+    "root": "/abs/agda-native-air/agda-dojang",
+    "library": {"name": "agda-dojang", "root": "/abs/agda-native-air/agda-dojang", "libFile": "…/agda-dojang.agda-lib", "includes": ["agda"]},
+    "librariesFile": "/abs/agda-native-air/agda/libraries",
+    "registeredLibraries": [{"name": "agda-dojang", "…": "…"}],
+    "selectedLibraries": ["agda-dojang", "standard-library"],
+    "includePaths": ["agda-dojang/agda"]
+  }
 }
 ```
 
@@ -359,7 +400,23 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
   "holesCount": 3,
   "timedOut": true,
   "elapsedMs": 300251,
-  "checkedFromSource": true
+  "checkedFromSource": true,
+  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+}
+```
+
+**Output (the file belongs to another checkout)**.  An error response, returned before `agda` is spawned.
+
+```json
+{
+  "error": "agda-mcp: refusing to check /abs/branch-B/src/M.agda — it belongs to a different checkout than the one this server has registered. …",
+  "rootMismatch": {
+    "filePath": "/abs/branch-B/src/M.agda",
+    "libraryName": "agda-algebras",
+    "fileRoot": "/abs/branch-B",
+    "registeredRoot": "/abs/branch-A",
+    "librariesFile": "/abs/agda-native-air/agda/libraries"
+  }
 }
 ```
 
@@ -399,9 +456,12 @@ Retrieve the current diagnostic state without reloading: error count, warning co
   "diagnosticsTotal": 1,
   "timedOut": false,
   "elapsedMs": 1980,
-  "checkedFromSource": false
+  "checkedFromSource": false,
+  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
 }
  ```
+
+`success` and `verdict` are the same fields `check_file` returns, with the same derivation from Agda's exit code: the two tools differ in what they summarize, never in what green means.  The `errors` / `warnings` counts come from parsing Agda's prose and can drift with its message format, which is exactly why `success` is not read from them.
 
 Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.  `errors` and `warnings` count every diagnostic found, not just the ones `maxDiagnostics` kept.
 

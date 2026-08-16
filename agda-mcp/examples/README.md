@@ -34,3 +34,18 @@ Two fields carry the machine-specific paths:
 For a different library, change the `-l <name>` flag and the matching `*_ROOT`
 variable (e.g. `AGDA_CATEGORIES_ROOT`, `AGDA_TYPETOPOLOGY_ROOT`); add `--corpus
 /ABS/PATH/TO/...jsonl` to enable the search tools.
+
+## One worktree per branch
+
+`AGDA_ALGEBRAS_ROOT` binds the server to one checkout, so a `.mcp.json` copied
+between worktrees — or a server left running while you move to another branch's
+worktree — points at the wrong tree.  The server no longer answers such a call:
+if the file you ask about sits under a different checkout of a library it has
+registered elsewhere, it refuses, naming both roots and the libraries file that
+disagrees with the file, instead of resolving your imports against the other
+tree and reporting success.  Every response also carries a `project` block naming
+the tree it checked, so you can confirm this without triggering the failure.
+
+Copy the template into each worktree separately and set `AGDA_ALGEBRAS_ROOT` to
+that worktree.  See [`docs/agda-mcp-environment.md`](../../docs/agda-mcp-environment.md)
+for the resolution rules and for what the server writes where.
