@@ -886,8 +886,15 @@ Claude Code auto-loads `.mcp.json` from the working directory (asking once to ap
 it).  Two entries in it do the real work — `env.AGDA_ALGEBRAS_ROOT`, which registers
 your library so the proof-state tools resolve it, and (optionally) `--corpus`, which
 turns on the search tools.  Both are covered in *Library registration and the search
-corpus* below.  Keep `--timeout 600`: the first typecheck of a large module is cold and
-builds `.agdai` interfaces, which overruns the 30 s default.
+corpus* below.  Keep `--timeout 600`: the bound is enforced — on expiry the `agda`
+process group is killed and the tool returns a timeout rather than blocking — and the
+first typecheck of a large module is cold, building `.agdai` interfaces for its whole
+import graph, which can take minutes and overruns even the 300 s default.  Sizing the
+bound too small is not a graceful degradation: it aborts exactly the call that would
+have built those interfaces, so the next call starts cold again.  Every proof-state
+response reports `elapsedMs` and `checkedFromSource`, so you can tell a slow cold call
+from a slow warm one (`checkedFromSource` is omitted when the run died before
+producing evidence either way — absent means unknown, not warm).
 
 #### Option B — `claude mcp add`
 

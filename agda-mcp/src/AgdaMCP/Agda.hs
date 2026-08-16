@@ -18,31 +18,64 @@
 --   The functions here call the @agda@ binary as a subprocess.  The long-term
 --   plan is to replace this with Agda-as-a-library calls once the Haskell
 --   interface to AgdaDojang matures.
+--
+--   Design note (timeout enforcement, issue #77):
+--   'runAgda' is built on 'createProcess' rather than 'readProcessWithExitCode'
+--   because the latter cannot be timed out cleanly: 'System.Timeout.timeout'
+--   kills the /waiting/ thread, not the subprocess, leaving a runaway @agda@
+--   behind.  Instead we spawn @agda@ in its own process group
+--   (@create_group = True@), drain its stdout and stderr concurrently on
+--   dedicated threads, and race the process against a timer.  On expiry we
+--   escalate group-wide — SIGINT (so agda unwinds and may still print), then
+--   SIGTERM, then SIGKILL, each rung taken while the process group still has
+--   members — and reap with 'waitForProcess', so no zombie and no orphan
+--   survives the call.  A timeout is reported as a /value/
+--   ('arTimedOut'), never an exception, which is what lets the in-place tools'
+--   'Control.Exception.bracket_' restore run on the timeout path exactly as it
+--   does on the success path.
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StrictData        #-}
 
 module AgdaMCP.Agda
   ( -- * Configuration
     AgdaConfig (..)
   , defaultConfig
+  , defaultTimeoutSeconds
     -- * Debug output
   , debugLog
     -- * Marker parsing (pure)
   , parseGoalContext
+  , checkedFromSourceOf
     -- * Agda subprocess (IO)
   , runAgda
   , AgdaResult (..)
+  , timeoutMessage
   ) where
 
-import Control.Exception (catch, SomeException)
+import Control.Concurrent (forkIO, killThread, threadDelay)
+import Control.Concurrent.MVar
+  (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, tryPutMVar)
+import Control.Exception (SomeException, bracket, catch, try)
+import Control.Monad (void, when)
+import qualified Data.ByteString as BS
 import Data.Text.IO as TIO
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+import Data.Text.Encoding.Error (lenientDecode)
+import GHC.Clock (getMonotonicTimeNSec)
 import System.Exit (ExitCode (..))
-import System.IO (stderr)
-import System.Process (readProcessWithExitCode)
+import System.IO (Handle, hClose, hSetBinaryMode, stderr)
+import System.Posix.Signals
+  (Signal, killProcess, nullSignal, signalProcessGroup, softwareTermination)
+import System.Process
+  ( CreateProcess (..), Pid, ProcessHandle, StdStream (..)
+  , createProcess, getPid, interruptProcessGroupOf, proc
+  , terminateProcess, waitForProcess
+  )
 
 import AgdaMCP.Types (CtxEntry (..))
 
@@ -55,17 +88,34 @@ import AgdaMCP.Types (CtxEntry (..))
 data AgdaConfig = AgdaConfig
   { agdaBin       :: FilePath     -- ^ Path to the agda binary.
   , agdaFlags     :: [String]     -- ^ Extra flags (e.g. @["-i", "agda", "--library-file=..."]@).
-  , agdaTimeout   :: Maybe Int    -- ^ Timeout in seconds (Nothing = no timeout).
+  , agdaTimeout   :: Maybe Int    -- ^ Wall-clock timeout in seconds for one @agda@
+                                  --   invocation.  @Nothing@ — or any non-positive
+                                  --   number, the usual "unlimited" spelling — means
+                                  --   no bound is enforced.
   , reportExpr    :: Text         -- ^ Reporting expression to inject (default: "reportGoalCtx").
   , agdaVerbose   :: Bool         -- ^ Emit debug output to stderr.
   } deriving (Eq, Show)
+
+-- | defaultTimeoutSeconds: the default per-invocation wall-clock bound.
+--
+-- Every tool call is a /cold/ @agda@ subprocess, so the first call against a
+-- large library pays for building its @.agdai@ interfaces — minutes, not
+-- seconds, for something the size of agda-algebras.  Before issue #77 the bound
+-- was inert, so its value did not matter; now that it is enforced, a small
+-- default would abort exactly the legitimate cold call a user is most likely to
+-- make first.  300 s leaves room for that interface build while still bounding a
+-- genuinely hung typechecker.  Callers that know their library is warm can lower
+-- it with @--timeout@; callers building a very large library from scratch should
+-- raise it (the field-test configuration uses 600).
+defaultTimeoutSeconds :: Int
+defaultTimeoutSeconds = 300
 
 -- | Sensible defaults; the caller should override @agdaFlags@ for their project.
 defaultConfig :: AgdaConfig
 defaultConfig = AgdaConfig
   { agdaBin     = "agda"
   , agdaFlags   = []
-  , agdaTimeout = Just 30
+  , agdaTimeout = Just defaultTimeoutSeconds
   , reportExpr  = "reportGoalCtx"
   , agdaVerbose = False
   }
@@ -182,41 +232,358 @@ fstSplitOn needle haystack =
 
 -- | The result of running Agda on a file.
 data AgdaResult = AgdaResult
-  { arExitCode :: Int       -- ^ Process exit code (0 = success).
-  , arStdout   :: Text      -- ^ Captured stdout.
-  , arStderr   :: Text      -- ^ Captured stderr.
+  { arExitCode  :: Int       -- ^ Process exit code (0 = success, -1 = could not run agda).
+  , arStdout    :: Text      -- ^ Captured stdout.
+  , arStderr    :: Text      -- ^ Captured stderr.
+  , arTimedOut  :: Bool      -- ^ True iff the run hit 'agdaTimeout' and was killed.
+                             --   An explicit flag rather than a magic exit code: a
+                             --   killed process reports whatever signal took it down
+                             --   (-2 for SIGINT, -15 for SIGTERM), which is not
+                             --   distinguishable from an ordinary failure.
+  , arElapsedMs :: Int       -- ^ Wall-clock duration of the subprocess, in
+                             --   milliseconds, from a monotonic clock.
   } deriving (Eq, Show)
 
 -- | Run the Agda binary on the given file path.
 --
--- Captures stdout and stderr separately, since Agda emits most diagnostics
--- on stderr.
+-- Captures stdout and stderr separately, since Agda emits most diagnostics on
+-- stderr, and bounds the run by 'agdaTimeout' (see the module header for why
+-- this cannot be done with 'System.Timeout.timeout' over
+-- 'System.Process.readProcessWithExitCode').  Whatever the child managed to
+-- write before being killed is still returned, so a timeout that happens to
+-- follow real diagnostics does not discard them.
+--
+-- Failure to /start/ @agda@ at all (missing binary, permission denied) is
+-- reported as exit code @-1@ with the exception text on stderr, preserving the
+-- pre-existing contract that 'AgdaMCP.Tools.ProofState' reads as @FillCrash@.
 runAgda :: AgdaConfig -> FilePath -> IO AgdaResult
 runAgda cfg path = do
   let args = agdaFlags cfg <> [path]
-  result <- safeReadProcess (agdaBin cfg) args ""
-  case result of
-    Left err -> pure AgdaResult
-      { arExitCode = -1
-      , arStdout   = ""
-      , arStderr   = "agda-mcp: failed to run agda: " <> T.pack (show err)
+  start   <- getMonotonicTimeNSec
+  outcome <- try (runAgdaProcess cfg args)
+  end     <- getMonotonicTimeNSec
+  let elapsed = fromIntegral ((end - start) `div` 1_000_000)
+  pure $ case outcome of
+    Left (err :: SomeException) -> AgdaResult
+      { arExitCode  = -1
+      , arStdout    = ""
+      , arStderr    = "agda-mcp: failed to run agda: " <> T.pack (show err)
+      , arTimedOut  = False
+      , arElapsedMs = elapsed
       }
-    Right (ec, out, err) ->
-      -- TODO: enforce agdaTimeout via System.Timeout.timeout
-      -- SEE: https://github.com/formalverification/agda-native-air/pull/38#discussion_r2969684706
-      let code = case ec of
-            ExitSuccess   -> 0
-            ExitFailure n -> n
-      in pure AgdaResult
-        { arExitCode = code
-        , arStdout   = T.pack out
-        , arStderr   = T.pack err
-        }
+    Right (mExit, out, err) -> AgdaResult
+      { arExitCode  = maybe (-1) exitCodeToInt mExit
+      , arStdout    = out
+      , arStderr    = err
+      , arTimedOut  = isNothing' mExit
+      , arElapsedMs = elapsed
+      }
+  where
+    isNothing' Nothing = True
+    isNothing' _       = False
 
--- | readProcessWithExitCode wrapped in exception handling.
-safeReadProcess
-  :: FilePath -> [String] -> String
-  -> IO (Either SomeException (ExitCode, String, String))
-safeReadProcess cmd args stdin' =
-  (Right <$> readProcessWithExitCode cmd args stdin')
-    `catch` \e -> pure (Left (e :: SomeException))
+exitCodeToInt :: ExitCode -> Int
+exitCodeToInt ExitSuccess     = 0
+exitCodeToInt (ExitFailure n) = n
+
+-- | runAgdaProcess: spawn @agda@, drain both streams, race against the timeout.
+--
+-- Returns @(Just exitCode, stdout, stderr)@ on a completed run and
+-- @(Nothing, …)@ when the timeout fired and the process group was killed.
+-- Throws only if the process could not be created at all; 'runAgda' catches
+-- that and maps it to exit code -1.
+runAgdaProcess
+  :: AgdaConfig -> [String] -> IO (Maybe ExitCode, Text, Text)
+runAgdaProcess cfg args =
+  bracket acquire cleanup $ \(handles, mPgid) ->
+    case handles of
+      (mIn, Just hOut, Just hErr, ph) -> do
+        -- Agda reads nothing from stdin in batch mode; close our end at once so
+        -- it sees EOF rather than blocking if it ever tries.
+        maybe (pure ()) (ignoringIOErrors . hClose) mIn
+        outVar <- drainAsync hOut
+        errVar <- drainAsync hErr
+        raceProcess cfg ph mPgid outVar errVar
+      -- createProcess with CreatePipe on both streams always yields both
+      -- handles; this branch exists only to keep the match total.
+      _ -> pure (Just (ExitFailure (-1)), "", "agda-mcp: could not open agda's output pipes")
+  where
+    spec = (proc (agdaBin cfg) args)
+      { std_in  = CreatePipe
+      , std_out = CreatePipe
+      , std_err = CreatePipe
+        -- Its own process group, so group-wide signals reach any descendant
+        -- agda spawned rather than just agda itself.
+      , create_group = True
+      }
+
+    -- The child's pgid is captured here, before any thread can 'waitForProcess'
+    -- it: 'getPid' reads Nothing once the leader has been reaped, and the
+    -- timeout ladder must still be able to reach *descendants* after the leader
+    -- itself has fallen (a leader dying to SIGINT while a SIGINT-ignoring
+    -- descendant survives is exactly the case the orphan test pins).
+    -- @create_group = True@ makes the child a group leader, so pid = pgid.
+    acquire = do
+      handles@(_, _, _, ph) <- createProcess spec
+      mPgid <- getPid ph
+      pure (handles, mPgid)
+
+    -- Deliberately not 'System.Process.cleanupProcess': that closes the stdout
+    -- and stderr handles, and closing a handle another thread is mid-read on
+    -- blocks on the handle lock — precisely the hang this whole change exists to
+    -- remove.  The drainer threads own those two handles and close them
+    -- themselves ('BS.hGetContents' closes at EOF), so all this needs to do is
+    -- guarantee the child is signalled and reaped on every exit path, including
+    -- an async exception mid-run.
+    cleanup ((mIn, _, _, ph), mPgid) = do
+      maybe (pure ()) (ignoringIOErrors . hClose) mIn
+      ignoringIOErrors (interruptProcessGroupOf ph)
+      signalGroupVia mPgid softwareTermination
+      ignoringIOErrors (terminateProcess ph)
+      -- Reap on a detached thread (a blocked 'waitForProcess' sits in a foreign
+      -- call, so doing it inline could stall an async-exception unwind), and
+      -- escalate to a group SIGKILL if anything ignores the SIGTERM above.
+      -- After the normal paths the group is already gone and the leader reaped,
+      -- so every step here is a no-op.
+      void . forkIO $ do
+        _ <- forkIO $ do
+          threadDelay termGraceMicros
+          alive <- groupAlive mPgid
+          when alive (signalGroupVia mPgid killProcess)
+        void (waitForProcess ph)
+
+-- | raceProcess: wait for the process, or for the timeout, whichever comes first.
+raceProcess
+  :: AgdaConfig -> ProcessHandle -> Maybe Pid -> MVar Text -> MVar Text
+  -> IO (Maybe ExitCode, Text, Text)
+raceProcess cfg ph mPgid outVar errVar = do
+  -- 'exitVar' is the reaped exit status; 'raceVar' is the first-past-the-post
+  -- signal, holding @Just ec@ if agda finished and @Nothing@ if the timer won.
+  exitVar <- newEmptyMVar
+  raceVar <- newEmptyMVar
+  _       <- forkIO $ do
+    ec <- waitForProcess ph
+    putMVar exitVar ec
+    void (tryPutMVar raceVar (Just ec))
+  timer <- case boundedTimeout cfg of
+    Nothing   -> pure Nothing
+    Just secs -> fmap Just . forkIO $ do
+      threadDelay (secs * 1_000_000)
+      void (tryPutMVar raceVar Nothing)
+  outcome <- takeMVar raceVar
+  maybe (pure ()) killThread timer
+  case outcome of
+    Just ec -> do
+      -- agda exited on its own, so both pipes are at EOF and the drainers are
+      -- about to finish.  The bound is a pure backstop against a descendant that
+      -- outlived agda and still holds a write end: everything agda itself wrote
+      -- is already buffered and reads in milliseconds, so it can never truncate
+      -- real output — but without it, such a descendant would hang the tool call
+      -- forever, which is the failure mode this change exists to remove.
+      out <- takeMVarWithin postExitDrainMicros outVar
+      err <- takeMVarWithin postExitDrainMicros errVar
+      pure (Just ec, orEmpty out, orEmpty err)
+    Nothing -> do
+      -- Timed out.  Escalate group-wide — SIGINT first (agda unwinds and may
+      -- still print), then SIGTERM, then SIGKILL — advancing a rung while the
+      -- process GROUP still has members, not merely while the leader remains
+      -- unreaped.  The distinction is load-bearing twice over: a descendant
+      -- can ignore SIGINT while the leader falls to it (POSIX starts the
+      -- background children of non-interactive shells with SIGINT ignored, so
+      -- the orphan fixture builds exactly this), and a ladder keyed on the
+      -- leader would then stop with the descendant still running; conversely a
+      -- leader that ignored SIGTERM must not stall the ladder short of
+      -- SIGKILL.  SIGKILL can be neither caught nor ignored, so past the last
+      -- rung only a kernel-stuck process can survive the bounded waits.  The
+      -- final reap goes through 'exitVar' rather than killing 'waiter': a
+      -- thread blocked in 'waitForProcess' sits in a foreign call, so
+      -- 'killThread' on it could block indefinitely.  Letting it complete is
+      -- what leaves no zombie.
+      ignoringIOErrors (interruptProcessGroupOf ph)
+      intGone <- waitGroupGone mPgid exitVar interruptGraceMicros
+      termGone <-
+        if intGone then pure True
+        else do
+          signalGroupVia mPgid softwareTermination
+          -- Belt and braces: reach the leader through the handle too, in case
+          -- the pgid was unavailable at spawn time.
+          ignoringIOErrors (terminateProcess ph)
+          waitGroupGone mPgid exitVar termGraceMicros
+      when (not termGone) $ do
+        signalGroupVia mPgid killProcess
+        void (waitGroupGone mPgid exitVar reapGraceMicros)
+      -- Reap the leader (bounded, so an unreapable process cannot hang the
+      -- call); with the group gone this returns immediately.
+      _ <- takeMVarWithin reapGraceMicros exitVar
+      out <- takeMVarWithin drainGraceMicros outVar
+      err <- takeMVarWithin drainGraceMicros errVar
+      pure (Nothing, orEmpty out, orEmpty err)
+  where
+    orEmpty = maybe "" id
+
+-- | boundedTimeout: the effective bound, treating a non-positive number the way
+-- command-line tools conventionally do — as "no limit" — rather than as an
+-- instant abort.
+boundedTimeout :: AgdaConfig -> Maybe Int
+boundedTimeout cfg = case agdaTimeout cfg of
+  Just secs | secs > 0 -> Just secs
+  _                    -> Nothing
+
+-- | How long SIGINT gets to work before SIGTERM follows.
+interruptGraceMicros :: Int
+interruptGraceMicros = 250_000
+
+-- | How long SIGTERM gets to work before SIGKILL follows.
+termGraceMicros :: Int
+termGraceMicros = 2_000_000
+
+-- | How long to wait for the SIGKILLed process to be reaped.
+reapGraceMicros :: Int
+reapGraceMicros = 5_000_000
+
+-- | signalGroupVia: send @sig@ to the child's whole process group, best-effort,
+-- through the pgid captured at spawn time.  A group that has since emptied
+-- makes 'signalProcessGroup' fail with ESRCH, which 'ignoringIOErrors'
+-- swallows; a group that emptied *and* had its pgid recycled between the probe
+-- and the signal is the standard, vanishingly-narrow @killpg@ race every
+-- timeout implementation accepts (the kernel does not reuse a pgid while the
+-- group still has members).
+signalGroupVia :: Maybe Pid -> Signal -> IO ()
+signalGroupVia mPgid sig = case mPgid of
+  Just pgid -> ignoringIOErrors (signalProcessGroup sig pgid)
+  Nothing   -> pure ()
+
+-- | groupAlive: does the child's process group still have members?  Probed
+-- with the null signal (@kill(-pgid, 0)@), which delivers nothing but reports
+-- ESRCH on an empty group.  Without a pgid the probe cannot be asked, and
+-- "assume dead" is the reading that keeps the caller from signalling blindly.
+groupAlive :: Maybe Pid -> IO Bool
+groupAlive Nothing     = pure False
+groupAlive (Just pgid) =
+  (signalProcessGroup nullSignal pgid >> pure True)
+    `catch` \(_ :: SomeException) -> pure False
+
+-- | waitGroupGone: wait (bounded) for the child's process group to empty;
+-- True iff it did.  This polls, which the module otherwise avoids on latency
+-- grounds — but it runs only on the timeout path, never on a healthy call,
+-- and group death has no blocking primitive to wait on the way a single
+-- process does.  Without a pgid it falls back to the leader's reap, the best
+-- signal still available.
+waitGroupGone :: Maybe Pid -> MVar ExitCode -> Int -> IO Bool
+waitGroupGone Nothing exitVar budget = do
+  r <- takeMVarWithin budget exitVar
+  pure (case r of Just _ -> True; Nothing -> False)
+waitGroupGone mPgid _ budget = go budget
+  where
+    stepMicros = 50_000
+    go b = do
+      alive <- groupAlive mPgid
+      if not alive
+        then pure True
+        else if b <= 0
+          then pure False
+          else do
+            threadDelay (min stepMicros b)
+            go (b - stepMicros)
+
+-- | How long to wait for a stream drainer to reach EOF after the kill.
+drainGraceMicros :: Int
+drainGraceMicros = 2_000_000
+
+-- | How long to wait for the drainers after agda exited of its own accord.
+-- Generous, because giving up here /would/ lose real diagnostics; it exists only
+-- so that a descendant holding a pipe open cannot hang the call forever.
+postExitDrainMicros :: Int
+postExitDrainMicros = 60_000_000
+
+-- | drainAsync: read a handle to EOF on its own thread, so neither stream can
+-- fill its pipe buffer and deadlock the other (the classic reason to drain
+-- concurrently rather than sequentially).
+--
+-- Bytes are decoded as UTF-8 leniently rather than through the handle's locale
+-- encoding: Agda's output is UTF-8 and routinely carries the goal's Unicode
+-- (@≡@, @→@, @⊤@), which a @C@-locale handle would mangle or reject.
+drainAsync :: Handle -> IO (MVar Text)
+drainAsync h = do
+  var <- newEmptyMVar
+  _   <- forkIO $ do
+    r <- try (hSetBinaryMode h True >> BS.hGetContents h)
+    putMVar var $ case r of
+      Left (_ :: SomeException) -> ""
+      Right bytes               -> TE.decodeUtf8With lenientDecode bytes
+  pure var
+
+-- | takeMVarWithin: read an 'MVar', giving up after a deadline.
+--
+-- Blocking rather than polling, so the overwhelmingly common case — the value is
+-- already there, or lands a scheduler tick later — costs nothing; a poll loop
+-- would tax every single agda call with its interval.  The deadline exists only
+-- so that a stuck producer cannot hang the whole tool call.
+--
+-- 'readMVar' rather than 'takeMVar': if the reader thread wins the value but
+-- loses the race to the timer, the value stays in the 'MVar' rather than being
+-- silently swallowed.
+takeMVarWithin :: forall a. Int -> MVar a -> IO (Maybe a)
+takeMVarWithin micros var = do
+  gate   <- newEmptyMVar
+  reader <- forkIO $ do
+    x <- readMVar var
+    void (tryPutMVar gate (Just x))
+  timer  <- forkIO $ do
+    threadDelay micros
+    void (tryPutMVar gate Nothing)
+  result <- takeMVar gate
+  -- Both are blocked on interruptible operations ('readMVar' / 'threadDelay'),
+  -- so neither killThread can stall.
+  killThread timer
+  killThread reader
+  pure result
+
+-- | ignoringIOErrors: best-effort signalling.  A process that has already exited
+-- makes 'terminateProcess' / 'interruptProcessGroupOf' fail, which is not an
+-- error we need to surface.
+ignoringIOErrors :: IO () -> IO ()
+ignoringIOErrors act = act `catch` \(_ :: SomeException) -> pure ()
+
+-- | timeoutMessage: the human-readable explanation attached to a timed-out tool
+-- response.  Names the bound that was hit and what to do about it, since the
+-- overwhelmingly likely cause is a cold interface build rather than a real hang.
+timeoutMessage :: AgdaConfig -> Text
+timeoutMessage cfg =
+  "agda timed out after " <> T.pack (show secs) <> "s"
+  <> " (raise --timeout if this is a cold first check that must build .agdai"
+  <> " interfaces for a large library)"
+  where
+    secs = maybe defaultTimeoutSeconds id (boundedTimeout cfg)
+
+
+-- | checkedFromSourceOf: did Agda re-typecheck the module from source, or did it
+-- reuse an already-built interface?
+--
+-- A coarse but reliable cache signal, and the one an agent actually needs: it
+-- explains why the same call took 200 ms once and three minutes the time before.
+-- The evidence, in order of authority (Agda 2.8.0 at default verbosity):
+--
+--   * A @Checking M (…/M.agda).@ line is printed the moment Agda starts
+--     re-typechecking a module from source — including runs that then fail or
+--     are killed mid-check — and reads as @Just True@.
+--   * A run that /completed successfully/ without one reads as @Just False@:
+--     a warm @agda@ exits 0 printing nothing at all, so silent success is
+--     itself the interface-reuse signature.
+--   * A @Loading M (…/M.agdai).@ line (emitted only at raised verbosity) is
+--     direct evidence of an interface read, so it also reads as @Just False@
+--     when no source re-check was observed.
+--   * Anything else — a run that failed or timed out before producing any
+--     evidence — is @Nothing@, and the response omits the field.  Defaulting
+--     to a Bool here would misread a startup failure or an early-killed cold
+--     call as a warm one.
+checkedFromSourceOf :: AgdaResult -> Maybe Bool
+checkedFromSourceOf r
+  | sawPrefix "Checking " = Just True
+  | completedOk           = Just False
+  | sawPrefix "Loading "  = Just False
+  | otherwise             = Nothing
+  where
+    combined    = arStdout r <> "\n" <> arStderr r
+    sawPrefix p = any (T.isPrefixOf p . T.stripStart) (T.lines combined)
+    completedOk = not (arTimedOut r) && arExitCode r == 0

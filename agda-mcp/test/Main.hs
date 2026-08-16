@@ -10,7 +10,9 @@
 --   1. Fixture-file tests (IO for file read, no Agda) — 1a: the hole model
 --      (issues #71/#73: all hole syntaxes, comment/prose decoys, literate
 --      flavours); 1b: corpus loading, search_by_name, search_by_type,
---      get_dependencies.
+--      get_dependencies; 1c: `--timeout` enforcement (subprocess, but no
+--      *Agda*), driven by the `fake-slow-agda.sh` stand-in binary so it
+--      runs anywhere.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips,
 --      including 2d: hole-enumeration parity against batch Agda.
 --
@@ -29,6 +31,7 @@
 
 module Main (main) where
 
+import Control.Concurrent (threadDelay)
 import Control.Exception (catch, SomeException)
 import Data.Char (isDigit)
 import Data.Either (isLeft)
@@ -38,7 +41,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as BS
-import System.Directory (findExecutable, doesFileExist, getCurrentDirectory)
+import System.Directory
+  ( Permissions, doesFileExist, findExecutable, getCurrentDirectory
+  , getPermissions, getTemporaryDirectory, makeAbsolute, removeFile
+  , setOwnerExecutable, setPermissions
+  )
+import System.Environment (setEnv)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath ((</>), takeDirectory, takeFileName)
 import System.IO (hPutStrLn, stderr)
@@ -47,6 +55,7 @@ import AgdaMCP.Agda
   ( parseGoalContext , defaultConfig
   , AgdaConfig (..)
   , runAgda , AgdaResult (..)
+  , checkedFromSourceOf , defaultTimeoutSeconds
   )
 import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode
@@ -85,6 +94,24 @@ assertEqual label expected actual
   | expected == actual = pure Pass
   | otherwise = pure . Fail $
       label <> ": expected " <> show expected <> ", got " <> show actual
+
+-- | failureText: flatten a structured 'ToolFailure' to its message, for test
+-- diagnostics that only want the prose.
+failureText :: ToolFailure -> Text
+failureText (FailMessage m)  = m
+failureText (FailTimeout tf) = tfMessage tf
+
+-- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
+-- tests — exit code, timed-out flag, and stdout, with the fields the signal
+-- never reads left inert.
+fakeResult :: Int -> Bool -> Text -> AgdaResult
+fakeResult ec timedOut out = AgdaResult
+  { arExitCode  = ec
+  , arStdout    = out
+  , arStderr    = ""
+  , arTimedOut  = timedOut
+  , arElapsedMs = 0
+  }
 
 
 -- ---------------------------------------------------------------------------
@@ -290,6 +317,59 @@ pureTests = do
     , runTest "onlyOpenHoleErrors: unparsable failure output fails closed" $
         assert "should not tolerate" (not (onlyOpenHoleErrors
           "agda: internal panic, no error header here"))
+
+    -- checkedFromSourceOf: the coarse cache signal (issue #77).  A @Checking@
+    -- line is positive evidence of a source re-check; a run that completed
+    -- successfully in silence is the interface-reuse signature (a warm Agda
+    -- 2.8.0 prints nothing at default verbosity); and a run that died without
+    -- producing evidence either way is unknown — a Copilot review catch on
+    -- PR #89: defaulting that case to False would misread a killed cold call
+    -- as a warm one.
+    , runTest "checkedFromSourceOf: a 'Checking' line means a source re-check" $
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf (fakeResult 0 False (T.unlines
+            [ "Checking Algebras.Basic (/lib/Algebras/Basic.agda)."
+            , "Finished Algebras.Basic."
+            ])))
+
+    , runTest "checkedFromSourceOf: a failed run that reached 'Checking' still counts" $
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf (fakeResult 42 False
+            "Checking Broken (/x/Broken.agda).\nerror: [MissingTypeSignature]"))
+
+    , runTest "checkedFromSourceOf: silent success is the interface-reuse signature" $
+        assertEqual "signal" (Just False)
+          (checkedFromSourceOf (fakeResult 0 False ""))
+
+    , runTest "checkedFromSourceOf: 'Loading' lines (verbose runs) also read as reuse" $
+        assertEqual "signal" (Just False)
+          (checkedFromSourceOf (fakeResult 42 False (T.unlines
+            [ "Loading Algebras.Basic (/lib/_build/Algebras/Basic.agdai)."
+            , "Loading Homomorphisms.Basic (/lib/_build/Homomorphisms/Basic.agdai)."
+            ])))
+
+    , runTest "checkedFromSourceOf: indented 'Checking' still counts" $
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf (fakeResult 0 False
+            "  Checking Proofs.Use (/lib/src/Proofs/Use.agda)."))
+
+    , runTest "checkedFromSourceOf: a failure with no evidence is unknown, not a guess" $
+        assertEqual "signal" Nothing
+          (checkedFromSourceOf (fakeResult 42 False
+            "error: [LibraryError]\nLibrary 'agda-dojang' not found."))
+
+    , runTest "checkedFromSourceOf: a timeout before any output is unknown, not warm" $
+        assertEqual "signal" Nothing
+          (checkedFromSourceOf (fakeResult (-15) True ""))
+
+    -- The default bound is enforced now (issue #77), so its value is a real
+    -- decision: a cold agda-algebras call builds .agdai interfaces and takes
+    -- minutes, which the previous 30 s default would have aborted.
+    , runTest "defaultConfig: the enforced default timeout is the documented 300s" $
+        assertEqual "timeout" (Just 300) (agdaTimeout defaultConfig)
+
+    , runTest "defaultTimeoutSeconds: matches defaultConfig" $
+        assertEqual "timeout" (Just defaultTimeoutSeconds) (agdaTimeout defaultConfig)
     ]
 
 
@@ -631,6 +711,240 @@ corpusTests = do
 
 
 -- ---------------------------------------------------------------------------
+-- Tier 1c: Timeout enforcement (subprocess, but no Agda) — issue #77
+--
+-- These drive a fake `agda` (test/resources/fake-slow-agda.sh) that sleeps for a
+-- configurable time, so they can prove `--timeout` is enforced without a real
+-- Agda, a real library, or a genuinely hung typechecker.  They run everywhere the
+-- pure tests do.
+-- ---------------------------------------------------------------------------
+
+-- | The stand-in binary and the fixture the in-place tools patch.
+fakeAgdaPath, timeoutFixturePath :: FilePath
+fakeAgdaPath       = "test" </> "resources" </> "fake-slow-agda.sh"
+timeoutFixturePath = "test" </> "resources" </> "TimeoutFixture.agda"
+
+-- | How long the fake agda "typechecks" for in the tests that expect a timeout.
+-- Must comfortably exceed 'fakeTimeoutSecs' so the bound is what ends the run,
+-- and must be short enough that a test can outwait it to check for an orphan.
+fakeSleepSecs :: Int
+fakeSleepSecs = 4
+
+-- | The bound the tests configure.  One second keeps the suite fast while still
+-- being long enough that a slow CI box cannot mistake startup for the timeout.
+fakeTimeoutSecs :: Int
+fakeTimeoutSecs = 1
+
+-- | timeoutTests: the issue #77 acceptance criteria, minus the parts that need a
+-- real Agda.
+timeoutTests :: IO [Bool]
+timeoutTests = do
+  hPutStrLn stderr "\n── Timeout tests (tier 1c: fake agda binary, #77) ──"
+  fakeExists    <- doesFileExist fakeAgdaPath
+  fixtureExists <- doesFileExist timeoutFixturePath
+  if not (fakeExists && fixtureExists)
+    then do
+      hPutStrLn stderr $ "  [skip] fixtures not found: "
+        <> fakeAgdaPath <> " / " <> timeoutFixturePath
+      pure []
+    else do
+      fakeAgda <- makeAbsolute fakeAgdaPath
+      -- A checkout that lost the executable bit would otherwise fail with a
+      -- confusing "permission denied" reported as a crash, so restore it.
+      ensureExecutable fakeAgda
+      tmpDir <- getTemporaryDirectory
+      let marker = tmpDir </> "agda-mcp-timeout-orphan-marker"
+          slowCfg = defaultConfig
+            { agdaBin     = fakeAgda
+            , agdaTimeout = Just fakeTimeoutSecs
+            }
+      removeIfExists marker
+      setEnv "AGDA_MCP_FAKE_MARKER" marker
+      setEnv "AGDA_MCP_FAKE_SLEEP" (show fakeSleepSecs)
+
+      -- One slow run, shared by the assertions below, so the suite pays the
+      -- timeout wait once.
+      slow <- runAgda slowCfg timeoutFixturePath
+
+      results1 <- sequence
+        [ runTest "runAgda: a hung agda is reported as timed out, not as a failure" $
+            assert ("arTimedOut should be True; got " <> show slow) (arTimedOut slow)
+
+        , runTest "runAgda: the timeout lands at the bound, not at the sleep" $
+            -- The fake would have run for 'fakeSleepSecs'; a bound that was not
+            -- enforced would show up here as an elapsed time near that instead.
+            assert ("elapsedMs = " <> show (arElapsedMs slow))
+              (arElapsedMs slow >= 500 && arElapsedMs slow < fakeSleepSecs * 1000)
+
+        , runTest "runAgda: output written before the kill is still captured" $
+            -- Proves partial output survives, and that the cache signal is
+            -- derived from what the process actually printed: the fake echoes
+            -- its "Checking" line before sleeping, so even this killed run
+            -- carries positive evidence of a source re-check.
+            assert ("stdout was " <> show (arStdout slow))
+              (checkedFromSourceOf slow == Just True)
+        ]
+
+      -- Outwait the fake's own sleep.  If the subprocess had merely been
+      -- abandoned (the failure mode of timing out the waiting Haskell thread
+      -- instead of the process), it would finish on its own by now and drop the
+      -- marker file.
+      threadDelay ((fakeSleepSecs + 2) * 1000 * 1000)
+      orphaned <- doesFileExist marker
+      results2 <- sequence
+        [ runTest "runAgda: the timed-out subprocess is killed, not orphaned" $
+            assert "the fake agda completed after the timeout — it was left running"
+                   (not orphaned)
+        ]
+
+      -- fill_hole must restore the file byte-for-byte on the timeout path too:
+      -- runAgda reports the timeout as a value rather than throwing, so the
+      -- bracket_ restore in runInPlace runs exactly as on the success path.
+      before <- BS.readFile timeoutFixturePath
+      fillRes <- handleFillHole slowCfg FillHoleParams
+        { fhFilePath  = timeoutFixturePath
+        , fhHoleIndex = 0
+        , fhCandidate = "zero"
+        }
+      after <- BS.readFile timeoutFixturePath
+      results3 <- sequence
+        [ runTest "fill_hole: a timeout is status 'timeout', not a type error" $
+            case fillRes of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> assertEqual "status" FillTimeout (frStatus fr)
+
+        , runTest "fill_hole: the timeout message names the bound that was hit" $
+            case fillRes of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> assert ("message was " <> show (frMessage fr))
+                (maybe False (\m -> "timed out after 1s" `T.isInfixOf` m) (frMessage fr))
+
+        , runTest "fill_hole: a timed-out response still carries elapsedMs" $
+            case fillRes of
+              Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+              Right fr -> assert ("elapsedMs = " <> show (frElapsedMs fr))
+                            (frElapsedMs fr > 0)
+
+        , runTest "fill_hole: a timed-out in-place call restores the file exactly" $
+            assert "fixture should be byte-for-byte unchanged after a timeout"
+                   (before == after)
+        ]
+
+      -- get_goal is the one tool whose timeout cannot ride inside a
+      -- success-shaped response, so its failure must be the structured kind
+      -- that still carries the call's measurements (a Copilot review catch on
+      -- PR #89: a plain error string dropped elapsedMs on the floor).
+      gg <- handleGetGoal slowCfg GetGoalParams
+        { ggFilePath  = timeoutFixturePath
+        , ggHoleIndex = 0
+        }
+      resultsGoal <- sequence
+        [ runTest "get_goal: a timeout is a structured failure carrying elapsedMs" $
+            case gg of
+              Right gi -> pure (Fail $ "expected a timeout failure, got a goal: " <> show gi)
+              Left (FailMessage m) ->
+                pure (Fail $ "expected FailTimeout, got FailMessage: " <> T.unpack m)
+              Left (FailTimeout tf) -> do
+                r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> assert ("message was " <> show (tfMessage tf))
+                              ("timed out after 1s" `T.isInfixOf` tfMessage tf)
+        ]
+
+      -- check_file / get_diagnostics report the timeout as a failed check with an
+      -- explanatory diagnostic, rather than as a silent "0 errors" summary of
+      -- output Agda never produced.
+      chk  <- handleCheckFile slowCfg (CheckFileParams timeoutFixturePath)
+      diag <- handleGetDiagnostics slowCfg (GetDiagnosticsParams timeoutFixturePath)
+      results4 <- sequence
+        [ runTest "check_file: a timeout is success:false with a timeout diagnostic" $
+            case chk of
+              Left err  -> pure (Fail $ "check_file failed: " <> T.unpack err)
+              Right fcr -> do
+                r1 <- assert "success should be False" (not (fcrSuccess fcr))
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> do
+                    r2 <- assert "timedOut should be True" (fcrTimedOut fcr)
+                    case r2 of
+                      Fail m -> pure (Fail m)
+                      Pass   -> assert
+                        ("diagnostics were " <> show (map diagMessage (fcrDiagnostics fcr)))
+                        (any (("agda timed out after" `T.isInfixOf`) . diagMessage)
+                             (fcrDiagnostics fcr))
+
+        , runTest "get_diagnostics: a timeout is success:false and counts as an error" $
+            case diag of
+              Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack err)
+              Right dr -> do
+                r1 <- assert "success should be False" (not (drSuccess dr))
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> do
+                    r2 <- assert "timedOut should be True" (drTimedOut dr)
+                    case r2 of
+                      Fail m -> pure (Fail m)
+                      Pass   -> assert ("errors = " <> show (drErrors dr))
+                                  (drErrors dr >= 1)
+        ]
+
+      -- Second orphan sweep.  The slow runs after the first sweep (fill_hole,
+      -- get_goal, check_file, get_diagnostics) each spawned their own fake with
+      -- its own marker subshell; outwait the longest of their sleeps so a
+      -- leader-only kill on any of those paths — the exact failure mode of
+      -- signalling agda but not its descendants — has had time to surface as a
+      -- marker drop.
+      threadDelay ((fakeSleepSecs + 2) * 1000 * 1000)
+      lateOrphan <- doesFileExist marker
+      resultsLate <- sequence
+        [ runTest "runAgda: no timed-out tool call leaves a descendant behind" $
+            assert "a fake agda descendant outlived its tool call and wrote the marker"
+                   (not lateOrphan)
+        ]
+
+      -- The fast path: a run that finishes inside its bound must not be reported
+      -- as a timeout, and must still be timed.
+      setEnv "AGDA_MCP_FAKE_SLEEP" "1"
+      removeIfExists marker
+      let fastCfg = defaultConfig { agdaBin = fakeAgda, agdaTimeout = Just 60 }
+      fast <- runAgda fastCfg timeoutFixturePath
+      results5 <- sequence
+        [ runTest "runAgda: a run inside the bound is not reported as timed out" $
+            assert ("arTimedOut should be False; got " <> show (arTimedOut fast))
+                   (not (arTimedOut fast))
+
+        , runTest "runAgda: a completed run reports its real exit code" $
+            assertEqual "exit code" 0 (arExitCode fast)
+
+        , runTest "runAgda: elapsedMs measures the real subprocess duration" $
+            -- The fake slept a second, so a plausible clock has to show it; this
+            -- is what a hard-coded 0 or an uninitialised field would fail.
+            assert ("elapsedMs = " <> show (arElapsedMs fast))
+              (arElapsedMs fast >= 500 && arElapsedMs fast < 60000)
+        ]
+
+      removeIfExists marker
+      pure (results1 <> results2 <> results3 <> resultsGoal <> results4
+              <> resultsLate <> results5)
+
+-- | ensureExecutable: restore the executable bit on the fake agda script.
+-- Git tracks the mode, so this is belt-and-braces for checkouts (or archive
+-- extractions) that drop it — without it the failure surfaces as an opaque
+-- "permission denied" crash rather than as a fixture problem.
+ensureExecutable :: FilePath -> IO ()
+ensureExecutable path = do
+  perms <- getPermissions path
+  setPermissions path (setOwnerExecutable True (perms :: Permissions))
+
+-- | removeIfExists: delete a scratch file, tolerating its absence.
+removeIfExists :: FilePath -> IO ()
+removeIfExists path = do
+  present <- doesFileExist path
+  if present then removeFile path else pure ()
+
+
+-- ---------------------------------------------------------------------------
 -- Tier 2: Subprocess tests (needs agda + agda-dojang on PATH)
 -- ---------------------------------------------------------------------------
 
@@ -697,28 +1011,28 @@ integrationTests cfg fixturePath repoRoot = do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "A" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 1 goal is exactly \"⊤\" (#70)" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 1 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "⊤" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 2 goal is exactly \"x ≡ x\" (#70)" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 2 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "x ≡ x" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 0 context contains 'x : A'" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
         result <- handleGetGoal cfg params
         case result of
-          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+          Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info ->
             let names = map ctxName (giContext info)
             in  assert "'x' should be in context" ("x" `elem` names)
@@ -752,6 +1066,43 @@ integrationTests cfg fixturePath repoRoot = do
           Left err -> pure (Fail $ "check_file failed: " <> T.unpack err)
           Right fcr ->
             assert "should report at least 1 hole" (fcrHolesCount fcr > 0)
+
+      -- The fast path against a *real* Agda (issue #77): a check that completes
+      -- must not be flagged as a timeout, and must carry a plausible duration.
+      -- The tier-1c tests pin the same invariants against the fake binary; this
+      -- one pins that the real subprocess is measured the same way.
+    , runTest "check_file: a real check is not a timeout and carries elapsedMs" $ do
+        let params = CheckFileParams { cfFilePath = fixturePath }
+        result <- handleCheckFile cfg params
+        case result of
+          Left err -> pure (Fail $ "check_file failed: " <> T.unpack err)
+          Right fcr -> do
+            r1 <- assert "timedOut should be False" (not (fcrTimedOut fcr))
+            case r1 of
+              Fail m -> pure (Fail m)
+              Pass   -> assert ("elapsedMs = " <> show (fcrElapsedMs fcr))
+                          (fcrElapsedMs fcr > 0)
+
+    , runTest "get_goal: a real goal query carries elapsedMs" $ do
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
+        result <- handleGetGoal cfg params
+        case result of
+          Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
+          Right info -> assert ("elapsedMs = " <> show (giElapsedMs info))
+                          (maybe False (> 0) (giElapsedMs info))
+
+    , runTest "fill_hole: a real fill carries elapsedMs and is not a timeout" $ do
+        let params = FillHoleParams
+              { fhFilePath = fixturePath, fhHoleIndex = 0, fhCandidate = "x" }
+        result <- handleFillHole cfg params
+        case result of
+          Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack err)
+          Right fr -> do
+            r1 <- assert "status should not be timeout" (frStatus fr /= FillTimeout)
+            case r1 of
+              Fail m -> pure (Fail m)
+              Pass   -> assert ("elapsedMs = " <> show (frElapsedMs fr))
+                          (frElapsedMs fr > 0)
 
     , runTest "get_diagnostics: Fixture01 reports holes" $ do
         let params = GetDiagnosticsParams { gdFilePath = fixturePath }
@@ -795,21 +1146,21 @@ hierIntegrationTests cfg repoRoot = do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
             result <- handleGetGoal hierCfg params
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
 
         , runTest "get_goal: Proofs.Use reports its declared (hierarchical) module name" $ do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
             result <- handleGetGoal hierCfg params
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "module" (Just "Proofs.Use") (giModule info)
 
         , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
             let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
             result <- handleGetGoal hierCfg params
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info ->
                 assert "'x' should be in context"
                   ("x" `elem` map ctxName (giContext info))
@@ -954,7 +1305,7 @@ holeModelIntegrationTests cfg = do
             result <- handleGetGoal cfg GetGoalParams
               { ggFilePath = variants, ggHoleIndex = 3 }
             case result of
-              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack err)
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "goal" "Nat" (giGoal info)
 
         , runTest "fill_hole: comment decoys do not shift hole indices (#71)" $ do
@@ -993,8 +1344,8 @@ holeModelIntegrationTests cfg = do
                 case r1 of
                   Fail m -> pure (Fail m)
                   Pass   -> assertEqual "goal" "Nat" (giGoal md)
-              (Left err, _) -> pure (Fail $ "get_goal (.lagda.md) failed: " <> T.unpack err)
-              (_, Left err) -> pure (Fail $ "get_goal (.agda) failed: " <> T.unpack err)
+              (Left err, _) -> pure (Fail $ "get_goal (.lagda.md) failed: " <> T.unpack (failureText err))
+              (_, Left err) -> pure (Fail $ "get_goal (.agda) failed: " <> T.unpack (failureText err))
 
         , runTest "fill_hole: {! zero !} in a .lagda.md fills like in a .agda" $ do
             mdFill    <- handleFillHole cfg FillHoleParams
@@ -1117,6 +1468,8 @@ main = do
   holeResults <- holeModelTests
   -- Tier 1b: corpus / search tests (no Agda, but needs fixture file).
   corpusResults <- corpusTests
+  -- Tier 1c: timeout enforcement, driven by a fake agda (no real Agda needed).
+  timeoutResults <- timeoutTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -1125,7 +1478,8 @@ main = do
       pure []
     Just (cfg, fixture, repoRoot) -> integrationTests cfg fixture repoRoot
 
-  let allResults = pureResults <> holeResults <> corpusResults <> integrationResults
+  let allResults =
+        pureResults <> holeResults <> corpusResults <> timeoutResults <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

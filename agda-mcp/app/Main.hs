@@ -38,7 +38,7 @@ import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import Text.Read (readMaybe)
 
-import AgdaMCP.Agda (AgdaConfig (..), defaultConfig)
+import AgdaMCP.Agda (AgdaConfig (..), defaultConfig, defaultTimeoutSeconds)
 import AgdaMCP.Corpus (loadCorpus)
 import AgdaMCP.Server (ServerConfig (..), runServer)
 
@@ -87,6 +87,9 @@ main = do
 
   hPutStrLn stderr $ "agda-mcp v0.2.0 starting (agda-bin: " <> agdaBin cfg <> ")"
   hPutStrLn stderr $ "  flags: " <> unwords (agdaFlags cfg)
+  hPutStrLn stderr $ "  timeout: " <> case agdaTimeout cfg of
+    Just n | n > 0 -> show n <> "s per agda call"
+    _              -> "(none)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
   hPutStrLn stderr   "  transport: stdio"
   hPutStrLn stderr   "  Waiting for MCP client..."
@@ -99,7 +102,7 @@ main = do
 --   --agda-bin PATH       Override the agda binary path (default: "agda").
 --   --agda-flags "..."    Space-separated Agda flags.
 --   --corpus PATH         Load agda-strux JSONL corpus for search tools.
---   --timeout N           Timeout in seconds (default: 30).
+--   --timeout N           Per-typecheck timeout in seconds (default: 300; 0 = none).
 --   --verbose             Emit debug output to stderr.
 --   --help                Print usage and exit.
 parseArgs :: [String] -> CliOpts -> CliOpts
@@ -134,7 +137,12 @@ usage = unlines
   , "  --agda-bin PATH       Path to the agda binary (default: agda)"
   , "  --agda-flags \"...\"    Space-separated Agda flags"
   , "  --corpus PATH         Load agda-strux JSONL corpus for search tools"
-  , "  --timeout N           Typecheck timeout in seconds (default: 30)"
+  , "  --timeout N           Per-typecheck timeout in seconds (default: "
+                             <> show defaultTimeoutSeconds <> "; 0 = no limit)"
+  , "                        Each tool call is a cold agda subprocess, so the"
+  , "                        first check of a large library builds its .agdai"
+  , "                        interfaces and can take minutes — size this for that"
+  , "                        cold build, not for the warm steady state."
   , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""

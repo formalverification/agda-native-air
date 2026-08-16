@@ -641,6 +641,10 @@ AGDA_MCP_CORPUS       ?= test/resources/corpus-fixture.jsonl
 AGDA_MCP_SMOKE_INPUT  ?= test/resources/mcp-smoke-input.jsonl
 AGDA_MCP_SERVE_FLAGS  ?= -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library
 AGDA_MCP_SERVE_CORPUS ?= agda-mcp/test/resources/corpus-fixture.jsonl
+# Per-agda-call bound, matching .mcp.json so this target really is the same
+# invocation.  Sized for a *cold* first check, which builds .agdai interfaces for
+# the whole import graph and can take minutes on a large library (issue #77).
+AGDA_MCP_SERVE_TIMEOUT ?= 600
 
 agda-mcp-build:
 	@echo ">> [agda-mcp-build] cabal build in $(AGDA_MCP_DIR)"
@@ -672,7 +676,7 @@ agda-mcp-smoke:
 # the backend shell itself — so this target does NOT use run_backend.
 agda-mcp-serve:
 	@echo ">> [agda-mcp-serve] launching agda-mcp via scripts/run-server.sh (Ctrl-C to stop)"
-	@./scripts/run-server.sh --agda-flags "$(AGDA_MCP_SERVE_FLAGS)" --corpus "$(AGDA_MCP_SERVE_CORPUS)"
+	@./scripts/run-server.sh --agda-flags "$(AGDA_MCP_SERVE_FLAGS)" --corpus "$(AGDA_MCP_SERVE_CORPUS)" --timeout "$(AGDA_MCP_SERVE_TIMEOUT)"
 
 agda-mcp-clean:
 	@echo ">> [agda-mcp-clean] clean agda-mcp build artifacts (cabal)"

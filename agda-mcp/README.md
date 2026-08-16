@@ -138,9 +138,46 @@ agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--agda-bin PATH`    | Path to the `agda` binary (default: `agda` on `PATH`). |
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
 | `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the three search tools. |
-| `--timeout N`        | Per-typecheck timeout in seconds (default: 30).  Raise it for large libraries whose interfaces are not yet built. |
+| `--timeout N`        | Per-typecheck timeout in seconds (default: 300; `0` means no limit).  Enforced: on expiry the `agda` process group is killed and the tool reports a timeout.  Size it for a *cold* first check — see below. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
+
+### Timeouts, cold calls, and latency
+
+Every tool call spawns a **cold `agda` subprocess**; this server keeps no warm
+Agda session and caches nothing itself.  The only warmth available is Agda's own
+`.agdai` interface files, which Agda writes on a first check and reuses on later
+ones.  So the first call against a large library is expected to be slow — it is
+building interfaces for the whole import graph, which for something the size of
+agda-algebras is *minutes*, not seconds — while later calls that reuse those
+interfaces are far faster.
+
+Size `--timeout` for that cold interface build, not for the warm steady state.
+The default is 300 s; the field-test configuration below uses 600 s, which is the
+safer choice the first time you point the server at a large library you have
+never checked in that worktree.  A bound that is too small does not degrade
+gracefully: it aborts the very call that would have built the interfaces, so the
+next call starts cold again.
+
+Every proof-state response reports what actually happened:
+
+| Field | Meaning |
+|-------|---------|
+| `elapsedMs`         | Wall-clock time in the `agda` subprocess, from a monotonic clock. |
+| `checkedFromSource` | `true` if Agda re-typechecked the module from source (a `Checking` line was observed — including runs that then failed or were killed mid-check), `false` if it reused `.agdai` interfaces (the run completed successfully in silence, which is Agda's warm signature, or printed `Loading` lines at raised verbosity) — the coarse signal that explains why the same call took three minutes once and 200 ms the next time.  **Omitted** when the run died before producing evidence either way (a startup failure, or a timeout before any output): an absent field means *unknown*, never a guess. |
+
+On expiry the subprocess and its whole process group are killed and reaped —
+escalating SIGINT → SIGTERM → SIGKILL group-wide, so no runaway `agda` and no
+descendant it spawned is left behind — and the tool reports the timeout in its
+own vocabulary: `fill_hole` returns `"status": "timeout"` (*not* `type_error`:
+the candidate was never judged) with a message naming the bound, `check_file`
+and `get_diagnostics` return `"success": false` with `"timedOut": true` and an
+`agda timed out after Ns` error diagnostic, and `get_goal` returns an error
+whose text is a JSON object — `{"error": …, "timedOut": true, "elapsedMs": …,
+"checkedFromSource": …?}` — naming the bound while preserving the measurements
+the killed call still produced.  Files patched in place by `get_goal` and
+`fill_hole` are restored byte-for-byte on the timeout path exactly as on every
+other path.
 
 
 ---
@@ -191,7 +228,9 @@ Given a file path and hole identifier, return the hole's expected type and its l
     {"name": "x", "type": "A", "visibility": "visible", "index": 0},
     {"name": "A", "type": "Set₀", "visibility": "hidden", "index": 1}
   ],
-  "module": "Fixture01"
+  "module": "Fixture01",
+  "elapsedMs": 1720,
+  "checkedFromSource": true
 }
 ```
 
@@ -215,7 +254,9 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 {
   "status": "ok",
   "candidate": "x",
-  "remainingHoles": 1
+  "remainingHoles": 1,
+  "elapsedMs": 1840,
+  "checkedFromSource": true
 }
 ```
 
@@ -224,7 +265,20 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 {
   "status": "type_error",
   "candidate": "tt",
-  "message": "A !=< ⊤ when checking that the expression tt has type A"
+  "message": "A !=< ⊤ when checking that the expression tt has type A",
+  "elapsedMs": 1795,
+  "checkedFromSource": true
+}
+```
+
+**Output (timeout)**.  
+```json
+{
+  "status": "timeout",
+  "candidate": "foldr-fusion refl",
+  "message": "agda timed out after 300s (raise --timeout if this is a cold first check that must build .agdai interfaces for a large library)",
+  "elapsedMs": 300262,
+  "checkedFromSource": true
 }
 ```
 
@@ -248,7 +302,24 @@ Load or reload an Agda file and return all diagnostics — errors, warnings, uns
   "diagnostics": [
     {"severity": "error", "message": "...", "line": 7}
   ],
-  "holesCount": 3
+  "holesCount": 3,
+  "timedOut": false,
+  "elapsedMs": 2140,
+  "checkedFromSource": true
+}
+```
+
+**Output (timeout)**.  
+```json
+{
+  "success": false,
+  "diagnostics": [
+    {"severity": "error", "message": "agda timed out after 300s (raise --timeout if this is a cold first check that must build .agdai interfaces for a large library)"}
+  ],
+  "holesCount": 3,
+  "timedOut": true,
+  "elapsedMs": 300251,
+  "checkedFromSource": true
 }
 ```
 
@@ -269,7 +340,12 @@ Retrieve the current diagnostic state without reloading: error count, warning co
   "filePath": "/path/to/Fixture01.agda",
   "errors": 0,
   "warnings": 1,
-  "holes": [{"index": 0, "line": 7, "col": 8, "goal": "?"}]
+  "holes": [{"index": 0, "line": 7, "col": 8, "goal": "?"}],
+  "success": true,
+  "diagnostics": [],
+  "timedOut": false,
+  "elapsedMs": 1980,
+  "checkedFromSource": false
 }
  ```
 
@@ -373,6 +449,7 @@ JSON-RPC framing.  It looks like this:
       "args": [
         "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library",
         "--corpus", "agda-mcp/test/resources/corpus-fixture.jsonl",
+        "--timeout", "600",
         "--verbose"
       ]
     }
@@ -382,6 +459,9 @@ JSON-RPC framing.  It looks like this:
 
 Drop the `--corpus` line to run with only the four core proof-state tools; point it
 at a real agda-strux corpus (see `make extract-lib`) to search a whole library.
+The `--timeout 600` is deliberate rather than decorative: a first check of a large
+library builds its `.agdai` interfaces and can run for minutes, so the bound has to
+cover that cold call (see [Timeouts, cold calls, and latency](#timeouts-cold-calls-and-latency)).
 
 **Direct (already inside a Nix shell).**  If you launch your client from within
 `nix develop .#backend`, you can skip the wrapper and invoke `cabal` directly:
@@ -393,7 +473,8 @@ at a real agda-strux corpus (see `make extract-lib`) to search a whole library.
       "command": "cabal",
       "args": [
         "run", "-v0", "agda-mcp", "--",
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library"
+        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library",
+        "--timeout", "600"
       ],
       "cwd": "/path/to/agda-native-air/agda-mcp"
     }
@@ -436,6 +517,19 @@ with `ModuleDefinedInOtherFile` (issue #66).
 **Limitations:** each tool call spawns a new Agda process (cold
 typechecking, no persistent state).  This is acceptable for the v0 demo
 and benchmark fixtures, but will need optimization for larger files.
+
+**Bounded subprocesses.**  Each call is bounded by `--timeout` and the bound is
+enforced by killing the process, not by abandoning it.  `agda` is spawned into its
+own process group; its stdout and stderr are drained concurrently on dedicated
+threads (so neither stream can fill its pipe buffer and deadlock the other), and
+the process is raced against a timer.  On expiry the group gets `SIGINT`, then
+`SIGTERM`, and is then reaped with `waitForProcess` — leaving no zombie and no
+orphaned `agda` still burning CPU.  This is why `readProcessWithExitCode` could
+not simply be wrapped in `System.Timeout.timeout`: that kills the *waiting
+Haskell thread*, not the subprocess, and leaks a running `agda` every time it
+fires (issue #77).  A timeout is returned as a value, never thrown, which is what
+lets the in-place tools' `bracket_` restore run on the timeout path exactly as it
+does after a clean typecheck.
 
 
 ### Future: Agda-as-a-library

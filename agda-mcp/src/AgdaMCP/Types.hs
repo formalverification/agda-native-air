@@ -11,6 +11,15 @@
 --
 --   Schema version: agda-mcp/v0
 --
+--   All proof-state responses carry @elapsedMs@ (wall-clock time in the Agda
+--   subprocess) and @checkedFromSource@ (whether Agda re-typechecked the module
+--   or reused its @.agdai@ interface), so an agent can tell a cold first call
+--   from a warm one.  Timeouts are reported per tool: @fill_hole@ as
+--   @status: "timeout"@, @check_file@ / @get_diagnostics@ as @success: false@
+--   with a @timedOut@ flag and an explanatory diagnostic.  These fields are
+--   additive — every pre-existing key keeps its name, type, and meaning — so the
+--   schema version is unchanged (issue #77).
+--
 --   These types correspond 1-to-1 with the policy contract defined in
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
@@ -30,6 +39,8 @@ module AgdaMCP.Types
   , CheckFileParams (..)
   , GetDiagnosticsParams (..)
     -- * Tool results (outbound)
+  , ToolFailure (..)
+  , TimeoutFailure (..)
   , GoalInfo (..)
   , HoleInfo (..)
   , FillResult (..)
@@ -153,18 +164,53 @@ instance FromJSON GetDiagnosticsParams where
 -- Tool results (outbound to agent)
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- | A tool failure that still carries the call's measurements.
+--
+-- @get_goal@ is the one proof-state tool whose timeout cannot be folded into a
+-- success-shaped response — there is no goal to report — so without this the
+-- timing and cache metadata the call did produce would be dropped on the floor
+-- of a plain error string (issue #77).  'FailMessage' keeps every ordinary
+-- failure exactly as it was: prose in, prose out.
+data ToolFailure
+  = FailMessage Text            -- ^ An ordinary failure; rendered as plain text.
+  | FailTimeout TimeoutFailure  -- ^ The call hit @--timeout@; rendered as JSON.
+  deriving (Eq, Show)
+
+-- | The structured payload of a timed-out tool call: what went wrong, and what
+-- the call still managed to measure on the way down.
+data TimeoutFailure = TimeoutFailure
+  { tfMessage           :: Text        -- ^ Human-readable explanation (names the bound).
+  , tfElapsedMs         :: Int         -- ^ Wall-clock ms before the process was killed.
+  , tfCheckedFromSource :: Maybe Bool  -- ^ Cache signal, when the killed run produced evidence.
+  } deriving (Eq, Show)
+
+instance ToJSON TimeoutFailure where
+  toJSON t = object $
+    [ "error"     .= tfMessage t
+    , "timedOut"  .= True
+    , "elapsedMs" .= tfElapsedMs t
+    ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (tfCheckedFromSource t)
+
 -- | Result of @get_goal@: the hole's goal type and local context.
+--
+-- 'giElapsedMs' and 'giCheckedFromSource' are optional so a 'GoalInfo' can be
+-- built without a timed Agda run (hole listings use 'HoleInfo' instead); the
+-- top-level @get_goal@ response always populates both.
 data GoalInfo = GoalInfo
-  { giGoal    :: Text         -- ^ Pretty-printed goal type.
-  , giContext :: [CtxEntry]   -- ^ Local context (bound variables with types).
-  , giModule  :: Maybe Text   -- ^ Module name (if determinable).
+  { giGoal              :: Text         -- ^ Pretty-printed goal type.
+  , giContext           :: [CtxEntry]   -- ^ Local context (bound variables with types).
+  , giModule            :: Maybe Text   -- ^ Module name (if determinable).
+  , giElapsedMs         :: Maybe Int    -- ^ Wall-clock ms spent in the Agda subprocess.
+  , giCheckedFromSource :: Maybe Bool   -- ^ Did Agda re-check from source (vs. load @.agdai@)?
   } deriving (Eq, Show)
 
 instance ToJSON GoalInfo where
   toJSON g = object $
     [ "goal"    .= giGoal g
     , "context" .= giContext g
-    ] <> maybe [] (\m -> ["module" .= m]) (giModule g)
+    ] <> maybe [] (\m -> ["module"            .= m]) (giModule g)
+      <> maybe [] (\m -> ["elapsedMs"         .= m]) (giElapsedMs g)
+      <> maybe [] (\b -> ["checkedFromSource" .= b]) (giCheckedFromSource g)
 
 -- | One open hole in a file, as listed by @get_diagnostics@.  The index is
 -- the 0-based @holeIndex@ that @get_goal@ / @fill_hole@ accept; line and
@@ -209,14 +255,20 @@ data FillResult = FillResult
   , frCandidate :: Text           -- ^ The candidate that was tried.
   , frMessage   :: Maybe Text     -- ^ Agda error message on failure; Nothing on success.
   , frRemainingHoles :: Maybe Int -- ^ Number of remaining holes after filling (if determinable).
+  , frElapsedMs :: Int            -- ^ Wall-clock ms spent in the Agda subprocess.
+  , frCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
+                                  --   @.agdai@)?  Nothing — and the field omitted —
+                                  --   when the run died before producing evidence.
   } deriving (Eq, Show)
 
 instance ToJSON FillResult where
   toJSON r = object $
-    [ "status"    .= frStatus r
-    , "candidate" .= frCandidate r
+    [ "status"            .= frStatus r
+    , "candidate"         .= frCandidate r
+    , "elapsedMs"         .= frElapsedMs r
     ] <> maybe [] (\m -> ["message"  .= m]) (frMessage r)
       <> maybe [] (\n -> ["remainingHoles" .= n]) (frRemainingHoles r)
+      <> maybe [] (\b -> ["checkedFromSource" .= b]) (frCheckedFromSource r)
 
 -- | Severity level for a diagnostic.
 data DiagSeverity = DiagError | DiagWarning | DiagInfo
@@ -247,30 +299,56 @@ data FileCheckResult = FileCheckResult
   { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0 with no errors.
   , fcrDiagnostics :: [Diagnostic]
   , fcrHolesCount  :: Int           -- ^ Number of open holes (any hole syntax, code regions only).
+  , fcrTimedOut    :: Bool          -- ^ True iff the check hit the @--timeout@ bound.
+                                    --   When set, 'fcrSuccess' is False and the timeout
+                                    --   appears as an error in 'fcrDiagnostics'.
+  , fcrElapsedMs   :: Int           -- ^ Wall-clock ms spent in the Agda subprocess.
+  , fcrCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
+                                    --   @.agdai@)?  Nothing — and the field omitted —
+                                    --   when the run died before producing evidence.
   } deriving (Eq, Show)
 
 instance ToJSON FileCheckResult where
-  toJSON r = object
-    [ "success"     .= fcrSuccess r
-    , "diagnostics" .= fcrDiagnostics r
-    , "holesCount"  .= fcrHolesCount r
-    ]
+  toJSON r = object $
+    [ "success"           .= fcrSuccess r
+    , "diagnostics"       .= fcrDiagnostics r
+    , "holesCount"        .= fcrHolesCount r
+    , "timedOut"          .= fcrTimedOut r
+    , "elapsedMs"         .= fcrElapsedMs r
+    ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (fcrCheckedFromSource r)
 
 -- | Result of @get_diagnostics@ (cached state from last check).
+--
+-- 'drDiagnostics' exposes the parsed diagnostics this tool already computed in
+-- order to produce 'drErrors' / 'drWarnings'.  Surfacing the list is what lets a
+-- timeout be reported the same way @check_file@ reports it — @success: false@
+-- plus an explanatory error entry — rather than as a silent zero-error summary
+-- of output Agda never got to produce.
 data DiagnosticsResult = DiagnosticsResult
   { drFilePath    :: FilePath
   , drErrors      :: Int
   , drWarnings    :: Int
   , drHoles       :: [HoleInfo]  -- ^ Open holes with index and (line, col).
+  , drSuccess     :: Bool        -- ^ True iff Agda exited 0, in time, with no errors.
+  , drDiagnostics :: [Diagnostic]-- ^ The diagnostics behind the counts above.
+  , drTimedOut    :: Bool        -- ^ True iff the run hit the @--timeout@ bound.
+  , drElapsedMs   :: Int         -- ^ Wall-clock ms spent in the Agda subprocess.
+  , drCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
+                                 --   @.agdai@)?  Nothing — and the field omitted —
+                                 --   when the run died before producing evidence.
   } deriving (Eq, Show)
 
 instance ToJSON DiagnosticsResult where
-  toJSON r = object
-    [ "filePath" .= drFilePath r
-    , "errors"   .= drErrors r
-    , "warnings" .= drWarnings r
-    , "holes"    .= drHoles r
-    ]
+  toJSON r = object $
+    [ "filePath"          .= drFilePath r
+    , "errors"            .= drErrors r
+    , "warnings"          .= drWarnings r
+    , "holes"             .= drHoles r
+    , "success"           .= drSuccess r
+    , "diagnostics"       .= drDiagnostics r
+    , "timedOut"          .= drTimedOut r
+    , "elapsedMs"         .= drElapsedMs r
+    ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (drCheckedFromSource r)
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- § Corpus types (agda-strux JSONL schema v0.01)
