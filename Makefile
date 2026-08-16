@@ -569,28 +569,43 @@ test-doc-howtorun:
 # 1.2.1. Project plan (docs/GITHUB_PROJECT.md <-> GitHub)
 #
 # The roadmap engine lives in the williamdemeo/github-project repository and is
-# NOT vendored here (issue #92): these targets call it from a local checkout,
-# pointed to by GHPROJECT_DIR.  The engine is stdlib-only Python, so plain
-# python3 suffices — no venv, no nix shell.  update/update-check talk to GitHub
-# through an authenticated `gh`; lint is offline.  Once github-project exposes
-# the engine as a Nix flake package, these targets should migrate to a pinned
-# flake input instead of a checkout path.
-GHPROJECT_DIR ?= $(HOME)/git/williamdemeo/github-project/main
+# NOT vendored here (issue #92): it arrives as a flake input, pinned in
+# flake.lock, and these targets run it through the ghproject-* apps this
+# flake re-exports — upgrade deliberately with
+# `nix flake update github-project`.  update/update-check talk to GitHub
+# through an authenticated `gh`; lint is offline.
+#
+# Escape hatch for engine development or Nix-less machines: set
+# GHPROJECT_DIR to a github-project checkout and the targets call its
+# scripts with plain python3 (the engine is stdlib-only).
+GHPROJECT_DIR ?=
+
+ifneq (,$(GHPROJECT_DIR))
+GHPROJECT_LINT         := python3 "$(GHPROJECT_DIR)/scripts/gh_project_lint.py"
+GHPROJECT_UPDATE       := python3 "$(GHPROJECT_DIR)/scripts/gh_project_update.py"
+GHPROJECT_UPDATE_CHECK := python3 "$(GHPROJECT_DIR)/scripts/gh_project_update.py" --check
+else
+# (\# because an unescaped # starts a comment inside an assignment)
+GHPROJECT_LINT         := nix run .\#ghproject-lint --
+GHPROJECT_UPDATE       := nix run .\#ghproject-update --
+GHPROJECT_UPDATE_CHECK := nix run .\#ghproject-update-check --
+endif
 
 _check-ghproject:
-	@test -f "$(GHPROJECT_DIR)/scripts/gh_project_update.py" || { \
+	@test -z "$(GHPROJECT_DIR)" || test -f "$(GHPROJECT_DIR)/scripts/gh_project_update.py" || { \
 	  echo "error: github-project engine not found at $(GHPROJECT_DIR)"; \
-	  echo "       clone williamdemeo/github-project there, or set GHPROJECT_DIR"; \
+	  echo "       clone williamdemeo/github-project there, or unset GHPROJECT_DIR"; \
+	  echo "       to use the flake input"; \
 	  exit 1; }
 
 project-lint: _check-ghproject
-	python3 "$(GHPROJECT_DIR)/scripts/gh_project_lint.py" docs/GITHUB_PROJECT.md
+	$(GHPROJECT_LINT) docs/GITHUB_PROJECT.md
 
 project-update: _check-ghproject
-	python3 "$(GHPROJECT_DIR)/scripts/gh_project_update.py" docs/GITHUB_PROJECT.md
+	$(GHPROJECT_UPDATE) docs/GITHUB_PROJECT.md
 
 project-update-check: _check-ghproject
-	python3 "$(GHPROJECT_DIR)/scripts/gh_project_update.py" docs/GITHUB_PROJECT.md --check
+	$(GHPROJECT_UPDATE_CHECK) docs/GITHUB_PROJECT.md
 
 # -------------------------------------------------------------------------------
 # 1.3. nix wrappers: convenience wrappers for running from outside Nix

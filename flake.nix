@@ -88,7 +88,13 @@
   # you can override nixpkgs-agda in flake.lock (see commands below).
   inputs.nixpkgs-agda.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs, nixpkgs-agda }:
+  # The github-project roadmap engine (docs/GITHUB_PROJECT.md tooling),
+  # pinned here in flake.lock; upgrade deliberately with
+  # `nix flake update github-project`.  See the Makefile's project-*
+  # targets and issue #92.
+  inputs.github-project.url = "github:williamdemeo/github-project";
+
+  outputs = { self, nixpkgs, nixpkgs-agda, github-project }:
   let
     systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
 
@@ -306,6 +312,14 @@
 
   in {
     formatter = forAllSystems ({ pkgsStable, ... }: pkgsStable.nixpkgs-fmt);
+
+    # Roadmap-engine apps re-exported under a ghproject- prefix, so
+    # `nix run .#ghproject-update -- docs/GITHUB_PROJECT.md` runs the
+    # engine at the version pinned by THIS repository's flake.lock.
+    apps = nixpkgs.lib.genAttrs systems (system:
+      nixpkgs.lib.mapAttrs'
+        (name: app: nixpkgs.lib.nameValuePair "ghproject-${name}" app)
+        github-project.apps.${system});
 
     # ---- Dev Shells -----------------------------------------------------------
     devShells = forAllSystems ({ pkgsStable, pkgsAgda, ... }:
