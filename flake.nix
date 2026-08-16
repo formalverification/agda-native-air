@@ -165,8 +165,14 @@
 
       # 1. An explicit anchor.  scripts/run-server.sh exports this so the MCP
       #    server's Agda configuration does not depend on the client's cwd.
-      if _anair_has_marker "$AGDA_NATIVE_AIR_ROOT"; then
-        ROOT="$AGDA_NATIVE_AIR_ROOT"
+      #    Probed with a default expansion so an inherited `set -u` (an exported
+      #    SHELLOPTS carrying `nounset`) cannot abort the hook here.  Note this
+      #    does not make the hook nounset-clean on its own: earlier lines still
+      #    expand LD_LIBRARY_PATH and friends unguarded, and that is where such a
+      #    shell actually dies today.  This just keeps the newest line from being
+      #    another one.
+      if _anair_has_marker "''${AGDA_NATIVE_AIR_ROOT:-}"; then
+        ROOT="''${AGDA_NATIVE_AIR_ROOT:-}"
       fi
 
       # 2. The enclosing git checkout, when it really is this repository.

@@ -296,10 +296,19 @@ readLibraryEntry libFile = do
 -- The fallback probe has no configured path to report, so a miss there really
 -- is @Nothing@: nothing was asked for and nothing was found.
 resolveLibrariesFile :: Maybe FilePath -> IO (Maybe (FilePath, Bool))
-resolveLibrariesFile (Just explicit) = do
-  abs'   <- makeAbsolute explicit
-  exists <- doesFileExist abs'
-  pure (Just (abs', exists))
+-- An empty value — @--library-file=@, as a template or an unset variable
+-- produces — is not a path, and must not be run through 'makeAbsolute', which
+-- would resolve @""@ to the current directory and report a directory nobody
+-- configured as the registry.  Nor is it "no flag at all": Agda does not fall
+-- back on it, it fails with @[LibraryError] Libraries file not found:@ (verified
+-- against 2.8.0), so echoing the value as configured-and-absent is the faithful
+-- reading and matches what Agda will say.
+resolveLibrariesFile (Just explicit)
+  | null explicit = pure (Just (explicit, False))
+  | otherwise = do
+      abs'   <- makeAbsolute explicit
+      exists <- doesFileExist abs'
+      pure (Just (abs', exists))
 resolveLibrariesFile Nothing = do
   mAgdaDir <- lookupEnv "AGDA_DIR"
   mHome    <- either (const Nothing) Just

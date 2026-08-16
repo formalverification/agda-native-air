@@ -1773,6 +1773,34 @@ echoTests = do
                          <> show (map leName (pcRegistered pc)))
                         (null (pcRegistered pc))
 
+          , runTest "project echo: an empty --library-file is not resolved to the cwd" $ do
+              -- "--library-file=" (an unset variable in a template) used to be
+              -- absolutised into the current directory, so the echo named a
+              -- directory nobody configured as the registry.  Agda does not fall
+              -- back on an empty value either — it fails with
+              -- "[LibraryError] Libraries file not found:" — so the faithful
+              -- echo is the value as configured, flagged absent (Copilot's third
+              -- review of PR 95).
+              cwd <- getCurrentDirectory
+              let emptyCfg = defaultConfig
+                    { agdaBin   = "/nonexistent/agda-must-not-run"
+                    , agdaFlags = ["--library-file=", "-l", "agda-algebras"]
+                    }
+              res <- handleCheckFile emptyCfg (CheckFileParams targetA Nothing)
+              withRight res $ \r -> do
+                let pc = fcrProject r
+                r1 <- assert ("librariesFile should not be the cwd, got "
+                              <> show (pcLibrariesFile pc))
+                        (pcLibrariesFile pc /= Just cwd)
+                case r1 of
+                  Fail m -> pure (Fail m)
+                  Pass   -> do
+                    r2 <- assertEqual "librariesFile" (Just "") (pcLibrariesFile pc)
+                    case r2 of
+                      Fail m -> pure (Fail m)
+                      Pass   -> assert "librariesFileMissing should be True"
+                                  (pcLibrariesFileMissing pc)
+
           , runTest "project echo: a readable registry is not flagged as missing" $
               withRight okA $ \r ->
                 assert "librariesFileMissing should be False for a real registry"
