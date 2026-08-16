@@ -146,14 +146,52 @@
     #     resolves to the Nix store path of the standard library at eval time.
     mkAgdaShellSetup = agdaStdlibPkg: ''
       # ==== Locate repo root ====
-      # Fall back to $PWD if not in a git repo.
+      # Three candidates, most explicit first, each validated against a marker
+      # that only this repository carries: agda-dojang/agda-dojang.agda-lib.
+      #
+      # The validation is not pedantry.  `nix develop <path>#backend` runs this
+      # hook in the *caller's* working directory, so `git rev-parse` answers
+      # about whatever checkout the caller happened to be standing in.  When an
+      # MCP client spawned the server from another project, that used to write
+      # a stray — and broken, since it names an agda-dojang that is not there —
+      # agda/ directory into that project's root.  Issue #76 records the
+      # sighting; docs/agda-mcp-environment.md records the reproduction.
+      _anair_has_marker() {
+        [ -n "$1" ] && [ -f "$1/agda-dojang/agda-dojang.agda-lib" ]
+      }
 
-      ROOT="$PWD"
-      if command -v git >/dev/null 2>&1; then
-        if git rev-parse --show-toplevel >/dev/null 2>&1; then
-          ROOT="$(git rev-parse --show-toplevel)"
-        fi
+      ROOT=""
+      _anair_git_root=""
+
+      # 1. An explicit anchor.  scripts/run-server.sh exports this so the MCP
+      #    server's Agda configuration does not depend on the client's cwd.
+      if _anair_has_marker "$AGDA_NATIVE_AIR_ROOT"; then
+        ROOT="$AGDA_NATIVE_AIR_ROOT"
       fi
+
+      # 2. The enclosing git checkout, when it really is this repository.
+      if command -v git >/dev/null 2>&1; then
+        _anair_git_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+      fi
+      if [ -z "$ROOT" ] && _anair_has_marker "$_anair_git_root"; then
+        ROOT="$_anair_git_root"
+      fi
+
+      # 3. Nothing identifiable.  Keep the old behaviour so the shell still
+      #    starts, but say plainly what is being written where: the libraries
+      #    file below will name an agda-dojang that does not exist, and failing
+      #    quietly here would only move the confusion downstream.
+      if [ -z "$ROOT" ]; then
+        if [ -n "$_anair_git_root" ]; then ROOT="$_anair_git_root"; else ROOT="$PWD"; fi
+        echo "[agda] WARNING: this does not look like the agda-native-air checkout:"
+        echo "[agda]            $ROOT"
+        echo "[agda]          (no agda-dojang/agda-dojang.agda-lib beneath it)"
+        echo "[agda]          Agda configuration is still being written to $ROOT/agda,"
+        echo "[agda]          and it will point at an agda-dojang that is not there."
+        echo "[agda]          Enter the shell from the repository, or set"
+        echo "[agda]          AGDA_NATIVE_AIR_ROOT to its path."
+      fi
+      unset -f _anair_has_marker
 
       # ==== Set AGDA_DIR (project-wide Agda configuration) ====
       # Lives at the repo top level — NOT inside agda-dojang or any other
@@ -474,7 +512,11 @@ PY
             echo "   GHC       : $(ghc --version 2>/dev/null || true)"
             echo "   JAVA_HOME : $(echo "$JAVA_HOME")"
             echo "   Java      : $(java -version 2>&1 | head -n1 || true)"
-            echo "   sbt       : $(sbt --version 2>&1 | head -n1 || true)"
+            # Probed from $ROOT, not from the caller's cwd: sbt creates a
+            # target/ directory wherever it is invoked, and the caller's cwd may
+            # be someone else's project (issue #76).  $ROOT/target is gitignored
+            # here.
+            echo "   sbt       : $( (cd "$ROOT" && sbt --version) 2>&1 | head -n1 || true)"
             echo "   ---------"
             echo "   LD_LIBRARY_PATH (head): $(echo "$LD_LIBRARY_PATH" | cut -d: -f1-3)"
             echo "   WHEEL_LD_LIBRARY_PATH: $(echo "$WHEEL_LD_LIBRARY_PATH")"
