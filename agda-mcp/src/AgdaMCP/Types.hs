@@ -51,6 +51,16 @@
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
 --
+--   @get_goal@ and @fill_hole@ address a hole by a 'AgdaMCP.Holes.HoleRef' —
+--   either a @(line, column)@ position in the file as written or the older
+--   0-based @holeIndex@ (issue #79).  The two are parsed into one field, so a
+--   request carries exactly one address and no handler has to decide which of a
+--   disagreeing pair was meant.  @fill_hole@ and @check_file@ answer with the
+--   full hole list ('HoleInfo'), the same shape @get_diagnostics@ already
+--   returned, so a client re-anchors on positions without a second call.  Both
+--   are additive: @holeIndex@ still parses and every pre-existing key keeps its
+--   name, type, and meaning, so the schema version is unchanged.
+--
 --   The corpus types track the agda-strux JSONL schema (v0.01) documented in
 --   docs/representation.md.  They are used by the search tools (M1-3).
 
@@ -65,6 +75,7 @@ module AgdaMCP.Types
   , FillHoleParams (..)
   , CheckFileParams (..)
   , GetDiagnosticsParams (..)
+  , parseHoleRef
     -- * Response echo (issues #72, #76)
   , CommandEcho (..)
   , commandLine
@@ -108,9 +119,12 @@ import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
   , object, withObject, withText
   )
+import Data.Aeson.Types (Object, Parser)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Text as T
+
+import AgdaMCP.Holes (HoleRef (..))
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -162,26 +176,74 @@ instance ToJSON CtxEntry where
 -- Tool parameters (inbound from agent)
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- | parseHoleRef: read the hole address out of a tool call's arguments
+-- (issue #79).
+--
+-- The wire spelling is two alternatives — @line@ + @column@ (the position, the
+-- handle to prefer) or @holeIndex@ (source-order, shift-prone, kept for
+-- backward compatibility) — parsed into the one 'HoleRef' the handlers take.
+-- @col@ is accepted in place of @column@ because that is how the hole listings
+-- spell it, so a hole entry can be passed back without renaming a key.
+--
+-- The accepted shapes are exactly three: @holeIndex@, @line@ + @column@, and
+-- @line@ + @col@.  They are the alternatives the tools' input schema advertises
+-- as its @oneOf@ (see 'AgdaMCP.Server.addressAlternatives'), so a client that
+-- validates its arguments and a client that just sends them get the same answer
+-- about what is a legal request.
+--
+-- Every other combination is a parse failure naming the fix, because each one is
+-- a client that does not know which hole it is asking about:
+--
+-- * an index /and/ a position — they can disagree, and picking one silently is
+--   exactly the wrong-hole answer this addressing model exists to prevent;
+-- * both @column@ and @col@ — one hole, one spelling, for the same reason;
+-- * a lone @line@ or a lone column — half a position is not a position;
+-- * /neither/ — there is nothing to address.
+parseHoleRef :: Object -> Parser HoleRef
+parseHoleRef o = do
+  mIndex  <- o .:? "holeIndex"
+  mLine   <- o .:? "line"
+  mCol    <- o .:? "column"
+  mColAlt <- o .:? "col"
+  mColumn <- case (mCol, mColAlt) of
+    (Just _, Just _) -> fail
+      "column and col are two spellings of one thing; give one of them"
+    _ -> pure (maybe mColAlt Just mCol)
+  case (mIndex, mLine, mColumn) of
+    (Nothing, Just ln, Just c) -> pure (ByPosition ln c)
+    (Just i,  Nothing, Nothing) -> pure (ByIndex i)
+    (Just _,  _, _) -> fail
+      "give either (line, column) or holeIndex, not both: they can disagree, \
+      \and guessing which one you meant is how a call fills the wrong hole"
+    (Nothing, Just _, Nothing) -> fail
+      "line was given without column; a position needs both"
+    (Nothing, Nothing, Just _) -> fail
+      "column was given without line; a position needs both"
+    (Nothing, Nothing, Nothing) -> fail
+      "no hole address: pass (line, column) — the handle to prefer, as reported \
+      \by get_diagnostics.holes, check_file.holes, and every fill_hole response \
+      \— or the older 0-based holeIndex"
+
 -- | Parameters for the @get_goal@ tool.
 data GetGoalParams = GetGoalParams
-  { ggFilePath  :: FilePath
-  , ggHoleIndex :: Int
+  { ggFilePath :: FilePath
+  , ggHole     :: HoleRef     -- ^ Which hole, by position or by index (#79).
   } deriving (Eq, Show)
 
 instance FromJSON GetGoalParams where
   parseJSON = withObject "GetGoalParams" $ \o ->
-    GetGoalParams <$> o .: "filePath" <*> o .: "holeIndex"
+    GetGoalParams <$> o .: "filePath" <*> parseHoleRef o
 
 -- | Parameters for the @fill_hole@ tool.
 data FillHoleParams = FillHoleParams
   { fhFilePath  :: FilePath
-  , fhHoleIndex :: Int
+  , fhHole      :: HoleRef    -- ^ Which hole, by position or by index (#79).
   , fhCandidate :: Text       -- ^ The candidate proof term to try.
   } deriving (Eq, Show)
 
 instance FromJSON FillHoleParams where
   parseJSON = withObject "FillHoleParams" $ \o ->
-    FillHoleParams <$> o .: "filePath" <*> o .: "holeIndex" <*> o .: "candidate"
+    FillHoleParams <$> o .: "filePath" <*> parseHoleRef o <*> o .: "candidate"
 
 -- | Parameters for the @check_file@ tool.
 --
@@ -486,10 +548,17 @@ instance ToJSON GoalInfo where
       <> maybe [] (\c -> ["command"           .= c]) (giCommand g)
       <> maybe [] (\p -> ["project"           .= p]) (giProject g)
 
--- | One open hole in a file, as listed by @get_diagnostics@.  The index is
--- the 0-based @holeIndex@ that @get_goal@ / @fill_hole@ accept; line and
--- column are 1-based positions in the file as written, so for literate
--- sources they are literate-file coordinates (issue #73).
+-- | One open hole in a file, as listed by @get_diagnostics@, @check_file@, and
+-- @fill_hole@.  The index is the 0-based @holeIndex@ that @get_goal@ /
+-- @fill_hole@ accept; line and column are 1-based positions in the file as
+-- written, so for literate sources they are literate-file coordinates (issue
+-- #73).
+--
+-- @line@ and @col@ are the pair to pass back: they describe where the hole's
+-- text sits, so a fill moves them only when it changes the text above them,
+-- whereas @index@ is a place in the source-order list and is renumbered by any
+-- fill at all (issue #79).  Neither is a permanent name: take the listing from
+-- the latest response.
 data HoleInfo = HoleInfo
   { hiIndex :: Int    -- ^ 0-based hole index (source order).
   , hiLine  :: Int    -- ^ 1-based line of the hole's first character.
@@ -524,11 +593,19 @@ instance FromJSON FillStatus where
     other        -> fail $ "Unknown FillStatus: " <> show other
 
 -- | Result of @fill_hole@.
+--
+-- 'frHoles' is the re-anchoring payload of issue #79: the holes of the file /as
+-- this candidate leaves it/, so a client that keeps the candidate has the next
+-- hole's position without a second call.  It describes the patched content, not
+-- the bytes on disk — @fill_hole@ restores the file — so until the candidate is
+-- written back the file still has the holes it started with.  'frRemainingHoles'
+-- is its length, kept as the pre-#79 scalar.
 data FillResult = FillResult
   { frStatus    :: FillStatus
   , frCandidate :: Text           -- ^ The candidate that was tried.
   , frMessage   :: Maybe Text     -- ^ Agda error message on failure; Nothing on success.
   , frRemainingHoles :: Maybe Int -- ^ Number of remaining holes after filling (if determinable).
+  , frHoles     :: [HoleInfo]     -- ^ Those holes, with index and (line, col) (#79).
   , frElapsedMs :: Int            -- ^ Wall-clock ms spent in the Agda subprocess.
   , frCheckedFromSource :: Maybe Bool -- ^ Did Agda re-check from source (vs. load
                                   --   @.agdai@)?  Nothing — and the field omitted —
@@ -542,6 +619,7 @@ instance ToJSON FillResult where
   toJSON r = object $
     [ "status"            .= frStatus r
     , "candidate"         .= frCandidate r
+    , "holes"             .= frHoles r
     , "elapsedMs"         .= frElapsedMs r
     , "verdict"           .= frVerdict r
     , "command"           .= frCommand r
@@ -692,12 +770,18 @@ instance ToJSON Diagnostic where
 -- Deriving it from parsed messages instead would make the verdict hostage to
 -- Agda's prose: a format change would silently empty 'fcrDiagnostics' and
 -- report a passing build (issue #72).
+--
+-- 'fcrHoles' lists the holes 'fcrHolesCount' counts, so the first call of a
+-- session already hands back the positions to address them by (issue #79).
 data FileCheckResult = FileCheckResult
   { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0, in time.
   , fcrDiagnostics :: [Diagnostic]  -- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
   , fcrDiagnosticsTotal :: Int      -- ^ How many were found before the cap; equals
                                     --   @length fcrDiagnostics@ when nothing was dropped.
   , fcrHolesCount  :: Int           -- ^ Number of open holes (any hole syntax, code regions only).
+  , fcrHoles       :: [HoleInfo]    -- ^ Those holes, with index and (line, col) — the
+                                    --   anchors to address them by (#79).  Free here:
+                                    --   the same scan already produced the count.
   , fcrTimedOut    :: Bool          -- ^ True iff the check hit the @--timeout@ bound.
                                     --   When set, 'fcrSuccess' is False and the timeout
                                     --   appears as an error in 'fcrDiagnostics'.
@@ -716,6 +800,7 @@ instance ToJSON FileCheckResult where
     , "diagnostics"       .= fcrDiagnostics r
     , "diagnosticsTotal"  .= fcrDiagnosticsTotal r
     , "holesCount"        .= fcrHolesCount r
+    , "holes"             .= fcrHoles r
     , "timedOut"          .= fcrTimedOut r
     , "elapsedMs"         .= fcrElapsedMs r
     , "verdict"           .= fcrVerdict r

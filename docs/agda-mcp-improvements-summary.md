@@ -34,7 +34,7 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 ### P2. Economics and ergonomics
 
 +  **Whole-project check tool** (#78, open — next batch).  The field session's real gate was a 10–20 minute `make check` run four times as backgrounded Bash, grepping logs because a wrapper masked the exit code.  `check_project` runs the project's own gate, never misreports its exit status, and returns the first error structured; this is the call that would replace that session's shell usage entirely.
-+  **Stable hole handles** (#79, open — unblocked now that #71 has landed).  Indices shift whenever an earlier hole is filled, turning multi-hole edits into bookkeeping.  Accept `(line, column)` or a stable id alongside `holeIndex`, and return the updated hole list from every `fill_hole` so the client re-anchors without a second call.
++  **Stable hole handles** (#79, PR 99, open).  Indices shift whenever an earlier hole is filled, turning multi-hole edits into bookkeeping an agent loses between calls.  `get_goal` and `fill_hole` now accept a `(line, column)` position — in the file as written, so literate-file coordinates for a literate source — as an alternative to `holeIndex`, which stays accepted and is documented as source-order and shift-prone.  A position addresses the hole whose span contains it; a position inside none is an error listing the file's nearest holes rather than a guess, and a request carrying both spellings is refused because they can disagree.  `fill_hole` and `check_file` answer with the full hole list, the shape `get_diagnostics` already returned, so the client re-anchors without a second call.
 
 ## Measurement and publication
 

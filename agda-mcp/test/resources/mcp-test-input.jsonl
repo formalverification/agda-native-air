@@ -2,3 +2,5 @@
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 {"jsonrpc":"2.0","id":2,"method":"tools/list"}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_goal","arguments":{"filePath":"../agda-dojang/data/fixtures/Fixture01.agda","holeIndex":0}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_goal","arguments":{"filePath":"../agda-dojang/data/fixtures/Fixture01.agda","line":16,"column":8}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"check_file","arguments":{"filePath":"../agda-dojang/data/fixtures/Fixture01.agda"}}}

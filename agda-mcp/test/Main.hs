@@ -12,9 +12,12 @@
 --      flavours); 1b: corpus loading, search_by_name, search_by_type,
 --      get_dependencies; 1c: `--timeout` enforcement (subprocess, but no
 --      *Agda*), driven by the `fake-slow-agda.sh` stand-in binary so it
---      runs anywhere.
+--      runs anywhere; 1d: the response echo and root resolution (#72/#76);
+--      1e: hole addressing by position or index, and the parse of both
+--      (#79) — all resolved before Agda is started, misses included.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips,
---      including 2d: hole-enumeration parity against batch Agda.
+--      including 2d: hole-enumeration parity against batch Agda, and 2f:
+--      re-anchoring by position across a fill (#79).
 --
 --   Tier 2 tests are skipped gracefully if Agda is not available, making the test
 --   suite safe to run in CI without a Nix shell.
@@ -34,9 +37,11 @@ module Main (main) where
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket_, catch, SomeException)
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KM
 import Data.Char (isDigit)
 import Data.Either (isLeft)
-import Data.List (find, sortOn)
+import Data.List (find, isInfixOf, nub, sort, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, listToMaybe)
 import Data.Text (Text)
@@ -64,6 +69,7 @@ import AgdaMCP.Agda
 import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode
   , HoleSpan (..) , findHoles , findNthHole
+  , HoleRef (..) , offsetOfPosition , resolveHoleRef
   , injectReportExpr , substituteHole
   )
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
@@ -74,6 +80,7 @@ import AgdaMCP.Project
   ( findNearestAgdaLib, includePathsOf, librariesFileFlagOf, libraryIncludeDirs
   , libraryIncludesOf, libraryNameOf, parseLibrariesFile, selectedLibrariesOf
   )
+import AgdaMCP.Server (ServerConfig (..), toolDefinitions)
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -1084,6 +1091,285 @@ holeModelTests = do
 
 
 -- ---------------------------------------------------------------------------
+-- Tier 1e: Hole addressing (issue #79; IO for fixture reads, no Agda)
+--
+-- Placed here, next to the tier-1a hole model it extends and whose fixtures it
+-- reuses; run last among the tier-1 groups, so the console reads in order.
+--
+-- Addressing is resolved before Agda is ever started, so every one of these
+-- runs everywhere the pure tests do — including the misses, which is where the
+-- issue's contract actually bites: a position that names no hole must produce
+-- an error listing the file's holes, never a silent guess at the nearest one.
+--
+-- The parse tests belong here for the same reason.  "Which hole did you mean?"
+-- is answered at the wire boundary, and a request that carries both spellings,
+-- half a position, or none at all is a client that does not know — so it is
+-- rejected there rather than resolved by a rule nobody wrote down.
+-- ---------------------------------------------------------------------------
+
+-- | A three-hole source with a multi-character hole in the middle, so a
+-- position can be tested at a hole's start, strictly inside its span, and one
+-- past its end.
+addressingSrc :: Text
+addressingSrc = T.unlines
+  [ "module Addressing where"     -- 1
+  , ""                            -- 2
+  , "a : Nat"                     -- 3
+  , "a = {!!}"                    -- 4: hole 0 at (4, 5), span 4.5-4.9
+  , ""                            -- 5
+  , "b : Nat"                     -- 6
+  , "b = {! zero !}"              -- 7: hole 1 at (7, 5), span 7.5-7.15
+  , ""                            -- 8
+  , "c : Nat"                     -- 9
+  , "c = ?"                       -- 10: hole 2 at (10, 5), span 10.5-10.6
+  ]
+
+-- | resolveIn: resolve a reference against 'addressingSrc'.
+resolveIn :: HoleRef -> Either Text Int
+resolveIn = resolveHoleRef "Addressing.agda" PlainAgda addressingSrc
+
+-- | decodeGoalParams: what the wire parser makes of a @get_goal@ argument
+-- object — the hole reference, or the message it refuses with.
+decodeGoalParams :: LBS.ByteString -> Either String HoleRef
+decodeGoalParams = fmap ggHole . Aeson.eitherDecode
+
+-- | The address shapes the wire parser accepts: the keys each one needs
+-- (besides @filePath@), with a minimal request that uses exactly those keys.
+--
+-- One list, read three times — every shape must parse, every key in it must be
+-- a declared schema property, and the shapes must be exactly the alternatives
+-- the schema's @oneOf@ advertises.  Both directions matter and both were wrong
+-- in earlier rounds of this PR (Copilot review catches): @col@ was accepted but
+-- undeclared, so a validating client could not send it; and the schema required
+-- only @filePath@, so it advertised an addressless call the parser rejects.
+addressShapes :: [([Text], LBS.ByteString)]
+addressShapes =
+  [ (["holeIndex"],      "{\"filePath\":\"F.agda\",\"holeIndex\":0}")
+  , (["line", "column"], "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
+  , (["line", "col"],    "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
+  ]
+
+-- | The tools that take a hole address.
+addressTools :: [Text]
+addressTools = ["get_goal", "fill_hole"]
+
+-- | inputSchemaOf: one tool's advertised input schema, read out of the very
+-- value @tools/list@ serializes.
+inputSchemaOf :: Text -> Aeson.Value -> Aeson.Object
+inputSchemaOf name v =
+  case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
+    Aeson.Error _    -> KM.empty
+    Aeson.Success ts -> case
+      [ schema
+      | t <- ts
+      , KM.lookup "name" t == Just (Aeson.String name)
+      , Just (Aeson.Object schema) <- [KM.lookup "inputSchema" t]
+      ] of
+        (s : _) -> s
+        []      -> KM.empty
+
+-- | schemaProperties: the property names that schema declares.
+schemaProperties :: Text -> Aeson.Value -> [Text]
+schemaProperties name v =
+  case KM.lookup "properties" (inputSchemaOf name v) of
+    Just (Aeson.Object props) -> map Key.toText (KM.keys props)
+    _                         -> []
+
+-- | schemaAlternatives: the @required@ list of each @oneOf@ branch — the shapes
+-- the schema says a legal request has.
+schemaAlternatives :: Text -> Aeson.Value -> [[Text]]
+schemaAlternatives name v =
+  case KM.lookup "oneOf" (inputSchemaOf name v) of
+    Just alts -> case Aeson.fromJSON alts :: Aeson.Result [Aeson.Object] of
+      Aeson.Success bs ->
+        [ ks
+        | b <- bs
+        , Just req <- [KM.lookup "required" b]
+        , Aeson.Success ks <- [Aeson.fromJSON req :: Aeson.Result [Text]]
+        ]
+      Aeson.Error _ -> []
+    _ -> []
+
+-- | advertisedTools: the tool definitions a client receives, with no corpus
+-- loaded (so the four proof-state tools and nothing else).
+advertisedTools :: Aeson.Value
+advertisedTools = toolDefinitions ServerConfig
+  { scAgdaConfig  = defaultConfig
+  , scServerName  = "agda-mcp-test"
+  , scVersion     = "0"
+  , scCorpusIndex = Nothing
+  }
+
+holeAddressingTests :: IO [Bool]
+holeAddressingTests = do
+  hPutStrLn stderr "\n── Hole-addressing tests (tier 1e: no Agda, #79) ──"
+  mdSrc <- TIO.readFile ("test" </> "resources" </> "LiterateMd.lagda.md")
+  sequence
+    [ runTest "offsetOfPosition: round-trips every hole's own (line, col)" $
+        assertEqual "offsets"
+          (map (Just . hsStart) (findHoles PlainAgda addressingSrc))
+          [ offsetOfPosition (hsLine h) (hsCol h) addressingSrc
+          | h <- findHoles PlainAgda addressingSrc ]
+
+    , runTest "offsetOfPosition: end-of-line column yes, beyond it no" $ do
+        -- Line 4 is "a = {!!}" (8 characters), so column 9 is its end and
+        -- column 10 is off the line — which must not silently roll onto line 5.
+        r1 <- assert "column 9 (one past the last character) resolves"
+                (isJust (offsetOfPosition 4 9 addressingSrc))
+        case r1 of
+          Fail m -> pure (Fail m)
+          Pass   -> allOf
+            [ assertEqual "column 10 is off the line" Nothing
+                (offsetOfPosition 4 10 addressingSrc)
+            , assertEqual "line 99 does not exist" Nothing
+                (offsetOfPosition 99 1 addressingSrc)
+            , assertEqual "0-based coordinates are not accepted" Nothing
+                (offsetOfPosition 0 0 addressingSrc)
+            ]
+
+    , runTest "resolveHoleRef: a position at a hole's first character hits it" $
+        assertEqual "indices" [Right 0, Right 1, Right 2]
+          [ resolveIn (ByPosition (hsLine h) (hsCol h))
+          | h <- findHoles PlainAgda addressingSrc ]
+
+    , runTest "resolveHoleRef: a position inside a hole's span hits it" $
+        -- Anywhere in {! zero !} — its opening brace, its body, its final
+        -- brace — is that hole; one past its last character is not.
+        assertEqual "indices" [Right 1, Right 1, Right 1, Left ()]
+          [ either (const (Left ())) Right (resolveIn (ByPosition 7 c))
+          | c <- [5, 10, 14, 15] ]
+
+    , runTest "resolveHoleRef: a position in no hole names the nearest ones" $
+        case resolveIn (ByPosition 8 1) of
+          Right i  -> pure (Fail $ "expected a miss, got hole " <> show i)
+          Left msg -> allOf
+            [ assert "names the position asked for"
+                ("line 8, column 1" `T.isInfixOf` msg)
+            , assert "names the hole above"  ("line 7, column 5"  `T.isInfixOf` msg)
+            , assert "names the hole below"  ("line 10, column 5" `T.isInfixOf` msg)
+            , assert "says how many holes there are" ("3 in the file" `T.isInfixOf` msg)
+            , assert "points at where the coordinates come from"
+                ("get_diagnostics.holes" `T.isInfixOf` msg)
+            ]
+
+    , runTest "resolveHoleRef: an out-of-range index says so and lists the holes" $
+        case resolveIn (ByIndex 7) of
+          Right i  -> pure (Fail $ "expected a miss, got hole " <> show i)
+          Left msg -> allOf
+            [ assert "keeps the pre-#79 wording" ("Hole index 7" `T.isInfixOf` msg)
+            , assert "warns that indices shift" ("shifts down by one" `T.isInfixOf` msg)
+            , assert "lists a real hole" ("index 0 at line 4, column 5" `T.isInfixOf` msg)
+            ]
+
+    , runTest "resolveHoleRef: a file with no holes says exactly that" $
+        case resolveHoleRef "Empty.agda" PlainAgda "x = 1\n" (ByPosition 1 1) of
+          Right i  -> pure (Fail $ "expected a miss, got hole " <> show i)
+          Left msg -> assert "says the file has no holes"
+                        ("Empty.agda has no holes" `T.isInfixOf` msg)
+
+    -- Literate coordinates, the #73 contract seen from the addressing side: a
+    -- position is read in the file as written, so the code hole resolves and
+    -- the prose decoys above it — which occupy no index either — do not.
+    , runTest "resolveHoleRef: literate positions are literate-file coordinates" $
+        case (findHoles LiterateMd mdSrc, expectedHolePos mdSrc) of
+          ([h], Just (ln, col)) -> allOf
+            [ assertEqual "the fixture's own hole position" (ln, col) (hsLine h, hsCol h)
+            , assertEqual "resolves by that position" (Right 0)
+                (resolveHoleRef "LiterateMd.lagda.md" LiterateMd mdSrc (ByPosition ln col))
+            , assert "a prose decoy position is a miss"
+                (isLeft (resolveHoleRef "LiterateMd.lagda.md" LiterateMd mdSrc
+                          (ByPosition (proseDecoyLine mdSrc) (proseDecoyCol mdSrc))))
+            ]
+          (hs, _) -> pure . Fail $ "expected 1 hole, got " <> show (length hs)
+
+    , runTest "params: holeIndex alone parses as an index reference" $
+        assertEqual "ref" (Right (ByIndex 2))
+          (decodeGoalParams "{\"filePath\":\"F.agda\",\"holeIndex\":2}")
+
+    , runTest "params: line + column parses as a position reference" $
+        assertEqual "ref" (Right (ByPosition 7 5))
+          (decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
+
+    -- The response spells the column `col`, so accepting that spelling is what
+    -- lets a hole entry be handed straight back with no key renaming — and
+    -- giving both spellings is refused like every other ambiguous request,
+    -- which is also what makes the schema's oneOf an exact description.
+    , runTest "params: col stands in for column, but not alongside it" $ allOf
+        [ assertEqual "col alone" (Right (ByPosition 7 5))
+            (decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
+        , case decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"col\":5}" of
+            Right r  -> pure (Fail $ "both spellings should not parse: " <> show r)
+            Left msg -> assert ("message: " <> msg) ("give one of them" `isInfixOf` msg)
+        ]
+
+    , runTest "params: both spellings at once is refused, not resolved" $
+        case decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"holeIndex\":0}" of
+          Right r  -> pure (Fail $ "expected a parse failure, got " <> show r)
+          Left msg -> assert ("message: " <> msg) ("not both" `isInfixOf` msg)
+
+    , runTest "params: half a position is refused" $ allOf
+        [ case decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7}" of
+            Right r  -> pure (Fail $ "expected a parse failure, got " <> show r)
+            Left msg -> assert ("message: " <> msg) ("without column" `isInfixOf` msg)
+        , case decodeGoalParams "{\"filePath\":\"F.agda\",\"column\":5}" of
+            Right r  -> pure (Fail $ "expected a parse failure, got " <> show r)
+            Left msg -> assert ("message: " <> msg) ("without line" `isInfixOf` msg)
+        ]
+
+    , runTest "params: no address at all is refused, naming both spellings" $
+        case decodeGoalParams "{\"filePath\":\"F.agda\"}" of
+          Right r  -> pure (Fail $ "expected a parse failure, got " <> show r)
+          Left msg -> allOf
+            [ assert ("message: " <> msg) ("line, column" `isInfixOf` msg)
+            , assert ("message: " <> msg) ("holeIndex"    `isInfixOf` msg)
+            ]
+
+    , runTest "params: fill_hole reads the same two spellings" $
+        assertEqual "refs" (Right (ByPosition 7 5), Right (ByIndex 1))
+          ( fmap fhHole (Aeson.eitherDecode
+              "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"candidate\":\"zero\"}")
+          , fmap fhHole (Aeson.eitherDecode
+              "{\"filePath\":\"F.agda\",\"holeIndex\":1,\"candidate\":\"zero\"}")
+          )
+
+    , runTest "params: every advertised address shape parses" $
+        assertEqual "shapes that failed to parse" []
+          [ ks | (ks, args) <- addressShapes, isLeft (decodeGoalParams args) ]
+
+    -- The other half of the same contract: a client picks what to send by
+    -- reading the schema, so an accepted key the schema omits may as well not
+    -- exist.  Reads the value tools/list serializes, not the Haskell.
+    , runTest "schema: every address key is a declared property (#79)" $
+        assertEqual "keys missing from the advertised input schema" []
+          [ (tool, k)
+          | tool <- addressTools
+          , let declared = schemaProperties tool advertisedTools
+          , k <- nub (concatMap fst addressShapes)
+          , k `notElem` declared
+          ]
+
+    -- `required` cannot say "address it somehow", so without the oneOf the
+    -- schema advertised a bare {filePath} as a complete call while the parser
+    -- refused it.  These are the same three shapes, from the same list.
+    , runTest "schema: oneOf advertises exactly the shapes that parse (#79)" $ allOf
+        [ assertEqual ("oneOf for " <> T.unpack tool)
+            (sort (map (sort . fst) addressShapes))
+            (sort (map sort (schemaAlternatives tool advertisedTools)))
+        | tool <- addressTools
+        ]
+    ]
+
+-- | proseDecoyLine / proseDecoyCol: the position of the first @{!!}@ token in
+-- the .lagda.md fixture's prose — a token that looks like a hole, sits above
+-- the code fence, and must be addressable by nothing.
+proseDecoyLine :: Text -> Int
+proseDecoyLine src = maybe 1 fst (posOfNth 0 src "{!!}")
+
+proseDecoyCol :: Text -> Int
+proseDecoyCol src = maybe 1 snd (posOfNth 0 src "{!!}")
+
+
+-- ---------------------------------------------------------------------------
 -- Tier 1b: Corpus / search tests (IO for file read, no Agda required)
 --
 -- These tests load a synthetic JSONL fixture and exercise the three search
@@ -1297,7 +1583,7 @@ timeoutTests = do
       before <- BS.readFile timeoutFixturePath
       fillRes <- handleFillHole slowCfg FillHoleParams
         { fhFilePath  = timeoutFixturePath
-        , fhHoleIndex = 0
+        , fhHole      = ByIndex 0
         , fhCandidate = "zero"
         }
       after <- BS.readFile timeoutFixturePath
@@ -1329,8 +1615,8 @@ timeoutTests = do
       -- that still carries the call's measurements (a Copilot review catch on
       -- PR #89: a plain error string dropped elapsedMs on the floor).
       gg <- handleGetGoal slowCfg GetGoalParams
-        { ggFilePath  = timeoutFixturePath
-        , ggHoleIndex = 0
+        { ggFilePath = timeoutFixturePath
+        , ggHole     = ByIndex 0
         }
       resultsGoal <- sequence
         [ runTest "get_goal: a timeout is a structured failure carrying elapsedMs" $
@@ -1652,7 +1938,7 @@ echoTests = do
         badDiag <- handleGetDiagnostics rootCfg (GetDiagnosticsParams targetB Nothing)
         beforeB <- BS.readFile targetB
         badFill <- handleFillHole rootCfg FillHoleParams
-          { fhFilePath = targetB, fhHoleIndex = 0, fhCandidate = "zero" }
+          { fhFilePath = targetB, fhHole = ByIndex 0, fhCandidate = "zero" }
         afterB  <- BS.readFile targetB
         sequence
           [ runTest "root resolution: a file in the registered checkout resolves to it" $
@@ -1910,28 +2196,28 @@ integrationTests cfg fixturePath repoRoot = do
       -- exact strings (rather than mere non-emptiness) is what catches a macro
       -- that "reports something" but reports the wrong thing.
       runTest "get_goal: Fixture01 hole 0 goal is exactly \"A\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0 }
         result <- handleGetGoal cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "A" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 1 goal is exactly \"⊤\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 1 }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 1 }
         result <- handleGetGoal cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "⊤" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 2 goal is exactly \"x ≡ x\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 2 }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 2 }
         result <- handleGetGoal cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "x ≡ x" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 0 context contains 'x : A'" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0 }
         result <- handleGetGoal cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
@@ -1942,7 +2228,7 @@ integrationTests cfg fixturePath repoRoot = do
     , runTest "fill_hole: Fixture01 hole 0 with 'x' succeeds" $ do
         let params = FillHoleParams
               { fhFilePath  = fixturePath
-              , fhHoleIndex = 0
+              , fhHole      = ByIndex 0
               , fhCandidate = "x"
               }
         result <- handleFillHole cfg params
@@ -1953,7 +2239,7 @@ integrationTests cfg fixturePath repoRoot = do
     , runTest "fill_hole: Fixture01 hole 0 with 'tt' fails (type error)" $ do
         let params = FillHoleParams
               { fhFilePath  = fixturePath
-              , fhHoleIndex = 0
+              , fhHole      = ByIndex 0
               , fhCandidate = "tt"
               }
         result <- handleFillHole cfg params
@@ -1988,7 +2274,7 @@ integrationTests cfg fixturePath repoRoot = do
                           (fcrElapsedMs fcr > 0)
 
     , runTest "get_goal: a real goal query carries elapsedMs" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHoleIndex = 0 }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0 }
         result <- handleGetGoal cfg params
         case result of
           Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
@@ -1997,7 +2283,7 @@ integrationTests cfg fixturePath repoRoot = do
 
     , runTest "fill_hole: a real fill carries elapsedMs and is not a timeout" $ do
         let params = FillHoleParams
-              { fhFilePath = fixturePath, fhHoleIndex = 0, fhCandidate = "x" }
+              { fhFilePath = fixturePath, fhHole = ByIndex 0, fhCandidate = "x" }
         result <- handleFillHole cfg params
         case result of
           Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -2021,7 +2307,8 @@ integrationTests cfg fixturePath repoRoot = do
   verdict <- fillVerdictTests cfg
   holes <- holeModelIntegrationTests cfg
   diags <- diagnosticIntegrationTests cfg
-  pure (base <> hier <> verdict <> holes <> diags)
+  handles <- holeAddressingIntegrationTests cfg
+  pure (base <> hier <> verdict <> holes <> diags <> handles)
 
 
 -- | hierIntegrationTests: issue #66 regression.
@@ -2049,21 +2336,21 @@ hierIntegrationTests cfg repoRoot = do
       before <- BS.readFile useFile
       results <- sequence
         [ runTest "get_goal: Proofs.Use (hierarchical) returns a non-empty goal" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0 }
             result <- handleGetGoal hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
 
         , runTest "get_goal: Proofs.Use reports its declared (hierarchical) module name" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0 }
             result <- handleGetGoal hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "module" (Just "Proofs.Use") (giModule info)
 
         , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHoleIndex = 0 }
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0 }
             result <- handleGetGoal hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
@@ -2073,7 +2360,7 @@ hierIntegrationTests cfg repoRoot = do
 
         , runTest "fill_hole: Proofs.Use with cross-directory 'thing' succeeds" $ do
             let params = FillHoleParams
-                  { fhFilePath = useFile, fhHoleIndex = 0, fhCandidate = "thing" }
+                  { fhFilePath = useFile, fhHole = ByIndex 0, fhCandidate = "thing" }
             result <- handleFillHole hierCfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -2081,7 +2368,7 @@ hierIntegrationTests cfg repoRoot = do
 
         , runTest "fill_hole: Proofs.Use with ill-typed 'tt' is a type error" $ do
             let params = FillHoleParams
-                  { fhFilePath = useFile, fhHoleIndex = 0, fhCandidate = "tt" }
+                  { fhFilePath = useFile, fhHole = ByIndex 0, fhCandidate = "tt" }
             result <- handleFillHole hierCfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
@@ -2121,7 +2408,7 @@ fillVerdictTests cfg = do
       results <- sequence
         [ runTest "fill_hole: candidate leaving an unsolved meta is a type error" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "implicitOnly" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "implicitOnly" }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed unexpectedly: " <> T.unpack (failureText err))
@@ -2134,7 +2421,7 @@ fillVerdictTests cfg = do
 
         , runTest "fill_hole: well-typed candidate with another hole open stays ok" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "zero" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "zero" }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -2142,7 +2429,7 @@ fillVerdictTests cfg = do
 
         , runTest "fill_hole: candidate introducing a new sub-hole stays ok" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc {!!}" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "suc {!!}" }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -2153,7 +2440,7 @@ fillVerdictTests cfg = do
         -- remainingHoles — here hole h plus the new `?`.
         , runTest "fill_hole: a '?' sub-hole is tolerated AND counted (#71)" $ do
             let params = FillHoleParams
-                  { fhFilePath = fixture, fhHoleIndex = 0, fhCandidate = "suc ?" }
+                  { fhFilePath = fixture, fhHole = ByIndex 0, fhCandidate = "suc ?" }
             result <- handleFillHole cfg params
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
@@ -2209,7 +2496,7 @@ holeModelIntegrationTests cfg = do
       results <- sequence
         [ runTest "get_goal: the ? hole in HoleVariants (index 3) has goal Nat" $ do
             result <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = variants, ggHoleIndex = 3 }
+              { ggFilePath = variants, ggHole = ByIndex 3 }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "goal" "Nat" (giGoal info)
@@ -2219,7 +2506,7 @@ holeModelIntegrationTests cfg = do
             -- remainingHoles == 3 proves the fill hit the real hole, not a
             -- decoy (writing into a comment would leave all 4 holes open).
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = variants, fhHoleIndex = 0, fhCandidate = "zero" }
+              { fhFilePath = variants, fhHole = ByIndex 0, fhCandidate = "zero" }
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
@@ -2230,7 +2517,7 @@ holeModelIntegrationTests cfg = do
 
         , runTest "fill_hole: a standalone ? hole is addressable and fillable" $ do
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = variants, fhHoleIndex = 3, fhCandidate = "zero" }
+              { fhFilePath = variants, fhHole = ByIndex 3, fhCandidate = "zero" }
             case result of
               Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
               Right fr -> do
@@ -2241,9 +2528,9 @@ holeModelIntegrationTests cfg = do
 
         , runTest "get_goal: {! zero !} in a .lagda.md ≡ the same code in a .agda" $ do
             mdGoal    <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = lagdaMd, ggHoleIndex = 0 }
+              { ggFilePath = lagdaMd, ggHole = ByIndex 0 }
             plainGoal <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = plainTwin, ggHoleIndex = 0 }
+              { ggFilePath = plainTwin, ggHole = ByIndex 0 }
             case (mdGoal, plainGoal) of
               (Right md, Right plain) -> do
                 r1 <- assertEqual "goals agree" (giGoal plain) (giGoal md)
@@ -2255,9 +2542,9 @@ holeModelIntegrationTests cfg = do
 
         , runTest "fill_hole: {! zero !} in a .lagda.md fills like in a .agda" $ do
             mdFill    <- handleFillHole cfg FillHoleParams
-              { fhFilePath = lagdaMd, fhHoleIndex = 0, fhCandidate = "zero" }
+              { fhFilePath = lagdaMd, fhHole = ByIndex 0, fhCandidate = "zero" }
             plainFill <- handleFillHole cfg FillHoleParams
-              { fhFilePath = plainTwin, fhHoleIndex = 0, fhCandidate = "zero" }
+              { fhFilePath = plainTwin, fhHole = ByIndex 0, fhCandidate = "zero" }
             case (mdFill, plainFill) of
               (Right md, Right plain) -> do
                 r1 <- assertEqual "status (.lagda.md)" FillOk (frStatus md)
@@ -2282,7 +2569,7 @@ holeModelIntegrationTests cfg = do
                         , resources </> "LiterateTree.lagda.tree"
                         ]
             results <- mapM (\f -> handleGetGoal cfg GetGoalParams
-                              { ggFilePath = f, ggHoleIndex = 0 }) files
+                              { ggFilePath = f, ggHole = ByIndex 0 }) files
             let bad = [ (takeFileName f, r)
                       | (f, r) <- zip files results
                       , either (const True) ((/= "Nat") . giGoal) r
@@ -2293,7 +2580,7 @@ holeModelIntegrationTests cfg = do
             -- LiterateMd has exactly one real hole; its prose decoys must
             -- not create an index 1.
             result <- handleFillHole cfg FillHoleParams
-              { fhFilePath = lagdaMd, fhHoleIndex = 1, fhCandidate = "zero" }
+              { fhFilePath = lagdaMd, fhHole = ByIndex 1, fhCandidate = "zero" }
             case result of
               Left err -> assert "error names the missing index"
                             ("Hole index 1" `T.isInfixOf` failureText err)
@@ -2571,6 +2858,195 @@ diagnosticIntegrationTests cfg = do
 
 
 -- ---------------------------------------------------------------------------
+-- Tier 2f: stable hole handles against real Agda (issue #79)
+--
+-- The acceptance criterion, run twice: a two-hole file stays addressable by
+-- position after its first hole is filled, with no index bookkeeping in the
+-- client — once on a plain .agda and once on its .lagda.md twin, where the
+-- coordinates are literate-file coordinates and every prose decoy is a chance
+-- to get them wrong.
+--
+-- What makes this a test rather than a demonstration is the pair of assertions
+-- at the end: the position that named the second hole before the fill still
+-- names it after, and the *index* that named it before now names nothing.  One
+-- of those two handles survived the edit; the other is the bookkeeping § 3.8 of
+-- the feedback document describes an agent losing.
+-- ---------------------------------------------------------------------------
+
+holeAddressingIntegrationTests :: AgdaConfig -> IO [Bool]
+holeAddressingIntegrationTests cfg = do
+  let resources = "test" </> "resources"
+      twoHoles  = resources </> "TwoHoles.agda"
+      twoHolesL = resources </> "TwoHolesLiterate.lagda.md"
+      lagdaMd   = resources </> "LiterateMd.lagda.md"
+      plainTwin = resources </> "HolePlain.agda"
+      fixtures  = [twoHoles, twoHolesL, lagdaMd, plainTwin]
+  exists <- mapM doesFileExist fixtures
+  if not (and exists)
+    then do
+      hPutStrLn stderr "\n  [skip] hole-addressing fixtures not found"
+      pure []
+    else do
+      hPutStrLn stderr
+        "\n── Integration tests (tier 2f: stable hole handles, #79) ──"
+      before   <- mapM BS.readFile fixtures
+      reanchor <- mapM (reanchorTest cfg) [twoHoles, twoHolesL]
+      parity   <- sequence
+        [ runTest "by position: a .lagda.md and its .agda twin answer alike (#79)" $ do
+            mdSrc    <- TIO.readFile lagdaMd
+            plainSrc <- TIO.readFile plainTwin
+            case (findHoles (flavourOf lagdaMd) mdSrc, findHoles (flavourOf plainTwin) plainSrc) of
+              ([mh], [ph]) -> do
+                -- Each file is addressed in its OWN coordinates — the hole sits
+                -- on a different line in each — which is the whole point: the
+                -- client reads the position out of that file's hole listing and
+                -- hands it back, and never learns which flavour it is talking to.
+                let mdRef    = ByPosition (hsLine mh) (hsCol mh)
+                    plainRef = ByPosition (hsLine ph) (hsCol ph)
+                mdGoal    <- handleGetGoal cfg GetGoalParams
+                  { ggFilePath = lagdaMd,   ggHole = mdRef }
+                plainGoal <- handleGetGoal cfg GetGoalParams
+                  { ggFilePath = plainTwin, ggHole = plainRef }
+                mdFill    <- handleFillHole cfg FillHoleParams
+                  { fhFilePath = lagdaMd,   fhHole = mdRef,    fhCandidate = "zero" }
+                plainFill <- handleFillHole cfg FillHoleParams
+                  { fhFilePath = plainTwin, fhHole = plainRef, fhCandidate = "zero" }
+                case (mdGoal, plainGoal, mdFill, plainFill) of
+                  (Right mg, Right pg, Right mf, Right pf) -> allOf
+                    [ assert "the twins' holes sit on different lines"
+                        (hsLine mh /= hsLine ph)
+                    , assertEqual "goals agree"       (giGoal pg)   (giGoal mg)
+                    , assertEqual "goal"              "Nat"         (giGoal mg)
+                    , assertEqual "fill statuses agree" (frStatus pf) (frStatus mf)
+                    , assertEqual "fill status"       FillOk        (frStatus mf)
+                    , assertEqual "re-anchored hole lists agree" (frHoles pf) (frHoles mf)
+                    , assertEqual "the candidate closed the last hole" [] (frHoles mf)
+                    ]
+                  (Left e, _, _, _) -> pure (Fail $ "get_goal (.lagda.md): "  <> T.unpack (failureText e))
+                  (_, Left e, _, _) -> pure (Fail $ "get_goal (.agda): "      <> T.unpack (failureText e))
+                  (_, _, Left e, _) -> pure (Fail $ "fill_hole (.lagda.md): " <> T.unpack (failureText e))
+                  (_, _, _, Left e) -> pure (Fail $ "fill_hole (.agda): "     <> T.unpack (failureText e))
+              (ms, ps) -> pure . Fail $
+                "expected 1 hole in each twin, got " <> show (length ms)
+                <> " and " <> show (length ps)
+
+        -- The limit of a position, pinned rather than papered over.  The
+        -- re-anchoring tests above fill with a same-length candidate on another
+        -- line, where the surviving hole does not move; a candidate that spans
+        -- two lines moves it, and the contract is that the response says so
+        -- (a Copilot review catch on PR #99 — the claim used to be that a
+        -- position survives any fill elsewhere, which is false).
+        , runTest "fill_hole: a multiline candidate moves later holes, and holes says where (#79)" $ do
+            src <- TIO.readFile twoHoles
+            let flav      = flavourOf twoHoles
+                candidate = "suc\n      zero"   -- one line becomes two
+            case (findHoles flav src, substituteHole flav 0 candidate src) of
+              ([h0, h1], Just patched) -> do
+                result <- handleFillHole cfg FillHoleParams
+                  { fhFilePath  = twoHoles
+                  , fhHole      = ByPosition (hsLine h0) (hsCol h0)
+                  , fhCandidate = candidate
+                  }
+                case result of
+                  Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
+                  Right fr -> allOf
+                    [ assertEqual "status" FillOk (frStatus fr)
+                    , assertEqual "the response re-anchors the survivor one line lower"
+                        [(0, hsLine h1 + 1, hsCol h1)]
+                        [ (hiIndex h, hiLine h, hiCol h) | h <- frHoles fr ]
+                    -- And the coordinates held from before the fill are now
+                    -- wrong in the way that matters: they name no hole, so a
+                    -- client reusing them gets the loud miss, never another hole.
+                    , assert "the pre-fill position no longer names a hole"
+                        (isLeft (resolveHoleRef twoHoles flav patched
+                                   (ByPosition (hsLine h1) (hsCol h1))))
+                    , assertEqual "the re-anchored position does" (Right 0)
+                        (resolveHoleRef twoHoles flav patched
+                           (ByPosition (hsLine h1 + 1) (hsCol h1)))
+                    ]
+              (hs, _) -> pure . Fail $ "expected exactly 2 holes, got " <> show (length hs)
+
+        -- The miss reaches the tool boundary intact.  Resolution happens before
+        -- Agda is started, so this costs no subprocess; it is here to pin that
+        -- the message a client sees is the one the resolver wrote.
+        , runTest "get_goal: a prose position is a loud miss, not a nearby hole (#79)" $ do
+            mdSrc  <- TIO.readFile lagdaMd
+            result <- handleGetGoal cfg GetGoalParams
+              { ggFilePath = lagdaMd
+              , ggHole     = ByPosition (proseDecoyLine mdSrc) (proseDecoyCol mdSrc)
+              }
+            case (result, findHoles LiterateMd mdSrc) of
+              (Right _, _)  -> pure (Fail "a prose decoy position should address no hole")
+              (Left err, holes) -> let msg = failureText err in allOf
+                [ assert "says no hole is there" ("No hole at line" `T.isInfixOf` msg)
+                , assert "names the real hole instead of resolving to it"
+                    (all (\h -> ("line " <> T.pack (show (hsLine h)) <> ", column "
+                                  <> T.pack (show (hsCol h))) `T.isInfixOf` msg) holes)
+                ]
+        ]
+      after    <- mapM BS.readFile fixtures
+      restored <- runTest "hole-addressing tests restore their fixtures byte-exactly" $
+        assert "files unchanged" (before == after)
+      pure (reanchor <> parity <> [restored])
+
+-- | reanchorTest: one fixture through the whole re-anchoring loop.
+--
+-- Fill the first hole by position; check the response's own hole list already
+-- names the second hole's position (and its new index); then write the
+-- candidate back, as a client keeping it would, and address that second hole by
+-- the coordinates read BEFORE the fill.  The fixture is restored either way.
+reanchorTest :: AgdaConfig -> FilePath -> IO Bool
+reanchorTest cfg path =
+  runTest ("re-anchoring after a fill: " <> takeFileName path) $ do
+    orig <- BS.readFile path
+    src  <- TIO.readFile path
+    let flav = flavourOf path
+    case findHoles flav src of
+      [h0, h1] -> do
+        let p0 = ByPosition (hsLine h0) (hsCol h0)
+            p1 = ByPosition (hsLine h1) (hsCol h1)
+        fill <- handleFillHole cfg FillHoleParams
+          { fhFilePath = path, fhHole = p0, fhCandidate = "zero" }
+        case (fill, substituteHole flav 0 "zero" src) of
+          (Left err, _) -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
+          (_, Nothing)  -> pure (Fail "substituteHole returned Nothing for hole 0")
+          (Right fr, Just patchedSrc) -> do
+            anchored <- allOf
+              [ assertEqual "status" FillOk (frStatus fr)
+              -- The re-anchoring payload: one hole left, still where it was,
+              -- and renumbered — the shift, reported rather than left to guess.
+              , assertEqual "the response's re-anchored hole list"
+                  [(0, hsLine h1, hsCol h1)]
+                  [ (hiIndex h, hiLine h, hiCol h) | h <- frHoles fr ]
+              , assertEqual "remainingHoles is that list's length"
+                  (Just (length (frHoles fr))) (frRemainingHoles fr)
+              ]
+            case anchored of
+              Fail m -> pure (Fail m)
+              Pass   ->
+                -- Keep the candidate, the way a client would after an ok, and
+                -- ask about the other hole with the handle held all along.
+                bracket_ (BS.writeFile path (TE.encodeUtf8 patchedSrc))
+                         (BS.writeFile path orig) $ do
+                  goal  <- handleGetGoal cfg GetGoalParams
+                    { ggFilePath = path, ggHole = p1 }
+                  stale <- handleGetGoal cfg GetGoalParams
+                    { ggFilePath = path, ggHole = ByIndex 1 }
+                  allOf
+                    [ case goal of
+                        Right info -> assertEqual "goal at the unmoved position" "Nat" (giGoal info)
+                        Left err    -> pure . Fail $
+                          "get_goal by the pre-fill position failed: "
+                          <> T.unpack (failureText err)
+                    , case stale of
+                        Left err -> assert "the stale index fails loudly"
+                                      ("Hole index 1" `T.isInfixOf` failureText err)
+                        Right _  -> pure (Fail "index 1 should no longer name a hole")
+                    ]
+      hs -> pure . Fail $ "expected exactly 2 holes, got " <> show (length hs)
+
+
+-- ---------------------------------------------------------------------------
 -- Main
 -- ---------------------------------------------------------------------------
 
@@ -2592,6 +3068,8 @@ main = do
   -- the timeout tests: it leaves AGDA_MCP_FAKE_EXIT set, and their fast-path
   -- case asserts the stand-in's default exit status of 0.
   echoResults <- echoTests
+  -- Tier 1e: hole addressing — position vs index, and the parse of both (#79).
+  addressResults <- holeAddressingTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -2602,7 +3080,7 @@ main = do
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
-          <> timeoutResults <> echoResults <> integrationResults
+          <> timeoutResults <> echoResults <> addressResults <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed
