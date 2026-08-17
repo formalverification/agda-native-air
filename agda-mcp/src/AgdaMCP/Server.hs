@@ -22,6 +22,13 @@
 --   * Optional 'CorpusIndex' in 'ServerConfig' (loaded via @--corpus@ flag).
 --   * Three search tools: search_by_name, search_by_type, get_dependencies.
 --   * Search tools appear in tools/list only when a corpus is loaded.
+--
+-- Issue #78 addition:
+--   * check_project — the whole-project gate.  Always registered, and the one
+--     tool that reads 'scGateConfig' as well as 'scAgdaConfig'.  Its call
+--     blocks for the duration of the gate: this transport is a synchronous line
+--     loop with no progress-notification plumbing, so streaming progress is
+--     follow-on scope rather than something the framing already supports.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -53,6 +60,8 @@ import qualified Data.ByteString.Lazy.Char8 as LBS8
 import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, BufferMode (..), isEOF)
 
 import AgdaMCP.Agda (AgdaConfig)
+import AgdaMCP.Gate (GateConfig)
+import AgdaMCP.Tools.CheckProject (handleCheckProject)
 import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
 import AgdaMCP.Types (CorpusIndex, ToolFailure (..))
@@ -67,6 +76,10 @@ import AgdaMCP.Types (CorpusIndex, ToolFailure (..))
 -- handlers are caught and returned as JSON-RPC error responses.
 data ServerConfig = ServerConfig
   { scAgdaConfig  :: AgdaConfig
+  , scGateConfig  :: GateConfig
+    -- ^ The whole-project gate: an optional configured command and its own
+    --   timeout (@--check-command@, @--check-timeout@).  Used by check_project
+    --   only; the per-file tools never see it (issue #78).
   , scServerName  :: Text
   , scVersion     :: Text
   , scCorpusIndex :: Maybe CorpusIndex
@@ -237,6 +250,30 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           ]
           ["filePath"]
+
+      , toolDef "check_project"
+          ("Run the WHOLE PROJECT's own acceptance gate — the check a human runs \
+           \before calling the work done — and report its verdict. Use this \
+           \instead of running the gate from a shell. "
+           <> gateModel
+           <> " " <> projectHonestyNote
+           <> " " <> projectPayloadNote
+           <> " " <> diagnosticModel
+           <> " " <> projectTimingNote
+           <> " " <> projectEchoNote)
+          [ prop "target" "string"
+              "A make target to run instead of the default 'check'. It is \
+              \resolved against the nearest Makefile up from the anchor that \
+              \declares it; naming one selects the Makefile gate even when the \
+              \server has a --check-command configured. If no Makefile declares \
+              \it, the call fails rather than running something else."
+          , prop "projectPath" "string"
+              "A file or directory inside the project to check (default: the \
+              \server's working directory). A file anchors its own directory. A \
+              \path that does not exist is an error."
+          , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
+          ]
+          []
        ]
     searchTools
       | isJust (scCorpusIndex cfg) =
@@ -356,6 +393,85 @@ diagnosticModel =
   \(e.g. ModuleDoesntExport before the NotInScope it causes), then scope \
   \errors, type errors, and unsolved metas — and identical repeats are \
   \collapsed."
+
+-- | gateModel: which command @check_project@ runs, and how it decided (issue
+-- #78).
+--
+-- An agent that cannot predict what the tool will run has to run the gate
+-- itself to be sure — the whole failure this tool exists to end — so the
+-- resolution order belongs in the description, not only in the response.
+gateModel :: Text
+gateModel =
+  "THE GATE: chosen in this order — the make target named by `target` (the \
+  \nearest Makefile above the anchor that declares it, run in that Makefile's \
+  \own directory); else this server's --check-command, if the operator \
+  \configured one (run directly, never through a shell); else the nearest \
+  \Makefile's `check` target; else agda on the project's Everything module \
+  \(Everything.agda or a literate flavour). The upward search stops at the \
+  \repository boundary. If none of those exists the call FAILS, naming every \
+  \directory it searched and what to configure — it never reports a check that \
+  \did not happen. gate {source, target?, makefile?, entry?, searchedFrom} in \
+  \the response says which one ran and on what evidence, and command echoes the \
+  \exact argument vector and working directory."
+
+-- | projectHonestyNote: the one thing the tool exists for, said where a client
+-- reads it.
+projectHonestyNote :: Text
+projectHonestyNote =
+  "success is true if and only if the gate exited 0, finished inside the bound, \
+  \AND its output carried no error diagnostic. exitCode is the gate's own \
+  \status, echoed verbatim and never overridden, so a failing gate can never be \
+  \reported green. The reverse is deliberate: a gate that exits 0 while its \
+  \output carries errors is reported as success:false with maskedFailure:true — \
+  \a wrapper script whose last command is an echo exits 0 whatever make did, \
+  \which is the trap that forces agents to grep build logs for 'error:'. Read \
+  \success; you do not have to grep the log."
+
+-- | projectPayloadNote: what a project response carries beyond the diagnostics
+-- list, and what each field is for.
+projectPayloadNote :: Text
+projectPayloadNote =
+  "firstError is the first error-severity diagnostic, lifted out so you need \
+  \not scan the (capped) diagnostics list. failingModule and failingFile name \
+  \the module the gate stopped in: the one carrying that error, or — on a \
+  \timeout — the last module agda started. modulesChecked counts the distinct \
+  \modules agda re-typechecked from source, so it says how much of the project \
+  \was actually rebuilt and, on a timeout, how far the run got. outputTail is \
+  \the bounded tail of the gate's stdout and stderr, present only when the check \
+  \did not pass, because a gate can fail for reasons agda never printed (no such \
+  \target, a missing tool, a killed build)."
+
+-- | projectTimingNote: the cost model of a whole-project check, including the
+-- fact that this call blocks.
+projectTimingNote :: Text
+projectTimingNote =
+  "COST: this call BLOCKS for the whole gate and does not stream progress; a \
+  \large library's gate running for 10-20 minutes is ordinary, and elapsedMs \
+  \reports the wall-clock time at the end. It is bounded by the server's \
+  \--check-timeout (default 1800s), which is a SEPARATE bound from the per-file \
+  \--timeout; timeoutSeconds echoes the bound that was in effect. On expiry the \
+  \gate's whole process group is killed — make and every agda under it — and the \
+  \response is success:false with timedOut:true and a timeout error diagnostic, \
+  \still carrying elapsedMs, modulesChecked, and failingModule so you can see \
+  \where it reached."
+
+-- | projectEchoNote: the response echo, in the vocabulary of a gate rather than
+-- of one agda call (issues #72, #76).
+projectEchoNote :: Text
+projectEchoNote =
+  "EVERY response carries the echo: verdict {equivalentTo, meaning, exitCode} — \
+  \the exact command this call is equivalent to, including the directory it runs \
+  \in, what success means, and the gate's own exit code; command {binary, args, \
+  \cwd}; and project {rootSource, root, library, librariesFile, \
+  \registeredLibraries, selectedLibraries, includePaths} — the tree the gate ran \
+  \in, resolved from the anchor exactly as check_file resolves it from a file. \
+  \One difference worth knowing: for a make or --check-command gate, \
+  \selectedLibraries and includePaths are this server's own configuration and \
+  \not a claim about the flags the gate passed agda, since the gate chooses \
+  \those itself; for the Everything gate they are what agda finally received. If \
+  \the anchor belongs to a different checkout of a library this server has \
+  \registered elsewhere, the call FAILS with a rootMismatch object naming both \
+  \roots rather than running a gate against the other tree."
 
 -- | maxDiagnosticsDoc: the cap's contract, in the input schema where a client
 -- decides what to pass.
@@ -611,6 +727,14 @@ dispatchTool cfg "check_file" args =
 dispatchTool cfg "get_diagnostics" args =
   case Aeson.fromJSON args of
     Aeson.Success p -> failureToMcp <$> handleGetDiagnostics (scAgdaConfig cfg) p
+    Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+-- Whole-project gate (M1-5, issue #78).  The one tool that takes the gate
+-- configuration as well as the Agda one.
+dispatchTool cfg "check_project" args =
+  case Aeson.fromJSON args of
+    Aeson.Success p ->
+      failureToMcp <$> handleCheckProject (scAgdaConfig cfg) (scGateConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Search tools (new M1-3)

@@ -48,7 +48,9 @@ library
     AgdaMCP.Diagnostics
     AgdaMCP.Holes
     AgdaMCP.Project
+    AgdaMCP.Gate
     AgdaMCP.Corpus
+    AgdaMCP.Tools.CheckProject
     AgdaMCP.Tools.ProofState
     AgdaMCP.Tools.Search
   build-depends:

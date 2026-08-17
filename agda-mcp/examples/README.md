@@ -49,3 +49,22 @@ the tree it checked, so you can confirm this without triggering the failure.
 Copy the template into each worktree separately and set `AGDA_ALGEBRAS_ROOT` to
 that worktree.  See [`docs/agda-mcp-environment.md`](../../docs/agda-mcp-environment.md)
 for the resolution rules and for what the server writes where.
+
+## `check_project` on an external project
+
+`scripts/run-server.sh` starts the server from *this* repository's root, so that
+is the working directory `check_project` anchors at when you give it none — and
+it would run **agda-native-air's** gate, not the one you are working on.  Pass
+the project you mean:
+
+```json
+{"name": "check_project", "arguments": {"projectPath": "/ABS/PATH/TO/agda-algebras/<your-worktree>"}}
+```
+
+The response's `gate.searchedFrom` and `command.cwd` always name the directory
+that was searched and the one the gate ran in, so a call anchored at the wrong
+project is visible in its own answer rather than something to discover later.
+If the external project's gate is not a `make check` — nor an `Everything`
+module — name it once in the config with
+`"--check-command", "<the command your gate is>"`; it is split on whitespace and
+run without a shell.

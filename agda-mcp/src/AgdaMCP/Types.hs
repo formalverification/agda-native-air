@@ -47,6 +47,14 @@
 --   type, and meaning, and the one new /failure/ shape ('FailProject') is a new
 --   kind rather than a changed one — so the schema version is unchanged.
 --
+--   'CheckProjectResult' (issue #78) is the whole-project gate's response.  It
+--   carries the same @verdict@ / @command@ / @project@ echo as the per-file
+--   tools, plus what only a project run has to say: which gate was chosen and
+--   why ('Gate'), how far it got ('cprModulesChecked'), and whether its exit
+--   code was masked by a wrapper ('cprMaskedFailure').  It is a new response
+--   type rather than a change to an existing one, so the schema version is
+--   again unchanged.
+--
 --   These types correspond 1-to-1 with the policy contract defined in
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
@@ -75,6 +83,7 @@ module AgdaMCP.Types
   , FillHoleParams (..)
   , CheckFileParams (..)
   , GetDiagnosticsParams (..)
+  , CheckProjectParams (..)
   , parseHoleRef
     -- * Response echo (issues #72, #76)
   , CommandEcho (..)
@@ -101,6 +110,10 @@ module AgdaMCP.Types
   , plainDiagnostic
   , FileCheckResult (..)
   , DiagnosticsResult (..)
+    -- * The whole-project gate (issue #78)
+  , GateSource (..)
+  , Gate (..)
+  , CheckProjectResult (..)
     -- * Hole location
   , HoleLocation (..)
     -- * Corpus types (agda-strux JSONL schema)
@@ -271,6 +284,27 @@ data GetDiagnosticsParams = GetDiagnosticsParams
 instance FromJSON GetDiagnosticsParams where
   parseJSON = withObject "GetDiagnosticsParams" $ \o ->
     GetDiagnosticsParams <$> o .: "filePath" <*> o .:? "maxDiagnostics"
+
+-- | Parameters for the @check_project@ tool (issue #78).
+--
+-- Every field is optional, because the honest default is discoverable: the
+-- project is the one the server is standing in, and its gate is the @check@
+-- target of the nearest Makefile (or the @Everything@ module, or whatever the
+-- operator configured with @--check-command@).  'cppMaxDiagnostics' is the cap
+-- described at 'CheckFileParams'.
+data CheckProjectParams = CheckProjectParams
+  { cppTarget         :: Maybe Text     -- ^ A @make@ target to run instead of @check@.
+  , cppProjectPath    :: Maybe FilePath -- ^ A file or directory anchoring the project
+                                        --   (default: the server's working directory).
+  , cppMaxDiagnostics :: Maybe Int      -- ^ Cap on the diagnostics returned.
+  } deriving (Eq, Show)
+
+instance FromJSON CheckProjectParams where
+  parseJSON = withObject "CheckProjectParams" $ \o ->
+    CheckProjectParams
+      <$> o .:? "target"
+      <*> o .:? "projectPath"
+      <*> o .:? "maxDiagnostics"
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -858,6 +892,124 @@ instance ToJSON DiagnosticsResult where
     , "command"           .= drCommand r
     , "project"           .= drProject r
     ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (drCheckedFromSource r)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § The whole-project gate (issue #78)
+--
+-- @check_project@ runs the project's own acceptance gate — a @make@ target, an
+-- operator-configured command, or @agda@ on the project's @Everything@ module —
+-- and reports its verdict without ever misreporting its exit code.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | GateSource: how the command that ran was decided.
+--
+-- Which one it was matters to a caller: @makefile-target@ and
+-- @everything-module@ were /discovered/ from the tree and can be re-derived by
+-- reading it, while @server-config@ is whatever the operator passed to
+-- @--check-command@ and is knowable only from this echo.
+data GateSource = GateFromMakefile | GateFromServerConfig | GateFromEverything
+  deriving (Eq, Show)
+
+instance ToJSON GateSource where
+  toJSON GateFromMakefile     = String "makefile-target"
+  toJSON GateFromServerConfig = String "server-config"
+  toJSON GateFromEverything   = String "everything-module"
+
+-- | Gate: which gate was chosen, and on what evidence.
+--
+-- The command itself is /not/ here — it is the response's 'CommandEcho', built
+-- from the argument vector actually handed to the process, exactly as it is for
+-- the per-file tools.  This record answers the question the echo cannot: why
+-- that command and not another one.
+data Gate = Gate
+  { gateSource       :: GateSource   -- ^ How the command was decided.
+  , gateTarget       :: Maybe Text   -- ^ The @make@ target, when the gate is one.
+  , gateMakefile     :: Maybe FilePath -- ^ The Makefile that declares it.
+  , gateEntry        :: Maybe FilePath -- ^ The @Everything@ module, when it is the gate.
+  , gateSearchedFrom :: FilePath     -- ^ The directory discovery started from — the
+                                     --   requested @projectPath@, or the server's
+                                     --   working directory when none was given.
+  } deriving (Eq, Show)
+
+instance ToJSON Gate where
+  toJSON g = object $
+    [ "source"       .= gateSource g
+    , "searchedFrom" .= gateSearchedFrom g
+    ] <> maybe [] (\t -> ["target"   .= t]) (gateTarget g)
+      <> maybe [] (\m -> ["makefile" .= m]) (gateMakefile g)
+      <> maybe [] (\e -> ["entry"    .= e]) (gateEntry g)
+
+-- | Result of @check_project@: the gate's verdict, and the evidence for it.
+--
+-- 'cprSuccess' is a /conjunction/, and deliberately so.  The per-file tools
+-- read success off Agda's exit code and nothing else (issue #72), because there
+-- the only failure mode worth defending against is Agda's prose drifting and
+-- silently turning a red build green.  A project gate has a second failure mode
+-- the field session met head-on: a wrapper script whose last command is an
+-- @echo@ exits 0 whatever @make@ did, so the shell's exit code says the build
+-- passed while the log is full of errors — which is why that session had to
+-- grep its logs for @error:@ four times.  So:
+--
+--   * the gate's exit code is echoed verbatim as @verdict.exitCode@ and is
+--     never overridden or reinterpreted;
+--   * 'cprSuccess' is true only when that code is 0, the run finished inside
+--     its bound, /and/ no error diagnostic was found in its output;
+--   * the third conjunct failing on its own is 'cprMaskedFailure', named and
+--     reported rather than folded silently into the verdict.
+--
+-- The evidence can therefore make a green gate red, never the other way round —
+-- the safe direction, and the one that removes the grep.
+data CheckProjectResult = CheckProjectResult
+  { cprSuccess        :: Bool          -- ^ Exit 0, in time, and no error diagnostic.
+  , cprTimedOut       :: Bool          -- ^ True iff the gate hit the @--check-timeout@ bound.
+  , cprMaskedFailure  :: Bool          -- ^ True iff the gate exited 0 while reporting errors.
+  , cprElapsedMs      :: Int           -- ^ Wall-clock ms of the whole gate run.
+  , cprTimeoutSeconds :: Maybe Int     -- ^ The bound in effect; 'Nothing' means unbounded.
+  , cprGate           :: Gate          -- ^ Which gate ran, and why that one.
+  , cprDiagnostics    :: [Diagnostic]  -- ^ Up to @maxDiagnostics@, most likely root cause first.
+  , cprDiagnosticsTotal :: Int         -- ^ How many were found before the cap.
+  , cprFirstError     :: Maybe Diagnostic -- ^ The first error-severity diagnostic, uncapped —
+                                       --   the one to read first, lifted out so a client need
+                                       --   not scan the list.
+  , cprFailingModule  :: Maybe Text    -- ^ The module the gate stopped in: the one carrying
+                                       --   'cprFirstError', or — on a timeout — the last one
+                                       --   Agda started checking.
+  , cprFailingFile    :: Maybe FilePath -- ^ That module's file.
+  , cprModulesChecked :: Int           -- ^ Distinct modules Agda re-typechecked from source
+                                       --   during the run (0 on a fully warm gate).  On a
+                                       --   timeout this is how far it got.
+  , cprOutputTail     :: Maybe Text    -- ^ The tail of the gate's output, bounded; present
+                                       --   only when the check did not succeed, since a gate
+                                       --   can fail for reasons Agda never printed (a missing
+                                       --   target, a shell error) and a client must not be
+                                       --   left blind.
+  , cprVerdict        :: Verdict        -- ^ What was run and what @success@ means (#72).
+  , cprCommand        :: CommandEcho    -- ^ The resolved command line and its cwd (#72).
+  , cprProject        :: ProjectContext -- ^ The tree the gate ran in (#76).
+  } deriving (Eq, Show)
+
+instance ToJSON CheckProjectResult where
+  toJSON r = object $
+    [ "success"          .= cprSuccess r
+    , "timedOut"         .= cprTimedOut r
+    , "elapsedMs"        .= cprElapsedMs r
+    , "gate"             .= cprGate r
+    , "diagnostics"      .= cprDiagnostics r
+    , "diagnosticsTotal" .= cprDiagnosticsTotal r
+    , "modulesChecked"   .= cprModulesChecked r
+    , "verdict"          .= cprVerdict r
+    , "command"          .= cprCommand r
+    , "project"          .= cprProject r
+    ]
+    -- Emitted only when true, as 'pcLibrariesFileMissing' is: an absent key is
+    -- the ordinary case, and a present one is a finding.
+    <> [ "maskedFailure" .= True | cprMaskedFailure r ]
+    <> maybe [] (\n -> ["timeoutSeconds" .= n]) (cprTimeoutSeconds r)
+    <> maybe [] (\d -> ["firstError"     .= d]) (cprFirstError r)
+    <> maybe [] (\m -> ["failingModule"  .= m]) (cprFailingModule r)
+    <> maybe [] (\f -> ["failingFile"    .= f]) (cprFailingFile r)
+    <> maybe [] (\t -> ["outputTail"     .= t]) (cprOutputTail r)
+
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- § Corpus types (agda-strux JSONL schema v0.01)
