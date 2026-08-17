@@ -606,7 +606,7 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence i
   "outputTail": "… 218 earlier lines elided …\nmake: *** [Makefile:31: check] Error 42\ngate finished",
   "verdict": {
     "equivalentTo": "equivalent-to: (cd /abs/agda-algebras && make check)",
-    "meaning": "success is true if and only if that command exited 0, finished inside the --check-timeout bound, and printed no error diagnostic. …",
+    "meaning": "success is true if and only if that command exited 0, finished inside the --check-timeout bound, and printed no failure evidence. …",
     "exitCode": 0
   },
   "command": {"binary": "/nix/store/…/bin/make", "args": ["check"], "cwd": "/abs/agda-algebras"},

@@ -964,9 +964,12 @@ instance ToJSON Gate where
 -- a list, not a theory: a mask that prints neither is reported as a pass, which
 -- is why 'cprOutputTail' is returned whatever the verdict.
 data CheckProjectResult = CheckProjectResult
-  { cprSuccess        :: Bool          -- ^ Exit 0, in time, and no error diagnostic.
+  { cprSuccess        :: Bool          -- ^ Exit 0, in time, and no failure evidence in the
+                                       --   output — an Agda error diagnostic, or the gate's
+                                       --   own failure line.
   , cprTimedOut       :: Bool          -- ^ True iff the gate hit the @--check-timeout@ bound.
-  , cprMaskedFailure  :: Bool          -- ^ True iff the gate exited 0 while reporting errors.
+  , cprMaskedFailure  :: Bool          -- ^ True iff the gate exited 0 while its own output
+                                       --   reported a failure.
   , cprElapsedMs      :: Int           -- ^ Wall-clock ms of the whole gate run.
   , cprTimeoutSeconds :: Maybe Int     -- ^ The bound in effect; 'Nothing' means unbounded.
   , cprGate           :: Gate          -- ^ Which gate ran, and why that one.

@@ -111,8 +111,10 @@ import AgdaMCP.Types
 --   3. Decide the gate ('AgdaMCP.Gate.resolveGate'), failing loudly when there
 --      is none rather than reporting a check that never happened.
 --   4. Run it bounded, and report: the verdict, the structured first error, the
---      module it stopped in, how far it got, and — when the check did not pass —
---      the tail of what it printed.
+--      module it stopped in, how far it got, and the tail of what it printed —
+--      that last whatever the verdict, since a mask this server cannot
+--      recognize is reported as a pass and the output is then the only evidence
+--      there is.
 handleCheckProject
   :: AgdaConfig -> GateConfig -> CheckProjectParams
   -> IO (Either ToolFailure CheckProjectResult)
