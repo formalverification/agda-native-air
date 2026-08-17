@@ -23,6 +23,7 @@
 -- Usage:
 --   agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 --            [--corpus PATH]   [--timeout N] [--verbose]
+--            [--check-command "CMD ARGS ..."] [--check-timeout N]
 --
 -- M1-3 additions:
 --   --corpus PATH   Load agda-strux JSONL corpus for search tools.
@@ -40,18 +41,22 @@ import Text.Read (readMaybe)
 
 import AgdaMCP.Agda (AgdaConfig (..), defaultConfig, defaultTimeoutSeconds)
 import AgdaMCP.Corpus (loadCorpus)
+import AgdaMCP.Gate
+  (GateConfig (..), defaultCheckTimeoutSeconds, defaultGateConfig)
 import AgdaMCP.Server (ServerConfig (..), runServer)
 
 -- | Parsed CLI options.  Separates Agda config from corpus path since
 -- corpus loading happens before the server loop starts.
 data CliOpts = CliOpts
   { cliAgdaConfig :: AgdaConfig
+  , cliGateConfig :: GateConfig
   , cliCorpusPath :: Maybe FilePath
   } deriving (Show)
 
 defaultCliOpts :: CliOpts
 defaultCliOpts = CliOpts
   { cliAgdaConfig = defaultConfig
+  , cliGateConfig = defaultGateConfig
   , cliCorpusPath = Nothing
   }
 
@@ -78,8 +83,10 @@ main = do
           exitFailure
         Right idx -> pure (Just idx)
 
-  let serverCfg = ServerConfig
+  let gateCfg = cliGateConfig opts
+      serverCfg = ServerConfig
         { scAgdaConfig  = cfg
+        , scGateConfig  = gateCfg
         , scServerName  = "agda-mcp"
         , scVersion     = "0.2.0"
         , scCorpusIndex = corpusIdx
@@ -89,6 +96,12 @@ main = do
   hPutStrLn stderr $ "  flags: " <> unwords (agdaFlags cfg)
   hPutStrLn stderr $ "  timeout: " <> case agdaTimeout cfg of
     Just n | n > 0 -> show n <> "s per agda call"
+    _              -> "(none)"
+  hPutStrLn stderr $ "  project gate: " <> case gcCommand gateCfg of
+    Just cmd@(_ : _) -> unwords cmd
+    _                -> "(discovered: nearest Makefile 'check' target, else Everything module)"
+  hPutStrLn stderr $ "  check timeout: " <> case gcTimeout gateCfg of
+    Just n | n > 0 -> show n <> "s per project check"
     _              -> "(none)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
   hPutStrLn stderr   "  transport: stdio"
@@ -103,6 +116,8 @@ main = do
 --   --agda-flags "..."    Space-separated Agda flags.
 --   --corpus PATH         Load agda-strux JSONL corpus for search tools.
 --   --timeout N           Per-typecheck timeout in seconds (default: 300; 0 = none).
+--   --check-command "..." The project gate check_project runs (no shell).
+--   --check-timeout N     Per-project-check timeout in seconds (default: 1800; 0 = none).
 --   --verbose             Emit debug output to stderr.
 --   --help                Print usage and exit.
 parseArgs :: [String] -> CliOpts -> CliOpts
@@ -115,6 +130,15 @@ parseArgs ("--corpus" : path : rest) opts =
   parseArgs rest opts { cliCorpusPath = Just path }
 parseArgs ("--timeout" : n : rest) opts = case readMaybe n of
   Just secs -> parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaTimeout = Just secs } }
+  Nothing   -> parseArgs rest opts
+-- The project gate (issue #78).  The command is split on whitespace and run
+-- directly, with no shell: a gate this server puts a wrapper around is a gate
+-- whose exit code this server could mask, which is the one thing check_project
+-- exists not to do.
+parseArgs ("--check-command" : cmd : rest) opts =
+  parseArgs rest opts { cliGateConfig = (cliGateConfig opts) { gcCommand = Just (words cmd) } }
+parseArgs ("--check-timeout" : n : rest) opts = case readMaybe n of
+  Just secs -> parseArgs rest opts { cliGateConfig = (cliGateConfig opts) { gcTimeout = Just secs } }
   Nothing   -> parseArgs rest opts
 parseArgs ("--verbose" : rest) opts =
   parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaVerbose = True } }
@@ -143,6 +167,18 @@ usage = unlines
   , "                        first check of a large library builds its .agdai"
   , "                        interfaces and can take minutes — size this for that"
   , "                        cold build, not for the warm steady state."
+  , "  --check-command \"...\" The project's acceptance gate, for check_project."
+  , "                        Split on whitespace and run DIRECTLY, with no shell"
+  , "                        — so it cannot contain a pipeline or a redirect, and"
+  , "                        nothing this server puts around your gate can mask"
+  , "                        its exit code.  Without it, check_project discovers"
+  , "                        the nearest Makefile's 'check' target, else the"
+  , "                        project's Everything module."
+  , "  --check-timeout N     Timeout for one check_project run, in seconds"
+  , "                        (default: " <> show defaultCheckTimeoutSeconds
+                             <> "; 0 = no limit).  Separate from --timeout,"
+  , "                        because a whole-project gate legitimately runs for"
+  , "                        tens of minutes."
   , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""

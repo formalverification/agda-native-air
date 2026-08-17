@@ -696,13 +696,21 @@ because env tokens can shadow your stored auth.
 `agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
 Cursor, etc.) interact with Agda through standard tool calls.
 
-The server exposes **seven tools**: four core proof-state tools — `get_goal`,
-`fill_hole`, `check_file`, `get_diagnostics` — that are always available, plus
-three corpus-backed search tools — `search_by_name`, `search_by_type`,
-`get_dependencies` — that are registered only when you start the server with
-`--corpus PATH` (an agda-strux JSONL corpus).  For the full command-line
-reference (`--agda-bin`, `--agda-flags`, `--corpus`, `--timeout`, `--verbose`),
-see [`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
+The server exposes **eight tools**: four core proof-state tools — `get_goal`,
+`fill_hole`, `check_file`, `get_diagnostics` — and the whole-project gate,
+`check_project`, all always available, plus three corpus-backed search tools —
+`search_by_name`, `search_by_type`, `get_dependencies` — that are registered
+only when you start the server with `--corpus PATH` (an agda-strux JSONL
+corpus).  For the full command-line reference (`--agda-bin`, `--agda-flags`,
+`--corpus`, `--timeout`, `--check-command`, `--check-timeout`, `--verbose`), see
+[`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
+
+`check_project` runs the project's own acceptance gate — the nearest Makefile's
+`check` target, a command you name with `--check-command`, or `agda` on the
+project's `Everything` module — and reports its verdict without misreporting its
+exit code, including the case where a wrapper script ending in `echo` reports
+shell exit 0 for a build that failed.  See
+[`agda-mcp/README.md`](../agda-mcp/README.md#check_project).
 
 This section walks you through building, testing, running, and connecting an agent.
 

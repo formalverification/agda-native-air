@@ -2,8 +2,9 @@
 
 # agda-mcp
 
-> **Status: v0.2.0 (M1-3).** Seven tools over stdio transport — four core
-> proof-state tools plus three corpus-backed search tools.
+> **Status: v0.2.0 (M1-3).** Eight tools over stdio transport — four core
+> proof-state tools, the whole-project gate, plus three corpus-backed search
+> tools.
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
 [AgdaDojang]'s proof-state interaction to any MCP-compatible coding agent —
@@ -84,10 +85,10 @@ For Claude Code setup and MCP client configuration, see [Configuring MCP Clients
 
 ## Tool Surface
 
-Seven tools are implemented: four core proof-state tools (Milestone [M1-2]) and
-three corpus-backed search tools (Milestone [M1-3]).  Navigation tools and neural
-premise selection are planned for later milestones; see
-[GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
+Eight tools are implemented: four core proof-state tools (Milestone [M1-2]), the
+whole-project gate (issue #78), and three corpus-backed search tools (Milestone
+[M1-3]).  Navigation tools and neural premise selection are planned for later
+milestones; see [GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
 
 ### Core proof-state tools (Milestone 1 — [M1-2])
 
@@ -99,6 +100,12 @@ This is the minimum tooling required for an agent to do interactive proof develo
 | `fill_hole`        | Substitute a candidate term into a hole and typecheck. |
 | `check_file`       | Load/reload an Agda file and return all diagnostics. |
 | `get_diagnostics`  | Lightweight summary: error/warning counts, open holes with positions. |
+
+### The whole-project gate (issue #78)
+
+| Tool | Description |
+|------|-------------|
+| `check_project`    | Run the project's own acceptance gate — a `make` target, a configured command, or `agda` on the project's `Everything` module — and report its verdict without misreporting its exit code. |
 
 ### The response echo: verdict, command, project (issues #72 and #76)
 
@@ -193,6 +200,7 @@ surface.
 ```
 agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
          [--corpus PATH]   [--timeout N] [--verbose]
+         [--check-command "CMD ARGS ..."] [--check-timeout N]
 ```
 
 | Flag | Description |
@@ -201,6 +209,8 @@ agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
 | `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the three search tools. |
 | `--timeout N`        | Per-typecheck timeout in seconds (default: 300; `0` means no limit).  Enforced: on expiry the `agda` process group is killed and the tool reports a timeout.  Size it for a *cold* first check — see below. |
+| `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect, and nothing this server puts around your gate can mask its exit code.  (A wrapper *script* you name here can still lie about its own — that is what `maskedFailure` catches.)  Without it, `check_project` discovers the gate (see below). |
+| `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
 
@@ -262,9 +272,11 @@ agda-mcp/
 │       ├── Diagnostics.hs       ← Agda output → structured diagnostics: codes, ranges, involved
 │       ├── Holes.hs             ← The hole model: literate masking + lexical hole scan
 │       ├── Project.hs           ← Root resolution: nearest *.agda-lib, registry, mismatch
+│       ├── Gate.hs              ← Which command is the project's gate: make target, configured, Everything
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
 │       └── Tools/
 │           ├── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
+│           ├── CheckProject.hs  ← check_project: run the gate, never misreport its exit code
 │           └── Search.hs        ← search_by_name, search_by_type, get_dependencies
 └── test/
     └── Main.hs                  ← Pure + corpus + integration tests
@@ -520,6 +532,120 @@ Retrieve the current diagnostic state without reloading: error count, warning co
 
 Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.  The `line`/`col` pair is the one to pass back: a fill moves it only when the edit moves the hole's text, while `index` is renumbered by any fill at all (see [Stable hole handles](#stable-hole-handles-issue-79)).  `errors` and `warnings` count every diagnostic found, not just the ones `maxDiagnostics` kept.
 
+### The whole-project gate (issue #78)
+
+#### `check_project`
+
+Run the project's own acceptance gate — the whole-project check a human runs before calling the work done — and report its verdict.  This is the call that replaces running the gate from a shell, and with it the defence the shell forces on you: in [§ 3.5 of the field report](../docs/feedback/flrp-agda-mcp-improvements.md), the session's gate was a 10–20 minute `make check` over a generated `Everything.agda`, run four times as a backgrounded Bash job, and its wrapper script ended in an `echo` — so the shell reported exit 0 whatever `make` had done, and the log had to be grepped for `error:` every time.
+
+**Input**.  Every field is optional, because the honest default is discoverable.
+
+```json
+{
+  "target": "check",
+  "projectPath": "/path/to/project",
+  "maxDiagnostics": 10
+}
+```
+
+**Which command runs**, in this order:
+
++  the `make` target named by `target` — the nearest Makefile *above the anchor* that declares it, run in that Makefile's own directory;
++  else the server's `--check-command`, if the operator configured one (run directly, never through a shell);
++  else the nearest Makefile's `check` target;
++  else `agda` on the project's `Everything` module (`Everything.agda` or any literate flavour), with the same flags `check_file` would use;
++  else the call **fails**, naming every directory it searched and what to configure.  A check that did not happen is never reported as a pass.
+
+The upward search stops at a repository boundary (a `.git` file or directory), so a Makefile above your checkout is never mistaken for your gate.  Discovery reads each Makefile's own rule lines: a target defined only in an `include`d file is not found, and `--check-command` is the escape hatch.  `projectPath` anchors the search — a file anchors its own directory, and a path that does not exist is an error rather than a reason to check something else.  The response's `gate` block says which of the five branches was taken, and `command` echoes the argument vector and working directory that ran.
+
+**`success` is a conjunction, and that is the whole point.**
+
+```
+success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence in the output
+```
+
++  `verdict.exitCode` is the gate's own status whenever the gate produced one, echoed verbatim and never reinterpreted, so a failing gate can never be reported green.  Two runs have no status of their own and report `-1`: a gate that could not be started, and one killed at the bound.  `timedOut` tells those apart, and a gate that could not be started also says so in `outputTail`.  A killed process's real status is the signal that took it down, which is indistinguishable from an ordinary failure, so #77 reports the fact as a flag rather than as a magic exit code, and this tool follows it.
++  The reverse is deliberate.  A gate that exits 0 while its output carries failure evidence is reported as `"success": false` with `"maskedFailure": true` — the wrapper-ending-in-`echo` trap, named in the response instead of left for the client to grep for.
++  *Failure evidence* is two recognizers: an Agda error diagnostic, and the gate's own failure line — GNU make's `make: *** [Makefile:12: check] Error 2` and its `make[1]:` / `gmake:` variants, which is what a missing tool or a failed non-Agda step looks like.  When the second one is what caught the mask, it becomes the diagnostic explaining the verdict, since Agda printed nothing that would.
++  So the evidence can turn a green gate red, never a red gate green.  This is the one place the server departs from "the verdict is the exit code and nothing else" (issue #72), and it departs only in the safe direction: there, the risk was Agda's prose drifting and silently passing a broken build; here, the risk is a wrapper the server did not write.
++  Those recognizers are a list, not a theory of failure.  A wrapper that hides a failure printing neither is reported as a pass, and no honest reading from outside the wrapper can do better — which is exactly why `outputTail` comes back whatever the verdict.  The response never claims a pass while withholding the output that could contradict it.
++  The cost is a false alarm for a gate that prints an Agda `error:` block in the course of passing — a deliberately-failing negative test, say.  The diagnostics and the exit code are both right there in the response, so the alarm is legible rather than mysterious.
+
+**Output (a gate whose exit code was masked)**.  An ordinary failure looks the same but with a non-zero `exitCode` and no `maskedFailure`.
+
+```json
+{
+  "success": false,
+  "timedOut": false,
+  "maskedFailure": true,
+  "elapsedMs": 812431,
+  "timeoutSeconds": 1800,
+  "gate": {
+    "source": "makefile-target",
+    "target": "check",
+    "makefile": "/abs/agda-algebras/Makefile",
+    "searchedFrom": "/abs/agda-algebras"
+  },
+  "diagnostics": [
+    {
+      "severity": "error",
+      "code": "NotInScope",
+      "file": "/abs/agda-algebras/src/Base/Structures/Basic.lagda.md",
+      "range": {"startLine": 116, "startCol": 9, "endLine": 116, "endCol": 14},
+      "line": 116,
+      "col": 9,
+      "message": "Not in scope:\n  zeroo\n  at …:116.9-14\n    (did you mean 'zero'?)",
+      "involved": {"candidates": ["zero"]}
+    }
+  ],
+  "diagnosticsTotal": 3,
+  "firstError": {"severity": "error", "code": "NotInScope", "…": "…"},
+  "failingModule": "Base.Structures.Basic",
+  "failingFile": "/abs/agda-algebras/src/Base/Structures/Basic.lagda.md",
+  "modulesChecked": 143,
+  "outputTail": "… 218 earlier lines elided …\nmake: *** [Makefile:31: check] Error 42\ngate finished",
+  "verdict": {
+    "equivalentTo": "equivalent-to: (cd /abs/agda-algebras && make check)",
+    "meaning": "success is true if and only if that command exited 0, finished inside the --check-timeout bound, and printed no failure evidence. …",
+    "exitCode": 0
+  },
+  "command": {"binary": "/nix/store/…/bin/make", "args": ["check"], "cwd": "/abs/agda-algebras"},
+  "project": {"…": "…"}
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `firstError`     | The first error-severity diagnostic, lifted out of the (capped) `diagnostics` list so a client need not scan it.  The list itself is the [structured-diagnostics](#structured-diagnostics-issue-74) shape, root-cause ordered and capped by `maxDiagnostics`. |
+| `failingModule` / `failingFile` | The module the gate stopped in, present **only when the check did not pass**: the one carrying `firstError`, or, when the gate failed without a located error (a timeout included), the last module `agda` started.  The module name comes from Agda's own `Checking M (path).` progress line.  A green gate has no failing module, so on a pass both are absent. |
+| `modulesChecked` | How many distinct modules `agda` re-typechecked from source, so how much of the project was actually rebuilt: 0 on a fully warm gate, the whole import graph on a cold one, and on a timeout, how far it got. |
+| `outputTail`     | The bounded tail of the gate's stdout and stderr (40 lines / 4000 characters, elision counted), returned **whatever the verdict** and absent only when the gate printed nothing.  A gate can fail for reasons Agda never printed — no such target, a missing tool, a killed build — and a mask the two recognizers above miss is reported as a pass, so the evidence has to be in the response to be read. |
+| `timeoutSeconds` | The `--check-timeout` bound in effect; absent when unbounded. |
+
+**Cost, and no streaming.**  This call *blocks* for the whole gate — 10–20 minutes is an ordinary figure for a large library — and reports its timings at the end.  The MCP transport here is a synchronous line loop with no progress-notification plumbing, so streaming progress is honest follow-on scope rather than something the framing already supports; `modulesChecked` and `failingModule` are the progress report a blocking call *can* give, including on the timeout path.  Narrowing a check to the files changed `since` a revision is likewise follow-on scope.
+
+**Output (timeout)**.  The gate's whole process group is killed — `make` and every `agda` under it — and the response still carries what the run established on the way down.
+
+```json
+{
+  "success": false,
+  "timedOut": true,
+  "elapsedMs": 1800213,
+  "timeoutSeconds": 1800,
+  "gate": {"source": "makefile-target", "target": "check", "…": "…"},
+  "diagnostics": [
+    {"severity": "error", "message": "the project gate timed out after 1800s (raise --check-timeout if this gate legitimately runs longer; a cold whole-project check that must build .agdai interfaces for a large library can take tens of minutes)"}
+  ],
+  "diagnosticsTotal": 1,
+  "failingModule": "Base.Structures.Basic",
+  "modulesChecked": 143,
+  "outputTail": "…",
+  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+}
+```
+
+**The `project` block, for a gate.**  It is resolved from the anchor exactly as `check_file` resolves it from a file, including the [wrong-checkout refusal](#the-response-echo-verdict-command-project-issues-72-and-76): pointing `check_project` at a worktree whose libraries registry names a *different* worktree fails with a `rootMismatch` rather than running a gate whose imports resolve against the other tree.  One difference is worth knowing: for a `make` or `--check-command` gate, `selectedLibraries` and `includePaths` are this server's own configuration and **not** a claim about the flags the gate passed `agda` — the gate chooses those itself.  For the `Everything` gate they are what `agda` finally received, as everywhere else.
+
 ### Corpus-backed search tools (Milestone 1 — [M1-3])
 
 Registered only when `--corpus PATH` points at an agda-strux JSONL corpus.  All
@@ -716,6 +842,10 @@ A typical agent session follows a propose-check-refine loop:
 
 This is the same loop that AgdaDojang's scripted policy backend demo implements, but
 driven by a frontier LLM instead of a fixed script.
+
+The loop ends where the project's own gate does: `check_project` once the file is
+green, which is the check a human runs before calling the work done — and the one
+an agent otherwise runs from a shell, with the exit-code trap that entails.
 
 
 ### MCP Transport

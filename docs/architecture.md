@@ -97,8 +97,10 @@ MCP tool interface.
    JSON-RPC on stdio; an optional agda-strux JSONL corpus via `--corpus`.
 +  **Outputs**.  Structured tool results: goal/context, typecheck verdicts,
    diagnostics, and search hits.
-+  **Status**.  v0.2.0.  Seven tools: four proof-state (`get_goal`, `fill_hole`,
-   `check_file`, `get_diagnostics`) and three corpus-backed search tools
++  **Status**.  v0.2.0.  Eight tools: four proof-state (`get_goal`, `fill_hole`,
+   `check_file`, `get_diagnostics`), the whole-project gate (`check_project`,
+   which runs the project's own `make` target or `Everything` module and never
+   misreports its exit code), and three corpus-backed search tools
    (`search_by_name`, `search_by_type`, `get_dependencies`, registered only when a
    corpus is supplied).  The v0 implementation shells out to the `agda` binary once
    per call; an Agda-as-a-library API is future work.

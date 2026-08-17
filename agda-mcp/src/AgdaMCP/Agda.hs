@@ -33,6 +33,17 @@
 --   ('arTimedOut'), never an exception, which is what lets the in-place tools'
 --   'Control.Exception.bracket_' restore run on the timeout path exactly as it
 --   does on the success path.
+--
+--   Design note (one runner, two callers, issue #78):
+--   'runAgda' is a thin wrapper over 'runCommand', which runs /any/ binary under
+--   the same bound, the same concurrent drainers, and the same kill ladder.  The
+--   whole-project gate (@check_project@) is the second caller: it runs @make@ or
+--   a configured command rather than @agda@, and it is precisely where long runs
+--   live, so it needs the bound more than the per-file tools do.  Running it
+--   through this machinery also means the gate is spawned into its own process
+--   group, so a timeout takes down the whole build tree — @make@ and every
+--   @agda@ under it — rather than leaving a 20-minute typecheck running
+--   unattended.
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns      #-}
@@ -51,6 +62,7 @@ module AgdaMCP.Agda
   , checkedFromSourceOf
     -- * Agda subprocess (IO)
   , runAgda
+  , runCommand
   , AgdaResult (..)
   , timeoutMessage
   ) where
@@ -231,7 +243,8 @@ fstSplitOn needle haystack =
 -- Agda subprocess (IO)
 -- ---------------------------------------------------------------------------
 
--- | The result of running Agda on a file.
+-- | The result of one bounded subprocess: @agda@ on a file, or the
+-- whole-project gate 'runCommand' runs for @check_project@ (issue #78).
 data AgdaResult = AgdaResult
   { arExitCode  :: Int       -- ^ Process exit code (0 = success, -1 = could not run agda).
   , arStdout    :: Text      -- ^ Captured stdout.
@@ -264,18 +277,36 @@ data AgdaResult = AgdaResult
 -- reported as exit code @-1@ with the exception text on stderr, preserving the
 -- pre-existing contract that 'AgdaMCP.Tools.ProofState' reads as @FillCrash@.
 runAgda :: AgdaConfig -> FilePath -> IO AgdaResult
-runAgda cfg path = do
-  let args = agdaFlags cfg <> [path]
-  echo    <- commandEchoFor cfg args
+runAgda cfg path = runCommand cfg (agdaBin cfg) (agdaFlags cfg <> [path]) Nothing
+
+-- | runCommand: run an arbitrary command under the bound, the drainers, and the
+-- kill ladder 'runAgda' uses.
+--
+-- The generalization issue #78 needs: the whole-project gate is @make@ or an
+-- operator-configured command, not @agda@, and it must be bounded and reaped
+-- exactly as carefully — more so, since it is the call that legitimately runs
+-- for tens of minutes.  Only 'agdaTimeout' and 'agdaVerbose' are read from the
+-- config here; the argument vector is passed through verbatim, so a caller that
+-- has already assembled its flags is not handed a second copy of them.
+--
+-- @mCwd@ is the working directory to run in, or 'Nothing' to inherit the
+-- server's.  It is not cosmetic: @make@ must run in its Makefile's directory,
+-- while an @agda@ invocation whose flags are relative to the server's cwd (the
+-- shipped @--library-file=agda/libraries@ is exactly that) must not be moved
+-- out from under them.  Whichever it is, the resolved directory is what the
+-- 'CommandEcho' reports.
+runCommand :: AgdaConfig -> FilePath -> [String] -> Maybe FilePath -> IO AgdaResult
+runCommand cfg bin args mCwd = do
+  echo    <- commandEchoFor bin args mCwd
   start   <- getMonotonicTimeNSec
-  outcome <- try (runAgdaProcess cfg args)
+  outcome <- try (runProcessBounded cfg bin args mCwd)
   end     <- getMonotonicTimeNSec
   let elapsed = fromIntegral ((end - start) `div` 1_000_000)
   pure $ case outcome of
     Left (err :: SomeException) -> AgdaResult
       { arExitCode  = -1
       , arStdout    = ""
-      , arStderr    = "agda-mcp: failed to run agda: " <> T.pack (show err)
+      , arStderr    = "agda-mcp: failed to run " <> T.pack bin <> ": " <> T.pack (show err)
       , arTimedOut  = False
       , arElapsedMs = elapsed
       , arCommand   = echo
@@ -294,57 +325,63 @@ runAgda cfg path = do
 
 -- | commandEchoFor: the 'CommandEcho' for an invocation about to be made.
 --
--- Built before the run and from the same @args@ list 'runAgdaProcess' passes to
--- 'createProcess', so the echo is the invocation rather than a description of
+-- Built before the run and from the same @args@ list 'runProcessBounded' passes
+-- to 'createProcess', so the echo is the invocation rather than a description of
 -- it.  The binary is reported as its resolved absolute path when the configured
 -- name is on @PATH@ — inside a Nix shell that name is a wrapper script which
 -- supplies flags of its own, and an agent comparing the echo against its own
 -- @agda@ needs to know it is looking at the same one.  Resolution is for the
--- report only: 'runAgdaProcess' still spawns @agdaBin cfg@, so no behaviour
--- rides on it, and a name that cannot be resolved is echoed as configured.
-commandEchoFor :: AgdaConfig -> [String] -> IO CommandEcho
-commandEchoFor cfg args = do
-  mResolved <- findExecutable (agdaBin cfg)
+-- report only: 'runProcessBounded' still spawns the name it was given, so no
+-- behaviour rides on it, and a name that cannot be resolved is echoed as
+-- configured.
+commandEchoFor :: FilePath -> [String] -> Maybe FilePath -> IO CommandEcho
+commandEchoFor bin args mCwd = do
+  mResolved <- findExecutable bin
     `catch` \(_ :: SomeException) -> pure Nothing
-  cwd <- getCurrentDirectory `catch` \(_ :: SomeException) -> pure "."
+  inherited <- getCurrentDirectory `catch` \(_ :: SomeException) -> pure "."
   pure CommandEcho
-    { ceBinary = maybe (agdaBin cfg) id mResolved
+    { ceBinary = maybe bin id mResolved
     , ceArgs   = args
-    , ceCwd    = cwd
+    , ceCwd    = maybe inherited id mCwd
     }
 
 exitCodeToInt :: ExitCode -> Int
 exitCodeToInt ExitSuccess     = 0
 exitCodeToInt (ExitFailure n) = n
 
--- | runAgdaProcess: spawn @agda@, drain both streams, race against the timeout.
+-- | runProcessBounded: spawn the command, drain both streams, race against the
+-- timeout.
 --
 -- Returns @(Just exitCode, stdout, stderr)@ on a completed run and
 -- @(Nothing, …)@ when the timeout fired and the process group was killed.
--- Throws only if the process could not be created at all; 'runAgda' catches
+-- Throws only if the process could not be created at all; 'runCommand' catches
 -- that and maps it to exit code -1.
-runAgdaProcess
-  :: AgdaConfig -> [String] -> IO (Maybe ExitCode, Text, Text)
-runAgdaProcess cfg args =
+runProcessBounded
+  :: AgdaConfig -> FilePath -> [String] -> Maybe FilePath
+  -> IO (Maybe ExitCode, Text, Text)
+runProcessBounded cfg bin args mCwd =
   bracket acquire cleanup $ \(handles, mPgid) ->
     case handles of
       (mIn, Just hOut, Just hErr, ph) -> do
-        -- Agda reads nothing from stdin in batch mode; close our end at once so
-        -- it sees EOF rather than blocking if it ever tries.
+        -- Agda reads nothing from stdin in batch mode, and neither should a
+        -- project gate; close our end at once so the child sees EOF rather than
+        -- blocking if it ever tries.
         maybe (pure ()) (ignoringIOErrors . hClose) mIn
         outVar <- drainAsync hOut
         errVar <- drainAsync hErr
         raceProcess cfg ph mPgid outVar errVar
       -- createProcess with CreatePipe on both streams always yields both
       -- handles; this branch exists only to keep the match total.
-      _ -> pure (Just (ExitFailure (-1)), "", "agda-mcp: could not open agda's output pipes")
+      _ -> pure (Just (ExitFailure (-1)), "", "agda-mcp: could not open the command's output pipes")
   where
-    spec = (proc (agdaBin cfg) args)
+    spec = (proc bin args)
       { std_in  = CreatePipe
       , std_out = CreatePipe
       , std_err = CreatePipe
-        -- Its own process group, so group-wide signals reach any descendant
-        -- agda spawned rather than just agda itself.
+      , cwd     = mCwd
+        -- Its own process group, so group-wide signals reach any descendant the
+        -- command spawned rather than just the command itself — @agda@'s own
+        -- children, or every @agda@ a @make@ gate started.
       , create_group = True
       }
 

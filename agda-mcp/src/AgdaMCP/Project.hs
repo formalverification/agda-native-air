@@ -54,6 +54,7 @@
 module AgdaMCP.Project
   ( -- * Resolution (IO)
     resolveProject
+  , resolveProjectDir
   , projectExtraFlags
   , withEffectiveFlags
     -- * Flag inspection (pure; exposed for testing)
@@ -107,7 +108,31 @@ import AgdaMCP.Types
 -- function is safe to call directly.
 resolveProject :: AgdaConfig -> FilePath -> IO (Either ProjectMismatch ProjectContext)
 resolveProject cfg path = do
-  absPath    <- makeAbsolute path
+  absPath <- makeAbsolute path
+  resolveFrom cfg (takeDirectory absPath) absPath
+
+-- | resolveProjectDir: the same resolution, anchored at a /directory/.
+--
+-- What @check_project@ needs (issue #78): its subject is a project rather than
+-- a file, so the walk starts at the directory itself and the fallback root is
+-- that directory rather than its parent.  Everything else — the registry read,
+-- the wrong-checkout refusal — is identical, and deliberately so: a gate run in
+-- a worktree whose libraries registry names a /different/ worktree resolves its
+-- imports against that other tree, which is the same silent wrong answer
+-- issue #76 refuses for a single file.
+resolveProjectDir :: AgdaConfig -> FilePath -> IO (Either ProjectMismatch ProjectContext)
+resolveProjectDir cfg dir = do
+  absDir <- makeAbsolute dir
+  resolveFrom cfg absDir absDir
+
+-- | resolveFrom: the shared body — walk up from the directory, read the
+-- registry, compare.  The second argument is the directory the walk starts at;
+-- the third is the path a mismatch names as the subject of the refusal (the
+-- requested file, or the anchor directory itself).
+resolveFrom
+  :: AgdaConfig -> FilePath -> FilePath
+  -> IO (Either ProjectMismatch ProjectContext)
+resolveFrom cfg dir absPath = do
   mConfigured <- resolveLibrariesFile (librariesFileFlagOf (agdaFlags cfg))
   -- Echo the registry that was configured whether or not it is readable; read
   -- entries only from one that is.  Note the safety consequence: with no
@@ -119,10 +144,10 @@ resolveProject cfg path = do
   registered <- case mConfigured of
     Just (p, True) -> readRegistry p
     _              -> pure []
-  mOwn       <- findNearestAgdaLib (takeDirectory absPath)
+  mOwn       <- findNearestAgdaLib dir
   let base = ProjectContext
         { pcRootSource    = RootFromServerConfig
-        , pcRoot          = takeDirectory absPath
+        , pcRoot          = dir
         , pcLibrary       = Nothing
         , pcLibrariesFile = mRegistry
         , pcLibrariesFileMissing = missing

@@ -14,7 +14,9 @@
 --      *Agda*), driven by the `fake-slow-agda.sh` stand-in binary so it
 --      runs anywhere; 1d: the response echo and root resolution (#72/#76);
 --      1e: hole addressing by position or index, and the parse of both
---      (#79) — all resolved before Agda is started, misses included.
+--      (#79) — all resolved before Agda is started, misses included;
+--      1f: the whole-project gate (#78), driven by `fake-project-gate.sh`
+--      over fixture projects — never over this repository's own gate.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips,
 --      including 2d: hole-enumeration parity against batch Agda, and 2f:
 --      re-anchoring by position across a fill (#79).
@@ -76,11 +78,18 @@ import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Diagnostics
   ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
   , maxMessageLines, parseDiagnostics )
+import AgdaMCP.Gate
+  ( GateConfig (..), GatePlan (..), defaultGateConfig, findMakefileGate
+  , makefileTargets, resolveGate )
 import AgdaMCP.Project
   ( findNearestAgdaLib, includePathsOf, librariesFileFlagOf, libraryIncludeDirs
-  , libraryIncludesOf, libraryNameOf, parseLibrariesFile, selectedLibrariesOf
+  , libraryIncludesOf, libraryNameOf, parseLibrariesFile, resolveProjectDir
+  , selectedLibrariesOf
   )
 import AgdaMCP.Server (ServerConfig (..), toolDefinitions)
+import AgdaMCP.Tools.CheckProject
+  ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
+  , outputTailOf, parseCheckingLine, progressModules )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -1191,10 +1200,12 @@ schemaAlternatives name v =
     _ -> []
 
 -- | advertisedTools: the tool definitions a client receives, with no corpus
--- loaded (so the four proof-state tools and nothing else).
+-- loaded (so the four proof-state tools and the project gate, and no search
+-- tools).
 advertisedTools :: Aeson.Value
 advertisedTools = toolDefinitions ServerConfig
   { scAgdaConfig  = defaultConfig
+  , scGateConfig  = defaultGateConfig
   , scServerName  = "agda-mcp-test"
   , scVersion     = "0"
   , scCorpusIndex = Nothing
@@ -2130,6 +2141,621 @@ withRight (Right a)  k = k a
 -- | encodeText: a value's JSON serialization, as Text, for wire-shape assertions.
 encodeText :: Aeson.ToJSON a => a -> Text
 encodeText = TE.decodeUtf8 . LBS.toStrict . Aeson.encode . Aeson.toJSON
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 1f: the whole-project gate — check_project (issue #78)
+--
+-- The tool runs a project's real acceptance gate, so the one thing these tests
+-- must not do is run this repository's.  Every gate here is
+-- test/resources/fake-project-gate.sh, which prints Agda-shaped output and then
+-- exits the way its mode says; the fixture projects are built under the temp
+-- directory and removed afterwards.
+--
+-- The mode that earns its keep is `masked`: a wrapper whose last command is an
+-- echo, so the shell exits 0 for a build that failed.  That is the trap § 3.5
+-- of the feedback document describes — the reason the field session had to grep
+-- its build logs for "error:" — and the test below is what pins that
+-- check_project reports it as a masked failure rather than as a pass.
+-- ---------------------------------------------------------------------------
+
+-- | The stand-in gate, and how long its slow mode sleeps.
+fakeGatePath :: FilePath
+fakeGatePath = "test" </> "resources" </> "fake-project-gate.sh"
+
+-- | GateScene: three fixture projects, one per way discovery can go.
+data GateScene = GateScene
+  { gsProject  :: FilePath -- ^ a Makefile declaring @check@ (and a @sub/@ to anchor from)
+  , gsSub      :: FilePath -- ^ a subdirectory of it, so the upward walk is exercised
+  , gsEntry    :: FilePath -- ^ no Makefile, but an @Everything.agda@
+  , gsBare     :: FilePath -- ^ neither: the "no gate found" case
+  , gsShadowed :: FilePath -- ^ a @GNUmakefile@ without @check@ shadowing a @Makefile@ with it
+  }
+
+-- | withGateScene: build the scene, run an action on it, remove it.
+--
+--   \<tmp\>/agda-mcp-gate/project/.git          (a file, so the walk stops here)
+--   \<tmp\>/agda-mcp-gate/project/Makefile      (check: runs the fixture gate)
+--   \<tmp\>/agda-mcp-gate/project/sub/
+--   \<tmp\>/agda-mcp-gate/entry/.git
+--   \<tmp\>/agda-mcp-gate/entry/Everything.agda
+--   \<tmp\>/agda-mcp-gate/bare/.git
+--   \<tmp\>/agda-mcp-gate/shadowed/.git
+--   \<tmp\>/agda-mcp-gate/shadowed/GNUmakefile  (no check target)
+--   \<tmp\>/agda-mcp-gate/shadowed/Makefile     (has one, but make never reads it)
+--
+-- The @.git@ markers are what make these projects rather than directories: the
+-- upward search stops at a repository boundary, so without them a fixture would
+-- climb into the temp directory's parents and could find a real Makefile.
+withGateScene :: FilePath -> (GateScene -> IO a) -> IO a
+withGateScene gate act = do
+  tmp <- getTemporaryDirectory
+  let scene = tmp </> "agda-mcp-gate"
+      gs = GateScene
+        { gsProject  = scene </> "project"
+        , gsSub      = scene </> "project" </> "sub"
+        , gsEntry    = scene </> "entry"
+        , gsBare     = scene </> "bare"
+        , gsShadowed = scene </> "shadowed"
+        }
+  bracket_ (build gs scene) (removeTree scene) (act gs)
+  where
+    build gs scene = do
+      removeTree scene
+      mapM_ (createDirectoryIfMissing True)
+        [gsSub gs, gsEntry gs, gsBare gs, gsShadowed gs]
+      mapM_ (\d -> TIO.writeFile (d </> ".git") "gitdir: fixture\n")
+        [gsProject gs, gsEntry gs, gsBare gs, gsShadowed gs]
+      TIO.writeFile (gsProject gs </> "Makefile") (makefileFor gate)
+      TIO.writeFile (gsEntry gs </> "Everything.agda")
+        "module Everything where\n\nopen import Agda.Builtin.Nat\n"
+      -- GNU make reads GNUmakefile and never looks at Makefile, so a `check`
+      -- declared only in the latter is not this project's gate.
+      TIO.writeFile (gsShadowed gs </> "GNUmakefile") "other:\n\t@true\n"
+      TIO.writeFile (gsShadowed gs </> "Makefile")    "check:\n\t@true\n"
+
+    makefileFor g = T.unlines
+      [ "# Fixture Makefile for the tier-1f gate tests (issue #78)."
+      , "GATE := " <> T.pack g
+      , ""
+      , "check:"
+      , "\t@$(GATE) fail"
+      , ""
+      , "other:"
+      , "\t@true"
+      ]
+
+    removeTree d = removeDirectoryRecursive d `catch` \(_ :: SomeException) -> pure ()
+
+-- | A Makefile exercising every shape the target scan has to tell apart.
+makefileSample :: Text
+makefileSample = T.unlines
+  [ "# a comment: with a colon in it"
+  , "SIMPLE = a:b"
+  , "IMMEDIATE := /some/path"
+  , "POSIX ::= x"
+  , "FANCY :::= y"
+  , ".PHONY: check test"
+  , "check test: deps"
+  , "\t@echo not-a-target: this is a recipe"
+  , "double:: dep"
+  , "%.o: %.c"
+  ]
+
+-- | gateTests: tier 1f.
+gateTests :: IO [Bool]
+gateTests = do
+  hPutStrLn stderr "\n── Whole-project gate (tier 1f: check_project, #78) ──"
+  gateExists <- doesFileExist fakeGatePath
+  if not gateExists
+    then do
+      hPutStrLn stderr $ "  [skip] fixture not found: " <> fakeGatePath
+      pure []
+    else do
+      gate <- makeAbsolute fakeGatePath
+      ensureExecutable gate
+
+      pureRes <- sequence
+        [ runTest "makefileTargets: rule lines declare targets, assignments do not" $
+            assertEqual "targets"
+              [".PHONY", "check", "test", "double", "%.o"]
+              (makefileTargets makefileSample)
+
+        , runTest "parseCheckingLine: an indented progress line parses; prose does not" $
+            allOf
+              [ assertEqual "indented"
+                  (Just ("Gate.Broken", "/fixture/Gate/Broken.agda"))
+                  (parseCheckingLine "  Checking Gate.Broken (/fixture/Gate/Broken.agda).")
+              , assertEqual "prose" Nothing
+                  (parseCheckingLine "Checking that the expression has type Nat")
+              , assertEqual "no path" Nothing
+                  (parseCheckingLine "Checking Gate.Broken.")
+              ]
+
+        , runTest "progressModules: every announced module, in order" $
+            assertEqual "modules" ["A", "B", "A"]
+              (map fst (progressModules
+                 (T.unlines [ "Checking A (/x/A.agda)."
+                            , "make: nothing to be done"
+                            , "  Checking B (/x/B.agda)."
+                            , "Checking A (/x/A.agda)." ])))
+
+        , runTest "failingModuleOf: a located error names its own module" $
+            let progress = [("A", "/x/A.agda"), ("B", "/x/B.agda")]
+                err = (plainDiagnostic DiagError "boom") { diagFile = Just "/x/B.agda" }
+            in  assertEqual "module and file"
+                  (Just "B", Just "/x/B.agda") (failingModuleOf progress (Just err))
+
+        , runTest "failingModuleOf: with no located error, the last module started" $
+            let progress = [("A", "/x/A.agda"), ("B", "/x/B.agda")]
+            in  assertEqual "module and file"
+                  (Just "B", Just "/x/B.agda") (failingModuleOf progress Nothing)
+
+        , runTest "outputTailOf: keeps the end, and pays for the marker out of the bound" $
+            -- The marker occupies one of the maxTailLines, rather than being
+            -- added on top of them: the bound is on the text as emitted, which
+            -- is 'AgdaMCP.Diagnostics.boundMessage''s rule and was this
+            -- function's stated contract before it was its behaviour (Copilot's
+            -- third review of PR 98).
+            let txt  = T.unlines [T.pack ("line " <> show i) | i <- [1 :: Int .. 100]]
+                tail' = maybe "" id (outputTailOf txt)
+                ls    = T.lines tail'
+            in  allOf
+                  [ assertEqual "lines emitted" maxTailLines (length ls)
+                  , assert ("first line was " <> show (listToMaybe ls))
+                      (maybe False ("61 earlier lines elided" `T.isInfixOf`) (listToMaybe ls))
+                  , assert "the last line of the output must survive"
+                      ("line 100" `T.isInfixOf` tail')
+                  ]
+
+        , runTest "outputTailOf: output that fits the bound is returned whole" $
+            let txt = T.unlines [T.pack ("line " <> show i) | i <- [1 :: Int .. maxTailLines]]
+            in  allOf
+                  [ assertEqual "lines emitted" maxTailLines
+                      (length (T.lines (maybe "" id (outputTailOf txt))))
+                  , assert "no elision marker on output that fits"
+                      (maybe False (not . ("elided" `T.isInfixOf`)) (outputTailOf txt))
+                  ]
+
+        , runTest "outputTailOf: empty output has no tail" $
+            assertEqual "tail" Nothing (outputTailOf "   \n\n  ")
+
+        , runTest "gateFailureLines: make's own failure lines, and nothing else" $
+            -- The evidence that catches a mask hiding a failure Agda never saw.
+            -- A line that merely mentions make is not evidence.
+            allOf
+              [ assertEqual "matches"
+                  [ "make: *** [Makefile:12: check] Error 127"
+                  , "make[1]: *** No rule to make target 'check'.  Stop."
+                  , "gmake: *** [check] Error 1"
+                  ]
+                  (gateFailureLines (T.unlines
+                     [ "Checking A (/x/A.agda)."
+                     , "make: *** [Makefile:12: check] Error 127"
+                     , "  make[1]: *** No rule to make target 'check'.  Stop."
+                     , "gmake: *** [check] Error 1"
+                     ]))
+              , assertEqual "no false positives" []
+                  (gateFailureLines (T.unlines
+                     [ "make: Nothing to be done for 'check'."
+                     , "make: Entering directory '/x'"
+                     , "echo \"make: *** pretend\" > log"
+                     , "/x/M.agda:3.1-5: error: [NotInScope]"
+                     ]))
+              ]
+        ]
+
+      sceneRes <- withGateScene gate $ \gs -> do
+        -- agdaBin points nowhere: a configured gate must never reach for agda,
+        -- so any test that does would fail as a crash rather than pass quietly.
+        let agdaCfg = defaultConfig { agdaBin = "/nonexistent/agda-must-not-run" }
+            gateCfg mode secs = GateConfig
+              { gcCommand = Just (gate : mode)
+              , gcTimeout = Just secs
+              }
+            paramsAt dir = CheckProjectParams
+              { cppTarget         = Nothing
+              , cppProjectPath    = Just dir
+              , cppMaxDiagnostics = Nothing
+              }
+
+        failRes   <- handleCheckProject agdaCfg (gateCfg ["fail"] 60)
+                       (paramsAt (gsProject gs))
+        passRes   <- handleCheckProject agdaCfg (gateCfg ["pass", "1"] 60)
+                       (paramsAt (gsProject gs))
+        maskedRes <- handleCheckProject agdaCfg (gateCfg ["masked"] 60)
+                       (paramsAt (gsProject gs))
+        maskedMake <- handleCheckProject agdaCfg (gateCfg ["masked-make"] 60)
+                        (paramsAt (gsProject gs))
+
+        failing <- sequence
+          [ runTest "check_project: a gate that fails mid-run is a non-success verdict" $
+              withRight failRes $ \r -> allOf
+                [ assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assertEqual "exitCode" 1 (vExitCode (cprVerdict r))
+                , assert "a gate that exits non-zero is not a masked failure"
+                    (not (cprMaskedFailure r))
+                , assert "timedOut should be False" (not (cprTimedOut r))
+                ]
+
+          , runTest "check_project: the failing gate's first error is structured (#74)" $
+              withRight failRes $ \r -> case cprFirstError r of
+                Nothing -> pure (Fail "no firstError in the response")
+                Just d  -> allOf
+                  [ assertEqual "code" (Just "NotInScope") (diagCode d)
+                  , assertEqual "file" (Just "/fixture/Gate/Broken.agda") (diagFile d)
+                  , assertEqual "range start" (Just (16, 9))
+                      ((\g -> (rngStartLine g, rngStartCol g)) <$> diagRange d)
+                  , assert ("candidates were " <> show (invCandidates (diagInvolved d)))
+                      ("zero" `elem` invCandidates (diagInvolved d))
+                  ]
+
+          , runTest "check_project: the failing gate names the module it stopped in" $
+              withRight failRes $ \r -> allOf
+                [ assertEqual "failingModule" (Just "Gate.Broken") (cprFailingModule r)
+                , assertEqual "failingFile"
+                    (Just "/fixture/Gate/Broken.agda") (cprFailingFile r)
+                ]
+
+          , runTest "check_project: a failing gate returns the tail of its output" $
+              -- The replacement for grepping the build log: a gate can fail for
+              -- reasons Agda never printed, so the tail is there whenever the
+              -- check did not pass.
+              withRight failRes $ \r ->
+                assert ("outputTail was " <> show (cprOutputTail r))
+                  (maybe False ("NotInScope" `T.isInfixOf`) (cprOutputTail r))
+
+          , runTest "check_project: modulesChecked counts the modules the gate rebuilt" $
+              withRight failRes $ \r -> assertEqual "modulesChecked" 2 (cprModulesChecked r)
+          ]
+
+        passing <- sequence
+          [ runTest "check_project: a passing gate names the command it ran and its elapsed time" $
+              withRight passRes $ \r -> allOf
+                [ assert ("success was " <> show (cprSuccess r)) (cprSuccess r)
+                , assertEqual "exitCode" 0 (vExitCode (cprVerdict r))
+                , assert ("elapsedMs = " <> show (cprElapsedMs r))
+                    (cprElapsedMs r >= 500 && cprElapsedMs r < 60000)
+                , assert ("equivalentTo was " <> show (vEquivalentTo (cprVerdict r)))
+                    ("fake-project-gate.sh" `T.isInfixOf` vEquivalentTo (cprVerdict r)
+                     && T.pack (gsProject gs) `T.isInfixOf` vEquivalentTo (cprVerdict r))
+                , assertEqual "args" ["pass", "1"] (ceArgs (cprCommand r))
+                , assertEqual "cwd" (gsProject gs) (ceCwd (cprCommand r))
+                  -- The tail comes back even on a pass: a mask this server
+                  -- cannot recognize is reported as a pass, so withholding the
+                  -- output exactly there is what would hide it.
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False ("Gate.Ok" `T.isInfixOf`) (cprOutputTail r))
+                , assertEqual "timeoutSeconds" (Just 60) (cprTimeoutSeconds r)
+                ]
+
+          , runTest "check_project: a passing gate echoes the gate it chose" $
+              withRight passRes $ \r ->
+                let g = cprGate r
+                in  allOf
+                      [ assertEqual "source" GateFromServerConfig (gateSource g)
+                      , assertEqual "searchedFrom" (gsProject gs) (gateSearchedFrom g)
+                      , assertEqual "target" Nothing (gateTarget g)
+                      ]
+
+          , runTest "check_project: a passing gate has no failing module" $
+              -- The progress fallback is for a check that did not pass.  Asking
+              -- for it unconditionally made a green run name the last module it
+              -- checked as the one it stopped in — a failure report about a
+              -- success (Copilot's third review of PR 98).
+              withRight passRes $ \r -> allOf
+                [ assertEqual "failingModule" Nothing (cprFailingModule r)
+                , assertEqual "failingFile" Nothing (cprFailingFile r)
+                , assert "neither key belongs in a passing response"
+                    (not ("\"failingModule\":" `T.isInfixOf` encodeText r)
+                     && not ("\"failingFile\":" `T.isInfixOf` encodeText r))
+                ]
+          ]
+
+        masked <- sequence
+          [ runTest "check_project: a wrapper ending in echo is a masked failure, not a pass" $
+              -- The field-session trap, verbatim: the gate's own exit status is
+              -- 0 and is echoed as 0, and the check is still not a success.
+              withRight maskedRes $ \r -> allOf
+                [ assertEqual "exitCode" 0 (vExitCode (cprVerdict r))
+                , assert "maskedFailure should be True" (cprMaskedFailure r)
+                , assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assertEqual "firstError code" (Just "NotInScope")
+                    (cprFirstError r >>= diagCode)
+                , assertEqual "failingModule" (Just "Gate.Broken") (cprFailingModule r)
+                ]
+
+          , runTest "check_project: the masked failure is visible in the wire shape" $
+              -- These key names are the client-visible contract the tool
+              -- description advertises, so they are asserted on the JSON.
+              withRight maskedRes $ \r ->
+                let wire = encodeText r
+                    want = [ "\"success\":false", "\"maskedFailure\":true"
+                           , "\"exitCode\":0", "\"firstError\":"
+                           , "\"failingModule\":", "\"outputTail\":"
+                           , "\"gate\":", "\"modulesChecked\":" ]
+                    missing = [k | k <- want, not (k `T.isInfixOf` wire)]
+                in  assert ("missing from the response: " <> show missing) (null missing)
+
+          , runTest "check_project: a mask with no Agda diagnostic is still caught" $
+              -- Copilot's review of PR 98: judging the mask from Agda's
+              -- diagnostics alone let a wrapper hiding a *non-Agda* failure —
+              -- a missing tool, make giving up — come back success:true with
+              -- nothing in the response to show it.  The gate's own failure
+              -- line is evidence too, and it becomes the diagnostic that
+              -- explains the verdict.
+              withRight maskedMake $ \r -> allOf
+                [ assertEqual "exitCode" 0 (vExitCode (cprVerdict r))
+                , assert "maskedFailure should be True" (cprMaskedFailure r)
+                , assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assert ("firstError was " <> show (cprFirstError r))
+                    (maybe False (("make: *** [Makefile:12: check] Error 127" `T.isInfixOf`)
+                                   . diagMessage)
+                           (cprFirstError r))
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False ("command not found" `T.isInfixOf`) (cprOutputTail r))
+                ]
+
+          , runTest "check_project: a passing gate does not claim a masked failure" $
+              -- The key, not the word: verdict.meaning explains maskedFailure in
+              -- prose on every response, so the search has to be for the JSON
+              -- key ("maskedFailure":) rather than for the name.
+              withRight passRes $ \r ->
+                assert "maskedFailure must be absent from a clean pass"
+                  (not (cprMaskedFailure r)
+                   && not ("\"maskedFailure\":" `T.isInfixOf` encodeText r))
+          ]
+
+        -- The timeout path.  One slow run at a one-second bound, then an
+        -- orphan sweep: the fixture's marker is written by a backgrounded
+        -- subshell, so it appears only if something outlived the kill.
+        tmpDir <- getTemporaryDirectory
+        let marker = tmpDir </> "agda-mcp-gate-orphan-marker"
+        removeIfExists marker
+        slowRes <- handleCheckProject agdaCfg
+                     (gateCfg ["slow", show fakeSleepSecs, marker] 1)
+                     (paramsAt (gsProject gs))
+        timeoutFast <- sequence
+          [ runTest "check_project: a gate that outruns --check-timeout is a timeout" $
+              withRight slowRes $ \r -> allOf
+                [ assert "timedOut should be True" (cprTimedOut r)
+                , assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assertEqual "timeoutSeconds" (Just 1) (cprTimeoutSeconds r)
+                , assert ("elapsedMs = " <> show (cprElapsedMs r))
+                    (cprElapsedMs r >= 500 && cprElapsedMs r < fakeSleepSecs * 1000)
+                , assert "a timeout is not a masked failure"
+                    (not (cprMaskedFailure r))
+                ]
+
+          , runTest "check_project: a run with no status of its own reports exitCode -1" $
+              -- Both no-status cases report -1, and timedOut is what tells them
+              -- apart; a killed process's real status is the signal that took it
+              -- down, which is why #77 reports the fact as a flag rather than as
+              -- a magic exit code.  The start-failure half is asserted below.
+              withRight slowRes $ \r -> allOf
+                [ assertEqual "exitCode" (-1) (vExitCode (cprVerdict r))
+                , assert "timedOut is what distinguishes it from a gate that never started"
+                    (cprTimedOut r)
+                ]
+
+          , runTest "check_project: a timed-out gate still reports how far it got" $
+              -- The progress a blocking call can otherwise not give: the module
+              -- it was in, and how many it had rebuilt.
+              withRight slowRes $ \r -> allOf
+                [ assertEqual "modulesChecked" 1 (cprModulesChecked r)
+                , assertEqual "failingModule" (Just "Gate.Slow") (cprFailingModule r)
+                , assert ("diagnostics were " <> show (map diagMessage (cprDiagnostics r)))
+                    (any (("the project gate timed out after 1s" `T.isInfixOf`) . diagMessage)
+                         (cprDiagnostics r))
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False ("Gate.Slow" `T.isInfixOf`) (cprOutputTail r))
+                ]
+          ]
+
+        -- Outwait the fixture's own sleep: a kill that took the leader but left
+        -- its backgrounded child running would drop the marker by now.
+        threadDelay ((fakeSleepSecs + 2) * 1000 * 1000)
+        orphaned <- doesFileExist marker
+        removeIfExists marker
+        timeoutOrphan <- sequence
+          [ runTest "check_project: the timed-out gate's whole process group is killed" $
+              assert "a descendant of the gate outlived the tool call and wrote the marker"
+                     (not orphaned)
+          ]
+
+        -- Discovery: what runs when nothing is configured.
+        found     <- findMakefileGate "check" (gsSub gs)
+        missed    <- findMakefileGate "nope"  (gsSub gs)
+        shadowed  <- findMakefileGate "check" (gsShadowed gs)
+        projectPc <- contextFor agdaCfg (gsProject gs)
+        entryPc   <- contextFor agdaCfg (gsEntry gs)
+        barePc    <- contextFor agdaCfg (gsBare gs)
+        makeGate  <- resolveGate defaultGateConfig agdaCfg projectPc (gsSub gs) Nothing
+        entryGate <- resolveGate defaultGateConfig agdaCfg entryPc (gsEntry gs) Nothing
+        bareGate  <- resolveGate defaultGateConfig agdaCfg barePc (gsBare gs) Nothing
+        cfgGate   <- resolveGate (gateCfg ["pass"] 60) agdaCfg projectPc (gsProject gs) Nothing
+        cfgTarget <- resolveGate (gateCfg ["pass"] 60) agdaCfg projectPc (gsProject gs) (Just "other")
+
+        discovery <- sequence
+          [ runTest "gate discovery: the nearest Makefile declaring the target wins" $
+              assertEqual "makefile and dir"
+                (Right (gsProject gs </> "Makefile", gsProject gs)) found
+
+          , runTest "gate discovery: an undeclared target misses, listing every directory searched" $
+              assertEqual "searched" (Left [gsSub gs, gsProject gs]) missed
+
+          , runTest "gate discovery: only the makefile make itself would read is consulted" $
+              -- A GNUmakefile shadows a Makefile for GNU make, so a `check`
+              -- declared only in the shadowed file is not a gate: naming it
+              -- would echo a makefile the run never read, and `make check`
+              -- would then fail for a target we had just said existed.
+              assertEqual "searched" (Left [gsShadowed gs]) shadowed
+
+          , runTest "gate discovery: with no target given, the Makefile's check target is the gate" $
+              case makeGate of
+                Left why   -> pure (Fail ("expected a gate: " <> T.unpack why))
+                Right plan -> allOf
+                  [ assertEqual "source" GateFromMakefile (gateSource (gpGate plan))
+                  , assertEqual "target" (Just "check") (gateTarget (gpGate plan))
+                  , assertEqual "binary" "make" (gpBinary plan)
+                  , assertEqual "args" ["check"] (gpArgs plan)
+                  , assertEqual "cwd" (Just (gsProject gs)) (gpCwd plan)
+                  ]
+
+          , runTest "gate discovery: with no Makefile, the Everything module is the gate" $
+              case entryGate of
+                Left why   -> pure (Fail ("expected a gate: " <> T.unpack why))
+                Right plan -> allOf
+                  [ assertEqual "source" GateFromEverything (gateSource (gpGate plan))
+                  , assertEqual "entry" (Just (gsEntry gs </> "Everything.agda"))
+                      (gateEntry (gpGate plan))
+                  , assertEqual "binary" (agdaBin agdaCfg) (gpBinary plan)
+                  , assert ("args were " <> show (gpArgs plan))
+                      (not (null (gpArgs plan))
+                       && last (gpArgs plan) == gsEntry gs </> "Everything.agda")
+                    -- The Everything gate keeps the server's working directory,
+                    -- because the server's agda flags are relative to it.
+                  , assertEqual "cwd" Nothing (gpCwd plan)
+                  ]
+
+          , runTest "gate discovery: a project with no gate is refused, showing its search" $
+              case bareGate of
+                Right plan -> pure (Fail ("expected no gate, got " <> show (gpGate plan)))
+                Left why   ->
+                  let want = ["no project gate found", T.pack (gsBare gs)
+                             , "Everything.agda", "--check-command"]
+                      missing = [w | w <- want, not (w `T.isInfixOf` why)]
+                  in  assert ("missing from the message: " <> show missing) (null missing)
+
+          , runTest "gate discovery: a configured command wins over discovery" $
+              case cfgGate of
+                Left why   -> pure (Fail ("expected a gate: " <> T.unpack why))
+                Right plan -> allOf
+                  [ assertEqual "source" GateFromServerConfig (gateSource (gpGate plan))
+                  , assertEqual "binary" gate (gpBinary plan)
+                  , assertEqual "args" ["pass"] (gpArgs plan)
+                  ]
+
+          , runTest "gate discovery: an explicit target outranks the configured command" $
+              case cfgTarget of
+                Left why   -> pure (Fail ("expected a gate: " <> T.unpack why))
+                Right plan -> allOf
+                  [ assertEqual "source" GateFromMakefile (gateSource (gpGate plan))
+                  , assertEqual "target" (Just "other") (gateTarget (gpGate plan))
+                  ]
+          ]
+
+        -- A gate that cannot be started at all: the other half of the -1
+        -- convention, and the case whose only explanation is the output tail.
+        unstartable <- handleCheckProject agdaCfg
+                         (GateConfig (Just ["/nonexistent/no-such-gate"]) (Just 60))
+                         (paramsAt (gsProject gs))
+        crash <- sequence
+          [ runTest "check_project: a gate that cannot be started is a failure, explained" $
+              withRight unstartable $ \r -> allOf
+                [ assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assertEqual "exitCode" (-1) (vExitCode (cprVerdict r))
+                , assert "not a timeout" (not (cprTimedOut r))
+                , assert "not a masked failure" (not (cprMaskedFailure r))
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False (("failed to run /nonexistent/no-such-gate" `T.isInfixOf`))
+                           (cprOutputTail r))
+                ]
+          ]
+
+        -- Refusals that happen before anything is run.
+        ghost <- handleCheckProject agdaCfg defaultGateConfig CheckProjectParams
+          { cppTarget         = Nothing
+          , cppProjectPath    = Just (gsProject gs </> "no-such-directory")
+          , cppMaxDiagnostics = Nothing
+          }
+        noGate <- handleCheckProject agdaCfg defaultGateConfig (paramsAt (gsBare gs))
+        refusals <- sequence
+          [ runTest "check_project: a projectPath that does not exist is refused" $
+              case ghost of
+                Right r -> pure (Fail ("expected a refusal, got success=" <> show (cprSuccess r)))
+                Left err ->
+                  let msg = failureText err
+                  in  assert ("message was " <> show msg)
+                        ("projectPath does not exist" `T.isInfixOf` msg
+                         && "no-such-directory" `T.isInfixOf` msg)
+
+          , runTest "check_project: a project with no discoverable gate is refused, not reported green" $
+              case noGate of
+                Right r  -> pure (Fail ("expected a refusal, got success=" <> show (cprSuccess r)))
+                Left err -> assert ("message was " <> show (failureText err))
+                              ("no project gate found" `T.isInfixOf` failureText err)
+          ]
+
+        -- The real make path, end to end: discovery picks the fixture
+        -- Makefile's check target, make runs the failing gate, and the report
+        -- carries make's own exit code rather than the script's.
+        mMake <- findExecutable "make"
+        makeRun <- case mMake of
+          Nothing -> do
+            hPutStrLn stderr "  [skip] make not on PATH; skipping the discovered-make-gate test"
+            pure []
+          Just _  -> do
+            res <- handleCheckProject agdaCfg defaultGateConfig (paramsAt (gsSub gs))
+            sequence
+              [ runTest "check_project: a discovered make gate runs, and reports make's own exit code" $
+                  withRight res $ \r -> allOf
+                    [ assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                    , assert ("exitCode was " <> show (vExitCode (cprVerdict r)))
+                        (vExitCode (cprVerdict r) /= 0)
+                    , assertEqual "source" GateFromMakefile (gateSource (cprGate r))
+                    , assertEqual "target" (Just "check") (gateTarget (cprGate r))
+                    , assertEqual "makefile" (Just (gsProject gs </> "Makefile"))
+                        (gateMakefile (cprGate r))
+                    , assertEqual "cwd" (gsProject gs) (ceCwd (cprCommand r))
+                    , assertEqual "failingModule" (Just "Gate.Broken") (cprFailingModule r)
+                    , assertEqual "firstError code" (Just "NotInScope")
+                        (cprFirstError r >>= diagCode)
+                    ]
+              ]
+
+        pure (failing <> passing <> masked <> timeoutFast <> timeoutOrphan
+                <> discovery <> crash <> refusals <> makeRun)
+
+      -- The wrong-checkout refusal, on the scene tier 1d already builds: a gate
+      -- run in a worktree the registry does not name resolves its imports
+      -- against the other tree, which is the same wrong answer issue #76
+      -- refuses for a single file.
+      mismatch <- withLibraryScene $ \ls -> do
+        let rootCfg = defaultConfig
+              { agdaBin   = "/nonexistent/agda-must-not-run"
+              , agdaFlags = ["--library-file=" <> lsLibraries ls, "-l", "agda-algebras"]
+              }
+        res <- handleCheckProject rootCfg defaultGateConfig CheckProjectParams
+          { cppTarget         = Nothing
+          , cppProjectPath    = Just (lsRootB ls)
+          , cppMaxDiagnostics = Nothing
+          }
+        sequence
+          [ runTest "check_project: a project in another checkout of the same library is refused (#76)" $
+              case res of
+                Left (FailProject pm) -> allOf
+                  [ assertEqual "fileRoot" (lsRootB ls) (pmFileRoot pm)
+                  , assertEqual "registeredRoot" (lsRootA ls) (pmRegisteredRoot pm)
+                  ]
+                Left other -> pure (Fail ("expected FailProject, got: "
+                                          <> T.unpack (failureText other)))
+                Right r    -> pure (Fail ("expected a refusal, got success="
+                                          <> show (cprSuccess r)))
+          ]
+
+      pure (pureRes <> sceneRes <> mismatch)
+
+-- | contextFor: the project context of a fixture directory.  These fixtures
+-- contain no @*.agda-lib@, so resolution cannot report a mismatch; a failure
+-- here is a broken fixture rather than a test result.
+contextFor :: AgdaConfig -> FilePath -> IO ProjectContext
+contextFor cfg dir = do
+  resolved <- resolveProjectDir cfg dir
+  case resolved of
+    Right pc -> pure pc
+    Left pm  -> fail ("fixture resolved to a root mismatch: "
+                        <> T.unpack (mismatchMessage pm))
 
 
 -- ---------------------------------------------------------------------------
@@ -3070,6 +3696,8 @@ main = do
   echoResults <- echoTests
   -- Tier 1e: hole addressing — position vs index, and the parse of both (#79).
   addressResults <- holeAddressingTests
+  -- Tier 1f: the whole-project gate (#78), driven by a fixture gate script.
+  gateResults <- gateTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -3080,7 +3708,8 @@ main = do
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
-          <> timeoutResults <> echoResults <> addressResults <> integrationResults
+          <> timeoutResults <> echoResults <> addressResults <> gateResults
+          <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

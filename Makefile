@@ -702,15 +702,15 @@ agda-mcp-test:
 
 # Fast end-to-end sanity: build the server, then drive the real binary with a
 # canned JSON-RPC sequence (initialize + tools/list) and assert it answers and
-# registers all seven tools.  Complements agda-mcp-test, which exercises the tool
+# registers all eight tools.  Complements agda-mcp-test, which exercises the tool
 # handlers directly but not the server's stdio JSON-RPC loop.  No Agda needed.
 agda-mcp-smoke:
 	@echo ">> [agda-mcp-smoke] JSON-RPC round-trip through the agda-mcp server binary"
 	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:agda-mcp && \
 	  BIN=$$(cabal list-bin exe:agda-mcp) && \
 	  OUT=$$("$$BIN" --corpus "$(AGDA_MCP_CORPUS)" < "$(AGDA_MCP_SMOKE_INPUT)" || true) && \
-	  if echo "$$OUT" | grep -q serverInfo && echo "$$OUT" | grep -q get_goal && echo "$$OUT" | grep -q search_by_name; then \
-	    echo "agda-mcp-smoke: OK — server responds and registers core + search tools"; \
+	  if echo "$$OUT" | grep -q serverInfo && echo "$$OUT" | grep -q get_goal && echo "$$OUT" | grep -q check_project && echo "$$OUT" | grep -q search_by_name; then \
+	    echo "agda-mcp-smoke: OK — server responds and registers core + project + search tools"; \
 	  else \
 	    echo "agda-mcp-smoke: FAILED — server did not answer as expected; see its stderr above. stdout was:"; \
 	    echo "$$OUT"; \
