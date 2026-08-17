@@ -28,6 +28,8 @@
 module AgdaMCP.Server
   ( runServer
   , ServerConfig (..)
+    -- * Exposed for testing
+  , toolDefinitions
   ) where
 
 import Control.Exception (SomeException, try, throwIO, fromException, AsyncException)
@@ -152,6 +154,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           [ prop "filePath"  "string"  "Path to the Agda file (absolute or relative to cwd)."
           , prop "line"      "integer" lineDoc
           , prop "column"    "integer" columnDoc
+          , prop "col"       "integer" colDoc
           , prop "holeIndex" "integer" holeIndexDoc
           ]
           ["filePath"]
@@ -187,6 +190,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           [ prop "filePath"  "string"  "Path to the Agda file (absolute or relative to cwd)."
           , prop "line"      "integer" lineDoc
           , prop "column"    "integer" columnDoc
+          , prop "col"       "integer" colDoc
           , prop "holeIndex" "integer" holeIndexDoc
           , prop "candidate" "string"  "The candidate proof term to try."
           ]
@@ -282,20 +286,31 @@ holeAddressing =
   \because the two can disagree. col is accepted as a synonym for column, so a \
   \hole entry can be passed straight back."
 
--- | lineDoc / columnDoc / holeIndexDoc: the same contract at the three input
+-- | lineDoc / columnDoc / colDoc / holeIndexDoc: the same contract at the input
 -- properties, where a client decides what to send.
+--
+-- @col@ is declared as a property of its own rather than merely mentioned in
+-- @columnDoc@, because a client that validates its arguments against the schema
+-- sees only what the schema declares: an accepted key the schema omits is one a
+-- careful client will refuse to send (a Copilot review catch on PR #99).
 lineDoc :: Text
 lineDoc =
   "1-based line of the hole, in the file as written (literate-file coordinates \
-  \for literate sources). Requires column. The stable way to address a hole: \
-  \unlike holeIndex, it survives a fill elsewhere in the file."
+  \for literate sources). Requires column (or its synonym col). The stable way \
+  \to address a hole: unlike holeIndex, it survives a fill elsewhere in the file."
 
 columnDoc :: Text
 columnDoc =
   "1-based column of the hole, in the file as written. Requires line. The key \
-  \col is accepted as a synonym, so a hole entry from get_diagnostics, \
-  \check_file, or a fill_hole response can be passed back unchanged; sending \
-  \both spellings is fine only if they agree."
+  \col is accepted as a synonym; sending both spellings is fine only if they \
+  \agree."
+
+colDoc :: Text
+colDoc =
+  "Synonym for column, accepted because that is the key the hole listings spell \
+  \it with — so a hole entry from get_diagnostics, check_file, or a fill_hole \
+  \response can be passed back without renaming anything. Requires line; if \
+  \column is given too, the two must agree."
 
 holeIndexDoc :: Text
 holeIndexDoc =

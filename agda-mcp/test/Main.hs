@@ -37,6 +37,8 @@ module Main (main) where
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket_, catch, SomeException)
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KM
 import Data.Char (isDigit)
 import Data.Either (isLeft)
 import Data.List (find, isInfixOf, sortOn)
@@ -78,6 +80,7 @@ import AgdaMCP.Project
   ( findNearestAgdaLib, includePathsOf, librariesFileFlagOf, libraryIncludeDirs
   , libraryIncludesOf, libraryNameOf, parseLibrariesFile, selectedLibrariesOf
   )
+import AgdaMCP.Server (ServerConfig (..), toolDefinitions)
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -1130,6 +1133,48 @@ resolveIn = resolveHoleRef "Addressing.agda" PlainAgda addressingSrc
 decodeGoalParams :: LBS.ByteString -> Either String HoleRef
 decodeGoalParams = fmap ggHole . Aeson.eitherDecode
 
+-- | The hole-addressing keys the wire parser accepts, each with a minimal
+-- argument object that uses it.
+--
+-- One list, read twice: once to check that every key parses, and once to check
+-- that every key is declared in the tools' advertised input schema.  A key
+-- accepted by the parser but missing from the schema is invisible to a client
+-- that validates its arguments — it will not send what the schema does not
+-- declare — which is exactly how @col@ shipped unusable in the first round of
+-- this PR (a Copilot review catch).
+addressingKeys :: [(Text, LBS.ByteString)]
+addressingKeys =
+  [ ("holeIndex", "{\"filePath\":\"F.agda\",\"holeIndex\":0}")
+  , ("line",      "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
+  , ("column",    "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
+  , ("col",       "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
+  ]
+
+-- | schemaProperties: the input-schema property names one tool advertises, read
+-- out of the very value @tools/list@ serializes.
+schemaProperties :: Text -> Aeson.Value -> [Text]
+schemaProperties name v =
+  case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
+    Aeson.Error _    -> []
+    Aeson.Success ts ->
+      [ Key.toText k
+      | t <- ts
+      , KM.lookup "name" t == Just (Aeson.String name)
+      , Just (Aeson.Object schema) <- [KM.lookup "inputSchema" t]
+      , Just (Aeson.Object props)  <- [KM.lookup "properties" schema]
+      , k <- KM.keys props
+      ]
+
+-- | advertisedTools: the tool definitions a client receives, with no corpus
+-- loaded (so the four proof-state tools and nothing else).
+advertisedTools :: Aeson.Value
+advertisedTools = toolDefinitions ServerConfig
+  { scAgdaConfig  = defaultConfig
+  , scServerName  = "agda-mcp-test"
+  , scVersion     = "0"
+  , scCorpusIndex = Nothing
+  }
+
 holeAddressingTests :: IO [Bool]
 holeAddressingTests = do
   hPutStrLn stderr "\n── Hole-addressing tests (tier 1e: no Agda, #79) ──"
@@ -1261,6 +1306,22 @@ holeAddressingTests = do
           , fmap fhHole (Aeson.eitherDecode
               "{\"filePath\":\"F.agda\",\"holeIndex\":1,\"candidate\":\"zero\"}")
           )
+
+    , runTest "params: every accepted addressing key parses" $
+        assertEqual "keys that failed to parse" []
+          [ k | (k, args) <- addressingKeys, isLeft (decodeGoalParams args) ]
+
+    -- The other half of the same contract: a client picks what to send by
+    -- reading the schema, so an accepted key the schema omits may as well not
+    -- exist.  Reads the value tools/list serializes, not the Haskell.
+    , runTest "schema: every accepted addressing key is advertised (#79)" $
+        assertEqual "keys missing from the advertised input schema" []
+          [ (tool, k)
+          | tool <- ["get_goal", "fill_hole"]
+          , let declared = schemaProperties tool advertisedTools
+          , (k, _) <- addressingKeys
+          , k `notElem` declared
+          ]
     ]
 
 -- | proseDecoyLine / proseDecoyCol: the position of the first @{!!}@ token in
