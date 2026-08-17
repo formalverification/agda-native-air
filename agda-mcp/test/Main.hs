@@ -41,7 +41,7 @@ import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
 import Data.Char (isDigit)
 import Data.Either (isLeft)
-import Data.List (find, isInfixOf, sortOn)
+import Data.List (find, isInfixOf, nub, sort, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, listToMaybe)
 import Data.Text (Text)
@@ -1133,37 +1133,62 @@ resolveIn = resolveHoleRef "Addressing.agda" PlainAgda addressingSrc
 decodeGoalParams :: LBS.ByteString -> Either String HoleRef
 decodeGoalParams = fmap ggHole . Aeson.eitherDecode
 
--- | The hole-addressing keys the wire parser accepts, each with a minimal
--- argument object that uses it.
+-- | The address shapes the wire parser accepts: the keys each one needs
+-- (besides @filePath@), with a minimal request that uses exactly those keys.
 --
--- One list, read twice: once to check that every key parses, and once to check
--- that every key is declared in the tools' advertised input schema.  A key
--- accepted by the parser but missing from the schema is invisible to a client
--- that validates its arguments — it will not send what the schema does not
--- declare — which is exactly how @col@ shipped unusable in the first round of
--- this PR (a Copilot review catch).
-addressingKeys :: [(Text, LBS.ByteString)]
-addressingKeys =
-  [ ("holeIndex", "{\"filePath\":\"F.agda\",\"holeIndex\":0}")
-  , ("line",      "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
-  , ("column",    "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
-  , ("col",       "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
+-- One list, read three times — every shape must parse, every key in it must be
+-- a declared schema property, and the shapes must be exactly the alternatives
+-- the schema's @oneOf@ advertises.  Both directions matter and both were wrong
+-- in earlier rounds of this PR (Copilot review catches): @col@ was accepted but
+-- undeclared, so a validating client could not send it; and the schema required
+-- only @filePath@, so it advertised an addressless call the parser rejects.
+addressShapes :: [([Text], LBS.ByteString)]
+addressShapes =
+  [ (["holeIndex"],      "{\"filePath\":\"F.agda\",\"holeIndex\":0}")
+  , (["line", "column"], "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
+  , (["line", "col"],    "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
   ]
 
--- | schemaProperties: the input-schema property names one tool advertises, read
--- out of the very value @tools/list@ serializes.
-schemaProperties :: Text -> Aeson.Value -> [Text]
-schemaProperties name v =
+-- | The tools that take a hole address.
+addressTools :: [Text]
+addressTools = ["get_goal", "fill_hole"]
+
+-- | inputSchemaOf: one tool's advertised input schema, read out of the very
+-- value @tools/list@ serializes.
+inputSchemaOf :: Text -> Aeson.Value -> Aeson.Object
+inputSchemaOf name v =
   case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
-    Aeson.Error _    -> []
-    Aeson.Success ts ->
-      [ Key.toText k
+    Aeson.Error _    -> KM.empty
+    Aeson.Success ts -> case
+      [ schema
       | t <- ts
       , KM.lookup "name" t == Just (Aeson.String name)
       , Just (Aeson.Object schema) <- [KM.lookup "inputSchema" t]
-      , Just (Aeson.Object props)  <- [KM.lookup "properties" schema]
-      , k <- KM.keys props
-      ]
+      ] of
+        (s : _) -> s
+        []      -> KM.empty
+
+-- | schemaProperties: the property names that schema declares.
+schemaProperties :: Text -> Aeson.Value -> [Text]
+schemaProperties name v =
+  case KM.lookup "properties" (inputSchemaOf name v) of
+    Just (Aeson.Object props) -> map Key.toText (KM.keys props)
+    _                         -> []
+
+-- | schemaAlternatives: the @required@ list of each @oneOf@ branch — the shapes
+-- the schema says a legal request has.
+schemaAlternatives :: Text -> Aeson.Value -> [[Text]]
+schemaAlternatives name v =
+  case KM.lookup "oneOf" (inputSchemaOf name v) of
+    Just alts -> case Aeson.fromJSON alts :: Aeson.Result [Aeson.Object] of
+      Aeson.Success bs ->
+        [ ks
+        | b <- bs
+        , Just req <- [KM.lookup "required" b]
+        , Aeson.Success ks <- [Aeson.fromJSON req :: Aeson.Result [Text]]
+        ]
+      Aeson.Error _ -> []
+    _ -> []
 
 -- | advertisedTools: the tool definitions a client receives, with no corpus
 -- loaded (so the four proof-state tools and nothing else).
@@ -1266,15 +1291,15 @@ holeAddressingTests = do
           (decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
 
     -- The response spells the column `col`, so accepting that spelling is what
-    -- lets a hole entry be handed straight back with no key renaming.
-    , runTest "params: col is accepted as a synonym for column" $ allOf
+    -- lets a hole entry be handed straight back with no key renaming — and
+    -- giving both spellings is refused like every other ambiguous request,
+    -- which is also what makes the schema's oneOf an exact description.
+    , runTest "params: col stands in for column, but not alongside it" $ allOf
         [ assertEqual "col alone" (Right (ByPosition 7 5))
             (decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
-        , assertEqual "col agreeing with column" (Right (ByPosition 7 5))
-            (decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"col\":5}")
-        , case decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"col\":9}" of
-            Right r  -> pure (Fail $ "disagreeing synonyms should not parse: " <> show r)
-            Left msg -> assert ("message: " <> msg) ("must agree" `isInfixOf` msg)
+        , case decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"col\":5}" of
+            Right r  -> pure (Fail $ "both spellings should not parse: " <> show r)
+            Left msg -> assert ("message: " <> msg) ("give one of them" `isInfixOf` msg)
         ]
 
     , runTest "params: both spellings at once is refused, not resolved" $
@@ -1307,21 +1332,31 @@ holeAddressingTests = do
               "{\"filePath\":\"F.agda\",\"holeIndex\":1,\"candidate\":\"zero\"}")
           )
 
-    , runTest "params: every accepted addressing key parses" $
-        assertEqual "keys that failed to parse" []
-          [ k | (k, args) <- addressingKeys, isLeft (decodeGoalParams args) ]
+    , runTest "params: every advertised address shape parses" $
+        assertEqual "shapes that failed to parse" []
+          [ ks | (ks, args) <- addressShapes, isLeft (decodeGoalParams args) ]
 
     -- The other half of the same contract: a client picks what to send by
     -- reading the schema, so an accepted key the schema omits may as well not
     -- exist.  Reads the value tools/list serializes, not the Haskell.
-    , runTest "schema: every accepted addressing key is advertised (#79)" $
+    , runTest "schema: every address key is a declared property (#79)" $
         assertEqual "keys missing from the advertised input schema" []
           [ (tool, k)
-          | tool <- ["get_goal", "fill_hole"]
+          | tool <- addressTools
           , let declared = schemaProperties tool advertisedTools
-          , (k, _) <- addressingKeys
+          , k <- nub (concatMap fst addressShapes)
           , k `notElem` declared
           ]
+
+    -- `required` cannot say "address it somehow", so without the oneOf the
+    -- schema advertised a bare {filePath} as a complete call while the parser
+    -- refused it.  These are the same three shapes, from the same list.
+    , runTest "schema: oneOf advertises exactly the shapes that parse (#79)" $ allOf
+        [ assertEqual ("oneOf for " <> T.unpack tool)
+            (sort (map (sort . fst) addressShapes))
+            (sort (map sort (schemaAlternatives tool advertisedTools)))
+        | tool <- addressTools
+        ]
     ]
 
 -- | proseDecoyLine / proseDecoyCol: the position of the first @{!!}@ token in
@@ -2894,6 +2929,42 @@ holeAddressingIntegrationTests cfg = do
               (ms, ps) -> pure . Fail $
                 "expected 1 hole in each twin, got " <> show (length ms)
                 <> " and " <> show (length ps)
+
+        -- The limit of a position, pinned rather than papered over.  The
+        -- re-anchoring tests above fill with a same-length candidate on another
+        -- line, where the surviving hole does not move; a candidate that spans
+        -- two lines moves it, and the contract is that the response says so
+        -- (a Copilot review catch on PR #99 — the claim used to be that a
+        -- position survives any fill elsewhere, which is false).
+        , runTest "fill_hole: a multiline candidate moves later holes, and holes says where (#79)" $ do
+            src <- TIO.readFile twoHoles
+            let flav      = flavourOf twoHoles
+                candidate = "suc\n      zero"   -- one line becomes two
+            case (findHoles flav src, substituteHole flav 0 candidate src) of
+              ([h0, h1], Just patched) -> do
+                result <- handleFillHole cfg FillHoleParams
+                  { fhFilePath  = twoHoles
+                  , fhHole      = ByPosition (hsLine h0) (hsCol h0)
+                  , fhCandidate = candidate
+                  }
+                case result of
+                  Left err -> pure (Fail $ "fill_hole failed: " <> T.unpack (failureText err))
+                  Right fr -> allOf
+                    [ assertEqual "status" FillOk (frStatus fr)
+                    , assertEqual "the response re-anchors the survivor one line lower"
+                        [(0, hsLine h1 + 1, hsCol h1)]
+                        [ (hiIndex h, hiLine h, hiCol h) | h <- frHoles fr ]
+                    -- And the coordinates held from before the fill are now
+                    -- wrong in the way that matters: they name no hole, so a
+                    -- client reusing them gets the loud miss, never another hole.
+                    , assert "the pre-fill position no longer names a hole"
+                        (isLeft (resolveHoleRef twoHoles flav patched
+                                   (ByPosition (hsLine h1) (hsCol h1))))
+                    , assertEqual "the re-anchored position does" (Right 0)
+                        (resolveHoleRef twoHoles flav patched
+                           (ByPosition (hsLine h1 + 1) (hsCol h1)))
+                    ]
+              (hs, _) -> pure . Fail $ "expected exactly 2 holes, got " <> show (length hs)
 
         -- The miss reaches the tool boundary intact.  Resolution happens before
         -- Agda is started, so this costs no subprocess; it is here to pin that

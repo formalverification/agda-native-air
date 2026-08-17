@@ -27,11 +27,11 @@
 --
 --   On top of the scan sits the /addressing/ model of issue #79: a 'HoleRef'
 --   names one hole, either by its source-order index or by a @(line, column)@
---   position in the file as written.  The position is the stable handle — a
---   hole's coordinates do not move when a hole elsewhere is filled, while every
---   index after a filled hole shifts down by one — and 'resolveHoleRef' turns
---   either spelling into an index, or into an error that names the file's holes
---   rather than guessing.
+--   position in the file as written.  The position is the handle to prefer — it
+--   moves only when an edit above it moves the text, while every index after a
+--   filled hole is renumbered whether or not anything moved — and
+--   'resolveHoleRef' turns either spelling into an index, or into an error that
+--   names the file's holes rather than guessing.
 --
 --   The functions here are pure; AgdaMCP.Tools.ProofState combines them with
 --   the Agda subprocess layer in AgdaMCP.Agda.  The long-term plan (issue
@@ -460,13 +460,21 @@ findNthHole flav n src
 
 -- | How a tool call names the hole it means.
 --
--- 'ByPosition' is the stable handle.  A hole's @(line, column)@ is a property of
--- where it sits in the file, so filling a hole elsewhere leaves it untouched;
--- 'ByIndex' is a 0-based index into the source-order hole list, so filling any
--- earlier hole shifts every later index down by one.  That shift is the
+-- 'ByPosition' is the handle to prefer, and the honest statement of why is a
+-- comparison rather than an absolute.  A hole's @(line, column)@ describes where
+-- its text sits, so it survives exactly the edits that do not move that text: a
+-- fill later in the file never disturbs it, and a fill earlier in the file
+-- disturbs it only when the candidate differs in length or line count from the
+-- hole token it replaced (then holes after it shift — by the length difference
+-- on the same line, by the line difference below).  'ByIndex' is a 0-based index
+-- into the source-order hole list, so /every/ hole after a filled one is
+-- renumbered, whether or not a character moved.  That unconditional shift is the
 -- bookkeeping § 3.8 of the feedback document records an agent losing track of
--- between calls, and it is why the two spellings are not equal alternatives:
--- the index is kept for backward compatibility, the position is the one to use.
+-- between calls.
+--
+-- Neither survives an arbitrary edit, which is why the tools answer with the
+-- re-anchored hole list: after a fill a client keeps, the next address comes
+-- from that response, not from coordinates cached before it.
 --
 -- Positions are 1-based coordinates in the file /as written/ — literate-file
 -- coordinates for literate sources, exactly what 'HoleSpan' reports and what
@@ -568,7 +576,8 @@ resolveHoleRef path flav src ref = case ref of
       "  Address a hole by the (line, column) its own listing reports — \
       \get_diagnostics.holes, check_file.holes, or the holes list every \
       \fill_hole response carries.\n\
-      \  Those coordinates survive a fill elsewhere in the file; indices do not."
+      \  Take that listing from the latest response: a fill above a hole moves \
+      \it when the candidate is a different length, and renumbers it always."
 
 -- | tshow: 'show' into 'Text', for the message builders above.
 tshow :: Show a => a -> Text

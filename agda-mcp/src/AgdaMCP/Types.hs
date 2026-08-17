@@ -179,19 +179,25 @@ instance ToJSON CtxEntry where
 -- | parseHoleRef: read the hole address out of a tool call's arguments
 -- (issue #79).
 --
--- The wire spelling is two optional alternatives — @line@ + @column@ (the
--- stable handle) or @holeIndex@ (source-order, shift-prone, kept for backward
--- compatibility) — parsed into the one 'HoleRef' the handlers take.  @col@ is
--- accepted as a synonym for @column@ so a hole entry from @get_diagnostics@,
--- @check_file@, or a @fill_hole@ response, which reports @line@ and @col@, can
--- be handed straight back without renaming a key.
+-- The wire spelling is two alternatives — @line@ + @column@ (the position, the
+-- handle to prefer) or @holeIndex@ (source-order, shift-prone, kept for
+-- backward compatibility) — parsed into the one 'HoleRef' the handlers take.
+-- @col@ is accepted in place of @column@ because that is how the hole listings
+-- spell it, so a hole entry can be passed back without renaming a key.
 --
--- Every degenerate combination is a parse failure naming the fix, because each
--- one is a client that does not know which hole it is asking about:
+-- The accepted shapes are exactly three: @holeIndex@, @line@ + @column@, and
+-- @line@ + @col@.  They are the alternatives the tools' input schema advertises
+-- as its @oneOf@ (see 'AgdaMCP.Server.addressAlternatives'), so a client that
+-- validates its arguments and a client that just sends them get the same answer
+-- about what is a legal request.
 --
--- * /both/ spellings — they can disagree, and picking one silently is exactly
---   the wrong-hole answer this addressing model exists to prevent;
--- * a lone @line@ or a lone @column@ — half a position is not a position;
+-- Every other combination is a parse failure naming the fix, because each one is
+-- a client that does not know which hole it is asking about:
+--
+-- * an index /and/ a position — they can disagree, and picking one silently is
+--   exactly the wrong-hole answer this addressing model exists to prevent;
+-- * both @column@ and @col@ — one hole, one spelling, for the same reason;
+-- * a lone @line@ or a lone column — half a position is not a position;
 -- * /neither/ — there is nothing to address.
 parseHoleRef :: Object -> Parser HoleRef
 parseHoleRef o = do
@@ -199,11 +205,9 @@ parseHoleRef o = do
   mLine   <- o .:? "line"
   mCol    <- o .:? "column"
   mColAlt <- o .:? "col"
-  -- Synonyms, so both may be present — but only if they agree.  Preferring one
-  -- silently would be the same tie-break this parser refuses to make below.
   mColumn <- case (mCol, mColAlt) of
-    (Just c, Just c') | c /= c' -> fail
-      "column and col are synonyms and must agree"
+    (Just _, Just _) -> fail
+      "column and col are two spellings of one thing; give one of them"
     _ -> pure (maybe mColAlt Just mCol)
   case (mIndex, mLine, mColumn) of
     (Nothing, Just ln, Just c) -> pure (ByPosition ln c)
@@ -216,9 +220,9 @@ parseHoleRef o = do
     (Nothing, Nothing, Just _) -> fail
       "column was given without line; a position needs both"
     (Nothing, Nothing, Nothing) -> fail
-      "no hole address: pass (line, column) — the stable handle, as reported by \
-      \get_diagnostics.holes, check_file.holes, and every fill_hole response — \
-      \or the older 0-based holeIndex"
+      "no hole address: pass (line, column) — the handle to prefer, as reported \
+      \by get_diagnostics.holes, check_file.holes, and every fill_hole response \
+      \— or the older 0-based holeIndex"
 
 -- | Parameters for the @get_goal@ tool.
 data GetGoalParams = GetGoalParams
@@ -550,9 +554,11 @@ instance ToJSON GoalInfo where
 -- written, so for literate sources they are literate-file coordinates (issue
 -- #73).
 --
--- @line@ and @col@ are the pair to pass back: they address the hole itself, so
--- they still name it after a hole elsewhere in the file is filled, whereas
--- @index@ is a position in the source-order list and shifts (issue #79).
+-- @line@ and @col@ are the pair to pass back: they describe where the hole's
+-- text sits, so a fill moves them only when it changes the text above them,
+-- whereas @index@ is a place in the source-order list and is renumbered by any
+-- fill at all (issue #79).  Neither is a permanent name: take the listing from
+-- the latest response.
 data HoleInfo = HoleInfo
   { hiIndex :: Int    -- ^ 0-based hole index (source order).
   , hiLine  :: Int    -- ^ 1-based line of the hole's first character.

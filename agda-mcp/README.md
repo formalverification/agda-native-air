@@ -130,16 +130,16 @@ All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` an
 
 `get_goal` and `fill_hole` accept two spellings of "which hole", and they are not equal alternatives.
 
-| Spelling | Stability |
-|----------|-----------|
-| `line` + `column` (`col` is accepted as a synonym) | Names the hole itself.  Filling a hole elsewhere does not move it. |
-| `holeIndex` | A 0-based index into the source-order hole list.  Filling any earlier hole shifts every later index down by one. |
+| Spelling | What a fill does to it |
+|----------|------------------------|
+| `line` + `column` (or `col`) | Describes where the hole's text sits.  A fill later in the file never moves it; a fill earlier in the file moves it only when the candidate differs in length or line count from the hole token it replaced. |
+| `holeIndex` | A 0-based index into the source-order hole list.  Filling any earlier hole renumbers it, whether or not a character moved. |
 
-**Prefer the position**.  An index cached across calls silently addresses a different hole once an earlier hole is filled — the bookkeeping § 3.8 of [the field report](../docs/feedback/flrp-agda-mcp-improvements.md) records an agent losing track of between calls.  `holeIndex` is kept for backward compatibility.
+**Prefer the position, and re-anchor it from each response**.  An index cached across calls silently addresses a different hole once an earlier hole is filled — the bookkeeping § 3.8 of [the field report](../docs/feedback/flrp-agda-mcp-improvements.md) records an agent losing track of between calls.  `holeIndex` is kept for backward compatibility.  Neither handle survives an arbitrary edit, though, which is why every answer carries the re-anchored list below: after a fill you keep, take the next address from that response rather than from coordinates cached before it.
 
 +  A position addresses the hole whose span contains it; a position at the hole's first character counts, one past its last does not.  So both `(22, 5)` and `(22, 7)` name the `{!!}` at line 22 column 5.
 +  A position inside no hole is an **error listing the file's nearest holes** — never a guess at the closest one.  An out-of-range `holeIndex` fails the same way, listing the holes the file does have.
-+  A request carrying *both* spellings is rejected: they can disagree, and choosing one silently is how a call fills the wrong hole.  Half a position (a `line` with no `column`) is rejected too.
++  A request carries exactly one address.  Both spellings at once is rejected — they can disagree, and choosing one silently is how a call fills the wrong hole — as are half a position (a `line` with no column) and both `column` and `col` together.  The input schema's `oneOf` names the three shapes a legal request has, so a client that validates its arguments and one that just sends them agree about what is legal.
 +  Positions are read in the file as written, so a literate file's holes are addressed in literate-file coordinates and its prose decoys are addressable by nothing.
 
 **Every answer re-anchors**.  `check_file` and `fill_hole` return the full hole list — the same `[{index, line, col, goal}]` shape `get_diagnostics` already returned — so a client never recomputes a position.  `fill_hole`'s list describes the file *as that candidate leaves it*, which is what the client will have once it keeps the candidate; the bytes on disk are restored either way, so until the candidate is written back the file still has the holes it started with.
@@ -376,7 +376,8 @@ whose span contains it; starting at it counts).
     index 1 at line 25, column 5
   Address a hole by the (line, column) its own listing reports — get_diagnostics.holes,
   check_file.holes, or the holes list every fill_hole response carries.
-  Those coordinates survive a fill elsewhere in the file; indices do not.
+  Take that listing from the latest response: a fill above a hole moves it when the
+  candidate is a different length, and renumbers it always.
 ```
 
 **How it works**.  Substitutes the candidate over the hole's actual span (four characters for `{!!}`, one for `?`, arbitrary for `{! e !}`), typechecks the file **in place** (restoring the original afterwards), and reports success — tolerating only the `[UnsolvedInteractionMetas]` of the file's other open holes, or of new sub-holes inside the candidate — or the type error.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` behind is reported as a type error (issue #69).  Hole *tracking* matches hole *tolerance* (issue #71): the hole address, `holes`, and `remainingHoles` cover every hole syntax, so a `?` or `{! ... !}` sub-hole introduced by the candidate is counted and addressable like any other hole.  Every response — ok, type error, or timeout — carries `holes`, the re-anchored list described under [Stable hole handles](#stable-hole-handles-issue-79), so a multi-hole edit needs no index bookkeeping between calls (issue #79).  As with `get_goal`, checking at the real path lets library-embedded modules resolve.
@@ -517,7 +518,7 @@ Retrieve the current diagnostic state without reloading: error count, warning co
 
 `success` and `verdict` are the same fields `check_file` returns, with the same derivation from Agda's exit code: the two tools differ in what they summarize, never in what green means.  The `errors` / `warnings` counts come from parsing Agda's prose and can drift with its message format, which is exactly why `success` is not read from them.
 
-Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.  The `line`/`col` pair is the one to pass back: it addresses the hole itself, so it survives a fill elsewhere in the file, while `index` shifts (see [Stable hole handles](#stable-hole-handles-issue-79)).  `errors` and `warnings` count every diagnostic found, not just the ones `maxDiagnostics` kept.
+Each hole carries its 0-based `index` (the `holeIndex` accepted by `get_goal` and `fill_hole`) and its 1-based `line`/`col` position — literate-file coordinates for literate sources.  The `line`/`col` pair is the one to pass back: a fill moves it only when the edit moves the hole's text, while `index` is renumbered by any fill at all (see [Stable hole handles](#stable-hole-handles-issue-79)).  `errors` and `warnings` count every diagnostic found, not just the ones `maxDiagnostics` kept.
 
 ### Corpus-backed search tools (Milestone 1 — [M1-3])
 

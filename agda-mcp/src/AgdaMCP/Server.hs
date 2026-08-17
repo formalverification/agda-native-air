@@ -134,7 +134,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
       \inside comments, string literals, or literate prose are never holes."
 
     proofStateTools =
-      [ toolDef "get_goal"
+      [ toolDefWith "get_goal"
           ("Inspect the goal type and local context at a hole. Injects a \
            \reporting macro over the addressed hole, typechecks the patched \
            \file in place, reads the goal back from the macro's output, and \
@@ -158,8 +158,9 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           , prop "holeIndex" "integer" holeIndexDoc
           ]
           ["filePath"]
+          [addressAlternatives]
 
-      , toolDef "fill_hole"
+      , toolDefWith "fill_hole"
           ("Substitute a candidate term into a hole (replacing the hole's \
            \actual span), typecheck the patched file in place, and restore it \
            \byte for byte. "
@@ -195,6 +196,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           , prop "candidate" "string"  "The candidate proof term to try."
           ]
           ["filePath", "candidate"]
+          [addressAlternatives]
 
       , toolDef "check_file"
           ("Typecheck one Agda file and return all diagnostics. "
@@ -202,8 +204,9 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            <> " " <> batchNote
            <> " " <> diagnosticModel
            <> " holes lists every open hole as {index, line, col, goal} \
-              \(holesCount is its length); (line, col) is the stable handle to \
-              \pass back to get_goal and fill_hole."
+              \(holesCount is its length); (line, col) is the address to pass \
+              \back to get_goal and fill_hole, and this is the listing to take \
+              \it from."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
@@ -215,8 +218,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
       , toolDef "get_diagnostics"
           ("Typecheck one Agda file and return a summary: error/warning counts, \
            \the diagnostics behind them, and each open hole's index and \
-           \(line, col) position — that (line, col) being the stable handle to \
-           \pass back to get_goal and fill_hole. "
+           \(line, col) position — that (line, col) being the address to pass \
+           \back to get_goal and fill_hole. "
            <> verdictNote
            <> " " <> batchNote
            <> " success and verdict are the same fields check_file returns, with \
@@ -265,26 +268,37 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
 --
 -- The description is where the contract lives (the § 6 meta-suggestion of the
 -- feedback document), and the contract worth stating here is not "two
--- parameters are available" but "one of them is stable and the other is not".
--- An agent that reads only this must come away addressing holes by position;
--- § 3.8 records what the other habit costs, and verification found it costs
--- more than stated, since a miscounted decoy could put "the first hole" inside
--- a comment.
+-- parameters are available" but which one to hold across calls, and how long it
+-- stays good.  An agent that reads only this must come away addressing holes by
+-- position and re-anchoring from each response; § 3.8 records what the other
+-- habit costs, and verification found it costs more than stated, since a
+-- miscounted decoy could put "the first hole" inside a comment.
+--
+-- The stability sentence is deliberately narrow.  A position is not stable under
+-- arbitrary edits — a candidate that differs in length or line count from the
+-- hole it replaced moves everything after it — and promising otherwise would
+-- hand a client the same wrong-hole answer by a different route (a Copilot
+-- review catch on PR #99).  What is true, and enough, is that a position moves
+-- only when the text before it moves, whereas an index is renumbered by any
+-- fill at all.
 holeAddressing :: Text
 holeAddressing =
   "ADDRESSING A HOLE: pass EITHER (line, column) — 1-based coordinates in the \
   \file as written, literate-file coordinates for a literate source, exactly \
   \what get_diagnostics.holes, check_file.holes, and every fill_hole response's \
-  \holes list report — OR holeIndex. PREFER THE POSITION. It names the hole \
-  \itself, so it still names it after any other hole is filled, whereas \
-  \holeIndex is a 0-based index into the source-order hole list and every index \
-  \after a filled hole shifts down by one: an index cached across calls \
-  \silently addresses a different hole. A position addresses the hole whose \
-  \span contains it (a position at its first character counts); a position \
-  \inside no hole is an error listing the file's nearest holes, never a guess. \
-  \Give one spelling or the other — a request carrying both is rejected, \
-  \because the two can disagree. col is accepted as a synonym for column, so a \
-  \hole entry can be passed straight back."
+  \holes list report — OR holeIndex. PREFER THE POSITION, AND RE-ANCHOR IT FROM \
+  \EACH RESPONSE. A position names the hole where it sits, so a fill later in \
+  \the file never disturbs it, and a fill earlier in the file disturbs it only \
+  \if the candidate differs in length or line count from the hole token it \
+  \replaced. holeIndex is a 0-based index into the source-order hole list, so \
+  \EVERY hole after a filled one is renumbered whether or not any text moved. \
+  \Neither survives an arbitrary edit: after a fill you keep, take the next \
+  \address from that response's holes list rather than reusing coordinates from \
+  \before it. A position addresses the hole whose span contains it (a position \
+  \at its first character counts); a position inside no hole is an error \
+  \listing the file's nearest holes, never a guess. Give one spelling or the \
+  \other — a request carrying both is rejected, because the two can disagree — \
+  \and see the schema's oneOf for the three shapes a legal request has."
 
 -- | lineDoc / columnDoc / colDoc / holeIndexDoc: the same contract at the input
 -- properties, where a client decides what to send.
@@ -296,28 +310,29 @@ holeAddressing =
 lineDoc :: Text
 lineDoc =
   "1-based line of the hole, in the file as written (literate-file coordinates \
-  \for literate sources). Requires column (or its synonym col). The stable way \
-  \to address a hole: unlike holeIndex, it survives a fill elsewhere in the file."
+  \for literate sources). Requires column (or col). The address to prefer: it \
+  \moves only when a fill above it moves the text, whereas holeIndex is \
+  \renumbered by any fill at all. Re-anchor it from each response's holes list."
 
 columnDoc :: Text
 columnDoc =
-  "1-based column of the hole, in the file as written. Requires line. The key \
-  \col is accepted as a synonym; sending both spellings is fine only if they \
-  \agree."
+  "1-based column of the hole, in the file as written. Requires line. Give this \
+  \or col, not both."
 
 colDoc :: Text
 colDoc =
-  "Synonym for column, accepted because that is the key the hole listings spell \
-  \it with — so a hole entry from get_diagnostics, check_file, or a fill_hole \
-  \response can be passed back without renaming anything. Requires line; if \
-  \column is given too, the two must agree."
+  "The same thing as column, accepted because that is how the hole listings \
+  \spell it — so a hole entry from get_diagnostics, check_file, or a fill_hole \
+  \response can be passed back without renaming anything (its other keys, index \
+  \and goal, are ignored). Requires line. Give this or column, not both."
 
 holeIndexDoc :: Text
 holeIndexDoc =
   "0-based index of the hole, in source order (any hole syntax). Accepted for \
-  \backward compatibility and SHIFT-PRONE: filling a hole renumbers every hole \
-  \after it, so an index from an earlier call may now name a different hole. \
-  \Prefer (line, column). Give one or the other, never both."
+  \backward compatibility and SHIFT-PRONE: filling any hole renumbers every \
+  \hole after it — even a fill that moves no text — so an index from an earlier \
+  \call may now name a different hole. Prefer (line, column). Give one or the \
+  \other, never both."
 
 -- | diagnosticModel: the shape of a diagnostic, stated where the client reads
 -- it (issue #74).
@@ -411,15 +426,49 @@ latencyNote =
 
 -- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
-toolDef name desc props required = object
+toolDef name desc props required = toolDefWith name desc props required []
+
+-- | As 'toolDef', with extra JSON Schema keywords merged into the input schema.
+--
+-- Exists for one keyword — the @oneOf@ that says a hole must be addressed
+-- somehow ('addressAlternatives').  @required@ alone cannot express it: the
+-- address is mandatory but its spelling is a choice, so listing any one
+-- spelling would be wrong and listing none advertises that a bare @filePath@ is
+-- a complete call, which the wire parser rejects (a Copilot review catch on PR
+-- #99).  A client that ignores @oneOf@ is no worse off than before; one that
+-- honours it now agrees with the parser about what a legal request is.
+toolDefWith :: Text -> Text -> [(Text, Value)] -> [Text] -> [(Text, Value)] -> Value
+toolDefWith name desc props required extra = object
   [ "name"        .= name
   , "description" .= desc
   , "inputSchema" .= object
-      [ "type"       .= ("object" :: Text)
-      , "properties" .= object [ Key.fromText k .= v | (k, v) <- props ]
-      , "required"   .= required
-      ]
+      ( [ "type"       .= ("object" :: Text)
+        , "properties" .= object [ Key.fromText k .= v | (k, v) <- props ]
+        , "required"   .= required
+        ]
+        <> [ Key.fromText k .= v | (k, v) <- extra ]
+      )
   ]
+
+-- | addressAlternatives: the hole address, as JSON Schema.
+--
+-- These three branches are exactly the shapes 'AgdaMCP.Types.parseHoleRef'
+-- accepts, and @oneOf@ (rather than @anyOf@) is what makes the correspondence
+-- exact: a request naming two of them — an index /and/ a position, or both
+-- spellings of the column — matches two branches and is therefore invalid here,
+-- which is precisely the parser's answer too.  The one rule the schema cannot
+-- carry is that a position must be inside a hole; that needs the file.
+addressAlternatives :: (Text, Value)
+addressAlternatives =
+  ( "oneOf"
+  , toJSON
+      [ requiring ["holeIndex"]
+      , requiring ["line", "column"]
+      , requiring ["line", "col"]
+      ]
+  )
+  where
+    requiring ks = object ["required" .= (ks :: [Text])]
 
 -- | Build a property definition for the input schema.
 prop :: Text -> Text -> Text -> (Text, Value)

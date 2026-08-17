@@ -19,12 +19,14 @@
 --   (issue #79).
 --     get_goal and fill_hole take a 'AgdaMCP.Holes.HoleRef': a @(line, column)@
 --     in the file as written, or the older 0-based @holeIndex@.  The position is
---     the stable handle — filling a hole shifts every later index down by one
---     but moves no other hole's coordinates — and a position inside no hole is
---     an error naming the file's holes, never a guess at the nearest one.  So
---     that a client never has to recompute those coordinates, fill_hole and
---     check_file answer with the full hole list, the shape get_diagnostics
---     already returned.  fill_hole's list describes the file /as the candidate
+--     the handle to prefer — a fill renumbers every index after it whether or
+--     not any text moved, while it moves a position only when the candidate
+--     changes the text above it — and a position inside no hole is an error
+--     naming the file's holes, never a guess at the nearest one.  Because
+--     neither handle survives an arbitrary edit, fill_hole and check_file answer
+--     with the full hole list, the shape get_diagnostics already returned, so
+--     the next address comes from the last response rather than from the
+--     client's memory.  fill_hole's list describes the file /as the candidate
 --     leaves it/, which is what the client will have once it keeps the
 --     candidate; the bytes on disk are restored either way.
 --
