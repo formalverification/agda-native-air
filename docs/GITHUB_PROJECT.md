@@ -153,7 +153,7 @@ Not all work fits the `[MN-k]` planning grid.  Issues filed in response to field
 
 +  The agda-mcp field-test hardening wave, tracked by [#68](https://github.com/formalverification/agda-native-air/issues/68): trust fixes (#69–#73), reach (#74–#77), ergonomics (#78, #79), and its measurement and publication companions (#83, #85, #86).  See `docs/agda-mcp-improvements-summary.md` for an executive summary and `docs/feedback/flrp-agda-mcp-improvements.md` for the field report that motivated it.
 +  In-place checking of library-embedded modules (#66, #67), an earlier field-driven fix in the same spirit.
-+  Agda-Nix library management follow-ons (#54, #55) and the `makeOverlay` optimization (#43).
++  Agda-Nix library management follow-ons (#54, #55), flake shell-hygiene fixes (#96), and the `makeOverlay` optimization (#43).
 
 ---
 
