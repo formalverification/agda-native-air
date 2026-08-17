@@ -25,6 +25,14 @@
 --   'injectReportExpr' splice the hole's actual span (one character for @?@,
 --   arbitrary for @{! e !}@) instead of a fixed four-character token.
 --
+--   On top of the scan sits the /addressing/ model of issue #79: a 'HoleRef'
+--   names one hole, either by its source-order index or by a @(line, column)@
+--   position in the file as written.  The position is the stable handle — a
+--   hole's coordinates do not move when a hole elsewhere is filled, while every
+--   index after a filled hole shifts down by one — and 'resolveHoleRef' turns
+--   either spelling into an index, or into an error that names the file's holes
+--   rather than guessing.
+--
 --   The functions here are pure; AgdaMCP.Tools.ProofState combines them with
 --   the Agda subprocess layer in AgdaMCP.Agda.  The long-term plan (issue
 --   #75) is to make Agda's interaction protocol the source of truth for live
@@ -44,13 +52,20 @@ module AgdaMCP.Holes
   , HoleSpan (..)
   , findHoles
   , findNthHole
+    -- * Hole addressing (issue #79)
+  , HoleRef (..)
+  , offsetOfPosition
+  , holeIndexAtOffset
+  , resolveHoleRef
+  , describeHole
     -- * Splicing
   , substituteHole
   , injectReportExpr
   ) where
 
 import Data.Char (isAlphaNum, isSpace, toLower)
-import Data.List (isSuffixOf)
+import Data.List (isSuffixOf, sortOn)
+import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -437,6 +452,128 @@ findNthHole flav n src
   | n < 0     = Nothing
   | otherwise = let holes = findHoles flav src
                 in  if n < length holes then Just (holes !! n) else Nothing
+
+
+-- ---------------------------------------------------------------------------
+-- Hole addressing (issue #79)
+-- ---------------------------------------------------------------------------
+
+-- | How a tool call names the hole it means.
+--
+-- 'ByPosition' is the stable handle.  A hole's @(line, column)@ is a property of
+-- where it sits in the file, so filling a hole elsewhere leaves it untouched;
+-- 'ByIndex' is a 0-based index into the source-order hole list, so filling any
+-- earlier hole shifts every later index down by one.  That shift is the
+-- bookkeeping § 3.8 of the feedback document records an agent losing track of
+-- between calls, and it is why the two spellings are not equal alternatives:
+-- the index is kept for backward compatibility, the position is the one to use.
+--
+-- Positions are 1-based coordinates in the file /as written/ — literate-file
+-- coordinates for literate sources, exactly what 'HoleSpan' reports and what
+-- @get_diagnostics@, @check_file@, and @fill_hole@ list back.
+data HoleRef
+  = ByIndex Int        -- ^ 0-based index into the source-order hole list.
+  | ByPosition Int Int -- ^ 1-based line and column in the file as written.
+  deriving (Eq, Show)
+
+-- | The 0-based character offset of a 1-based @(line, column)@ position, or
+-- @Nothing@ when the text has no such position.
+--
+-- A column one past a line's last character is accepted — that is where a
+-- line's end sits, and it is a position Agda itself prints in ranges — but a
+-- column beyond it is a miss rather than a silent clamp onto the next line.
+offsetOfPosition :: Int -> Int -> Text -> Maybe Int
+offsetOfPosition line col src
+  | line < 1 || col < 1 = Nothing
+  | otherwise           = go (line - 1) 0 src
+  where
+    go :: Int -> Int -> Text -> Maybe Int
+    go 0 !off rest
+      | col <= T.length (T.takeWhile (/= '\n') rest) + 1 = Just (off + col - 1)
+      | otherwise                                        = Nothing
+    go !n !off rest = case T.breakOn "\n" rest of
+      (_, r) | T.null r -> Nothing          -- the text has fewer lines than that
+      (l, r)            -> go (n - 1) (off + T.length l + 1) (T.drop 1 r)
+
+-- | The index of the hole whose span covers an offset: @start <= off < end@, so
+-- a position at the hole's first character counts and one past its last does
+-- not.  Spans never overlap (the scanner resumes after each hole), so at most
+-- one can match.
+holeIndexAtOffset :: [HoleSpan] -> Int -> Maybe Int
+holeIndexAtOffset holes off =
+  listToMaybe [ i | (i, h) <- zip [0 ..] holes, hsStart h <= off, off < hsEnd h ]
+
+-- | describeHole: one hole named the way an error message and a hole listing
+-- both name it.
+describeHole :: Int -> HoleSpan -> Text
+describeHole i h = T.concat
+  [ "index ", tshow i, " at line ", tshow (hsLine h), ", column ", tshow (hsCol h) ]
+
+-- | Resolve a 'HoleRef' against a source file to a hole index, or explain the
+-- miss loudly.
+--
+-- Loudly, because the alternative is the failure mode the whole issue is about:
+-- an address that no longer means what the caller thinks it means, answered
+-- with a plausible wrong hole.  A miss therefore reports what the file actually
+-- contains — the nearest holes to a position that hit nothing, the census of
+-- holes behind an out-of-range index — so the caller's next call can be right
+-- rather than merely different.
+--
+-- The result is an /index/ because that is what the splicing functions take;
+-- resolution is the only place the two spellings meet.
+resolveHoleRef :: FilePath -> LiterateFlavour -> Text -> HoleRef -> Either Text Int
+resolveHoleRef path flav src ref = case ref of
+  ByIndex i
+    | i >= 0, i < length holes -> Right i
+    | otherwise -> Left $ T.concat
+        [ "Hole index ", tshow i, " not found in ", T.pack path
+        , " (holeIndex is a 0-based index into the source-order hole list, and"
+        , " every index after a filled hole shifts down by one).\n"
+        , census "the holes it does have" (take maxListed indexed)
+        , addressingHint
+        ]
+  ByPosition ln col ->
+    case offsetOfPosition ln col src >>= holeIndexAtOffset holes of
+      Just i  -> Right i
+      Nothing -> Left $ T.concat
+        [ "No hole at line ", tshow ln, ", column ", tshow col
+        , " in ", T.pack path
+        , " (a position addresses the hole whose span contains it; starting at"
+        , " it counts).\n"
+        , census "nearest holes" (nearestTo ln col)
+        , addressingHint
+        ]
+  where
+    holes   = findHoles flav src
+    indexed = zip [0 ..] holes
+
+    -- Enough holes to orient a caller, few enough not to bury the message in a
+    -- file with hundreds of them.
+    maxListed  = 8
+    maxNearest = 3
+
+    -- Nearest by line, ties broken by column: robust even when the requested
+    -- line does not exist in the file, where there is no offset to measure from.
+    nearestTo ln col =
+      take maxNearest (sortOn (\(_, h) -> (abs (hsLine h - ln), abs (hsCol h - col))) indexed)
+
+    census lead shown
+      | null holes = "  " <> T.pack path <> " has no holes.\n"
+      | otherwise  = T.concat
+          [ "  ", lead, " (", tshow (length holes), " in the file):\n"
+          , T.concat [ "    " <> describeHole i h <> "\n" | (i, h) <- shown ]
+          ]
+
+    addressingHint =
+      "  Address a hole by the (line, column) its own listing reports — \
+      \get_diagnostics.holes, check_file.holes, or the holes list every \
+      \fill_hole response carries.\n\
+      \  Those coordinates survive a fill elsewhere in the file; indices do not."
+
+-- | tshow: 'show' into 'Text', for the message builders above.
+tshow :: Show a => a -> Text
+tshow = T.pack . show
+
 
 -- | Replace the n-th hole's actual span with a candidate term.
 substituteHole :: LiterateFlavour -> Int -> Text -> Text -> Maybe Text

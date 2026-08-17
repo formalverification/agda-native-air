@@ -15,6 +15,19 @@
 --   * check_file      - load/reload a file and return all diagnostics
 --   * get_diagnostics - lightweight summary (hole count, error count)
 --
+--   Design note — a hole is addressed by position, and every answer re-anchors
+--   (issue #79).
+--     get_goal and fill_hole take a 'AgdaMCP.Holes.HoleRef': a @(line, column)@
+--     in the file as written, or the older 0-based @holeIndex@.  The position is
+--     the stable handle — filling a hole shifts every later index down by one
+--     but moves no other hole's coordinates — and a position inside no hole is
+--     an error naming the file's holes, never a guess at the nearest one.  So
+--     that a client never has to recompute those coordinates, fill_hole and
+--     check_file answer with the full hole list, the shape get_diagnostics
+--     already returned.  fill_hole's list describes the file /as the candidate
+--     leaves it/, which is what the client will have once it keeps the
+--     candidate; the bytes on disk are restored either way.
+--
 --   Design note — diagnostics are structured (issue #74).
 --     check_file and get_diagnostics report each diagnostic with Agda's own
 --     @code@, its @file@ and @range@, the bounded full message body, and an
@@ -101,7 +114,7 @@ import AgdaMCP.Agda
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
-  , injectReportExpr, substituteHole
+  , injectReportExpr, resolveHoleRef, substituteHole
   )
 import AgdaMCP.Project (projectExtraFlags, resolveProject, withEffectiveFlags)
 import AgdaMCP.Types
@@ -110,15 +123,23 @@ import AgdaMCP.Types
 -- get_goal
 -- ---------------------------------------------------------------------------
 
--- | handleGetGoal: inspect goal type and local context at hole @n@ in given file.
+-- | handleGetGoal: inspect goal type and local context at the addressed hole.
 --
 -- 1. Read source file.
--- 2. Ensure @open import AgdaDojang.Debug@ is in scope (inject it if absent) so the
+-- 2. Resolve the caller's 'HoleRef' — a @(line, column)@ position or a
+--    @holeIndex@ — against that source (issue #79).
+-- 3. Ensure @open import AgdaDojang.Debug@ is in scope (inject it if absent) so the
 --    @reportGoalCtx@ macro resolves.
--- 3. Replace hole @n@ with @reportGoalCtx ?@.
--- 4. Typecheck the patched file IN PLACE (restoring the original afterwards).
--- 5. Parse the AGDADOJANG_REQ_BEGIN/END block from Agda's output.
--- 6. Return structured (goal, context).
+-- 4. Replace the hole with @reportGoalCtx ?@.
+-- 5. Typecheck the patched file IN PLACE (restoring the original afterwards).
+-- 6. Parse the AGDADOJANG_REQ_BEGIN/END block from Agda's output.
+-- 7. Return structured (goal, context).
+--
+-- Steps 2 and 3 are in that order deliberately.  The caller's position is a
+-- position in the file /as it stands/, while the import injection shifts every
+-- line below the module header down by one; resolving first turns the position
+-- into an index, which the injection cannot disturb because an import line
+-- introduces no holes.
 --
 -- Failures are 'ToolFailure' rather than bare 'Text' because this is the one
 -- proof-state tool whose timeout cannot ride inside a success-shaped response —
@@ -132,73 +153,83 @@ handleGetGoal cfg0 params = do
     case TE.decodeUtf8' origBytes of
       Left err  -> pure (Left (FailMessage (decodeError absPath err)))
       Right src ->
-        -- ensureDebugImport runs BEFORE hole finding, so injectReportExpr
-        -- locates the hole in the already-shifted (import-injected) source.
-        case injectReportExpr (reportExpr cfg) (flavourOf absPath)
-               (ggHoleIndex params) (ensureDebugImport (flavourOf absPath) src) of
-          Nothing -> pure . Left . FailMessage $
-            "Hole index " <> T.pack (show (ggHoleIndex params))
-            <> " not found in " <> T.pack absPath
-          Just patched -> do
-            result <- runInPlace cfg absPath origBytes patched
-            -- DEBUG: show what Agda actually returned
-            debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
-              <> " timedOut=" <> T.pack (show (arTimedOut result))
-              <> " elapsedMs=" <> T.pack (show (arElapsedMs result))
-            debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
-            debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
-            -- Agda may emit markers on stdout or stderr; check both.
-            let combined = arStdout result <> "\n" <> arStderr result
-                verdict  = patchedVerdict result goalVerdictMeaning
-                  ("hole " <> T.pack (show (ggHoleIndex params))
-                   <> " replaced by '" <> reportExpr cfg <> " ?'")
-            if arTimedOut result
-              -- A timeout is reported as such rather than as "could not parse
-              -- markers": the markers are missing because Agda was killed, and
-              -- saying so is what tells the caller to raise the bound.  It is a
-              -- structured failure so the response still carries the timing,
-              -- cache, and project metadata the call produced on the way down.
-              then pure . Left . FailTimeout $ TimeoutFailure
-                { tfMessage = timeoutMessage cfg <> "; no goal was reported for hole "
-                    <> T.pack (show (ggHoleIndex params)) <> " in " <> T.pack absPath
-                , tfElapsedMs         = arElapsedMs result
-                , tfCheckedFromSource = checkedFromSourceOf result
-                , tfVerdict           = verdict
-                , tfCommand           = arCommand result
-                , tfProject           = pc
-                }
-              else case parseGoalContext combined of
-                Nothing -> pure . Left . FailMessage $
-                  "Could not parse goal/context markers from Agda output.\n"
-                  <> "ran: " <> commandLine (arCommand result) <> "\n"
-                  <> "output:\n" <> T.take 2000 combined
-                Just (goal, ctx) ->
-                  pure . Right $ GoalInfo
-                    { giGoal    = goal
-                    , giContext = ctx
-                    -- The declared module name (e.g. FLRP.Bridge), parsed from the
-                    -- header — not the file's base name.
-                    , giModule  = moduleNameOf src
-                    , giElapsedMs         = Just (arElapsedMs result)
-                    , giCheckedFromSource = checkedFromSourceOf result
-                    , giVerdict = Just verdict
-                    , giCommand = Just (arCommand result)
-                    , giProject = Just pc
+        case resolveHoleRef absPath (flavourOf absPath) src (ggHole params) of
+          Left miss -> pure (Left (FailMessage miss))
+          Right idx -> do
+            let label = holeLabel (flavourOf absPath) src idx
+            case injectReportExpr (reportExpr cfg) (flavourOf absPath) idx
+                   (ensureDebugImport (flavourOf absPath) src) of
+              -- Unreachable in practice: 'resolveHoleRef' validated the index
+              -- against the same scan, and the injected import adds no holes.
+              Nothing -> pure . Left . FailMessage $
+                "Could not splice the reporting macro over " <> label
+                <> " in " <> T.pack absPath
+              Just patched -> do
+                result <- runInPlace cfg absPath origBytes patched
+                -- DEBUG: show what Agda actually returned
+                debugLog cfg $ "get_goal: exit=" <> T.pack (show (arExitCode result))
+                  <> " timedOut=" <> T.pack (show (arTimedOut result))
+                  <> " elapsedMs=" <> T.pack (show (arElapsedMs result))
+                debugLog cfg $ "get_goal stdout: " <> T.take 500 (arStdout result)
+                debugLog cfg $ "get_goal stderr: " <> T.take 500 (arStderr result)
+                -- Agda may emit markers on stdout or stderr; check both.
+                let combined = arStdout result <> "\n" <> arStderr result
+                    verdict  = patchedVerdict result goalVerdictMeaning
+                      (label <> " replaced by '" <> reportExpr cfg <> " ?'")
+                if arTimedOut result
+                  -- A timeout is reported as such rather than as "could not parse
+                  -- markers": the markers are missing because Agda was killed, and
+                  -- saying so is what tells the caller to raise the bound.  It is a
+                  -- structured failure so the response still carries the timing,
+                  -- cache, and project metadata the call produced on the way down.
+                  then pure . Left . FailTimeout $ TimeoutFailure
+                    { tfMessage = timeoutMessage cfg <> "; no goal was reported for "
+                        <> label <> " in " <> T.pack absPath
+                    , tfElapsedMs         = arElapsedMs result
+                    , tfCheckedFromSource = checkedFromSourceOf result
+                    , tfVerdict           = verdict
+                    , tfCommand           = arCommand result
+                    , tfProject           = pc
                     }
+                  else case parseGoalContext combined of
+                    Nothing -> pure . Left . FailMessage $
+                      "Could not parse goal/context markers from Agda output.\n"
+                      <> "ran: " <> commandLine (arCommand result) <> "\n"
+                      <> "output:\n" <> T.take 2000 combined
+                    Just (goal, ctx) ->
+                      pure . Right $ GoalInfo
+                        { giGoal    = goal
+                        , giContext = ctx
+                        -- The declared module name (e.g. FLRP.Bridge), parsed from the
+                        -- header — not the file's base name.
+                        , giModule  = moduleNameOf src
+                        , giElapsedMs         = Just (arElapsedMs result)
+                        , giCheckedFromSource = checkedFromSourceOf result
+                        , giVerdict = Just verdict
+                        , giCommand = Just (arCommand result)
+                        , giProject = Just pc
+                        }
 
 
 -- ---------------------------------------------------------------------------
 -- fill_hole
 -- ---------------------------------------------------------------------------
 
--- | handleFillHole: try substituting @candidate@ into hole @n@ and typecheck.
+-- | handleFillHole: try substituting @candidate@ into the addressed hole and
+-- typecheck.
 --
--- 1. Read source, substitute candidate into hole n.
+-- 1. Read source, resolve the caller's 'HoleRef' (a @(line, column)@ position
+--    or a @holeIndex@), substitute the candidate over that hole's span.
 -- 2. Typecheck the patched file IN PLACE (restoring the original afterwards).
 -- 3. Exit 0 → ok.  A non-zero exit is ok only when 'onlyOpenHoleErrors' holds,
 --    i.e. every reported error is an open hole's @[UnsolvedInteractionMetas]@;
 --    a candidate that leaves @[UnsolvedMetaVariables]@ or
 --    @[UnsolvedConstraints]@ behind is a type error (issue #69).
+-- 4. Answer with the hole list of the patched source, so a client that keeps
+--    the candidate re-anchors on positions without a second call (issue #79).
+--    Those are the holes of the file /as this candidate leaves it/; the bytes
+--    on disk are restored, so until the candidate is written back the file
+--    still has the holes it started with.
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either ToolFailure FillResult)
 handleFillHole cfg0 params = do
   absPath <- makeAbsolute (fhFilePath params)
@@ -207,48 +238,55 @@ handleFillHole cfg0 params = do
     case TE.decodeUtf8' origBytes of
       Left err  -> pure (Left (FailMessage (decodeError absPath err)))
       Right src ->
-        case substituteHole (flavourOf absPath) (fhHoleIndex params) (fhCandidate params) src of
-          Nothing -> pure . Left . FailMessage $
-            "Hole index " <> T.pack (show (fhHoleIndex params))
-            <> " not found in " <> T.pack (fhFilePath params)
-          Just patched -> do
-            result <- runInPlace cfg absPath origBytes patched
-            -- Agda 2.8.0 emits some errors on stdout; check both streams.
-            let combined = arStdout result <> "\n" <> arStderr result
-                -- Verdict (issues #69, #77).  The timeout arm comes first: a killed
-                -- process exits on its signal (-2 SIGINT, -15 SIGTERM), which is
-                -- otherwise indistinguishable from an ordinary failure, and calling
-                -- an unfinished typecheck a type_error would be a false verdict.
-                -- Below it, a non-zero exit is ok only when every reported error is
-                -- an open hole's [UnsolvedInteractionMetas]; 'onlyOpenHoleErrors'
-                -- explains why this is a whitelist.  An exit code of -1 means the
-                -- agda binary could not be run at all.
-                status
-                  | arTimedOut result           = FillTimeout
-                  | arExitCode result == 0      = FillOk
-                  | arExitCode result == (-1)   = FillCrash
-                  | onlyOpenHoleErrors combined = FillOk
-                  | otherwise                   = FillTypeError
-                msg
-                  | arTimedOut result = Just (timeoutMessage cfg)
-                  | status == FillOk  = Nothing
-                  | otherwise         = Just (T.take 2000 combined)
-                -- Count remaining holes (every Agda hole syntax, code regions
-                -- only) in the patched source after substitution.
-                remainingHoles = length (findHoles (flavourOf absPath) patched)
-            pure . Right $ FillResult
-              { frStatus    = status
-              , frCandidate = fhCandidate params
-              , frMessage   = msg
-              , frRemainingHoles = Just remainingHoles
-              , frElapsedMs = arElapsedMs result
-              , frCheckedFromSource = checkedFromSourceOf result
-              , frVerdict   = patchedVerdict result fillVerdictMeaning
-                  ("hole " <> T.pack (show (fhHoleIndex params))
-                   <> " replaced by the candidate")
-              , frCommand   = arCommand result
-              , frProject   = pc
-              }
+        case resolveHoleRef absPath (flavourOf absPath) src (fhHole params) of
+          Left miss -> pure (Left (FailMessage miss))
+          Right idx -> do
+            let label = holeLabel (flavourOf absPath) src idx
+            case substituteHole (flavourOf absPath) idx (fhCandidate params) src of
+              -- Unreachable in practice: 'resolveHoleRef' validated the index
+              -- against the same scan of the same text.
+              Nothing -> pure . Left . FailMessage $
+                "Could not splice the candidate over " <> label
+                <> " in " <> T.pack absPath
+              Just patched -> do
+                result <- runInPlace cfg absPath origBytes patched
+                -- Agda 2.8.0 emits some errors on stdout; check both streams.
+                let combined = arStdout result <> "\n" <> arStderr result
+                    -- Verdict (issues #69, #77).  The timeout arm comes first: a killed
+                    -- process exits on its signal (-2 SIGINT, -15 SIGTERM), which is
+                    -- otherwise indistinguishable from an ordinary failure, and calling
+                    -- an unfinished typecheck a type_error would be a false verdict.
+                    -- Below it, a non-zero exit is ok only when every reported error is
+                    -- an open hole's [UnsolvedInteractionMetas]; 'onlyOpenHoleErrors'
+                    -- explains why this is a whitelist.  An exit code of -1 means the
+                    -- agda binary could not be run at all.
+                    status
+                      | arTimedOut result           = FillTimeout
+                      | arExitCode result == 0      = FillOk
+                      | arExitCode result == (-1)   = FillCrash
+                      | onlyOpenHoleErrors combined = FillOk
+                      | otherwise                   = FillTypeError
+                    msg
+                      | arTimedOut result = Just (timeoutMessage cfg)
+                      | status == FillOk  = Nothing
+                      | otherwise         = Just (T.take 2000 combined)
+                    -- The holes left in the patched source (every Agda hole
+                    -- syntax, code regions only): the re-anchoring payload, of
+                    -- which remainingHoles is the count.
+                    remaining = holeInfosOf (findHoles (flavourOf absPath) patched)
+                pure . Right $ FillResult
+                  { frStatus    = status
+                  , frCandidate = fhCandidate params
+                  , frMessage   = msg
+                  , frRemainingHoles = Just (length remaining)
+                  , frHoles     = remaining
+                  , frElapsedMs = arElapsedMs result
+                  , frCheckedFromSource = checkedFromSourceOf result
+                  , frVerdict   = patchedVerdict result fillVerdictMeaning
+                      (label <> " replaced by the candidate")
+                  , frCommand   = arCommand result
+                  , frProject   = pc
+                  }
 
 
 -- ---------------------------------------------------------------------------
@@ -283,13 +321,14 @@ handleCheckFile cfg0 params = do
         allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
                      <> parseDiagnostics combined
         (diags, total) = capDiagnostics (cfMaxDiagnostics params) allDiags
-        nHoles  = length (findHoles (flavourOf absPath) src)
+        holes   = holeInfosOf (findHoles (flavourOf absPath) src)
         success = arExitCode result == 0 && not (arTimedOut result)
     pure . Right $ FileCheckResult
       { fcrSuccess     = success
       , fcrDiagnostics = diags
       , fcrDiagnosticsTotal = total
-      , fcrHolesCount  = nHoles
+      , fcrHolesCount  = length holes
+      , fcrHoles       = holes
       , fcrTimedOut    = arTimedOut result
       , fcrElapsedMs   = arElapsedMs result
       , fcrCheckedFromSource = checkedFromSourceOf result
@@ -333,20 +372,11 @@ handleGetDiagnostics cfg0 params = do
                      <> parseDiagnostics combined
         (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
         countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
-        holes    = findHoles (flavourOf absPath) src
-        holeInfo = [ HoleInfo
-                       { hiIndex = i
-                       , hiLine  = hsLine h
-                       , hiCol   = hsCol h
-                       , hiGoal  = "?"  -- Lightweight: no goal extraction here.
-                       }
-                   | (i, h) <- zip [0 ..] holes
-                   ]
     pure . Right $ DiagnosticsResult
       { drFilePath = gdFilePath params
       , drErrors   = countOf DiagError
       , drWarnings = countOf DiagWarning
-      , drHoles    = holeInfo
+      , drHoles    = holeInfosOf (findHoles (flavourOf absPath) src)
       , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
       , drDiagnostics = diags
       , drDiagnosticsTotal = total
@@ -499,6 +529,37 @@ runInPlace cfg absPath originalBytes patched =
     (BS.writeFile absPath (TE.encodeUtf8 patched))
     (BS.writeFile absPath originalBytes)
     (runAgda cfg absPath)
+
+
+-- | holeInfosOf: a scan's spans as the wire hole list — the one construction
+-- behind @get_diagnostics@'s, @check_file@'s, and @fill_hole@'s @holes@ key, so
+-- the three cannot describe holes differently (issue #79).
+--
+-- The goal is the cheap placeholder the shape has always carried: listing holes
+-- costs one pure scan, whereas a real goal per hole costs one Agda run per hole.
+holeInfosOf :: [HoleSpan] -> [HoleInfo]
+holeInfosOf holes =
+  [ HoleInfo
+      { hiIndex = i
+      , hiLine  = hsLine h
+      , hiCol   = hsCol h
+      , hiGoal  = "?"  -- Lightweight: no goal extraction here.
+      }
+  | (i, h) <- zip [0 ..] holes
+  ]
+
+-- | holeLabel: how a resolved hole is named in a sentence — the position first,
+-- because that is the handle to reuse, with the index it resolved to alongside.
+--
+-- 'AgdaMCP.Holes.describeHole' is the same facts as a list entry
+-- (@index 0 at line 22, column 5@); this is the prose form that reads correctly
+-- inside a verdict's patch note or a timeout message.
+holeLabel :: LiterateFlavour -> Text -> Int -> Text
+holeLabel flav src i = case drop i (findHoles flav src) of
+  (h : _) -> "the hole at line " <> T.pack (show (hsLine h))
+               <> ", column " <> T.pack (show (hsCol h))
+               <> " (index " <> T.pack (show i) <> ")"
+  []      -> "hole index " <> T.pack (show i)
 
 
 -- | timeoutDiagnostic: the timeout rendered as an ordinary error diagnostic, so

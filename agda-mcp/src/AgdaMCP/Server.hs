@@ -134,9 +134,11 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
     proofStateTools =
       [ toolDef "get_goal"
           ("Inspect the goal type and local context at a hole. Injects a \
-           \reporting macro over hole N, typechecks the patched file in place, \
-           \reads the goal back from the macro's output, and restores the file \
-           \byte for byte. "
+           \reporting macro over the addressed hole, typechecks the patched \
+           \file in place, reads the goal back from the macro's output, and \
+           \restores the file byte for byte. "
+           <> holeAddressing
+           <> " "
            <> verdictNote
            <> " For this tool verdict.exitCode is normally NON-ZERO even when \
               \the goal is correct, because the injected macro leaves an \
@@ -147,15 +149,19 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            <> " {error, timedOut: true, elapsedMs, checkedFromSource?, verdict,"
            <> " command, project} — naming the bound, since no goal was reported. "
            <> holeModel)
-          [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
-          , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
+          [ prop "filePath"  "string"  "Path to the Agda file (absolute or relative to cwd)."
+          , prop "line"      "integer" lineDoc
+          , prop "column"    "integer" columnDoc
+          , prop "holeIndex" "integer" holeIndexDoc
           ]
-          ["filePath", "holeIndex"]
+          ["filePath"]
 
       , toolDef "fill_hole"
           ("Substitute a candidate term into a hole (replacing the hole's \
            \actual span), typecheck the patched file in place, and restore it \
            \byte for byte. "
+           <> holeAddressing
+           <> " "
            <> verdictNote
            <> " status is \"ok\" if and only if that command exits 0, or fails \
               \with nothing but [UnsolvedInteractionMetas] — holes still open \
@@ -166,22 +172,34 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
               \does not pass the build and is not ok here either. A run killed \
               \by --timeout is \"timeout\" (the candidate was never judged, and \
               \the file is still restored); an agda binary that could not be \
-              \started is \"crash\". holeIndex and remainingHoles cover every \
-              \hole syntax."
+              \started is \"crash\"."
+           <> " EVERY response carries holes: the full hole list of the file AS \
+              \THIS CANDIDATE LEAVES IT — [{index, line, col, goal}], one entry \
+              \per remaining hole, remainingHoles being its length — so you \
+              \re-anchor on the next hole's position without a second call. \
+              \Because the file on disk is restored, those coordinates are the \
+              \ones you get once you write the candidate back; until you do, \
+              \the file still has the holes it started with. The hole address, \
+              \holes, and remainingHoles all cover every hole syntax."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " "
            <> holeModel)
-          [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
-          , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
-          , prop "candidate" "string" "The candidate proof term to try."
+          [ prop "filePath"  "string"  "Path to the Agda file (absolute or relative to cwd)."
+          , prop "line"      "integer" lineDoc
+          , prop "column"    "integer" columnDoc
+          , prop "holeIndex" "integer" holeIndexDoc
+          , prop "candidate" "string"  "The candidate proof term to try."
           ]
-          ["filePath", "holeIndex", "candidate"]
+          ["filePath", "candidate"]
 
       , toolDef "check_file"
           ("Typecheck one Agda file and return all diagnostics. "
            <> verdictNote
            <> " " <> batchNote
            <> " " <> diagnosticModel
+           <> " holes lists every open hole as {index, line, col, goal} \
+              \(holesCount is its length); (line, col) is the stable handle to \
+              \pass back to get_goal and fill_hole."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
@@ -193,7 +211,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
       , toolDef "get_diagnostics"
           ("Typecheck one Agda file and return a summary: error/warning counts, \
            \the diagnostics behind them, and each open hole's index and \
-           \(line, col) position. "
+           \(line, col) position — that (line, col) being the stable handle to \
+           \pass back to get_goal and fill_hole. "
            <> verdictNote
            <> " " <> batchNote
            <> " success and verdict are the same fields check_file returns, with \
@@ -236,6 +255,54 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
               ["name"]
           ]
       | otherwise = []
+
+-- | holeAddressing: how to name the hole you mean, in the two tools that take
+-- one (issue #79).
+--
+-- The description is where the contract lives (the § 6 meta-suggestion of the
+-- feedback document), and the contract worth stating here is not "two
+-- parameters are available" but "one of them is stable and the other is not".
+-- An agent that reads only this must come away addressing holes by position;
+-- § 3.8 records what the other habit costs, and verification found it costs
+-- more than stated, since a miscounted decoy could put "the first hole" inside
+-- a comment.
+holeAddressing :: Text
+holeAddressing =
+  "ADDRESSING A HOLE: pass EITHER (line, column) — 1-based coordinates in the \
+  \file as written, literate-file coordinates for a literate source, exactly \
+  \what get_diagnostics.holes, check_file.holes, and every fill_hole response's \
+  \holes list report — OR holeIndex. PREFER THE POSITION. It names the hole \
+  \itself, so it still names it after any other hole is filled, whereas \
+  \holeIndex is a 0-based index into the source-order hole list and every index \
+  \after a filled hole shifts down by one: an index cached across calls \
+  \silently addresses a different hole. A position addresses the hole whose \
+  \span contains it (a position at its first character counts); a position \
+  \inside no hole is an error listing the file's nearest holes, never a guess. \
+  \Give one spelling or the other — a request carrying both is rejected, \
+  \because the two can disagree. col is accepted as a synonym for column, so a \
+  \hole entry can be passed straight back."
+
+-- | lineDoc / columnDoc / holeIndexDoc: the same contract at the three input
+-- properties, where a client decides what to send.
+lineDoc :: Text
+lineDoc =
+  "1-based line of the hole, in the file as written (literate-file coordinates \
+  \for literate sources). Requires column. The stable way to address a hole: \
+  \unlike holeIndex, it survives a fill elsewhere in the file."
+
+columnDoc :: Text
+columnDoc =
+  "1-based column of the hole, in the file as written. Requires line. The key \
+  \col is accepted as a synonym, so a hole entry from get_diagnostics, \
+  \check_file, or a fill_hole response can be passed back unchanged; sending \
+  \both spellings is fine only if they agree."
+
+holeIndexDoc :: Text
+holeIndexDoc =
+  "0-based index of the hole, in source order (any hole syntax). Accepted for \
+  \backward compatibility and SHIFT-PRONE: filling a hole renumbers every hole \
+  \after it, so an index from an earlier call may now name a different hole. \
+  \Prefer (line, column). Give one or the other, never both."
 
 -- | diagnosticModel: the shape of a diagnostic, stated where the client reads
 -- it (issue #74).
