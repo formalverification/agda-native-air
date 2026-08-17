@@ -38,7 +38,10 @@
 --   defined only in an include is not discovered — the failure message says so,
 --   and @--check-command@ is the escape hatch.  The alternative, running @make@
 --   speculatively to ask, evaluates the makefile (@$(shell …)@ and all) just to
---   answer a question the caller can settle by naming the command.
+--   answer a question the caller can settle by naming the command.  In each
+--   directory the file consulted is the one @make@ itself would read (the first
+--   of @GNUmakefile@, @makefile@, @Makefile@), so the makefile the response
+--   names is always the makefile the gate ran.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -60,6 +63,7 @@ module AgdaMCP.Gate
   , makefileNames
     -- * Discovery (IO; exposed for testing)
   , findMakefileGate
+  , firstMakefileIn
   , findEverythingModule
   , everythingNames
   ) where
@@ -92,7 +96,10 @@ data GateConfig = GateConfig
   { gcCommand :: Maybe [String]
     -- ^ @--check-command@, as an argument vector (the flag's value is split on
     --   whitespace).  Run directly, with no shell, so it cannot contain a
-    --   pipeline, a redirect, or a @&&@ — and cannot mask an exit code.
+    --   pipeline, a redirect, or a @&&@, and nothing this server puts around the
+    --   gate can mask its exit code.  A wrapper /script/ named here can still
+    --   lie about its own, which is what
+    --   'AgdaMCP.Tools.CheckProject' detects and reports as @maskedFailure@.
   , gcTimeout :: Maybe Int
     -- ^ @--check-timeout@, in seconds.  'Nothing', or any non-positive number,
     --   means no bound — the usual command-line spelling of "unlimited", and
@@ -290,12 +297,19 @@ listOf ps = T.intercalate ", " (map T.pack ps)
 makefileNames :: [FilePath]
 makefileNames = ["GNUmakefile", "makefile", "Makefile"]
 
--- | findMakefileGate: the nearest Makefile declaring @target@, walking up from
+-- | findMakefileGate: the nearest makefile declaring @target@, walking up from
 -- a directory to the repository boundary.
 --
 -- @Right (makefile, dir)@ is the file and the directory @make@ should run in.
 -- @Left dirs@ lists every directory that was examined, so the failure message
 -- can show its work.
+--
+-- In each directory only the makefile @make@ /would read/ is consulted — the
+-- first of @GNUmakefile@, @makefile@, @Makefile@ that exists, which is make's
+-- own precedence rule.  Reading past it to a lower-precedence file that happens
+-- to declare the target would let the echo name a file the gate never ran, and
+-- the run would then fail with make's "No rule to make target" for a target we
+-- had just said existed.
 findMakefileGate :: Text -> FilePath -> IO (Either [FilePath] (FilePath, FilePath))
 findMakefileGate target dir0 = makeAbsolute dir0 >>= go []
   where
@@ -304,7 +318,7 @@ findMakefileGate target dir0 = makeAbsolute dir0 >>= go []
       if not isDir
         then pure (Left (reverse seen))
         else do
-          hit <- firstDeclaring dir makefileNames
+          hit <- declaringMakefileIn dir
           case hit of
             Just makefile -> pure (Right (makefile, dir))
             Nothing       -> do
@@ -315,18 +329,31 @@ findMakefileGate target dir0 = makeAbsolute dir0 >>= go []
                 then pure (Left (reverse seen'))
                 else go seen' up
 
-    firstDeclaring _   []           = pure Nothing
-    firstDeclaring dir (name : rest) = do
-      let path = dir </> name
-      mTxt <- readTextMaybe path
-      case mTxt of
-        Just txt | makefileDeclares target txt -> pure (Just path)
-        _                                      -> firstDeclaring dir rest
+    declaringMakefileIn dir = do
+      mMakefile <- firstMakefileIn dir
+      case mMakefile of
+        Nothing   -> pure Nothing
+        Just path -> do
+          mTxt <- readTextMaybe path
+          pure $ case mTxt of
+            Just txt | makefileDeclares target txt -> Just path
+            _                                      -> Nothing
 
     isRepoRoot dir = do
       f <- doesFileExist (dir </> ".git")
       d <- doesDirectoryExist (dir </> ".git")
       pure (f || d)
+
+-- | firstMakefileIn: the makefile @make@ would read in a directory, or
+-- 'Nothing' if it has none.
+firstMakefileIn :: FilePath -> IO (Maybe FilePath)
+firstMakefileIn dir = go makefileNames
+  where
+    go []           = pure Nothing
+    go (name : rest) = do
+      let path = dir </> name
+      exists <- doesFileExist path
+      if exists then pure (Just path) else go rest
 
 -- | makefileDeclares: does this makefile have a rule for @target@?
 makefileDeclares :: Text -> Text -> Bool

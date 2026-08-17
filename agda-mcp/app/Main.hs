@@ -170,9 +170,10 @@ usage = unlines
   , "  --check-command \"...\" The project's acceptance gate, for check_project."
   , "                        Split on whitespace and run DIRECTLY, with no shell"
   , "                        — so it cannot contain a pipeline or a redirect, and"
-  , "                        cannot mask the gate's exit code.  Without it,"
-  , "                        check_project discovers the nearest Makefile's"
-  , "                        'check' target, else the project's Everything module."
+  , "                        nothing this server puts around your gate can mask"
+  , "                        its exit code.  Without it, check_project discovers"
+  , "                        the nearest Makefile's 'check' target, else the"
+  , "                        project's Everything module."
   , "  --check-timeout N     Timeout for one check_project run, in seconds"
   , "                        (default: " <> show defaultCheckTimeoutSeconds
                              <> "; 0 = no limit).  Separate from --timeout,"

@@ -25,10 +25,19 @@
 --     is Agda's prose drifting and silently turning a red build green.  A gate
 --     has a second one, and it is the one the field session actually met: a
 --     wrapper can report 0 for a build that failed.  So @success@ here is a
---     conjunction — exit 0, in time, and no error diagnostic in the output —
+--     conjunction — exit 0, in time, and no failure evidence in the output —
 --     while @verdict.exitCode@ echoes the gate's own status verbatim and is
 --     never overridden.  The extra conjunct can only turn a green gate red,
 --     never a red one green, and when it fires it is named: @maskedFailure@.
+--
+--     "Failure evidence" is two recognizers, not a general theory: Agda's own
+--     error diagnostics, and the gate's own failure lines ('gateFailureLines' —
+--     make reporting a recipe that died, which is what a missing tool or a
+--     failed non-Agda step looks like).  A mask that prints neither is reported
+--     as a pass, and there is no honest way around that from outside the
+--     wrapper.  What follows from it is the rule that @outputTail@ is returned
+--     whatever the verdict: the response must never say "pass" while withholding
+--     the one thing that could contradict it.
 --
 --   Design note — bounded like everything else (issue #77), but sized for a
 --   project.
@@ -59,6 +68,7 @@ module AgdaMCP.Tools.CheckProject
   , progressModules
   , parseCheckingLine
   , failingModuleOf
+  , gateFailureLines
   , outputTailOf
   , projectVerdictMeaning
   , projectTimeoutMessage
@@ -75,7 +85,7 @@ import System.Directory
 import System.FilePath (takeDirectory)
 
 import AgdaMCP.Agda
-  ( AgdaConfig (..), AgdaResult (..), runCommand )
+  ( AgdaConfig (..), AgdaResult (..), debugLog, runCommand )
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Gate
   ( GateConfig, GatePlan (..), checkTimeoutOf, resolveGate )
@@ -127,7 +137,16 @@ runGate
 runGate cfg gcfg params pc plan = do
   let bound  = checkTimeoutOf gcfg
       runCfg = cfg { agdaTimeout = bound }
+  -- Under --verbose, say which gate was chosen /before/ running it: a gate can
+  -- run for tens of minutes, and an operator watching stderr should not have to
+  -- wait for the response to learn what is running.
+  debugLog runCfg $ "check_project: gate " <> T.pack (show (gateSource (gpGate plan)))
+    <> " → " <> T.pack (unwords (gpBinary plan : gpArgs plan))
+    <> " (cwd " <> T.pack (maybe "<server's>" id (gpCwd plan)) <> ")"
   result <- runCommand runCfg (gpBinary plan) (gpArgs plan) (gpCwd plan)
+  debugLog runCfg $ "check_project: exit=" <> T.pack (show (arExitCode result))
+    <> " timedOut=" <> T.pack (show (arTimedOut result))
+    <> " elapsedMs=" <> T.pack (show (arElapsedMs result))
   let combined = arStdout result <> "\n" <> arStderr result
       -- Agda's own diagnostics, from whichever stream they arrived on.  The
       -- timeout notice is ours, so it is kept out of 'parsed' and prepended to
@@ -135,15 +154,27 @@ runGate cfg gcfg params pc plan = do
       -- must not be able to take part in the masked-failure test below.
       parsed   = parseDiagnostics combined
       timedOut = arTimedOut result
+      -- The field-session trap: exit 0 with a failure in the log.  Two kinds of
+      -- evidence count, because a masked gate need not have failed inside Agda —
+      -- Agda's own error diagnostics, and the gate's own failure lines (make
+      -- reporting a recipe that died, which is what a missing tool or a failed
+      -- non-Agda step looks like).
+      agdaErrors   = any ((== DiagError) . diagSeverity) parsed
+      gateFailures = gateFailureLines combined
+      masked   = arExitCode result == 0 && not timedOut
+                   && (agdaErrors || not (null gateFailures))
+      success  = arExitCode result == 0 && not timedOut && not masked
+      -- When the mask is caught by a gate failure line alone, that line is the
+      -- only thing explaining the verdict, so it is reported as a diagnostic of
+      -- ours.  When Agda did report errors, they are the root cause and this
+      -- would only push them out of firstError.
+      maskDiags = [ plainDiagnostic DiagError (maskedMessage ln)
+                  | masked, not agdaErrors, ln <- take 1 gateFailures ]
       allDiags = [ plainDiagnostic DiagError (projectTimeoutMessage bound) | timedOut ]
+                   <> maskDiags
                    <> parsed
       (diags, total) = capDiagnostics (cppMaxDiagnostics params) allDiags
       firstErr = find ((== DiagError) . diagSeverity) allDiags
-      -- The field-session trap: exit 0 with errors in the log.  Judged on
-      -- Agda's diagnostics alone, and only on a run that finished.
-      masked   = arExitCode result == 0 && not timedOut
-                   && any ((== DiagError) . diagSeverity) parsed
-      success  = arExitCode result == 0 && not timedOut && not masked
       progress = progressModules combined
       (failMod, failFile) = failingModuleOf progress firstErr
   pure CheckProjectResult
@@ -159,11 +190,13 @@ runGate cfg gcfg params pc plan = do
     , cprFailingModule    = failMod
     , cprFailingFile      = failFile
     , cprModulesChecked   = length (nub (map fst progress))
-      -- Only on a failure: a passing gate's output is noise, while a failing
-      -- one can have failed for a reason Agda never printed — a missing target,
-      -- a shell error, a killed build — and leaving the caller to infer it from
-      -- an empty diagnostics list is how a tool sends someone back to the shell.
-    , cprOutputTail       = if success then Nothing else outputTailOf combined
+      -- Returned whatever the verdict, and that is the point.  A masked failure
+      -- this server does not recognize — a wrapper hiding a failure that printed
+      -- nothing we can key on — is a run reported as a pass, and withholding the
+      -- output exactly there would leave the caller with no way to see it at all.
+      -- The tail is what makes an unrecognized mask visible rather than silent;
+      -- it also costs nothing on a quiet gate, whose output is empty.
+    , cprOutputTail       = outputTailOf combined
     , cprVerdict          = projectVerdict result
     , cprCommand          = arCommand result
     , cprProject          = reportedContext pc plan
@@ -232,15 +265,17 @@ projectVerdict result = Verdict
 projectVerdictMeaning :: Text
 projectVerdictMeaning =
   "success is true if and only if that command exited 0, finished inside the \
-  \--check-timeout bound, and printed no error diagnostic. exitCode is the \
+  \--check-timeout bound, and printed no failure evidence. exitCode is the \
   \gate's own status, echoed verbatim and never overridden or reinterpreted, so \
   \a failing gate cannot be reported green. The reverse is possible and \
-  \deliberate: a gate that exits 0 while its output carries Agda errors is \
-  \reported as success:false with maskedFailure:true, because a wrapper script \
-  \whose last command is an echo exits 0 whatever make did — the trap that made \
-  \the field session grep its build logs for 'error:', which is exactly what \
-  \this tool exists to make unnecessary. So the output can turn a green gate \
-  \red, never a red gate green."
+  \deliberate: a gate that exits 0 while its output carries an Agda error or a \
+  \make failure line is reported as success:false with maskedFailure:true, \
+  \because a wrapper script whose last command is an echo exits 0 whatever make \
+  \did — the trap that made the field session grep its build logs for 'error:', \
+  \which is exactly what this tool exists to make unnecessary. So the output can \
+  \turn a green gate red, never a red gate green. Those two recognizers are not \
+  \a general theory of failure: a mask that prints neither is reported as a \
+  \pass, which is why outputTail is returned whatever the verdict."
 
 -- | projectTimeoutMessage: the timeout, as the caller needs to read it — the
 -- bound that was hit, and the reason it is usually the wrong bound rather than
@@ -305,6 +340,48 @@ failingModuleOf progress mErr = case mErr >>= diagFile of
 
     lastMaybe [] = Nothing
     lastMaybe xs = Just (last xs)
+
+-- | gateFailureLines: lines in which the gate itself reports having failed, as
+-- distinct from Agda reporting a type error.
+--
+-- The gap this closes was found in review of the first version: @maskedFailure@
+-- was judged from Agda's diagnostics alone, so a wrapper that masked a failure
+-- Agda never saw — a missing tool, a failed non-Agda step, @make@ giving up —
+-- still came back @success: true@, which is precisely the trap the tool claims
+-- to remove.
+--
+-- What is recognized is GNU make's own error line, in the shapes it prints:
+--
+-- > make: *** [Makefile:12: check] Error 2
+-- > make[1]: *** No rule to make target 'check'.  Stop.
+-- > gmake: *** [check] Error 1
+--
+-- The @make@-family name is required before the @: *** @, so a line that merely
+-- quotes one (in Agda's output, or in a recipe echoing a command) is not
+-- evidence.  This is a list of recognized markers rather than a general theory
+-- of failure, and the contract says so: a mask this list does not recognize is
+-- reported as a pass — which is why 'cprOutputTail' is now returned whatever
+-- the verdict, so the caller can see the evidence even when the server could
+-- not name it.
+gateFailureLines :: Text -> [Text]
+gateFailureLines txt =
+  [ line | raw <- T.lines txt, let line = T.strip raw, isMakeFailure line ]
+  where
+    isMakeFailure line =
+      let (before, rest) = T.breakOn ": *** " line
+      in  not (T.null rest) && T.takeWhile (/= '[') before `elem` makeNames
+
+    -- The program name make prints, including the @make[N]@ of a sub-make.
+    makeNames = ["make", "gmake", "mingw32-make"]
+
+-- | maskedMessage: the diagnostic that explains a mask caught by a gate failure
+-- line rather than by an Agda error.
+maskedMessage :: Text -> Text
+maskedMessage line =
+  "the gate exited 0, but its output reports a failure: " <> line
+  <> " — reported as success:false with maskedFailure:true, since a wrapper's"
+  <> " exit status is its last command's and says nothing about what failed"
+  <> " inside it."
 
 -- | outputTailOf: the end of the gate's output, bounded.
 --

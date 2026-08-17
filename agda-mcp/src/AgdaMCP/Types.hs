@@ -953,12 +953,16 @@ instance ToJSON Gate where
 --   * the gate's exit code is echoed verbatim as @verdict.exitCode@ and is
 --     never overridden or reinterpreted;
 --   * 'cprSuccess' is true only when that code is 0, the run finished inside
---     its bound, /and/ no error diagnostic was found in its output;
+--     its bound, /and/ no failure evidence was found in its output — an Agda
+--     error diagnostic, or the gate's own failure line (make reporting a recipe
+--     that died);
 --   * the third conjunct failing on its own is 'cprMaskedFailure', named and
 --     reported rather than folded silently into the verdict.
 --
 -- The evidence can therefore make a green gate red, never the other way round —
--- the safe direction, and the one that removes the grep.
+-- the safe direction, and the one that removes the grep.  Those recognizers are
+-- a list, not a theory: a mask that prints neither is reported as a pass, which
+-- is why 'cprOutputTail' is returned whatever the verdict.
 data CheckProjectResult = CheckProjectResult
   { cprSuccess        :: Bool          -- ^ Exit 0, in time, and no error diagnostic.
   , cprTimedOut       :: Bool          -- ^ True iff the gate hit the @--check-timeout@ bound.
@@ -978,11 +982,12 @@ data CheckProjectResult = CheckProjectResult
   , cprModulesChecked :: Int           -- ^ Distinct modules Agda re-typechecked from source
                                        --   during the run (0 on a fully warm gate).  On a
                                        --   timeout this is how far it got.
-  , cprOutputTail     :: Maybe Text    -- ^ The tail of the gate's output, bounded; present
-                                       --   only when the check did not succeed, since a gate
-                                       --   can fail for reasons Agda never printed (a missing
-                                       --   target, a shell error) and a client must not be
-                                       --   left blind.
+  , cprOutputTail     :: Maybe Text    -- ^ The tail of the gate's output, bounded, whatever
+                                       --   the verdict — absent only when the gate printed
+                                       --   nothing.  A gate can fail for reasons Agda never
+                                       --   printed (a missing tool, a shell error), and a
+                                       --   mask this server cannot recognize is reported as a
+                                       --   pass, so the evidence has to be there to be read.
   , cprVerdict        :: Verdict        -- ^ What was run and what @success@ means (#72).
   , cprCommand        :: CommandEcho    -- ^ The resolved command line and its cwd (#72).
   , cprProject        :: ProjectContext -- ^ The tree the gate ran in (#76).

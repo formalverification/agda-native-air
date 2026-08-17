@@ -27,6 +27,12 @@
 #           docs/feedback/flrp-agda-mcp-improvements.md, reproduced verbatim so
 #           the test suite can pin that check_project reports it as
 #           maskedFailure rather than as a pass.
+#   masked-make
+#           the same trap with NO Agda diagnostic in the log: the build dies in
+#           make's own plumbing (a missing tool), so the only evidence is make's
+#           error line.  Copilot's review of PR 98 found that the first version
+#           judged masking from Agda's diagnostics alone and reported this case
+#           as a pass; this mode is the regression fixture for that.
 #   slow    print one "Checking" line and then sleep SECONDS (default 30),
 #           for the timeout path.  If MARKER is given, a BACKGROUNDED SUBSHELL
 #           creates that file after the sleep — so a test that outwaits the
@@ -99,6 +105,16 @@ case "$mode" in
     ( exit 1 )
     # ... and the wrapper's last command is an echo, so the shell exits 0.
     # Nothing may follow this line: that is the whole point of the fixture.
+    echo "gate finished"
+    ;;
+
+  masked-make)
+    progress_ok
+    # No Agda diagnostic anywhere: the failure is in make's own plumbing, which
+    # is what a missing tool or a failed non-Agda step looks like.
+    echo "/bin/sh: line 1: agda: command not found" >&2
+    echo "make: *** [Makefile:12: check] Error 127" >&2
+    # Same trap, same reason: the wrapper's last command is an echo.
     echo "gate finished"
     ;;
 esac

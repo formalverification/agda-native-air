@@ -209,7 +209,7 @@ agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
 | `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the three search tools. |
 | `--timeout N`        | Per-typecheck timeout in seconds (default: 300; `0` means no limit).  Enforced: on expiry the `agda` process group is killed and the tool reports a timeout.  Size it for a *cold* first check — see below. |
-| `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect — and cannot mask the gate's exit code.  Without it, `check_project` discovers the gate (see below). |
+| `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect, and nothing this server puts around your gate can mask its exit code.  (A wrapper *script* you name here can still lie about its own — that is what `maskedFailure` catches.)  Without it, `check_project` discovers the gate (see below). |
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
@@ -561,12 +561,14 @@ The upward search stops at a repository boundary (a `.git` file or directory), s
 **`success` is a conjunction, and that is the whole point.**
 
 ```
-success  ⟺  exit 0  ∧  finished inside the bound  ∧  no error diagnostic in the output
+success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence in the output
 ```
 
 +  `verdict.exitCode` is the gate's own status, echoed verbatim and never overridden, so a failing gate can never be reported green.
-+  The reverse is deliberate.  A gate that exits 0 while its output carries errors is reported as `"success": false` with `"maskedFailure": true` — the wrapper-ending-in-`echo` trap, named in the response instead of left for the client to grep for.
++  The reverse is deliberate.  A gate that exits 0 while its output carries failure evidence is reported as `"success": false` with `"maskedFailure": true` — the wrapper-ending-in-`echo` trap, named in the response instead of left for the client to grep for.
++  *Failure evidence* is two recognizers: an Agda error diagnostic, and the gate's own failure line — GNU make's `make: *** [Makefile:12: check] Error 2` and its `make[1]:` / `gmake:` variants, which is what a missing tool or a failed non-Agda step looks like.  When the second one is what caught the mask, it becomes the diagnostic explaining the verdict, since Agda printed nothing that would.
 +  So the evidence can turn a green gate red, never a red gate green.  This is the one place the server departs from "the verdict is the exit code and nothing else" (issue #72), and it departs only in the safe direction: there, the risk was Agda's prose drifting and silently passing a broken build; here, the risk is a wrapper the server did not write.
++  Those recognizers are a list, not a theory of failure.  A wrapper that hides a failure printing neither is reported as a pass, and no honest reading from outside the wrapper can do better — which is exactly why `outputTail` comes back whatever the verdict.  The response never claims a pass while withholding the output that could contradict it.
 +  The cost is a false alarm for a gate that prints an Agda `error:` block in the course of passing — a deliberately-failing negative test, say.  The diagnostics and the exit code are both right there in the response, so the alarm is legible rather than mysterious.
 
 **Output (a gate whose exit code was masked)**.  An ordinary failure looks the same but with a non-zero `exitCode` and no `maskedFailure`.
@@ -617,7 +619,7 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no error diagnostic i
 | `firstError`     | The first error-severity diagnostic, lifted out of the (capped) `diagnostics` list so a client need not scan it.  The list itself is the [structured-diagnostics](#structured-diagnostics-issue-74) shape, root-cause ordered and capped by `maxDiagnostics`. |
 | `failingModule` / `failingFile` | The module the gate stopped in: the one carrying `firstError`, or — on a timeout — the last module `agda` started.  The module name comes from Agda's own `Checking M (path).` progress line. |
 | `modulesChecked` | How many distinct modules `agda` re-typechecked from source, so how much of the project was actually rebuilt: 0 on a fully warm gate, the whole import graph on a cold one, and on a timeout, how far it got. |
-| `outputTail`     | The bounded tail of the gate's stdout and stderr (40 lines / 4000 characters, elision counted), present **only** when the check did not pass.  A gate can fail for reasons Agda never printed — no such target, a missing tool, a killed build — and this is what says so. |
+| `outputTail`     | The bounded tail of the gate's stdout and stderr (40 lines / 4000 characters, elision counted), returned **whatever the verdict** and absent only when the gate printed nothing.  A gate can fail for reasons Agda never printed — no such target, a missing tool, a killed build — and a mask the two recognizers above miss is reported as a pass, so the evidence has to be in the response to be read. |
 | `timeoutSeconds` | The `--check-timeout` bound in effect; absent when unbounded. |
 
 **Cost, and no streaming.**  This call *blocks* for the whole gate — 10–20 minutes is an ordinary figure for a large library — and reports its timings at the end.  The MCP transport here is a synchronous line loop with no progress-notification plumbing, so streaming progress is honest follow-on scope rather than something the framing already supports; `modulesChecked` and `failingModule` are the progress report a blocking call *can* give, including on the timeout path.  Narrowing a check to the files changed `since` a revision is likewise follow-on scope.

@@ -88,8 +88,8 @@ import AgdaMCP.Project
   )
 import AgdaMCP.Server (ServerConfig (..), toolDefinitions)
 import AgdaMCP.Tools.CheckProject
-  ( handleCheckProject, failingModuleOf, maxTailLines, outputTailOf
-  , parseCheckingLine, progressModules )
+  ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
+  , outputTailOf, parseCheckingLine, progressModules )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -2165,10 +2165,11 @@ fakeGatePath = "test" </> "resources" </> "fake-project-gate.sh"
 
 -- | GateScene: three fixture projects, one per way discovery can go.
 data GateScene = GateScene
-  { gsProject :: FilePath  -- ^ a Makefile declaring @check@ (and a @sub/@ to anchor from)
-  , gsSub     :: FilePath  -- ^ a subdirectory of it, so the upward walk is exercised
-  , gsEntry   :: FilePath  -- ^ no Makefile, but an @Everything.agda@
-  , gsBare    :: FilePath  -- ^ neither: the "no gate found" case
+  { gsProject  :: FilePath -- ^ a Makefile declaring @check@ (and a @sub/@ to anchor from)
+  , gsSub      :: FilePath -- ^ a subdirectory of it, so the upward walk is exercised
+  , gsEntry    :: FilePath -- ^ no Makefile, but an @Everything.agda@
+  , gsBare     :: FilePath -- ^ neither: the "no gate found" case
+  , gsShadowed :: FilePath -- ^ a @GNUmakefile@ without @check@ shadowing a @Makefile@ with it
   }
 
 -- | withGateScene: build the scene, run an action on it, remove it.
@@ -2179,6 +2180,9 @@ data GateScene = GateScene
 --   \<tmp\>/agda-mcp-gate/entry/.git
 --   \<tmp\>/agda-mcp-gate/entry/Everything.agda
 --   \<tmp\>/agda-mcp-gate/bare/.git
+--   \<tmp\>/agda-mcp-gate/shadowed/.git
+--   \<tmp\>/agda-mcp-gate/shadowed/GNUmakefile  (no check target)
+--   \<tmp\>/agda-mcp-gate/shadowed/Makefile     (has one, but make never reads it)
 --
 -- The @.git@ markers are what make these projects rather than directories: the
 -- upward search stops at a repository boundary, so without them a fixture would
@@ -2188,22 +2192,27 @@ withGateScene gate act = do
   tmp <- getTemporaryDirectory
   let scene = tmp </> "agda-mcp-gate"
       gs = GateScene
-        { gsProject = scene </> "project"
-        , gsSub     = scene </> "project" </> "sub"
-        , gsEntry   = scene </> "entry"
-        , gsBare    = scene </> "bare"
+        { gsProject  = scene </> "project"
+        , gsSub      = scene </> "project" </> "sub"
+        , gsEntry    = scene </> "entry"
+        , gsBare     = scene </> "bare"
+        , gsShadowed = scene </> "shadowed"
         }
   bracket_ (build gs scene) (removeTree scene) (act gs)
   where
     build gs scene = do
       removeTree scene
       mapM_ (createDirectoryIfMissing True)
-        [gsSub gs, gsEntry gs, gsBare gs]
+        [gsSub gs, gsEntry gs, gsBare gs, gsShadowed gs]
       mapM_ (\d -> TIO.writeFile (d </> ".git") "gitdir: fixture\n")
-        [gsProject gs, gsEntry gs, gsBare gs]
+        [gsProject gs, gsEntry gs, gsBare gs, gsShadowed gs]
       TIO.writeFile (gsProject gs </> "Makefile") (makefileFor gate)
       TIO.writeFile (gsEntry gs </> "Everything.agda")
         "module Everything where\n\nopen import Agda.Builtin.Nat\n"
+      -- GNU make reads GNUmakefile and never looks at Makefile, so a `check`
+      -- declared only in the latter is not this project's gate.
+      TIO.writeFile (gsShadowed gs </> "GNUmakefile") "other:\n\t@true\n"
+      TIO.writeFile (gsShadowed gs </> "Makefile")    "check:\n\t@true\n"
 
     makefileFor g = T.unlines
       [ "# Fixture Makefile for the tier-1f gate tests (issue #78)."
@@ -2296,6 +2305,30 @@ gateTests = do
 
         , runTest "outputTailOf: empty output has no tail" $
             assertEqual "tail" Nothing (outputTailOf "   \n\n  ")
+
+        , runTest "gateFailureLines: make's own failure lines, and nothing else" $
+            -- The evidence that catches a mask hiding a failure Agda never saw.
+            -- A line that merely mentions make is not evidence.
+            allOf
+              [ assertEqual "matches"
+                  [ "make: *** [Makefile:12: check] Error 127"
+                  , "make[1]: *** No rule to make target 'check'.  Stop."
+                  , "gmake: *** [check] Error 1"
+                  ]
+                  (gateFailureLines (T.unlines
+                     [ "Checking A (/x/A.agda)."
+                     , "make: *** [Makefile:12: check] Error 127"
+                     , "  make[1]: *** No rule to make target 'check'.  Stop."
+                     , "gmake: *** [check] Error 1"
+                     ]))
+              , assertEqual "no false positives" []
+                  (gateFailureLines (T.unlines
+                     [ "make: Nothing to be done for 'check'."
+                     , "make: Entering directory '/x'"
+                     , "echo \"make: *** pretend\" > log"
+                     , "/x/M.agda:3.1-5: error: [NotInScope]"
+                     ]))
+              ]
         ]
 
       sceneRes <- withGateScene gate $ \gs -> do
@@ -2318,6 +2351,8 @@ gateTests = do
                        (paramsAt (gsProject gs))
         maskedRes <- handleCheckProject agdaCfg (gateCfg ["masked"] 60)
                        (paramsAt (gsProject gs))
+        maskedMake <- handleCheckProject agdaCfg (gateCfg ["masked-make"] 60)
+                        (paramsAt (gsProject gs))
 
         failing <- sequence
           [ runTest "check_project: a gate that fails mid-run is a non-success verdict" $
@@ -2372,7 +2407,11 @@ gateTests = do
                      && T.pack (gsProject gs) `T.isInfixOf` vEquivalentTo (cprVerdict r))
                 , assertEqual "args" ["pass", "1"] (ceArgs (cprCommand r))
                 , assertEqual "cwd" (gsProject gs) (ceCwd (cprCommand r))
-                , assertEqual "outputTail" Nothing (cprOutputTail r)
+                  -- The tail comes back even on a pass: a mask this server
+                  -- cannot recognize is reported as a pass, so withholding the
+                  -- output exactly there is what would hide it.
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False ("Gate.Ok" `T.isInfixOf`) (cprOutputTail r))
                 , assertEqual "timeoutSeconds" (Just 60) (cprTimeoutSeconds r)
                 ]
 
@@ -2410,6 +2449,25 @@ gateTests = do
                            , "\"gate\":", "\"modulesChecked\":" ]
                     missing = [k | k <- want, not (k `T.isInfixOf` wire)]
                 in  assert ("missing from the response: " <> show missing) (null missing)
+
+          , runTest "check_project: a mask with no Agda diagnostic is still caught" $
+              -- Copilot's review of PR 98: judging the mask from Agda's
+              -- diagnostics alone let a wrapper hiding a *non-Agda* failure —
+              -- a missing tool, make giving up — come back success:true with
+              -- nothing in the response to show it.  The gate's own failure
+              -- line is evidence too, and it becomes the diagnostic that
+              -- explains the verdict.
+              withRight maskedMake $ \r -> allOf
+                [ assertEqual "exitCode" 0 (vExitCode (cprVerdict r))
+                , assert "maskedFailure should be True" (cprMaskedFailure r)
+                , assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assert ("firstError was " <> show (cprFirstError r))
+                    (maybe False (("make: *** [Makefile:12: check] Error 127" `T.isInfixOf`)
+                                   . diagMessage)
+                           (cprFirstError r))
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False ("command not found" `T.isInfixOf`) (cprOutputTail r))
+                ]
 
           , runTest "check_project: a passing gate does not claim a masked failure" $
               -- The key, not the word: verdict.meaning explains maskedFailure in
@@ -2470,6 +2528,7 @@ gateTests = do
         -- Discovery: what runs when nothing is configured.
         found     <- findMakefileGate "check" (gsSub gs)
         missed    <- findMakefileGate "nope"  (gsSub gs)
+        shadowed  <- findMakefileGate "check" (gsShadowed gs)
         projectPc <- contextFor agdaCfg (gsProject gs)
         entryPc   <- contextFor agdaCfg (gsEntry gs)
         barePc    <- contextFor agdaCfg (gsBare gs)
@@ -2486,6 +2545,13 @@ gateTests = do
 
           , runTest "gate discovery: an undeclared target misses, listing every directory searched" $
               assertEqual "searched" (Left [gsSub gs, gsProject gs]) missed
+
+          , runTest "gate discovery: only the makefile make itself would read is consulted" $
+              -- A GNUmakefile shadows a Makefile for GNU make, so a `check`
+              -- declared only in the shadowed file is not a gate: naming it
+              -- would echo a makefile the run never read, and `make check`
+              -- would then fail for a target we had just said existed.
+              assertEqual "searched" (Left [gsShadowed gs]) shadowed
 
           , runTest "gate discovery: with no target given, the Makefile's check target is the gate" $
               case makeGate of

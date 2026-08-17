@@ -419,13 +419,18 @@ gateModel =
 projectHonestyNote :: Text
 projectHonestyNote =
   "success is true if and only if the gate exited 0, finished inside the bound, \
-  \AND its output carried no error diagnostic. exitCode is the gate's own \
-  \status, echoed verbatim and never overridden, so a failing gate can never be \
-  \reported green. The reverse is deliberate: a gate that exits 0 while its \
-  \output carries errors is reported as success:false with maskedFailure:true — \
-  \a wrapper script whose last command is an echo exits 0 whatever make did, \
-  \which is the trap that forces agents to grep build logs for 'error:'. Read \
-  \success; you do not have to grep the log."
+  \AND its output carried no failure evidence — an Agda error diagnostic, or the \
+  \gate's own failure line (make reporting a recipe that died). exitCode is the \
+  \gate's own status, echoed verbatim and never overridden, so a failing gate \
+  \can never be reported green. The reverse is deliberate: a gate that exits 0 \
+  \with such evidence in its output is reported as success:false with \
+  \maskedFailure:true — a wrapper script whose last command is an echo exits 0 \
+  \whatever make did, which is the trap that forces agents to grep build logs \
+  \for 'error:'. Read success; you do not have to grep the log. Those two \
+  \recognizers are a list, not a theory of failure: a mask that prints neither \
+  \is reported as a pass, which is why outputTail comes back whatever the \
+  \verdict — the response never claims a pass while withholding the output that \
+  \could contradict it."
 
 -- | projectPayloadNote: what a project response carries beyond the diagnostics
 -- list, and what each field is for.
@@ -437,9 +442,10 @@ projectPayloadNote =
   \timeout — the last module agda started. modulesChecked counts the distinct \
   \modules agda re-typechecked from source, so it says how much of the project \
   \was actually rebuilt and, on a timeout, how far the run got. outputTail is \
-  \the bounded tail of the gate's stdout and stderr, present only when the check \
-  \did not pass, because a gate can fail for reasons agda never printed (no such \
-  \target, a missing tool, a killed build)."
+  \the bounded tail of the gate's stdout and stderr, returned whatever the \
+  \verdict and absent only when the gate printed nothing, because a gate can \
+  \fail for reasons agda never printed (no such target, a missing tool, a killed \
+  \build) and an unrecognized mask is reported as a pass."
 
 -- | projectTimingNote: the cost model of a whole-project check, including the
 -- fact that this call blocks.
