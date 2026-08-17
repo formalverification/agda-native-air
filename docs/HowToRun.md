@@ -949,6 +949,17 @@ on every shell entry, so a manual line is wiped the next time the server starts.
 `*_ROOT` variable and `-l <name>` — see [§1.3](#13--registering-external-agda-libraries-optional)
 for the supported set.
 
+**You cannot get a silent answer about the wrong worktree.**  A stale `AGDA_ALGEBRAS_ROOT`
+used to be a genuine hazard: the server would resolve your file's imports against the
+*other* branch's tree and report success.  It now refuses instead — a file whose nearest
+`*.agda-lib` names a library the server has registered at a different root fails with a
+`rootMismatch` object naming both roots and the libraries file that disagrees.  You do not
+have to wait for that to notice, either: every proof-state response carries a `project`
+block naming the tree it checked, alongside `command` (the exact `agda` invocation,
+resolved binary and cwd included) and `verdict` (what green means, and Agda's own exit
+code, which the verdict is read from).  See
+[`docs/agda-mcp-environment.md`](agda-mcp-environment.md).
+
 **Add a corpus — `--corpus <abs-path>.jsonl` (turns on the search tools).**  The
 `search_by_name` / `search_by_type` / `get_dependencies` tools appear in `tools/list` only
 when a corpus is loaded; the proof-state tools do not need one.  Build a corpus of your

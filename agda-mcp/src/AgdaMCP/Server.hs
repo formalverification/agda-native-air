@@ -123,21 +123,29 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
     -- every Agda hole syntax is enumerated, comments and prose never count,
     -- and positions/indices are coordinates in the file as written.
     holeModel =
-      "Holes are enumerated in source order across every Agda hole syntax \
-      \({!!}, {! ... !} with nesting, and standalone ?); tokens inside \
-      \comments, string literals, or literate prose are never holes. \
-      \Literate flavours (.lagda, .lagda.tex, .lagda.md, .lagda.typ, \
-      \.lagda.rst, .lagda.org, .lagda.tree) are recognized by extension and \
-      \scanned in their code regions only, with positions reported in \
-      \literate-file coordinates."
+      "FILE FLAVOURS AND HOLES: plain .agda plus every literate flavour Agda \
+      \2.8 supports (.lagda, .lagda.tex, .lagda.md, .lagda.typ, .lagda.rst, \
+      \.lagda.org, .lagda.tree), recognized by extension and scanned in their \
+      \code regions only, with positions reported in literate-file \
+      \coordinates. Holes are enumerated in source order across every Agda \
+      \hole syntax ({!!}, {! ... !} with nesting, and standalone ?); tokens \
+      \inside comments, string literals, or literate prose are never holes."
 
     proofStateTools =
       [ toolDef "get_goal"
-          ("Inspect the goal type and local context at a hole."
+          ("Inspect the goal type and local context at a hole. Injects a \
+           \reporting macro over hole N, typechecks the patched file in place, \
+           \reads the goal back from the macro's output, and restores the file \
+           \byte for byte. "
+           <> verdictNote
+           <> " For this tool verdict.exitCode is normally NON-ZERO even when \
+              \the goal is correct, because the injected macro leaves an \
+              \interaction point behind: it is evidence about the introspection \
+              \run, not a judgement on your file — use check_file for that."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout this returns an error whose text is a JSON object —"
-           <> " {error, timedOut: true, elapsedMs, checkedFromSource?} — naming the"
-           <> " bound, since no goal was reported. "
+           <> " {error, timedOut: true, elapsedMs, checkedFromSource?, verdict,"
+           <> " command, project} — naming the bound, since no goal was reported. "
            <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
           , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
@@ -146,14 +154,22 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
 
       , toolDef "fill_hole"
           ("Substitute a candidate term into a hole (replacing the hole's \
-           \actual span) and typecheck. Returns ok only if the file then \
-           \passes batch agda, tolerating only [UnsolvedInteractionMetas] \
-           \from open holes — the file's other holes, or new sub-holes \
-           \inside the candidate; a candidate that leaves unsolved metas or \
-           \constraints behind is a type_error. holeIndex and remainingHoles \
-           \cover every hole syntax."
+           \actual span), typecheck the patched file in place, and restore it \
+           \byte for byte. "
+           <> verdictNote
+           <> " status is \"ok\" if and only if that command exits 0, or fails \
+              \with nothing but [UnsolvedInteractionMetas] — holes still open \
+              \in the file, including any new sub-hole inside the candidate, \
+              \which is a successful refinement. EVERY other failure is \
+              \\"type_error\", including [UnsolvedMetaVariables] and \
+              \[UnsolvedConstraints]: a candidate that leaves a meta unsolved \
+              \does not pass the build and is not ok here either. A run killed \
+              \by --timeout is \"timeout\" (the candidate was never judged, and \
+              \the file is still restored); an agda binary that could not be \
+              \started is \"crash\". holeIndex and remainingHoles cover every \
+              \hole syntax."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
-           <> " On timeout the status is \"timeout\" (not type_error — the candidate was never judged) with a message naming the bound; the source file is restored either way. "
+           <> " "
            <> holeModel)
           [ prop "filePath"  "string" "Path to the Agda file (absolute or relative to cwd)."
           , prop "holeIndex" "integer" "0-based index of the hole, in source order (any hole syntax)."
@@ -162,8 +178,10 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           ["filePath", "holeIndex", "candidate"]
 
       , toolDef "check_file"
-          ("Load/reload an Agda file and return all diagnostics. "
-           <> diagnosticModel
+          ("Typecheck one Agda file and return all diagnostics. "
+           <> verdictNote
+           <> " " <> batchNote
+           <> " " <> diagnosticModel
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
@@ -173,9 +191,17 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           ["filePath"]
 
       , toolDef "get_diagnostics"
-          ("Retrieve diagnostic summary: error/warning counts, and each open \
-           \hole's index and (line, col) position. "
-           <> diagnosticModel
+          ("Typecheck one Agda file and return a summary: error/warning counts, \
+           \the diagnostics behind them, and each open hole's index and \
+           \(line, col) position. "
+           <> verdictNote
+           <> " " <> batchNote
+           <> " success and verdict are the same fields check_file returns, with \
+              \the same meaning; the two tools differ in what they summarize, \
+              \never in what green means. The counts come from parsing Agda's \
+              \prose and can drift with its message format, which is precisely \
+              \why success is not read from them."
+           <> " " <> diagnosticModel
            <> " The errors and warnings counts are over every diagnostic found, \
               \not over the (capped) diagnostics list."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
@@ -241,6 +267,48 @@ maxDiagnosticsDoc =
   "Maximum diagnostics to return (default 10; 0 means no limit). \
   \diagnosticsTotal always reports how many were found before the cap, so a \
   \truncated list is never mistaken for a short one."
+
+-- | verdictNote: the response-echo contract, stated in every proof-state tool
+-- description (issues #72 and #76).
+--
+-- The § 6 meta-suggestion of the field report is that an agent picks a tool by
+-- reading its description and nothing else, and that the shipped descriptions
+-- did not say the one thing that decides whether the tool is worth calling:
+-- whether a green result means the build passes.  These three sentences say it,
+-- and say where in the response to check it.
+verdictNote :: Text
+verdictNote =
+  "EVERY response carries the echo: verdict {equivalentTo, meaning, exitCode} —"
+  <> " the exact agda command this call is equivalent to, what its verdict field"
+  <> " means, and agda's own exit code, which the verdict is derived from and"
+  <> " never from parsing Agda's message text; command {binary, args, cwd} — the"
+  <> " resolved command line; and project {rootSource, root, library,"
+  <> " librariesFile, registeredLibraries, selectedLibraries, includePaths} — the"
+  <> " tree that was actually checked, with selectedLibraries and includePaths as"
+  <> " agda finally received them, so project and command.args never disagree."
+  <> " rootSource is \"nearest-agda-lib\" when the"
+  <> " requested file's own *.agda-lib decided the context and \"server-config\""
+  <> " when the flags fixed at server start did. If the file belongs to a"
+  <> " different checkout of a library this server has registered elsewhere, the"
+  <> " call FAILS with a rootMismatch object naming both roots rather than"
+  <> " quietly checking the other tree — with one limit worth knowing: that"
+  <> " detection compares against the libraries registry, so if the configured"
+  <> " one is missing there is nothing to compare against and no mismatch can be"
+  <> " found. The response says so as project.librariesFileMissing."
+
+-- | batchNote: what success means for the two whole-file tools.
+--
+-- Stated once, verbatim from 'AgdaMCP.Tools.ProofState.batchVerdictMeaning' in
+-- substance: this server shells out to batch @agda@ per call, and its verdict is
+-- that command's verdict.
+batchNote :: Text
+batchNote =
+  "success is true if and only if that agda command exits 0, so it means exactly"
+  <> " what green means in a batch build: unsolved metavariables, unsolved"
+  <> " constraints, and open holes all make agda exit non-zero and so make"
+  <> " success false. There is no interaction mode anywhere in this server, and"
+  <> " no --safe-style leniency to opt into: the default already is the strict"
+  <> " gate."
 
 -- | latencyNote: the shared latency/timeout sentence appended to every
 -- proof-state tool description.
@@ -401,17 +469,17 @@ dispatchTool cfg "get_goal" args =
 
 dispatchTool cfg "fill_hole" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleFillHole (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleFillHole (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg "check_file" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleCheckFile (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleCheckFile (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg "get_diagnostics" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> eitherToMcp <$> handleGetDiagnostics (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleGetDiagnostics (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Search tools (new M1-3)
@@ -452,17 +520,24 @@ dispatchTool _ name _ =
 eitherToMcp :: ToJSON a => Either Text a -> Value
 eitherToMcp = either toolError okToMcp
 
--- | As 'eitherToMcp', for handlers whose failures are structured 'ToolFailure's.
--- A 'FailMessage' renders exactly as it always did — prose with @isError@ — while
--- a 'FailTimeout' serializes its payload as the error text, so the timing and
--- cache metadata a timed-out call produced still reach the agent (issue #77).
+-- | As 'eitherToMcp', for handlers whose failures are structured 'ToolFailure's
+-- — which, since issue #76, is all four proof-state tools.
+--
+-- A 'FailMessage' renders exactly as it always did — prose with @isError@ —
+-- while 'FailTimeout' and 'FailProject' serialize their payload as the error
+-- text.  That is what lets a timed-out call still deliver its timing and cache
+-- metadata (issue #77), and a wrong-tree refusal still deliver both roots as
+-- data rather than as a sentence the client would have to parse (issue #76).
 failureToMcp :: ToJSON a => Either ToolFailure a -> Value
 failureToMcp = either render okToMcp
   where
     render (FailMessage msg) = toolError msg
-    render (FailTimeout tf)  = object
+    render (FailTimeout tf)  = structuredError (toJSON tf)
+    render (FailProject pm)  = structuredError (toJSON pm)
+
+    structuredError payload = object
       [ "content" .= [ object [ "type" .= ("text" :: Text)
-                               , "text" .= decodeUtf8 (LBS.toStrict (encode (toJSON tf)))
+                               , "text" .= decodeUtf8 (LBS.toStrict (encode payload))
                                ] ]
       , "isError" .= True
       ]
