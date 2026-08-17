@@ -364,7 +364,16 @@ data Verdict = Verdict
                             --   Serialized behind an @equivalent-to:@ prefix,
                             --   which is what the response actually shows.
   , vMeaning      :: Text   -- ^ One sentence: what the tool's verdict field means.
-  , vExitCode     :: Int    -- ^ Agda's exit code (@-1@: the binary could not be run).
+  , vExitCode     :: Int    -- ^ The command's own exit code, when it produced one.
+                            --   @-1@ stands for a run that produced none: the binary
+                            --   could not be started, or the run was killed at the
+                            --   @--timeout@ / @--check-timeout@ bound.  The response's
+                            --   @timedOut@ flag distinguishes those two, and a start
+                            --   failure additionally says so in its output.  A killed
+                            --   process's real status is the signal that took it down —
+                            --   indistinguishable from an ordinary failure — which is why
+                            --   issue #77 reports the fact as a flag rather than as a
+                            --   magic exit code.
   } deriving (Eq, Show)
 
 instance ToJSON Verdict where
@@ -951,7 +960,9 @@ instance ToJSON Gate where
 -- grep its logs for @error:@ four times.  So:
 --
 --   * the gate's exit code is echoed verbatim as @verdict.exitCode@ and is
---     never overridden or reinterpreted;
+--     never overridden or reinterpreted — with the one qualification 'Verdict'
+--     documents, that a run which produced no status of its own (never started,
+--     or killed at the bound) reports @-1@, which 'cprTimedOut' disambiguates;
 --   * 'cprSuccess' is true only when that code is 0, the run finished inside
 --     its bound, /and/ no failure evidence was found in its output — an Agda
 --     error diagnostic, or the gate's own failure line (make reporting a recipe
@@ -978,9 +989,12 @@ data CheckProjectResult = CheckProjectResult
   , cprFirstError     :: Maybe Diagnostic -- ^ The first error-severity diagnostic, uncapped —
                                        --   the one to read first, lifted out so a client need
                                        --   not scan the list.
-  , cprFailingModule  :: Maybe Text    -- ^ The module the gate stopped in: the one carrying
-                                       --   'cprFirstError', or — on a timeout — the last one
-                                       --   Agda started checking.
+  , cprFailingModule  :: Maybe Text    -- ^ The module the gate stopped in, on a check that
+                                       --   did not pass: the one carrying 'cprFirstError',
+                                       --   or — when the gate failed without a located error,
+                                       --   a timeout included — the last one Agda started
+                                       --   checking.  Absent on a pass, where the last module
+                                       --   started is simply the last module checked.
   , cprFailingFile    :: Maybe FilePath -- ^ That module's file.
   , cprModulesChecked :: Int           -- ^ Distinct modules Agda re-typechecked from source
                                        --   during the run (0 on a fully warm gate).  On a

@@ -178,7 +178,13 @@ runGate cfg gcfg params pc plan = do
       (diags, total) = capDiagnostics (cppMaxDiagnostics params) allDiags
       firstErr = find ((== DiagError) . diagSeverity) allDiags
       progress = progressModules combined
-      (failMod, failFile) = failingModuleOf progress firstErr
+      -- Only a check that did not pass has a module it stopped in.  Asking
+      -- unconditionally made a green run name the last module it checked as the
+      -- one it "stopped in" — a successfully checked module labelled as failing
+      -- (Copilot's third review of PR 98).
+      (failMod, failFile)
+        | success   = (Nothing, Nothing)
+        | otherwise = failingModuleOf progress firstErr
   pure CheckProjectResult
     { cprSuccess          = success
     , cprTimedOut         = timedOut
@@ -268,8 +274,14 @@ projectVerdictMeaning :: Text
 projectVerdictMeaning =
   "success is true if and only if that command exited 0, finished inside the \
   \--check-timeout bound, and printed no failure evidence. exitCode is the \
-  \gate's own status, echoed verbatim and never overridden or reinterpreted, so \
-  \a failing gate cannot be reported green. The reverse is possible and \
+  \gate's own status whenever the gate produced one, echoed verbatim and never \
+  \reinterpreted, so a failing gate cannot be reported green. Two runs have no \
+  \status of their own and report -1: a gate that could not be started at all, \
+  \and one killed at the bound. timedOut tells those two apart, and a gate that \
+  \could not be started says so in outputTail; a killed process's real status is \
+  \the signal that took it down, which is indistinguishable from an ordinary \
+  \failure, which is why this server reports the fact as a flag rather than as a \
+  \magic exit code. The reverse is possible and \
   \deliberate: a gate that exits 0 while its output carries an Agda error or a \
   \make failure line is reported as success:false with maskedFailure:true, \
   \because a wrapper script whose last command is an echo exits 0 whatever make \
@@ -331,6 +343,10 @@ parseCheckingLine raw = do
 -- with no position — the answer is the last module the run started, which is
 -- the progress report a blocking call can otherwise not give.  An unannounced
 -- file yields the file and no module rather than a guess.
+--
+-- The caller asks this only of a check that did not pass: on a green run the
+-- last module started is simply the last module checked, and calling it the
+-- module the gate "stopped in" would be a failure report about a success.
 failingModuleOf :: [(Text, FilePath)] -> Maybe Diagnostic -> (Maybe Text, Maybe FilePath)
 failingModuleOf progress mErr = case mErr >>= diagFile of
   Just file -> (moduleFor file, Just file)
@@ -390,8 +406,13 @@ maskedMessage line =
 -- The replacement for the @tail -50 build.log@ half of the workflow this tool
 -- absorbs: when a gate fails for a reason that is not an Agda diagnostic — no
 -- such target, a missing tool, a killed build — this is the only thing that
--- says what happened.  Both bounds are on the text as emitted, elision marker
--- included, so a client budgeting 'maxTailChars' is never handed more.
+-- says what happened.
+--
+-- Each marker is paid for out of the bound it announces — one line of the line
+-- budget, one character of the character budget — so the result satisfies the
+-- documented limit rather than exceeding it by the width of the marker.  That
+-- is 'AgdaMCP.Diagnostics.boundMessage''s rule, and this deviated from it until
+-- Copilot's third review of PR 98 caught the extra line.
 outputTailOf :: Text -> Maybe Text
 outputTailOf raw
   | T.null trimmed = Nothing
@@ -400,11 +421,12 @@ outputTailOf raw
     trimmed = T.strip raw
 
     byLines t
-      | dropped <= 0 = t
-      | otherwise    = T.intercalate "\n" (lineMarker dropped : drop dropped ls)
+      | length ls <= maxTailLines = t
+      | otherwise = T.intercalate "\n" (lineMarker dropped : drop dropped ls)
       where
         ls      = T.lines t
-        dropped = length ls - maxTailLines
+        kept    = maxTailLines - 1   -- the first line is the marker
+        dropped = length ls - kept
 
     lineMarker n = "… " <> T.pack (show n) <> " earlier lines elided …"
 

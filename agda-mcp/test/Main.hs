@@ -2291,16 +2291,30 @@ gateTests = do
             in  assertEqual "module and file"
                   (Just "B", Just "/x/B.agda") (failingModuleOf progress Nothing)
 
-        , runTest "outputTailOf: keeps the end, and counts what it elided" $
+        , runTest "outputTailOf: keeps the end, and pays for the marker out of the bound" $
+            -- The marker occupies one of the maxTailLines, rather than being
+            -- added on top of them: the bound is on the text as emitted, which
+            -- is 'AgdaMCP.Diagnostics.boundMessage''s rule and was this
+            -- function's stated contract before it was its behaviour (Copilot's
+            -- third review of PR 98).
             let txt  = T.unlines [T.pack ("line " <> show i) | i <- [1 :: Int .. 100]]
                 tail' = maybe "" id (outputTailOf txt)
                 ls    = T.lines tail'
             in  allOf
-                  [ assertEqual "lines kept" (maxTailLines + 1) (length ls)
+                  [ assertEqual "lines emitted" maxTailLines (length ls)
                   , assert ("first line was " <> show (listToMaybe ls))
-                      (maybe False ("60 earlier lines elided" `T.isInfixOf`) (listToMaybe ls))
+                      (maybe False ("61 earlier lines elided" `T.isInfixOf`) (listToMaybe ls))
                   , assert "the last line of the output must survive"
                       ("line 100" `T.isInfixOf` tail')
+                  ]
+
+        , runTest "outputTailOf: output that fits the bound is returned whole" $
+            let txt = T.unlines [T.pack ("line " <> show i) | i <- [1 :: Int .. maxTailLines]]
+            in  allOf
+                  [ assertEqual "lines emitted" maxTailLines
+                      (length (T.lines (maybe "" id (outputTailOf txt))))
+                  , assert "no elision marker on output that fits"
+                      (maybe False (not . ("elided" `T.isInfixOf`)) (outputTailOf txt))
                   ]
 
         , runTest "outputTailOf: empty output has no tail" $
@@ -2423,6 +2437,19 @@ gateTests = do
                       , assertEqual "searchedFrom" (gsProject gs) (gateSearchedFrom g)
                       , assertEqual "target" Nothing (gateTarget g)
                       ]
+
+          , runTest "check_project: a passing gate has no failing module" $
+              -- The progress fallback is for a check that did not pass.  Asking
+              -- for it unconditionally made a green run name the last module it
+              -- checked as the one it stopped in — a failure report about a
+              -- success (Copilot's third review of PR 98).
+              withRight passRes $ \r -> allOf
+                [ assertEqual "failingModule" Nothing (cprFailingModule r)
+                , assertEqual "failingFile" Nothing (cprFailingFile r)
+                , assert "neither key belongs in a passing response"
+                    (not ("\"failingModule\":" `T.isInfixOf` encodeText r)
+                     && not ("\"failingFile\":" `T.isInfixOf` encodeText r))
+                ]
           ]
 
         masked <- sequence
@@ -2498,6 +2525,17 @@ gateTests = do
                     (cprElapsedMs r >= 500 && cprElapsedMs r < fakeSleepSecs * 1000)
                 , assert "a timeout is not a masked failure"
                     (not (cprMaskedFailure r))
+                ]
+
+          , runTest "check_project: a run with no status of its own reports exitCode -1" $
+              -- Both no-status cases report -1, and timedOut is what tells them
+              -- apart; a killed process's real status is the signal that took it
+              -- down, which is why #77 reports the fact as a flag rather than as
+              -- a magic exit code.  The start-failure half is asserted below.
+              withRight slowRes $ \r -> allOf
+                [ assertEqual "exitCode" (-1) (vExitCode (cprVerdict r))
+                , assert "timedOut is what distinguishes it from a gate that never started"
+                    (cprTimedOut r)
                 ]
 
           , runTest "check_project: a timed-out gate still reports how far it got" $
@@ -2607,6 +2645,24 @@ gateTests = do
                   ]
           ]
 
+        -- A gate that cannot be started at all: the other half of the -1
+        -- convention, and the case whose only explanation is the output tail.
+        unstartable <- handleCheckProject agdaCfg
+                         (GateConfig (Just ["/nonexistent/no-such-gate"]) (Just 60))
+                         (paramsAt (gsProject gs))
+        crash <- sequence
+          [ runTest "check_project: a gate that cannot be started is a failure, explained" $
+              withRight unstartable $ \r -> allOf
+                [ assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assertEqual "exitCode" (-1) (vExitCode (cprVerdict r))
+                , assert "not a timeout" (not (cprTimedOut r))
+                , assert "not a masked failure" (not (cprMaskedFailure r))
+                , assert ("outputTail was " <> show (cprOutputTail r))
+                    (maybe False (("failed to run /nonexistent/no-such-gate" `T.isInfixOf`))
+                           (cprOutputTail r))
+                ]
+          ]
+
         -- Refusals that happen before anything is run.
         ghost <- handleCheckProject agdaCfg defaultGateConfig CheckProjectParams
           { cppTarget         = Nothing
@@ -2659,7 +2715,7 @@ gateTests = do
               ]
 
         pure (failing <> passing <> masked <> timeoutFast <> timeoutOrphan
-                <> discovery <> refusals <> makeRun)
+                <> discovery <> crash <> refusals <> makeRun)
 
       -- The wrong-checkout refusal, on the scene tier 1d already builds: a gate
       -- run in a worktree the registry does not name resolves its imports

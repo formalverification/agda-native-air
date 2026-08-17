@@ -421,8 +421,11 @@ projectHonestyNote =
   "success is true if and only if the gate exited 0, finished inside the bound, \
   \AND its output carried no failure evidence — an Agda error diagnostic, or the \
   \gate's own failure line (make reporting a recipe that died). exitCode is the \
-  \gate's own status, echoed verbatim and never overridden, so a failing gate \
-  \can never be reported green. The reverse is deliberate: a gate that exits 0 \
+  \gate's own status whenever the gate produced one, echoed verbatim and never \
+  \reinterpreted, so a failing gate can never be reported green; the two runs \
+  \with no status of their own — a gate that could not be started, and one \
+  \killed at the bound — report -1, and timedOut tells them apart. The reverse \
+  \is deliberate: a gate that exits 0 \
   \with such evidence in its output is reported as success:false with \
   \maskedFailure:true — a wrapper script whose last command is an echo exits 0 \
   \whatever make did, which is the trap that forces agents to grep build logs \
@@ -438,8 +441,10 @@ projectPayloadNote :: Text
 projectPayloadNote =
   "firstError is the first error-severity diagnostic, lifted out so you need \
   \not scan the (capped) diagnostics list. failingModule and failingFile name \
-  \the module the gate stopped in: the one carrying that error, or — on a \
-  \timeout — the last module agda started. modulesChecked counts the distinct \
+  \the module the gate stopped in, and appear only on a check that did not \
+  \pass: the one carrying that error, or — when the gate failed without a \
+  \located error, a timeout included — the last module agda started. \
+  \modulesChecked counts the distinct \
   \modules agda re-typechecked from source, so it says how much of the project \
   \was actually rebuilt and, on a timeout, how far the run got. outputTail is \
   \the bounded tail of the gate's stdout and stderr, returned whatever the \
