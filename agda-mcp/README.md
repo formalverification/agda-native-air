@@ -107,6 +107,32 @@ This is the minimum tooling required for an agent to do interactive proof develo
 |------|-------------|
 | `check_project`    | Run the project's own acceptance gate — a `make` target, a configured command, or `agda` on the project's `Everything` module — and report its verdict without misreporting its exit code. |
 
+### Which file gets checked: the path rule (issue #101)
+
+Every path-taking tool — `get_goal`, `fill_hole`, `check_file`, `get_diagnostics`, and `check_project`'s `projectPath` — resolves the path you send the same way, and the rule matters because the server is a **separate process** from your client.
+
++  **Pass an absolute path.**  A relative path is resolved against the *server's* working directory, which is the only directory the server knows: it is never told where its client stands.  Launched through `scripts/run-server.sh`, that directory is this repository's root, because the script deliberately `cd`s there (issue #76's stray-directory fix).  So `src/Foo.lagda.md` sent from your project names a file in *this* checkout, not in yours.
++  **A relative path that does resolve still works.**  A client whose own working directory *is* the server's — this repository's committed `.mcp.json`, `make agda-mcp-serve`, or the binary driven by hand from the repo root — keeps sending repo-root-relative paths exactly as before.
++  **A path that resolves to no readable file is refused by name.**  The failure is a structured `pathError` object next to the prose, naming what you sent, what it resolved to, whether it was relative, and the server's working directory:
+
+```json
+{
+  "error": "agda-mcp: filePath does not exist: /home/w/git/…/agda-native-air/src/Foo.lagda.md\n  you sent a RELATIVE path: src/Foo.lagda.md\n  This server resolves relative paths against ITS OWN working directory. …",
+  "pathError": {
+    "parameter": "filePath",
+    "requestedPath": "src/Foo.lagda.md",
+    "resolvedPath": "/home/w/git/…/agda-native-air/src/Foo.lagda.md",
+    "relative": true,
+    "serverCwd": "/home/w/git/…/agda-native-air",
+    "problem": "missing"
+  }
+}
+```
+
+`problem` is `missing`, `notAFile` (you passed a directory), or `unreadable` (it is there and the read was refused; the syscall's own words come back under `detail`).  All three arrive as `isError` tool results — content your client hands its model — never as a JSON-RPC error.
+
+This replaces the failure issue #101 was filed over: the read was unguarded, so a missing file threw an `IOException` that escaped the handler as a bare `MCP error -32603: Internal error`, naming neither the path nor the rule.  The #83 field test measured what that costs — the one agent that reached for the server on its own initiative sent a relative path, got `-32603`, concluded the server had crashed, and never called it again.  The resolution is deliberately not *guessed*: trying the relative path under each registered library root and taking a unique hit would have made that call succeed, at the price of occasionally answering green about a tree the caller never named, which is the one outcome [the field report](../docs/feedback/flrp-agda-mcp-improvements.md) § 3.6 calls worse than an error.  MCP's `roots/list` is the protocol-correct way to learn where a client stands and is left as follow-up work; it needs a bidirectional transport this server does not yet have.
+
 ### The response echo: verdict, command, project (issues #72 and #76)
 
 Every proof-state response — success, timeout, or refusal — carries three keys that say what ran, what its answer means, and which tree it ran against.  They exist because a verdict an agent cannot check costs more than no verdict: § 2 of [the field report](../docs/feedback/flrp-agda-mcp-improvements.md) records a session in which the server was configured, listed, and never called, because nothing said whether green here meant the build passed.

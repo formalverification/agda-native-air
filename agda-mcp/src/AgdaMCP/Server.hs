@@ -164,7 +164,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            <> " {error, timedOut: true, elapsedMs, checkedFromSource?, verdict,"
            <> " command, project} — naming the bound, since no goal was reported. "
            <> holeModel)
-          [ prop "filePath"  "string"  "Path to the Agda file (absolute or relative to cwd)."
+          [ prop "filePath"  "string"  filePathDoc
           , prop "line"      "integer" lineDoc
           , prop "column"    "integer" columnDoc
           , prop "col"       "integer" colDoc
@@ -201,7 +201,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " "
            <> holeModel)
-          [ prop "filePath"  "string"  "Path to the Agda file (absolute or relative to cwd)."
+          [ prop "filePath"  "string"  filePathDoc
           , prop "line"      "integer" lineDoc
           , prop "column"    "integer" columnDoc
           , prop "col"       "integer" colDoc
@@ -223,7 +223,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
-          [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
+          [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           ]
           ["filePath"]
@@ -246,7 +246,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
-          [ prop "filePath" "string" "Path to the Agda file (absolute or relative to cwd)."
+          [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           ]
           ["filePath"]
@@ -269,8 +269,11 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
               \it, the call fails rather than running something else."
           , prop "projectPath" "string"
               "A file or directory inside the project to check (default: the \
-              \server's working directory). A file anchors its own directory. A \
-              \path that does not exist is an error."
+              \server's working directory). A file anchors its own directory. \
+              \PASS AN ABSOLUTE PATH: a relative one is resolved against THIS \
+              \SERVER'S working directory, not yours. A path that does not exist \
+              \is an error naming the path as resolved and that working \
+              \directory."
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           ]
           []
@@ -336,6 +339,26 @@ holeAddressing =
   \listing the file's nearest holes, never a guess. Give one spelling or the \
   \other — a request carrying both is rejected, because the two can disagree — \
   \and see the schema's oneOf for the three shapes a legal request has."
+
+-- | filePathDoc: the resolution rule, at the property that carries the path.
+--
+-- The four file-taking tools used to say "absolute or relative to cwd" without
+-- saying /whose/ cwd, and for any client outside this repository the honest
+-- answer — the server's own working directory — was never the one meant.  The
+-- #83 field test measured the cost: an agent sent the relative path natural in
+-- its own project, the server resolved it against its own checkout, the file
+-- was not there, and the client never called the server again (issue #101).
+-- Saying it plainly here is half the repair; the other half is that a path
+-- resolving to nothing now fails by name rather than silently or opaquely.
+filePathDoc :: Text
+filePathDoc =
+  "Path to the Agda file. PASS AN ABSOLUTE PATH. A relative path is resolved \
+  \against THIS SERVER'S working directory — the server is a separate process, \
+  \normally started in its own checkout rather than in your project, so a path \
+  \relative to your project does not name your file here. A path that resolves \
+  \to no readable file is refused with an error naming the path AS RESOLVED, \
+  \the working directory it was resolved against, and this rule; it is never \
+  \quietly checked somewhere else, and it is never an opaque internal error."
 
 -- | lineDoc / columnDoc / colDoc / holeIndexDoc: the same contract at the input
 -- properties, where a client decides what to send.
@@ -699,7 +722,7 @@ handleRequest cfg req | rpcMethod req == "tools/call" = do
           args = case KM.lookup "arguments" o of
             Just v  -> v
             Nothing -> Object mempty
-      result <- dispatchTool cfg toolName args
+      result <- dispatchToolGuarded cfg toolName args
       pure . Just $ mkResult (rpcId req) result
     _ ->
       pure . Just $ mkError (rpcId req) (-32602) "Invalid params"
@@ -712,6 +735,37 @@ handleRequest _ req =
 -- ---------------------------------------------------------------------------
 -- Tool dispatch
 -- ---------------------------------------------------------------------------
+
+-- | dispatchToolGuarded: the last line of defence.  A tool that throws answers
+-- with a tool error, never with a JSON-RPC one.
+--
+-- The handlers return their failures as data ('AgdaMCP.Types.ToolFailure'), so
+-- reaching this is a bug.  It still matters which /kind/ of answer a bug
+-- produces.  A JSON-RPC error is a transport fault: Claude Code renders it as
+-- @MCP error -32603: Internal error@, with no path, no tool, and no rule, and
+-- the #83 field test recorded an agent reading exactly that as "the MCP agda
+-- server crashed" and never calling the server again (issue #101).  An
+-- @isError@ tool result is content the client hands its model, naming the tool
+-- and what actually went wrong — which at worst tells the agent that this call
+-- failed rather than that this server is dead.
+--
+-- Asynchronous exceptions are re-thrown rather than reported: a cancelled
+-- server is not a failed tool call, and the loop above is what shuts it down.
+dispatchToolGuarded :: ServerConfig -> Text -> Value -> IO Value
+dispatchToolGuarded cfg name args = do
+  outcome <- try (dispatchTool cfg name args)
+  case outcome of
+    Right value -> pure value
+    Left (e :: SomeException) -> case fromException e of
+      Just ae -> throwIO (ae :: AsyncException)
+      Nothing -> do
+        hPutStrLn stderr $ "agda-mcp: uncaught exception in tool "
+          <> T.unpack name <> ": " <> show e
+        pure . toolError $
+          "agda-mcp: the " <> name <> " tool failed with an unexpected internal \
+          \error. This is a bug in the server, not in your request; the call ran \
+          \nothing you need to undo. What went wrong: "
+          <> T.pack (show e)
 
 -- | dispatchTool: route a tool call to the appropriate handler.
 --
@@ -790,16 +844,25 @@ eitherToMcp = either toolError okToMcp
 -- — which, since issue #76, is all four proof-state tools.
 --
 -- A 'FailMessage' renders exactly as it always did — prose with @isError@ —
--- while 'FailTimeout' and 'FailProject' serialize their payload as the error
--- text.  That is what lets a timed-out call still deliver its timing and cache
--- metadata (issue #77), and a wrong-tree refusal still deliver both roots as
--- data rather than as a sentence the client would have to parse (issue #76).
+-- while 'FailTimeout', 'FailProject', and 'FailPath' serialize their payload as
+-- the error text.  That is what lets a timed-out call still deliver its timing
+-- and cache metadata (issue #77), a wrong-tree refusal still deliver both roots
+-- as data rather than as a sentence the client would have to parse (issue #76),
+-- and a path that named no readable file deliver what it resolved to and the
+-- directory it was resolved against (issue #101).
+--
+-- All of them arrive as @isError@ /tool results/ rather than as JSON-RPC
+-- errors, which is the distinction issue #101 turns on: a tool result is
+-- content the client shows its model, while a JSON-RPC error is a transport
+-- fault, and @-32603 Internal error@ is what an agent reasonably reads as
+-- "this server is broken".
 failureToMcp :: ToJSON a => Either ToolFailure a -> Value
 failureToMcp = either render okToMcp
   where
     render (FailMessage msg) = toolError msg
     render (FailTimeout tf)  = structuredError (toJSON tf)
     render (FailProject pm)  = structuredError (toJSON pm)
+    render (FailPath pf)     = structuredError (toJSON pf)
 
     structuredError payload = object
       [ "content" .= [ object [ "type" .= ("text" :: Text)

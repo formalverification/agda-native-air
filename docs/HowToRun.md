@@ -1045,6 +1045,14 @@ typecheck a temp copy that collides with the module's canonical location.  Use
 `check_file` / `get_diagnostics` (which load in place), or work in a scratch top-level
 module — see the first item under *Three things to know* in §13.5.
 
+**"filePath does not exist" naming a path in the agda-native-air checkout**.  You sent a
+relative path from your own project.  The server is a separate process, and
+`scripts/run-server.sh` starts it in *this* repository, so relative paths resolve here
+rather than in your tree — the error names both the path as resolved and the working
+directory it was resolved against.  Send an absolute path: your project's directory
+followed by the relative path you tried.  See *Which file gets checked: the path rule*
+in [`agda-mcp/README.md`](../agda-mcp/README.md).
+
 **Claude Code doesn't see the MCP server**.  Verify that `.mcp.json` exists in the
 repo root and that the `cwd` field (if present) points to the correct absolute path.
 Run `claude` from the repo root directory.

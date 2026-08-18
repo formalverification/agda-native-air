@@ -44,8 +44,9 @@
 --   The echo is what lets a client confirm "this equals my @agda \<file\>@ gate"
 --   and "this checked /my/ worktree" without reading Haskell.  It is additive
 --   like the issue-#77 fields before it — every pre-existing key keeps its name,
---   type, and meaning, and the one new /failure/ shape ('FailProject') is a new
---   kind rather than a changed one — so the schema version is unchanged.
+--   type, and meaning, and the new /failure/ shapes ('FailProject', and
+--   'FailPath' from issue #101) are new kinds rather than changed ones — so the
+--   schema version is unchanged.
 --
 --   'CheckProjectResult' (issue #78) is the whole-project gate's response.  It
 --   carries the same @verdict@ / @command@ / @project@ echo as the per-file
@@ -94,6 +95,10 @@ module AgdaMCP.Types
   , ProjectContext (..)
   , ProjectMismatch (..)
   , mismatchMessage
+    -- * Requested-path failures (issue #101)
+  , PathProblem (..)
+  , PathFailure (..)
+  , pathFailureMessage
     -- * Tool results (outbound)
   , ToolFailure (..)
   , TimeoutFailure (..)
@@ -512,6 +517,123 @@ instance ToJSON ProjectMismatch where
     ]
 
 
+-- | PathProblem: why a path the client sent could not be used.
+--
+-- Three cases rather than one, because the fix differs: a path that names
+-- nothing is usually a path resolved against the wrong directory, a path that
+-- names a directory is a caller passing the project instead of the file, and a
+-- path that names a file we cannot open is a permissions or hardware problem
+-- the caller cannot fix by rewriting the argument.
+data PathProblem
+  = PathMissing            -- ^ Nothing is at the resolved path.
+  | PathNotAFile           -- ^ Something is there, but it is a directory.
+  | PathUnreadable Text    -- ^ It is a file, but opening or decoding it failed.
+  deriving (Eq, Show)
+
+-- | PathFailure: the requested path could not be turned into a file this
+-- server can read, and here is everything needed to see why.
+--
+-- The loud failure of issue #101, and the companion to 'ProjectMismatch'.
+-- Where that one answers /which tree did you check?/, this one answers the
+-- question before it: /which file did you mean, and where did I look for it?/
+--
+-- Both defects the field test hit are this one payload.  A relative path is
+-- resolved against the __server's__ working directory — the server is a
+-- separate process, and @scripts\/run-server.sh@ deliberately starts it in the
+-- agda-native-air checkout (issue #76), so a path relative to the /client's/
+-- project names a file in the wrong tree, or, far more often, no file at all.
+-- And a path naming no file used to reach @readFile@ and throw, which escaped
+-- the handler as JSON-RPC @-32603 Internal error@: an error that names neither
+-- the path nor the rule, and so teaches a client nothing.  Issue #101's field
+-- evidence is an agent that got exactly that on its first call and never
+-- called the server again.
+--
+-- Reporting 'pfRequested' and 'pfResolved' side by side is the point: a caller
+-- who can see that @src\/Foo.agda@ became
+-- @\/home\/…\/agda-native-air\/src\/Foo.agda@ has diagnosed the whole problem
+-- without reading any documentation.
+data PathFailure = PathFailure
+  { pfParameter :: Text        -- ^ The argument that carried it (@filePath@, @projectPath@).
+  , pfRequested :: FilePath    -- ^ Exactly what the client sent.
+  , pfResolved  :: FilePath    -- ^ What this server resolved it to.
+  , pfRelative  :: Bool        -- ^ True when the client sent a relative path.
+  , pfServerCwd :: FilePath    -- ^ The directory relative paths are resolved against.
+  , pfProblem   :: PathProblem -- ^ What went wrong at 'pfResolved'.
+  } deriving (Eq, Show)
+
+-- | pathFailureMessage: the human-readable form of a 'PathFailure'.
+--
+-- Same house style as 'mismatchMessage': name the offending path, say
+-- precisely what went wrong, and state the fix.  An agent that reads only the
+-- error string still learns the rule — which is the whole repair, since the
+-- @-32603@ this replaces taught nothing and ended adoption.
+pathFailureMessage :: PathFailure -> Text
+pathFailureMessage f = T.concat $
+  [ "agda-mcp: ", pfParameter f, " ", verb, ": ", T.pack (pfResolved f), "\n" ]
+  <> detail
+  <> resolution
+  <> [ "  this server's working directory: ", T.pack (pfServerCwd f), "\n"
+     , "  Fix: ", fix ]
+  where
+    verb = case pfProblem f of
+      PathMissing      -> "does not exist"
+      PathNotAFile     -> "is a directory, not a file"
+      PathUnreadable _ -> "could not be read"
+
+    detail = case pfProblem f of
+      PathUnreadable why -> [ "  ", why, "\n" ]
+      _                  -> []
+
+    -- The sentence issue #101 exists to publish.  It is stated on the failing
+    -- call rather than left to the tool description because a description is
+    -- read once, at tool-selection time, while this is read at the moment it
+    -- explains the error in front of the caller.
+    resolution
+      | pfRelative f =
+          [ "  you sent a RELATIVE path: ", T.pack (pfRequested f), "\n"
+          , "  This server resolves relative paths against ITS OWN working directory. It is a\n"
+          , "  separate process, normally started in its own checkout rather than in your\n"
+          , "  project, so a path relative to your project does not name your file here.\n" ]
+      | otherwise =
+          [ "  the path was absolute, so it was used exactly as you sent it.\n" ]
+
+    fix = case pfProblem f of
+      PathNotAFile     -> "pass the Agda source file itself, not the directory holding it."
+      PathUnreadable _ -> "check the file's permissions; the path resolved, the read did not."
+      PathMissing
+        -- Actionable rather than merely correct: the caller knows its own
+        -- project directory, so naming the two halves of the answer is the
+        -- whole of the repair.
+        | pfRelative f -> "pass an ABSOLUTE path: YOUR project's directory, followed by "
+                          <> T.pack (pfRequested f) <> "."
+        | otherwise    -> "check the path; nothing is there. (A relative path would be \
+                          \resolved against the working directory above, never against \
+                          \yours.)"
+
+instance ToJSON PathProblem where
+  toJSON PathMissing        = "missing"
+  toJSON PathNotAFile       = "notAFile"
+  toJSON (PathUnreadable _) = "unreadable"
+
+instance ToJSON PathFailure where
+  toJSON f = object
+    [ "error"     .= pathFailureMessage f
+    , "pathError" .= object
+        ( [ "parameter"     .= pfParameter f
+          , "requestedPath" .= pfRequested f
+          , "resolvedPath"  .= pfResolved f
+          , "relative"      .= pfRelative f
+          , "serverCwd"     .= pfServerCwd f
+          , "problem"       .= pfProblem f
+          ]
+          -- Only the unreadable case has anything to add: the underlying
+          -- 'IOException' text, which names the syscall that refused.
+          <> case pfProblem f of
+               PathUnreadable why -> [ "detail" .= why ]
+               _                  -> [] )
+    ]
+
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Tool results (outbound to agent)
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -524,8 +646,12 @@ instance ToJSON ProjectMismatch where
 -- of a plain error string (issue #77).  'FailProject' generalizes the same idea
 -- to a failure that happens /before/ Agda is ever started (issue #76): the
 -- structured payload names both trees, so a client sees the mismatch as data
--- rather than having to parse a sentence.  'FailMessage' keeps every ordinary
--- failure exactly as it was: prose in, prose out.
+-- rather than having to parse a sentence.  'FailPath' is the same move one step
+-- earlier still (issue #101) — the requested path named no readable file, so
+-- there is no tree to resolve, and no Agda run to describe — and it exists
+-- because that case used to escape the handler as an uncaught 'IOException'
+-- and reach the client as a bare @-32603 Internal error@.  'FailMessage' keeps
+-- every ordinary failure exactly as it was: prose in, prose out.
 --
 -- All four proof-state tools fail through this type, so a client has one
 -- failure shape to handle rather than one per tool.
@@ -533,6 +659,7 @@ data ToolFailure
   = FailMessage Text            -- ^ An ordinary failure; rendered as plain text.
   | FailTimeout TimeoutFailure  -- ^ The call hit @--timeout@; rendered as JSON.
   | FailProject ProjectMismatch -- ^ The file belongs to a different checkout; rendered as JSON.
+  | FailPath    PathFailure     -- ^ The path named no readable file; rendered as JSON.
   deriving (Eq, Show)
 
 -- | The structured payload of a timed-out tool call: what went wrong, and what

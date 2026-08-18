@@ -47,6 +47,7 @@ library
     AgdaMCP.Agda
     AgdaMCP.Diagnostics
     AgdaMCP.Holes
+    AgdaMCP.Path
     AgdaMCP.Project
     AgdaMCP.Gate
     AgdaMCP.Corpus

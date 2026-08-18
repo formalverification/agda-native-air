@@ -80,15 +80,14 @@ import Data.List (find, nub)
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import System.Directory
-  ( doesDirectoryExist, doesFileExist, getCurrentDirectory, makeAbsolute )
-import System.FilePath (takeDirectory)
+import System.Directory (getCurrentDirectory)
 
 import AgdaMCP.Agda
   ( AgdaConfig (..), AgdaResult (..), debugLog, runCommand )
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Gate
   ( GateConfig, GatePlan (..), checkTimeoutOf, resolveGate )
+import AgdaMCP.Path (resolveRequestedAnchor)
 import AgdaMCP.Project (resolveProjectDir, withEffectiveFlags)
 import AgdaMCP.Types
 
@@ -121,7 +120,7 @@ handleCheckProject
 handleCheckProject cfg gcfg params = do
   mAnchor <- resolveAnchor (cppProjectPath params)
   case mAnchor of
-    Left err     -> pure (Left (FailMessage err))
+    Left failure -> pure (Left (FailPath failure))
     Right anchor -> do
       resolved <- resolveProjectDir cfg anchor
       case resolved of
@@ -229,18 +228,16 @@ reportedContext pc plan = case gateSource (gpGate plan) of
 -- be editing.  A path that does not exist is refused: silently anchoring at its
 -- parent would run a real gate over a project the caller did not name, and
 -- report a pass about it.
-resolveAnchor :: Maybe FilePath -> IO (Either Text FilePath)
+--
+-- Omitting @projectPath@ anchors at the server's own working directory, which
+-- is the documented default — "the project this server is standing in".  A
+-- @projectPath@ that /is/ given goes through 'resolveRequestedAnchor', so a
+-- relative one is resolved against that same directory and, when that names
+-- nothing, refused with the rule stated rather than left for the caller to
+-- infer (issue #101).
+resolveAnchor :: Maybe FilePath -> IO (Either PathFailure FilePath)
 resolveAnchor Nothing     = Right <$> getCurrentDirectory
-resolveAnchor (Just path) = do
-  abs'   <- makeAbsolute path
-  isDir  <- doesDirectoryExist abs'
-  isFile <- doesFileExist abs'
-  pure $ if isDir  then Right abs'
-    else if isFile then Right (takeDirectory abs')
-    else Left $
-      "agda-mcp: projectPath does not exist: " <> T.pack abs'
-      <> "\n  Pass a file or directory inside the project, or omit projectPath"
-      <> " to check the project this server is standing in."
+resolveAnchor (Just path) = resolveRequestedAnchor "projectPath" path
 
 
 -- ---------------------------------------------------------------------------
