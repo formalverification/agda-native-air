@@ -53,6 +53,20 @@
 --   @-32603 Internal error@ — the message that ended the only adoption attempt
 --   the issue-#83 field test observed.  'withSourceFile' is the single place
 --   the read happens, so no handler can forget the guard.
+--
+--   And the read is only ever attempted on a __regular__ file, which is a
+--   stronger requirement than "exists" and is checked rather than assumed.
+--   'System.Directory.doesFileExist' answers "exists and is not a directory",
+--   so it admits FIFOs, sockets, and devices; each of those turns the read into
+--   a failure this server cannot report, because it does not survive to answer.
+--   'AgdaMCP.Types.PathProblem' records the two measurements.  What remains is a
+--   window rather than a hole: the path is @stat@ed and then opened, so a file
+--   swapped for a FIFO in between would still be opened.  Closing that needs a
+--   non-blocking open followed by @fstat@ on the descriptor, which is a good deal
+--   more machinery than the exposure warrants, so it is stated here rather than
+--   claimed away.  A regular file's read is bounded by its own size, and no
+--   further cap is imposed: any threshold would be arbitrary, and Agda source
+--   that large is not Agda source.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -74,9 +88,12 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Text.Encoding.Error (UnicodeException)
 
-import System.Directory
-  ( doesDirectoryExist, doesFileExist, getCurrentDirectory, makeAbsolute )
+import System.Directory (getCurrentDirectory, makeAbsolute)
 import System.FilePath (isAbsolute, takeDirectory)
+import System.IO.Error (isDoesNotExistError)
+import System.Posix.Files
+  ( FileStatus, getFileStatus, isBlockDevice, isCharacterDevice, isDirectory
+  , isNamedPipe, isRegularFile, isSocket )
 
 import AgdaMCP.Types
   ( PathFailure (..), PathProblem (..), ToolFailure (..) )
@@ -159,30 +176,76 @@ resolveRequestedFile param requested =
 -- pass about it.
 resolveRequestedAnchor :: Text -> FilePath -> IO (Either PathFailure FilePath)
 resolveRequestedAnchor param requested = do
-  rp    <- describe param requested
-  isDir <- doesDirectoryExist (rpAbsolute rp)
-  if isDir
-    then pure (Right (rpAbsolute rp))
-    else do
-      isFile <- doesFileExist (rpAbsolute rp)
-      pure $ if isFile
-        then Right (takeDirectory (rpAbsolute rp))
-        else Left (failureOf rp PathMissing)
+  rp     <- describe param requested
+  status <- statusOf rp
+  pure $ case status of
+    Left failure -> Left failure
+    Right st
+      | isDirectory st   -> Right (rpAbsolute rp)
+      | isRegularFile st -> Right (takeDirectory (rpAbsolute rp))
+      -- A FIFO or a device is never read here — only its parent directory is
+      -- taken — but anchoring a whole project gate at the parent of one is not
+      -- something a caller can have meant, and running the gate anyway would
+      -- check a project nobody named.
+      | otherwise        -> Left (failureOf rp (PathNotRegular (fileTypeOf st)))
 
 -- | resolveFile: 'resolveRequestedFile', keeping the provenance record.
+--
+-- The check is for a __regular__ file, not merely for something that exists.
+-- 'System.Directory.doesFileExist' answers "exists and is not a directory", so
+-- it admits FIFOs, sockets, and devices, each of which turns the read below into
+-- a hang or an unbounded allocation — and into one this server cannot report,
+-- because it does not survive to answer.  See 'AgdaMCP.Types.PathProblem' for
+-- the two measurements.
 resolveFile :: Text -> FilePath -> IO (Either PathFailure ResolvedPath)
 resolveFile param requested = do
   rp     <- describe param requested
-  isFile <- doesFileExist (rpAbsolute rp)
-  if isFile
-    then pure (Right rp)
-    else do
+  status <- statusOf rp
+  pure $ case status of
+    Left failure -> Left failure
+    Right st
+      | isRegularFile st -> Right rp
       -- A directory is reported as such rather than as "does not exist":
       -- something /is/ there, and telling a caller who passed their project
       -- root that the path is missing would send them looking for the wrong
       -- mistake.
-      isDir <- doesDirectoryExist (rpAbsolute rp)
-      pure (Left (failureOf rp (if isDir then PathNotAFile else PathMissing)))
+      | isDirectory st   -> Left (failureOf rp PathNotAFile)
+      | otherwise        -> Left (failureOf rp (PathNotRegular (fileTypeOf st)))
+
+-- | statusOf: @stat@ the resolved path, or say why that failed.
+--
+-- 'getFileStatus' follows symbolic links, which is the behaviour wanted: a link
+-- to a regular file is a regular file for every purpose here, and it is what
+-- @agda@ would open too.
+--
+-- A @stat@ that failed for a reason other than absence — a permission wall on
+-- some parent directory is the usual one — is deliberately not reported as
+-- "does not exist".  Saying that about a path the caller can see is there would
+-- send them looking for the wrong mistake, so the errno's own words are
+-- reported instead.
+statusOf :: ResolvedPath -> IO (Either PathFailure FileStatus)
+statusOf rp = do
+  attempt <- try (getFileStatus (rpAbsolute rp))
+  pure $ case attempt of
+    Right st -> Right st
+    Left (e :: IOException)
+      | isDoesNotExistError e -> Left (failureOf rp PathMissing)
+      | otherwise -> Left (failureOf rp (PathUnreadable (T.pack (show e))))
+
+-- | fileTypeOf: what is at the path, when it is not a regular file, in the
+-- words a refusal can use.
+--
+-- 'isDirectory' is last because the callers test it themselves first; it is
+-- here so that this function is total over the type rather than answering
+-- "not a regular file" about a case it could have named.
+fileTypeOf :: FileStatus -> Text
+fileTypeOf st
+  | isNamedPipe st       = "a named pipe (FIFO)"
+  | isSocket st          = "a socket"
+  | isCharacterDevice st = "a character device"
+  | isBlockDevice st     = "a block device"
+  | isDirectory st       = "a directory"
+  | otherwise            = "not a regular file"
 
 -- | describe: what the client asked for, stated in the terms a failure needs.
 describe :: Text -> FilePath -> IO ResolvedPath

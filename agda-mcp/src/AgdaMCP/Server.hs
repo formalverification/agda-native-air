@@ -37,9 +37,11 @@ module AgdaMCP.Server
   , ServerConfig (..)
     -- * Exposed for testing
   , toolDefinitions
+  , forceResponse
   ) where
 
-import Control.Exception (SomeException, try, throwIO, fromException, AsyncException)
+import Control.Exception
+  (AsyncException, SomeException, evaluate, fromException, throwIO, try)
 import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
@@ -749,11 +751,20 @@ handleRequest _ req =
 -- and what actually went wrong — which at worst tells the agent that this call
 -- failed rather than that this server is dead.
 --
+-- The guard covers the value as well as the action, which is why
+-- 'forceResponse' is inside the 'try' rather than after it.  A handler can
+-- return successfully and hand back a 'Value' whose thunks have not been
+-- evaluated yet; those are forced later, by @encode@ in 'sendResponse', which
+-- runs outside every 'try' in this module.  A bottom reachable from a tool
+-- result would then kill the loop instead of becoming a tool error — a worse
+-- outcome than the @-32603@ this exists to prevent, since the client sees the
+-- transport close rather than an answer (Copilot's review of PR 102).
+--
 -- Asynchronous exceptions are re-thrown rather than reported: a cancelled
 -- server is not a failed tool call, and the loop above is what shuts it down.
 dispatchToolGuarded :: ServerConfig -> Text -> Value -> IO Value
 dispatchToolGuarded cfg name args = do
-  outcome <- try (dispatchTool cfg name args)
+  outcome <- try (dispatchTool cfg name args >>= forceResponse)
   case outcome of
     Right value -> pure value
     Left (e :: SomeException) -> case fromException e of
@@ -761,11 +772,38 @@ dispatchToolGuarded cfg name args = do
       Nothing -> do
         hPutStrLn stderr $ "agda-mcp: uncaught exception in tool "
           <> T.unpack name <> ": " <> show e
+        -- Deliberately silent about what the call did or did not do.  An earlier
+        -- version promised "the call ran nothing you need to undo", which is not
+        -- something this point can know: check_project may already have run the
+        -- operator's gate, and a proof-state tool may already have run agda and
+        -- written interface files, since the exception can be raised after either
+        -- (Copilot's review of PR 102).  The one effect that /is/ guaranteed
+        -- undone is get_goal's and fill_hole's in-place patch, which is restored
+        -- under a bracket whatever happens; that is stated in their own contracts
+        -- rather than promised here for tools it is not true of.
         pure . toolError $
           "agda-mcp: the " <> name <> " tool failed with an unexpected internal \
-          \error. This is a bug in the server, not in your request; the call ran \
-          \nothing you need to undo. What went wrong: "
+          \error. This is a bug in the server, not a problem with your request. \
+          \Treat what the call had already done as unknown: it may have run agda, \
+          \or a project gate, before failing. What went wrong: "
           <> T.pack (show e)
+
+-- | forceResponse: force a response value's JSON encoding, and hand the value
+-- back once nothing lazy is left in it.
+--
+-- The point is /where/ the exception surfaces, not the bytes: 'encode' traverses
+-- the whole structure, so evaluating its length raises any bottom inside the
+-- value here, in the caller's guarded region, rather than in the writer.
+-- Thunks are updated in place once forced, so the encode 'sendResponse' does
+-- afterwards cannot raise what this one did not.
+--
+-- The cost is one extra traversal per tool call, which is nothing beside
+-- spawning @agda@, and every response is bounded — diagnostics are capped and
+-- message bodies truncated — so there is no large payload to pay for twice.
+forceResponse :: Value -> IO Value
+forceResponse value = do
+  _ <- evaluate (LBS.length (encode value))
+  pure value
 
 -- | dispatchTool: route a tool call to the appropriate handler.
 --

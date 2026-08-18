@@ -63,6 +63,7 @@ import System.Directory
   )
 import System.Environment (setEnv)
 import System.Exit (exitFailure, exitSuccess)
+import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, unionFileModes)
 import System.FilePath ((</>), takeDirectory, takeFileName)
 import System.IO (hPutStrLn, stderr)
 
@@ -90,7 +91,7 @@ import AgdaMCP.Project
   , libraryIncludesOf, libraryNameOf, parseLibrariesFile, resolveProjectDir
   , selectedLibrariesOf
   )
-import AgdaMCP.Server (ServerConfig (..), toolDefinitions)
+import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf, parseCheckingLine, progressModules )
@@ -1643,6 +1644,9 @@ timeoutTests = do
               Left (FailProject pm) ->
                 pure (Fail $ "expected FailTimeout, got FailProject: "
                              <> T.unpack (mismatchMessage pm))
+              Left (FailPath pf) ->
+                pure (Fail $ "expected FailTimeout, got FailPath: "
+                             <> T.unpack (pathFailureMessage pf))
               Left (FailTimeout tf) -> do
                 r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
                 case r1 of
@@ -2792,6 +2796,7 @@ data ClientScene = ClientScene
   , csRelative :: FilePath  -- ^ The file, as the client would name it: relative to that root.
   , csFile     :: FilePath  -- ^ The same file, absolutely.
   , csMissing  :: FilePath  -- ^ An absolute path naming nothing.
+  , csFifo     :: FilePath  -- ^ A named pipe: exists, is not a regular file.
   }
 
 -- | withClientScene: build the scene under the temp directory, run an action on
@@ -2814,6 +2819,7 @@ withClientScene act = do
         , csRelative = rel
         , csFile     = root </> rel
         , csMissing  = root </> "src" </> "NoSuchModule.agda"
+        , csFifo     = root </> "src" </> "Pipe.agda"
         }
   bracket_ (build cs) (removeTree root) (act cs)
   where
@@ -2823,6 +2829,10 @@ withClientScene act = do
       createDirectoryIfMissing True (takeDirectory (csFile cs))
       TIO.writeFile (csFile cs)
         "module Setoid.Algebras.Finite where\n\nopen import Agda.Builtin.Nat\n\nn : Nat\nn = {!!}\n"
+      -- A FIFO with no writer reads as immediate EOF, so this fixture cannot
+      -- hang the suite even if the file-type check regresses: the call would
+      -- then reach Agda and come back a Right, which is what the test catches.
+      createNamedPipe (csFifo cs) (ownerReadMode `unionFileModes` ownerWriteMode)
 
     removeTree d = removeDirectoryRecursive d `catch` \(_ :: SomeException) -> pure ()
 
@@ -2871,6 +2881,10 @@ pathTests = do
     fillMiss <- handleFillHole cfg FillHoleParams
       { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero" }
     dirCall  <- handleCheckFile cfg (CheckFileParams (csRoot cs) Nothing)
+    fifoCall <- handleCheckFile cfg (CheckFileParams (csFifo cs) Nothing)
+    fifoProj <- handleCheckProject cfg defaultGateConfig CheckProjectParams
+      { cppTarget = Nothing, cppProjectPath = Just (csFifo cs)
+      , cppMaxDiagnostics = Nothing }
     projMiss <- handleCheckProject cfg defaultGateConfig CheckProjectParams
       { cppTarget = Nothing, cppProjectPath = Just (csRelative cs)
       , cppMaxDiagnostics = Nothing }
@@ -2946,6 +2960,33 @@ pathTests = do
                 ("is a directory, not a file" `T.isInfixOf` pathFailureMessage pf)
             ]
 
+      , runTest "path: a path naming a FIFO is refused unread, not opened (Copilot, PR 102)" $
+          -- doesFileExist answers "exists and is not a directory", so it admits
+          -- FIFOs, sockets, and devices.  Measured before the fix: a FIFO with a
+          -- writer attached blocked BS.readFile forever — before --timeout has
+          -- anything to bound, since that bounds the agda subprocess and this
+          -- read happens first — and /dev/zero read until the heap was exhausted
+          -- and the process died.  Neither is reportable: the server does not
+          -- survive to answer.
+          withPathFailure fifoCall $ \pf -> allOf
+            [ assertEqual "problem" (PathNotRegular "a named pipe (FIFO)") (pfProblem pf)
+            , assertEqual "resolvedPath" (csFifo cs) (pfResolved pf)
+            , assert ("message was " <> show (pathFailureMessage pf))
+                ("is not a regular file, it is a named pipe (FIFO)"
+                   `T.isInfixOf` pathFailureMessage pf)
+            , assert "the wire shape should name the file type"
+                ("\"problem\":\"notRegularFile\"" `T.isInfixOf` encodeText pf)
+            ]
+
+      , runTest "path: check_project refuses a FIFO anchor rather than anchoring at its parent" $
+          -- Nothing reads it there — only its parent directory is taken — but a
+          -- gate run against the parent of a FIFO is a gate over a project the
+          -- caller cannot have named.
+          withPathFailure fifoProj $ \pf -> allOf
+            [ assertEqual "parameter" "projectPath" (pfParameter pf)
+            , assertEqual "problem" (PathNotRegular "a named pipe (FIFO)") (pfProblem pf)
+            ]
+
       , runTest "path: check_project refuses a projectPath that does not exist, naming the rule" $
           withPathFailure projMiss $ \pf -> allOf
             [ assertEqual "parameter" "projectPath" (pfParameter pf)
@@ -2966,6 +3007,24 @@ pathTests = do
                        , "\"problem\":\"missing\"", "\"error\":" ]
                 missing = [k | k <- want, not (k `T.isInfixOf` wire)]
             in  assert ("missing from the wire shape: " <> show missing) (null missing)
+
+      , runTest "response guard: a bottom inside a tool result surfaces in the guard, not in the writer (Copilot, PR 102)" $ do
+          -- A handler can return successfully and hand back a Value whose thunks
+          -- are unevaluated; encode in sendResponse forces them, outside every
+          -- try in the server.  A bottom reachable from a tool result would then
+          -- kill the loop rather than become a tool error — worse than the
+          -- -32603 the guard exists to prevent, since the client sees the
+          -- transport close instead of an answer.  forceResponse is what moves
+          -- that moment inside the guarded region.
+          outcome <- try (forceResponse
+            (Aeson.object ["message" Aeson..= (error "kaboom" :: Text)]))
+              :: IO (Either SomeException Aeson.Value)
+          assert "expected the bottom to be raised by forceResponse" (isLeft outcome)
+
+      , runTest "response guard: a well-formed tool result passes through unchanged" $ do
+          let value = Aeson.object ["success" Aeson..= True, "holes" Aeson..= ([] :: [Int])]
+          forced <- forceResponse value
+          assertEqual "value" value forced
 
       , runTest "descriptions: every filePath property says whose working directory it resolves against (#101)" $
           -- The descriptions used to say "absolute or relative to cwd" without

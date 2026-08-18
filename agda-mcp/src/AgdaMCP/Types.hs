@@ -519,15 +519,28 @@ instance ToJSON ProjectMismatch where
 
 -- | PathProblem: why a path the client sent could not be used.
 --
--- Three cases rather than one, because the fix differs: a path that names
+-- Four cases rather than one, because the fix differs: a path that names
 -- nothing is usually a path resolved against the wrong directory, a path that
--- names a directory is a caller passing the project instead of the file, and a
--- path that names a file we cannot open is a permissions or hardware problem
--- the caller cannot fix by rewriting the argument.
+-- names a directory is a caller passing the project instead of the file, a path
+-- that names something that is neither is not Agda source at all, and a path
+-- that names a readable-looking file we cannot open is a permissions or
+-- hardware problem the caller cannot fix by rewriting the argument.
+--
+-- 'PathNotRegular' is the one that is about this server's survival rather than
+-- about the caller's mistake, and it earns its own case for that reason.  A
+-- FIFO, a socket, or a device passes an existence check and then reads
+-- unboundedly or not at all: measured against @\/dev\/zero@, the read consumed
+-- memory until the heap was exhausted and the process died; measured against a
+-- named pipe with a writer attached, the read blocked forever, and it blocks
+-- /before/ @--timeout@ has anything to bound, since that bound applies to the
+-- @agda@ subprocess and this read happens first.  Neither is a failure the
+-- client can even be told about, because the server does not survive to answer
+-- (Copilot's review of PR 102).
 data PathProblem
   = PathMissing            -- ^ Nothing is at the resolved path.
   | PathNotAFile           -- ^ Something is there, but it is a directory.
-  | PathUnreadable Text    -- ^ It is a file, but opening or decoding it failed.
+  | PathNotRegular Text    -- ^ Neither file nor directory: a FIFO, socket, or device.
+  | PathUnreadable Text    -- ^ It is a regular file, but opening or decoding it failed.
   deriving (Eq, Show)
 
 -- | PathFailure: the requested path could not be turned into a file this
@@ -571,18 +584,29 @@ pathFailureMessage :: PathFailure -> Text
 pathFailureMessage f = T.concat $
   [ "agda-mcp: ", pfParameter f, " ", verb, ": ", T.pack (pfResolved f), "\n" ]
   <> detail
+  <> hazard
   <> resolution
   <> [ "  this server's working directory: ", T.pack (pfServerCwd f), "\n"
      , "  Fix: ", fix ]
   where
     verb = case pfProblem f of
-      PathMissing      -> "does not exist"
-      PathNotAFile     -> "is a directory, not a file"
-      PathUnreadable _ -> "could not be read"
+      PathMissing       -> "does not exist"
+      PathNotAFile      -> "is a directory, not a file"
+      PathNotRegular ty -> "is not a regular file, it is " <> ty
+      PathUnreadable _  -> "could not be read"
 
     detail = case pfProblem f of
       PathUnreadable why -> [ "  ", why, "\n" ]
       _                  -> []
+
+    -- Why refusing a non-regular file is this server's business and not the
+    -- caller's: the read, not the typecheck, is what would never come back.
+    hazard = case pfProblem f of
+      PathNotRegular _ ->
+        [ "  Reading one is unbounded or blocking, and it blocks before --timeout has\n"
+        , "  anything to bound: that bound applies to the agda subprocess, and the read\n"
+        , "  happens first. So this server refuses to open it at all.\n" ]
+      _ -> []
 
     -- The sentence issue #101 exists to publish.  It is stated on the failing
     -- call rather than left to the tool description because a description is
@@ -599,6 +623,7 @@ pathFailureMessage f = T.concat $
 
     fix = case pfProblem f of
       PathNotAFile     -> "pass the Agda source file itself, not the directory holding it."
+      PathNotRegular _ -> "pass a path naming an ordinary file of Agda source."
       PathUnreadable _ -> "check the file's permissions; the path resolved, the read did not."
       PathMissing
         -- Actionable rather than merely correct: the caller knows its own
@@ -611,9 +636,10 @@ pathFailureMessage f = T.concat $
                           \yours.)"
 
 instance ToJSON PathProblem where
-  toJSON PathMissing        = "missing"
-  toJSON PathNotAFile       = "notAFile"
-  toJSON (PathUnreadable _) = "unreadable"
+  toJSON PathMissing         = "missing"
+  toJSON PathNotAFile        = "notAFile"
+  toJSON (PathNotRegular _)  = "notRegularFile"
+  toJSON (PathUnreadable _)  = "unreadable"
 
 instance ToJSON PathFailure where
   toJSON f = object
@@ -626,10 +652,12 @@ instance ToJSON PathFailure where
           , "serverCwd"     .= pfServerCwd f
           , "problem"       .= pfProblem f
           ]
-          -- Only the unreadable case has anything to add: the underlying
-          -- 'IOException' text, which names the syscall that refused.
+          -- Two cases have something to add: the underlying 'IOException' text,
+          -- which names the syscall that refused, and the file type that was
+          -- there instead of a regular file.
           <> case pfProblem f of
                PathUnreadable why -> [ "detail" .= why ]
+               PathNotRegular ty  -> [ "detail" .= ty ]
                _                  -> [] )
     ]
 
