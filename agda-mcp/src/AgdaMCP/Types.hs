@@ -593,7 +593,12 @@ pathFailureMessage f = T.concat $
       PathMissing       -> "does not exist"
       PathNotAFile      -> "is a directory, not a file"
       PathNotRegular ty -> "is not a regular file, it is " <> ty
-      PathUnreadable _  -> "could not be read"
+      -- Not "could not be read": 'AgdaMCP.Path.ioProblem' produces this case
+      -- from the @stat@ as well as from the @open@, and a @stat@ that was
+      -- refused means no read was attempted at all.  The detail line below
+      -- carries the operating system's own message, which names the call that
+      -- failed, so the summary does not have to guess at it.
+      PathUnreadable _  -> "was refused by the operating system"
 
     detail = case pfProblem f of
       PathUnreadable why -> [ "  ", why, "\n" ]
@@ -618,13 +623,28 @@ pathFailureMessage f = T.concat $
           , "  This server resolves relative paths against ITS OWN working directory. It is a\n"
           , "  separate process, normally started in its own checkout rather than in your\n"
           , "  project, so a path relative to your project does not name your file here.\n" ]
+      -- The claim is about resolution, not about spelling.  An earlier version
+      -- said the path "was used exactly as you sent it", which the two fields
+      -- beside it can visibly contradict: 'System.Directory.makeAbsolute'
+      -- normalises, so an absolute @\/a\/.\/b@ or @\/a\/\/b@ arrives as
+      -- @\/a\/b@ (@..@ it leaves alone).  What matters here, and what is true of
+      -- every absolute path, is that the server's working directory had no part
+      -- in it.
       | otherwise =
-          [ "  the path was absolute, so it was used exactly as you sent it.\n" ]
+          [ "  the path was absolute, so this server's working directory was not \
+            \used to resolve it.\n" ]
 
     fix = case pfProblem f of
       PathNotAFile     -> "pass the Agda source file itself, not the directory holding it."
       PathNotRegular _ -> "pass a path naming an ordinary file of Agda source."
-      PathUnreadable _ -> "check the file's permissions; the path resolved, the read did not."
+      -- Deliberately not "check the file's permissions".  Every failure that is
+      -- not absence lands here — a permission wall, a symbolic-link loop, a
+      -- device error — so naming one of them would be the same false-advice
+      -- defect twice over: it asserts a cause this server did not establish, and
+      -- it asserts a read that may never have happened.
+      PathUnreadable _ -> "act on the reason above; it is the operating system's own, \
+                          \it names the call that failed, and this server got no \
+                          \further than reporting it."
       PathMissing
         -- Actionable rather than merely correct: the caller knows its own
         -- project directory, so naming the two halves of the answer is the

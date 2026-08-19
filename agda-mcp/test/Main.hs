@@ -3113,7 +3113,12 @@ unreadableFileTest cfg cs = do
             (case pfProblem pf of PathUnreadable _ -> True; _ -> False)
         , assertEqual "resolvedPath" locked (pfResolved pf)
         , assert ("message was " <> show (pathFailureMessage pf))
-            ("could not be read" `T.isInfixOf` pathFailureMessage pf)
+            ("was refused by the operating system" `T.isInfixOf` pathFailureMessage pf)
+          -- The summary must not name a syscall or a cause: this same case is
+          -- produced by the stat, where no read happens, and by errnos that
+          -- have nothing to do with permissions (Copilot's fourth review).
+        , assert ("message should not assert a cause: " <> show (pathFailureMessage pf))
+            (not ("check the file's permissions" `T.isInfixOf` pathFailureMessage pf))
         , assert "the wire shape should carry the underlying detail"
             ("\"detail\":" `T.isInfixOf` encodeText pf)
         ]
