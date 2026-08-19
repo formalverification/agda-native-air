@@ -63,6 +63,8 @@ import System.Directory
   )
 import System.Environment (setEnv)
 import System.Exit (exitFailure, exitSuccess)
+import System.IO.Error
+  ( doesNotExistErrorType, mkIOError, permissionErrorType )
 import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, unionFileModes)
 import System.FilePath ((</>), takeDirectory, takeFileName)
 import System.IO (hPutStrLn, stderr)
@@ -80,6 +82,7 @@ import AgdaMCP.Holes
   , injectReportExpr , substituteHole
   )
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
+import AgdaMCP.Path (ioProblem)
 import AgdaMCP.Diagnostics
   ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
   , maxMessageLines, parseDiagnostics )
@@ -3007,6 +3010,40 @@ pathTests = do
                        , "\"problem\":\"missing\"", "\"error\":" ]
                 missing = [k | k <- want, not (k `T.isInfixOf` wire)]
             in  assert ("missing from the wire shape: " <> show missing) (null missing)
+
+      , runTest "path: a file that vanishes between the stat and the read is missing, not unreadable (Copilot, PR 102)" $
+          -- The two sites that catch an IOException about a path are the stat and
+          -- the open of that same path, and they must agree about the same errno.
+          -- They did not: ENOENT from getFileStatus was PathMissing while ENOENT
+          -- from BS.readFile was PathUnreadable, so a file deleted in the window
+          -- between them came back as "could not be read / check the file's
+          -- permissions" — false advice, since there is no file left to have
+          -- permissions.  Asserted through the shared classifier rather than by
+          -- racing the window, so the test is deterministic.
+          let vanished = mkIOError doesNotExistErrorType "openBinaryFile"
+                           Nothing (Just (csFile cs))
+              refused  = mkIOError permissionErrorType "openBinaryFile"
+                           Nothing (Just (csFile cs))
+              rendered = pathFailureMessage PathFailure
+                { pfParameter = "filePath", pfRequested = csFile cs
+                , pfResolved  = csFile cs,  pfRelative  = False
+                , pfServerCwd = cwd,        pfProblem   = ioProblem vanished }
+          in  allOf
+                [ assertEqual "a vanished file" PathMissing (ioProblem vanished)
+                , assert ("a refused read was " <> show (ioProblem refused))
+                    (case ioProblem refused of PathUnreadable _ -> True; _ -> False)
+                , assert ("the refused read should carry the errno, was "
+                          <> show (ioProblem refused))
+                    (case ioProblem refused of
+                       PathUnreadable why -> "permission" `T.isInfixOf` why
+                       _                  -> False)
+                , assert ("the message should not advise checking permissions: "
+                          <> show rendered)
+                    (not ("permissions" `T.isInfixOf` rendered))
+                , assert ("the message should say the path is not there: "
+                          <> show rendered)
+                    ("does not exist" `T.isInfixOf` rendered)
+                ]
 
       , runTest "response guard: a bottom inside a tool result surfaces in the guard, not in the writer (Copilot, PR 102)" $ do
           -- A handler can return successfully and hand back a Value whose thunks

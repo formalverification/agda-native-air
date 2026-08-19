@@ -64,7 +64,10 @@
 --   swapped for a FIFO in between would still be opened.  Closing that needs a
 --   non-blocking open followed by @fstat@ on the descriptor, which is a good deal
 --   more machinery than the exposure warrants, so it is stated here rather than
---   claimed away.  A regular file's read is bounded by its own size, and no
+--   claimed away.  What the window /does/ get is an honest answer: every failure
+--   raised inside it is classified by 'ioProblem', so a file deleted between the
+--   two calls is reported missing rather than as an imaginary permissions
+--   problem.  A regular file's read is bounded by its own size, and no
 --   further cap is imposed: any threshold would be arbitrary, and Agda source
 --   that large is not Agda source.
 
@@ -77,6 +80,8 @@ module AgdaMCP.Path
     -- * Resolution on its own (exposed for @check_project@ and for testing)
   , resolveRequestedFile
   , resolveRequestedAnchor
+    -- * Failure classification (pure; exposed for testing)
+  , ioProblem
     -- * Decoding
   , decodeError
   ) where
@@ -227,10 +232,28 @@ statusOf :: ResolvedPath -> IO (Either PathFailure FileStatus)
 statusOf rp = do
   attempt <- try (getFileStatus (rpAbsolute rp))
   pure $ case attempt of
-    Right st -> Right st
-    Left (e :: IOException)
-      | isDoesNotExistError e -> Left (failureOf rp PathMissing)
-      | otherwise -> Left (failureOf rp (PathUnreadable (T.pack (show e))))
+    Right st                -> Right st
+    Left (e :: IOException) -> Left (failureOf rp (ioProblem e))
+
+-- | ioProblem: classify an 'IOException' raised about a path.
+--
+-- One function for every site that catches one, because the two sites are the
+-- @stat@ and the @open@ of the same path and must agree about the same errno.
+-- They did not: this module reported @ENOENT@ from 'getFileStatus' as
+-- 'PathMissing' and @ENOENT@ from 'BS.readFile' as 'PathUnreadable', so a file
+-- deleted in the window between them came back as "could not be read \/ check
+-- the file's permissions" — advice that is not merely unhelpful but false, since
+-- there is no file left to have permissions (Copilot's third review of PR 102).
+-- Sharing the classification is what stops the two from drifting again.
+--
+-- Anything that is not absence stays 'PathUnreadable' carrying the errno's own
+-- words: a permission wall, a device error, an @EISDIR@ that the file-type check
+-- should have caught first.  Those really are "it is there and the read did not
+-- work", which is what that case says.
+ioProblem :: IOException -> PathProblem
+ioProblem e
+  | isDoesNotExistError e = PathMissing
+  | otherwise             = PathUnreadable (T.pack (show e))
 
 -- | fileTypeOf: what is at the path, when it is not a regular file, in the
 -- words a refusal can use.
@@ -285,18 +308,22 @@ failureOf rp problem = PathFailure
 -- | readGuarded: read the resolved file, turning an 'IOException' into a
 -- structured failure instead of letting it escape the tool call.
 --
--- 'resolveFile' has already established that a file was there, so this fires
--- for the cases existence cannot rule out: a file we may not open, a file
+-- 'resolveFile' has already established that a regular file was there, so this
+-- fires for the cases that check cannot rule out: a file we may not open, a file
 -- removed in the moment between the check and the read, a device that refused.
 -- Whatever the cause, the client learns the path and the syscall's own words
--- rather than @-32603 Internal error@.
+-- rather than @-32603 Internal error@ — and learns them under the right
+-- classification, which is what 'ioProblem' is for: the file that vanished is
+-- reported missing, not as a permissions problem it cannot have.
 readGuarded :: ResolvedPath -> IO (Either PathFailure BS.ByteString)
 readGuarded rp = do
   attempt <- try (BS.readFile (rpAbsolute rp))
   pure $ case attempt of
-    Right bytes         -> Right bytes
-    Left (e :: IOException) ->
-      Left (failureOf rp (PathUnreadable (T.pack (show e))))
+    Right bytes             -> Right bytes
+    -- 'ioProblem', not 'PathUnreadable' directly: a file removed between the
+    -- @stat@ and this read raises @ENOENT@ here, and it is missing rather than
+    -- unreadable.
+    Left (e :: IOException) -> Left (failureOf rp (ioProblem e))
 
 -- | decodeError: a structured error for a file whose bytes are not valid UTF-8.
 --
