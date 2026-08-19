@@ -2884,6 +2884,10 @@ pathTests = do
     fillMiss <- handleFillHole cfg FillHoleParams
       { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero" }
     dirCall  <- handleCheckFile cfg (CheckFileParams (csRoot cs) Nothing)
+    -- A relative path that resolves to a directory that is really there: "test",
+    -- from the test process's own working directory.
+    relDir   <- handleCheckFile cfg (CheckFileParams "test" Nothing)
+    emptyCall <- handleCheckFile cfg (CheckFileParams "" Nothing)
     fifoCall <- handleCheckFile cfg (CheckFileParams (csFifo cs) Nothing)
     fifoProj <- handleCheckProject cfg defaultGateConfig CheckProjectParams
       { cppTarget = Nothing, cppProjectPath = Just (csFifo cs)
@@ -2910,7 +2914,12 @@ pathTests = do
           withPathFailure relMiss $ \pf ->
             let msg  = pathFailureMessage pf
                 want = [ T.pack (cwd </> csRelative cs), T.pack cwd
-                       , T.pack (csRelative cs), "RELATIVE", "ABSOLUTE" ]
+                       , T.pack (csRelative cs), "RELATIVE", "ABSOLUTE"
+                       -- The mis-resolution diagnosis belongs on this failure:
+                       -- a relative path that resolved to nothing is the one
+                       -- case where resolving against the wrong directory is
+                       -- what went wrong.
+                       , "does not\n  name your file here" ]
                 missing = [w | w <- want, not (w `T.isInfixOf` msg)]
             in  assert ("missing from the message " <> show msg <> ": " <> show missing)
                   (null missing)
@@ -2962,6 +2971,39 @@ pathTests = do
             , assert ("message was " <> show (pathFailureMessage pf))
                 ("is a directory, not a file" `T.isInfixOf` pathFailureMessage pf)
             ]
+
+      , runTest "path: a relative path that DID resolve is not lectured about resolution (self-review, PR 102)" $
+          -- dirCall sends the project root, absolutely; relDir sends a relative
+          -- path that resolves to a directory that really is there.  The
+          -- mis-resolution paragraph used to ride on every relative failure, so
+          -- this message asserted "a path relative to your project does not name
+          -- your file here" about a path that had just named something — and for
+          -- an in-repo client, whose directory IS the server's, that is false.
+          -- The Fix line then prescribed something unrelated to it: two
+          -- competing diagnoses in one error.
+          withPathFailure relDir $ \pf ->
+            let msg = pathFailureMessage pf
+            in  allOf
+                  [ assertEqual "problem" PathNotAFile (pfProblem pf)
+                  , assert "the resolution FACT should still be stated"
+                      ("RELATIVE path" `T.isInfixOf` msg)
+                  , assert ("the mis-resolution DIAGNOSIS should not be: " <> show msg)
+                      (not ("name your file here" `T.isInfixOf` msg))
+                  ]
+
+      , runTest "path: an empty filePath is named as empty, not printed as nothing (self-review, PR 102)" $
+          -- makeAbsolute "" is the working directory itself, so this arrives as
+          -- notAFile.  The old text read "you sent a RELATIVE path: " with
+          -- nothing after the colon, describing an empty string as a path the
+          -- caller could go and look at.
+          withPathFailure emptyCall $ \pf ->
+            let msg = pathFailureMessage pf
+            in  allOf
+                  [ assertEqual "requestedPath" "" (pfRequested pf)
+                  , assertEqual "resolvedPath" cwd (pfResolved pf)
+                  , assert ("should name the path as empty: " <> show msg)
+                      ("EMPTY path" `T.isInfixOf` msg)
+                  ]
 
       , runTest "path: a path naming a FIFO is refused unread, not opened (Copilot, PR 102)" $
           -- doesFileExist answers "exists and is not a directory", so it admits

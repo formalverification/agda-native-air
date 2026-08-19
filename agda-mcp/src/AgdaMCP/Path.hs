@@ -57,8 +57,12 @@
 --   And the read is only ever attempted on a __regular__ file, which is a
 --   stronger requirement than "exists" and is checked rather than assumed.
 --   'System.Directory.doesFileExist' answers "exists and is not a directory",
---   so it admits FIFOs, sockets, and devices; each of those turns the read into
---   a failure this server cannot report, because it does not survive to answer.
+--   so it admits FIFOs, sockets, and devices.  Two of those turn the read into a
+--   failure this server cannot report, because it does not survive to answer: a
+--   FIFO with a writer blocks in @open@ forever, and a character device such as
+--   @\/dev\/zero@ is read until the heap is gone.  A socket is merely refused
+--   (@ENXIO@), which /is/ reportable — but the type check is what makes that
+--   distinction unnecessary, since none of them is Agda source.
 --   'AgdaMCP.Types.PathProblem' records the two measurements.  What remains is a
 --   window rather than a hole: the path is @stat@ed and then opened, so a file
 --   swapped for a FIFO in between would still be opened.  Closing that needs a

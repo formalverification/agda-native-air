@@ -586,6 +586,7 @@ pathFailureMessage f = T.concat $
   <> detail
   <> hazard
   <> resolution
+  <> diagnosis
   <> [ "  this server's working directory: ", T.pack (pfServerCwd f), "\n"
      , "  Fix: ", fix ]
   where
@@ -606,33 +607,67 @@ pathFailureMessage f = T.concat $
 
     -- Why refusing a non-regular file is this server's business and not the
     -- caller's: the read, not the typecheck, is what would never come back.
+    --
+    -- Stated as the policy and the two cases that motivate it rather than as a
+    -- property of whatever is actually there, because that property does not
+    -- hold of every type this case covers: opening a unix socket fails at once
+    -- with ENXIO (measured: "No such device or address"), and a block device is
+    -- bounded by its size.  "Reading one is unbounded or blocking" was therefore
+    -- true of the two types measured and false of the other two.
     hazard = case pfProblem f of
       PathNotRegular _ ->
-        [ "  Reading one is unbounded or blocking, and it blocks before --timeout has\n"
-        , "  anything to bound: that bound applies to the agda subprocess, and the read\n"
-        , "  happens first. So this server refuses to open it at all.\n" ]
+        [ "  This server opens regular files only. Reading anything else can block\n"
+        , "  forever (a FIFO waits for a writer) or never reach EOF (a character device\n"
+        , "  such as /dev/zero), and it would do so before --timeout has anything to\n"
+        , "  bound: that bound applies to the agda subprocess, and the read happens\n"
+        , "  first.\n" ]
       _ -> []
 
-    -- The sentence issue #101 exists to publish.  It is stated on the failing
-    -- call rather than left to the tool description because a description is
-    -- read once, at tool-selection time, while this is read at the moment it
-    -- explains the error in front of the caller.
+    -- How the path was resolved: a fact about this call, stated for every
+    -- failure.  Deliberately only the fact — the /diagnosis/ is separate, below,
+    -- because it is not true of every failure.
+    --
+    -- The absolute arm claims resolution, not spelling.  An earlier version said
+    -- the path "was used exactly as you sent it", which the two fields beside it
+    -- can visibly contradict: 'System.Directory.makeAbsolute' normalises, so an
+    -- absolute @\/a\/.\/b@ or @\/a\/\/b@ arrives as @\/a\/b@ (@..@ it leaves
+    -- alone).  What is true of every absolute path is that the server's working
+    -- directory had no part in it.
     resolution
+      -- An empty path is relative, and 'makeAbsolute' turns it into the working
+      -- directory itself.  Saying "you sent a RELATIVE path: " with nothing
+      -- after the colon described that as a path the caller could go and look
+      -- at; naming it for what it was is both shorter and true.
+      | pfRelative f, null (pfRequested f) =
+          [ "  you sent an EMPTY path, which resolves to this server's own working\n"
+          , "  directory.\n" ]
       | pfRelative f =
-          [ "  you sent a RELATIVE path: ", T.pack (pfRequested f), "\n"
-          , "  This server resolves relative paths against ITS OWN working directory. It is a\n"
-          , "  separate process, normally started in its own checkout rather than in your\n"
-          , "  project, so a path relative to your project does not name your file here.\n" ]
-      -- The claim is about resolution, not about spelling.  An earlier version
-      -- said the path "was used exactly as you sent it", which the two fields
-      -- beside it can visibly contradict: 'System.Directory.makeAbsolute'
-      -- normalises, so an absolute @\/a\/.\/b@ or @\/a\/\/b@ arrives as
-      -- @\/a\/b@ (@..@ it leaves alone).  What matters here, and what is true of
-      -- every absolute path, is that the server's working directory had no part
-      -- in it.
+          [ "  you sent a RELATIVE path (", T.pack (pfRequested f)
+          , "), which this server resolved against its own\n"
+          , "  working directory.\n" ]
       | otherwise =
           [ "  the path was absolute, so this server's working directory was not \
             \used to resolve it.\n" ]
+
+    -- The sentence issue #101 exists to publish — and it belongs only on the
+    -- failure it explains.
+    --
+    -- It used to be part of 'resolution', so every relative-path failure carried
+    -- it.  That made a message argue with itself: a relative path naming a
+    -- /directory/ resolved to something that is really there, so "a path
+    -- relative to your project does not name your file here" was both beside the
+    -- point and not established — for a client whose own directory is this
+    -- server's, which is the in-repo case, it is plainly false — and the Fix
+    -- line beneath it then gave an unrelated remedy.  Two competing diagnoses in
+    -- one error is how a reader ends up trusting neither.  It is stated for
+    -- 'PathMissing' alone, which is the only case where resolving against the
+    -- wrong directory is what went wrong.
+    diagnosis = case pfProblem f of
+      PathMissing | pfRelative f ->
+        [ "  This server is a separate process, normally started in its own checkout\n"
+        , "  rather than in your project, so a path relative to your project does not\n"
+        , "  name your file here.\n" ]
+      _ -> []
 
     fix = case pfProblem f of
       PathNotAFile     -> "pass the Agda source file itself, not the directory holding it."
@@ -646,6 +681,10 @@ pathFailureMessage f = T.concat $
                           \it names the call that failed, and this server got no \
                           \further than reporting it."
       PathMissing
+        -- Nothing to append for an empty path, and "followed by ." would have
+        -- been the result of appending it anyway.
+        | pfRelative f, null (pfRequested f) ->
+            "pass an ABSOLUTE path to the file you meant."
         -- Actionable rather than merely correct: the caller knows its own
         -- project directory, so naming the two halves of the answer is the
         -- whole of the repair.

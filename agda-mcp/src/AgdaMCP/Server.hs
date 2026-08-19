@@ -358,9 +358,9 @@ filePathDoc =
   \against THIS SERVER'S working directory — the server is a separate process, \
   \normally started in its own checkout rather than in your project, so a path \
   \relative to your project does not name your file here. A path that resolves \
-  \to no readable file is refused with an error naming the path AS RESOLVED, \
-  \the working directory it was resolved against, and this rule; it is never \
-  \quietly checked somewhere else, and it is never an opaque internal error."
+  \to no readable file is refused with an error naming the path AS RESOLVED and \
+  \this server's working directory; it is never quietly checked somewhere else, \
+  \and it is never an opaque internal error."
 
 -- | lineDoc / columnDoc / colDoc / holeIndexDoc: the same contract at the input
 -- properties, where a client decides what to send.
