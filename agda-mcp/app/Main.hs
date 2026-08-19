@@ -21,8 +21,8 @@
 --     }
 --
 -- Usage:
---   agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
---            [--corpus PATH]   [--timeout N] [--verbose]
+--   agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
+--            [--corpus PATH]  [--timeout N] [--verbose]
 --            [--check-command "CMD ARGS ..."] [--check-timeout N]
 --
 -- M1-3 additions:
@@ -33,7 +33,9 @@
 
 module Main where
 
+import Control.Exception (IOException, try)
 import Control.Monad (when)
+import System.Directory (getCurrentDirectory, setCurrentDirectory)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
@@ -51,6 +53,7 @@ data CliOpts = CliOpts
   { cliAgdaConfig :: AgdaConfig
   , cliGateConfig :: GateConfig
   , cliCorpusPath :: Maybe FilePath
+  , cliCwd        :: Maybe FilePath
   } deriving (Show)
 
 defaultCliOpts :: CliOpts
@@ -58,6 +61,7 @@ defaultCliOpts = CliOpts
   { cliAgdaConfig = defaultConfig
   , cliGateConfig = defaultGateConfig
   , cliCorpusPath = Nothing
+  , cliCwd        = Nothing
   }
 
 
@@ -69,6 +73,25 @@ main = do
     exitSuccess
   let opts = parseArgs args defaultCliOpts
       cfg  = cliAgdaConfig opts
+
+  -- Enter --cwd before anything else touches a path: the corpus below, every
+  -- relative client path (they resolve against this directory — AgdaMCP.Path's
+  -- published rule), the gate discovery, and Agda itself, whose own project
+  -- discovery (the nearest *.agda-lib) anchors to the directory it is spawned
+  -- in.  That last one is what the flag exists for: a server checking a client
+  -- project with the client's own agda must run that agda inside the client's
+  -- checkout, or Agda resolves the file against no project at all (issue #103).
+  -- A directory we cannot enter is a fatal configuration error, reported by
+  -- name rather than discovered one bewildering tool failure at a time.
+  case cliCwd opts of
+    Nothing  -> pure ()
+    Just dir -> do
+      entered <- try (setCurrentDirectory dir) :: IO (Either IOException ())
+      case entered of
+        Left err -> do
+          hPutStrLn stderr $ "agda-mcp: cannot enter --cwd " <> dir <> ": " <> show err
+          exitFailure
+        Right () -> pure ()
 
   -- Load corpus if --corpus was provided.
   corpusIdx <- case cliCorpusPath opts of
@@ -92,7 +115,9 @@ main = do
         , scCorpusIndex = corpusIdx
         }
 
+  cwdNow <- getCurrentDirectory
   hPutStrLn stderr $ "agda-mcp v0.2.0 starting (agda-bin: " <> agdaBin cfg <> ")"
+  hPutStrLn stderr $ "  cwd: " <> cwdNow
   hPutStrLn stderr $ "  flags: " <> unwords (agdaFlags cfg)
   hPutStrLn stderr $ "  timeout: " <> case agdaTimeout cfg of
     Just n | n > 0 -> show n <> "s per agda call"
@@ -112,6 +137,7 @@ main = do
 -- | Minimal CLI argument parser.
 --
 -- Supports:
+--   --cwd DIR             Working directory to enter before anything else.
 --   --agda-bin PATH       Override the agda binary path (default: "agda").
 --   --agda-flags "..."    Space-separated Agda flags.
 --   --corpus PATH         Load agda-strux JSONL corpus for search tools.
@@ -122,6 +148,8 @@ main = do
 --   --help                Print usage and exit.
 parseArgs :: [String] -> CliOpts -> CliOpts
 parseArgs [] opts = opts
+parseArgs ("--cwd" : dir : rest) opts =
+  parseArgs rest opts { cliCwd = Just dir }
 parseArgs ("--agda-bin" : path : rest) opts =
   parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaBin = path } }
 parseArgs ("--agda-flags" : flags : rest) opts =
@@ -158,6 +186,13 @@ usage = unlines
   , "Usage: agda-mcp [OPTIONS]"
   , ""
   , "Options:"
+  , "  --cwd DIR             Working directory to enter before anything else."
+  , "                        Every later relative path — --corpus, client file"
+  , "                        paths, gate discovery — resolves inside it, and the"
+  , "                        checking agda runs there, so Agda's own project"
+  , "                        discovery (the nearest *.agda-lib) anchors to it."
+  , "                        Set it to the client project's checkout root when"
+  , "                        this server checks a project it is not started in."
   , "  --agda-bin PATH       Path to the agda binary (default: agda)"
   , "  --agda-flags \"...\"    Space-separated Agda flags"
   , "  --corpus PATH         Load agda-strux JSONL corpus for search tools"
