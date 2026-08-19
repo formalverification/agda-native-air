@@ -56,13 +56,14 @@ import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import System.Directory
-  ( Permissions, createDirectoryIfMissing, doesFileExist, emptyPermissions
-  , findExecutable, getCurrentDirectory, getPermissions, getTemporaryDirectory
-  , makeAbsolute, removeDirectoryRecursive, removeFile, setOwnerExecutable
-  , setPermissions
+  ( Permissions, canonicalizePath, createDirectoryIfMissing, doesDirectoryExist
+  , doesFileExist, emptyPermissions, findExecutable, getCurrentDirectory
+  , getPermissions, getTemporaryDirectory, makeAbsolute
+  , removeDirectoryRecursive, removeFile, setOwnerExecutable, setPermissions
   )
 import System.Environment (setEnv)
-import System.Exit (exitFailure, exitSuccess)
+import System.Exit (ExitCode (..), exitFailure, exitSuccess)
+import System.Process (readProcessWithExitCode)
 import System.IO.Error
   ( doesNotExistErrorType, mkIOError, permissionErrorType )
 import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, unionFileModes)
@@ -90,9 +91,9 @@ import AgdaMCP.Gate
   ( GateConfig (..), GatePlan (..), defaultGateConfig, findMakefileGate
   , makefileTargets, resolveGate )
 import AgdaMCP.Project
-  ( findNearestAgdaLib, includePathsOf, librariesFileFlagOf, libraryIncludeDirs
-  , libraryIncludesOf, libraryNameOf, parseLibrariesFile, resolveProjectDir
-  , selectedLibrariesOf
+  ( fileDirIncludeFlags, findNearestAgdaLib, includePathsOf, librariesFileFlagOf
+  , libraryIncludeDirs, libraryIncludesOf, libraryNameOf, parseLibrariesFile
+  , resolveProjectDir, selectedLibrariesOf, underAnyDir
   )
 import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
@@ -481,7 +482,65 @@ pureTests = do
         assertEqual "libraries" ["a", "b", "c", "d"]
           (selectedLibrariesOf
              ["-l", "a", "-lb", "--library=c", "--library", "d", "-i", "e"])
+
+    -- The dir-of-file include and when it may be added (issue #103).  The
+    -- fls field failure: an unconditional -i src/Ledger beside the project's
+    -- own -i src made the import `Prelude` ambiguous — resolvable both as
+    -- src/Prelude and, through the stray root, as src/Ledger/Prelude itself.
+    , runTest "underAnyDir: a directory contains itself and its descendants" $
+        allOf
+          [ assertEqual "itself"     True  (underAnyDir ["/a/b"] "/a/b")
+          , assertEqual "descendant" True  (underAnyDir ["/a/b"] "/a/b/c/d")
+          , assertEqual "unrelated"  False (underAnyDir ["/a/b"] "/x/y")
+          ]
+
+    , runTest "underAnyDir: component-wise, so /a/b does not claim /a/bc" $
+        assertEqual "sibling string prefix" False (underAnyDir ["/a/b"] "/a/bc")
+
+    , runTest "fileDirIncludeFlags: a file inside its library's include dirs adds nothing (#103)" $ do
+        flags <- fileDirIncludeFlags [] (pcOfLibrary (Just flsShapedLibrary))
+                   "/proj/src/Ledger/Prelude.lagda.md"
+        assertEqual "no stray root" ([] :: [String]) flags
+
+    , runTest "fileDirIncludeFlags: a file outside them still gets its own directory (#66)" $ do
+        flags <- fileDirIncludeFlags [] (pcOfLibrary (Just flsShapedLibrary))
+                   "/proj/data/fixtures/Fixture01.agda"
+        assertEqual "fixture dir" ["-i", "/proj/data/fixtures"] flags
+
+    , runTest "fileDirIncludeFlags: a flag -i that covers the file suffices" $ do
+        flags <- fileDirIncludeFlags ["-i", "/elsewhere/agda"] (pcOfLibrary Nothing)
+                   "/elsewhere/agda/AgdaDojang/Debug.agda"
+        assertEqual "covered by flag" ([] :: [String]) flags
+
+    , runTest "fileDirIncludeFlags: a bare orphan file keeps the fallback" $ do
+        flags <- fileDirIncludeFlags [] (pcOfLibrary Nothing) "/tmp/probe/Probe.agda"
+        assertEqual "orphan dir" ["-i", "/tmp/probe"] flags
     ]
+
+-- | flsShapedLibrary: the shape that surfaced issue #103 — a hierarchical
+-- library whose modules live under nested include directories.
+flsShapedLibrary :: LibraryEntry
+flsShapedLibrary = LibraryEntry
+  { leName     = "formal-ledger"
+  , leRoot     = "/proj"
+  , leLibFile  = "/proj/formal-ledger.agda-lib"
+  , leIncludes = ["src", "src-lib-exts"]
+  }
+
+-- | pcOfLibrary: a context varying only in the field 'fileDirIncludeFlags'
+-- reads.  Absolute paths throughout, so 'makeAbsolute' inside the function
+-- under test is the identity and the expectations stay literal.
+pcOfLibrary :: Maybe LibraryEntry -> ProjectContext
+pcOfLibrary lib = ProjectContext
+  { pcRootSource           = maybe RootFromServerConfig (const RootFromAgdaLib) lib
+  , pcRoot                 = maybe "/tmp" leRoot lib
+  , pcLibrary              = lib
+  , pcLibrariesFile        = Nothing
+  , pcLibrariesFileMissing = False
+  , pcRegistered           = []
+  , pcSelected             = []
+  , pcIncludePaths         = []
+  }
 
 
 
@@ -2029,23 +2088,37 @@ echoTests = do
             -- ones the server started with.  Resolution extends them two ways —
             -- an unregistered library contributes its include dirs, a registered
             -- but unselected one contributes a --library — and the requested
-            -- file's own directory is added on every call.  A project block
-            -- built before those additions would quietly describe a context Agda
-            -- never saw (Copilot's review of PR 95).
-          , runTest "project echo: includePaths cover the file's own directory" $
+            -- file's own directory is added exactly when nothing else reaches it
+            -- (issues #66 and #103).  A project block built before those
+            -- additions would quietly describe a context Agda never saw
+            -- (Copilot's review of PR 95).
+          , runTest "project echo: a selected library's file needs no include paths (#103)" $
+              -- Before #103 the file's own directory was appended on every
+              -- call; for a file its library already reaches, that stray root
+              -- could make short-name imports ambiguous.  Reaching the file is
+              -- now the -l selection's job alone, and the echo says so.
               withRight okA $ \r ->
                 let pc = fcrProject r
-                    dir = rootA </> "src"
                 in  assert ("includePaths were " <> show (pcIncludePaths pc))
-                      (dir `elem` pcIncludePaths pc)
+                      (null (pcIncludePaths pc))
 
           , runTest "project echo: an unregistered library's include dirs are reported" $
               withRight okC $ \r ->
                 let pc   = fcrProject r
-                    want = [rootC </> "src", rootC </> "src" </> "Deep"]
-                    miss = [d | d <- want, d `notElem` pcIncludePaths pc]
-                in  assert ("missing from includePaths " <> show (pcIncludePaths pc)
-                            <> ": " <> show miss) (null miss)
+                    want = rootC </> "src"
+                in  assert ("includePaths were " <> show (pcIncludePaths pc))
+                      (want `elem` pcIncludePaths pc)
+
+          , runTest "project echo: a nested file's own directory is not a root (#103)" $
+              -- The fls shape: modules under src/Ledger/… checked with an extra
+              -- -i src/Ledger resolve the import `Prelude` both as src/Prelude
+              -- and as src/Ledger/Prelude itself — AmbiguousTopLevelModuleName
+              -- on a module that checks clean in its own project.
+              withRight okC $ \r ->
+                let pc    = fcrProject r
+                    stray = rootC </> "src" </> "Deep"
+                in  assert ("includePaths were " <> show (pcIncludePaths pc))
+                      (stray `notElem` pcIncludePaths pc)
 
           , runTest "project echo: a registered-but-unselected library is reported as selected" $
               withRight okD $ \r ->
@@ -3178,6 +3251,136 @@ unreadableFileTest cfg cs = do
 --   3. agda-dojang libraries file exists
 -- Returns @Just (cfg, fixturePath, repoRoot)@ if everything is available,
 -- @Nothing@ otherwise.
+-- ---------------------------------------------------------------------------
+-- Tier 2g: the --cwd startup option, at the process level (issue #103)
+--
+-- --cwd lives in app/Main.hs — the argument parse, the chdir, its ordering
+-- before anything touches a path — none of which a handler-level test can see.
+-- So this tier drives the real executable, from a directory that is not the
+-- client's, the way scripts/run-server.sh spawns it, and asserts the three
+-- behaviors the flag exists for: a client-relative path resolves (and its
+-- hierarchical module checks, which only happens when Agda's own project
+-- discovery saw the client root as cwd — the fls failure shape); a relative
+-- miss is refused against the client root, not the launch directory; and a
+-- directory that cannot be entered is a fatal startup error naming the path.
+--
+-- The executable is the one cabal built.  CI builds it before running this
+-- suite (the smoke lane precedes agda-mcp-test in ci.yml); a local bare
+-- `cabal test` on a tree that never built the executable skips loudly instead,
+-- exactly as tier 2 skips without an agda on PATH.
+-- ---------------------------------------------------------------------------
+
+-- | probeServerExe: the built @agda-mcp@ executable, when cabal can name one
+-- that exists.  @cabal list-bin@ answers from the plan without building, so a
+-- stale path (never-built executable) is checked against the filesystem rather
+-- than trusted.
+probeServerExe :: IO (Maybe FilePath)
+probeServerExe = do
+  r <- try (readProcessWithExitCode "cabal" ["list-bin", "exe:agda-mcp"] "")
+         :: IO (Either SomeException (ExitCode, String, String))
+  case r of
+    Right (ExitSuccess, out, _) | (p : _) <- lines out -> do
+      exists <- doesFileExist p
+      pure (if exists then Just p else Nothing)
+    _ -> pure Nothing
+
+-- | innerText: the double-encoded payload of one JSON-RPC response — the
+-- @result.content[0].text@ of the line whose @id@ matches.  The assertions
+-- below then substring-match compact-encoded tokens (e.g. @"success":true@)
+-- inside it: the payload is aeson's compact encoding, whose prose fields spell
+-- such facts with spaces, so the tokens are unambiguous without decoding the
+-- payload a second time.
+innerText :: Int -> String -> Maybe Text
+innerText wanted out = listToMaybe
+  [ txt
+  | l <- lines out
+  , Just (Aeson.Object o)   <- [Aeson.decodeStrict (TE.encodeUtf8 (T.pack l))]
+  , Just (Aeson.Number n)   <- [KM.lookup "id" o]
+  , n == fromIntegral wanted
+  , Just (Aeson.Object res) <- [KM.lookup "result" o]
+  , Just (Aeson.Array cs)   <- [KM.lookup "content" res]
+  , Aeson.Object c : _      <- [foldr (:) [] cs]
+  , Just (Aeson.String txt) <- [KM.lookup "text" c]
+  ]
+
+-- | cwdProcessTests: build a client project under the temp directory, then
+-- spawn the executable twice — once with @--cwd@ naming it, once naming a
+-- directory that does not exist.
+--
+--   <tmp>/agda-mcp-cwd-client/.git/                 (a repository boundary)
+--   <tmp>/agda-mcp-cwd-client/client-lib.agda-lib   (include: src)
+--   <tmp>/agda-mcp-cwd-client/src/Sub/Mod.agda      (module Sub.Mod — resolves
+--                                                    only under the project)
+cwdProcessTests :: FilePath -> IO [Bool]
+cwdProcessTests exe = do
+  hPutStrLn stderr "\n── Process tests (tier 2g: --cwd end to end, #103) ──"
+  tmp <- getTemporaryDirectory
+  let raw  = tmp </> "agda-mcp-cwd-client"
+      nuke = do e <- doesDirectoryExist raw
+                if e then removeDirectoryRecursive raw else pure ()
+  nuke
+  createDirectoryIfMissing True (raw </> "src" </> "Sub")
+  createDirectoryIfMissing True (raw </> ".git")
+  writeFile (raw </> "client-lib.agda-lib") "name: client-lib\ninclude: src\n"
+  writeFile (raw </> "src" </> "Sub" </> "Mod.agda") "module Sub.Mod where\n"
+  -- The server reports directories as the operating system names them
+  -- (getCurrentDirectory resolves symlinks — /tmp may be one), so compare
+  -- against the canonical form and pass that same form on the command line.
+  client <- canonicalizePath raw
+
+  let reqs = unlines
+        [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":\
+          \{\"name\":\"check_file\",\"arguments\":{\"filePath\":\"src/Sub/Mod.agda\"}}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":\
+          \{\"name\":\"check_file\",\"arguments\":{\"filePath\":\"src/Missing.agda\"}}}"
+        ]
+  (okExit, okOut, okErr) <-
+    readProcessWithExitCode exe ["--cwd", client, "--timeout", "120"] reqs
+  (badExit, _, badErr) <-
+    readProcessWithExitCode exe ["--cwd", client </> "no-such-dir"]
+      "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}\n"
+
+  results <- sequence
+    [ runTest "--cwd: the server serves from the client root and exits cleanly" $
+        assertEqual "exit" ExitSuccess okExit
+
+    , runTest "--cwd: the startup banner names the entered directory" $
+        assert ("stderr was:\n" <> okErr) (("cwd: " <> client) `isInfixOf` okErr)
+
+    , runTest "--cwd: a client-relative path resolves and its hierarchical module checks" $
+        case innerText 2 okOut of
+          Nothing -> pure (Fail ("no response payload for id 2; stdout:\n" <> take 400 okOut))
+          Just t  -> allOf
+            [ assert ("payload was: " <> T.unpack (T.take 300 t))
+                ("\"success\":true" `T.isInfixOf` t)
+            , assert "project root should be the client checkout"
+                (T.pack ("\"root\":\"" <> client <> "\"") `T.isInfixOf` t)
+            ]
+
+    , runTest "--cwd: a relative miss is refused against the client root, not the launch directory" $
+        case innerText 3 okOut of
+          Nothing -> pure (Fail ("no response payload for id 3; stdout:\n" <> take 400 okOut))
+          Just t  -> allOf
+            [ assert ("payload was: " <> T.unpack (T.take 300 t))
+                (T.pack ("\"serverCwd\":\"" <> client <> "\"") `T.isInfixOf` t)
+            , assert "resolution should land under the client root"
+                (T.pack ("\"resolvedPath\":\"" <> (client </> "src" </> "Missing.agda") <> "\"")
+                   `T.isInfixOf` t)
+            ]
+
+    , runTest "--cwd: a directory that cannot be entered is a fatal startup error, by name" $
+        allOf
+          [ assert ("exit was: " <> show badExit) (badExit /= ExitSuccess)
+          , assert ("stderr was:\n" <> badErr) ("cannot enter --cwd" `isInfixOf` badErr)
+          , assert "the failing path is named"
+              ((client </> "no-such-dir") `isInfixOf` badErr)
+          ]
+    ]
+  nuke
+  pure results
+
+
 probeAgdaEnv :: IO (Maybe (AgdaConfig, FilePath, FilePath))
 probeAgdaEnv = do
   mAgda <- findExecutable "agda"
@@ -4115,11 +4318,23 @@ main = do
       hPutStrLn stderr "\n── Integration tests (tier 2): SKIPPED ──"
       pure []
     Just (cfg, fixture, repoRoot) -> integrationTests cfg fixture repoRoot
+  -- Tier 2g: the --cwd option, driven through the real executable (#103).
+  -- Needs agda on PATH (same gate as tier 2) and the built executable; CI
+  -- builds it before this suite runs (agda-mcp-smoke precedes agda-mcp-test).
+  mExe <- case mEnv of
+    Nothing -> pure Nothing
+    Just _  -> probeServerExe
+  cwdResults <- case mExe of
+    Nothing -> do
+      hPutStrLn stderr
+        "\n── Process tests (tier 2g: --cwd, #103): SKIPPED (executable not built or cabal absent) ──"
+      pure []
+    Just exe -> cwdProcessTests exe
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
-          <> pathResults <> integrationResults
+          <> pathResults <> integrationResults <> cwdResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

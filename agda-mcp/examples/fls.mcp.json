@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "agda": {
+      "command": "/ABS/PATH/TO/agda-native-air/scripts/run-server.sh",
+      "args": [
+        "--cwd", "/ABS/PATH/TO/formal-ledger-specifications",
+        "--agda-bin", "/ABS/PATH/TO/fls-agda-root/bin/agda",
+        "--agda-flags", "-i /ABS/PATH/TO/agda-native-air/agda-dojang/agda",
+        "--timeout", "900",
+        "--check-command", "/ABS/PATH/TO/fls-agda-root/bin/agda src/Ledger.lagda.md",
+        "--check-timeout", "3600"
+      ]
+    }
+  }
+}
