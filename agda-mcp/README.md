@@ -151,7 +151,7 @@ Two properties are contractual, not incidental.
 
 There is no `strict` option to opt into: this server shells out to batch `agda` per call, so unsolved metavariables, unsolved constraints, and open holes have always made it red.  What was missing was saying so.
 
-### The hole model (issues #71 and #73)
+### The hole model, and the code-only view (issues #71, #73, #100)
 
 All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` and kept in sync with what Agda itself reports:
 
@@ -159,6 +159,8 @@ All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` an
 +  Tokens inside comments (`--` lines, nested `{- ... -}` blocks), pragmas, string/character literals, and literate prose are never holes.
 +  Literate files are recognized by extension (`.lagda` / `.lagda.tex`, `.lagda.md` / `.lagda.typ`, `.lagda.rst`, `.lagda.org`, `.lagda.tree`) and only their code regions are scanned, following the code-block rules of Agda 2.8.0's own literate preprocessor.
 +  `holeIndex` addresses holes in source order under this model, and all reported positions are 1-based (line, col) coordinates in the file as written — literate-file coordinates for literate sources, matching what an editor or Agda's error messages show.
+
+One lexical scan serves the scans that are not about holes, too.  `get_goal`'s `module` field and the `AgdaDojang.Debug` import it injects are read from the *code-only view* of the file — literate prose, comment text, and pragma text blanked, every character position preserved — so a prose paragraph opening with `module`, a commented-out `module M where`, or the embedded Haskell of a `{-# FOREIGN GHC ... #-}` pragma is never mistaken for the module header.  Before issue #100 the injection read that view and the name did not, so `get_goal` on a literate file could report a module name that appears only in its prose.
 
 ### Stable hole handles (issue #79)
 
@@ -306,7 +308,7 @@ agda-mcp/
 │       ├── Types.hs             ← Stable JSON schema types
 │       ├── Agda.hs              ← Agda subprocess interaction + marker parsing
 │       ├── Diagnostics.hs       ← Agda output → structured diagnostics: codes, ranges, involved
-│       ├── Holes.hs             ← The hole model: literate masking + lexical hole scan
+│       ├── Holes.hs             ← The hole model: literate masking, lexical scan, code-only view
 │       ├── Project.hs           ← Root resolution: nearest *.agda-lib, registry, mismatch
 │       ├── Gate.hs              ← Which command is the project's gate: make target, configured, Everything
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
@@ -355,6 +357,8 @@ Given a file path and hole address, return the hole's expected type and its loca
   "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
 }
 ```
+
+`module` is the module's **declared** name — `Proofs.Use` for a module embedded at `src/Proofs/Use.agda`, not the file's base name — read from the code-only view of the source, so neither a prose line nor a commented-out header that opens with `module` is mistaken for the real one (issue #100).
 
 `verdict.exitCode` here is normally **non-zero even when the goal is right**: the injected macro leaves an interaction point behind, so this run is evidence about the introspection, not a judgement on the file.  Use `check_file` for that.
 

@@ -14,16 +14,22 @@
 --      pipeline).  Masking, rather than extracting, preserves every character
 --      position, so all spans below are in literate-file coordinates.
 --   2. Lexical awareness.  The masked text is then scanned with a small model
---      of Agda's lexer: line comments (@--@ at a token boundary), nested
---      block comments (@{- … -}@), pragmas (@{-# … #-}@), string and
---      character literals, nested @{! … !}@ holes, and @?@ as a hole only
---      when it stands as a lexically separate token (so @op?@ or @_≟_@ never
---      match).
+--      of Agda's lexer ('lexSpans'): line comments (@--@ at a token
+--      boundary), nested block comments (@{- … -}@), pragmas (@{-# … #-}@),
+--      string and character literals, nested @{! … !}@ holes, and @?@ as a
+--      hole only when it stands as a lexically separate token (so @op?@ or
+--      @_≟_@ never match).
 --
 --   The result is that hole enumeration agrees with Agda's interaction-point
 --   count, comment and prose tokens are never holes, and 'substituteHole' /
 --   'injectReportExpr' splice the hole's actual span (one character for @?@,
 --   arbitrary for @{! e !}@) instead of a fixed four-character token.
+--
+--   That one scan serves two views, so there is a single model of where a
+--   comment starts and ends rather than one per consumer (issue #100):
+--   'findHoles' keeps the holes it found, and 'codeOnly' blanks the comments
+--   and pragmas — the view any line scan for a declaration (a @module@
+--   header, an @import@) should read instead of the raw source.
 --
 --   On top of the scan sits the /addressing/ model of issue #79: a 'HoleRef'
 --   names one hole, either by its source-order index or by a @(line, column)@
@@ -48,6 +54,7 @@ module AgdaMCP.Holes
     LiterateFlavour (..)
   , flavourOf
   , maskNonCode
+  , codeOnly
     -- * Hole spans
   , HoleSpan (..)
   , findHoles
@@ -133,9 +140,12 @@ maskNonCode flav src = case flav of
     fromLines :: [(Bool, Text)] -> Text
     fromLines = T.concat . map (\(code, t) -> if code then t else bleach t)
 
-    -- Agda's bleach: keep non-tab whitespace (so newlines survive), blank
-    -- everything else.
-    bleach = T.map (\c -> if isSpace c && c /= '\t' then c else ' ')
+-- | Agda's @bleach@: keep non-tab whitespace (so newlines survive), blank
+-- everything else.  Both maskings — 'maskNonCode' over literate prose and
+-- 'blankSpans' over comments and pragmas — go through it, so masked text
+-- always has the length, and the line structure, of the text it came from.
+bleach :: Text -> Text
+bleach = T.map (\c -> if isSpace c && c /= '\t' then c else ' ')
 
 -- Each layer function maps lines (with trailing newlines) to
 -- (isCode, chunk) pairs whose concatenation is the original text.
@@ -325,18 +335,45 @@ data HoleSpan = HoleSpan
 isNameBreak :: Char -> Bool
 isNameBreak c = isSpace c || c `elem` ("(){};.@\"" :: String)
 
--- | Find all holes in source text, in order.  The flavour selects the
--- literate masking applied first; the scan itself recognizes every Agda hole
--- syntax — @{!!}@, @{! … !}@ with nesting, and standalone @?@ — while
--- skipping comments, pragmas, and string/character literals, so a hole token
--- in a comment or in literate prose is never counted.
-findHoles :: LiterateFlavour -> Text -> [HoleSpan]
-findHoles flav src = scan 0 1 1 True (maskNonCode flav src)
+-- | What a lexical scan found: the token classes a caller may need to treat
+-- specially.  String and character literals are not among them — they are
+-- code, and 'lexSpans' skips over them only so that a @--@ or @{-@ inside one
+-- does not open a comment.
+data LexKind
+  = LexHole     -- ^ @{! … !}@ (with nesting), or a standalone @?@.
+  | LexComment  -- ^ a @--@ line comment, or a nested @{- … -}@ block comment.
+  | LexPragma   -- ^ @{-# … #-}@.
+  deriving (Eq, Show)
+
+-- | A located lexical token, in coordinates of the text scanned.
+data LexSpan = LexSpan
+  { lxKind  :: LexKind
+  , lxStart :: Int    -- ^ 0-based character offset (Text index) of its first character.
+  , lxEnd   :: Int    -- ^ 0-based character offset one past its last character.
+  , lxLine  :: Int    -- ^ 1-based line number of its first character.
+  , lxCol   :: Int    -- ^ 1-based column number of its first character.
+  } deriving (Eq, Show)
+
+-- | lexSpans: scan text with a small model of Agda's lexer and report every
+-- hole, comment, and pragma in it, in source order and without overlap.
+--
+-- The model recognizes line comments (@--@ at a token boundary), nested block
+-- comments (@{- … -}@), pragmas (@{-# … #-}@), string and character literals,
+-- nested @{! … !}@ holes, and @?@ as a hole only when it stands as a
+-- lexically separate token (so @op?@ or @_≟_@ never match).  An unterminated
+-- comment, pragma, or hole runs to end of file: Agda would reject such a
+-- file, and reporting the region keeps this total rather than partial.
+--
+-- Callers apply 'maskNonCode' first for a literate file, which preserves
+-- every character position, so the offsets and @(line, column)@ pairs
+-- reported here are coordinates in the file as written.
+lexSpans :: Text -> [LexSpan]
+lexSpans = scan 0 1 1 True
   where
     -- afterBreak: was the previous character a token break (or BOF)?
     -- Needed because "--", "?", and "'" only begin their token when they are
     -- not glued to a preceding name (x--y, op?, x' are single names).
-    scan :: Int -> Int -> Int -> Bool -> Text -> [HoleSpan]
+    scan :: Int -> Int -> Int -> Bool -> Text -> [LexSpan]
     scan !off !ln !col !afterBreak txt = case T.uncons txt of
       Nothing -> []
       Just (c, rest)
@@ -349,32 +386,48 @@ findHoles flav src = scan 0 1 1 True (maskNonCode flav src)
                 col'  = if nls == 0
                           then col + len
                           else 1 + T.length (T.takeWhileEnd (/= '\n') token)
-            in  HoleSpan off (off + len) ln col
+            in  LexSpan LexHole off (off + len) ln col
                   : scan (off + len) ln' col' True (T.drop len txt)
-        -- Pragma {-# … #-}: skip to #-} (holes cannot occur inside).
+        -- Pragma {-# … #-}: reported whole (holes cannot occur inside).
         | c == '{', "-#" `T.isPrefixOf` rest ->
-            skipTo "#-}" off ln col txt
+            spanned LexPragma off ln col (skipTo "#-}" off ln col txt)
         -- Nested block comment {- … -}.
         | c == '{', "-" `T.isPrefixOf` rest ->
-            comment 1 (off + 2) ln (col + 2) (T.drop 1 rest)
-        -- String literal.
+            spanned LexComment off ln col
+              (skipComment 1 (off + 2) ln (col + 2) (T.drop 1 rest))
+        -- String literal: skipped, not reported.
         | c == '"' ->
-            string (off + 1) ln (col + 1) rest
+            resume (skipString (off + 1) ln (col + 1) rest)
         -- Constructs that only start at a token boundary:
         | afterBreak, c == '-', "-" `T.isPrefixOf` rest ->
             -- Line comment: "--" to end of line (Agda's comment rule wins
             -- over any operator munch, so -- always comments here).
-            lineComment off ln col txt
+            spanned LexComment off ln col (skipLine off ln col txt)
         | afterBreak, c == '?', maybe True (isNameBreak . fst) (T.uncons rest) ->
             -- Standalone ? — a hole only as a lexically separate token.
-            HoleSpan off (off + 1) ln col
+            LexSpan LexHole off (off + 1) ln col
               : scan (off + 1) ln (col + 1) True rest
         | afterBreak, c == '\'' ->
-            charLit off ln col rest
+            -- A ' at a token boundary opens a character literal when one
+            -- closes on this line; otherwise it is an ordinary name
+            -- character (defensive; Agda would reject the latter).
+            case charLitLen rest of
+              Just n  -> scan (off + 1 + n) ln (col + 1 + n) True (T.drop n rest)
+              Nothing -> scan (off + 1) ln (col + 1) False rest
         | c == '\n' ->
             scan (off + 1) (ln + 1) 1 True rest
         | otherwise ->
             scan (off + 1) ln (col + 1) (isNameBreak c) rest
+
+    -- Report the region just skipped, then carry on from where the skip
+    -- stopped.  A comment or pragma always ends at a token break.
+    spanned :: LexKind -> Int -> Int -> Int -> (Int, Int, Int, Text) -> [LexSpan]
+    spanned kind !start !startLn !startCol st@(off, _, _, _) =
+      LexSpan kind start off startLn startCol : resume st
+
+    -- Carry on from a skip's end state without reporting anything.
+    resume :: (Int, Int, Int, Text) -> [LexSpan]
+    resume (off, ln, col, rest) = scan off ln col True rest
 
     -- Inside {! … !}: count nesting; returns the token length measured from
     -- the opening '{'.  An unterminated hole extends to end of file (Agda
@@ -387,64 +440,104 @@ findHoles flav src = scan 0 1 1 True (maskNonCode flav src)
       Just ('!', r) | "}" `T.isPrefixOf` r -> holeLen (depth - 1) (len + 2) (T.drop 1 r)
       Just (_, r) -> holeLen depth (len + 1) r
 
-    -- Inside {- … -}: count nesting (Agda comments nest).
-    comment :: Int -> Int -> Int -> Int -> Text -> [HoleSpan]
-    comment 0 !off !ln !col rest = scan off ln col True rest
-    comment !depth !off !ln !col rest = case T.uncons rest of
-      Nothing -> []
-      Just ('{', r) | "-" `T.isPrefixOf` r -> comment (depth + 1) (off + 2) ln (col + 2) (T.drop 1 r)
-      Just ('-', r) | "}" `T.isPrefixOf` r -> comment (depth - 1) (off + 2) ln (col + 2) (T.drop 1 r)
-      Just ('\n', r) -> comment depth (off + 1) (ln + 1) 1 r
-      Just (_, r)    -> comment depth (off + 1) ln (col + 1) r
+    -- The skips below all answer the same question — where does scanning
+    -- resume? — as (offset, line, column, rest of the text).
 
-    -- "-- …" to end of line.
-    lineComment !off !ln !col txt =
+    -- Inside {- … -}: count nesting (Agda comments nest).
+    skipComment :: Int -> Int -> Int -> Int -> Text -> (Int, Int, Int, Text)
+    skipComment 0 !off !ln !col rest = (off, ln, col, rest)
+    skipComment !depth !off !ln !col rest = case T.uncons rest of
+      Nothing -> (off, ln, col, T.empty)
+      Just ('{', r) | "-" `T.isPrefixOf` r -> skipComment (depth + 1) (off + 2) ln (col + 2) (T.drop 1 r)
+      Just ('-', r) | "}" `T.isPrefixOf` r -> skipComment (depth - 1) (off + 2) ln (col + 2) (T.drop 1 r)
+      Just ('\n', r) -> skipComment depth (off + 1) (ln + 1) 1 r
+      Just (_, r)    -> skipComment depth (off + 1) ln (col + 1) r
+
+    -- "-- …" to end of line; the newline itself is not part of the comment.
+    skipLine :: Int -> Int -> Int -> Text -> (Int, Int, Int, Text)
+    skipLine !off !ln !col txt =
       let (skipped, rest) = T.breakOn "\n" txt
-      in  scan (off + T.length skipped) ln (col + T.length skipped) True rest
+      in  (off + T.length skipped, ln, col + T.length skipped, rest)
 
     -- Skip to just past a delimiter (or end of file), tracking position.
-    skipTo :: Text -> Int -> Int -> Int -> Text -> [HoleSpan]
+    skipTo :: Text -> Int -> Int -> Int -> Text -> (Int, Int, Int, Text)
     skipTo delim !off !ln !col txt = case T.uncons txt of
-      Nothing -> []
+      Nothing -> (off, ln, col, T.empty)
       Just (c, rest)
         | delim `T.isPrefixOf` txt ->
             let n = T.length delim
-            in  scan (off + n) ln (col + n) True (T.drop n txt)
+            in  (off + n, ln, col + n, T.drop n txt)
         | c == '\n' -> skipTo delim (off + 1) (ln + 1) 1 rest
         | otherwise -> skipTo delim (off + 1) ln (col + 1) rest
 
     -- Inside "…": backslash escapes; a newline also ends the literal
     -- (Agda strings are single-line; stay well-defined on bad input).
-    string :: Int -> Int -> Int -> Text -> [HoleSpan]
-    string !off !ln !col rest = case T.uncons rest of
-      Nothing -> []
+    skipString :: Int -> Int -> Int -> Text -> (Int, Int, Int, Text)
+    skipString !off !ln !col rest = case T.uncons rest of
+      Nothing -> (off, ln, col, T.empty)
       Just ('\\', r) -> case T.uncons r of
-        Nothing      -> []
-        Just (e, r') -> string (off + 2) (if e == '\n' then ln + 1 else ln)
-                               (if e == '\n' then 1 else col + 2) r'
-      Just ('"', r)  -> scan (off + 1) ln (col + 1) True r
-      Just ('\n', r) -> scan (off + 1) (ln + 1) 1 True r
-      Just (_, r)    -> string (off + 1) ln (col + 1) r
+        Nothing      -> (off + 1, ln, col + 1, T.empty)
+        Just (e, r') -> skipString (off + 2) (if e == '\n' then ln + 1 else ln)
+                                   (if e == '\n' then 1 else col + 2) r'
+      Just ('"', r)  -> (off + 1, ln, col + 1, r)
+      Just ('\n', r) -> (off + 1, ln + 1, 1, r)
+      Just (_, r)    -> skipString (off + 1) ln (col + 1) r
 
-    -- A ' at a token boundary: consume a character literal if one closes on
-    -- this line, otherwise treat the quote as an ordinary name character
-    -- (defensive; Agda would reject the latter).
-    charLit !off !ln !col rest =
-      case litLen rest of
-        Just n  -> scan (off + 1 + n) ln (col + 1 + n) True (T.drop n rest)
-        Nothing -> scan (off + 1) ln (col + 1) False rest
+    -- The length of a character literal that closes on this line, measured
+    -- from just after the opening quote, or Nothing if none does.
+    charLitLen :: Text -> Maybe Int
+    charLitLen = go 0
       where
-        litLen t = go' 0 t
-          where
-            go' :: Int -> Text -> Maybe Int
-            go' !n u = case T.uncons u of
-              Nothing         -> Nothing
-              Just ('\n', _)  -> Nothing
-              Just ('\\', u') -> case T.uncons u' of
-                Nothing       -> Nothing
-                Just (_, u'') -> go' (n + 2) u''
-              Just ('\'', _)  -> Just (n + 1)
-              Just (_, u')    -> go' (n + 1) u'
+        go :: Int -> Text -> Maybe Int
+        go !n u = case T.uncons u of
+          Nothing         -> Nothing
+          Just ('\n', _)  -> Nothing
+          Just ('\\', u') -> case T.uncons u' of
+            Nothing       -> Nothing
+            Just (_, u'') -> go (n + 2) u''
+          Just ('\'', _)  -> Just (n + 1)
+          Just (_, u')    -> go (n + 1) u'
+
+-- | Find all holes in source text, in order.  The flavour selects the
+-- literate masking applied first; the lexical scan then keeps the holes, so a
+-- hole token in a comment, a pragma, a string literal, or literate prose is
+-- never counted.
+findHoles :: LiterateFlavour -> Text -> [HoleSpan]
+findHoles flav src =
+  [ HoleSpan (lxStart s) (lxEnd s) (lxLine s) (lxCol s)
+  | s <- lexSpans (maskNonCode flav src)
+  , lxKind s == LexHole
+  ]
+
+-- | codeOnly: the source with everything that is not Agda code blanked out —
+-- literate prose ('maskNonCode') and comment and pragma text (the lexical
+-- scan) — preserving every character position, so a line index or a column
+-- found on the result addresses the same character of the original.
+--
+-- This is the view a line scan for a declaration should read, because a scan
+-- of the raw source reads whatever /looks/ like Agda: literate prose opening
+-- with @module@ (issue #100), a commented-out @module M where@, or a @module@
+-- or @import@ line inside the embedded Haskell of a @{-# FOREIGN GHC … #-}@
+-- pragma.  Agda sees a declaration in none of them, and none of them survives
+-- here.  Code, string literals, and hole tokens are left as they are.
+codeOnly :: LiterateFlavour -> Text -> Text
+codeOnly flav src =
+  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
+  where
+    masked = maskNonCode flav src
+
+-- | blankSpans: 'bleach' the given character ranges of a text, keeping the
+-- rest.  The ranges must be ascending and non-overlapping, which is how
+-- 'lexSpans' reports them.
+blankSpans :: Text -> [(Int, Int)] -> Text
+blankSpans txt = T.concat . go 0 txt
+  where
+    go :: Int -> Text -> [(Int, Int)] -> [Text]
+    go _    rest []                    = [rest]
+    go !pos rest ((start, end) : more) =
+      let (keep, rest')  = T.splitAt (start - pos) rest
+          (blank, rest'') = T.splitAt (end - start) rest'
+      in  keep : bleach blank : go end rest'' more
 
 -- | Find the n-th hole (0-indexed) in source text.
 findNthHole :: LiterateFlavour -> Int -> Text -> Maybe HoleSpan

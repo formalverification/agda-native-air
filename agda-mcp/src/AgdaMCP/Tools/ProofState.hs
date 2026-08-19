@@ -80,6 +80,18 @@
 --     @checkedFromSource@, so an agent can distinguish a slow cold call that
 --     built @.agdai@ interfaces from a genuinely slow one.
 --
+--   Design note: every line scan reads the code-only view (issues #73, #100).
+--     A source file's raw text carries things that look like Agda and are not: a
+--     literate prose paragraph opening with @module@, a commented-out
+--     declaration, the embedded Haskell of a @{-# FOREIGN GHC … #-}@ pragma.
+--     'ensureDebugImport' and 'moduleNameOf' therefore scan
+--     'AgdaMCP.Holes.codeOnly' — the source with prose, comments, and pragmas
+--     blanked, every character position preserved — so the header they find is
+--     the header Agda finds, and a line index found there still splices into the
+--     original text.  Scanning the raw source instead is what made get_goal
+--     report a module name read from a prose line (issue #100): the same fixture
+--     whose prose #73 already stopped fooling the import injection.
+--
 --   Design note: all four tools typecheck the file IN PLACE.
 --     Agda decides a module's name from where its file sits relative to the include
 --     path, so a module embedded in a library at a hierarchical path (e.g. FLRP.Bridge
@@ -126,7 +138,7 @@ import AgdaMCP.Agda
   )
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Holes
-  ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
+  ( HoleSpan (..), LiterateFlavour, codeOnly, findHoles, flavourOf
   , injectReportExpr, resolveHoleRef, substituteHole
   )
 import AgdaMCP.Path (withSourceFile)
@@ -212,8 +224,9 @@ handleGetGoal cfg0 params =
                         { giGoal    = goal
                         , giContext = ctx
                         -- The declared module name (e.g. FLRP.Bridge), parsed from the
-                        -- header — not the file's base name.
-                        , giModule  = moduleNameOf src
+                        -- header — not the file's base name, and not a prose or
+                        -- comment line that looks like one (issue #100).
+                        , giModule  = moduleNameOf (flavourOf absPath) src
                         , giElapsedMs         = Just (arElapsedMs result)
                         , giCheckedFromSource = checkedFromSourceOf result
                         , giVerdict = Just verdict
@@ -588,81 +601,87 @@ timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
 -- below the @module@ keyword when the module is parameterised (common in agda-algebras).
 -- agda-dojang is on the library path (@-l agda-dojang@), so the import resolves.
 --
--- Literate awareness (issues #71/#73): all line scans run over the source with its
--- non-code regions masked out ('maskNonCode'), so a prose line that happens to start
--- with @module@ (or mention the import) can neither misplace the injection nor
--- suppress it; the header is found inside a code region, where the inserted line is
--- Agda-visible.  The import also inherits the header line's indentation, which keeps
--- it inside indentation-delimited code blocks (@.lagda.rst@); an unindented insert
--- there would terminate the block.  Masking preserves the line structure, so line
--- indices found on the masked text splice correctly into the original.
+-- Literate and lexical awareness (issues #71/#73/#100): all line scans run over the
+-- code-only view of the source ('codeOnly'), which blanks literate prose, comment,
+-- and pragma text, so a line that happens to start with @module@ (or mention the
+-- import) without being code can neither misplace the injection nor suppress it; the
+-- header is found inside a code region, where the inserted line is Agda-visible.  The
+-- import also inherits the header line's indentation, which keeps it inside
+-- indentation-delimited code blocks (@.lagda.rst@); an unindented insert there would
+-- terminate the block.  Masking preserves the line structure, so line indices found on
+-- the masked text splice correctly into the original.
 --
 -- The "already imported?" scan is restricted to the *top-level* prelude — the lines
 -- after the top-level module header, up to the first nested @module@ — so an import
 -- inside a nested module (which does not bring names into the surrounding scope) does
 -- not suppress injection.  Both that scan and the header search look at real
 -- import/module lines (not mere substrings), so a passing mention of @AgdaDojang.Debug@
--- or @module@ in a comment neither suppresses the injection nor misplaces it.  When no
--- @module … where@ header is found the source is returned unchanged (get_goal then
--- surfaces the resulting scope error), so injection is best-effort, not guaranteed.
+-- or @module@ in prose or in a comment neither suppresses the injection nor misplaces
+-- it.  When no @module … where@ header is found the source is returned unchanged
+-- (get_goal then surfaces the resulting scope error), so injection is best-effort, not
+-- guaranteed.
 ensureDebugImport :: LiterateFlavour -> Text -> Text
 ensureDebugImport flav src =
-  case moduleHeaderSpan maskedLs of
+  case moduleHeaderSpan codeLs of
     Nothing -> src   -- no top-level module header found; leave as-is (best-effort)
     Just (hdrLine, afterHdr)
-      | any isDebugImportLine (takeWhile (not . startsModule) (drop afterHdr maskedLs)) -> src
+      | any isDebugImportLine (takeWhile (not . opensModule) (drop afterHdr codeLs)) -> src
       | otherwise ->
-          let indent          = T.takeWhile isIndentChar (maskedLs !! hdrLine)
+          let indent          = T.takeWhile isIndentChar (codeLs !! hdrLine)
               (before, after) = splitAt afterHdr (T.lines src)
           in  T.unlines (before <> [indent <> "open import AgdaDojang.Debug"] <> after)
   where
-    maskedLs = T.lines (maskNonCode flav src)
+    codeLs = T.lines (codeOnly flav src)
 
     isIndentChar c = c == ' ' || c == '\t'
 
-    -- A nested `module …` line ends the top-level prelude; imports below it are not in
-    -- the surrounding scope, so they must not count as "already imported".
-    startsModule l = "module" `T.isPrefixOf` T.stripStart (stripLineComment l)
-
-    -- A genuine import of the module: with any line comment stripped, the first
-    -- token is an import-introducing keyword, @import@ is present, and
-    -- @AgdaDojang.Debug@ appears as a whole module token; so none of a comment
-    -- mention, an inline @-- … AgdaDojang.Debug@ trailer, or a longer name such as
-    -- @AgdaDojang.Debug.Extra@ is mistaken for the import.
+    -- A genuine import of the module: the first token is an import-introducing
+    -- keyword, @import@ is present, and @AgdaDojang.Debug@ appears as a whole module
+    -- token; so neither an inline @-- … AgdaDojang.Debug@ trailer (blanked before the
+    -- scan) nor a longer name such as @AgdaDojang.Debug.Extra@ is mistaken for the
+    -- import.
     isDebugImportLine ln =
-      case T.words (stripLineComment ln) of
+      case T.words ln of
         ws@(w : _) -> w `elem` ["import", "open", "private"]
                    && "import"           `elem` ws
                    && "AgdaDojang.Debug"  `elem` ws
         []         -> False
 
--- | moduleHeaderSpan: locate the top-level module header in (masked) source lines.
--- Returns the 0-based index of the @module@ line and the index just past the header's
--- closing line — the first subsequent line carrying a standalone @where@ token (they
--- may be the same line, or several apart for a parameterised module).  Line comments
--- are stripped before the scan, so a @where@ (or @module@) sitting inside a @--@
--- comment on a header line is ignored.  Returns @Nothing@ if no header is found.
+-- | opensModule: does this (code-only) line open a @module@ declaration?  The keyword
+-- must stand as the line's first token, so a definition named @moduleAxioms@ is not a
+-- header.  A nested @module …@ line also ends the top-level prelude: imports below it
+-- are not in the surrounding scope, so they must not count as "already imported".
+opensModule :: Text -> Bool
+opensModule ln = case T.words ln of
+  (w : _) -> w == "module"
+  []      -> False
+
+-- | moduleHeaderSpan: locate the top-level module header in code-only source lines
+-- ('codeOnly').  Returns the 0-based index of the @module@ line and the index just
+-- past the header's closing line — the first subsequent line carrying a standalone
+-- @where@ token (they may be the same line, or several apart for a parameterised
+-- module).  Returns @Nothing@ if no header is found.
 moduleHeaderSpan :: [Text] -> Maybe (Int, Int)
 moduleHeaderSpan ls = do
-  i    <- findIndex (\l -> "module" `T.isPrefixOf` T.stripStart (stripLineComment l)) ls
-  jRel <- findIndex (\l -> "where" `elem` T.words (stripLineComment l)) (drop i ls)
+  i    <- findIndex opensModule ls
+  jRel <- findIndex (\l -> "where" `elem` T.words l) (drop i ls)
   pure (i, i + jRel + 1)
 
--- | stripLineComment: drop an Agda @--@ line comment (best-effort: treats the first
--- @--@ as the comment start).  Enough to keep comment text out of the keyword and
--- @where@ scans above; block comments (@{- … -}@) are not handled.
-stripLineComment :: Text -> Text
-stripLineComment = fst . T.breakOn "--"
-
 -- | moduleNameOf: the declared top-level module name, parsed from the @module …@
--- header line (with any line comment stripped).  This is the *declared* name (e.g.
--- @FLRP.Bridge@) not the file's base name, which would mangle a hierarchical module
--- to its last segment and strip only one extension from a literate @.lagda.md@ file.
--- Returns @Nothing@ when no @module@ header is found.
-moduleNameOf :: Text -> Maybe Text
-moduleNameOf src = do
-  hdr <- find (\l -> "module" `T.isPrefixOf` T.stripStart (stripLineComment l)) (T.lines src)
-  case dropWhile (/= "module") (T.words (stripLineComment hdr)) of
+-- header line of the code-only view of the source ('codeOnly').  This is the
+-- *declared* name (e.g. @FLRP.Bridge@) not the file's base name, which would mangle a
+-- hierarchical module to its last segment and strip only one extension from a literate
+-- @.lagda.md@ file.
+--
+-- Reading the code-only view is what makes the answer the /declared/ name rather than
+-- the first thing in the file that reads like a header: the flavour blanks literate
+-- prose discussing module structure, and the lexical scan blanks a commented-out header
+-- (issue #100).  Returns @Nothing@ when the file declares no module.
+moduleNameOf :: LiterateFlavour -> Text -> Maybe Text
+moduleNameOf flav src = do
+  hdr <- find opensModule (T.lines (codeOnly flav src))
+  case T.words hdr of
+    -- 'opensModule' pins the first token as the keyword, so the second is the name.
     (_ : name : _) -> Just name
     _              -> Nothing
 

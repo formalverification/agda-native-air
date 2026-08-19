@@ -9,10 +9,13 @@
 --   0. Pure unit tests (no IO, no Agda) — hole finding, marker parsing.
 --   1. Fixture-file tests (IO for file read, no Agda) — 1a: the hole model
 --      (issues #71/#73: all hole syntaxes, comment/prose decoys, literate
---      flavours); 1b: corpus loading, search_by_name, search_by_type,
---      get_dependencies; 1c: `--timeout` enforcement (subprocess, but no
---      *Agda*), driven by the `fake-slow-agda.sh` stand-in binary so it
---      runs anywhere; 1d: the response echo and root resolution (#72/#76);
+--      flavours) and the code-only view every declaration scan reads
+--      (issue #100: the module name each fixture declares, and the plain
+--      .agda one whose block comment declares another); 1b: corpus loading,
+--      search_by_name, search_by_type, get_dependencies; 1c: `--timeout`
+--      enforcement (subprocess, but no *Agda*), driven by the
+--      `fake-slow-agda.sh` stand-in binary so it runs anywhere; 1d: the
+--      response echo and root resolution (#72/#76);
 --      1e: hole addressing by position or index, and the parse of both
 --      (#79) — all resolved before Agda is started, misses included;
 --      1f: the whole-project gate (#78), driven by `fake-project-gate.sh`
@@ -77,7 +80,7 @@ import AgdaMCP.Agda
   , checkedFromSourceOf , defaultTimeoutSeconds
   )
 import AgdaMCP.Holes
-  ( LiterateFlavour (..) , flavourOf , maskNonCode
+  ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
   , HoleSpan (..) , findHoles , findNthHole
   , HoleRef (..) , offsetOfPosition , resolveHoleRef
   , injectReportExpr , substituteHole
@@ -130,6 +133,12 @@ assertEqual label expected actual
   | expected == actual = pure Pass
   | otherwise = pure . Fail $
       label <> ": expected " <> show expected <> ", got " <> show actual
+
+-- | nth: the i-th element of a list, or Nothing when the list is shorter than
+-- that.  Lets a test name the line it expects a value on without a separate
+-- length guard.
+nth :: Int -> [a] -> Maybe a
+nth i xs = if i < length xs then Just (xs !! i) else Nothing
 
 -- | allOf: run assertions in sequence, stopping at the first failure.  A test
 -- that checks several things about one result (a diagnostic's code, then its
@@ -308,6 +317,31 @@ pureTests = do
           Pass   -> assert "import sits just after the real where"
                       (length out > 4 && out !! 4 == "open import AgdaDojang.Debug")
 
+    -- A commented-out header must not misplace the injection either: inserting
+    -- after it would leave the import inside the comment, so the macro get_goal
+    -- injects would not resolve (issue #100).
+    , runTest "ensureDebugImport: a commented-out header does not misplace the import" $ do
+        let s = T.unlines
+              [ "{- an earlier draft:"
+              , "module Decoy where"
+              , "-}"
+              , "module Real where"
+              , "foo = {!!}" ]
+            out = T.lines (ensureDebugImport PlainAgda s)
+        assertEqual "import follows the real header"
+          (Just "open import AgdaDojang.Debug") (nth 4 out)
+
+    -- The prelude scan ends at a nested `module …` line, so the keyword must
+    -- stand as a token: a definition whose name merely starts with "module"
+    -- would otherwise cut the scan short and inject a duplicate import.
+    , runTest "ensureDebugImport: a definition named module… does not end the prelude" $ do
+        let s = T.unlines
+              [ "module Top where"
+              , "moduleAxioms = 3"
+              , "open import AgdaDojang.Debug"
+              , "foo = {!!}" ]
+        assertEqual "already imported → unchanged" s (ensureDebugImport PlainAgda s)
+
     , runTest "ensureDebugImport: a nested-module import does not suppress injection" $ do
         let s = T.unlines
               [ "module Top where"
@@ -322,19 +356,48 @@ pureTests = do
           Pass   -> assert "the nested import is left in place"
                       ("  open import AgdaDojang.Debug" `elem` out)
 
-    -- moduleNameOf: the goal's `module` field is the declared name, not the base name.
+    -- moduleNameOf: the goal's `module` field is the declared name — not the
+    -- base name, and not the first line of the file that reads like a header.
+    -- The flavour is what tells prose from code (issue #100).
     , runTest "moduleNameOf: hierarchical name from the header" $
         assertEqual "name" (Just "FLRP.Bridge")
-          (moduleNameOf (T.unlines [ "module FLRP.Bridge where", "foo = {!!}" ]))
+          (moduleNameOf PlainAgda (T.unlines [ "module FLRP.Bridge where", "foo = {!!}" ]))
 
     , runTest "moduleNameOf: parameterised header, comment ignored" $
         assertEqual "name" (Just "M")
-          (moduleNameOf (T.unlines
+          (moduleNameOf PlainAgda (T.unlines
             [ "module M {a : Level} where  -- not FLRP.Bridge", "x = {!!}" ]))
 
     , runTest "moduleNameOf: no header → Nothing" $
         assertEqual "name" Nothing
-          (moduleNameOf (T.unlines [ "-- just a comment", "x = 1" ]))
+          (moduleNameOf PlainAgda (T.unlines [ "-- just a comment", "x = 1" ]))
+
+    , runTest "moduleNameOf: literate prose 'module …' is not the header (#100)" $
+        assertEqual "name" (Just "M")
+          (moduleNameOf LiterateMd (T.unlines
+            [ "module Example where — the prose decoy of LiterateMd.lagda.md"
+            , "```agda"
+            , "module M where"
+            , "x = ?"
+            , "```" ]))
+
+    , runTest "moduleNameOf: a commented-out header is not the header (#100)" $
+        assertEqual "name" (Just "Real")
+          (moduleNameOf PlainAgda (T.unlines
+            [ "{- an earlier draft:"
+            , "module Decoy where"
+            , "-}"
+            , "module Real where"
+            , "x = {!!}" ]))
+
+    , runTest "moduleNameOf: a nested block comment hides its header too (#100)" $
+        assertEqual "name" (Just "Real")
+          (moduleNameOf PlainAgda (T.unlines
+            [ "{- outer {- inner"
+            , "module Decoy where"
+            , "-} still commented -}"
+            , "module Real where"
+            , "x = {!!}" ]))
 
     -- fill_hole verdict classification (issue #69): whitelist, not blacklist.
     , runTest "errorTagsOf: collects error names in order, skips warnings" $
@@ -981,18 +1044,20 @@ expectedHolePos src =
       in  Just (nLines + 1, T.length lastLine + 1)
 
 -- | Run one literate-fixture regression: exactly one hole, spanning
--- @{! zero !}@, at the position the literate file itself dictates.
-literateFixtureTest :: FilePath -> IO TestResult
-literateFixtureTest path = do
+-- @{! zero !}@, at the position the literate file itself dictates, and the
+-- declared module name the fixture's code region gives — not one read from its
+-- prose (issue #100).
+literateFixtureTest :: FilePath -> Text -> IO TestResult
+literateFixtureTest path declared = do
   src <- TIO.readFile path
   let holes = findHoles (flavourOf path) src
   case (holes, expectedHolePos src) of
     (_, Nothing) -> pure (Fail "fixture lacks the n = {! zero !} line")
-    ([h], Just (ln, col)) -> do
-      r1 <- assertEqual "hole slice" "{! zero !}" (sliceSpan src h)
-      case r1 of
-        Fail m -> pure (Fail m)
-        Pass   -> assertEqual "(line, col)" (ln, col) (hsLine h, hsCol h)
+    ([h], Just (ln, col)) -> allOf
+      [ assertEqual "hole slice" "{! zero !}" (sliceSpan src h)
+      , assertEqual "(line, col)" (ln, col) (hsLine h, hsCol h)
+      , assertEqual "declared module" (Just declared) (moduleNameOf (flavourOf path) src)
+      ]
     (hs, _) -> pure . Fail $ "expected exactly 1 hole, got " <> show (length hs)
 
 holeModelTests :: IO [Bool]
@@ -1103,20 +1168,53 @@ holeModelTests = do
               Fail m -> pure (Fail m)
               Pass   -> assert "prose is blanked" (not ("Prose" `T.isInfixOf` masked))
 
+    -- codeOnly is what every declaration scan reads (issue #100): comment and
+    -- pragma text goes, code and hole tokens stay, positions are preserved.
+    , runTest "codeOnly: comment and pragma text is blanked, code and holes are not" $ do
+        let src = T.unlines
+              [ "{-# FOREIGN GHC module Decoy where #-}"
+              , "{- outer {- inner"
+              , "module Commented where"
+              , "-} still commented -}"
+              , "module Real where           -- module Trailing where"
+              , "x = {! -- not a comment !}"
+              ]
+            out = codeOnly PlainAgda src
+        allOf
+          [ assertEqual "length preserved" (T.length src) (T.length out)
+          , assertEqual "line count preserved" (length (T.lines src)) (length (T.lines out))
+          , assert "the real header survives"      ("module Real where" `T.isInfixOf` out)
+          , assert "the pragma is blanked"         (not ("Decoy" `T.isInfixOf` out))
+          , assert "the block comment is blanked"  (not ("Commented" `T.isInfixOf` out))
+          , assert "the line comment is blanked"   (not ("Trailing" `T.isInfixOf` out))
+          , assert "the hole token is kept whole"  ("{! -- not a comment !}" `T.isInfixOf` out)
+          ]
+
+    -- The plain-Agda half of issue #100: a `module … where` inside a block
+    -- comment is neither the file's header nor a hole site.
+    , runTest "block-comment fixture: declares BlockCommentModule, has one hole (#100)" $ do
+        let path = "test" </> "resources" </> "BlockCommentModule.agda"
+        src <- TIO.readFile path
+        allOf
+          [ assertEqual "declared module" (Just "BlockCommentModule")
+              (moduleNameOf (flavourOf path) src)
+          , assertEqual "hole count" 1 (length (findHoles (flavourOf path) src))
+          ]
+
     , runTest "literate regression: .lagda.md (prose decoys above and below)" $
-        literateFixtureTest ("test" </> "resources" </> "LiterateMd.lagda.md")
+        literateFixtureTest ("test" </> "resources" </> "LiterateMd.lagda.md") "LiterateMd"
 
     , runTest "literate regression: .lagda (TeX; commented \\begin{code} decoy)" $
-        literateFixtureTest ("test" </> "resources" </> "LiterateTex.lagda")
+        literateFixtureTest ("test" </> "resources" </> "LiterateTex.lagda") "LiterateTex"
 
     , runTest "literate regression: .lagda.rst" $
-        literateFixtureTest ("test" </> "resources" </> "LiterateRst.lagda.rst")
+        literateFixtureTest ("test" </> "resources" </> "LiterateRst.lagda.rst") "LiterateRst"
 
     , runTest "literate regression: .lagda.org" $
-        literateFixtureTest ("test" </> "resources" </> "LiterateOrg.lagda.org")
+        literateFixtureTest ("test" </> "resources" </> "LiterateOrg.lagda.org") "LiterateOrg"
 
     , runTest "literate regression: .lagda.tree (Forester)" $
-        literateFixtureTest ("test" </> "resources" </> "LiterateTree.lagda.tree")
+        literateFixtureTest ("test" </> "resources" </> "LiterateTree.lagda.tree") "LiterateTree"
 
     , runTest "literate: a non-Agda ```haskell fence stays prose (md)" $ do
         src <- TIO.readFile ("test" </> "resources" </> "LiterateMd.lagda.md")
@@ -1163,8 +1261,6 @@ holeModelTests = do
         assertEqual "indented import follows the header"
           (Just "  open import AgdaDojang.Debug") (nth 3 out)
     ]
-  where
-    nth i xs = if i < length xs then Just (xs !! i) else Nothing
 
 
 -- ---------------------------------------------------------------------------
@@ -3708,13 +3804,15 @@ fillVerdictTests cfg = do
 -- in-place patching of non-{!!} holes must still restore files byte-exactly.
 holeModelIntegrationTests :: AgdaConfig -> IO [Bool]
 holeModelIntegrationTests cfg = do
-  let resources = "test" </> "resources"
-      variants  = resources </> "HoleVariants.agda"
-      lagdaMd   = resources </> "LiterateMd.lagda.md"
-      plainTwin = resources </> "HolePlain.agda"
+  let resources    = "test" </> "resources"
+      variants     = resources </> "HoleVariants.agda"
+      lagdaMd      = resources </> "LiterateMd.lagda.md"
+      plainTwin    = resources </> "HolePlain.agda"
+      blockComment = resources </> "BlockCommentModule.agda"
       parityFixtures =
         [ variants
         , lagdaMd
+        , blockComment
         , resources </> "LiterateTex.lagda"
         , resources </> "LiterateRst.lagda.rst"
         , resources </> "LiterateOrg.lagda.org"
@@ -3812,6 +3910,24 @@ holeModelIntegrationTests cfg = do
                       , either (const True) ((/= "Nat") . giGoal) r
                       ]
             assert ("failures: " <> show (map fst bad)) (null bad)
+
+        -- Issue #100 end to end: the `module` get_goal reports is the declared
+        -- one, though LiterateMd's prose opens a line with `module Example
+        -- where` and BlockCommentModule's block comment holds `module Decoy
+        -- where`.  This is the acceptance criterion of the issue.
+        , runTest "get_goal: the reported module is declared, not read from prose or a comment (#100)" $ do
+            mdInfo <- handleGetGoal cfg GetGoalParams
+              { ggFilePath = lagdaMd, ggHole = ByIndex 0 }
+            bcInfo <- handleGetGoal cfg GetGoalParams
+              { ggFilePath = blockComment, ggHole = ByIndex 0 }
+            case (mdInfo, bcInfo) of
+              (Right md, Right bc) -> allOf
+                [ assertEqual "module (.lagda.md)" (Just "LiterateMd") (giModule md)
+                , assertEqual "module (.agda)" (Just "BlockCommentModule") (giModule bc)
+                , assertEqual "goal (.agda)" "Nat" (giGoal bc)
+                ]
+              (Left err, _) -> pure (Fail $ "get_goal (.lagda.md) failed: " <> T.unpack (failureText err))
+              (_, Left err) -> pure (Fail $ "get_goal (.agda) failed: " <> T.unpack (failureText err))
 
         , runTest "fill_hole: prose {!!} decoys are not addressable (#73)" $ do
             -- LiterateMd has exactly one real hole; its prose decoys must
