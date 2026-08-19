@@ -476,7 +476,7 @@ batchVerdictMeaning =
   \change in Agda's message format can empty the diagnostics list but cannot \
   \turn a failing build green."
 
--- | fillVerdictMeaning: what @status@ means for @fill_hole@,n in particular,
+-- | fillVerdictMeaning: what @status@ means for @fill_hole@, in particular,
 -- the exact set of failures its @ok@ tolerates (issue #69).
 fillVerdictMeaning :: Text
 fillVerdictMeaning =
