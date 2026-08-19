@@ -56,11 +56,13 @@ module AgdaMCP.Project
     resolveProject
   , resolveProjectDir
   , projectExtraFlags
+  , fileDirIncludeFlags
   , withEffectiveFlags
     -- * Flag inspection (pure; exposed for testing)
   , librariesFileFlagOf
   , includePathsOf
   , selectedLibrariesOf
+  , underAnyDir
     -- * @*.agda-lib@ and registry parsing (pure; exposed for testing)
   , parseLibrariesFile
   , libraryNameOf
@@ -83,7 +85,7 @@ import System.Directory
   , listDirectory, makeAbsolute
   )
 import System.Environment (lookupEnv)
-import System.FilePath (takeDirectory, (</>))
+import System.FilePath (normalise, splitDirectories, takeDirectory, (</>))
 
 import AgdaMCP.Agda (AgdaConfig (..))
 import AgdaMCP.Types
@@ -240,6 +242,56 @@ libraryIncludeDirs :: LibraryEntry -> [FilePath]
 libraryIncludeDirs e = case leIncludes e of
   [] -> [leRoot e]
   is -> [leRoot e </> i | i <- is]
+
+-- | fileDirIncludeFlags: the @-i \<dir-of-file\>@ a proof-state tool appends —
+-- or nothing, when the file is already reachable.
+--
+-- The flag exists for the file that no include directory covers: a flat
+-- top-level module (issue #66), or a fixture outside its library's @include:@
+-- dirs, such as @agda-dojang\/data\/fixtures\/@.  For those, the file's own
+-- directory is the only root under which its module name can resolve.
+--
+-- But appended /unconditionally/ it is not merely redundant — inside a
+-- hierarchical project it is wrong (issue #103).  Checking
+-- @src\/Ledger\/Prelude.lagda.md@ in a project whose root is @src@ with an
+-- extra @-i src\/Ledger@ makes the import @Prelude@ ambiguous: the name now
+-- resolves both to @src\/Prelude@ and, through the stray root, to
+-- @src\/Ledger\/Prelude@ itself.  Agda refuses with
+-- @AmbiguousTopLevelModuleName@, and since the roots apply to the whole
+-- invocation, every transitive recheck through such a module fails the same
+-- way.  The extra root can also /mask/ a real defect: a module misnamed for
+-- its project-relative path may still resolve dir-of-file-relatively, checking
+-- green here and failing everywhere else.
+--
+-- So the directory is appended exactly when no directory that the call already
+-- provides — an @-i@ among the flags (the server's own, plus whatever
+-- 'projectExtraFlags' added), or an @include:@ directory of the file's own
+-- library, reachable through @-l@ selection or registration — contains the
+-- file.  Flag directories may be relative (the shipped registrations name them
+-- relative to the server's working directory, which is where Agda resolves
+-- them too), so they are absolutized against that directory before comparing;
+-- the library's come out of resolution absolute already.  The comparison does
+-- not resolve symlinks — both sides come from the same 'makeAbsolute'-based
+-- resolution, and a mismatch merely re-adds the flag, which is the behavior
+-- this function exists to narrow, never a new failure.
+fileDirIncludeFlags :: [String] -> ProjectContext -> FilePath -> IO [String]
+fileDirIncludeFlags flags pc absPath = do
+  flagDirs <- mapM makeAbsolute (includePathsOf flags)
+  let libDirs = maybe [] libraryIncludeDirs (pcLibrary pc)
+      fileDir = takeDirectory absPath
+  pure $ if underAnyDir (flagDirs <> libDirs) fileDir
+           then []
+           else ["-i", fileDir]
+
+-- | underAnyDir: is the path at, or anywhere below, one of the directories?
+--
+-- Component-wise, so @\/a\/b@ contains @\/a\/b@ and @\/a\/b\/c@ but not the
+-- sibling @\/a\/bc@ that a string prefix would claim.
+underAnyDir :: [FilePath] -> FilePath -> Bool
+underAnyDir dirs path = any contains dirs
+  where
+    comps      = splitDirectories (normalise path)
+    contains d = splitDirectories (normalise d) `isPrefixOf` comps
 
 
 -- ---------------------------------------------------------------------------

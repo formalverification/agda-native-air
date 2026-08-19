@@ -120,8 +120,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
-import System.FilePath (takeDirectory)
-
 import AgdaMCP.Agda
   ( AgdaConfig, AgdaResult (..), agdaFlags, checkedFromSourceOf, debugLog
   , parseGoalContext, reportExpr, runAgda, timeoutMessage
@@ -132,7 +130,8 @@ import AgdaMCP.Holes
   , injectReportExpr, resolveHoleRef, substituteHole
   )
 import AgdaMCP.Path (withSourceFile)
-import AgdaMCP.Project (projectExtraFlags, resolveProject, withEffectiveFlags)
+import AgdaMCP.Project
+  ( fileDirIncludeFlags, projectExtraFlags, resolveProject, withEffectiveFlags )
 import AgdaMCP.Types
 
 -- ---------------------------------------------------------------------------
@@ -410,9 +409,12 @@ handleGetDiagnostics cfg0 params =
 -- echo and a config whose flags reach the file's own tree.
 --
 -- This is also the /only/ place the effective flags are assembled: the server's
--- own, plus whatever resolution implies ('projectExtraFlags'), plus the
--- requested file's directory — the @-i@ that lets a flat top-level module
--- resolve at its real path (issue #66).  Assembling them anywhere else is how
+-- own, plus whatever resolution implies ('projectExtraFlags'), plus — only for
+-- a file no provided include directory reaches — the requested file's own
+-- directory, the @-i@ that lets a flat top-level module resolve at its real
+-- path (issue #66).  The condition is 'fileDirIncludeFlags': for a file inside
+-- a hierarchical project the unconditional extra root made short-name imports
+-- ambiguous (issue #103).  Assembling them anywhere else is how
 -- the echo and the invocation drift apart: 'withEffectiveFlags' restates the
 -- context from the very list handed to Agda, so @project.selectedLibraries@ and
 -- @project.includePaths@ cannot describe a context Agda did not see, and a
@@ -427,9 +429,9 @@ withProject cfg absPath body = do
   case resolved of
     Left mismatch -> pure (Left (FailProject mismatch))
     Right pc      -> do
-      let effFlags = agdaFlags cfg
-                       <> projectExtraFlags pc
-                       <> ["-i", takeDirectory absPath]
+      let baseFlags = agdaFlags cfg <> projectExtraFlags pc
+      dirFlags <- fileDirIncludeFlags baseFlags pc absPath
+      let effFlags = baseFlags <> dirFlags
       body (withEffectiveFlags effFlags pc) cfg { agdaFlags = effFlags }
 
 -- | plainVerdict: the verdict for a tool that checked the file as it stands.

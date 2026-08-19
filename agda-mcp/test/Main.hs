@@ -90,9 +90,9 @@ import AgdaMCP.Gate
   ( GateConfig (..), GatePlan (..), defaultGateConfig, findMakefileGate
   , makefileTargets, resolveGate )
 import AgdaMCP.Project
-  ( findNearestAgdaLib, includePathsOf, librariesFileFlagOf, libraryIncludeDirs
-  , libraryIncludesOf, libraryNameOf, parseLibrariesFile, resolveProjectDir
-  , selectedLibrariesOf
+  ( fileDirIncludeFlags, findNearestAgdaLib, includePathsOf, librariesFileFlagOf
+  , libraryIncludeDirs, libraryIncludesOf, libraryNameOf, parseLibrariesFile
+  , resolveProjectDir, selectedLibrariesOf, underAnyDir
   )
 import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
@@ -481,7 +481,65 @@ pureTests = do
         assertEqual "libraries" ["a", "b", "c", "d"]
           (selectedLibrariesOf
              ["-l", "a", "-lb", "--library=c", "--library", "d", "-i", "e"])
+
+    -- The dir-of-file include and when it may be added (issue #103).  The
+    -- fls field failure: an unconditional -i src/Ledger beside the project's
+    -- own -i src made the import `Prelude` ambiguous — resolvable both as
+    -- src/Prelude and, through the stray root, as src/Ledger/Prelude itself.
+    , runTest "underAnyDir: a directory contains itself and its descendants" $
+        allOf
+          [ assertEqual "itself"     True  (underAnyDir ["/a/b"] "/a/b")
+          , assertEqual "descendant" True  (underAnyDir ["/a/b"] "/a/b/c/d")
+          , assertEqual "unrelated"  False (underAnyDir ["/a/b"] "/x/y")
+          ]
+
+    , runTest "underAnyDir: component-wise, so /a/b does not claim /a/bc" $
+        assertEqual "sibling string prefix" False (underAnyDir ["/a/b"] "/a/bc")
+
+    , runTest "fileDirIncludeFlags: a file inside its library's include dirs adds nothing (#103)" $ do
+        flags <- fileDirIncludeFlags [] (pcOfLibrary (Just flsShapedLibrary))
+                   "/proj/src/Ledger/Prelude.lagda.md"
+        assertEqual "no stray root" ([] :: [String]) flags
+
+    , runTest "fileDirIncludeFlags: a file outside them still gets its own directory (#66)" $ do
+        flags <- fileDirIncludeFlags [] (pcOfLibrary (Just flsShapedLibrary))
+                   "/proj/data/fixtures/Fixture01.agda"
+        assertEqual "fixture dir" ["-i", "/proj/data/fixtures"] flags
+
+    , runTest "fileDirIncludeFlags: a flag -i that covers the file suffices" $ do
+        flags <- fileDirIncludeFlags ["-i", "/elsewhere/agda"] (pcOfLibrary Nothing)
+                   "/elsewhere/agda/AgdaDojang/Debug.agda"
+        assertEqual "covered by flag" ([] :: [String]) flags
+
+    , runTest "fileDirIncludeFlags: a bare orphan file keeps the fallback" $ do
+        flags <- fileDirIncludeFlags [] (pcOfLibrary Nothing) "/tmp/probe/Probe.agda"
+        assertEqual "orphan dir" ["-i", "/tmp/probe"] flags
     ]
+
+-- | flsShapedLibrary: the shape that surfaced issue #103 — a hierarchical
+-- library whose modules live under nested include directories.
+flsShapedLibrary :: LibraryEntry
+flsShapedLibrary = LibraryEntry
+  { leName     = "formal-ledger"
+  , leRoot     = "/proj"
+  , leLibFile  = "/proj/formal-ledger.agda-lib"
+  , leIncludes = ["src", "src-lib-exts"]
+  }
+
+-- | pcOfLibrary: a context varying only in the field 'fileDirIncludeFlags'
+-- reads.  Absolute paths throughout, so 'makeAbsolute' inside the function
+-- under test is the identity and the expectations stay literal.
+pcOfLibrary :: Maybe LibraryEntry -> ProjectContext
+pcOfLibrary lib = ProjectContext
+  { pcRootSource           = maybe RootFromServerConfig (const RootFromAgdaLib) lib
+  , pcRoot                 = maybe "/tmp" leRoot lib
+  , pcLibrary              = lib
+  , pcLibrariesFile        = Nothing
+  , pcLibrariesFileMissing = False
+  , pcRegistered           = []
+  , pcSelected             = []
+  , pcIncludePaths         = []
+  }
 
 
 
@@ -2029,23 +2087,37 @@ echoTests = do
             -- ones the server started with.  Resolution extends them two ways —
             -- an unregistered library contributes its include dirs, a registered
             -- but unselected one contributes a --library — and the requested
-            -- file's own directory is added on every call.  A project block
-            -- built before those additions would quietly describe a context Agda
-            -- never saw (Copilot's review of PR 95).
-          , runTest "project echo: includePaths cover the file's own directory" $
+            -- file's own directory is added exactly when nothing else reaches it
+            -- (issues #66 and #103).  A project block built before those
+            -- additions would quietly describe a context Agda never saw
+            -- (Copilot's review of PR 95).
+          , runTest "project echo: a selected library's file needs no include paths (#103)" $
+              -- Before #103 the file's own directory was appended on every
+              -- call; for a file its library already reaches, that stray root
+              -- could make short-name imports ambiguous.  Reaching the file is
+              -- now the -l selection's job alone, and the echo says so.
               withRight okA $ \r ->
                 let pc = fcrProject r
-                    dir = rootA </> "src"
                 in  assert ("includePaths were " <> show (pcIncludePaths pc))
-                      (dir `elem` pcIncludePaths pc)
+                      (null (pcIncludePaths pc))
 
           , runTest "project echo: an unregistered library's include dirs are reported" $
               withRight okC $ \r ->
                 let pc   = fcrProject r
-                    want = [rootC </> "src", rootC </> "src" </> "Deep"]
-                    miss = [d | d <- want, d `notElem` pcIncludePaths pc]
-                in  assert ("missing from includePaths " <> show (pcIncludePaths pc)
-                            <> ": " <> show miss) (null miss)
+                    want = rootC </> "src"
+                in  assert ("includePaths were " <> show (pcIncludePaths pc))
+                      (want `elem` pcIncludePaths pc)
+
+          , runTest "project echo: a nested file's own directory is not a root (#103)" $
+              -- The fls shape: modules under src/Ledger/… checked with an extra
+              -- -i src/Ledger resolve the import `Prelude` both as src/Prelude
+              -- and as src/Ledger/Prelude itself — AmbiguousTopLevelModuleName
+              -- on a module that checks clean in its own project.
+              withRight okC $ \r ->
+                let pc    = fcrProject r
+                    stray = rootC </> "src" </> "Deep"
+                in  assert ("includePaths were " <> show (pcIncludePaths pc))
+                      (stray `notElem` pcIncludePaths pc)
 
           , runTest "project echo: a registered-but-unselected library is reported as selected" $
               withRight okD $ \r ->
