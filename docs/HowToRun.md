@@ -701,7 +701,7 @@ The server exposes **eight tools**: four core proof-state tools — `get_goal`,
 `check_project`, all always available, plus three corpus-backed search tools —
 `search_by_name`, `search_by_type`, `get_dependencies` — that are registered
 only when you start the server with `--corpus PATH` (an agda-strux JSONL
-corpus).  For the full command-line reference (`--agda-bin`, `--agda-flags`,
+corpus).  For the full command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`,
 `--corpus`, `--timeout`, `--check-command`, `--check-timeout`, `--verbose`), see
 [`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
 
@@ -1007,13 +1007,17 @@ proof-state tools — it neither requires nor affects library registration.
 +  **Use absolute file paths.**  The server's working directory is agda-native-air, not
    your project, so tool calls resolve paths from there.  Claude passes absolute paths
    automatically from its own Read/Edit tools; just avoid hand-typing relative paths in
-   prompts.
+   prompts.  (A registration that passes `--cwd`, as the fls template does, has moved
+   that directory to the client project, so its project-relative paths resolve too;
+   absolute remains the form that is correct under every registration.)
 +  **Match the toolchain.**  agda-mcp typechecks with this repo's pinned Agda 2.8.0 and
    standard-library 2.3.  That is only correct if the other project is compatible with
-   those versions — confirm `agda --version` and the std-lib version line up.  If the
-   project pins a different std-lib you will see mismatch errors; the fix is then to add
-   `--agda-bin` pointing at that project's own `agda` (advanced — the macro must still
-   typecheck there, with agda-dojang registered).
+   those versions — confirm `agda --version` and the std-lib version line up.  A project
+   that pins its own toolchain should instead be checked with it: give the registration
+   `--agda-bin` naming that project's `agda` and `--cwd` naming its checkout root, the
+   issue-#103 pattern that [`agda-mcp/examples/fls.mcp.json`](../agda-mcp/examples/fls.mcp.json)
+   and its [README section](../agda-mcp/examples/README.md#flsmcpjson) implement for
+   formal-ledger-specifications.
 
 #### Web UI
 

@@ -113,6 +113,7 @@ Every path-taking tool — `get_goal`, `fill_hole`, `check_file`, `get_diagnosti
 
 +  **Pass an absolute path.**  A relative path is resolved against the *server's* working directory, which is the only directory the server knows: it is never told where its client stands.  Launched through `scripts/run-server.sh`, that directory is this repository's root, because the script deliberately `cd`s there (issue #76's stray-directory fix).  So `src/Foo.lagda.md` sent from your project names a file in *this* checkout, not in yours.
 +  **A relative path that does resolve still works.**  A client whose own working directory *is* the server's — this repository's committed `.mcp.json`, `make agda-mcp-serve`, or the binary driven by hand from the repo root — keeps sending repo-root-relative paths exactly as before.
++  **`--cwd` moves that directory, deliberately.**  A registration made *for* one client project (issue #103) starts the server with `--cwd` naming that project's checkout root; the server enters it before doing anything else, so the project's own relative paths resolve there — and, just as important, the checking `agda` runs there, which is where Agda's own project discovery (the nearest `*.agda-lib`) anchors.  See [Checking a client project with its own toolchain](#checking-a-client-project-with-its-own-toolchain-issue-103).
 +  **A path that resolves to no readable file is refused by name.**  The failure is a structured `pathError` object next to the prose, naming what you sent, what it resolved to, whether it was relative, and the server's working directory.  The prose states how the path was resolved on every failure; it goes on to explain the cwd rule only when the path resolved to *nothing*, which is the one case where resolving against the wrong directory is what went wrong — a relative path that resolved to a directory gets the remedy for that instead:
 
 ```json
@@ -224,13 +225,14 @@ surface.
 ## Command-line options
 
 ```
-agda-mcp [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
-         [--corpus PATH]   [--timeout N] [--verbose]
+agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
+         [--corpus PATH]  [--timeout N] [--verbose]
          [--check-command "CMD ARGS ..."] [--check-timeout N]
 ```
 
 | Flag | Description |
 |------|-------------|
+| `--cwd DIR`          | Working directory to enter before anything else.  Every later relative path — `--corpus`, client file paths, gate discovery — resolves inside it, and the checking `agda` runs there, so Agda's own project discovery (the nearest `*.agda-lib`) anchors to it.  Set it to the client project's checkout root when this server checks a project it is not started in (issue #103).  A directory the server cannot enter is a fatal startup error, reported by name. |
 | `--agda-bin PATH`    | Path to the `agda` binary (default: `agda` on `PATH`). |
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
 | `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the three search tools. |
@@ -277,6 +279,14 @@ the killed call still produced.  Files patched in place by `get_goal` and
 `fill_hole` are restored byte-for-byte on the timeout path exactly as on every
 other path.
 
+### Checking a client project with its own toolchain (issue #103)
+
+A project that pins its own Agda — formal-ledger-specifications pins a custom Agda 2.8.0 plus five libraries through its Nix flake — must be checked with *that* toolchain, never this repository's; for a specification repo, version skew is a correctness hazard.  Two flags carry the whole arrangement:
+
++  **`--agda-bin`** names the client's own `agda`.  For a Nix-pinned project, realise a garbage-collector-rooted wrapper once — `nix build <checkout>#<agdaWithPackages-attr> -o ~/.cache/<proj>/agda-root` — and point at `<root>/bin/agda`: the wrapper bakes in the project's `--library-file`, so it is self-contained from any directory, and the gc-root pins it against `nix store gc`.  Re-run the same command after the project's flake pin moves; it re-points the same symlink.
++  **`--cwd`** names the client's checkout root.  Agda decides a file's project by walking up from the *directory it runs in* to the nearest `*.agda-lib` — not from the checked file's location — so without `--cwd` the client's modules resolve against no project at all, and with it they resolve, and write their `.agdai` interfaces, exactly as the project's own `nix develop --command agda` does.
+
+`--agda-flags` then needs only what the wrapped binary does not already carry.  One addition is load-bearing: `-i <this-repo>/agda-dojang/agda`, because `get_goal` splices `open import AgdaDojang.Debug` into the file it inspects, and the client's Agda must be able to see that module's source (it imports only builtins, so it compiles under any Agda 2.8).  [`examples/fls.mcp.json`](examples/fls.mcp.json) is the registration this section describes, tested against real formal-ledger modules.
 
 ---
 
