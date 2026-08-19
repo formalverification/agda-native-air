@@ -15,13 +15,13 @@
 --   * check_file      - load/reload a file and return all diagnostics
 --   * get_diagnostics - lightweight summary (hole count, error count)
 --
---   Design note — a hole is addressed by position, and every answer re-anchors
+--   Design note: a hole is addressed by position, and every answer re-anchors
 --   (issue #79).
 --     get_goal and fill_hole take a 'AgdaMCP.Holes.HoleRef': a @(line, column)@
 --     in the file as written, or the older 0-based @holeIndex@.  The position is
---     the handle to prefer — a fill renumbers every index after it whether or
+--     the handle to prefer.  A fill renumbers every index after it whether or
 --     not any text moved, while it moves a position only when the candidate
---     changes the text above it — and a position inside no hole is an error
+--     changes the text above it.  A position inside no hole is an error
 --     naming the file's holes, never a guess at the nearest one.  Because
 --     neither handle survives an arbitrary edit, fill_hole and check_file answer
 --     with the full hole list, the shape get_diagnostics already returned, so
@@ -30,7 +30,7 @@
 --     leaves it/, which is what the client will have once it keeps the
 --     candidate; the bytes on disk are restored either way.
 --
---   Design note — diagnostics are structured (issue #74).
+--   Design note: diagnostics are structured (issue #74).
 --     check_file and get_diagnostics report each diagnostic with Agda's own
 --     @code@, its @file@ and @range@, the bounded full message body, and an
 --     @involved@ payload naming the types, candidates, or metas the message is
@@ -39,7 +39,7 @@
 --     'AgdaMCP.Diagnostics', which is pure; these handlers only prepend the
 --     timeout notice, apply the cap, and count.
 --
---   Design note — every response says what it ran, against which tree (issues
+--   Design note: every response says what it ran, against which tree (issues
 --   #72, #76).
 --     Before Agda is started, 'AgdaMCP.Project.resolveProject' decides the
 --     library context from the requested path — the nearest @*.agda-lib@ above
@@ -54,7 +54,7 @@
 --     so an Agda message-format change can empty the diagnostics list but can
 --     never turn a failing build green.
 --
---   Design note — the requested path is resolved and read before anything else
+--   Design note: the requested path is resolved and read before anything else
 --   (issue #101).
 --     All four tools go through 'AgdaMCP.Path.withSourceFile', which absolutises
 --     the client's @filePath@, requires it to name a readable file, and reads it
@@ -70,7 +70,7 @@
 --     server over.  Path resolution runs /before/ 'withProject' deliberately:
 --     there is no library tree to resolve for a file that is not there.
 --
---   Design note — every call is bounded and timed (issue #77).
+--   Design note: every call is bounded and timed (issue #77).
 --     Each tool spawns a cold @agda@ subprocess, bounded by 'AgdaConfig''s
 --     @agdaTimeout@.  When that bound is hit the subprocess (and its process
 --     group) is killed and the tool reports the timeout in its own vocabulary:
@@ -80,7 +80,7 @@
 --     @checkedFromSource@, so an agent can distinguish a slow cold call that
 --     built @.agdai@ interfaces from a genuinely slow one.
 --
---   Design note — all four tools typecheck the file IN PLACE.
+--   Design note: all four tools typecheck the file IN PLACE.
 --     Agda decides a module's name from where its file sits relative to the include
 --     path, so a module embedded in a library at a hierarchical path (e.g. FLRP.Bridge
 --     at src/FLRP/Bridge.lagda.md) only resolves when it is checked at its real
@@ -94,7 +94,7 @@
 --     or substitute a candidate), so they patch the real file transiently and restore
 --     it under 'Control.Exception.bracket_'.  The original is captured and restored as
 --     raw bytes ('Data.ByteString'), so the file is returned byte-for-byte even if Agda
---     errors or the call is interrupted — no encoding or newline round-trip is involved.
+--     errors or the call is interrupted; no encoding or newline round-trip is involved.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -363,7 +363,7 @@ handleCheckFile cfg0 params =
 -- Agda's exit code, that @check_file@ returns: the two tools differ in what
 -- they summarize, never in what green means (issue #72).  The counts, by
 -- contrast, come from parsing Agda's prose, so they can drift with its message
--- format — which is exactly why they are not what the verdict is read from.
+-- format, which is exactly why they are not what the verdict is read from.
 handleGetDiagnostics :: AgdaConfig -> GetDiagnosticsParams -> IO (Either ToolFailure DiagnosticsResult)
 handleGetDiagnostics cfg0 params =
   withSourceFile (gdFilePath params) $ \absPath _bytes src ->
@@ -401,16 +401,16 @@ handleGetDiagnostics cfg0 params =
 -- | withProject: resolve the file's library context, then run the tool body
 -- with the flags that resolution implies.
 --
--- The gate every proof-state tool passes through.  A 'ProjectMismatch' — the
--- requested file belongs to a different checkout of a library this server has
--- registered elsewhere — short-circuits here, /before/ Agda is started and
+-- The gate every proof-state tool passes through.  A 'ProjectMismatch', where
+-- the requested file belongs to a different checkout of a library this server has
+-- registered elsewhere, short-circuits here, /before/ Agda is started and
 -- before any in-place patching, so a wrong-tree answer is not merely unreported
 -- but impossible.  On the ordinary path the body gets the resolved context to
 -- echo and a config whose flags reach the file's own tree.
 --
 -- This is also the /only/ place the effective flags are assembled: the server's
--- own, plus whatever resolution implies ('projectExtraFlags'), plus — only for
--- a file no provided include directory reaches — the requested file's own
+-- own, plus whatever resolution implies ('projectExtraFlags'), plus (only for
+-- a file no provided include directory reaches) the requested file's own
 -- directory, the @-i@ that lets a flat top-level module resolve at its real
 -- path (issue #66).  The condition is 'fileDirIncludeFlags': for a file inside
 -- a hierarchical project the unconditional extra root made short-name imports
@@ -462,9 +462,9 @@ patchedVerdict result meaning patchNote = Verdict
 -- @get_diagnostics@.
 --
 -- The sentence issue #72 exists to publish.  It is deliberately explicit that
--- there is no interaction mode and no tolerance for outstanding metas, because
--- the field report's original complaint (§ 3.1) was a guess that the server ran
--- Agda interactively — plausible, wrong, and expensive: an agent that cannot
+-- there is no interaction mode and no tolerance for outstanding metas, because the
+-- field report's original complaint (§ 3.1) was a guess that the server ran Agda
+-- interactively, which is plausible, wrong, and expensive: an agent that cannot
 -- rule it out runs the real checker anyway and the tool call is pure overhead.
 batchVerdictMeaning :: Text
 batchVerdictMeaning =
@@ -476,12 +476,12 @@ batchVerdictMeaning =
   \change in Agda's message format can empty the diagnostics list but cannot \
   \turn a failing build green."
 
--- | fillVerdictMeaning: what @status@ means for @fill_hole@ — in particular,
+-- | fillVerdictMeaning: what @status@ means for @fill_hole@,n in particular,
 -- the exact set of failures its @ok@ tolerates (issue #69).
 fillVerdictMeaning :: Text
 fillVerdictMeaning =
   "status is \"ok\" if and only if that command exited 0, or failed with \
-  \nothing but [UnsolvedInteractionMetas] — holes still open in the file, \
+  \nothing but [UnsolvedInteractionMetas] (holes still open in the file), \
   \including any new sub-hole the candidate itself introduced, which is a \
   \successful refinement. Every other failure is \"type_error\", including \
   \[UnsolvedMetaVariables] and [UnsolvedConstraints]: a candidate that leaves \
@@ -512,9 +512,9 @@ goalVerdictMeaning =
 -- @command@ and @project@ is exactly what ran here too.
 -- Both the write and the restore go through 'Data.ByteString', and
 -- the restore runs under 'bracket_', so the file is returned to its exact original
--- bytes even if Agda errors or the call is interrupted — no encoding or newline
+-- bytes even if Agda errors or the call is interrupted; i.e., no encoding or newline
 -- round-trip is involved.  Checking at the real path (rather than a scratch copy) is
--- what lets hierarchically-named library modules resolve — see the module header and
+-- what lets hierarchically-named library modules resolve; see the module header and
 -- issue #66.
 --
 -- The timeout path restores exactly like every other path, and by construction
@@ -525,7 +525,7 @@ goalVerdictMeaning =
 -- byte-identical (issue #77); the test suite pins this.
 --
 -- Only the file's /contents/ are restored, not its modification time: the restore write
--- deliberately leaves a fresh mtime.  That is intentional — a newer mtime forces Agda to
+-- deliberately leaves a fresh mtime.  That is intentional; a newer mtime forces Agda to
 -- re-typecheck from the restored source on its next load under any interface-freshness
 -- rule, whereas resetting mtime to the original (older) value could let Agda reuse an
 -- @.agdai@ built from the transiently-patched content (e.g. a fill_hole candidate that
@@ -573,7 +573,7 @@ holeLabel flav src i = case drop i (findHoles flav src) of
 -- | timeoutDiagnostic: the timeout rendered as an ordinary error diagnostic, so
 -- callers that already walk @diagnostics@ see it without special-casing the
 -- @timedOut@ flag.  It is ours rather than Agda's, so it carries no code,
--- position, or payload — 'plainDiagnostic' is exactly that shape.
+-- position, or payload; 'plainDiagnostic' is exactly that shape.
 timeoutDiagnostic :: AgdaConfig -> Diagnostic
 timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
 
@@ -584,14 +584,14 @@ timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
 -- The @reportGoalCtx@ macro get_goal injects lives in @AgdaDojang.Debug@; a library
 -- file being inspected will not normally import it.  If the top-level module already
 -- imports it this is a no-op; otherwise the import is inserted immediately after the
--- module header — i.e. after the header's closing @where@, which may be several lines
+-- module header; i.e. after the header's closing @where@, which may be several lines
 -- below the @module@ keyword when the module is parameterised (common in agda-algebras).
 -- agda-dojang is on the library path (@-l agda-dojang@), so the import resolves.
 --
 -- Literate awareness (issues #71/#73): all line scans run over the source with its
 -- non-code regions masked out ('maskNonCode'), so a prose line that happens to start
 -- with @module@ (or mention the import) can neither misplace the injection nor
--- suppress it — the header is found inside a code region, where the inserted line is
+-- suppress it; the header is found inside a code region, where the inserted line is
 -- Agda-visible.  The import also inherits the header line's indentation, which keeps
 -- it inside indentation-delimited code blocks (@.lagda.rst@); an unindented insert
 -- there would terminate the block.  Masking preserves the line structure, so line
@@ -626,7 +626,7 @@ ensureDebugImport flav src =
 
     -- A genuine import of the module: with any line comment stripped, the first
     -- token is an import-introducing keyword, @import@ is present, and
-    -- @AgdaDojang.Debug@ appears as a whole module token — so none of a comment
+    -- @AgdaDojang.Debug@ appears as a whole module token; so none of a comment
     -- mention, an inline @-- … AgdaDojang.Debug@ trailer, or a longer name such as
     -- @AgdaDojang.Debug.Extra@ is mistaken for the import.
     isDebugImportLine ln =
@@ -655,8 +655,8 @@ stripLineComment :: Text -> Text
 stripLineComment = fst . T.breakOn "--"
 
 -- | moduleNameOf: the declared top-level module name, parsed from the @module …@
--- header line (with any line comment stripped).  This is the *declared* name — e.g.
--- @FLRP.Bridge@ — not the file's base name, which would mangle a hierarchical module
+-- header line (with any line comment stripped).  This is the *declared* name (e.g.
+-- @FLRP.Bridge@) not the file's base name, which would mangle a hierarchical module
 -- to its last segment and strip only one extension from a literate @.lagda.md@ file.
 -- Returns @Nothing@ when no @module@ header is found.
 moduleNameOf :: Text -> Maybe Text
@@ -670,7 +670,7 @@ moduleNameOf src = do
 -- | errorTagsOf: every bracketed error name in Agda's output, in order of
 -- appearance.  Agda (≥ 2.6.4) prints one @…: error: [TagName]@ header line per
 -- error; warning headers say @warning: [TagName]@ and are deliberately not
--- collected — a warning never flips a fill verdict.
+-- collected; a warning never flips a fill verdict.
 errorTagsOf :: Text -> [Text]
 errorTagsOf out =
   [ tag
@@ -697,9 +697,9 @@ errorTagsOf out =
 --
 -- This replaces an earlier tag /blacklist/, which reported ok whenever an open
 -- hole's interaction metas appeared alongside an unlisted error class (e.g.
--- [UnsolvedMetaVariables] from an implicit nothing constrains).  As a
--- whitelist, unrecognized error classes fail closed — including a failure
--- whose output carries no parsable error header at all.
+-- [UnsolvedMetaVariables] from an implicit nothing constrains).  As a whitelist,
+-- unrecognized error classes fail closed, including a failure whose output
+-- carries no parsable error header at all.
 onlyOpenHoleErrors :: Text -> Bool
 onlyOpenHoleErrors combined =
   case errorTagsOf combined of

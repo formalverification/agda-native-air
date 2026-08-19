@@ -22,7 +22,7 @@
 --      @~/.agda/libraries@ — and parse the @*.agda-lib@ files it names.
 --   3. Compare.  If the registry gives the file's library name a /different/
 --      root, refuse the call: see 'AgdaMCP.Types.ProjectMismatch'.  If it gives
---      that name the same root, nothing needs adding — the server's @-l@ flags
+--      that name the same root, nothing needs adding; the server's @-l@ flags
 --      already reach it.  If the registry has never heard of the library, add
 --      its own @include:@ directories with @-i@ so the file resolves in its own
 --      tree.
@@ -100,8 +100,8 @@ import AgdaMCP.Types
 
 -- | resolveProject: decide, and report, the library context for one file.
 --
--- @Left@ is the loud failure of issue #76 — the file belongs to a different
--- checkout of a library this server has registered elsewhere — and it is
+-- @Left@ is the loud failure of issue #76: the file belongs to a different
+-- checkout of a library this server has registered elsewhere; it is
 -- returned /before/ Agda is started, so no wrong-tree typecheck ever happens.
 -- @Right@ carries the context to echo in the response.
 --
@@ -127,7 +127,7 @@ resolveProjectDir cfg dir = do
   absDir <- makeAbsolute dir
   resolveFrom cfg absDir absDir
 
--- | resolveFrom: the shared body — walk up from the directory, read the
+-- | resolveFrom (the shared body): walk up from the directory, read the
 -- registry, compare.  The second argument is the directory the walk starts at;
 -- the third is the path a mismatch names as the subject of the refusal (the
 -- requested file, or the anchor directory itself).
@@ -140,7 +140,7 @@ resolveFrom cfg dir absPath = do
   -- entries only from one that is.  Note the safety consequence: with no
   -- entries there is nothing for the mismatch check below to contradict, so a
   -- registry that is missing does not merely degrade the echo, it disables
-  -- wrong-tree detection entirely — which is why the response says so.
+  -- wrong-tree detection entirely, which is why the response says so.
   let mRegistry = fst <$> mConfigured
       missing   = maybe False (not . snd) mConfigured
   registered <- case mConfigured of
@@ -197,13 +197,13 @@ resolveFrom cfg dir absPath = do
 -- | projectExtraFlags: the Agda flags this resolution implies, on top of the
 -- server's own.
 --
--- Empty in the common cases — a file inside the library the server was already
+-- Empty in the common cases: a file inside the library the server was already
 -- started for needs nothing added.  It is non-empty exactly when the file's
 -- library is real but not already reachable:
 --
---   * registered in the libraries file but not selected by a @-l@ flag — name
+--   * registered in the libraries file but not selected by a @-l@ flag: name
 --     it with @--library@, which also pulls in its @depend:@ libraries;
---   * not in the registry at all — put its own @include:@ directories on the
+--   * not in the registry at all: put its own @include:@ directories on the
 --     include path with @-i@, so its hierarchical modules resolve against
 --     /its/ root rather than against whatever the server was started with.
 --
@@ -222,7 +222,7 @@ projectExtraFlags pc = case pcLibrary pc of
 -- paths in terms of the flags the call will actually run with.
 --
 -- 'resolveProject' can only describe the flags it was /given/, but the caller
--- then extends them — with 'projectExtraFlags', and with the requested file's
+-- then extends them, with 'projectExtraFlags', and with the requested file's
 -- own directory.  Reporting the pre-extension view would make the @project@
 -- block describe a context that is not the one Agda saw, which is precisely
 -- the transparency the block exists to provide; a client reading @project@
@@ -243,7 +243,7 @@ libraryIncludeDirs e = case leIncludes e of
   [] -> [leRoot e]
   is -> [leRoot e </> i | i <- is]
 
--- | fileDirIncludeFlags: the @-i \<dir-of-file\>@ a proof-state tool appends —
+-- | fileDirIncludeFlags: the @-i \<dir-of-file\>@ a proof-state tool appends,
 -- or nothing, when the file is already reachable.
 --
 -- The flag exists for the file that no include directory covers: a flat
@@ -251,7 +251,7 @@ libraryIncludeDirs e = case leIncludes e of
 -- dirs, such as @agda-dojang\/data\/fixtures\/@.  For those, the file's own
 -- directory is the only root under which its module name can resolve.
 --
--- But appended /unconditionally/ it is not merely redundant — inside a
+-- But appended /unconditionally/ it is not merely redundant; inside a
 -- hierarchical project it is wrong (issue #103).  Checking
 -- @src\/Ledger\/Prelude.lagda.md@ in a project whose root is @src@ with an
 -- extra @-i src\/Ledger@ makes the import @Prelude@ ambiguous: the name now
@@ -271,7 +271,7 @@ libraryIncludeDirs e = case leIncludes e of
 -- relative to the server's working directory, which is where Agda resolves
 -- them too), so they are absolutized against that directory before comparing;
 -- the library's come out of resolution absolute already.  The comparison does
--- not resolve symlinks — both sides come from the same 'makeAbsolute'-based
+-- not resolve symlinks; both sides come from the same 'makeAbsolute'-based
 -- resolution, and a mismatch merely re-adds the flag, which is the behavior
 -- this function exists to narrow, never a new failure.
 fileDirIncludeFlags :: [String] -> ProjectContext -> FilePath -> IO [String]
@@ -358,7 +358,7 @@ readLibraryEntry libFile = do
 --
 -- The explicit @--library-file@ from the server's flags wins, exactly as it
 -- does for Agda.  Failing that, Agda looks in its application directory, which
--- is @$AGDA_DIR@ when set and @~/.agda@ otherwise — and @$AGDA_DIR@ is set by
+-- is @$AGDA_DIR@ when set and @~/.agda@ otherwise, and @$AGDA_DIR@ is set by
 -- this repository's flake shellHook, so naming it here is not hypothetical.
 --
 -- @Just (path, False)@ — a configured registry that is not there — is a case
@@ -463,10 +463,9 @@ fieldValues field = go . map stripComment . T.lines
 -- | stripComment: drop an Agda @--@ comment from a library or libraries line.
 --
 -- The @--@ must start the line or follow whitespace, so a path or directory
--- name that happens to contain a double hyphen (@…/my--lib/…@) is not
--- truncated into a different path — the failure mode a naive
--- @breakOn "--"@ would introduce into exactly the path comparison this module
--- exists to get right.
+-- name that happens to contain a double hyphen (@…/my--lib/…@) is not truncated
+-- into a different path; the failure mode a naive @breakOn "--"@ would introduce
+-- into exactly the path comparison this module exists to get right.
 stripComment :: Text -> Text
 stripComment l = case T.breakOn "--" l of
   (before, rest)
@@ -477,7 +476,7 @@ stripComment l = case T.breakOn "--" l of
 
 -- | librariesFileFlagOf: the @--library-file@ the server was started with, in
 -- either spelling Agda accepts (@--library-file=PATH@ and @--library-file PATH@).
--- The last occurrence wins, as it does for Agda's own option parser — which
+-- The last occurrence wins, as it does for Agda's own option parser, which
 -- matters because the Nix @agda@ wrapper supplies one of its own ahead of the
 -- caller's flags.
 librariesFileFlagOf :: [String] -> Maybe FilePath
