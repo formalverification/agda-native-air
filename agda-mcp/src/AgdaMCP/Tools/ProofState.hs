@@ -54,6 +54,22 @@
 --     so an Agda message-format change can empty the diagnostics list but can
 --     never turn a failing build green.
 --
+--   Design note — the requested path is resolved and read before anything else
+--   (issue #101).
+--     All four tools go through 'AgdaMCP.Path.withSourceFile', which absolutises
+--     the client's @filePath@, requires it to name a readable file, and reads it
+--     under a guard.  Two things follow.  A relative path is resolved against
+--     the /server's/ working directory — the only directory the server knows,
+--     and normally not the client's project — so one that names nothing is
+--     refused with a 'AgdaMCP.Types.PathFailure' stating the resolved path, that
+--     directory, and the rule, instead of being resolved silently into the wrong
+--     tree.  And a missing or unreadable file is that same structured failure
+--     rather than an 'IOException' escaping the handler as @-32603 Internal
+--     error@, which is what it used to be: an error naming neither the path nor
+--     the rule, and the one the #83 field test measured a client abandoning the
+--     server over.  Path resolution runs /before/ 'withProject' deliberately:
+--     there is no library tree to resolve for a file that is not there.
+--
 --   Design note — every call is bounded and timed (issue #77).
 --     Each tool spawns a cold @agda@ subprocess, bounded by 'AgdaConfig''s
 --     @agdaTimeout@.  When that bound is hit the subprocess (and its process
@@ -103,10 +119,7 @@ import Data.List (find, findIndex)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Data.Text.Encoding.Error (UnicodeException)
-import qualified Data.Text.IO as TIO
 
-import System.Directory (makeAbsolute)
 import System.FilePath (takeDirectory)
 
 import AgdaMCP.Agda
@@ -118,6 +131,7 @@ import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, findHoles, flavourOf, maskNonCode
   , injectReportExpr, resolveHoleRef, substituteHole
   )
+import AgdaMCP.Path (withSourceFile)
 import AgdaMCP.Project (projectExtraFlags, resolveProject, withEffectiveFlags)
 import AgdaMCP.Types
 
@@ -148,13 +162,9 @@ import AgdaMCP.Types
 -- there is no goal to report — and the measurements the call did produce
 -- (@elapsedMs@, the cache signal) must not be dropped with it (issue #77).
 handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either ToolFailure GoalInfo)
-handleGetGoal cfg0 params = do
-  absPath <- makeAbsolute (ggFilePath params)
-  withProject cfg0 absPath $ \pc cfg -> do
-    origBytes <- BS.readFile absPath
-    case TE.decodeUtf8' origBytes of
-      Left err  -> pure (Left (FailMessage (decodeError absPath err)))
-      Right src ->
+handleGetGoal cfg0 params =
+  withSourceFile (ggFilePath params) $ \absPath origBytes src ->
+    withProject cfg0 absPath $ \pc cfg ->
         case resolveHoleRef absPath (flavourOf absPath) src (ggHole params) of
           Left miss -> pure (Left (FailMessage miss))
           Right idx -> do
@@ -233,13 +243,9 @@ handleGetGoal cfg0 params = do
 --    on disk are restored, so until the candidate is written back the file
 --    still has the holes it started with.
 handleFillHole :: AgdaConfig -> FillHoleParams -> IO (Either ToolFailure FillResult)
-handleFillHole cfg0 params = do
-  absPath <- makeAbsolute (fhFilePath params)
-  withProject cfg0 absPath $ \pc cfg -> do
-    origBytes <- BS.readFile absPath
-    case TE.decodeUtf8' origBytes of
-      Left err  -> pure (Left (FailMessage (decodeError absPath err)))
-      Right src ->
+handleFillHole cfg0 params =
+  withSourceFile (fhFilePath params) $ \absPath origBytes src ->
+    withProject cfg0 absPath $ \pc cfg ->
         case resolveHoleRef absPath (flavourOf absPath) src (fhHole params) of
           Left miss -> pure (Left (FailMessage miss))
           Right idx -> do
@@ -308,36 +314,35 @@ handleFillHole cfg0 params = do
 -- otherwise, the position-parsing drift that issue #74 records would have been
 -- a silent green build rather than a cosmetic gap (issue #72).
 handleCheckFile :: AgdaConfig -> CheckFileParams -> IO (Either ToolFailure FileCheckResult)
-handleCheckFile cfg0 params = do
-  absPath <- makeAbsolute (cfFilePath params)
-  withProject cfg0 absPath $ \pc cfg -> do
-    src <- TIO.readFile absPath
-    result <- runAgda cfg absPath
-    let combined = arStdout result <> "\n" <> arStderr result
-        -- On a timeout the parsed diagnostics describe only what Agda managed to
-        -- print before it was killed, so the timeout itself is prepended as an
-        -- error.  Without it the response would be an empty diagnostics list next
-        -- to success:false — accurate but unactionable.  It is prepended after
-        -- the root-cause sort rather than through it: it explains why the rest of
-        -- the list is short, so it belongs first whatever else was found.
-        allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
-                     <> parseDiagnostics combined
-        (diags, total) = capDiagnostics (cfMaxDiagnostics params) allDiags
-        holes   = holeInfosOf (findHoles (flavourOf absPath) src)
-        success = arExitCode result == 0 && not (arTimedOut result)
-    pure . Right $ FileCheckResult
-      { fcrSuccess     = success
-      , fcrDiagnostics = diags
-      , fcrDiagnosticsTotal = total
-      , fcrHolesCount  = length holes
-      , fcrHoles       = holes
-      , fcrTimedOut    = arTimedOut result
-      , fcrElapsedMs   = arElapsedMs result
-      , fcrCheckedFromSource = checkedFromSourceOf result
-      , fcrVerdict     = plainVerdict result batchVerdictMeaning
-      , fcrCommand     = arCommand result
-      , fcrProject     = pc
-      }
+handleCheckFile cfg0 params =
+  withSourceFile (cfFilePath params) $ \absPath _bytes src ->
+    withProject cfg0 absPath $ \pc cfg -> do
+      result <- runAgda cfg absPath
+      let combined = arStdout result <> "\n" <> arStderr result
+          -- On a timeout the parsed diagnostics describe only what Agda managed to
+          -- print before it was killed, so the timeout itself is prepended as an
+          -- error.  Without it the response would be an empty diagnostics list next
+          -- to success:false — accurate but unactionable.  It is prepended after
+          -- the root-cause sort rather than through it: it explains why the rest of
+          -- the list is short, so it belongs first whatever else was found.
+          allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
+                       <> parseDiagnostics combined
+          (diags, total) = capDiagnostics (cfMaxDiagnostics params) allDiags
+          holes   = holeInfosOf (findHoles (flavourOf absPath) src)
+          success = arExitCode result == 0 && not (arTimedOut result)
+      pure . Right $ FileCheckResult
+        { fcrSuccess     = success
+        , fcrDiagnostics = diags
+        , fcrDiagnosticsTotal = total
+        , fcrHolesCount  = length holes
+        , fcrHoles       = holes
+        , fcrTimedOut    = arTimedOut result
+        , fcrElapsedMs   = arElapsedMs result
+        , fcrCheckedFromSource = checkedFromSourceOf result
+        , fcrVerdict     = plainVerdict result batchVerdictMeaning
+        , fcrCommand     = arCommand result
+        , fcrProject     = pc
+        }
 
 
 -- ---------------------------------------------------------------------------
@@ -361,34 +366,33 @@ handleCheckFile cfg0 params = do
 -- contrast, come from parsing Agda's prose, so they can drift with its message
 -- format — which is exactly why they are not what the verdict is read from.
 handleGetDiagnostics :: AgdaConfig -> GetDiagnosticsParams -> IO (Either ToolFailure DiagnosticsResult)
-handleGetDiagnostics cfg0 params = do
-  absPath <- makeAbsolute (gdFilePath params)
-  withProject cfg0 absPath $ \pc cfg -> do
-    src <- TIO.readFile absPath
-    result <- runAgda cfg absPath
-    let combined = arStdout result <> "\n" <> arStderr result
-        -- As in check_file: a timeout is itself an error diagnostic, so it lands in
-        -- both the list and the error count rather than vanishing into a summary
-        -- that reads "0 errors" because Agda never finished reporting any.
-        allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
-                     <> parseDiagnostics combined
-        (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
-        countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
-    pure . Right $ DiagnosticsResult
-      { drFilePath = gdFilePath params
-      , drErrors   = countOf DiagError
-      , drWarnings = countOf DiagWarning
-      , drHoles    = holeInfosOf (findHoles (flavourOf absPath) src)
-      , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
-      , drDiagnostics = diags
-      , drDiagnosticsTotal = total
-      , drTimedOut = arTimedOut result
-      , drElapsedMs = arElapsedMs result
-      , drCheckedFromSource = checkedFromSourceOf result
-      , drVerdict  = plainVerdict result batchVerdictMeaning
-      , drCommand  = arCommand result
-      , drProject  = pc
-      }
+handleGetDiagnostics cfg0 params =
+  withSourceFile (gdFilePath params) $ \absPath _bytes src ->
+    withProject cfg0 absPath $ \pc cfg -> do
+      result <- runAgda cfg absPath
+      let combined = arStdout result <> "\n" <> arStderr result
+          -- As in check_file: a timeout is itself an error diagnostic, so it lands in
+          -- both the list and the error count rather than vanishing into a summary
+          -- that reads "0 errors" because Agda never finished reporting any.
+          allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
+                       <> parseDiagnostics combined
+          (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
+          countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
+      pure . Right $ DiagnosticsResult
+        { drFilePath = gdFilePath params
+        , drErrors   = countOf DiagError
+        , drWarnings = countOf DiagWarning
+        , drHoles    = holeInfosOf (findHoles (flavourOf absPath) src)
+        , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
+        , drDiagnostics = diags
+        , drDiagnosticsTotal = total
+        , drTimedOut = arTimedOut result
+        , drElapsedMs = arElapsedMs result
+        , drCheckedFromSource = checkedFromSourceOf result
+        , drVerdict  = plainVerdict result batchVerdictMeaning
+        , drCommand  = arCommand result
+        , drProject  = pc
+        }
 
 
 -- ---------------------------------------------------------------------------
@@ -659,14 +663,6 @@ moduleNameOf src = do
   case dropWhile (/= "module") (T.words (stripLineComment hdr)) of
     (_ : name : _) -> Just name
     _              -> Nothing
-
--- | decodeError: a structured error for a file whose bytes are not valid UTF-8.  Agda
--- source is required to be UTF-8, so this should not arise in practice, but returning a
--- 'Left' is friendlier than letting a 'UnicodeException' escape the tool call.
-decodeError :: FilePath -> UnicodeException -> Text
-decodeError path err =
-  "Could not decode " <> T.pack path <> " as UTF-8 (Agda source must be UTF-8): "
-  <> T.pack (show err)
 
 
 -- | errorTagsOf: every bracketed error name in Agda's output, in order of

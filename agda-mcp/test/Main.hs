@@ -16,7 +16,10 @@
 --      1e: hole addressing by position or index, and the parse of both
 --      (#79) — all resolved before Agda is started, misses included;
 --      1f: the whole-project gate (#78), driven by `fake-project-gate.sh`
---      over fixture projects — never over this repository's own gate.
+--      over fixture projects — never over this repository's own gate;
+--      1g: the requested path (#101) — a relative path resolved against the
+--      server's own working directory, and every way a path can fail to name
+--      a readable file, each refused by name rather than crashing the call.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips,
 --      including 2d: hole-enumeration parity against batch Agda, and 2f:
 --      re-anchoring by position across a fill (#79).
@@ -37,7 +40,7 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (bracket_, catch, SomeException)
+import Control.Exception (bracket_, catch, try, SomeException)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
@@ -53,12 +56,16 @@ import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import System.Directory
-  ( Permissions, createDirectoryIfMissing, doesFileExist, findExecutable
-  , getCurrentDirectory, getPermissions, getTemporaryDirectory, makeAbsolute
-  , removeDirectoryRecursive, removeFile, setOwnerExecutable, setPermissions
+  ( Permissions, createDirectoryIfMissing, doesFileExist, emptyPermissions
+  , findExecutable, getCurrentDirectory, getPermissions, getTemporaryDirectory
+  , makeAbsolute, removeDirectoryRecursive, removeFile, setOwnerExecutable
+  , setPermissions
   )
 import System.Environment (setEnv)
 import System.Exit (exitFailure, exitSuccess)
+import System.IO.Error
+  ( doesNotExistErrorType, mkIOError, permissionErrorType )
+import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, unionFileModes)
 import System.FilePath ((</>), takeDirectory, takeFileName)
 import System.IO (hPutStrLn, stderr)
 
@@ -75,6 +82,7 @@ import AgdaMCP.Holes
   , injectReportExpr , substituteHole
   )
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
+import AgdaMCP.Path (ioProblem)
 import AgdaMCP.Diagnostics
   ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
   , maxMessageLines, parseDiagnostics )
@@ -86,7 +94,7 @@ import AgdaMCP.Project
   , libraryIncludesOf, libraryNameOf, parseLibrariesFile, resolveProjectDir
   , selectedLibrariesOf
   )
-import AgdaMCP.Server (ServerConfig (..), toolDefinitions)
+import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf, parseCheckingLine, progressModules )
@@ -140,6 +148,7 @@ failureText :: ToolFailure -> Text
 failureText (FailMessage m)  = m
 failureText (FailTimeout tf) = tfMessage tf
 failureText (FailProject pm) = mismatchMessage pm
+failureText (FailPath pf)    = pathFailureMessage pf
 
 -- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
 -- tests — exit code, timed-out flag, and stdout, with the fields the signal
@@ -1638,6 +1647,9 @@ timeoutTests = do
               Left (FailProject pm) ->
                 pure (Fail $ "expected FailTimeout, got FailProject: "
                              <> T.unpack (mismatchMessage pm))
+              Left (FailPath pf) ->
+                pure (Fail $ "expected FailTimeout, got FailPath: "
+                             <> T.unpack (pathFailureMessage pf))
               Left (FailTimeout tf) -> do
                 r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
                 case r1 of
@@ -2759,6 +2771,402 @@ contextFor cfg dir = do
 
 
 -- ---------------------------------------------------------------------------
+-- Tier 1g: the requested path — resolution and refusal (issue #101)
+--
+-- The field failure these tests exist to keep fixed.  An agent working in its
+-- own project sent `check_file {"filePath": "src/…/Finite.lagda.md"}` — the
+-- path form natural from a project directory — the server resolved it against
+-- *its own* working directory, the file was not there, and the missing-file
+-- IOException escaped the handler as a bare JSON-RPC `-32603 Internal error`.
+-- The agent concluded the server had crashed and never called it again.
+--
+-- So: a relative path is still resolved against the server's working directory,
+-- because that is the only directory the server knows, but the resolution is
+-- now checked, and a miss is a structured refusal naming the path as resolved,
+-- the directory it was resolved against, and the rule.  The scene below is that
+-- shape exactly — a project outside the test process's working directory —
+-- and it sits beside tier 1d's wrong-checkout refusal, which is the same
+-- discipline one step later in the pipeline.
+--
+-- No Agda is involved: `agdaBin` names a binary that cannot be executed, so a
+-- call that reaches Agda comes back as a Right carrying exit code -1, and a
+-- Left is proof the refusal happened first.
+-- ---------------------------------------------------------------------------
+
+-- | ClientScene: a project the server is not standing in.
+data ClientScene = ClientScene
+  { csRoot     :: FilePath  -- ^ The client's project root.
+  , csRelative :: FilePath  -- ^ The file, as the client would name it: relative to that root.
+  , csFile     :: FilePath  -- ^ The same file, absolutely.
+  , csMissing  :: FilePath  -- ^ An absolute path naming nothing.
+  , csFifo     :: FilePath  -- ^ A named pipe: exists, is not a regular file.
+  }
+
+-- | withClientScene: build the scene under the temp directory, run an action on
+-- it, and remove it.
+--
+--   <tmp>/agda-mcp-client-project/.git/                  (a repository boundary)
+--   <tmp>/agda-mcp-client-project/src/Setoid/Algebras/Finite.agda
+--
+-- 'csRelative' is deliberately a path that also *looks* resolvable from the
+-- test process's working directory (agda-mcp/ has a src/ of its own), which is
+-- the whole hazard: a relative path is plausible in two trees at once and names
+-- the caller's file in only one of them.
+withClientScene :: (ClientScene -> IO a) -> IO a
+withClientScene act = do
+  tmp <- getTemporaryDirectory
+  let root = tmp </> "agda-mcp-client-project"
+      rel  = "src" </> "Setoid" </> "Algebras" </> "Finite.agda"
+      cs   = ClientScene
+        { csRoot     = root
+        , csRelative = rel
+        , csFile     = root </> rel
+        , csMissing  = root </> "src" </> "NoSuchModule.agda"
+        , csFifo     = root </> "src" </> "Pipe.agda"
+        }
+  bracket_ (build cs) (removeTree root) (act cs)
+  where
+    build cs = do
+      removeTree (csRoot cs)
+      createDirectoryIfMissing True (csRoot cs </> ".git")
+      createDirectoryIfMissing True (takeDirectory (csFile cs))
+      TIO.writeFile (csFile cs)
+        "module Setoid.Algebras.Finite where\n\nopen import Agda.Builtin.Nat\n\nn : Nat\nn = {!!}\n"
+      -- A FIFO with no writer reads as immediate EOF, so this fixture cannot
+      -- hang the suite even if the file-type check regresses: the call would
+      -- then reach Agda and come back a Right, which is what the test catches.
+      createNamedPipe (csFifo cs) (ownerReadMode `unionFileModes` ownerWriteMode)
+
+    removeTree d = removeDirectoryRecursive d `catch` \(_ :: SomeException) -> pure ()
+
+-- | withPathFailure: the assertion shape tier 1g repeats — the call was refused,
+-- and refused as a path failure rather than as anything else.
+withPathFailure :: Either ToolFailure a -> (PathFailure -> IO TestResult) -> IO TestResult
+withPathFailure (Left (FailPath pf)) k = k pf
+withPathFailure (Left other) _ = pure . Fail $
+  "expected a FailPath refusal, got: " <> T.unpack (failureText other)
+withPathFailure (Right _) _ = pure (Fail "expected a refusal, got a result")
+
+-- | propertyDoc: one input property's advertised description, read out of the
+-- value @tools\/list@ serializes rather than out of the Haskell that builds it.
+propertyDoc :: Text -> Text -> Aeson.Value -> Text
+propertyDoc tool name v =
+  case KM.lookup "properties" (inputSchemaOf tool v) of
+    Just (Aeson.Object props) -> case KM.lookup (Key.fromText name) props of
+      Just (Aeson.Object p) -> case KM.lookup "description" p of
+        Just (Aeson.String d) -> d
+        _                     -> ""
+      _ -> ""
+    _ -> ""
+
+-- | The tools that take a file path.
+filePathTools :: [Text]
+filePathTools = ["get_goal", "fill_hole", "check_file", "get_diagnostics"]
+
+pathTests :: IO [Bool]
+pathTests = do
+  hPutStrLn stderr "\n── Requested-path resolution and refusal (tier 1g: #101) ──"
+  cwd <- getCurrentDirectory
+  withClientScene $ \cs -> do
+    let cfg = defaultConfig { agdaBin = "/nonexistent/agda-must-not-run" }
+    -- The field-test call itself: the client's own relative path, sent to a
+    -- server standing somewhere else.
+    relMiss  <- handleCheckFile cfg (CheckFileParams (csRelative cs) Nothing)
+    -- The two paths that must keep working: an absolute one, and a relative one
+    -- that really is under the server's working directory (the in-repo client).
+    absOk    <- handleCheckFile cfg (CheckFileParams (csFile cs) Nothing)
+    relOk    <- handleCheckFile cfg (CheckFileParams timeoutFixturePath Nothing)
+    -- The second defect: a path naming nothing, and the other three tools.
+    absMiss  <- handleCheckFile cfg (CheckFileParams (csMissing cs) Nothing)
+    diagMiss <- handleGetDiagnostics cfg (GetDiagnosticsParams (csMissing cs) Nothing)
+    goalMiss <- handleGetGoal cfg GetGoalParams
+      { ggFilePath = csMissing cs, ggHole = ByIndex 0 }
+    fillMiss <- handleFillHole cfg FillHoleParams
+      { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero" }
+    dirCall  <- handleCheckFile cfg (CheckFileParams (csRoot cs) Nothing)
+    -- A relative path that resolves to a directory that is really there: "test",
+    -- from the test process's own working directory.
+    relDir   <- handleCheckFile cfg (CheckFileParams "test" Nothing)
+    emptyCall <- handleCheckFile cfg (CheckFileParams "" Nothing)
+    fifoCall <- handleCheckFile cfg (CheckFileParams (csFifo cs) Nothing)
+    fifoProj <- handleCheckProject cfg defaultGateConfig CheckProjectParams
+      { cppTarget = Nothing, cppProjectPath = Just (csFifo cs)
+      , cppMaxDiagnostics = Nothing }
+    projMiss <- handleCheckProject cfg defaultGateConfig CheckProjectParams
+      { cppTarget = Nothing, cppProjectPath = Just (csRelative cs)
+      , cppMaxDiagnostics = Nothing }
+
+    core <- sequence
+      [ runTest "path: a relative filePath from a mismatched cwd is refused, not resolved into the server's tree (#101)" $
+          withPathFailure relMiss $ \pf -> allOf
+            [ assertEqual "problem"   PathMissing        (pfProblem pf)
+            , assert      "relative should be True"      (pfRelative pf)
+            , assertEqual "requestedPath" (csRelative cs) (pfRequested pf)
+            , assertEqual "resolvedPath"  (cwd </> csRelative cs) (pfResolved pf)
+            , assertEqual "serverCwd"     cwd             (pfServerCwd pf)
+            , assertEqual "parameter"     "filePath"      (pfParameter pf)
+            ]
+
+      , runTest "path: the refusal names the resolved path, the server's directory, and the rule" $
+          -- An agent that can read only the error string must still learn
+          -- enough to retry successfully on the very next call; that is the
+          -- whole repair, since the -32603 this replaces taught nothing.
+          withPathFailure relMiss $ \pf ->
+            let msg  = pathFailureMessage pf
+                want = [ T.pack (cwd </> csRelative cs), T.pack cwd
+                       , T.pack (csRelative cs), "RELATIVE", "ABSOLUTE"
+                       -- The mis-resolution diagnosis belongs on this failure:
+                       -- a relative path that resolved to nothing is the one
+                       -- case where resolving against the wrong directory is
+                       -- what went wrong.
+                       , "does not\n  name your file here" ]
+                missing = [w | w <- want, not (w `T.isInfixOf` msg)]
+            in  assert ("missing from the message " <> show msg <> ": " <> show missing)
+                  (null missing)
+
+      , runTest "path: the refusal happens before agda is spawned" $
+          -- agdaBin is a path that cannot be executed.  Had the call run it, the
+          -- result would be a Right carrying exit code -1; a Left proves
+          -- resolution short-circuited first.
+          assert "expected a refusal rather than a failed agda run" (isLeft relMiss)
+
+      , runTest "path: a relative filePath that IS under the server's directory still resolves" $
+          -- The in-repo client, whose working directory really is the server's.
+          -- Rejecting every relative path would have broken it for no safety
+          -- gain: here cwd resolution is the right answer.
+          withRight relOk $ \r ->
+            let args = ceArgs (fcrCommand r)
+            in  assert ("args were " <> show args)
+                  (T.pack (cwd </> timeoutFixturePath) `elem` map T.pack args)
+
+      , runTest "path: an absolute filePath is used exactly as sent" $
+          withRight absOk $ \r ->
+            let args = ceArgs (fcrCommand r)
+            in  assert ("args were " <> show args) (csFile cs `elem` args)
+
+      , runTest "path: a nonexistent absolute filePath is a structured failure, not an internal error" $
+          withPathFailure absMiss $ \pf -> allOf
+            [ assertEqual "problem"      PathMissing    (pfProblem pf)
+            , assert      "relative should be False"    (not (pfRelative pf))
+            , assertEqual "resolvedPath" (csMissing cs) (pfResolved pf)
+            , assert ("message should name the path, was " <> show (pathFailureMessage pf))
+                (T.pack (csMissing cs) `T.isInfixOf` pathFailureMessage pf)
+            ]
+
+      , runTest "path: get_goal, fill_hole, and get_diagnostics refuse the same way" $
+          -- The read used to be unguarded in all four handlers, so all four are
+          -- asserted: fixing one and leaving the others is exactly how this
+          -- regressed the first time.
+          allOf
+            [ withPathFailure goalMiss $ \pf -> assertEqual "get_goal problem" PathMissing (pfProblem pf)
+            , withPathFailure fillMiss $ \pf -> assertEqual "fill_hole problem" PathMissing (pfProblem pf)
+            , withPathFailure diagMiss $ \pf -> assertEqual "get_diagnostics problem" PathMissing (pfProblem pf)
+            ]
+
+      , runTest "path: a directory passed as filePath is refused as a directory" $
+          -- Something is there, so "does not exist" would send the caller
+          -- looking for the wrong mistake.
+          withPathFailure dirCall $ \pf -> allOf
+            [ assertEqual "problem" PathNotAFile (pfProblem pf)
+            , assert ("message was " <> show (pathFailureMessage pf))
+                ("is a directory, not a file" `T.isInfixOf` pathFailureMessage pf)
+            ]
+
+      , runTest "path: a relative path that DID resolve is not lectured about resolution (self-review, PR 102)" $
+          -- dirCall sends the project root, absolutely; relDir sends a relative
+          -- path that resolves to a directory that really is there.  The
+          -- mis-resolution paragraph used to ride on every relative failure, so
+          -- this message asserted "a path relative to your project does not name
+          -- your file here" about a path that had just named something — and for
+          -- an in-repo client, whose directory IS the server's, that is false.
+          -- The Fix line then prescribed something unrelated to it: two
+          -- competing diagnoses in one error.
+          withPathFailure relDir $ \pf ->
+            let msg = pathFailureMessage pf
+            in  allOf
+                  [ assertEqual "problem" PathNotAFile (pfProblem pf)
+                  , assert "the resolution FACT should still be stated"
+                      ("RELATIVE path" `T.isInfixOf` msg)
+                  , assert ("the mis-resolution DIAGNOSIS should not be: " <> show msg)
+                      (not ("name your file here" `T.isInfixOf` msg))
+                  ]
+
+      , runTest "path: an empty filePath is named as empty, not printed as nothing (self-review, PR 102)" $
+          -- makeAbsolute "" is the working directory itself, so this arrives as
+          -- notAFile.  The old text read "you sent a RELATIVE path: " with
+          -- nothing after the colon, describing an empty string as a path the
+          -- caller could go and look at.
+          withPathFailure emptyCall $ \pf ->
+            let msg = pathFailureMessage pf
+            in  allOf
+                  [ assertEqual "requestedPath" "" (pfRequested pf)
+                  , assertEqual "resolvedPath" cwd (pfResolved pf)
+                  , assert ("should name the path as empty: " <> show msg)
+                      ("EMPTY path" `T.isInfixOf` msg)
+                  ]
+
+      , runTest "path: a path naming a FIFO is refused unread, not opened (Copilot, PR 102)" $
+          -- doesFileExist answers "exists and is not a directory", so it admits
+          -- FIFOs, sockets, and devices.  Measured before the fix: a FIFO with a
+          -- writer attached blocked BS.readFile forever — before --timeout has
+          -- anything to bound, since that bounds the agda subprocess and this
+          -- read happens first — and /dev/zero read until the heap was exhausted
+          -- and the process died.  Neither is reportable: the server does not
+          -- survive to answer.
+          withPathFailure fifoCall $ \pf -> allOf
+            [ assertEqual "problem" (PathNotRegular "a named pipe (FIFO)") (pfProblem pf)
+            , assertEqual "resolvedPath" (csFifo cs) (pfResolved pf)
+            , assert ("message was " <> show (pathFailureMessage pf))
+                ("is not a regular file, it is a named pipe (FIFO)"
+                   `T.isInfixOf` pathFailureMessage pf)
+            , assert "the wire shape should name the file type"
+                ("\"problem\":\"notRegularFile\"" `T.isInfixOf` encodeText pf)
+            ]
+
+      , runTest "path: check_project refuses a FIFO anchor rather than anchoring at its parent" $
+          -- Nothing reads it there — only its parent directory is taken — but a
+          -- gate run against the parent of a FIFO is a gate over a project the
+          -- caller cannot have named.
+          withPathFailure fifoProj $ \pf -> allOf
+            [ assertEqual "parameter" "projectPath" (pfParameter pf)
+            , assertEqual "problem" (PathNotRegular "a named pipe (FIFO)") (pfProblem pf)
+            ]
+
+      , runTest "path: check_project refuses a projectPath that does not exist, naming the rule" $
+          withPathFailure projMiss $ \pf -> allOf
+            [ assertEqual "parameter" "projectPath" (pfParameter pf)
+            , assertEqual "problem"   PathMissing   (pfProblem pf)
+            , assert      "relative should be True" (pfRelative pf)
+            , assert ("message was " <> show (pathFailureMessage pf))
+                (T.pack cwd `T.isInfixOf` pathFailureMessage pf)
+            ]
+
+      , runTest "path: the refusal's wire shape carries the path payload as data" $
+          -- Asserted on the encoded JSON, because these key names are what a
+          -- client reads instead of parsing the sentence.
+          withPathFailure relMiss $ \pf ->
+            let wire = encodeText pf
+                want = [ "\"pathError\":", "\"parameter\":\"filePath\""
+                       , "\"requestedPath\":", "\"resolvedPath\":"
+                       , "\"relative\":true", "\"serverCwd\":"
+                       , "\"problem\":\"missing\"", "\"error\":" ]
+                missing = [k | k <- want, not (k `T.isInfixOf` wire)]
+            in  assert ("missing from the wire shape: " <> show missing) (null missing)
+
+      , runTest "path: a file that vanishes between the stat and the read is missing, not unreadable (Copilot, PR 102)" $
+          -- The two sites that catch an IOException about a path are the stat and
+          -- the open of that same path, and they must agree about the same errno.
+          -- They did not: ENOENT from getFileStatus was PathMissing while ENOENT
+          -- from BS.readFile was PathUnreadable, so a file deleted in the window
+          -- between them came back as "could not be read / check the file's
+          -- permissions" — false advice, since there is no file left to have
+          -- permissions.  Asserted through the shared classifier rather than by
+          -- racing the window, so the test is deterministic.
+          let vanished = mkIOError doesNotExistErrorType "openBinaryFile"
+                           Nothing (Just (csFile cs))
+              refused  = mkIOError permissionErrorType "openBinaryFile"
+                           Nothing (Just (csFile cs))
+              rendered = pathFailureMessage PathFailure
+                { pfParameter = "filePath", pfRequested = csFile cs
+                , pfResolved  = csFile cs,  pfRelative  = False
+                , pfServerCwd = cwd,        pfProblem   = ioProblem vanished }
+          in  allOf
+                [ assertEqual "a vanished file" PathMissing (ioProblem vanished)
+                , assert ("a refused read was " <> show (ioProblem refused))
+                    (case ioProblem refused of PathUnreadable _ -> True; _ -> False)
+                , assert ("the refused read should carry the errno, was "
+                          <> show (ioProblem refused))
+                    (case ioProblem refused of
+                       PathUnreadable why -> "permission" `T.isInfixOf` why
+                       _                  -> False)
+                , assert ("the message should not advise checking permissions: "
+                          <> show rendered)
+                    (not ("permissions" `T.isInfixOf` rendered))
+                , assert ("the message should say the path is not there: "
+                          <> show rendered)
+                    ("does not exist" `T.isInfixOf` rendered)
+                ]
+
+      , runTest "response guard: a bottom inside a tool result surfaces in the guard, not in the writer (Copilot, PR 102)" $ do
+          -- A handler can return successfully and hand back a Value whose thunks
+          -- are unevaluated; encode in sendResponse forces them, outside every
+          -- try in the server.  A bottom reachable from a tool result would then
+          -- kill the loop rather than become a tool error — worse than the
+          -- -32603 the guard exists to prevent, since the client sees the
+          -- transport close instead of an answer.  forceResponse is what moves
+          -- that moment inside the guarded region.
+          outcome <- try (forceResponse
+            (Aeson.object ["message" Aeson..= (error "kaboom" :: Text)]))
+              :: IO (Either SomeException Aeson.Value)
+          assert "expected the bottom to be raised by forceResponse" (isLeft outcome)
+
+      , runTest "response guard: a well-formed tool result passes through unchanged" $ do
+          let value = Aeson.object ["success" Aeson..= True, "holes" Aeson..= ([] :: [Int])]
+          forced <- forceResponse value
+          assertEqual "value" value forced
+
+      , runTest "descriptions: every filePath property says whose working directory it resolves against (#101)" $
+          -- The descriptions used to say "absolute or relative to cwd" without
+          -- saying whose, and for any client outside this repository the honest
+          -- answer was never the one meant.
+          assertEqual "tools whose filePath description still fails to state the rule" []
+            [ tool
+            | tool <- filePathTools
+            , let doc = propertyDoc tool "filePath" advertisedTools
+            , not (   "working directory" `T.isInfixOf` doc
+                   && "ABSOLUTE"          `T.isInfixOf` doc
+                   && not ("relative to cwd" `T.isInfixOf` doc) )
+            ]
+      ]
+
+    unreadable <- unreadableFileTest cfg cs
+    pure (core <> unreadable)
+
+-- | unreadableFileTest: a file that exists and cannot be opened.
+--
+-- The case existence checks cannot rule out, and the reason the read is guarded
+-- rather than merely preceded by a 'doesFileExist': the client learns the path
+-- and the syscall's own words instead of @-32603 Internal error@.
+--
+-- Skipped when the permission bits do not bite — running as root, or on a
+-- filesystem that ignores them — rather than asserted and failed, since neither
+-- says anything about this server.
+unreadableFileTest :: AgdaConfig -> ClientScene -> IO [Bool]
+unreadableFileTest cfg cs = do
+  let locked = csRoot cs </> "src" </> "Locked.agda"
+  TIO.writeFile locked "module Locked where\n"
+  before <- getPermissions locked
+  setPermissions locked emptyPermissions
+  stillReadable <- either (const False) (const True)
+    <$> (try (BS.readFile locked) :: IO (Either SomeException BS.ByteString))
+  result <- if stillReadable then pure Nothing
+            else Just <$> handleCheckFile cfg (CheckFileParams locked Nothing)
+  setPermissions locked before
+  removeFile locked
+  case result of
+    Nothing -> do
+      hPutStrLn stderr "  [skip] the file is readable despite empty permissions (root?); \
+                       \skipping the unreadable-file test"
+      pure []
+    Just res -> fmap (: []) . runTest
+      "path: a file that exists but cannot be read is a structured failure naming the path" $
+      withPathFailure res $ \pf -> allOf
+        [ assert ("problem was " <> show (pfProblem pf))
+            (case pfProblem pf of PathUnreadable _ -> True; _ -> False)
+        , assertEqual "resolvedPath" locked (pfResolved pf)
+        , assert ("message was " <> show (pathFailureMessage pf))
+            ("was refused by the operating system" `T.isInfixOf` pathFailureMessage pf)
+          -- The summary must not name a syscall or a cause: this same case is
+          -- produced by the stat, where no read happens, and by errnos that
+          -- have nothing to do with permissions (Copilot's fourth review).
+        , assert ("message should not assert a cause: " <> show (pathFailureMessage pf))
+            (not ("check the file's permissions" `T.isInfixOf` pathFailureMessage pf))
+        , assert "the wire shape should carry the underlying detail"
+            ("\"detail\":" `T.isInfixOf` encodeText pf)
+        ]
+
+
+-- ---------------------------------------------------------------------------
 -- Tier 2: Subprocess tests (needs agda + agda-dojang on PATH)
 -- ---------------------------------------------------------------------------
 
@@ -3698,6 +4106,8 @@ main = do
   addressResults <- holeAddressingTests
   -- Tier 1f: the whole-project gate (#78), driven by a fixture gate script.
   gateResults <- gateTests
+  -- Tier 1g: the requested path — how it resolves, and how it refuses (#101).
+  pathResults <- pathTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -3709,7 +4119,7 @@ main = do
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
-          <> integrationResults
+          <> pathResults <> integrationResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

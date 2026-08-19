@@ -80,6 +80,8 @@ Two further environment facts an operator needs.
 
 ## 4.  Which tree gets checked
 
+Before any of that, a prior question the server used to answer silently: **which file did you name?**  A relative `filePath` is resolved against the *server's* working directory, because that is the only directory the server knows — it is a separate process and is never told where its client stands — and `scripts/run-server.sh` pins that directory to this repository.  A relative path that really does name a file there is checked, which is what keeps the in-repo client working; one that does not is refused with a `pathError` object naming the path as resolved, the working directory it was resolved against, and the rule (issue #101).  Guessing instead — trying the path under each registered library root — was rejected for the reason this whole section exists: it would sometimes answer green about a tree nobody named.
+
 `agda/libraries` is shared, mutable, process-global state: the hook rewrites it on **every** shell entry from whatever `AGDA_ALGEBRAS_ROOT` (or `AGDA_CATEGORIES_ROOT`, …) is in effect at that moment.  With one worktree per branch — the `ualib/agda-algebras` workflow — a second shell entry elsewhere silently repoints the registry a long-running server is still reading.  That is the hazard § 3.6 of [the field report](feedback/flrp-agda-mcp-improvements.md) describes: not a crash, but a green answer about a tree nobody asked about.
 
 The server now resolves the library context per call, in [`agda-mcp/src/AgdaMCP/Project.hs`](../agda-mcp/src/AgdaMCP/Project.hs):
@@ -118,6 +120,7 @@ One limit worth stating.  The name comparison is exact, so a library that declar
 ## 5.  Operator checklist
 
 +  Launch the server through `scripts/run-server.sh`; it anchors the shell to this repository.  Launching the binary some other way is fine, but then `--library-file` and `-l` are entirely yours to get right.
++  Pass **absolute** `filePath`s from any client that is not standing in this repository.  A relative one is resolved against the server's working directory, not yours; when it names nothing there the call is refused with both paths in the message, so a wrong answer is not among the outcomes.
 +  Read `project.root` in any response to confirm which tree answered.  If it is not the tree you are editing, the server will have told you so rather than guessed.
 +  A `[agda] WARNING: this does not look like the agda-native-air checkout` line on startup means the shell could not identify this repository; the Agda configuration it wrote will not work, and nothing downstream will be trustworthy.
 +  Nothing needs adding to a client project's `.gitignore` any more — the server writes nothing into it.  If you want belt and braces for older launches, `agda/` and `target/` are the two names to cover.

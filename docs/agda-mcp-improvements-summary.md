@@ -1,6 +1,6 @@
 # agda-mcp improvements — executive summary
 
-This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of the `agda-mcp` hardening effort tracked by issue #68 — what the server is, what the field test found, what has landed, and what remains — for anyone returning to the project after time away.  It is a navigation aid, not a source of truth; the authoritative material is listed at the end.  Status is as of 2026-08-16.
+This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of the `agda-mcp` hardening effort tracked by issue #68 — what the server is, what the field test found, what has landed, and what remains — for anyone returning to the project after time away.  It is a navigation aid, not a source of truth; the authoritative material is listed at the end.  Status is as of 2026-08-17.
 
 ## What agda-mcp is and where it sits
 
@@ -24,6 +24,8 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 +  **First-class literate Agda** (#73, PR 88, merged).  All literate flavours (`.lagda`, `.lagda.md`, `.lagda.tex`, `.lagda.rst`, `.lagda.org`, `.lagda.tree`) are masked to their code regions with positions reported in literate-file coordinates, so prose can never be a hole and a `.lagda.md` behaves exactly like the same code in a `.agda`.  This matters because `agda-algebras` is entirely literate and its prose discusses holes constantly.
 +  **Explicit batch verdict and contract** (#72, PR 95, merged).  Verification refuted the "check_file green on unsolved metas" claim — the server was already batch-strict — but nothing said so, and an agent chooses tools by reading two-line descriptions.  Every response now carries a `verdict` naming the equivalent `agda` command, what green means, and Agda's exit code, plus a `command` echo of binary, argument vector, and cwd; `success` is derived from the exit code and never from parsing Agda's prose.  The four tool descriptions carry the client-visible contract, so a `tools/list` dump alone answers whether green means the build passes.
 
++  **Honest path resolution, and no crash on a missing file** (#101, PR 102).  A relative `filePath` was resolved against the server's own working directory — which `scripts/run-server.sh` pins to this repository — so a path natural in the client's project silently named a file in the wrong tree, and the missing file's `IOException` escaped the handler as a bare `-32603 Internal error` naming neither the path nor the rule.  The #83 field test measured the cost: the single adoption attempt observed across six sessions was a relative-path `check_file`, it returned `-32603`, the agent wrote "the MCP agda server crashed", and it never called the server again — so every fix above was invisible in the one session that tried them.  Relative paths still resolve against the server's working directory, since that is the only directory the server knows, but the resolution is now checked and a miss is a structured `pathError` naming what was sent, what it resolved to, that directory, and the fix; every file-taking handler reads under a guard, and only ever reads a *regular* file, so a missing, unreadable, directory, or FIFO/device path is a refusal rather than a hang, an exhausted heap, or a crash; and the four tool descriptions state the rule instead of saying "relative to cwd" without saying whose.
+
 ### P1. Reach beyond the shell
 
 +  **Enforced timeout with timing visibility** (#77, PR 89, merged).  `--timeout` was parsed and then ignored, so a hung Agda blocked a tool call forever.  The subprocess group is now killed on a SIGINT → SIGTERM → SIGKILL ladder at the bound, every response carries `elapsedMs` and a tri-state `checkedFromSource` cache signal, and the default bound was raised from 30 s to 300 s so cold interface builds are not aborted.
@@ -38,7 +40,7 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 
 ## Measurement and publication
 
-+  **Measured re-run** (#83, open — unblocked once the trust wave is contractual).  Replay a comparable real `agda-algebras` task against the hardened server with a fresh agent that knows nothing of the server's internals, and record per-tool call counts, iterations to green, and the moments the agent chose server versus shell.  This is the experiment that checks whether the wave achieved its one metric; #72's contract descriptions are the prerequisite, since descriptions are all a fresh agent reads, and they are in PR 95.
++  **Measured re-run** (#83, runs 1–4 complete; the remaining arms pending #101).  The experiment: replay a comparable real `agda-algebras` task against the hardened server with a fresh agent that knows nothing of the server's internals, and record per-tool call counts, iterations to green, and the moments the agent chose server versus shell.  Runs 3 and 4 produced the wave's sharpest datum and the fix above: adoption is model-dependent, and the one agent that did reach for the server on its own initiative was turned away by #101 on its first call and never returned.  The remaining arms wait on that fix, since a re-run against a server whose first response is `-32603` measures the bug rather than the wave.  Full write-up: `field-test-83/RESULTS-runs-3-and-4.md` in the operator directory.
 +  **Tech report** (#86, draft PR 87 in progress).  A write-up of the field test and hardening cycle: baseline session, verification methodology, fixes, and the re-run results.
 +  **Demo page** (#85, open).  An animated session replay and corpus-search demo on GitHub Pages; independent of the server work.
 
@@ -46,7 +48,7 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 
 +  Merged so far, in order: PR 88 (#71 + #73), PR 89 (#77), PR 94 (#74), PR 95 (#72 + #76 together, sharing the response-echo plumbing, which completed the P0 trust lane), and PR 99 (#79) — each rebased over the last.
 +  In review: PR 98 (#78, `check_project`), the first of the P2 lane, rebased over PR 99.
-+  Next: #75 (live scope/type/definition queries) on top of the new hole model; then the #83 re-run as the wave's acceptance measurement.
++  Next: #101 (path resolution and the missing-file crash), which gates the whole wave because it ends adoption on the first call; then #75 (live scope/type/definition queries) on top of the new hole model; then the remaining #83 arms as the wave's acceptance measurement.
 +  Related later work that builds on this surface: corpus-backed retrieval tools in the server (#17, M2-3), counterexample-search tools (#24, M3-2), a local completion backend (#29, M4-3), and `makeOverlay` performance (#43).
 
 ## Where the details live
