@@ -150,6 +150,7 @@ module AgdaMCP.Tools.ProofState
 import Control.Applicative ((<|>))
 import Control.Exception (bracket_)
 import qualified Data.ByteString as BS
+import GHC.Clock (getMonotonicTimeNSec)
 import Data.List (find, findIndex)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -166,8 +167,16 @@ import AgdaMCP.Holes
   , injectReportExpr, resolveHoleRef, substituteHole
   )
 import AgdaMCP.Path (withSourceFile)
+import AgdaMCP.Interaction
+  ( GoalContext (..), GoalCtxEntry (..), InteractionLanes, IPoint (..)
+  , IRange (..), LaneEvent (..), LaneFailure (..), LaneGoal (..)
+  , LoadReport (..), LoadedInfo (..), cmdGoalTypeContext, ensureLoaded
+  , goalContextOf, peekLoadedGoals, runQuery, withLane
+  )
 import AgdaMCP.Project
   ( fileDirIncludeFlags, projectExtraFlags, resolveProject, withEffectiveFlags )
+import AgdaMCP.Tools.LiveQueries
+  ( interactionFailure, laneCommandEcho, laneEchoFrom )
 import AgdaMCP.Types
 
 -- ---------------------------------------------------------------------------
@@ -176,17 +185,25 @@ import AgdaMCP.Types
 
 -- | handleGetGoal: inspect goal type and local context at the addressed hole.
 --
--- 1. Read source file.
--- 2. Resolve the caller's 'HoleRef' — a @(line, column)@ position or a
---    @holeIndex@ — against that source (issue #79).
--- 3. Ensure @open import AgdaDojang.Debug@ is in scope (inject it if absent) so the
---    @reportGoalCtx@ macro resolves.
--- 4. Replace the hole with @reportGoalCtx ?@.
--- 5. Typecheck the patched file IN PLACE (restoring the original afterwards).
--- 6. Parse the AGDADOJANG_REQ_BEGIN/END block from Agda's output.
--- 7. Return structured (goal, context).
+-- The preferred path is the interaction lane (issue #108): resolve the
+-- 'HoleRef' against the source (issue #79), then 'laneGoal' loads the file
+-- in the per-root child (reused when unchanged), verifies the addressed
+-- hole against Agda's announced interaction point by coordinates, and asks
+-- @Cmd_goal_type_context@ — no file mutation, and the response says
+-- @source: "interaction-lane"@.
 --
--- Steps 2 and 3 are in that order deliberately.  The caller's position is a
+-- 'injectedGoal' is the fallback (@source: "injected-macro"@), used when the
+-- lane cannot serve (see 'laneGoal' for the exact cases).  Its mechanism is
+-- the original one:
+--
+-- 1. Ensure @open import AgdaDojang.Debug@ is in scope (inject it if absent)
+--    so the @reportGoalCtx@ macro resolves.
+-- 2. Replace the hole with @reportGoalCtx ?@.
+-- 3. Typecheck the patched file IN PLACE (restoring the original afterwards).
+-- 4. Parse the AGDADOJANG_REQ_BEGIN/END block from Agda's output.
+-- 5. Return structured (goal, context).
+--
+-- Resolution before injection is deliberate.  The caller's position is a
 -- position in the file /as it stands/, while the import injection shifts every
 -- line below the module header down by one; resolving first turns the position
 -- into an index, which the injection cannot disturb because an import line
@@ -196,13 +213,34 @@ import AgdaMCP.Types
 -- proof-state tool whose timeout cannot ride inside a success-shaped response —
 -- there is no goal to report — and the measurements the call did produce
 -- (@elapsedMs@, the cache signal) must not be dropped with it (issue #77).
-handleGetGoal :: AgdaConfig -> GetGoalParams -> IO (Either ToolFailure GoalInfo)
-handleGetGoal cfg0 params =
+handleGetGoal
+  :: InteractionLanes -> AgdaConfig -> GetGoalParams
+  -> IO (Either ToolFailure GoalInfo)
+handleGetGoal lanes cfg0 params =
   withSourceFile (ggFilePath params) $ \absPath origBytes src ->
     withProject cfg0 absPath $ \pc cfg ->
         case resolveHoleRef absPath (flavourOf absPath) src (ggHole params) of
           Left miss -> pure (Left (FailMessage miss))
           Right idx -> do
+            -- The lane first (issue #108): Agda's own goal display, no file
+            -- mutation, answered from the warm child when one serves this
+            -- root.  Falls back to the injection below whenever the lane
+            -- cannot answer — except on a lane timeout, which is surfaced
+            -- rather than silently doubling the call's bound with a second
+            -- full run.
+            viaLane <- laneGoal lanes cfg pc absPath src (ggReload params) idx
+            case viaLane of
+              Right (Just info) -> pure (Right info)
+              Left tf           -> pure (Left tf)
+              Right Nothing     -> injectedGoal cfg pc absPath origBytes src idx
+
+-- | injectedGoal: the original reporting-macro mechanism, now the fallback
+-- path of @get_goal@ (issue #108) — unchanged in behavior, and the only path
+-- that can report binder visibility.
+injectedGoal
+  :: AgdaConfig -> ProjectContext -> FilePath -> BS.ByteString -> Text -> Int
+  -> IO (Either ToolFailure GoalInfo)
+injectedGoal cfg pc absPath origBytes src idx = do
             let label = holeLabel (flavourOf absPath) src idx
             case injectReportExpr (reportExpr cfg) (flavourOf absPath) idx
                    (ensureDebugImport (flavourOf absPath) src) of
@@ -259,8 +297,96 @@ handleGetGoal cfg0 params =
                         , giVerdict = Just verdict
                         , giCommand = Just (arCommand result)
                         , giProject = Just pc
+                        , giSource  = Just "injected-macro"
+                        , giLane    = Nothing
                         }
 
+
+-- | laneGoal: try to answer @get_goal@ from the interaction lane.
+--
+-- @Right (Just info)@ is a complete answer; @Right Nothing@ means the lane
+-- cannot serve this call and the injection fallback should run — a load
+-- failure (the injection will report it as it always has), a crashed or
+-- unspawnable child, a shutdown-latched registry, or a shape mismatch
+-- between the lexical hole index and the announced interaction points.
+-- @Left@ is reserved for the one case where falling back would be worse
+-- than failing: a lane timeout has consumed the call's bound, and a second
+-- full run behind it would double what the contract promises, so it
+-- surfaces as the same structured failure the live-query tools raise.
+--
+-- The hole index is the lexical scan's (already validated by
+-- 'resolveHoleRef'), and the tier-3 parity tests pin that scan to Agda's
+-- interaction points across the fixture matrix; the length guard below
+-- covers the day they disagree, by declining rather than answering about
+-- the wrong hole.
+laneGoal
+  :: InteractionLanes -> AgdaConfig -> ProjectContext -> FilePath -> Text
+  -> Bool -> Int -> IO (Either ToolFailure (Maybe GoalInfo))
+laneGoal lanes cfg pc absPath src reload idx = do
+  startNs <- getMonotonicTimeNSec
+  out <- withLane lanes cfg (pcRoot pc) $ \lh -> do
+    loaded <- ensureLoaded lh reload absPath (agdaFlags cfg)
+    case loaded of
+      Left lf  -> pure (Left lf)
+      Right lr -> case lrOutcome lr of
+        Left _   -> pure (Right Nothing)
+        Right li -> case drop idx (liPoints li) of
+          []      -> pure (Right Nothing)
+          (p : _)
+            -- The selected point must BE the addressed hole, not merely
+            -- exist: if either enumeration carried an extra or missing
+            -- point before idx, index correspondence alone would answer
+            -- about a different hole.  Coordinates decide (a Copilot catch
+            -- on the #108 review); any mismatch declines to the fallback.
+            | not (pointMatchesSpan p) -> pure (Right Nothing)
+          (p : _) -> do
+            rs <- runQuery lh absPath (cmdGoalTypeContext (ipId p))
+            case rs of
+              Left lf     -> pure (Left lf)
+              Right resps -> case goalContextOf resps of
+                Nothing -> pure (Right Nothing)
+                Just gc -> do
+                  lane  <- laneEchoFrom (pcRoot pc) lh lr
+                  echo  <- laneCommandEcho cfg
+                  endNs <- getMonotonicTimeNSec
+                  pure . Right . Just $ GoalInfo
+                    { giGoal    = gcType gc
+                    , giContext =
+                        [ CtxEntry
+                            { ctxName       = geName e
+                            , ctxType       = geBinding e
+                            , ctxVisibility = Nothing
+                            , ctxIndex      = Nothing
+                            }
+                        | e <- gcEntries gc ]
+                    -- Agda's announced name, stored at load time so even a
+                    -- reused load knows it; the declared name is the same
+                    -- fallback the injection path uses (issue #100).
+                    , giModule  = liModule li
+                                    <|> moduleNameOf (flavourOf absPath) src
+                    , giElapsedMs         =
+                        Just (fromIntegral ((endNs - startNs) `div` 1_000_000))
+                    , giCheckedFromSource = Just (lrCheckedFromSource lr)
+                    , giVerdict = Nothing
+                    , giCommand = Just echo
+                    , giProject = Just pc
+                    , giSource  = Just "interaction-lane"
+                    , giLane    = Just lane
+                    }
+  case out of
+    Right (Right mInfo) -> pure (Right mInfo)
+    Right (Left lf)     -> surfaceOrDecline startNs lf
+    Left lf             -> surfaceOrDecline startNs lf
+  where
+    pointMatchesSpan p = case (ipRange p, drop idx spans) of
+      (Just r, (h : _)) -> irLine r == hsLine h && irCol r == hsCol h
+      _                 -> False
+    spans = findHoles (flavourOf absPath) src
+
+    surfaceOrDecline startNs lf
+      | lfEvent lf == LaneTimeout =
+          Left . FailInteraction <$> interactionFailure pc cfg startNs lf
+      | otherwise = pure (Right Nothing)
 
 -- ---------------------------------------------------------------------------
 -- fill_hole
@@ -352,8 +478,10 @@ handleFillHole cfg0 params =
 -- is a convenience over Agda's prose and gets no vote in the verdict: were it
 -- otherwise, the position-parsing drift that issue #74 records would have been
 -- a silent green build rather than a cosmetic gap (issue #72).
-handleCheckFile :: AgdaConfig -> CheckFileParams -> IO (Either ToolFailure FileCheckResult)
-handleCheckFile cfg0 params =
+handleCheckFile
+  :: InteractionLanes -> AgdaConfig -> CheckFileParams
+  -> IO (Either ToolFailure FileCheckResult)
+handleCheckFile lanes cfg0 params =
   withSourceFile (cfFilePath params) $ \absPath _bytes src ->
     withProject cfg0 absPath $ \pc cfg -> do
       result <- runAgda cfg absPath
@@ -367,8 +495,15 @@ handleCheckFile cfg0 params =
           allDiags = [ timeoutDiagnostic cfg | arTimedOut result ]
                        <> parseDiagnostics combined
           (diags, total) = capDiagnostics (cfMaxDiagnostics params) allDiags
-          holes   = holeInfosOf (findHoles (flavourOf absPath) src)
           success = arExitCode result == 0 && not (arTimedOut result)
+      -- Fill each hole's goal type from the interaction lane when — and only
+      -- when — a lane already holds a matching load of these very bytes
+      -- (issue #108).  A peek, never a spawn or a load: the batch tools'
+      -- cost model and verdict source are untouched, and the placeholder
+      -- "?" remains the answer when no warm lane can vouch for the types.
+      laneGoals <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
+      let holes = fillHoleGoals laneGoals
+                    (holeInfosOf (findHoles (flavourOf absPath) src))
       pure . Right $ FileCheckResult
         { fcrSuccess     = success
         , fcrDiagnostics = diags
@@ -404,8 +539,10 @@ handleCheckFile cfg0 params =
 -- they summarize, never in what green means (issue #72).  The counts, by
 -- contrast, come from parsing Agda's prose, so they can drift with its message
 -- format, which is exactly why they are not what the verdict is read from.
-handleGetDiagnostics :: AgdaConfig -> GetDiagnosticsParams -> IO (Either ToolFailure DiagnosticsResult)
-handleGetDiagnostics cfg0 params =
+handleGetDiagnostics
+  :: InteractionLanes -> AgdaConfig -> GetDiagnosticsParams
+  -> IO (Either ToolFailure DiagnosticsResult)
+handleGetDiagnostics lanes cfg0 params =
   withSourceFile (gdFilePath params) $ \absPath _bytes src ->
     withProject cfg0 absPath $ \pc cfg -> do
       result <- runAgda cfg absPath
@@ -417,11 +554,14 @@ handleGetDiagnostics cfg0 params =
                        <> parseDiagnostics combined
           (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
           countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
+      -- The same warm-lane peek as check_file (issue #108).
+      laneGoals <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
       pure . Right $ DiagnosticsResult
         { drFilePath = gdFilePath params
         , drErrors   = countOf DiagError
         , drWarnings = countOf DiagWarning
-        , drHoles    = holeInfosOf (findHoles (flavourOf absPath) src)
+        , drHoles    = fillHoleGoals laneGoals
+                         (holeInfosOf (findHoles (flavourOf absPath) src))
         , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
         , drDiagnostics = diags
         , drDiagnosticsTotal = total
@@ -585,6 +725,23 @@ runInPlace cfg absPath originalBytes patched =
 --
 -- The goal is the cheap placeholder the shape has always carried: listing holes
 -- costs one pure scan, whereas a real goal per hole costs one Agda run per hole.
+-- | fillHoleGoals: replace hole-listing placeholders with the goal types a
+-- warm lane holds for these bytes (issue #108).  Matching is by the hole's
+-- starting (line, col), the coordinates the parity tests pin between the
+-- lexical scan and Agda's interaction points; a hole the lane cannot vouch
+-- for keeps the \"?\" placeholder.
+fillHoleGoals :: Maybe [LaneGoal] -> [HoleInfo] -> [HoleInfo]
+fillHoleGoals Nothing      hs = hs
+fillHoleGoals (Just goals) hs = map fill hs
+  where
+    fill h = case [ lgType g
+                  | g <- goals
+                  , Just r <- [lgRange g]
+                  , irLine r == hiLine h, irCol r == hiCol h
+                  , not (T.null (lgType g)) ] of
+      (t : _) -> h { hiGoal = t }
+      []      -> h
+
 holeInfosOf :: [HoleSpan] -> [HoleInfo]
 holeInfosOf holes =
   [ HoleInfo

@@ -1,12 +1,31 @@
 # agda-mcp improvements: executive summary
 
-This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of the `agda-mcp` hardening effort tracked by issue #68 (what the server is, what the field test found, what has landed, and what remains) for anyone returning to the project after time away.  It is a navigation aid, not a source of truth; the authoritative material is listed at the end.  Status is as of 2026-08-19.
+This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of the `agda-mcp` hardening effort tracked by issue #68 (what the server is, what the field test found, what has landed, and what remains).
+
+It is aimed at anyone new to the project and can also serve as a refresher for those returning after some time away.
+
+It is a navigation aid, not a source of truth; the authoritative material is listed at the end.
+
+Status is as of 2026-08-20.
 
 ## What agda-mcp is and where it sits
 
-+  `agda-mcp` is a small Haskell server speaking the Model Context Protocol over stdio, giving AI coding agents structured tools for working with Agda: `check_file`, `get_diagnostics`, `get_goal`, and `fill_hole` for one file, `check_project` for the project's own acceptance gate, five live-query tools (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`) answered by a persistent `agda --interaction-json` child per project root, plus corpus-backed search tools (`search_by_name`, `search_by_type`, `get_dependencies`) when started with `--corpus`.  Verdict-producing tools call the pinned `agda` binary as a batch subprocess per request; the live queries ride the interaction lane (`docs/agda-mcp-interaction-lane.md`); Agda-as-a-library is the long-term plan.
-+  Within `agda-native-air`, it is one of the three core components of the interaction layer between frontier models and Agda: `agda-dojang` (the Agda-side reflection harness whose `reportGoalCtx` macro `get_goal` uses), `agda-mcp` (the bridge agents actually call), and `agda-strux` (structured corpus extraction feeding the search tools and the Milestone 2 retrieval layer).
-+  On the roadmap it is the centerpiece of Milestone 1 (frontier agent solves real proofs through the MCP interface) and the delivery vehicle for Milestone 2 retrieval and Milestone 3 counterexample tools.
++  `agda-mcp` is a small Haskell server speaking the Model Context Protocol over stdio, giving AI coding agents structured tools for working with Agda:
+
+   +  `check_file`, `get_diagnostics`, `get_goal`, and `fill_hole` for one file;
+   +  `check_project` for the project's own acceptance gate;
+   +  five live-query tools (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`) answered by a persistent `agda --interaction-json` child per project root;
+   +  corpus-backed search tools (`search_by_name`, `search_by_type`, `get_dependencies`) when started with `--corpus`.
+
+   Verdict-producing tools call the pinned `agda` binary as a batch subprocess per request; the live queries ride the interaction lane (`docs/agda-mcp-interaction-lane.md`); Agda-as-a-library is the long-term plan.
+
++  Within `agda-native-air`, it is one of the three core components of the interaction layer between frontier models and Agda: 
+
+   +  `agda-dojang` (the Agda-side reflection harness whose `reportGoalCtx` macro `get_goal` uses);
+   +  `agda-mcp` (the bridge agents actually call);
+   +  `agda-strux` (structured corpus extraction feeding the search tools and the Milestone 2 retrieval layer).
+
++  On the roadmap `agda-mcp` is the centerpiece of Milestone 1 (frontier agent solves real proofs through the MCP interface) and the delivery vehicle for Milestone 2 retrieval and Milestone 3 counterexample tools.
 
 ## The field test that drives the current wave
 
@@ -49,7 +68,8 @@ This document (`docs/agda-mcp-improvements-summary.md`) condenses the state of t
 ## Near-term sequencing
 
 +  Merged so far, in order: PR 88 (#71 + #73), PR 89 (#77), PR 94 (#74), PR 95 (#72 + #76 together, sharing the response-echo plumbing, which completed the P0 trust lane), PR 99 (#79), PR 98 (#78, `check_project`), PR 102 (#101), PR 104 (#103), and PR 105 (#100).
-+  In review: PR 107 (#75): the live queries and the interaction lane they ride, the wave's reach centerpiece; its Phase-3 stretch (re-sourcing `get_goal` and hole goal types through the lane) is filed as #108.
++  Merged since: PR 107 (#75): the live queries and the interaction lane they ride, the wave's reach centerpiece.
++  In review: PR 110 (#108): `get_goal` re-sourced through the lane — no injection, no file mutation, millisecond-warm, with the macro path as its stated fallback — and the batch tools' hole listings enriched with real goal types from a warm lane's free peek.
 +  Next: the remaining #83 arms as the wave's acceptance measurement, and the #106 ask-Agda audit.
 +  Related later work that builds on this surface: corpus-backed retrieval tools in the server (#17, M2-3), counterexample-search tools (#24, M3-2), a local completion backend (#29, M4-3), and `makeOverlay` performance (#43).
 

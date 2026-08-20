@@ -54,6 +54,10 @@ module AgdaMCP.Tools.LiveQueries
   , handleResolveName
   , handleDefinitionOf
   , handleExportsOf
+    -- * Shared with the lane-sourced get_goal (issue #108)
+  , interactionFailure
+  , laneCommandEcho
+  , laneEchoFrom
     -- * Exposed for testing
   , candidateFrom
   , defSiteFrom
@@ -175,29 +179,35 @@ laneCommandEcho cfg = do
 -- | liveMeta: the echo block of a completed call.
 liveMeta :: LiveCtx -> IO LiveMeta
 liveMeta ctx = do
-  sent  <- laneSentLines (lcHandle ctx)
-  ver   <- laneAgdaVersion (lcHandle ctx)
-  pid   <- lanePidOf (lcHandle ctx)
   echo  <- laneCommandEcho (lcConfig ctx)
+  lane  <- laneEchoFrom (pcRoot (lcProject ctx)) (lcHandle ctx) (lcLoad ctx)
   endNs <- getMonotonicTimeNSec
-  let lr = lcLoad ctx
   pure LiveMeta
     { lmElapsedMs         =
         fromIntegral ((endNs - lcStartNs ctx) `div` 1_000_000)
-    , lmCheckedFromSource = lrCheckedFromSource lr
-    , lmLane = LaneEcho
-        { lchRoot          = pcRoot (lcProject ctx)
-        , lchPid           = pid
-        , lchSpawned       = laneWasSpawned (lcHandle ctx)
-        , lchLoad          = loadActionText (lrAction lr)
-        , lchLoadElapsedMs = case lrAction lr of
-            LoadReused -> Nothing
-            _          -> Just (lrElapsedMs lr)
-        , lchAgdaVersion   = ver
-        , lchIotcm         = sent
-        }
+    , lmCheckedFromSource = lrCheckedFromSource (lcLoad ctx)
+    , lmLane    = lane
     , lmCommand = echo
     , lmProject = lcProject ctx
+    }
+
+-- | laneEchoFrom: the lane block of a completed request — shared by the five
+-- live-query tools and the lane-sourced @get_goal@ (issue #108).
+laneEchoFrom :: FilePath -> LaneHandle -> LoadReport -> IO LaneEcho
+laneEchoFrom root lh lr = do
+  sent <- laneSentLines lh
+  ver  <- laneAgdaVersion lh
+  pid  <- lanePidOf lh
+  pure LaneEcho
+    { lchRoot          = root
+    , lchPid           = pid
+    , lchSpawned       = laneWasSpawned lh
+    , lchLoad          = loadActionText (lrAction lr)
+    , lchLoadElapsedMs = case lrAction lr of
+        LoadReused -> Nothing
+        _          -> Just (lrElapsedMs lr)
+    , lchAgdaVersion   = ver
+    , lchIotcm         = sent
     }
 
 loadActionText :: LoadAction -> Text

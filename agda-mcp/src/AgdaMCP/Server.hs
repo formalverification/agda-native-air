@@ -153,19 +153,36 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
 
     proofStateTools =
       [ toolDefWith "get_goal"
-          ("Inspect the goal type and local context at a hole. Injects a \
-           \reporting macro over the addressed hole, typechecks the patched \
-           \file in place, reads the goal back from the macro's output, and \
-           \restores the file byte for byte. "
+          ("Inspect the goal type and local context at a hole. The response's \
+           \source field says which of two mechanisms answered. PREFERRED, \
+           \source='interaction-lane': the persistent per-root agda process \
+           \answers from Agda's own goal display — no file mutation, and \
+           \millisecond-warm once the file is loaded (one load first, like \
+           \one check_file; re-loaded on the live tools' evidence — a change \
+           \on disk, changed flags, a failed previous load, or reload:true). \
+           \This shape \
+           \carries lane {root, pid, spawned, load, iotcm, ...} and NO \
+           \verdict — there is no batch run to have one; context entries \
+           \carry name and type (shadowed outers appear under their primed \
+           \display names). FALLBACK, source='injected-macro', used when the \
+           \lane cannot serve (its process crashed or could not start, the \
+           \file does not load there, or the server is shutting down): \
+           \injects a reporting macro over the addressed hole, typechecks the \
+           \patched file in place, reads the goal back, and restores the file \
+           \byte for byte — the one path whose context entries carry \
+           \visibility (visible/hidden). A lane TIMEOUT is surfaced as the \
+           \structured lane failure rather than silently running the fallback \
+           \behind it, which would double the bound. "
            <> holeAddressing
            <> " "
-           <> verdictNote
-           <> " For this tool verdict.exitCode is normally NON-ZERO even when \
-              \the goal is correct, because the injected macro leaves an \
-              \interaction point behind: it is evidence about the introspection \
-              \run, not a judgement on your file — use check_file for that."
-           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
-           <> " On timeout this returns an error whose text is a JSON object —"
+           <> goalEchoNote
+           <> " On the fallback path verdict.exitCode is normally NON-ZERO \
+              \even when the goal is correct, because the injected macro \
+              \leaves an interaction point behind: it is evidence about the \
+              \introspection run, not a judgement on your file — use \
+              \check_file for that."
+           <> " Returns elapsedMs and checkedFromSource; on the fallback path, " <> latencyNote
+           <> " On a fallback-path timeout this returns an error whose text is a JSON object —"
            <> " {error, timedOut: true, elapsedMs, checkedFromSource?, verdict,"
            <> " command, project} — naming the bound, since no goal was reported. "
            <> holeModel)
@@ -174,6 +191,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "column"    "integer" columnDoc
           , prop "col"       "integer" colDoc
           , prop "holeIndex" "integer" holeIndexDoc
+          , prop "reload"    "boolean" liveReloadDoc
           ]
           ["filePath"]
           [addressAlternatives]
@@ -224,7 +242,11 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
            <> " holes lists every open hole as {index, line, col, goal} \
               \(holesCount is its length); (line, col) is the address to pass \
               \back to get_goal and fill_hole, and this is the listing to take \
-              \it from."
+              \it from. goal is each hole's goal type WHEN the root's \
+              \interaction lane already holds a matching load of this exact \
+              \file state (warmed by the live-query tools or get_goal — a \
+              \free peek, never a lane call), and the placeholder '?' \
+              \otherwise."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
@@ -235,9 +257,11 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
 
       , toolDef "get_diagnostics"
           ("Typecheck one Agda file and return a summary: error/warning counts, \
-           \the diagnostics behind them, and each open hole's index and \
+           \the diagnostics behind them, and each open hole's index, \
            \(line, col) position — that (line, col) being the address to pass \
-           \back to get_goal and fill_hole. "
+           \back to get_goal and fill_hole — and goal type when the root's \
+           \interaction lane already holds a matching load of this exact file \
+           \state (a free peek; '?' otherwise). "
            <> verdictNote
            <> " " <> batchNote
            <> " success and verdict are the same fields check_file returns, with \
@@ -652,6 +676,22 @@ verdictNote =
   <> " one is missing there is nothing to compare against and no mismatch can be"
   <> " found. The response says so as project.librariesFileMissing."
 
+-- | goalEchoNote: get_goal's two-shape echo contract (#108) — the one tool
+-- whose response echo depends on which mechanism answered, so 'verdictNote'
+-- (which promises a verdict on EVERY response) would contradict the lane
+-- shape (a Copilot catch on the #108 review).
+goalEchoNote :: Text
+goalEchoNote =
+  "THE ECHO, by path: every response carries command {binary, args, cwd} and"
+  <> " project {rootSource, root, library, librariesFile, registeredLibraries,"
+  <> " selectedLibraries, includePaths} — the tree that was actually consulted,"
+  <> " with the same wrong-checkout refusal as every file-taking tool. A"
+  <> " lane-sourced response (source='interaction-lane') carries lane {root,"
+  <> " pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm} and NO verdict."
+  <> " A fallback response (source='injected-macro') carries verdict"
+  <> " {equivalentTo, meaning, exitCode} — derived from agda's exit code, never"
+  <> " from its prose — and no lane block."
+
 -- | batchNote: what success means for the two whole-file tools.
 --
 -- Stated once, verbatim from 'AgdaMCP.Tools.ProofState.batchVerdictMeaning' in
@@ -662,9 +702,10 @@ batchNote =
   "success is true if and only if that agda command exits 0, so it means exactly"
   <> " what green means in a batch build: unsolved metavariables, unsolved"
   <> " constraints, and open holes all make agda exit non-zero and so make"
-  <> " success false. There is no interaction mode anywhere in this server, and"
-  <> " no --safe-style leniency to opt into: the default already is the strict"
-  <> " gate."
+  <> " success false. The interaction lane NEVER participates in this verdict —"
+  <> " it is tolerant by design and only ever enriches informational fields,"
+  <> " such as the hole listing's goal types — and there is no --safe-style"
+  <> " leniency to opt into: the default already is the strict gate."
 
 -- | latencyNote: the shared latency/timeout sentence appended to every
 -- proof-state tool description.
@@ -1015,9 +1056,9 @@ forceResponse value = do
 dispatchTool :: ServerConfig -> InteractionLanes -> Text -> Value -> IO Value
 
 -- Proof-state tools (existing M1-2)
-dispatchTool cfg _lanes "get_goal" args =
+dispatchTool cfg lanes "get_goal" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleGetGoal (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleGetGoal lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg _lanes "fill_hole" args =
@@ -1025,14 +1066,14 @@ dispatchTool cfg _lanes "fill_hole" args =
     Aeson.Success p -> failureToMcp <$> handleFillHole (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg _lanes "check_file" args =
+dispatchTool cfg lanes "check_file" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleCheckFile (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleCheckFile lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg _lanes "get_diagnostics" args =
+dispatchTool cfg lanes "get_diagnostics" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleGetDiagnostics (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp <$> handleGetDiagnostics lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Whole-project gate (M1-5, issue #78).  The one tool that takes the gate
