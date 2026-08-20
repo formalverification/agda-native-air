@@ -913,6 +913,46 @@ state and millisecond warm latency the library plan promises, for queries only
 enforces.  Protocol, lifecycle, and measurements:
 [`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md).
 
+### Ask Agda rather than re-derive (issue #106)
+
+Before a new tool — or a new field on an existing one — computes an answer
+by scanning source text, ask the question this server holds itself to: can
+Agda answer this?  If it can, in output a call already captures or through
+an interaction-lane query, then Agda's answer is the authority and the
+local derivation is at most a pre-flight approximation and a fallback:
+
+```
+answer = whatAgdaSaid <|> whatWeDerived
+```
+
+so that a change in Agda's output degrades the field to the derived value,
+never to a wrong value.  This is issue #72's rule for verdicts ("the
+diagnostics text never gets a vote") applied to informational fields.
+
+The worked example is issue #100.  `get_goal` reported its `module` field
+from a file scan, so a literate file whose *prose* opened a line with
+`module` was reported under the prose's name — while Agda had already
+printed the true answer (`Checking LiterateMd (…).`) in output the same
+call had captured.  Agda's answer is also better than a correct scan's:
+it is the name Agda *resolved* from the include path (`AnonModule` for a
+`module _ where` header, `Proofs.Use` for a hierarchical module), where a
+scan can only repeat what the header claims, and the difference between
+the two is a diagnosis.  The field is now sourced from Agda on both paths
+(the lane's stored `liModule`, the batch run's `agdaModuleNameOf`), with
+the declared-name scan as the `<|>` fallback (PRs 105 and 110).
+
+The audit that applied this rule to every derived answer in the server —
+verdicts, the issues that delegated each one, and the measurements for
+diagnostics and `checkedFromSource` — is
+[`docs/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp-ask-agda-audit.md).
+Two of its conclusions matter when writing new code: project resolution
+(`AgdaMCP.Project`) stays local because no Agda query exists for it, by
+measurement rather than oversight; and Agda's *silence* is weaker evidence
+than Agda's *answer* — a client flag (`--trace-imports=0`) can mute the
+progress channel that `checkedFromSource` infers from, which is issue
+#114's fix to make.
+
+
 ### Future: Agda-as-a-library
 
 The long-term plan is to use Agda as a Haskell library (persistent
@@ -947,6 +987,7 @@ transport handles the three methods we need: `initialize`, `tools/list`, `tools/
 
 - [`agda-dojang/README.md`](../agda-dojang/README.md): Action space reference (the macros this server wraps).
 - [`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md): The interaction lane's design record — the two-lane policy, the wire protocol as observed, lifecycle, and economics (issue #75).
+- [`docs/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp-ask-agda-audit.md): The issue-#106 audit — every answer computed from source text, its verdict, and the diagnostics and `checkedFromSource` measurements.
 - [`docs/policy_contract.md`](../docs/policy_contract.md): Policy backend JSON contract (compatible with our tool schemas).
 - [`docs/architecture.md`](../docs/architecture.md): System architecture overview.
 
