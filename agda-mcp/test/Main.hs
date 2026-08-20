@@ -71,6 +71,7 @@ import System.Process (readProcessWithExitCode)
 import System.IO.Error
   ( doesNotExistErrorType, mkIOError, permissionErrorType )
 import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, unionFileModes)
+import System.Posix.Signals (killProcess, signalProcess)
 import System.FilePath ((</>), takeDirectory, takeFileName)
 import System.IO (hPutStrLn, stderr)
 
@@ -4940,6 +4941,76 @@ interactionLaneTests cfg repoRoot = do
             r3 <- assertEqual "code" (Just (Just "UnequalTerms"))
                     (lveCode <$> torError res)
             pure (firstFailure [r1, r2, r3])
+
+    , -- The recovery path (§ 2.6): a hole-free file's completed toplevel
+      -- scope loses the two opens, so WhyInScope says not-in-scope and the
+      -- machinery must recover through did-you-mean, re-resolving each
+      -- suggested qualified spelling for its chain (the Copilot-round fix:
+      -- recovered candidates carry provenance like first-class ones).
+      runTest "resolve_name: hole-free ambiguity recovers candidates WITH provenance" $ do
+        r <- handleResolveName lanes cfg ResolveNameParams
+               { rnpFilePath = fx "ScopeAmbiguousComplete.agda"
+               , rnpName     = "amb"
+               , rnpLine     = Nothing
+               }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assert "not in scope as written" (not (rnrInScope res))
+            r2 <- assertEqual "recovered" (Just "did-you-mean") (rnrRecovered res)
+            r3 <- assertEqual "candidates" 2 (length (rnrCandidates res))
+            r4 <- assert "every recovered candidate carries a chain"
+                    (all (not . null . ncProvenance) (rnrCandidates res))
+            r5 <- assert "every recovered candidate is located"
+                    (all (isJust . ncDefinition) (rnrCandidates res))
+            pure (firstFailure [r1, r2, r3, r4, r5])
+
+    , runTest "definition_of: hole-free ambiguity locates both origins through recovery" $ do
+        r <- handleDefinitionOf lanes cfg DefinitionOfParams
+               { dopFilePath = fx "ScopeAmbiguousComplete.agda"
+               , dopName     = "amb"
+               , dopLine     = Nothing
+               }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assertEqual "recovered" (Just "did-you-mean") (dorRecovered res)
+            r2 <- assertEqual "definition lines" [20, 24]
+                    (sort (map dsLine (dorDefinitions res)))
+            pure (firstFailure [r1, r2])
+
+    , -- The revival path: a child that died while the lane sat idle is
+      -- replaced silently on the next request (its handles closed, its
+      -- ladder deliberately skipped — see closeLaneHandles).
+      runTest "revival: a child killed while idle is replaced on the next request" $ do
+        r1 <- handleTypeOf lanes cfg TypeOfParams
+                { topFilePath = fx "TwoHoles.agda"
+                , topExpr     = "g"
+                , topLine     = Nothing
+                }
+        a <- case r1 of
+          Left err  -> pure (Left (T.unpack (failureText err)))
+          Right res -> pure (Right (lchPid (lmLane (torMeta res))))
+        case a of
+          Left m -> pure (Fail m)
+          Right Nothing -> pure (Fail "no pid in the lane echo")
+          Right (Just pid) -> do
+            signalProcess killProcess (fromIntegral pid)
+            threadDelay 200_000
+            r2 <- handleTypeOf lanes cfg TypeOfParams
+                    { topFilePath = fx "TwoHoles.agda"
+                    , topExpr     = "h"
+                    , topLine     = Nothing
+                    }
+            case r2 of
+              Left err  -> pure (Fail $ "after kill: " <> T.unpack (failureText err))
+              Right res -> do
+                x <- assertEqual "type after revival" (Just "Nat") (torType res)
+                y <- assert "a fresh child was spawned"
+                       (lchSpawned (lmLane (torMeta res)))
+                z <- assert "and it is a different process"
+                       (lchPid (lmLane (torMeta res)) /= Just pid)
+                pure (firstFailure [x, y, z])
 
     , -- Parity: the lexical hole model against Agda's own interaction points,
       -- across the fixture matrix the issue names (HoleVariants + the five

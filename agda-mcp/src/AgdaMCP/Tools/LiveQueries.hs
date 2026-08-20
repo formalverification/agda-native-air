@@ -367,16 +367,18 @@ handleTypeOf lanes cfg0 p =
             , torType  = inferredTypeOf resps
             , torError = case inferredTypeOf resps of
                 Just _  -> Nothing
-                Nothing -> Just (fromMaybe (opaqueAnswer resps)
+                Nothing -> Just (fromMaybe (opaqueAnswer "expression" resps)
                                            (queryError "expression" resps))
             , torMeta  = meta
             }
 
 -- | opaqueAnswer: the fallback error when Agda answered with neither the
 -- expected payload nor an error — named as such rather than guessed at.
-opaqueAnswer :: [IResponse] -> LiveError
-opaqueAnswer rs = LiveError
-  { lveStage   = "expression"
+-- The stage is the caller's, matching its 'queryError' (a hardcoded stage
+-- here mislabeled resolve_name's and exports_of's opaque answers).
+opaqueAnswer :: Text -> [IResponse] -> LiveError
+opaqueAnswer stage rs = LiveError
+  { lveStage   = stage
   , lveCode    = Nothing
   , lveMessage = "agda answered with neither a result nor an error; kinds seen: "
       <> T.intercalate ", " (map kindOf rs)
@@ -419,7 +421,7 @@ handleNormalize lanes cfg0 p =
             , nrNormalForm = normalFormOf resps
             , nrError      = case normalFormOf resps of
                 Just _  -> Nothing
-                Nothing -> Just (fromMaybe (opaqueAnswer resps)
+                Nothing -> Just (fromMaybe (opaqueAnswer "expression" resps)
                                            (queryError "expression" resps))
             , nrMeta       = meta
             }
@@ -457,7 +459,7 @@ resolveMachinery ctx name mLine = do
   runShaped ctx (whyCmd name) $ \resps ->
     case whyInScopeMessageOf resps of
       Nothing -> pure . Right $ Resolution scopeTxt False []
-        Nothing (Just (fromMaybe (opaqueAnswer resps)
+        Nothing (Just (fromMaybe (opaqueAnswer "name" resps)
                                  (queryError "name" resps)))
       Just msg -> case parseWhyInScope msg of
         Just cands@(_ : _) -> pure . Right $
@@ -465,33 +467,52 @@ resolveMachinery ctx name mLine = do
         Just [] -> pure . Right $ Resolution scopeTxt True [] Nothing Nothing
         Nothing ->
           -- Not in scope as written: recover through the name's own errors.
+          -- Both routes below resolve each recovered qualified spelling with
+          -- its own WhyInScope, so recovered candidates carry provenance
+          -- chains like first-class ones (§ 2.6 of the design document:
+          -- qualified names resolve even in the completed toplevel scope).
           runShaped ctx inferCmd $ \inferResps ->
             case mapMaybe errorMessageOf inferResps of
               (errMsg : _)
+                -- No input under the pinned 2.8.0 is known to reach this
+                -- branch: the shapes probed for the design document route to
+                -- did-you-mean (completed toplevel scope) or to an in-scope
+                -- WhyInScope answer (goal scope, or a holed file's toplevel).
+                -- It exists because [AmbiguousName] is documented output of
+                -- Cmd_infer, and if it ever fires the recovery must not lose
+                -- it; the binding site from the error is the fallback when
+                -- the qualified lookup answers nothing.
                 | ambs@(_ : _) <- parseAmbiguousName errMsg ->
-                    pure . Right $ Resolution scopeTxt False
-                      [ NameCandidate
-                          { ncDescription = "bound as " <> q
-                          , ncQualified   = Just q
-                          , ncProvenance  = []
-                          , ncDefinition  = defSiteFrom (Just q) <$> mLoc
-                          }
+                    resolveEach scopeTxt whyCmd "ambiguous-name-error"
+                      [ (q, Just (bindingSiteCandidate q mLoc))
                       | (q, mLoc) <- ambs ]
-                      (Just "ambiguous-name-error") Nothing
                 | suggs@(_ : _) <- parseDidYouMean errMsg ->
-                    resolveSuggestions scopeTxt whyCmd suggs
+                    resolveEach scopeTxt whyCmd "did-you-mean"
+                      [ (sugg, Nothing) | sugg <- suggs ]
               _ -> pure . Right $
                 Resolution scopeTxt False [] Nothing Nothing
   where
-    resolveSuggestions scopeTxt whyCmd suggs = go suggs []
+    -- resolveEach: the shared engine of both recovery routes — one
+    -- WhyInScope per recovered qualified spelling, its parsed candidates
+    -- taken whole, the per-item fallback (a binding-site-only candidate, or
+    -- nothing) used when the lookup answers nothing.
+    resolveEach scopeTxt whyCmd tag items = go items []
       where
         go [] acc = pure . Right $
-          Resolution scopeTxt False (reverse acc) (Just "did-you-mean") Nothing
-        go (s : rest) acc =
-          runShaped ctx (whyCmd s) $ \resps ->
+          Resolution scopeTxt False (reverse acc) (Just tag) Nothing
+        go ((q, mFallback) : rest) acc =
+          runShaped ctx (whyCmd q) $ \resps ->
             case parseWhyInScope =<< whyInScopeMessageOf resps of
-              Just cands -> go rest (reverse (map candidateFrom cands) <> acc)
-              Nothing    -> go rest acc
+              Just cands@(_ : _) ->
+                go rest (reverse (map candidateFrom cands) <> acc)
+              _ -> go rest (maybe acc (: acc) mFallback)
+
+    bindingSiteCandidate q mLoc = NameCandidate
+      { ncDescription = "bound as " <> q
+      , ncQualified   = Just q
+      , ncProvenance  = []
+      , ncDefinition  = defSiteFrom (Just q) <$> mLoc
+      }
 
 -- | handleResolveName: the AmbiguousName moment — candidates with their
 -- provenance chains.
@@ -588,7 +609,7 @@ handleExportsOf lanes cfg0 p =
             , exrExports = moduleExportsOf resps
             , exrError   = case moduleExportsOf resps of
                 Just _  -> Nothing
-                Nothing -> Just . fromMaybe (opaqueAnswer resps) $
+                Nothing -> Just . fromMaybe (opaqueAnswer "module" resps) $
                   queryError "module" resps
             , exrMeta    = meta
             }
