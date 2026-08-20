@@ -383,6 +383,41 @@ pureTests = do
               , "open import AgdaDojang.Debug" ]
         assertEqual "already imported → unchanged" s (ensureDebugImport PlainAgda s)
 
+    -- The injected line must be a layout sibling of the declarations it joins.
+    -- A header at column 1 over an indented body is legal Agda, and inserting at
+    -- the header's column there makes those declarations continuations of the
+    -- import — Agda answers [ParseError] (Copilot, PR 105 third review).
+    , runTest "ensureDebugImport: the import takes the body's indentation, not the header's" $ do
+        let s = T.unlines
+              [ "module M where"
+              , "  open import Agda.Builtin.Nat"
+              , "  n : Nat"
+              , "  n = {!!}" ]
+            out = T.lines (ensureDebugImport PlainAgda s)
+        allOf
+          [ assertEqual "indented like the body" (Just "  open import AgdaDojang.Debug") (nth 1 out)
+          , assertEqual "the header is untouched" (Just "module M where") (nth 0 out)
+          , assertEqual "the body follows unchanged"
+              (Just "  open import Agda.Builtin.Nat") (nth 2 out)
+          ]
+
+    -- A comment-only line is blank in the code-only view, so it cannot supply
+    -- the indentation; the first real declaration does.
+    , runTest "ensureDebugImport: a leading comment does not supply the indentation" $ do
+        let s = T.unlines
+              [ "module M where"
+              , "-- a comment at column 1"
+              , "  n = {!!}" ]
+        assertEqual "indented like the declaration"
+          (Just "  open import AgdaDojang.Debug") (nth 1 (T.lines (ensureDebugImport PlainAgda s)))
+
+    -- With no declaration to match, the header's own indentation is the only
+    -- guess, and it is what keeps the line inside an indented code block.
+    , runTest "ensureDebugImport: an empty body falls back to the header's indentation" $ do
+        let s = T.unlines [ "  module M where" ]
+        assertEqual "indented like the header"
+          (Just "  open import AgdaDojang.Debug") (nth 1 (T.lines (ensureDebugImport PlainAgda s)))
+
     , runTest "ensureDebugImport: a nested-module import does not suppress injection" $ do
         let s = T.unlines
               [ "module Top where"
@@ -3879,11 +3914,13 @@ holeModelIntegrationTests cfg = do
       blockComment = resources </> "BlockCommentModule.agda"
       anonModule   = resources </> "AnonModule.agda"
       holeDecoy    = resources </> "HoleImportDecoy.agda"
+      indentedBody = resources </> "IndentedBody.agda"
       parityFixtures =
         [ variants
         , lagdaMd
         , blockComment
         , holeDecoy
+        , indentedBody
         , resources </> "LiterateTex.lagda"
         , resources </> "LiterateRst.lagda.rst"
         , resources </> "LiterateOrg.lagda.org"
@@ -4048,6 +4085,20 @@ holeModelIntegrationTests cfg = do
               Right info -> allOf
                 [ assertEqual "goal" "Nat" (giGoal info)
                 , assertEqual "module" (Just "HoleImportDecoy") (giModule info)
+                ]
+
+        -- End to end for the layout defect: this fixture's header is at column 1
+        -- and its body is indented, so an import injected at the header's column
+        -- made Agda read the body as continuations of it — [ParseError] on a file
+        -- that type-checks (measured before the fix).
+        , runTest "get_goal: an indented module body still gets a well-placed import (#100)" $ do
+            result <- handleGetGoal cfg GetGoalParams
+              { ggFilePath = indentedBody, ggHole = ByIndex 0 }
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
+              Right info -> allOf
+                [ assertEqual "goal" "Nat" (giGoal info)
+                , assertEqual "module" (Just "IndentedBody") (giModule info)
                 ]
 
         , runTest "fill_hole: prose {!!} decoys are not addressable (#73)" $ do

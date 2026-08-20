@@ -633,10 +633,10 @@ timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
 -- and pragma text, so a line that happens to start with @module@ (or mention the
 -- import) without being code can neither misplace the injection nor suppress it; the
 -- header is found inside a code region, where the inserted line is Agda-visible.  The
--- import also inherits the header line's indentation, which keeps it inside
--- indentation-delimited code blocks (@.lagda.rst@); an unindented insert there would
--- terminate the block.  Masking preserves the line structure, so line indices found on
--- the masked text splice correctly into the original.
+-- import also inherits the indentation of the module's /body/, which keeps it inside
+-- indentation-delimited code blocks (@.lagda.rst@) and, more generally, makes it a
+-- layout sibling of the declarations it joins.  Masking preserves the line structure,
+-- so line indices found on the masked text splice correctly into the original.
 --
 -- The "already imported?" scan is restricted to the *top-level* prelude — the lines
 -- after the top-level module header, up to the first nested @module@ — so an import
@@ -657,13 +657,28 @@ ensureDebugImport flav src =
     Just (hdrLine, afterHdr)
       | any isDebugImportLine (takeWhile (not . opensModule) (drop afterHdr codeLs)) -> src
       | otherwise ->
-          let indent          = T.takeWhile isIndentChar (codeLs !! hdrLine)
-              (before, after) = splitAt afterHdr (T.lines src)
-          in  T.unlines (before <> [indent <> "open import AgdaDojang.Debug"] <> after)
+          let (before, after) = splitAt afterHdr (T.lines src)
+          in  T.unlines
+                (before <> [bodyIndent hdrLine afterHdr <> "open import AgdaDojang.Debug"] <> after)
   where
     codeLs = T.lines (codeOnly flav src)
 
     isIndentChar c = c == ' ' || c == '\t'
+
+    -- The inserted line has to be a layout /sibling/ of the module's other
+    -- declarations, so it takes the indentation of the first of them rather than the
+    -- header's.  A header at column 1 whose body is indented is legal Agda, and an
+    -- insert at column 1 there makes every existing declaration a continuation of the
+    -- import: Agda answers @[ParseError]@ and get_goal fails on a file that checks
+    -- fine (measured; Copilot's third review of PR 105).  Comment-only and prose lines
+    -- are blank in the code-only view, so they cannot supply the indentation.  With no
+    -- declaration to match — an empty module body — the header's own indentation is the
+    -- only guess available, and it is the one that keeps the line inside an
+    -- indentation-delimited code block.
+    bodyIndent hdr afterHdr =
+      case dropWhile (T.null . T.strip) (drop afterHdr codeLs) of
+        (l : _) -> T.takeWhile isIndentChar l
+        []      -> T.takeWhile isIndentChar (codeLs !! hdr)
 
     -- A genuine import of the module: the first token is an import-introducing
     -- keyword, @import@ is present, and @AgdaDojang.Debug@ appears as a whole module
