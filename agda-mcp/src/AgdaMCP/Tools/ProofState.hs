@@ -367,7 +367,10 @@ laneGoal lanes cfg pc absPath src reload idx = do
                                     <|> moduleNameOf (flavourOf absPath) src
                     , giElapsedMs         =
                         Just (fromIntegral ((endNs - startNs) `div` 1_000_000))
-                    , giCheckedFromSource = Just (lrCheckedFromSource lr)
+                      -- Absent when the per-load argv muted Agda's progress
+                      -- channel: the load's own evidence for this field is
+                      -- exactly what --trace-imports=0 silences (issue #114).
+                    , giCheckedFromSource = lrCheckedFromSource lr
                     , giVerdict = Nothing
                     , giCommand = Just echo
                     , giProject = Just pc

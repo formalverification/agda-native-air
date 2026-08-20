@@ -81,7 +81,8 @@ import qualified Data.Text as T
 import System.Directory (getCurrentDirectory)
 
 import AgdaMCP.Agda
-  ( AgdaConfig (..), AgdaResult (..), debugLog, progressModules, runCommand )
+  ( AgdaConfig (..), AgdaResult (..), debugLog, progressChannelMuted
+  , progressModules, runCommand )
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Gate
   ( GateConfig, GatePlan (..), checkTimeoutOf, resolveGate )
@@ -182,6 +183,25 @@ runGate cfg gcfg params pc plan = do
       (failMod, failFile)
         | success   = (Nothing, Nothing)
         | otherwise = failingModuleOf progress firstErr
+      -- This counts the same progress lines 'AgdaMCP.Agda.checkedFromSourceOf'
+      -- reads, so a muted channel gets the same treatment (issue #114) — with
+      -- the difference a count deserves.  One @Checking@ line settles a
+      -- boolean, but no number of them settles a total once the channel that
+      -- would have announced the rest is silenced: what survives
+      -- @--trace-imports=0@ is a floor, and a floor reported as a total is the
+      -- wrong-over-absent trade this wave refuses.  So the count is withheld
+      -- whenever the argv this gate ran under mutes the channel, whether or
+      -- not something printed a line anyway.  That argv is the gate's own: the
+      -- server assembles it for an @Everything@ gate and for an operator's
+      -- @--check-command@, while a @make@ gate hides its agda invocation in a
+      -- recipe this server never reads, so there the count stays the
+      -- best-effort read it always was.  'failingModuleOf' needs no such care:
+      -- it degrades to the located error's file, and to no module rather than
+      -- to a wrong one.
+      rebuilt = length (nub (map fst progress))
+      modulesChecked
+        | progressChannelMuted (ceArgs (arCommand result)) = Nothing
+        | otherwise                                        = Just rebuilt
   pure CheckProjectResult
     { cprSuccess          = success
     , cprTimedOut         = timedOut
@@ -194,7 +214,7 @@ runGate cfg gcfg params pc plan = do
     , cprFirstError       = firstErr
     , cprFailingModule    = failMod
     , cprFailingFile      = failFile
-    , cprModulesChecked   = length (nub (map fst progress))
+    , cprModulesChecked   = modulesChecked
       -- Returned whatever the verdict, and that is the point.  A masked failure
       -- this server does not recognize — a wrapper hiding a failure that printed
       -- nothing we can key on — is a run reported as a pass, and withholding the

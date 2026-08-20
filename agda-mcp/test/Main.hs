@@ -82,6 +82,7 @@ import AgdaMCP.Agda
   , runAgda , AgdaResult (..)
   , checkedFromSourceOf , defaultTimeoutSeconds
   , agdaModuleNameOf , parseCheckingLine , progressModules
+  , progressChannelMuted , traceImportsLevel
   )
 import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
@@ -105,9 +106,10 @@ import AgdaMCP.Project
 import AgdaMCP.Interaction
   ( IPoint (..), IRange (..), IResponse (..), LaneGoal (..), LaneMeta (..)
   , LoadReport (..), LoadedInfo (..)
-  , cmdGoalTypeContext, cmdLoad, ensureLoaded, goalsOf, hsShow, metasOf
-  , interactionPointsOf, iotcmLine, newInteractionLanes, parseAmbiguousName
-  , parseDidYouMean, parseResponseLine, parseSrcLoc, parseWhyInScope
+  , cmdGoalTypeContext, cmdLoad, ensureLoaded, goalsOf, hsShow
+  , interactionPointsOf, iotcmLine, loadCheckedFromSource, metasOf
+  , newInteractionLanes, parseAmbiguousName, parseDidYouMean, parseResponseLine
+  , parseSrcLoc, parseWhyInScope
   , pointContaining, shutdownLanes, stripPrompts, withLane
   , InteractionLanes, LaneFailure (..), ProvenanceStep (..)
   , ScopeCandidate (..), SrcLoc (..)
@@ -191,15 +193,24 @@ failureText (FailInteraction xf) = xfMessage xf
 
 -- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
 -- tests — exit code, timed-out flag, and stdout, with the fields the signal
--- never reads left inert.
+-- never reads left inert.  The argv is empty, which is a real state and not a
+-- placeholder: no @--trace-imports@ occurrence means Agda's default level, so
+-- these results describe a run whose progress channel was open.
 fakeResult :: Int -> Bool -> Text -> AgdaResult
-fakeResult ec timedOut out = AgdaResult
+fakeResult = fakeResultUnder []
+
+-- | fakeResultUnder: the same, for a run made under a given argument vector —
+-- the context 'checkedFromSourceOf' reads to decide whether this server itself
+-- muted the channel it is about to infer from (issue #114).  The echo carries
+-- the argv precisely because it is built from the list handed to the process.
+fakeResultUnder :: [String] -> Int -> Bool -> Text -> AgdaResult
+fakeResultUnder args ec timedOut out = AgdaResult
   { arExitCode  = ec
   , arStdout    = out
   , arStderr    = ""
   , arTimedOut  = timedOut
   , arElapsedMs = 0
-  , arCommand   = CommandEcho { ceBinary = "agda", ceArgs = [], ceCwd = "." }
+  , arCommand   = CommandEcho { ceBinary = "agda", ceArgs = args, ceCwd = "." }
   }
 
 
@@ -602,6 +613,78 @@ pureTests = do
     , runTest "checkedFromSourceOf: a timeout before any output is unknown, not warm" $
         assertEqual "signal" Nothing
           (checkedFromSourceOf (fakeResult (-15) True ""))
+
+    -- The muted evidence channel (issue #114).  --trace-imports=0 silences the
+    -- progress lines outright, so under it a genuinely cold check produces the
+    -- warm signature — silent success — and the old signal called it warm.  The
+    -- flag can only arrive on the argv this server assembles (a pragma or an
+    -- .agda-lib flags: field carrying it is rejected outright), so the server
+    -- always knows, and an inference from a silence it caused is withheld.
+    -- Every level below was measured against the pinned Agda 2.8.0; the
+    -- transcripts are in docs/agda-mcp-ask-agda-audit.md § 4.
+    , runTest "traceImportsLevel: no occurrence means Agda's default level" $
+        assertEqual "level" 1
+          (traceImportsLevel ["-i", "/x", "--library-file=/y", "/x/M.agda"])
+
+    , runTest "traceImportsLevel: =N carries the level, and the bare flag means 2" $
+        allOf
+          [ assertEqual "=0"   0 (traceImportsLevel ["--trace-imports=0"])
+          , assertEqual "=1"   1 (traceImportsLevel ["--trace-imports=1"])
+          , assertEqual "=3"   3 (traceImportsLevel ["--trace-imports=3"])
+          , assertEqual "bare" 2 (traceImportsLevel ["--trace-imports"])
+          ]
+
+    , runTest "traceImportsLevel: the last occurrence wins, both ways round" $
+        allOf
+          [ assertEqual "0 then 1" 1
+              (traceImportsLevel ["--trace-imports=0", "--trace-imports=1"])
+          , assertEqual "1 then 0" 0
+              (traceImportsLevel ["--trace-imports=1", "--trace-imports=0"])
+          ]
+
+    , runTest "traceImportsLevel: a space-separated level is not a level" $
+        -- Measured: agda reads the bare flag (level 2) and then takes the 0 as
+        -- a second input file, which it refuses.  So the token decides and the
+        -- 0 is not read as one.
+        assertEqual "level" 2 (traceImportsLevel ["--trace-imports", "0"])
+
+    , runTest "traceImportsLevel: an abbreviation is not the flag" $
+        -- Measured: agda answers --trace-imp=0 with [OptionError] Unrecognized
+        -- option, so reading it as the flag would report a channel muted that
+        -- agda never muted (and that argv never checks anything at all).
+        assertEqual "level" 1 (traceImportsLevel ["--trace-imp=0"])
+
+    , runTest "progressChannelMuted: level 0 mutes, the default and above do not" $
+        allOf
+          [ assert "=0 mutes"
+              (progressChannelMuted ["-i", "/x", "--trace-imports=0", "/x/M.agda"])
+          , assert "no flag does not"     (not (progressChannelMuted ["-i", "/x"]))
+          , assert "the bare flag does not" (not (progressChannelMuted ["--trace-imports"]))
+          , assert "a later =1 restores it"
+              (not (progressChannelMuted ["--trace-imports=0", "--trace-imports=1"]))
+          ]
+
+    , runTest "checkedFromSourceOf: silent success under a muted channel is unknown (#114)" $
+        -- The defect, in one line: this run re-typechecked from source and said
+        -- nothing about it because the server told it not to.  Absent, not warm.
+        assertEqual "signal" Nothing
+          (checkedFromSourceOf
+             (fakeResultUnder ["-i", "/x", "--trace-imports=0"] 0 False ""))
+
+    , runTest "checkedFromSourceOf: the same silence with the channel open is reuse" $
+        -- The control: only the flag differs, and silence then means what it
+        -- has always meant.
+        assertEqual "signal" (Just False)
+          (checkedFromSourceOf (fakeResultUnder ["-i", "/x"] 0 False ""))
+
+    , runTest "checkedFromSourceOf: a 'Checking' line outranks a muted channel" $
+        -- Pins the branch order rather than an observed agda behavior: muting
+        -- withholds the inference from silence, never an answer something
+        -- actually said.
+        assertEqual "signal" (Just True)
+          (checkedFromSourceOf
+             (fakeResultUnder ["--trace-imports=0"] 0 False
+                "Checking M (/x/M.agda)."))
 
     -- The default bound is enforced now (issue #77), so its value is a real
     -- decision: a cold agda-algebras call builds .agdai interfaces and takes
@@ -2724,6 +2807,13 @@ gateTests = do
                        (paramsAt (gsProject gs))
         maskedMake <- handleCheckProject agdaCfg (gateCfg ["masked-make"] 60)
                         (paramsAt (gsProject gs))
+        -- The same failing gate, run under an argv that mutes Agda's progress
+        -- channel (issue #114).  A configured --check-command is a vector this
+        -- server hands to the process, so the scan sees the flag there exactly
+        -- as it does in an Everything gate's assembled flags.
+        mutedRes  <- handleCheckProject agdaCfg
+                       (gateCfg ["fail", "0", "--trace-imports=0"] 60)
+                       (paramsAt (gsProject gs))
 
         failing <- sequence
           [ runTest "check_project: a gate that fails mid-run is a non-success verdict" $
@@ -2763,7 +2853,24 @@ gateTests = do
                   (maybe False ("NotInScope" `T.isInfixOf`) (cprOutputTail r))
 
           , runTest "check_project: modulesChecked counts the modules the gate rebuilt" $
-              withRight failRes $ \r -> assertEqual "modulesChecked" 2 (cprModulesChecked r)
+              withRight failRes $ \r ->
+                assertEqual "modulesChecked" (Just 2) (cprModulesChecked r)
+
+          , runTest "check_project: a muted trace channel withholds modulesChecked (#114)" $
+              -- The count is a read of the lines --trace-imports=0 silences, so
+              -- under it the number is a floor at best and the field goes
+              -- absent.  Everything that does not depend on counting them
+              -- survives: the verdict, the structured first error, and the
+              -- module the gate stopped in (named from the located error's own
+              -- file, which is why it does not need the count to be complete).
+              withRight mutedRes $ \r -> allOf
+                [ assertEqual "modulesChecked" Nothing (cprModulesChecked r)
+                , assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
+                , assertEqual "firstError code" (Just "NotInScope")
+                    (cprFirstError r >>= diagCode)
+                , assertEqual "failingModule" (Just "Gate.Broken")
+                    (cprFailingModule r)
+                ]
           ]
 
         passing <- sequence
@@ -2899,7 +3006,7 @@ gateTests = do
               -- The progress a blocking call can otherwise not give: the module
               -- it was in, and how many it had rebuilt.
               withRight slowRes $ \r -> allOf
-                [ assertEqual "modulesChecked" 1 (cprModulesChecked r)
+                [ assertEqual "modulesChecked" (Just 1) (cprModulesChecked r)
                 , assertEqual "failingModule" (Just "Gate.Slow") (cprFailingModule r)
                 , assert ("diagnostics were " <> show (map diagMessage (cprDiagnostics r)))
                     (any (("the project gate timed out after 1s" `T.isInfixOf`) . diagMessage)
@@ -3786,6 +3893,48 @@ integrationTests cfg fixturePath repoRoot = do
               Fail m -> pure (Fail m)
               Pass   -> assert ("elapsedMs = " <> show (fcrElapsedMs fcr))
                           (fcrElapsedMs fcr > 0)
+
+    , -- Issue #114: --trace-imports=0 silences the progress lines
+      -- checkedFromSource is inferred from, so under it a genuinely cold check
+      -- wears the warm signature (silent success) and used to be reported as
+      -- warm.  Two scratch modules with identical bodies, each checked exactly
+      -- once so both checks are cold, leave the flag as the only difference:
+      -- with the channel open the field says true, and with it muted the field
+      -- is absent rather than false.  This is the audit's § 4 measurement,
+      -- executable.
+      runTest "check_file: a cold check under --trace-imports=0 omits checkedFromSource (#114)" $ do
+        dir <- scratchDir "trace-muted"
+        let body name = T.unlines
+              [ "module " <> name <> " where"
+              , ""
+              , "open import Agda.Builtin.Nat"
+              , ""
+              , "twice : Nat -> Nat"
+              , "twice n = n + n"
+              ]
+            write name = do
+              let file = dir </> (T.unpack name <> ".agda")
+              TIO.writeFile file (body name)
+              pure file
+            mutedCfg = cfg { agdaFlags = agdaFlags cfg <> ["--trace-imports=0"] }
+        audible <- write "TraceAudible"
+        muted   <- write "TraceMuted"
+        rOpen  <- handleCheckFile injLanes cfg      (CheckFileParams audible Nothing)
+        rMuted <- handleCheckFile injLanes mutedCfg (CheckFileParams muted Nothing)
+        case (rOpen, rMuted) of
+          (Right o, Right m) -> allOf
+            [ assert "the control check should pass" (fcrSuccess o)
+            , assertEqual "channel open: a cold check says it re-checked"
+                (Just True) (fcrCheckedFromSource o)
+            , assert "the muted check should pass too" (fcrSuccess m)
+            , assertEqual "channel muted: unknown, not warm"
+                Nothing (fcrCheckedFromSource m)
+            , assert "and no checkedFromSource key rides the muted response"
+                (not ("\"checkedFromSource\"" `T.isInfixOf` encodeText m))
+            ]
+          (o, m) -> pure . Fail $
+            "check_file failed: " <> show (either (T.unpack . failureText) (const "ok") o)
+            <> " / " <> show (either (T.unpack . failureText) (const "ok") m)
 
     , runTest "get_goal: a real goal query carries elapsedMs" $ do
         let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
@@ -4844,6 +4993,41 @@ interactionWireTests = do
                 Aeson.Error e   -> pure (Fail e)
         pure (firstFailure [r1, r2, r3])
 
+    , -- The lane's half of issue #114, with no Agda in the way: the same
+      -- RunningInfo lines answer "did this load re-check the file?", and the
+      -- same muting silences them (probed: a load whose per-load argv carries
+      -- --trace-imports=0 emits no RunningInfo at all, going straight to
+      -- AllGoalsWarnings).
+      runTest "loadCheckedFromSource: a line naming this file is a source re-check" $
+        assertEqual "signal" (Just True)
+          (loadCheckedFromSource "/p/F.agda" []
+             [ IRunningInfo "Checking Dep (/p/Dep.agda)."
+             , IRunningInfo "  Checking F (/p/F.agda)."
+             , IInteractionPoints []
+             ])
+
+    , runTest "loadCheckedFromSource: a load that announced only dependencies is reuse" $
+        -- The file itself was not announced while the channel was open, so the
+        -- silence about it is Agda's own answer: its interface was reused.
+        assertEqual "signal" (Just False)
+          (loadCheckedFromSource "/p/F.agda" []
+             [ IRunningInfo "Checking Dep (/p/Dep.agda)."
+             , IInteractionPoints []
+             ])
+
+    , runTest "loadCheckedFromSource: silence under a muted channel is unknown (#114)" $
+        allOf
+          [ assertEqual "muted" Nothing
+              (loadCheckedFromSource "/p/F.agda" ["-i", "/p", "--trace-imports=0"]
+                 [IInteractionPoints []])
+          , assertEqual "open, for contrast" (Just False)
+              (loadCheckedFromSource "/p/F.agda" ["-i", "/p"]
+                 [IInteractionPoints []])
+          , assertEqual "a line still outranks the muting" (Just True)
+              (loadCheckedFromSource "/p/F.agda" ["--trace-imports=0"]
+                 [IRunningInfo "Checking F (/p/F.agda)."])
+          ]
+
     , runTest "pointContaining: line picks earliest; a column picks the exact hole" $ do
         let ps = [ IPoint 0 (Just (IRange 22 5 22 9))
                  , IPoint 1 (Just (IRange 22 14 22 18))
@@ -5509,6 +5693,42 @@ interactionLaneTests cfg repoRoot = do
             b <- assertEqual "forced" (Just "forced")
                    (lchLoad <$> giLane info)
             pure (firstFailure [a, b])
+
+    , -- Issue #114 on the lane: the per-load argv rides the Cmd_load, so
+      -- --trace-imports=0 in it silences the RunningInfo lines the lane reads,
+      -- and a fresh load that really did re-typecheck the file would report
+      -- reuse.  Each half gets a registry of its own so its first load is cold,
+      -- and the fixture has holes, so a load always re-checks it (a file with
+      -- holes writes no interface).  The third call is the distinction the
+      -- field turns on: a reuse is honestly false whatever the argv says,
+      -- because no load ran at all.
+      runTest "get_goal: the lane withholds checkedFromSource under a muted channel (#114)" $ do
+        openLanes  <- newInteractionLanes
+        mutedLanes <- newInteractionLanes
+        let fixture  = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
+            mutedCfg = cfg { agdaFlags = agdaFlags cfg <> ["--trace-imports=0"] }
+            ask ls c = handleGetGoal ls c GetGoalParams
+                         { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False }
+        rOpen   <- ask openLanes  cfg
+        rMuted  <- ask mutedLanes mutedCfg
+        rReused <- ask mutedLanes mutedCfg
+        shutdownLanes openLanes
+        shutdownLanes mutedLanes
+        case (rOpen, rMuted, rReused) of
+          (Right o, Right m, Right u) -> allOf
+            [ assertEqual "open: the lane answered" (Just "interaction-lane") (giSource o)
+            , assertEqual "open: a cold load re-checked from source"
+                (Just True) (giCheckedFromSource o)
+            , assertEqual "muted: the lane answered too" (Just "interaction-lane") (giSource m)
+            , assertEqual "muted: unknown, not warm" Nothing (giCheckedFromSource m)
+            , assertEqual "the second muted call reused the load"
+                (Just "reused") (lchLoad <$> giLane u)
+            , assertEqual "a reuse is honestly false, muted or not"
+                (Just False) (giCheckedFromSource u)
+            ]
+          (o, m, u) -> pure . Fail $ "get_goal failed: "
+            <> unwords [ either (T.unpack . failureText) (const "ok") r
+                       | r <- [o, m, u] ]
 
     , -- The revival path: a child that died while the lane sat idle is
       -- replaced silently on the next request (its handles closed, its

@@ -99,6 +99,7 @@ module AgdaMCP.Interaction
   , goalsOf
   , metasOf
   , goalInfoOf
+  , loadCheckedFromSource
   , GoalContext (..)
   , GoalCtxEntry (..)
   , goalContextOf
@@ -164,7 +165,8 @@ import System.Process
   )
 import System.Timeout (timeout)
 
-import AgdaMCP.Agda (AgdaConfig (..), escalateAndReap, parseCheckingLine)
+import AgdaMCP.Agda
+  ( AgdaConfig (..), escalateAndReap, parseCheckingLine, progressChannelMuted )
 
 
 -- ---------------------------------------------------------------------------
@@ -1104,10 +1106,14 @@ data LoadReport = LoadReport
   , lrOutcome           :: Either Text LoadedInfo
                            -- ^ Left: the load failed, and this is Agda's
                            -- message.  The lane itself is healthy.
-  , lrCheckedFromSource :: Bool
+  , lrCheckedFromSource :: Maybe Bool
                            -- ^ Did this call re-typecheck the file from
-                           -- source (a @Checking@ progress line naming it)?
-                           -- False for 'LoadReused'.
+                           -- source?  @Just True@ on a @Checking@ progress
+                           -- line naming it; @Just False@ for 'LoadReused'
+                           -- (no load ran, so nothing was checked) and for a
+                           -- load that announced nothing over an open
+                           -- channel; 'Nothing' when the per-load argv muted
+                           -- that channel — see 'loadCheckedFromSource'.
   , lrElapsedMs         :: Int
   } deriving (Eq, Show)
 
@@ -1142,7 +1148,10 @@ ensureLoaded lh force path flags = do
       pure . Right $ LoadReport
         { lrAction            = LoadReused
         , lrOutcome           = lsOutcome ls
-        , lrCheckedFromSource = False
+          -- Honestly False, and it needs no evidence from Agda: no
+          -- @Cmd_load@ ran, so nothing was checked from source on this
+          -- call, whatever the argv would have printed (issue #114).
+        , lrCheckedFromSource = Just False
         , lrElapsedMs         = elapsedMsBetween start end
         }
     (mAction, _) -> do
@@ -1151,8 +1160,8 @@ ensureLoaded lh force path flags = do
       case collected of
         Left lf -> pure (Left lf)
         Right rs -> do
-          let outcome = classifyLoad path rs
-              checked = any (checkingNames path) rs
+          let outcome    = classifyLoad path rs
+              fromSource = loadCheckedFromSource path flags rs
           writeIORef (laneLoad (lhLane lh)) . Just $ LoadState
             { lsPath    = path
             , lsStamp   = stamp
@@ -1163,13 +1172,33 @@ ensureLoaded lh force path flags = do
           pure . Right $ LoadReport
             { lrAction            = action
             , lrOutcome           = outcome
-            , lrCheckedFromSource = checked
+            , lrCheckedFromSource = fromSource
             , lrElapsedMs         = elapsedMsBetween start end
             }
+
+
+-- | loadCheckedFromSource: the cache signal of a /fresh/ load — did this
+-- @Cmd_load@ re-typecheck the file from source?
+--
+-- The evidence is the @RunningInfo@ responses, which carry the same
+-- @Checking M (path).@ lines the batch lane reads (design document § 2.4), and
+-- the answer is a 'Maybe' for the same reason
+-- 'AgdaMCP.Agda.checkedFromSourceOf' is: a line naming this file is positive
+-- evidence of a re-check, while no line is an inference from silence that holds
+-- only while the channel is open.  The per-load argv rides the @Cmd_load@
+-- itself, so an effective @--trace-imports=0@ in it mutes the @RunningInfo@
+-- stream — probed, such a load emits none at all and goes straight to
+-- @AllGoalsWarnings@ — and a genuine re-check would then read as reuse.  Under
+-- one this answers 'Nothing', and the field goes absent (issue #114).
+loadCheckedFromSource :: FilePath -> [String] -> [IResponse] -> Maybe Bool
+loadCheckedFromSource path flags rs
+  | any announcedThisFile rs   = Just True
+  | progressChannelMuted flags = Nothing
+  | otherwise                  = Just False
   where
-    checkingNames p (IRunningInfo msg) =
-      any (equalFilePath p . snd) (mapMaybe parseCheckingLine (T.lines msg))
-    checkingNames _ _ = False
+    announcedThisFile (IRunningInfo msg) =
+      any (equalFilePath path . snd) (mapMaybe parseCheckingLine (T.lines msg))
+    announcedThisFile _ = False
 
 -- | classifyLoad: a load is successful exactly when it announced interaction
 -- points (§ 2.4); otherwise the first error message is the outcome, and a
