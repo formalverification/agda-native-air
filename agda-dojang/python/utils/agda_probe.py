@@ -8,7 +8,7 @@ Description:
   next `{!!}`, rewrite it (with a reporting macro, or with a candidate term),
   run Agda over the rewritten file, and read a verdict out of what Agda printed.
 
-  Three concerns live here, in that order:
+  Three concerns live here:
 
   1.  Source surgery.  `find_next_hole` and the `build_*_variant` functions turn
       a fixture's text into the exact text we want Agda to see.
