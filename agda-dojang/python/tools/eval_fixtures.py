@@ -304,12 +304,10 @@ def _status_from_run(res: Result[CommandResult, PipelineError]) -> Tuple[str, in
 def _probe_cfg_for_fixture(cfg: EvalConfig, fixture: Path) -> ProbeConfig:
     return ProbeConfig(
         file=fixture.resolve(),
-        policy_cmd=cfg.policy_cmd,
         agda_bin=cfg.agda_bin,
         agda_flags=cfg.agda_flags,
         include_dirs=list(cfg.include_dirs),
         timeout_sec=cfg.timeout_sec,
-        top_k=cfg.top_k,
         cwd=cfg.cwd,
         report_expr=cfg.report_expr,
     )
@@ -391,7 +389,7 @@ def _discover_fixtures(specs: Sequence[str]) -> List[Path]:
 # =============================================================================
 
 def call_policy(
-    cfg: ProbeConfig,
+    cfg: EvalConfig,
     req: PolicyRequest,
     workdir: Path,
 ) -> Result[PolicyResponse, PipelineError]:
@@ -536,7 +534,7 @@ def _try_candidates_for_hole(
         json.dumps(req_log_obj, ensure_ascii=False, indent=2) + "\n",
     )
 
-    pol = call_policy(probe_cfg, req=req, workdir=shadow_dir)
+    pol = call_policy(cfg, req=req, workdir=shadow_dir)
     if isinstance(pol, Err):
         log_path = logs_dir / "policy_error.txt"
         write_text_atomic(log_path, pol.error.message + "\n")

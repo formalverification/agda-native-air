@@ -27,8 +27,10 @@ Provenance:
   of the `agda-mcp` server (issue #109).  Behaviour is unchanged; the bridge's
   own loop, its CLI, and its dead helpers did not come along, and the names the
   proof-completion evaluator imports are public here rather than underscored.
-  `ProbeConfig` is the old `ProbeConfig` minus three fields (`output`,
-  `keep_workdir`, `max_holes`) that only the retired CLI read.
+  `ProbeConfig` is the old `BridgeConfig` minus five fields: `output`,
+  `keep_workdir`, and `max_holes`, which only the retired CLI read, and
+  `policy_cmd` and `top_k`, which describe the policy backend rather than an
+  Agda run and so stayed behind with the evaluator.
 
   The evaluator `tools/eval_fixtures.py` is the one caller.  Agents reach the
   same capabilities through `agda-mcp` (`get_goal`, `fill_hole`), which is the
@@ -76,12 +78,10 @@ class HoleSpan:
 @dataclass(frozen=True)
 class ProbeConfig:
     file: Path
-    policy_cmd: List[str]
     agda_bin: str
     agda_flags: str
     include_dirs: List[str]
     timeout_sec: Optional[float]
-    top_k: int
     cwd: Optional[Path]
 
     # The Agda-side reporting macro call we inject in place of `{!!}`
