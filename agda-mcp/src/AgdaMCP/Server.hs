@@ -301,6 +301,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
               \verbatim (any syntax a hole would accept); it does not have to \
               \occur in the file."
           , prop "line"     "integer" liveLineDoc
+          , prop "column"   "integer" liveColumnDoc
+          , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "expr"]
@@ -315,6 +317,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "expr"     "string"  "The Agda expression to evaluate, sent \
               \verbatim; it does not have to occur in the file."
           , prop "line"     "integer" liveLineDoc
+          , prop "column"   "integer" liveColumnDoc
+          , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "expr"]
@@ -337,6 +341,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "name"     "string"  "The name to resolve, qualified or not, \
               \exactly as it would appear in the file."
           , prop "line"     "integer" liveLineDoc
+          , prop "column"   "integer" liveColumnDoc
+          , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "name"]
@@ -353,6 +359,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           [ prop "filePath" "string"  liveFilePathDoc
           , prop "name"     "string"  "The name to locate, qualified or not."
           , prop "line"     "integer" liveLineDoc
+          , prop "column"   "integer" liveColumnDoc
+          , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "name"]
@@ -712,8 +720,10 @@ liveLineNote =
   "SCOPE: if line falls inside a hole, the query runs in that goal's scope — \
   \local variables become visible, and names opened from file-local modules \
   \resolve that the completed top-level scope of a hole-free file loses. \
-  \Otherwise it runs against the file's top-level scope. The response's \
-  \scope field says which happened."
+  \Otherwise it runs against the file's top-level scope. Two holes can share \
+  \a line with different scopes; add column (or col) to pick one, else the \
+  \earliest hole on the line answers. The response's scope field says which \
+  \happened."
 
 -- | liveFilePathDoc: the path rule for live-query tools — the batch tools'
 -- resolution rule (issue #101), plus what the file means to a scope query.
@@ -730,7 +740,23 @@ liveLineDoc :: Text
 liveLineDoc =
   "Optional 1-based line in the file as written. Inside a hole: the query \
   \runs in that goal's scope (locals visible). Elsewhere or omitted: the \
-  \file's top-level scope."
+  \file's top-level scope. When two holes share the line, the earliest \
+  \answers unless column (or col) picks one."
+
+-- | liveColumnDoc / liveColDoc: the optional column that sharpens @line@ into
+-- a position, deciding between goals that share a line.
+liveColumnDoc :: Text
+liveColumnDoc =
+  "Optional 1-based column sharpening line into a position; the query runs \
+  \in the scope of the hole whose span contains it. Needed only when two \
+  \holes share the line (their scopes can differ). Requires line. Give this \
+  \or col, not both."
+
+liveColDoc :: Text
+liveColDoc =
+  "The same thing as column, accepted because the hole listings spell it \
+  \col — so a goal entry from check_file or get_diagnostics can be passed \
+  \back without renaming. Requires line. Give this or column, not both."
 
 -- | liveReloadDoc: the @reload@ property's contract.
 liveReloadDoc :: Text

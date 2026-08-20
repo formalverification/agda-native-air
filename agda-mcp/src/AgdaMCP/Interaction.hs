@@ -124,10 +124,10 @@ module AgdaMCP.Interaction
 
 import Control.Concurrent (ThreadId, forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
-  (MVar, modifyMVar, newMVar, putMVar, readMVar, tryTakeMVar)
+  (MVar, modifyMVar, newMVar, putMVar, readMVar, takeMVar, tryTakeMVar)
 import Control.Exception
   ( AsyncException, IOException, SomeException, catch, fromException
-  , onException, throwIO, try
+  , mask, onException, throwIO, try
   )
 import Control.Monad (forever)
 import Data.Aeson (Value (..), decodeStrict')
@@ -297,12 +297,20 @@ goalInfoOf (IDisplayInfo "GoalSpecific" (Object io)) = KM.lookup "goalInfo" io
 goalInfoOf _ = Nothing
 
 -- | pointContaining: the interaction point whose range contains the 1-based
--- line, if any; the earliest wins when several share the line.  This is how a
--- tool's optional @line@ argument selects goal-scoped rather than toplevel
--- answering.
-pointContaining :: Int -> [IPoint] -> Maybe IPoint
-pointContaining ln ps = listToMaybe
-  [ p | p <- ps, Just r <- [ipRange p], irLine r <= ln, ln <= irEndLine r ]
+-- position.  With a column, containment is positional (start inclusive, end
+-- exclusive, matching the hole model's addressing) — which is what
+-- distinguishes two goals sharing a line, whose scopes can differ (probed:
+-- @(\ m -> {!!}) {!!}@ binds @m@ in the first hole only).  With a line
+-- alone, the earliest point on that line wins, which the tool descriptions
+-- state.
+pointContaining :: Int -> Maybe Int -> [IPoint] -> Maybe IPoint
+pointContaining ln mCol ps = listToMaybe
+  [ p | p <- ps, Just r <- [ipRange p], contains r ]
+  where
+    contains r = case mCol of
+      Nothing  -> irLine r <= ln && ln <= irEndLine r
+      Just col ->
+        (irLine r, irCol r) <= (ln, col) && (ln, col) < (irEndLine r, irEndCol r)
 
 -- Field helpers over Aeson objects.
 
@@ -441,10 +449,15 @@ data LoadedInfo = LoadedInfo
 type LaneSlot = MVar (Maybe Lane)
 
 -- | InteractionLanes: the registry — one slot per resolved project root —
--- plus the idle reaper's thread.
+-- plus the idle reaper's thread and the shutdown latch.  The latch is read
+-- and written only under the 'ilSlots' lock, which is what orders every
+-- request against 'shutdownLanes': a request that saw the registry open got
+-- its slot into the map shutdown will drain, and one that arrives later is
+-- refused before it can spawn anything.
 data InteractionLanes = InteractionLanes
   { ilSlots  :: MVar (Map FilePath LaneSlot)
   , ilReaper :: ThreadId
+  , ilClosed :: IORef Bool
   }
 
 -- | laneIdleSeconds: how long a lane may sit unused before the reaper closes
@@ -460,7 +473,8 @@ newInteractionLanes :: IO InteractionLanes
 newInteractionLanes = do
   slots  <- newMVar Map.empty
   reaper <- forkIO (reapLoop slots)
-  pure (InteractionLanes slots reaper)
+  closed <- newIORef False
+  pure (InteractionLanes slots reaper closed)
   where
     -- Synchronous failures must not kill the reaper, but the asynchronous
     -- 'ThreadKilled' from 'shutdownLanes' must — a blanket handler here would
@@ -496,20 +510,29 @@ newInteractionLanes = do
             then stopLane lane >> pure Nothing
             else pure (Just lane)
 
--- | shutdownLanes: stop the reaper and close every lane.  Called on server
--- exit; harmless against lanes already dead.
+-- | shutdownLanes: latch the registry closed, stop the reaper, and stop
+-- every lane — waiting for a slot an in-flight request still holds rather
+-- than skipping it, or that request would restore a live child into a
+-- detached slot nobody will ever look at again (a Copilot round-3 catch).
+-- The wait is bounded in practice: the latch (set under the registry lock)
+-- refuses new requests, and the holder finishes within its own @--timeout@.
+-- In the shipped serial server no request can be in flight here at all, so
+-- the take never blocks; the wait is for embeddings that cancel a server
+-- while another thread is mid-request.  Harmless against lanes already dead,
+-- and idempotent.
 shutdownLanes :: InteractionLanes -> IO ()
 shutdownLanes il = do
   killThread (ilReaper il)
-  m <- modifyMVar (ilSlots il) (\m -> pure (Map.empty, m))
+  m <- modifyMVar (ilSlots il) $ \m -> do
+    writeIORef (ilClosed il) True
+    pure (Map.empty, m)
   mapM_ closeSlot (Map.elems m)
   where
     closeSlot slot = do
-      taken <- tryTakeMVar slot
-      case taken of
-        Just (Just lane) -> stopLane lane >> putMVar slot Nothing
-        Just Nothing     -> putMVar slot Nothing
-        Nothing          -> pure ()
+      held <- takeMVar slot
+      case held of
+        Just lane -> stopLane lane >> putMVar slot Nothing
+        Nothing   -> putMVar slot Nothing
 
 -- | stopLane: close stdin — Agda exits cleanly on EOF (probed: rc 0) — then
 -- make sure with the ladder.  'escalateAndReap' begins with SIGINT and always
@@ -576,6 +599,7 @@ data LaneEvent
   = LaneSpawnFailure   -- ^ The child could not be started.
   | LaneTimeout        -- ^ The request hit the bound; the child was killed.
   | LaneCrash          -- ^ The child exited or closed its pipes mid-request.
+  | LaneShutdown       -- ^ The registry is latched closed; nothing was run.
   deriving (Eq, Show)
 
 -- | LaneFailure: a structured lane-level failure.  The tool layer serializes
@@ -664,46 +688,63 @@ withLane il cfg root body = do
   -- its remaining budget, so a first request is bounded by @--timeout@ once,
   -- not once per phase (a Copilot review catch on PR 107).
   deadline <- newDeadline (agdaTimeout cfg)
-  slot <- modifyMVar (ilSlots il) $ \m ->
-    case Map.lookup root m of
-      Just s  -> pure (m, s)
-      Nothing -> do
-        s <- newMVar Nothing
-        pure (Map.insert root s m, s)
-  modifyMVar slot $ \held -> do
-    revived <- reviveOrSpawn deadline held
-    case revived of
-      Left failure -> pure (Nothing, Left failure)
-      Right (lane, spawned) -> do
-        sent     <- newIORef []
-        doomed   <- newIORef False
-        let lh = LaneHandle lane deadline sent spawned doomed
-        outcome <- try (body lh)
-        case outcome of
-          Left (e :: SomeException) -> do
-            stopLane lane
-            throwIO e
-          Right a -> do
-            isDoomed <- readIORef doomed
-            if isDoomed
-              then do
-                stopLane lane
-                pure (Nothing, Right a)
-              else do
-                monotonicSeconds >>= writeIORef (laneLastUse lane)
-                pure (Just lane, Right a)
+  -- The shutdown latch is read under the registry lock, so a request either
+  -- got its slot into the map 'shutdownLanes' will drain, or is refused here
+  -- before it can spawn anything (a Copilot round-3 catch).
+  mSlot <- modifyMVar (ilSlots il) $ \m -> do
+    closed <- readIORef (ilClosed il)
+    if closed then pure (m, Nothing) else
+      case Map.lookup root m of
+        Just s  -> pure (m, Just s)
+        Nothing -> do
+          s <- newMVar Nothing
+          pure (Map.insert root s m, Just s)
+  case mSlot of
+    Nothing -> pure . Left $ LaneFailure
+      { lfEvent      = LaneShutdown
+      , lfMessage    = "the server is shutting down; no interaction lane will be started"
+      , lfStderrTail = []
+      , lfSent       = []
+      }
+    Just slot -> modifyMVar slot $ \held -> do
+      revived <- reviveOrSpawn deadline held
+      case revived of
+        Left failure -> pure (Nothing, Left failure)
+        Right (lane, flushSent, spawned) -> do
+          -- A spawning call's echo starts with the startup flush it already
+          -- sent (newest first, as the handle stores them); a reviving or
+          -- reusing call starts empty.
+          sent   <- newIORef (reverse flushSent)
+          doomed <- newIORef False
+          let lh = LaneHandle lane deadline sent spawned doomed
+          outcome <- try (body lh)
+          case outcome of
+            Left (e :: SomeException) -> do
+              stopLane lane
+              throwIO e
+            Right a -> do
+              isDoomed <- readIORef doomed
+              if isDoomed
+                then do
+                  stopLane lane
+                  pure (Nothing, Right a)
+                else do
+                  monotonicSeconds >>= writeIORef (laneLastUse lane)
+                  pure (Just lane, Right a)
   where
     reviveOrSpawn deadline (Just lane) = do
       gone <- getProcessExitCode (laneProc lane)
       case gone of
-        Nothing -> pure (Right (lane, False))
+        Nothing -> pure (Right (lane, [], False))
         Just _  -> do
           -- Dead while idle: release its handles (no ladder — the child died
           -- an unknown time ago, see 'closeLaneHandles') and start afresh.
           closeLaneHandles lane
-          fmap (\l -> (l, True)) <$> spawnLane cfg root deadline
+          fmap (\(l, flushSent) -> (l, flushSent, True))
+            <$> spawnLane cfg root deadline
     reviveOrSpawn deadline Nothing =
-      fmap (\l -> (l, True)) <$> spawnLane cfg root deadline
+      fmap (\(l, flushSent) -> (l, flushSent, True))
+        <$> spawnLane cfg root deadline
 
 -- | spawnLane: start @agda --interaction-json@, wire up the stderr drainer,
 -- and flush the startup noise with one sentinel so no command's response
@@ -717,7 +758,9 @@ withLane il cfg root body = do
 -- shipped @--library-file=agda/libraries@ is exactly that), and the two lanes
 -- must resolve one file against one tree.  The root parameter keys the lane's
 -- registry slot and bookkeeping; it is not a chdir.
-spawnLane :: AgdaConfig -> FilePath -> Deadline -> IO (Either LaneFailure Lane)
+spawnLane
+  :: AgdaConfig -> FilePath -> Deadline
+  -> IO (Either LaneFailure (Lane, [Text]))
 spawnLane cfg root deadline = do
   started <- trySynchronous $ createProcess (proc (agdaBin cfg) ["--interaction-json"])
     { std_in  = CreatePipe
@@ -736,7 +779,13 @@ spawnLane cfg root deadline = do
       , lfStderrTail = []
       , lfSent       = []
       }
-    Right (Just hIn, Just hOut, Just hErr, ph) -> do
+    -- From here to the registry the child is owned by nobody: the setup runs
+    -- under 'mask' and the (interruptible) flush under 'onException'-cleanup,
+    -- so an exception at any point — asynchronous cancellation included —
+    -- stops the child instead of leaking a process no registry knows about
+    -- (a Copilot round-3 catch).  Asyncs still propagate; they are deferred
+    -- only across the non-blocking setup below.
+    Right (Just hIn, Just hOut, Just hErr, ph) -> mask $ \restore -> do
       hSetBinaryMode hOut True
       errTail <- newIORef []
       _ <- forkIO (drainStderr hErr errTail)
@@ -762,9 +811,10 @@ spawnLane cfg root deadline = do
       sent     <- newIORef []
       doomed   <- newIORef False
       let lh = LaneHandle lane deadline sent False doomed
-      flushed <- runCmdOn lh Nothing
+      flushed <- restore (runCmdOn lh Nothing) `onException` stopLane lane
+      flushSent <- laneSentLines lh
       case flushed of
-        Right _ -> pure (Right lane)
+        Right _ -> pure (Right (lane, flushSent))
         Left lf -> do
           stopLane lane
           pure . Left $ lf { lfEvent = LaneSpawnFailure }

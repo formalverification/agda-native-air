@@ -4733,16 +4733,22 @@ interactionWireTests = do
         r3 <- assertEqual "no code" Nothing (errorCodeOf "plain prose")
         pure (firstFailure [r1, r2, r3])
 
-    , runTest "pointContaining: containment decides, earliest wins, miss is Nothing" $ do
+    , runTest "pointContaining: line picks earliest; a column picks the exact hole" $ do
         let ps = [ IPoint 0 (Just (IRange 22 5 22 9))
-                 , IPoint 1 (Just (IRange 25 5 27 9))
-                 , IPoint 2 Nothing
+                 , IPoint 1 (Just (IRange 22 14 22 18))
+                 , IPoint 2 (Just (IRange 25 5 27 9))
+                 , IPoint 3 Nothing
                  ]
-        r1 <- assertEqual "line 22" (Just 0) (ipId <$> pointContaining 22 ps)
-        r2 <- assertEqual "line 26 (inside multi-line)" (Just 1)
-                (ipId <$> pointContaining 26 ps)
-        r3 <- assert "line 3 misses" (isNothing (pointContaining 3 ps))
-        pure (firstFailure [r1, r2, r3])
+        r1 <- assertEqual "line 22 alone -> earliest" (Just 0)
+                (ipId <$> pointContaining 22 Nothing ps)
+        r2 <- assertEqual "line 22 col 14 -> second hole" (Just 1)
+                (ipId <$> pointContaining 22 (Just 14) ps)
+        r3 <- assertEqual "end is exclusive" Nothing
+                (ipId <$> pointContaining 22 (Just 18) ps)
+        r4 <- assertEqual "line 26 (inside multi-line)" (Just 2)
+                (ipId <$> pointContaining 26 Nothing ps)
+        r5 <- assert "line 3 misses" (isNothing (pointContaining 3 Nothing ps))
+        pure (firstFailure [r1, r2, r3, r4, r5])
     ]
 
 -- | firstFailure: fold sub-assertions into one result, first failure wins.
@@ -4774,6 +4780,7 @@ interactionLaneTests cfg repoRoot = do
                { rnpFilePath = fx "ScopeAmbiguous.agda"
                , rnpName     = "amb"
                , rnpLine     = Nothing
+               , rnpColumn   = Nothing
                , rnpReload   = False
                }
         case r of
@@ -4796,6 +4803,7 @@ interactionLaneTests cfg repoRoot = do
                { topFilePath = fx "TwoHoles.agda"
                , topExpr     = "implicitOnly {3}"
                , topLine     = Nothing
+               , topColumn   = Nothing
                , topReload   = False
                }
         case r of
@@ -4811,6 +4819,7 @@ interactionLaneTests cfg repoRoot = do
                { dopFilePath = fx "ReexportUse.agda"
                , dopName     = "originalName"
                , dopLine     = Nothing
+               , dopColumn   = Nothing
                , dopReload   = False
                }
         case r of
@@ -4829,6 +4838,7 @@ interactionLaneTests cfg repoRoot = do
                { nomFilePath = fx "TwoHoles.agda"
                , nomExpr     = "implicitOnly {suc 1}"
                , nomLine     = Nothing
+               , nomColumn   = Nothing
                , nomReload   = False
                }
         case r of
@@ -4897,6 +4907,7 @@ interactionLaneTests cfg repoRoot = do
                { topFilePath = fx "TwoHoles.agda"
                , topExpr     = "Nat Nat"
                , topLine     = Nothing
+               , topColumn   = Nothing
                , topReload   = False
                }
         a <- case r of
@@ -4910,6 +4921,7 @@ interactionLaneTests cfg repoRoot = do
                { topFilePath = fx "TwoHoles.agda"
                , topExpr     = "g"
                , topLine     = Nothing
+               , topColumn   = Nothing
                , topReload   = False
                }
         b <- case r2 of
@@ -4923,7 +4935,7 @@ interactionLaneTests cfg repoRoot = do
         TIO.writeFile file
           "module LaneLocal where\nopen import Agda.Builtin.Nat\nf : Nat -> Nat -> Nat\nf x y = {!!}\n"
         r <- handleResolveName lanes cfg ResolveNameParams
-               { rnpFilePath = file, rnpName = "x", rnpLine = Just 4, rnpReload = False }
+               { rnpFilePath = file, rnpName = "x", rnpLine = Just 4, rnpColumn = Nothing, rnpReload = False }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -4940,14 +4952,14 @@ interactionLaneTests cfg repoRoot = do
           "module LaneStale where\nopen import Agda.Builtin.Nat\nf : Nat\nf = zero\n"
         r1 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "f", topLine = Nothing
-                , topReload = False }
+                , topColumn = Nothing, topReload = False }
         a <- case r1 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "first load" "first"
             (lchLoad (lmLane (torMeta res)))
         r2 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "f", topLine = Nothing
-                , topReload = False }
+                , topColumn = Nothing, topReload = False }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "unchanged is reused" "reused"
@@ -4955,7 +4967,7 @@ interactionLaneTests cfg repoRoot = do
         TIO.appendFile file "extra : Nat\nextra = suc zero\n"
         r3 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "extra", topLine = Nothing
-                , topReload = False }
+                , topColumn = Nothing, topReload = False }
         c <- case r3 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -4967,7 +4979,7 @@ interactionLaneTests cfg repoRoot = do
         -- Copilot round).
         r4 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "extra", topLine = Nothing
-                , topReload = True }
+                , topColumn = Nothing, topReload = True }
         d <- case r4 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -4991,7 +5003,7 @@ interactionLaneTests cfg repoRoot = do
           "module LaneBroken where\nopen import Agda.Builtin.Nat\nbad : Nat\nbad = Nat\n"
         r <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = file, topExpr = "zero", topLine = Nothing
-               , topReload = False }
+               , topColumn = Nothing, topReload = False }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -5011,6 +5023,7 @@ interactionLaneTests cfg repoRoot = do
                { rnpFilePath = fx "ScopeAmbiguousComplete.agda"
                , rnpName     = "amb"
                , rnpLine     = Nothing
+               , rnpColumn   = Nothing
                , rnpReload   = False
                }
         case r of
@@ -5030,6 +5043,7 @@ interactionLaneTests cfg repoRoot = do
                { dopFilePath = fx "ScopeAmbiguousComplete.agda"
                , dopName     = "amb"
                , dopLine     = Nothing
+               , dopColumn   = Nothing
                , dopReload   = False
                }
         case r of
@@ -5040,6 +5054,81 @@ interactionLaneTests cfg repoRoot = do
                     (sort (map dsLine (dorDefinitions res)))
             pure (firstFailure [r1, r2])
 
+    , -- Two holes on one line, different scopes (Copilot round 3): the
+      -- column decides which goal answers; the columns come from the
+      -- lexical scan, whose agreement with Agda's points the parity test
+      -- pins.
+      runTest "resolve_name: a column distinguishes two goals sharing a line" $ do
+        src <- TIO.readFile (fx "SameLineScopes.agda")
+        case findHoles (flavourOf (fx "SameLineScopes.agda")) src of
+          [h0, h1] -> do
+            let ask col = handleResolveName lanes cfg ResolveNameParams
+                  { rnpFilePath = fx "SameLineScopes.agda"
+                  , rnpName     = "m"
+                  , rnpLine     = Just (hsLine h0)
+                  , rnpColumn   = Just col
+                  , rnpReload   = False
+                  }
+            rIn <- ask (hsCol h0)
+            a <- case rIn of
+              Left err  -> pure (Fail $ T.unpack (failureText err))
+              Right res -> do
+                x <- assert "in the lambda's goal, m is in scope" (rnrInScope res)
+                y <- assert "scope names goal 0" ("goal 0" `T.isPrefixOf` rnrScope res)
+                pure (firstFailure [x, y])
+            rOut <- ask (hsCol h1)
+            b <- case rOut of
+              Left err  -> pure (Fail $ T.unpack (failureText err))
+              Right res -> do
+                x <- assert "in the argument's goal, m is not in scope"
+                       (not (rnrInScope res) && null (rnrCandidates res))
+                y <- assert "scope names goal 1" ("goal 1" `T.isPrefixOf` rnrScope res)
+                pure (firstFailure [x, y])
+            pure (firstFailure [a, b])
+          hs -> pure (Fail $ "expected two holes, found " <> show (length hs))
+
+    , -- The spawn flush is part of the call that spawned (Copilot round 3):
+      -- a spawned:true response's iotcm echo begins with the flush sentinel.
+      runTest "echo: a spawning call's iotcm includes the startup flush" $ do
+        freshLanes <- newInteractionLanes
+        r <- handleTypeOf freshLanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda"
+               , topExpr     = "g"
+               , topLine     = Nothing
+               , topColumn   = Nothing
+               , topReload   = False
+               }
+        shutdownLanes freshLanes
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            let lanes' = lmLane (torMeta res)
+                sentinels = length [ l | l <- lchIotcm lanes'
+                                       , "Cmd_show_version" `T.isInfixOf` l ]
+            x <- assert "spawned" (lchSpawned lanes')
+            y <- assertEqual "flush + load + query sentinels" 3 sentinels
+            pure (firstFailure [x, y])
+
+    , -- After shutdownLanes, a request is refused structurally rather than
+      -- spawning a child no registry would ever stop (Copilot round 3).
+      runTest "shutdown: a request after shutdownLanes is refused structurally" $ do
+        freshLanes <- newInteractionLanes
+        shutdownLanes freshLanes
+        r <- handleTypeOf freshLanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda"
+               , topExpr     = "g"
+               , topLine     = Nothing
+               , topColumn   = Nothing
+               , topReload   = False
+               }
+        case r of
+          Left (FailInteraction xf) -> do
+            x <- assertEqual "event" "shutdown" (xfEvent xf)
+            y <- assert "says so" ("shutting down" `T.isInfixOf` xfMessage xf)
+            pure (firstFailure [x, y])
+          Left other -> pure (Fail $ "wrong failure shape: " <> T.unpack (failureText other))
+          Right _    -> pure (Fail "unexpectedly ran after shutdown")
+
     , -- The revival path: a child that died while the lane sat idle is
       -- replaced silently on the next request (its handles closed, its
       -- ladder deliberately skipped — see closeLaneHandles).
@@ -5048,6 +5137,7 @@ interactionLaneTests cfg repoRoot = do
                 { topFilePath = fx "TwoHoles.agda"
                 , topExpr     = "g"
                 , topLine     = Nothing
+                , topColumn   = Nothing
                 , topReload   = False
                 }
         a <- case r1 of
@@ -5063,6 +5153,7 @@ interactionLaneTests cfg repoRoot = do
                     { topFilePath = fx "TwoHoles.agda"
                     , topExpr     = "h"
                     , topLine     = Nothing
+                    , topColumn   = Nothing
                     , topReload   = False
                     }
             case r2 of
@@ -5102,7 +5193,7 @@ interactionLaneTests cfg repoRoot = do
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgHang TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
-               , topReload = False }
+               , topColumn = Nothing, topReload = False }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
@@ -5126,7 +5217,7 @@ interactionLaneTests cfg repoRoot = do
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgHang TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
-               , topReload = False }
+               , topColumn = Nothing, topReload = False }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
@@ -5144,7 +5235,7 @@ interactionLaneTests cfg repoRoot = do
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgDie TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
-               , topReload = False }
+               , topColumn = Nothing, topReload = False }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) ->

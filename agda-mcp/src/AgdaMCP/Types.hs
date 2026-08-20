@@ -1433,20 +1433,37 @@ instance ToJSON DependenciesResult where
 -- the exact IOTCM lines sent, and the timings.
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- | scopeColumn: the optional column of a scoped live query, in either
+-- spelling — @column@, or @col@ as the hole listings print it, so a goal
+-- entry can be passed back unchanged.  Both at once is rejected, for the
+-- same reason 'parseHoleRef' rejects it: the two can disagree, and no
+-- handler should decide which was meant.
+scopeColumn :: Object -> Parser (Maybe Int)
+scopeColumn o = do
+  mColumn <- o .:? "column"
+  mCol    <- o .:? "col"
+  case (mColumn, mCol) of
+    (Just _, Just _) -> fail "give column or col, not both"
+    (Just c, _)      -> pure (Just c)
+    (_, mc)          -> pure mc
+
 -- | Parameters for the @type_of@ tool: infer the type of an expression in a
--- file's scope, no edit required.  @line@ optionally scopes the question to
--- the goal whose range contains that line, which is what makes local
--- variables visible to the query.
+-- file's scope, no edit required.  @line@ (optionally sharpened by a column)
+-- scopes the question to the goal whose range contains that position, which
+-- is what makes local variables visible to the query; the column decides
+-- between two goals sharing a line, whose scopes can differ.
 data TypeOfParams = TypeOfParams
   { topFilePath :: FilePath
   , topExpr     :: Text
   , topLine     :: Maybe Int
+  , topColumn   :: Maybe Int
   , topReload   :: Bool       -- ^ Force a fresh load (a changed dependency).
   } deriving (Eq, Show)
 
 instance FromJSON TypeOfParams where
   parseJSON = withObject "TypeOfParams" $ \o ->
     TypeOfParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
+                 <*> scopeColumn o
                  <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @normalize@ tool: evaluate an expression to normal
@@ -1455,12 +1472,14 @@ data NormalizeParams = NormalizeParams
   { nomFilePath :: FilePath
   , nomExpr     :: Text
   , nomLine     :: Maybe Int
+  , nomColumn   :: Maybe Int
   , nomReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON NormalizeParams where
   parseJSON = withObject "NormalizeParams" $ \o ->
     NormalizeParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
+                    <*> scopeColumn o
                     <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @resolve_name@ tool: what does this name resolve to
@@ -1472,12 +1491,14 @@ data ResolveNameParams = ResolveNameParams
   { rnpFilePath :: FilePath
   , rnpName     :: Text
   , rnpLine     :: Maybe Int
+  , rnpColumn   :: Maybe Int
   , rnpReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON ResolveNameParams where
   parseJSON = withObject "ResolveNameParams" $ \o ->
     ResolveNameParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
+                      <*> scopeColumn o
                       <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @definition_of@ tool: where is this name defined?
@@ -1485,12 +1506,14 @@ data DefinitionOfParams = DefinitionOfParams
   { dopFilePath :: FilePath
   , dopName     :: Text
   , dopLine     :: Maybe Int
+  , dopColumn   :: Maybe Int
   , dopReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON DefinitionOfParams where
   parseJSON = withObject "DefinitionOfParams" $ \o ->
     DefinitionOfParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
+                       <*> scopeColumn o
                        <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @exports_of@ tool: the public surface of a module, as

@@ -175,6 +175,7 @@ eventText :: LaneEvent -> Text
 eventText LaneSpawnFailure = "spawn-failure"
 eventText LaneTimeout      = "timeout"
 eventText LaneCrash        = "crash"
+eventText LaneShutdown     = "shutdown"
 
 -- | laneCommandEcho: the child's invocation.  The per-file flags ride each
 -- Cmd_load rather than the process argv (design document § 3), which is why
@@ -238,15 +239,20 @@ loadError msg = LiveError
 -- | QueryScope: where a query runs, plus the text the response reports.
 data QueryScope = AtGoal Int | Toplevel
 
-scopeFor :: Maybe Int -> LoadReport -> (QueryScope, Text)
-scopeFor mLine lr = case (mLine, lrOutcome lr) of
+scopeFor :: Maybe Int -> Maybe Int -> LoadReport -> (QueryScope, Text)
+scopeFor mLine mCol lr = case (mLine, lrOutcome lr) of
   (Just ln, Right li)
-    | Just p <- pointContaining ln (liPoints li) ->
+    | Just p <- pointContaining ln mCol (liPoints li) ->
         ( AtGoal (ipId p)
-        , "goal " <> T.pack (show (ipId p)) <> " (line " <> T.pack (show ln) <> ")"
+        , "goal " <> T.pack (show (ipId p)) <> " (line " <> T.pack (show ln)
+          <> maybe "" ((", column " <>) . T.pack . show) mCol <> ")"
         )
     | otherwise ->
-        (Toplevel, "toplevel (line " <> T.pack (show ln) <> " is inside no goal)")
+        ( Toplevel
+        , "toplevel (line " <> T.pack (show ln)
+          <> maybe "" ((", column " <>) . T.pack . show) mCol
+          <> " is inside no goal)"
+        )
   _ -> (Toplevel, "toplevel")
 
 -- | runShaped: send one query and shape its responses, converting a lane
@@ -376,7 +382,7 @@ handleTypeOf lanes cfg0 p =
         pure . Right $ TypeOfResult (topExpr p) "toplevel"
           Nothing (Just (loadError loadMsg)) meta
       Right _ -> do
-        let (scope, scopeTxt) = scopeFor (topLine p) (lcLoad ctx)
+        let (scope, scopeTxt) = scopeFor (topLine p) (topColumn p) (lcLoad ctx)
             cmd = case scope of
               AtGoal g -> cmdInferAtGoal g (topExpr p)
               Toplevel -> cmdInferToplevel (topExpr p)
@@ -430,7 +436,7 @@ handleNormalize lanes cfg0 p =
         pure . Right $ NormalizeResult (nomExpr p) "toplevel"
           Nothing (Just (loadError loadMsg)) meta
       Right _ -> do
-        let (scope, scopeTxt) = scopeFor (nomLine p) (lcLoad ctx)
+        let (scope, scopeTxt) = scopeFor (nomLine p) (nomColumn p) (lcLoad ctx)
             cmd = case scope of
               AtGoal g -> cmdComputeAtGoal g (nomExpr p)
               Toplevel -> cmdComputeToplevel (nomExpr p)
@@ -467,10 +473,10 @@ data Resolution = Resolution
 -- every candidate's binding site, or whose did-you-mean suggestions are each
 -- re-resolved for their chains.
 resolveMachinery
-  :: LiveCtx -> Text -> Maybe Int
+  :: LiveCtx -> Text -> Maybe Int -> Maybe Int
   -> IO (Either ToolFailure Resolution)
-resolveMachinery ctx name mLine = do
-  let (scope, scopeTxt) = scopeFor mLine (lcLoad ctx)
+resolveMachinery ctx name mLine mCol = do
+  let (scope, scopeTxt) = scopeFor mLine mCol (lcLoad ctx)
       whyCmd n = case scope of
         AtGoal g -> cmdWhyInScopeAtGoal g n
         Toplevel -> cmdWhyInScopeToplevel n
@@ -548,7 +554,7 @@ handleResolveName lanes cfg0 p =
         pure . Right $ ResolveNameResult (rnpName p) "toplevel" False []
           Nothing (Just (loadError loadMsg)) meta
       Right _ -> do
-        resolved <- resolveMachinery ctx (rnpName p) (rnpLine p)
+        resolved <- resolveMachinery ctx (rnpName p) (rnpLine p) (rnpColumn p)
         case resolved of
           Left tf  -> pure (Left tf)
           Right res -> do
@@ -577,7 +583,7 @@ handleDefinitionOf lanes cfg0 p =
         pure . Right $ DefinitionOfResult (dopName p) "toplevel" [] []
           Nothing (Just (loadError loadMsg)) meta
       Right _ -> do
-        resolved <- resolveMachinery ctx (dopName p) (dopLine p)
+        resolved <- resolveMachinery ctx (dopName p) (dopLine p) (dopColumn p)
         case resolved of
           Left tf  -> pure (Left tf)
           Right res -> do
