@@ -67,6 +67,8 @@
 module AgdaMCP.Diagnostics
   ( -- * Parsing Agda's output
     parseDiagnostics
+    -- * Enrichment from a warm interaction lane
+  , attachUnsolvedMetas
     -- * Bounding the payload
   , capDiagnostics
   , defaultMaxDiagnostics
@@ -90,7 +92,7 @@ import qualified Data.Text as T
 
 import AgdaMCP.Types
   ( DiagRange (..), DiagSeverity (..), Diagnostic (..), Involved (..)
-  , noInvolved
+  , InvolvedMeta (..), noInvolved
   )
 
 
@@ -153,6 +155,61 @@ maxMessageLines = 24
 -- normalized type can be thousands of characters).
 maxMessageChars :: Int
 maxMessageChars = 2000
+
+
+-- ---------------------------------------------------------------------------
+-- Enrichment from a warm interaction lane (issue #115)
+-- ---------------------------------------------------------------------------
+
+-- | attachUnsolvedMetas: give the two unsolved-meta diagnostics the metas as
+-- data, alongside the prose they already carry.
+--
+-- The one payload of the § 5 corpus batch prose cannot deliver: Agda names its
+-- unsolved metas by location and never prints their types, while a load on the
+-- interaction lane lists each meta with its name, type, and range (measured in
+-- docs/agda-mcp-ask-agda-audit.md § 3).  The caller supplies them from a warm
+-- lane's stored load and nothing else — never by asking a lane anything, so no
+-- batch call pays a lane cost and no verdict is touched.  With an empty list
+-- this is the identity, which is what makes a cold or stale lane's response
+-- byte-identical to what the prose alone produced.
+--
+-- Three decisions, each stated because its alternative looks reasonable:
+--
+--   * Both subject codes get the whole list, not a range-matched slice.  Agda
+--     reports several unsolved metas in /one/ @[UnsolvedMetaVariables]@ whose
+--     header range names one site, so matching metas to a diagnostic by range
+--     would silently drop the metas at the others — and each meta carries its
+--     own range here, so a client that wants the correspondence can still make
+--     it.  The @[UnsolvedConstraints]@ sibling has no range at all and names
+--     the metas in its constraint text, which is precisely where their types
+--     are the missing half.
+--   * @[UnsolvedInteractionMetas]@ is not a subject code, though it is in the
+--     same 'unsolvedCodes' family for ordering: its subject is the file's open
+--     holes, which are the load's /visible/ goals and are already delivered as
+--     the hole listing's @goal@ fields (issue #108).  Its prose lists a
+--     different population than @invisibleGoals@ does, and attaching these
+--     metas to it would assert an involvement that is not there.
+--   * 'invMetaTypes' is left exactly as it was.  It is what Agda's own prose
+--     said, it is present whether or not a lane is warm, and a client reading
+--     it must keep working (issue #74's wire shape).  The structured metas are
+--     an addition beside it, never a replacement for it.
+attachUnsolvedMetas :: [InvolvedMeta] -> [Diagnostic] -> [Diagnostic]
+attachUnsolvedMetas []    ds = ds
+attachUnsolvedMetas metas ds = map attach ds
+  where
+    attach d
+      | Just c <- diagCode d, c `Set.member` unsolvedMetaCodes =
+          d { diagInvolved = (diagInvolved d) { invMetas = metas } }
+      | otherwise = d
+
+-- | The codes whose subject /is/ these metas: the two Agda reports them in.
+-- A subset of 'unsolvedCodes', which is about ordering and about how to read
+-- a body, and so also covers the open-hole class this payload skips.
+unsolvedMetaCodes :: Set.Set Text
+unsolvedMetaCodes = Set.fromList
+  [ "UnsolvedMetaVariables"
+  , "UnsolvedConstraints"
+  ]
 
 
 -- ---------------------------------------------------------------------------

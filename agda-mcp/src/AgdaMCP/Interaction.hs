@@ -91,11 +91,13 @@ module AgdaMCP.Interaction
   , IRange (..)
   , IPoint (..)
   , LaneGoal (..)
+  , LaneMeta (..)
   , stripPrompts
   , parseResponseLine
   , errorMessageOf
   , interactionPointsOf
   , goalsOf
+  , metasOf
   , goalInfoOf
   , GoalContext (..)
   , GoalCtxEntry (..)
@@ -210,6 +212,25 @@ data LaneGoal = LaneGoal
   , lgType  :: Text
   } deriving (Eq, Show)
 
+-- | LaneMeta: one /invisible/ goal from @AllGoalsWarnings@ — an unsolved
+-- metavariable Agda kept to itself instead of exposing as an interaction
+-- point: its name (@_n_4@), the type it was created at, and the range of the
+-- term that left it unsolved.  Batch prose names these metas by location only
+-- and their types not at all, so this is the one payload of the feedback
+-- document's § 5 corpus that the interaction protocol carries as data and the
+-- prose cannot carry at all (issue #115, measured in
+-- docs/agda-mcp-ask-agda-audit.md § 3).
+--
+-- Note the wire asymmetry with 'LaneGoal': a visible goal's @constraintObj@
+-- carries an integer @id@ (its interaction point), an invisible one a string
+-- @name@ (the meta's), so the two arrays need separate readers even though
+-- they ride one response.
+data LaneMeta = LaneMeta
+  { lmetaName  :: Text
+  , lmetaRange :: Maybe IRange
+  , lmetaType  :: Text
+  } deriving (Eq, Show)
+
 -- | stripPrompts: remove every leading @JSON> @ marker from a line.
 --
 -- The marker is printed by the child's reader thread as it consumes input,
@@ -273,19 +294,46 @@ interactionPointsOf rs = listToMaybe [ps | IInteractionPoints ps <- rs]
 -- | goalsOf: the visible goals of the last @AllGoalsWarnings@ in a collection;
 -- i.e., each goal's interaction point and printed type.
 goalsOf :: [IResponse] -> [LaneGoal]
-goalsOf rs = case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
-  [] -> []
-  os -> goalsFrom (last os)
-  where
-    goalsFrom io = case KM.lookup "visibleGoals" io of
-      Just (Array a) -> mapMaybe goalFrom (V.toList a)
+goalsOf = goalArrayOf "visibleGoals" $ \g c -> do
+  i <- intField "id" c
+  pure (LaneGoal i (rangeField c) (fromMaybe "" (textField "type" g)))
+
+-- | metasOf: the /invisible/ goals of the same response — the load's unsolved
+-- metavariables, each with its name, type, and range (issue #115).  A load
+-- that left metas behind is still a successful load on this lane (it announces
+-- interaction points, so 'classifyLoad' answers 'Right'), which is exactly why
+-- these are knowledge and never a verdict: batch @agda@ exits 42 on the same
+-- file, and that exit code stays the only verdict.
+metasOf :: [IResponse] -> [LaneMeta]
+metasOf = goalArrayOf "invisibleGoals" $ \g c -> do
+  n <- textField "name" c
+  pure (LaneMeta n (rangeField c) (fromMaybe "" (textField "type" g)))
+
+-- | goalArrayOf: one goal array of the /last/ @AllGoalsWarnings@ in a
+-- collection, read by the given entry reader.
+--
+-- The reader is handed both objects an entry is split across: the entry itself,
+-- which carries @type@, and its @constraintObj@, which carries the identity
+-- (@id@ for a visible goal, @name@ for an invisible one) and the range.  An
+-- entry the reader declines is dropped, so a wire change costs that entry
+-- rather than the whole list.  The last such response wins: a collection can
+-- hold the load's own plus a later command's, and the latest describes the
+-- current state.
+goalArrayOf
+  :: Text
+  -> (KM.KeyMap Value -> KM.KeyMap Value -> Maybe a)
+  -> [IResponse] -> [a]
+goalArrayOf field reader rs =
+  case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
+    [] -> []
+    os -> case KM.lookup (Key.fromText field) (last os) of
+      Just (Array a) -> mapMaybe entry (V.toList a)
       _              -> []
-    goalFrom (Object g) = case KM.lookup "constraintObj" g of
-      Just (Object c) -> do
-        i <- intField "id" c
-        pure (LaneGoal i (rangeField c) (fromMaybe "" (textField "type" g)))
-      _ -> Nothing
-    goalFrom _ = Nothing
+  where
+    entry (Object g) = case KM.lookup "constraintObj" g of
+      Just (Object c) -> reader g c
+      _               -> Nothing
+    entry _ = Nothing
 
 -- | goalInfoOf: the @goalInfo@ object of a @GoalSpecific@ response; this is where
 -- goal-scoped answers (inferred types, goal contexts) live.
@@ -488,14 +536,17 @@ data FileStamp = FileStamp UTCTime Integer Word64
   deriving (Eq, Show)
 
 -- | LoadedInfo: what a successful load leaves behind — the interaction
--- points, each visible goal's type, and the module name Agda announced for
--- the file (its @Checking@ progress line; absent when the load reused an
--- interface, but a stored name persists across later 'LoadReused' requests,
--- so a lane often knows the name even when the batch lane's single run
--- would not — issue #100's preference for Agda's own answer).
+-- points, each visible goal's type, each unsolved meta's name and type
+-- (issue #115: the load's invisible goals, which no batch prose carries),
+-- and the module name Agda announced for the file (its @Checking@ progress
+-- line; absent when the load reused an interface, but a stored name persists
+-- across later 'LoadReused' requests, so a lane often knows the name even
+-- when the batch lane's single run would not — issue #100's preference for
+-- Agda's own answer).
 data LoadedInfo = LoadedInfo
   { liPoints :: [IPoint]
   , liGoals  :: [LaneGoal]
+  , liMetas  :: [LaneMeta]
   , liModule :: Maybe Text
   } deriving (Eq, Show)
 
@@ -1125,7 +1176,7 @@ ensureLoaded lh force path flags = do
 -- load that produced neither is reported as such rather than guessed at.
 classifyLoad :: FilePath -> [IResponse] -> Either Text LoadedInfo
 classifyLoad path rs = case interactionPointsOf rs of
-  Just ps -> Right (LoadedInfo ps (goalsOf rs) announcedModule)
+  Just ps -> Right (LoadedInfo ps (goalsOf rs) (metasOf rs) announcedModule)
   Nothing -> Left $ case mapMaybe errorMessageOf rs of
     (msg : _) -> msg
     []        -> "agda reported neither interaction points nor an error while loading "
@@ -1138,22 +1189,27 @@ classifyLoad path rs = case interactionPointsOf rs of
       , equalFilePath announced path
       ]
 
--- | peekLoadedGoals: the goal types a root's lane already holds for a file,
--- when — and only when — its recorded load still describes the file's
--- current bytes.  Never spawns, loads, or blocks: a busy slot, a missing
--- lane, another current file, a changed stamp, or a failed load all answer
--- 'Nothing'.  This is what lets the batch tools fill their hole listings'
--- @goal@ fields for free after live queries warmed the lane (issue #108),
--- without a batch call ever paying an interaction-lane cost — the two-lane
--- cost model stays intact.  Child liveness is deliberately not probed: the
--- goals describe bytes, not a process, and a dead child's last load is
--- still true of an unchanged file.  The flags must match too: 'ensureLoaded'
--- treats changed effective flags as grounds to re-load, so a peek that
--- ignored them could vouch for goals loaded under a configuration the
--- caller no longer runs with (a Copilot catch on the PR 110 review).
+-- | peekLoadedGoals: what a root's lane already knows about a file, when —
+-- and only when — its recorded load still describes the file's current bytes.
+-- Never spawns, loads, or blocks: a busy slot, a missing lane, another current
+-- file, a changed stamp, or a failed load all answer 'Nothing'.  This is what
+-- lets the batch tools fill their hole listings' @goal@ fields for free after
+-- live queries warmed the lane (issue #108) and, from the same peek, hand the
+-- unsolved-meta diagnostics each meta's name and type (issue #115) — without a
+-- batch call ever paying an interaction-lane cost, so the two-lane cost model
+-- stays intact.  \"Goals\" is Agda's own vocabulary here, and the answer is the
+-- whole stored 'LoadedInfo': one @AllGoalsWarnings@ carries the file's visible
+-- goals and its invisible metas together, so one peek vouches for both and a
+-- second enrichment costs no second stamp read.  Child liveness is
+-- deliberately not probed: the goals describe bytes, not a process, and a
+-- dead child's last load is still true of an unchanged file.  The flags must
+-- match too: 'ensureLoaded' treats changed effective flags as grounds to
+-- re-load, so a peek that ignored them could vouch for goals loaded under a
+-- configuration the caller no longer runs with (a Copilot catch on the PR 110
+-- review).
 peekLoadedGoals
   :: InteractionLanes -> FilePath -> FilePath -> [String]
-  -> IO (Maybe [LaneGoal])
+  -> IO (Maybe LoadedInfo)
 peekLoadedGoals il root path flags = do
   m <- readMVar (ilSlots il)
   case Map.lookup root m of
@@ -1180,7 +1236,7 @@ peekLoadedGoals il root path flags = do
               , Right li <- lsOutcome ls -> do
                   stamp <- stampOf path
                   pure $ if stamp /= Nothing && stamp == lsStamp ls
-                           then Just (liGoals li)
+                           then Just li
                            else Nothing
             _ -> pure Nothing
 
