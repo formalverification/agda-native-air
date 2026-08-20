@@ -79,7 +79,7 @@ module AgdaMCP.Agda
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
   (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, tryPutMVar)
-import Control.Exception (SomeException, bracket, catch, try)
+import Control.Exception (IOException, SomeException, bracket, catch, try)
 import Control.Monad (void, when)
 import qualified Data.ByteString as BS
 import Data.Maybe (listToMaybe)
@@ -348,8 +348,8 @@ runCommand cfg bin args mCwd = do
 commandEchoFor :: FilePath -> [String] -> Maybe FilePath -> IO CommandEcho
 commandEchoFor bin args mCwd = do
   mResolved <- findExecutable bin
-    `catch` \(_ :: SomeException) -> pure Nothing
-  inherited <- getCurrentDirectory `catch` \(_ :: SomeException) -> pure "."
+    `catch` \(_ :: IOException) -> pure Nothing
+  inherited <- getCurrentDirectory `catch` \(_ :: IOException) -> pure "."
   pure CommandEcho
     { ceBinary = maybe bin id mResolved
     , ceArgs   = args
@@ -572,7 +572,7 @@ groupAlive :: Maybe Pid -> IO Bool
 groupAlive Nothing     = pure False
 groupAlive (Just pgid) =
   (signalProcessGroup nullSignal pgid >> pure True)
-    `catch` \(_ :: SomeException) -> pure False
+    `catch` \(_ :: IOException) -> pure False
 
 -- | waitGroupGone: wait (bounded) for the child's process group to empty;
 -- True iff it did.  This polls, which the module otherwise avoids on latency
@@ -652,9 +652,13 @@ takeMVarWithin micros var = do
 
 -- | ignoringIOErrors: best-effort signalling.  A process that has already exited
 -- makes 'terminateProcess' / 'interruptProcessGroupOf' fail, which is not an
--- error we need to surface.
+-- error we need to surface.  Exactly 'IOException's — which every process and
+-- signal primitive here throws — so an asynchronous cancellation arriving
+-- mid-cleanup still reaches the caller instead of being eaten (the PR 107
+-- round-2 family; this helper predates that branch and had the same blanket
+-- catch).
 ignoringIOErrors :: IO () -> IO ()
-ignoringIOErrors act = act `catch` \(_ :: SomeException) -> pure ()
+ignoringIOErrors act = act `catch` \(_ :: IOException) -> pure ()
 
 -- | timeoutMessage: the human-readable explanation attached to a timed-out tool
 -- response.  Names the bound that was hit and what to do about it, since the

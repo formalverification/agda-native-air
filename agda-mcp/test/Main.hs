@@ -4851,6 +4851,35 @@ interactionLaneTests cfg repoRoot = do
             (map exName <$> exrExports res)
         pure (firstFailure [a, b])
 
+    , -- The two member kinds of a module surface (Copilot round 2): value
+      -- members from the wire's contents, nested modules from its names —
+      -- a reader of contents alone under-reports the surface — and a
+      -- parameterized module's types carry their binders folded in.
+      runTest "exports_of: nested modules and folded-in binders are both reported" $ do
+        r1 <- handleExportsOf lanes cfg ExportsOfParams
+                { eopFilePath = fx "ExportSurfaces.agda", eopModule = "Inner"
+                , eopReload = False }
+        a <- case r1 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            x <- assertEqual "value members" (Just ["val"])
+                   (map exName <$> exrExports res)
+            y <- assertEqual "nested modules" (Just ["Nested"]) (exrModules res)
+            pure (firstFailure [x, y])
+        r2 <- handleExportsOf lanes cfg ExportsOfParams
+                { eopFilePath = fx "ExportSurfaces.agda", eopModule = "Param"
+                , eopReload = False }
+        b <- case r2 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            x <- assert "binders folded into the member type"
+                   (maybe False (any (("(A : Set)" `T.isInfixOf`) . exTerm))
+                          (exrExports res))
+            y <- assert "no telescope observed under 2.8.0"
+                   (isNothing (exrTelescope res))
+            pure (firstFailure [x, y])
+        pure (firstFailure [a, b])
+
     , runTest "exports_of: a module the file's scope cannot name errors in band" $ do
         r <- handleExportsOf lanes cfg ExportsOfParams
                { eopFilePath = fx "ReexportUse.agda", eopModule = "Agda.Builtin.Bool", eopReload = False }
@@ -5080,7 +5109,13 @@ interactionLaneTests cfg repoRoot = do
             r1 <- assertEqual "event" "spawn-failure" (xfEvent xf)
             r2 <- assert "names the timeout"
                     ("timed out" `T.isInfixOf` xfMessage xf)
-            pure (firstFailure [r1, r2])
+            -- The startup flush's telemetry is real, not fabricated zeros
+            -- (Copilot round 2): the sentinel it sent is echoed, and the
+            -- elapsed time covers the wait for the bound.
+            r3 <- assert "echoes the attempted sentinel"
+                    (any ("Cmd_show_version" `T.isInfixOf`) (xfIotcm xf))
+            r4 <- assert "carries real elapsed time" (xfElapsedMs xf > 0)
+            pure (firstFailure [r1, r2, r3, r4])
           Left other -> pure (Fail $ "wrong failure shape: " <> T.unpack (failureText other))
           Right _    -> pure (Fail "unexpectedly succeeded")
 

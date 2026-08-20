@@ -546,8 +546,23 @@ monotonicSeconds = do
   ns <- getMonotonicTimeNSec
   pure (fromIntegral (ns `div` 1_000_000_000))
 
+-- | ignoringIOErrors: best-effort cleanup — exactly 'IOException's, which is
+-- what the name says.  A blanket @SomeException@ here would also swallow the
+-- asynchronous cancellation a shutting-down server delivers, and cleanup
+-- that eats its caller's kill leaves the server running (the round-2 Copilot
+-- family on PR 107).
 ignoringIOErrors :: IO () -> IO ()
-ignoringIOErrors act = act `catch` \(_ :: SomeException) -> pure ()
+ignoringIOErrors act = act `catch` \(_ :: IOException) -> pure ()
+
+-- | trySynchronous: 'try' that lets asynchronous exceptions fly.  For the
+-- spawn path: a 'ThreadKilled' landing during 'createProcess' is the
+-- server's shutdown, not a spawn failure to classify.
+trySynchronous :: IO a -> IO (Either SomeException a)
+trySynchronous act = try act >>= either sift (pure . Right)
+  where
+    sift e = case fromException e of
+      Just (a :: AsyncException) -> throwIO a
+      Nothing                    -> pure (Left e)
 
 
 -- ---------------------------------------------------------------------------
@@ -570,6 +585,9 @@ data LaneFailure = LaneFailure
   { lfEvent      :: LaneEvent
   , lfMessage    :: Text
   , lfStderrTail :: [Text]   -- ^ Newest first, bounded.
+  , lfSent       :: [Text]   -- ^ The IOTCM lines the failing request had
+                             --   attempted, oldest first — so a spawn-phase
+                             --   failure still echoes its wire trail.
   } deriving (Eq, Show)
 
 
@@ -701,7 +719,7 @@ withLane il cfg root body = do
 -- registry slot and bookkeeping; it is not a chdir.
 spawnLane :: AgdaConfig -> FilePath -> Deadline -> IO (Either LaneFailure Lane)
 spawnLane cfg root deadline = do
-  started <- try $ createProcess (proc (agdaBin cfg) ["--interaction-json"])
+  started <- trySynchronous $ createProcess (proc (agdaBin cfg) ["--interaction-json"])
     { std_in  = CreatePipe
     , std_out = CreatePipe
     , std_err = CreatePipe
@@ -716,6 +734,7 @@ spawnLane cfg root deadline = do
                        <> " --interaction-json in " <> T.pack root
                        <> ": " <> T.pack (show e)
       , lfStderrTail = []
+      , lfSent       = []
       }
     Right (Just hIn, Just hOut, Just hErr, ph) -> do
       hSetBinaryMode hOut True
@@ -753,6 +772,7 @@ spawnLane cfg root deadline = do
       { lfEvent      = LaneSpawnFailure
       , lfMessage    = "could not open the interaction child's pipes"
       , lfStderrTail = []
+      , lfSent       = []
       }
 
 -- | drainStderr: keep the last lines of the child's stderr for crash
@@ -760,7 +780,7 @@ spawnLane cfg root deadline = do
 -- down is exactly what a 'LaneCrash' needs to carry.
 drainStderr :: Handle -> IORef [Text] -> IO ()
 drainStderr h ref = do
-  loop `catch` \(_ :: SomeException) -> pure ()
+  loop `catch` \(_ :: IOException) -> pure ()
   ignoringIOErrors (hClose h)
   where
     keep = 40
@@ -834,10 +854,12 @@ doomWith lh event msg = do
   writeIORef (lhDoomed lh) True
   stopLane (lhLane lh)
   errs <- readIORef (laneErrTail (lhLane lh))
+  sent <- laneSentLines lh
   pure . Left $ LaneFailure
     { lfEvent      = event
     , lfMessage    = msg
     , lfStderrTail = take 10 errs
+    , lfSent       = sent
     }
 
 data ReadEnd = ReadTimedOut | ReadEOF
@@ -975,8 +997,8 @@ stampOf :: FilePath -> IO (Maybe FileStamp)
 stampOf path = do
   r <- try $ FileStamp <$> getModificationTime path <*> getFileSize path
   pure $ case r of
-    Left (_ :: SomeException) -> Nothing
-    Right s                   -> Just s
+    Left (_ :: IOException) -> Nothing
+    Right s                 -> Just s
 
 elapsedMsBetween :: Word64 -> Word64 -> Int
 elapsedMsBetween start end =

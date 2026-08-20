@@ -358,9 +358,12 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           ["filePath", "name"]
 
       , toolDef "exports_of"
-          ("The public surface of a module: every exported name with its \
-           \type, as {exports: [{name, type}]} — so a barrel omission is \
-           \caught before compiling against it. The module is named FROM A \
+          ("The public surface of a module, both member kinds: exports \
+           \[{name, type}] lists the value members (a parameterized module's \
+           \types carry its binders folded in), and modules [name] lists the \
+           \exported nested modules — a datatype or record induces one — so \
+           \a barrel omission of either kind is caught before compiling \
+           \against it. The module is named FROM A \
            \FILE'S SCOPE: pass the module name as that file can write it \
            \(imported directly or through re-exports); a module the file's \
            \scope cannot name answers with an in-band NotInScope error. The \
@@ -371,6 +374,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "module"   "string"  "The module whose exports to list, as \
               \nameable in filePath's scope; \"\" for the file's own \
               \top-level module."
+          , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "module"]
       ]

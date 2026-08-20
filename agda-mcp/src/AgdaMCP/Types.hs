@@ -1727,18 +1727,31 @@ instance ToJSON DefinitionOfResult where
     <> liveMetaPairs (dorMeta r)
 
 -- | Result of @exports_of@.  Exactly one of @exports@ / @error@ is present.
+--
+-- A module's surface has two member kinds on the wire: value members
+-- (@contents@, here @exports@) and exported nested modules (@names@, here
+-- @modules@ — a datatype or record induces one, and @module M = N@ creates
+-- one), so a barrel that re-exports a module is not silently omitted.  The
+-- wire also carries a @telescope@; under the pinned Agda 2.8.0 it is empty
+-- in every probed shape — a parameterized module's binders arrive folded
+-- into each member's printed type instead — so it is passed through
+-- verbatim only if some future shape populates it, never dropped.
 data ExportsOfResult = ExportsOfResult
-  { exrModule  :: Text
-  , exrExports :: Maybe [ExportEntry]
-  , exrError   :: Maybe LiveError
-  , exrMeta    :: LiveMeta
+  { exrModule    :: Text
+  , exrExports   :: Maybe [ExportEntry]
+  , exrModules   :: Maybe [Text]
+  , exrTelescope :: Maybe Value
+  , exrError     :: Maybe LiveError
+  , exrMeta      :: LiveMeta
   } deriving (Eq, Show)
 
 instance ToJSON ExportsOfResult where
   toJSON r = object $
     [ "module" .= exrModule r ]
-    <> maybe [] (\es -> ["exports" .= es]) (exrExports r)
-    <> maybe [] (\e  -> ["error"   .= e]) (exrError r)
+    <> maybe [] (\es -> ["exports"   .= es]) (exrExports r)
+    <> maybe [] (\ms -> ["modules"   .= ms]) (exrModules r)
+    <> maybe [] (\tv -> ["telescope" .= tv]) (exrTelescope r)
+    <> maybe [] (\e  -> ["error"     .= e]) (exrError r)
     <> liveMetaPairs (exrMeta r)
 
 -- | InteractionFailure: the interaction lane's process failed this call — it

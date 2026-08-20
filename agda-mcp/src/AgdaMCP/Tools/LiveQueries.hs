@@ -61,7 +61,7 @@ module AgdaMCP.Tools.LiveQueries
   , defSiteFrom
   ) where
 
-import Control.Exception (SomeException, catch)
+import Control.Exception (IOException, catch)
 import Data.Aeson (Value (..))
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
@@ -126,7 +126,7 @@ withLiveFile lanes cfg0 requested reload body =
             Right lr ->
               body (LiveCtx lh absPath lr pc cfg startNs)
         case outcome of
-          Left lf      -> Left . FailInteraction <$> spawnFailure pc cfg lf
+          Left lf      -> Left . FailInteraction <$> spawnFailure pc cfg startNs lf
           Right result -> pure result
 
 -- | laneFailure: shape a mid-request lane failure, with everything the call
@@ -149,18 +149,24 @@ laneFailure lh pc cfg startNs lf = do
     , xfProject    = pc
     }
 
--- | spawnFailure: as 'laneFailure', for a child that never came up — there is
--- no handle to read wire lines from.
-spawnFailure :: ProjectContext -> AgdaConfig -> LaneFailure -> IO InteractionFailure
-spawnFailure pc cfg lf = do
-  echo <- laneCommandEcho cfg
+-- | spawnFailure: as 'laneFailure', for a child that never came up.  The
+-- failure still carries real telemetry: the elapsed time from the request's
+-- own start, and the wire lines the startup flush attempted ('lfSent' —
+-- empty only when the process could not be created at all), so a hung
+-- startup is not reported with fabricated zeros (a Copilot round-2 catch).
+spawnFailure
+  :: ProjectContext -> AgdaConfig -> Word64 -> LaneFailure
+  -> IO InteractionFailure
+spawnFailure pc cfg startNs lf = do
+  echo  <- laneCommandEcho cfg
+  endNs <- getMonotonicTimeNSec
   pure InteractionFailure
     { xfEvent      = eventText (lfEvent lf)
     , xfMessage    = lfMessage lf
     , xfStderrTail = lfStderrTail lf
-    , xfElapsedMs  = 0
+    , xfElapsedMs  = fromIntegral ((endNs - startNs) `div` 1_000_000)
     , xfRoot       = pcRoot pc
-    , xfIotcm      = []
+    , xfIotcm      = lfSent lf
     , xfCommand    = echo
     , xfProject    = pc
     }
@@ -177,7 +183,7 @@ eventText LaneCrash        = "crash"
 -- flags resolve identically in both lanes — and that is the cwd echoed.
 laneCommandEcho :: AgdaConfig -> IO CommandEcho
 laneCommandEcho cfg = do
-  cwd <- getCurrentDirectory `catch` \(_ :: SomeException) -> pure "."
+  cwd <- getCurrentDirectory `catch` \(_ :: IOException) -> pure "."
   pure CommandEcho
     { ceBinary = agdaBin cfg
     , ceArgs   = ["--interaction-json"]
@@ -289,17 +295,30 @@ whyInScopeMessageOf rs = listToMaybe
   [ m | IDisplayInfo "WhyInScope" (Object io) <- rs
       , Just m <- [textOf "message" io] ]
 
--- | moduleExportsOf: the entries of a @ModuleContents@ answer.
-moduleExportsOf :: [IResponse] -> Maybe [ExportEntry]
-moduleExportsOf rs = listToMaybe
-  [ mapMaybe entryFrom (V.toList a)
+-- | moduleSurfaceOf: the full surface of a @ModuleContents@ answer — the
+-- value members (@contents@), the exported nested modules (@names@ — probed:
+-- a nested @module@ appears there and nowhere in @contents@), and the
+-- @telescope@ passed through verbatim when nonempty (never observed under
+-- 2.8.0, where a parameterized module's binders arrive folded into each
+-- member's type; carried so a future shape is not silently dropped).
+moduleSurfaceOf :: [IResponse] -> Maybe ([ExportEntry], [Text], Maybe Value)
+moduleSurfaceOf rs = listToMaybe
+  [ ( maybe [] entriesFrom (KM.lookup "contents" io)
+    , maybe [] namesFrom   (KM.lookup "names" io)
+    , case KM.lookup "telescope" io of
+        Just v@(Array a) | not (V.null a) -> Just v
+        _                                 -> Nothing
+    )
   | IDisplayInfo "ModuleContents" (Object io) <- rs
-  , Just (Array a) <- [KM.lookup "contents" io]
   ]
   where
-    entryFrom (Object e) =
+    entriesFrom (Array a) = mapMaybe entryFrom (V.toList a)
+    entriesFrom _         = []
+    entryFrom (Object e)  =
       ExportEntry <$> textOf "name" e <*> textOf "term" e
     entryFrom _ = Nothing
+    namesFrom (Array a) = [n | String n <- V.toList a]
+    namesFrom _         = []
 
 -- | queryError: the first Agda error among the responses, shaped in band.
 queryError :: Text -> [IResponse] -> Maybe LiveError
@@ -602,16 +621,19 @@ handleExportsOf lanes cfg0 p =
       Left loadMsg -> do
         meta <- liveMeta ctx
         pure . Right $ ExportsOfResult (eopModule p)
-          Nothing (Just (loadError loadMsg)) meta
+          Nothing Nothing Nothing (Just (loadError loadMsg)) meta
       Right _ ->
         runShaped ctx (cmdModuleContentsToplevel (eopModule p)) $ \resps -> do
           meta <- liveMeta ctx
+          let surface = moduleSurfaceOf resps
           pure . Right $ ExportsOfResult
-            { exrModule  = eopModule p
-            , exrExports = moduleExportsOf resps
-            , exrError   = case moduleExportsOf resps of
+            { exrModule    = eopModule p
+            , exrExports   = (\(es, _, _) -> es) <$> surface
+            , exrModules   = (\(_, ms, _) -> ms) <$> surface
+            , exrTelescope = (\(_, _, tv) -> tv) =<< surface
+            , exrError     = case surface of
                 Just _  -> Nothing
                 Nothing -> Just . fromMaybe (opaqueAnswer "module" resps) $
                   queryError "module" resps
-            , exrMeta    = meta
+            , exrMeta      = meta
             }
