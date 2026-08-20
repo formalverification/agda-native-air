@@ -708,8 +708,10 @@ parseCheckingLine raw = do
 -- somewhere in the source (issue #100).
 --
 -- It is a 'Maybe' because Agda does not always say.  A warm run prints nothing
--- at all, and a run that dies before type-checking starts — a parse error, a
--- header that does not match its file name, a timeout — never reaches the line.
+-- at all; a run that dies before type-checking starts — a parse error, a header
+-- that does not match its file name, a timeout — never reaches the line; and a
+-- client that puts @--trace-imports=0@ in its flags silences the line outright
+-- (measured: levels 1 and up print it, 0 prints nothing).
 -- The caller falls back to the name the source /declares/, which is exactly the
 -- answer those cases call for: what the file claims to be is the diagnosis when
 -- Agda will not accept the claim.  A run may also announce several modules (its
