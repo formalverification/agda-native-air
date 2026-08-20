@@ -5,7 +5,7 @@
 
 module FixtureStdlibBooleanAlgebraMinimal where
 
--- AgdaDojang reporting macro used by agent_bridge / eval_fixtures:
+-- AgdaDojang reporting macro used by eval_fixtures:
 open import AgdaDojang.Debug using (reportGoalCtx)
 open import Data.Bool.Properties using (∨-∧-booleanAlgebra)
 open import Algebra.Lattice.Bundles using (BooleanAlgebra)

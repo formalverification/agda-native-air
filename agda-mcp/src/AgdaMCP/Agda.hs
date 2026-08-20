@@ -15,9 +15,13 @@
 --
 --   Hole enumeration and splicing live in AgdaMCP.Holes (issues #71/#73).
 --
---   It is a Haskell port of the essential logic in legacy Python tools:
---     agda-dojang/python/tools/agent_bridge.py
---     agda-dojang/python/tools/report_parser.py
+--   Historical note: this logic began as a Haskell port of two Python tools
+--   that once lived under agda-dojang/python/tools/ (agent_bridge.py and
+--   report_parser.py).  Those retired in issue #109, superseded by this
+--   server, so the loop has a single implementation again.  What survives
+--   from that lineage is the marker protocol, and it is a live contract
+--   rather than a legacy detail: agda-dojang/agda/AgdaDojang/Debug.agda
+--   emits what 'parseGoalContext' below reads.
 --
 --   The functions here call the @agda@ binary as a subprocess.  The long-term
 --   plan is to replace this with Agda-as-a-library calls once the Haskell
