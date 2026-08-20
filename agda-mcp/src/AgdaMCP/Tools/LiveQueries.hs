@@ -122,42 +122,26 @@ withLiveFile lanes cfg0 requested reload body =
         outcome <- withLane lanes cfg (pcRoot pc) $ \lh -> do
           loaded <- ensureLoaded lh reload absPath effFlags
           case loaded of
-            Left lf -> Left <$> laneFailure lh pc cfg startNs lf
+            Left lf -> Left . FailInteraction
+                         <$> interactionFailure pc cfg startNs lf
             Right lr ->
               body (LiveCtx lh absPath lr pc cfg startNs)
         case outcome of
-          Left lf      -> Left . FailInteraction <$> spawnFailure pc cfg startNs lf
+          Left lf      -> Left . FailInteraction
+                            <$> interactionFailure pc cfg startNs lf
           Right result -> pure result
 
--- | laneFailure: shape a mid-request lane failure, with everything the call
--- had sent and measured up to the kill.
-laneFailure
-  :: LaneHandle -> ProjectContext -> AgdaConfig -> Word64
-  -> LaneFailure -> IO ToolFailure
-laneFailure lh pc cfg startNs lf = do
-  sent  <- laneSentLines lh
-  endNs <- getMonotonicTimeNSec
-  echo  <- laneCommandEcho cfg
-  pure . FailInteraction $ InteractionFailure
-    { xfEvent      = eventText (lfEvent lf)
-    , xfMessage    = lfMessage lf
-    , xfStderrTail = lfStderrTail lf
-    , xfElapsedMs  = fromIntegral ((endNs - startNs) `div` 1_000_000)
-    , xfRoot       = pcRoot pc
-    , xfIotcm      = sent
-    , xfCommand    = echo
-    , xfProject    = pc
-    }
-
--- | spawnFailure: as 'laneFailure', for a child that never came up.  The
--- failure still carries real telemetry: the elapsed time from the request's
--- own start, and the wire lines the startup flush attempted ('lfSent' —
--- empty only when the process could not be created at all), so a hung
--- startup is not reported with fabricated zeros (a Copilot round-2 catch).
-spawnFailure
+-- | interactionFailure: shape a lane-level failure, wherever in the request
+-- it struck.  The telemetry is real on every path: 'lfSent' carries the
+-- wire lines the failing request attempted — 'doomWith' records them for
+-- mid-request failures, the spawn path for its startup flush — and the
+-- elapsed time runs from the request's own start.  Empty lines mean the
+-- child could not even be created, or the registry refused the request at
+-- shutdown; there was genuinely nothing to echo.
+interactionFailure
   :: ProjectContext -> AgdaConfig -> Word64 -> LaneFailure
   -> IO InteractionFailure
-spawnFailure pc cfg startNs lf = do
+interactionFailure pc cfg startNs lf = do
   echo  <- laneCommandEcho cfg
   endNs <- getMonotonicTimeNSec
   pure InteractionFailure
@@ -264,8 +248,9 @@ runShaped
 runShaped ctx cmd shape = do
   rs <- runQuery (lcHandle ctx) (lcAbsPath ctx) cmd
   case rs of
-    Left lf -> Left <$> laneFailure (lcHandle ctx) (lcProject ctx)
-                                    (lcConfig ctx) (lcStartNs ctx) lf
+    Left lf -> Left . FailInteraction
+                 <$> interactionFailure (lcProject ctx) (lcConfig ctx)
+                                        (lcStartNs ctx) lf
     Right resps -> shape resps
 
 
@@ -273,27 +258,25 @@ runShaped ctx cmd shape = do
 -- Response extraction
 -- ---------------------------------------------------------------------------
 
--- | inferredTypeOf: the answer of @Cmd_infer_toplevel@ (an @InferredType@
--- whose @expr@ field carries the type) or of the goal variant (the same
--- payload wrapped in @GoalSpecific.goalInfo@).
-inferredTypeOf :: [IResponse] -> Maybe Text
-inferredTypeOf rs = listToMaybe $
-  [ t | IDisplayInfo "InferredType" (Object io) <- rs
+-- | answerOf: the expression answer of the given kind — @InferredType@ or
+-- @NormalForm@, whose @expr@ field carries it — accepted from either wire
+-- position: a toplevel @DisplayInfo@ of that kind, or the same payload
+-- wrapped in a goal-scoped @GoalSpecific.goalInfo@.
+answerOf :: Text -> [IResponse] -> Maybe Text
+answerOf kind rs = listToMaybe $
+  [ t | IDisplayInfo k (Object io) <- rs
+      , k == kind
       , Just t <- [textOf "expr" io] ]
   <> [ t | r <- rs
          , Just (Object gi) <- [goalInfoOf r]
-         , textOf "kind" gi == Just "InferredType"
+         , textOf "kind" gi == Just kind
          , Just t <- [textOf "expr" gi] ]
 
--- | normalFormOf: as 'inferredTypeOf', for @Cmd_compute@'s @NormalForm@.
+inferredTypeOf :: [IResponse] -> Maybe Text
+inferredTypeOf = answerOf "InferredType"
+
 normalFormOf :: [IResponse] -> Maybe Text
-normalFormOf rs = listToMaybe $
-  [ t | IDisplayInfo "NormalForm" (Object io) <- rs
-      , Just t <- [textOf "expr" io] ]
-  <> [ t | r <- rs
-         , Just (Object gi) <- [goalInfoOf r]
-         , textOf "kind" gi == Just "NormalForm"
-         , Just t <- [textOf "expr" gi] ]
+normalFormOf = answerOf "NormalForm"
 
 -- | whyInScopeMessageOf: the provenance prose of a @WhyInScope@ answer.
 whyInScopeMessageOf :: [IResponse] -> Maybe Text
@@ -370,7 +353,8 @@ candidateFrom sc = NameCandidate
 -- ---------------------------------------------------------------------------
 
 -- | handleTypeOf: Agda's @C-c C-d@ on an expression that need not be in the
--- file.  Goal-scoped when @line@ addresses a goal, else toplevel.
+-- file.  Goal-scoped when the (line, column) position addresses a goal,
+-- else toplevel.
 handleTypeOf
   :: InteractionLanes -> AgdaConfig -> TypeOfParams
   -> IO (Either ToolFailure TypeOfResult)
@@ -400,9 +384,8 @@ handleTypeOf lanes cfg0 p =
             }
 
 -- | opaqueAnswer: the fallback error when Agda answered with neither the
--- expected payload nor an error — named as such rather than guessed at.
--- The stage is the caller's, matching its 'queryError' (a hardcoded stage
--- here mislabeled resolve_name's and exports_of's opaque answers).
+-- expected payload nor an error — named as such rather than guessed at,
+-- with the stage supplied by the caller to match its 'queryError'.
 opaqueAnswer :: Text -> [IResponse] -> LiveError
 opaqueAnswer stage rs = LiveError
   { lveStage   = stage

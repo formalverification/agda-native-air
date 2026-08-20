@@ -104,7 +104,7 @@ import AgdaMCP.Project
 import AgdaMCP.Interaction
   ( IPoint (..), IRange (..), IResponse (..), LaneGoal (..)
   , LoadReport (..), LoadedInfo (..)
-  , cmdLoad, ensureLoaded, goalsOf, hsShow
+  , cmdGoalTypeContext, cmdLoad, ensureLoaded, goalsOf, hsShow
   , interactionPointsOf, iotcmLine, newInteractionLanes, parseAmbiguousName
   , parseDidYouMean, parseResponseLine, parseSrcLoc, parseWhyInScope
   , pointContaining, shutdownLanes, stripPrompts, withLane
@@ -4663,6 +4663,14 @@ interactionWireTests = do
         assertEqual "line"
           "IOTCM \"/p/F.agda\" None Direct (Cmd_load \"/p/F.agda\" [\"-i\",\"/p\",\"-l\",\"lib\"])"
           (iotcmLine "/p/F.agda" (cmdLoad "/p/F.agda" ["-i", "/p", "-l", "lib"]))
+
+    , -- The one command the tools do not yet send: issue #108 re-sources
+      -- get_goal through it, so its wire shape is pinned here against the
+      -- captured transcript rather than left to drift unexercised.
+      runTest "cmdGoalTypeContext: the #108 seam's exact wire shape" $
+        assertEqual "command"
+          "Cmd_goal_type_context Normalised 0 noRange \"\""
+          (cmdGoalTypeContext 0)
 
     , runTest "hsShow: escaping is Haskell's — backslash, quote, newline, unicode" $ do
         r1 <- assertEqual "backslash" "\"\\\\x -> x\"" (hsShow "\\x -> x")

@@ -44,12 +44,14 @@
 --     'show' is the escaper.  A raw @\\x@ in an expression rejects the whole
 --     line with a plain-text @cannot read:@ reply.
 --   * A file is (re)loaded only on evidence: first sight, a path switch, a
---     changed (mtime, size) stamp, changed flags, or a failed previous load.
---     A file with open holes writes no interface, so an unconditional
---     re-load would re-typecheck the module on every query — the cost this
---     lane exists to remove.  The failure side of the policy is the reverse:
---     a failed load is retried on every request, so a fix in a dependency is
---     noticed at the first opportunity.
+--     changed (mtime, size) stamp, changed flags, a failed previous load, or
+--     the client's own @reload: true@ (the escape hatch for a changed
+--     dependency, which no stamp on the queried file can see).  A file with
+--     open holes writes no interface, so an unconditional re-load would
+--     re-typecheck the module on every query — the cost this lane exists to
+--     remove.  The failure side of the policy is the reverse: a failed load
+--     is retried on every request, so a fix in a dependency is noticed at
+--     the first opportunity.
 --   * A hung command is handled with the issue-#77 ladder
 --     ('AgdaMCP.Agda.escalateAndReap') applied to the child's process group,
 --     and the lane is respawned on next use.  A crashed or hung lane
@@ -57,7 +59,8 @@
 --     -32603 — the #101 lesson.
 --   * An idle lane is shut down by closing its stdin, which Agda answers by
 --     exiting cleanly (probed: rc 0 on EOF); a reaper thread sweeps on a
---     fixed cadence.
+--     fixed cadence.  Server shutdown latches the registry closed and drains
+--     every lane, waiting for any a request still holds.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -91,7 +94,6 @@ module AgdaMCP.Interaction
   , LaneGoal (..)
   , stripPrompts
   , parseResponseLine
-  , displayInfoKind
   , errorMessageOf
   , interactionPointsOf
   , goalsOf
@@ -248,12 +250,6 @@ parseResponseLine raw =
       i <- intField "id" o
       pure (IPoint i (rangeField o))
     pointFrom _ = Nothing
-
--- | displayInfoKind: the @info.kind@ of a 'IDisplayInfo', when that is what
--- this response is.
-displayInfoKind :: IResponse -> Maybe Text
-displayInfoKind (IDisplayInfo k _) = Just k
-displayInfoKind _                  = Nothing
 
 -- | errorMessageOf: the message of a @DisplayInfo@/@Error@ response.
 --
@@ -670,7 +666,7 @@ lanePidOf lh = pure (fromIntegral <$> lanePgid (lhLane lh))
 --
 -- Lifecycle, all on this seam: a child that died while idle is detected
 -- ('getProcessExitCode') and replaced before the body runs; a body that
--- doomed its lane (timeout, crash — the doom flag is set by 'runCmd') leaves
+-- doomed its lane (timeout, crash — the doom flag is set by 'runCmdOn') leaves
 -- a killed process and an empty slot; a body that threw kills the lane —
 -- the wire may hold another request's half-collected responses, which no
 -- future request may inherit — and re-throws, with 'modifyMVar' restoring
@@ -680,7 +676,8 @@ lanePidOf lh = pure (fromIntegral <$> lanePgid (lhLane lh))
 withLane
   :: InteractionLanes
   -> AgdaConfig
-  -> FilePath   -- ^ The resolved project root — the lane key and child cwd.
+  -> FilePath   -- ^ The resolved project root — the lane's registry key
+                --   (the child itself inherits the server's cwd).
   -> (LaneHandle -> IO a)
   -> IO (Either LaneFailure a)
 withLane il cfg root body = do
@@ -707,9 +704,23 @@ withLane il cfg root body = do
       , lfSent       = []
       }
     Just slot -> modifyMVar slot $ \held -> do
-      revived <- reviveOrSpawn deadline held
+      -- Re-check the latch now that this slot is held: between the registry
+      -- access above and here, a whole shutdown can have run and drained
+      -- this very slot, and spawning after that would leak a child nothing
+      -- drains again.  The two checks close the window from both sides —
+      -- either this request sees the latch, or shutdown's blocking drain
+      -- waits for it and stops whatever it restores.
+      closed <- readIORef (ilClosed il)
+      revived <- if closed
+        then pure (Left LaneFailure
+          { lfEvent      = LaneShutdown
+          , lfMessage    = "the server is shutting down; no interaction lane will be started"
+          , lfStderrTail = []
+          , lfSent       = []
+          })
+        else reviveOrSpawn deadline held
       case revived of
-        Left failure -> pure (Nothing, Left failure)
+        Left failure -> pure (held, Left failure)
         Right (lane, flushSent, spawned) -> do
           -- A spawning call's echo starts with the startup flush it already
           -- sent (newest first, as the handle stores them); a reviving or
@@ -740,9 +751,10 @@ withLane il cfg root body = do
           -- Dead while idle: release its handles (no ladder — the child died
           -- an unknown time ago, see 'closeLaneHandles') and start afresh.
           closeLaneHandles lane
-          fmap (\(l, flushSent) -> (l, flushSent, True))
-            <$> spawnLane cfg root deadline
-    reviveOrSpawn deadline Nothing =
+          spawnFresh deadline
+    reviveOrSpawn deadline Nothing = spawnFresh deadline
+
+    spawnFresh deadline =
       fmap (\(l, flushSent) -> (l, flushSent, True))
         <$> spawnLane cfg root deadline
 
