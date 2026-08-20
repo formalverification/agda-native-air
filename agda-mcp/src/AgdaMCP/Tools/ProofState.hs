@@ -86,10 +86,15 @@
 --     what an @import@ of this file must say, what Agda's own messages print,
 --     and the name of a file whose header is anonymous (@module _ where@), which
 --     no reading of the source can supply.  The source scan is the fallback for
---     when Agda did not say — a warm run prints nothing, and a parse error, a
---     header that does not match its file name, or a timeout never reaches the
---     line — and there the name the header /claims/ is the answer worth having,
---     since the claim is the diagnosis when Agda will not accept it.  This is
+--     when a goal comes back and Agda named no module, which in practice means a
+--     client whose flags include @--trace-imports=0@: that silences the progress
+--     line while the goal markers still arrive.  The other ways Agda can decline
+--     to say do not reach this field at all — a parse error, a header that does
+--     not match its file name, or a timeout ends the call as a 'Left', and a
+--     failure carries no @module@ (for the mismatch, Agda's own message names
+--     both the module it found and the file it wanted, and that message is what
+--     the failure reports).  So the fallback keeps a /successful/ answer
+--     complete; it is not a diagnosis channel.  This is
 --     the project's own thesis applied to its implementation: where Agda can
 --     answer, ask Agda; the scan is the pre-flight approximation, not the
 --     authority.  ('AgdaMCP.Agda.agdaModuleNameOf' reads the line;

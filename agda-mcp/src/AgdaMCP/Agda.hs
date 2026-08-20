@@ -707,16 +707,22 @@ parseCheckingLine raw = do
 -- reads @module _ where@, and never a name that merely /looks/ like a header
 -- somewhere in the source (issue #100).
 --
--- It is a 'Maybe' because Agda does not always say.  A warm run prints nothing
--- at all; a run that dies before type-checking starts — a parse error, a header
--- that does not match its file name, a timeout — never reaches the line; and a
--- client that puts @--trace-imports=0@ in its flags silences the line outright
--- (measured: levels 1 and up print it, 0 prints nothing).
--- The caller falls back to the name the source /declares/, which is exactly the
--- answer those cases call for: what the file claims to be is the diagnosis when
--- Agda will not accept the claim.  A run may also announce several modules (its
--- dependencies), so the answer is the line naming /this/ file rather than the
--- first line seen.
+-- It is a 'Maybe' because Agda does not always say, and the cases are worth
+-- keeping apart.  A warm run prints nothing at all, and a client that puts
+-- @--trace-imports=0@ in its flags silences the line outright (measured: levels
+-- 1 and up print it, 0 prints nothing).  A run that dies before it reaches
+-- /this/ file — a parse error, a header that does not match its file name, or a
+-- kill while its dependencies were still being checked — leaves only its
+-- dependencies' lines, which is why the answer is the line naming this file
+-- rather than the first line seen.
+--
+-- A timeout does /not/ by itself lose the name.  Agda prints the line when it
+-- starts checking a module, so a run killed mid-check has already printed it
+-- (measured: killed at ~1s, the line was there) — the same reason
+-- 'checkedFromSourceOf' reads such a run as a source re-check.  What drops the
+-- name on a timeout is the /response/: get_goal answers a timeout with a
+-- failure, and a failure carries no module field.  See Copilot's review of
+-- PR 105, which caught this doc claiming otherwise.
 agdaModuleNameOf :: FilePath -> AgdaResult -> Maybe Text
 agdaModuleNameOf path r =
   listToMaybe

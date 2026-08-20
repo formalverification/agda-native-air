@@ -3973,6 +3973,24 @@ holeModelIntegrationTests cfg = do
                 , assertEqual "goal" "Nat" (giGoal info)
                 ]
 
+        -- The other half of that contract, made executable (Copilot's review of
+        -- PR 105 caught the docs overstating it): the declared name is the
+        -- fallback for a call that reports a goal while Agda named no module,
+        -- and --trace-imports=0 is what produces one — it silences the progress
+        -- line while the goal markers still arrive.  The anonymous fixture is
+        -- the one that shows the difference: Agda would say AnonModule, the
+        -- source says only _.
+        , runTest "get_goal: with --trace-imports=0 the module falls back to the declared name (#100)" $ do
+            let quietCfg = cfg { agdaFlags = agdaFlags cfg <> ["--trace-imports=0"] }
+            result <- handleGetGoal quietCfg GetGoalParams
+              { ggFilePath = anonModule, ggHole = ByIndex 0 }
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
+              Right info -> allOf
+                [ assertEqual "the goal still arrives" "Nat" (giGoal info)
+                , assertEqual "module" (Just "_") (giModule info)
+                ]
+
         , runTest "fill_hole: prose {!!} decoys are not addressable (#73)" $ do
             -- LiterateMd has exactly one real hole; its prose decoys must
             -- not create an index 1.
