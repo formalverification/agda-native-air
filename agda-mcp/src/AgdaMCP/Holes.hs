@@ -516,13 +516,22 @@ findHoles flav src =
 --
 -- This is the view a line scan for a declaration should read, because a scan
 -- of the raw source reads whatever /looks/ like Agda: literate prose opening
--- with @module@ (issue #100), a commented-out @module M where@, or a @module@
--- or @import@ line inside the embedded Haskell of a @{-# FOREIGN GHC … #-}@
--- pragma.  Agda sees a declaration in none of them, and none of them survives
--- here.  Code, string literals, and hole tokens are left as they are.
+-- with @module@ (issue #100), a commented-out @module M where@, a @module@ or
+-- @import@ line inside the embedded Haskell of a @{-# FOREIGN GHC … #-}@
+-- pragma, or such a line sitting inside a hole.  Agda sees a declaration in
+-- none of them, and none of them survives here.
+--
+-- A hole goes with them, its contents included, because Agda's lexer consumes
+-- @{! … !}@ whole and never parses what is inside: a hole may hold arbitrary
+-- text — prose, a commented-out draft, a line reading @open import
+-- AgdaDojang.Debug@ — and a file with such a hole type-checks, so nothing in
+-- there declares anything.  Reading a hole's interior as code is what let a
+-- decoy import inside a hole suppress get_goal's own import injection (Copilot's
+-- second review of PR 105); 'findHoles' is where holes are meant to be seen, and
+-- it reads the same scan.  String literals stay, being code Agda does parse.
 codeOnly :: LiterateFlavour -> Text -> Text
 codeOnly flav src =
-  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
+  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked ]
   where
     masked = maskNonCode flav src
 

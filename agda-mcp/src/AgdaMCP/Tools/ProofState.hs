@@ -103,7 +103,9 @@
 --   Design note: every line scan reads the code-only view (issues #73, #100).
 --     A source file's raw text carries things that look like Agda and are not: a
 --     literate prose paragraph opening with @module@, a commented-out
---     declaration, the embedded Haskell of a @{-# FOREIGN GHC … #-}@ pragma.
+--     declaration, the embedded Haskell of a @{-# FOREIGN GHC … #-}@ pragma, or
+--     a declaration-shaped line sitting inside a @{! … !}@ hole, which Agda
+--     lexes as one token and never parses.
 --     'ensureDebugImport' and 'moduleNameOf' therefore scan
 --     'AgdaMCP.Holes.codeOnly' — the source with prose, comments, and pragmas
 --     blanked, every character position preserved — so the header they find is
@@ -639,7 +641,10 @@ timeoutDiagnostic cfg = plainDiagnostic DiagError (timeoutMessage cfg)
 -- The "already imported?" scan is restricted to the *top-level* prelude — the lines
 -- after the top-level module header, up to the first nested @module@ — so an import
 -- inside a nested module (which does not bring names into the surrounding scope) does
--- not suppress injection.  Both that scan and the header search look at real
+-- not suppress injection.  Nor does an import-shaped line inside a hole: the
+-- code-only view blanks holes, so a @{! open import AgdaDojang.Debug !}@ left in a
+-- proof is hole text, not an import, and the injection still happens (it did not
+-- before, and get_goal then failed with @reportGoalCtx@ out of scope).  Both that scan and the header search look at real
 -- import/module lines (not mere substrings), so a passing mention of @AgdaDojang.Debug@
 -- or @module@ in prose or in a comment neither suppresses the injection nor misplaces
 -- it.  When no @module … where@ header is found the source is returned unchanged

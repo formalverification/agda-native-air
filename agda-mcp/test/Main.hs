@@ -344,6 +344,45 @@ pureTests = do
               , "foo = {!!}" ]
         assertEqual "already imported → unchanged" s (ensureDebugImport PlainAgda s)
 
+    -- A hole may hold arbitrary text, including declaration-shaped lines: Agda
+    -- lexes {! … !} whole and never parses inside it.  Reading a hole's interior
+    -- as code let a decoy import suppress the injection, and since the hole is
+    -- then replaced by the reporting macro the decoy went with it, leaving
+    -- reportGoalCtx out of scope (Copilot, PR 105 second review).
+    , runTest "ensureDebugImport: an import inside a hole does not suppress injection" $ do
+        let s = T.unlines
+              [ "module M where"
+              , "foo = {!"
+              , "open import AgdaDojang.Debug"
+              , "zero !}" ]
+            out = T.lines (ensureDebugImport PlainAgda s)
+        allOf
+          [ assertEqual "injects after the header"
+              (Just "open import AgdaDojang.Debug") (nth 1 out)
+          , assert "the hole's text is untouched"
+              ("open import AgdaDojang.Debug" `elem` drop 2 out)
+          ]
+
+    , runTest "ensureDebugImport: an import inside a hole's block comment does not either" $ do
+        let s = T.unlines
+              [ "module M where"
+              , "foo = {!"
+              , "{-"
+              , "open import AgdaDojang.Debug"
+              , "-}"
+              , "zero !}" ]
+        assertEqual "injects after the header"
+          (Just "open import AgdaDojang.Debug") (nth 1 (T.lines (ensureDebugImport PlainAgda s)))
+
+    , runTest "ensureDebugImport: a 'module' line inside a hole does not end the prelude" $ do
+        let s = T.unlines
+              [ "module Top where"
+              , "foo = {!"
+              , "module Decoy where"
+              , "zero !}"
+              , "open import AgdaDojang.Debug" ]
+        assertEqual "already imported → unchanged" s (ensureDebugImport PlainAgda s)
+
     , runTest "ensureDebugImport: a nested-module import does not suppress injection" $ do
         let s = T.unlines
               [ "module Top where"
@@ -1194,9 +1233,11 @@ holeModelTests = do
               Fail m -> pure (Fail m)
               Pass   -> assert "prose is blanked" (not ("Prose" `T.isInfixOf` masked))
 
-    -- codeOnly is what every declaration scan reads (issue #100): comment and
-    -- pragma text goes, code and hole tokens stay, positions are preserved.
-    , runTest "codeOnly: comment and pragma text is blanked, code and holes are not" $ do
+    -- codeOnly is what every declaration scan reads (issue #100): comment,
+    -- pragma, and hole text goes, code stays, positions are preserved.  Holes go
+    -- because Agda lexes {! … !} whole and never parses what is inside, so
+    -- nothing in there declares anything (Copilot, PR 105 second review).
+    , runTest "codeOnly: comment, pragma, and hole text is blanked, code is not" $ do
         let src = T.unlines
               [ "{-# FOREIGN GHC module Decoy where #-}"
               , "{- outer {- inner"
@@ -1213,7 +1254,8 @@ holeModelTests = do
           , assert "the pragma is blanked"         (not ("Decoy" `T.isInfixOf` out))
           , assert "the block comment is blanked"  (not ("Commented" `T.isInfixOf` out))
           , assert "the line comment is blanked"   (not ("Trailing" `T.isInfixOf` out))
-          , assert "the hole token is kept whole"  ("{! -- not a comment !}" `T.isInfixOf` out)
+          , assert "the hole goes with its contents" (not ("not a comment" `T.isInfixOf` out))
+          , assert "the code around the hole stays"   ("x = " `T.isInfixOf` out)
           ]
 
     -- The plain-Agda half of issue #100: a `module … where` inside a block
@@ -3836,10 +3878,12 @@ holeModelIntegrationTests cfg = do
       plainTwin    = resources </> "HolePlain.agda"
       blockComment = resources </> "BlockCommentModule.agda"
       anonModule   = resources </> "AnonModule.agda"
+      holeDecoy    = resources </> "HoleImportDecoy.agda"
       parityFixtures =
         [ variants
         , lagdaMd
         , blockComment
+        , holeDecoy
         , resources </> "LiterateTex.lagda"
         , resources </> "LiterateRst.lagda.rst"
         , resources </> "LiterateOrg.lagda.org"
@@ -3989,6 +4033,21 @@ holeModelIntegrationTests cfg = do
               Right info -> allOf
                 [ assertEqual "the goal still arrives" "Nat" (giGoal info)
                 , assertEqual "module" (Just "_") (giModule info)
+                ]
+
+        -- End to end for the hole-interior defect: this fixture's one hole holds
+        -- a bare `open import AgdaDojang.Debug`, the same line inside a block
+        -- comment, and a `module … where`.  Measured before the fix: get_goal
+        -- failed with reportGoalCtx out of scope, because the injection read the
+        -- decoy as an import and then the hole (decoy included) was replaced.
+        , runTest "get_goal: a decoy import inside the hole does not break injection (#100)" $ do
+            result <- handleGetGoal cfg GetGoalParams
+              { ggFilePath = holeDecoy, ggHole = ByIndex 0 }
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
+              Right info -> allOf
+                [ assertEqual "goal" "Nat" (giGoal info)
+                , assertEqual "module" (Just "HoleImportDecoy") (giModule info)
                 ]
 
         , runTest "fill_hole: prose {!!} decoys are not addressable (#73)" $ do
