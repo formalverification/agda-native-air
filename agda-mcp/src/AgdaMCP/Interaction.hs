@@ -882,6 +882,9 @@ data LoadAction
   | LoadSwitch    -- ^ The lane held a different file.
   | LoadChanged   -- ^ The file's (mtime, size) stamp or flags changed.
   | LoadRetry     -- ^ The previous load of this file failed.
+  | LoadForced    -- ^ The client passed @reload: true@ — the escape hatch
+                  --   for a changed dependency, which no stamp on the
+                  --   queried file can see.
   deriving (Eq, Show)
 
 -- | LoadReport: the outcome of 'ensureLoaded'.
@@ -899,19 +902,22 @@ data LoadReport = LoadReport
 
 -- | ensureLoaded: make the lane's state be about this file, re-loading only
 -- on evidence (§ 3 of the design document): first sight, a path switch, a
--- changed stamp, changed flags, or a failed previous load.  The flags are
--- the effective flag list the batch lane would run @agda@ with, and they
--- ride the @Cmd_load@ as its per-load argv.
+-- changed stamp, changed flags, a failed previous load, or the client's own
+-- @reload: true@ (evidence the stamp cannot carry — a changed dependency).
+-- The flags are the effective flag list the batch lane would run @agda@
+-- with, and they ride the @Cmd_load@ as its per-load argv.
 ensureLoaded
   :: LaneHandle
+  -> Bool       -- ^ Force a fresh load regardless of the stamp.
   -> FilePath   -- ^ Absolute path of the file queried.
   -> [String]   -- ^ Effective flags (server's + project's + file dir).
   -> IO (Either LaneFailure LoadReport)
-ensureLoaded lh path flags = do
+ensureLoaded lh force path flags = do
   start  <- getMonotonicTimeNSec
   stamp  <- stampOf path
   known  <- readIORef (laneLoad (lhLane lh))
   let decision = case known of
+        _ | force -> Just LoadForced
         Nothing -> Just LoadFirst
         Just ls
           | not (equalFilePath (lsPath ls) path) -> Just LoadSwitch

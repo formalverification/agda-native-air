@@ -4774,6 +4774,7 @@ interactionLaneTests cfg repoRoot = do
                { rnpFilePath = fx "ScopeAmbiguous.agda"
                , rnpName     = "amb"
                , rnpLine     = Nothing
+               , rnpReload   = False
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4795,6 +4796,7 @@ interactionLaneTests cfg repoRoot = do
                { topFilePath = fx "TwoHoles.agda"
                , topExpr     = "implicitOnly {3}"
                , topLine     = Nothing
+               , topReload   = False
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4809,6 +4811,7 @@ interactionLaneTests cfg repoRoot = do
                { dopFilePath = fx "ReexportUse.agda"
                , dopName     = "originalName"
                , dopLine     = Nothing
+               , dopReload   = False
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4826,6 +4829,7 @@ interactionLaneTests cfg repoRoot = do
                { nomFilePath = fx "TwoHoles.agda"
                , nomExpr     = "implicitOnly {suc 1}"
                , nomLine     = Nothing
+               , nomReload   = False
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4833,13 +4837,13 @@ interactionLaneTests cfg repoRoot = do
 
     , runTest "exports_of: the barrel's surface, and \"\" for the file's own module" $ do
         r1 <- handleExportsOf lanes cfg ExportsOfParams
-                { eopFilePath = fx "ReexportUse.agda", eopModule = "ReexportBarrel" }
+                { eopFilePath = fx "ReexportUse.agda", eopModule = "ReexportBarrel", eopReload = False }
         a <- case r1 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "barrel exports"
             (Just [ExportEntry "originalName" "Nat"]) (exrExports res)
         r2 <- handleExportsOf lanes cfg ExportsOfParams
-                { eopFilePath = fx "TwoHoles.agda", eopModule = "" }
+                { eopFilePath = fx "TwoHoles.agda", eopModule = "", eopReload = False }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "own module"
@@ -4849,7 +4853,7 @@ interactionLaneTests cfg repoRoot = do
 
     , runTest "exports_of: a module the file's scope cannot name errors in band" $ do
         r <- handleExportsOf lanes cfg ExportsOfParams
-               { eopFilePath = fx "ReexportUse.agda", eopModule = "Agda.Builtin.Bool" }
+               { eopFilePath = fx "ReexportUse.agda", eopModule = "Agda.Builtin.Bool", eopReload = False }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -4864,6 +4868,7 @@ interactionLaneTests cfg repoRoot = do
                { topFilePath = fx "TwoHoles.agda"
                , topExpr     = "Nat Nat"
                , topLine     = Nothing
+               , topReload   = False
                }
         a <- case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4876,6 +4881,7 @@ interactionLaneTests cfg repoRoot = do
                { topFilePath = fx "TwoHoles.agda"
                , topExpr     = "g"
                , topLine     = Nothing
+               , topReload   = False
                }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4888,7 +4894,7 @@ interactionLaneTests cfg repoRoot = do
         TIO.writeFile file
           "module LaneLocal where\nopen import Agda.Builtin.Nat\nf : Nat -> Nat -> Nat\nf x y = {!!}\n"
         r <- handleResolveName lanes cfg ResolveNameParams
-               { rnpFilePath = file, rnpName = "x", rnpLine = Just 4 }
+               { rnpFilePath = file, rnpName = "x", rnpLine = Just 4, rnpReload = False }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -4904,27 +4910,50 @@ interactionLaneTests cfg repoRoot = do
         TIO.writeFile file
           "module LaneStale where\nopen import Agda.Builtin.Nat\nf : Nat\nf = zero\n"
         r1 <- handleTypeOf lanes cfg TypeOfParams
-                { topFilePath = file, topExpr = "f", topLine = Nothing }
+                { topFilePath = file, topExpr = "f", topLine = Nothing
+                , topReload = False }
         a <- case r1 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "first load" "first"
             (lchLoad (lmLane (torMeta res)))
         r2 <- handleTypeOf lanes cfg TypeOfParams
-                { topFilePath = file, topExpr = "f", topLine = Nothing }
+                { topFilePath = file, topExpr = "f", topLine = Nothing
+                , topReload = False }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "unchanged is reused" "reused"
             (lchLoad (lmLane (torMeta res)))
         TIO.appendFile file "extra : Nat\nextra = suc zero\n"
         r3 <- handleTypeOf lanes cfg TypeOfParams
-                { topFilePath = file, topExpr = "extra", topLine = Nothing }
+                { topFilePath = file, topExpr = "extra", topLine = Nothing
+                , topReload = False }
         c <- case r3 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
             x <- assertEqual "edit re-loads" "changed" (lchLoad (lmLane (torMeta res)))
             y <- assertEqual "and the new definition answers" (Just "Nat") (torType res)
             pure (firstFailure [x, y])
-        pure (firstFailure [a, b, c])
+        -- The escape hatch: reload:true forces a fresh load of an unchanged
+        -- file — the client's evidence for a changed dependency (#75's
+        -- Copilot round).
+        r4 <- handleTypeOf lanes cfg TypeOfParams
+                { topFilePath = file, topExpr = "extra", topLine = Nothing
+                , topReload = True }
+        d <- case r4 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            x <- assertEqual "reload:true forces" "forced" (lchLoad (lmLane (torMeta res)))
+            -- No checkedFromSource assertion, and no exact rendering: this
+            -- fixture is hole-free, so the forced Cmd_load correctly answers
+            -- from its still-valid interface — Agda itself re-examines the
+            -- dependencies on load, which is exactly what the escape hatch
+            -- is for — and the interface-loaded scope renders the type
+            -- qualified (Agda.Builtin.Nat.Nat) where the source-checked one
+            -- shortened it (§ 2.6 of the design document).
+            y <- assert "and still answers a Nat type"
+                   (maybe False ("Nat" `T.isSuffixOf`) (torType res))
+            pure (firstFailure [x, y])
+        pure (firstFailure [a, b, c, d])
 
     , runTest "load failure: a file that does not load errors in band with stage 'load'" $ do
         tmp <- scratchDir "lane-broken"
@@ -4932,7 +4961,8 @@ interactionLaneTests cfg repoRoot = do
         TIO.writeFile file
           "module LaneBroken where\nopen import Agda.Builtin.Nat\nbad : Nat\nbad = Nat\n"
         r <- handleTypeOf lanes cfg TypeOfParams
-               { topFilePath = file, topExpr = "zero", topLine = Nothing }
+               { topFilePath = file, topExpr = "zero", topLine = Nothing
+               , topReload = False }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -4952,6 +4982,7 @@ interactionLaneTests cfg repoRoot = do
                { rnpFilePath = fx "ScopeAmbiguousComplete.agda"
                , rnpName     = "amb"
                , rnpLine     = Nothing
+               , rnpReload   = False
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4970,6 +5001,7 @@ interactionLaneTests cfg repoRoot = do
                { dopFilePath = fx "ScopeAmbiguousComplete.agda"
                , dopName     = "amb"
                , dopLine     = Nothing
+               , dopReload   = False
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -4987,6 +5019,7 @@ interactionLaneTests cfg repoRoot = do
                 { topFilePath = fx "TwoHoles.agda"
                 , topExpr     = "g"
                 , topLine     = Nothing
+                , topReload   = False
                 }
         a <- case r1 of
           Left err  -> pure (Left (T.unpack (failureText err)))
@@ -5001,6 +5034,7 @@ interactionLaneTests cfg repoRoot = do
                     { topFilePath = fx "TwoHoles.agda"
                     , topExpr     = "h"
                     , topLine     = Nothing
+                    , topReload   = False
                     }
             case r2 of
               Left err  -> pure (Fail $ "after kill: " <> T.unpack (failureText err))
@@ -5038,7 +5072,8 @@ interactionLaneTests cfg repoRoot = do
         let cfgHang = cfg { agdaBin = script, agdaTimeout = Just 1 }
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgHang TypeOfParams
-               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing }
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
+               , topReload = False }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
@@ -5055,7 +5090,8 @@ interactionLaneTests cfg repoRoot = do
         let cfgHang = cfg { agdaBin = script, agdaTimeout = Just 1 }
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgHang TypeOfParams
-               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing }
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
+               , topReload = False }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
@@ -5072,7 +5108,8 @@ interactionLaneTests cfg repoRoot = do
         let cfgDie = cfg { agdaBin = script, agdaTimeout = Just 5 }
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgDie TypeOfParams
-               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing }
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
+               , topReload = False }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) ->
@@ -5090,7 +5127,7 @@ parityCheck lanes cfg file = do
   src <- TIO.readFile file
   let expected = [ (hsLine h, hsCol h) | h <- findHoles (flavourOf file) src ]
   outcome <- withLane lanes cfg (takeDirectory file) $ \lh -> do
-    loaded <- ensureLoaded lh file (agdaFlags cfg <> ["-i", takeDirectory file])
+    loaded <- ensureLoaded lh False file (agdaFlags cfg <> ["-i", takeDirectory file])
     pure $ case loaded of
       Left lf -> Fail (T.unpack (lfMessage lf))
       Right lr -> case lrOutcome lr of

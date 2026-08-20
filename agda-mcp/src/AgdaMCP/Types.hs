@@ -154,7 +154,7 @@ module AgdaMCP.Types
   ) where
 
 import Data.Aeson
-  ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
+  ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.!=), (.=)
   , object, withObject, withText
   )
 import Data.Aeson.Types (Object, Pair, Parser)
@@ -1441,11 +1441,13 @@ data TypeOfParams = TypeOfParams
   { topFilePath :: FilePath
   , topExpr     :: Text
   , topLine     :: Maybe Int
+  , topReload   :: Bool       -- ^ Force a fresh load (a changed dependency).
   } deriving (Eq, Show)
 
 instance FromJSON TypeOfParams where
   parseJSON = withObject "TypeOfParams" $ \o ->
     TypeOfParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
+                 <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @normalize@ tool: evaluate an expression to normal
 -- form in a file's scope.  @line@ as in 'TypeOfParams'.
@@ -1453,11 +1455,13 @@ data NormalizeParams = NormalizeParams
   { nomFilePath :: FilePath
   , nomExpr     :: Text
   , nomLine     :: Maybe Int
+  , nomReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON NormalizeParams where
   parseJSON = withObject "NormalizeParams" $ \o ->
     NormalizeParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
+                    <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @resolve_name@ tool: what does this name resolve to
 -- here, and why?  @line@ as in 'TypeOfParams'; for scope questions it matters
@@ -1468,22 +1472,26 @@ data ResolveNameParams = ResolveNameParams
   { rnpFilePath :: FilePath
   , rnpName     :: Text
   , rnpLine     :: Maybe Int
+  , rnpReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON ResolveNameParams where
   parseJSON = withObject "ResolveNameParams" $ \o ->
     ResolveNameParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
+                      <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @definition_of@ tool: where is this name defined?
 data DefinitionOfParams = DefinitionOfParams
   { dopFilePath :: FilePath
   , dopName     :: Text
   , dopLine     :: Maybe Int
+  , dopReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON DefinitionOfParams where
   parseJSON = withObject "DefinitionOfParams" $ \o ->
     DefinitionOfParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
+                       <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @exports_of@ tool: the public surface of a module, as
 -- seen from a file whose scope can name it.  The empty string names the
@@ -1491,11 +1499,13 @@ instance FromJSON DefinitionOfParams where
 data ExportsOfParams = ExportsOfParams
   { eopFilePath :: FilePath
   , eopModule   :: Text
+  , eopReload   :: Bool
   } deriving (Eq, Show)
 
 instance FromJSON ExportsOfParams where
   parseJSON = withObject "ExportsOfParams" $ \o ->
     ExportsOfParams <$> o .: "filePath" <*> o .: "module"
+                    <*> (o .:? "reload" .!= False)
 
 -- | LaneEcho: what the interaction lane did to answer this call (issue #75's
 -- analogue of the batch lane's verdict/command echo, issue #72).

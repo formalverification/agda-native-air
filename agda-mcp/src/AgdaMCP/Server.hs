@@ -301,6 +301,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
               \verbatim (any syntax a hole would accept); it does not have to \
               \occur in the file."
           , prop "line"     "integer" liveLineDoc
+          , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "expr"]
 
@@ -314,6 +315,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "expr"     "string"  "The Agda expression to evaluate, sent \
               \verbatim; it does not have to occur in the file."
           , prop "line"     "integer" liveLineDoc
+          , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "expr"]
 
@@ -335,6 +337,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "name"     "string"  "The name to resolve, qualified or not, \
               \exactly as it would appear in the file."
           , prop "line"     "integer" liveLineDoc
+          , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "name"]
 
@@ -350,6 +353,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           [ prop "filePath" "string"  liveFilePathDoc
           , prop "name"     "string"  "The name to locate, qualified or not."
           , prop "line"     "integer" liveLineDoc
+          , prop "reload"   "boolean" liveReloadDoc
           ]
           ["filePath", "name"]
 
@@ -693,7 +697,9 @@ liveLaneNote =
   \{binary, args, cwd} (the persistent child; per-file flags ride the \
   \Cmd_load line visible in lane.iotcm), project {the same block the batch \
   \tools report}, elapsedMs, and checkedFromSource (whether this call \
-  \re-typechecked the file from source)."
+  \re-typechecked the file from source). Pass reload:true to force a fresh \
+  \load first — the escape hatch for a changed DEPENDENCY, which no stamp \
+  \on the queried file can see; the response echoes lane.load='forced'."
 
 -- | liveLineNote: what the optional @line@ argument selects, and why it
 -- matters for scope questions (the probed § 2.6 degradation).
@@ -721,6 +727,16 @@ liveLineDoc =
   "Optional 1-based line in the file as written. Inside a hole: the query \
   \runs in that goal's scope (locals visible). Elsewhere or omitted: the \
   \file's top-level scope."
+
+-- | liveReloadDoc: the @reload@ property's contract.
+liveReloadDoc :: Text
+liveReloadDoc =
+  "Optional; default false. Force a fresh Cmd_load before answering, even \
+  \though this file's stamp is unchanged — the escape hatch after editing a \
+  \DEPENDENCY of this file, which the lane's own change detection cannot \
+  \see. Agda re-examines the dependencies on that load and re-checks what \
+  \changed; checkedFromSource reports whether this file itself was \
+  \re-typechecked. The response echoes lane.load='forced'."
 
 -- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value

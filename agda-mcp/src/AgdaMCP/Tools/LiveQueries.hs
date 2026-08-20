@@ -104,9 +104,10 @@ withLiveFile
   :: InteractionLanes
   -> AgdaConfig
   -> FilePath
+  -> Bool       -- ^ @reload@: force a fresh load (a changed dependency).
   -> (LiveCtx -> IO (Either ToolFailure a))
   -> IO (Either ToolFailure a)
-withLiveFile lanes cfg0 requested body =
+withLiveFile lanes cfg0 requested reload body =
   withSourceFile requested $ \absPath _bytes _src -> do
     resolved <- resolveProject cfg0 absPath
     case resolved of
@@ -119,7 +120,7 @@ withLiveFile lanes cfg0 requested body =
             cfg = cfg0 { agdaFlags = effFlags }
         startNs <- getMonotonicTimeNSec
         outcome <- withLane lanes cfg (pcRoot pc) $ \lh -> do
-          loaded <- ensureLoaded lh absPath effFlags
+          loaded <- ensureLoaded lh reload absPath effFlags
           case loaded of
             Left lf -> Left <$> laneFailure lh pc cfg startNs lf
             Right lr ->
@@ -217,6 +218,7 @@ loadActionText LoadFirst   = "first"
 loadActionText LoadSwitch  = "switch"
 loadActionText LoadChanged = "changed"
 loadActionText LoadRetry   = "retry"
+loadActionText LoadForced  = "forced"
 
 -- | loadError: the in-band error for a file whose load failed.  The query
 -- was not run; saying so, with Agda's message, is the whole answer.
@@ -348,7 +350,7 @@ handleTypeOf
   :: InteractionLanes -> AgdaConfig -> TypeOfParams
   -> IO (Either ToolFailure TypeOfResult)
 handleTypeOf lanes cfg0 p =
-  withLiveFile lanes cfg0 (topFilePath p) $ \ctx ->
+  withLiveFile lanes cfg0 (topFilePath p) (topReload p) $ \ctx ->
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
@@ -402,7 +404,7 @@ handleNormalize
   :: InteractionLanes -> AgdaConfig -> NormalizeParams
   -> IO (Either ToolFailure NormalizeResult)
 handleNormalize lanes cfg0 p =
-  withLiveFile lanes cfg0 (nomFilePath p) $ \ctx ->
+  withLiveFile lanes cfg0 (nomFilePath p) (nomReload p) $ \ctx ->
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
@@ -520,7 +522,7 @@ handleResolveName
   :: InteractionLanes -> AgdaConfig -> ResolveNameParams
   -> IO (Either ToolFailure ResolveNameResult)
 handleResolveName lanes cfg0 p =
-  withLiveFile lanes cfg0 (rnpFilePath p) $ \ctx ->
+  withLiveFile lanes cfg0 (rnpFilePath p) (rnpReload p) $ \ctx ->
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
@@ -549,7 +551,7 @@ handleDefinitionOf
   :: InteractionLanes -> AgdaConfig -> DefinitionOfParams
   -> IO (Either ToolFailure DefinitionOfResult)
 handleDefinitionOf lanes cfg0 p =
-  withLiveFile lanes cfg0 (dopFilePath p) $ \ctx ->
+  withLiveFile lanes cfg0 (dopFilePath p) (dopReload p) $ \ctx ->
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
@@ -595,7 +597,7 @@ handleExportsOf
   :: InteractionLanes -> AgdaConfig -> ExportsOfParams
   -> IO (Either ToolFailure ExportsOfResult)
 handleExportsOf lanes cfg0 p =
-  withLiveFile lanes cfg0 (eopFilePath p) $ \ctx ->
+  withLiveFile lanes cfg0 (eopFilePath p) (eopReload p) $ \ctx ->
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
