@@ -266,11 +266,17 @@ parseHoleRef o = do
 data GetGoalParams = GetGoalParams
   { ggFilePath :: FilePath
   , ggHole     :: HoleRef     -- ^ Which hole, by position or by index (#79).
+  , ggReload   :: Bool        -- ^ Force a fresh lane load first — the same
+                              --   dependency-staleness escape hatch the
+                              --   live-query tools expose (#108); the
+                              --   injection fallback is per-call fresh and
+                              --   ignores it.
   } deriving (Eq, Show)
 
 instance FromJSON GetGoalParams where
   parseJSON = withObject "GetGoalParams" $ \o ->
     GetGoalParams <$> o .: "filePath" <*> parseHoleRef o
+                  <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @fill_hole@ tool.
 data FillHoleParams = FillHoleParams
@@ -814,8 +820,14 @@ data GoalInfo = GoalInfo
   , giElapsedMs         :: Maybe Int    -- ^ Wall-clock ms spent in the Agda subprocess.
   , giCheckedFromSource :: Maybe Bool   -- ^ Did Agda re-check from source (vs. load @.agdai@)?
   , giVerdict           :: Maybe Verdict        -- ^ What was run and what it means (#72).
+                                                --   Absent on a lane-sourced answer,
+                                                --   which makes no batch run (#108).
   , giCommand           :: Maybe CommandEcho    -- ^ The resolved agda command line (#72).
   , giProject           :: Maybe ProjectContext -- ^ The tree that was checked (#76).
+  , giSource            :: Maybe Text           -- ^ Which mechanism answered (#108):
+                                                --   @interaction-lane@ or @injected-macro@.
+  , giLane              :: Maybe LaneEcho       -- ^ The lane echo, on a lane-sourced
+                                                --   answer (#108).
   } deriving (Eq, Show)
 
 instance ToJSON GoalInfo where
@@ -828,6 +840,8 @@ instance ToJSON GoalInfo where
       <> maybe [] (\v -> ["verdict"           .= v]) (giVerdict g)
       <> maybe [] (\c -> ["command"           .= c]) (giCommand g)
       <> maybe [] (\p -> ["project"           .= p]) (giProject g)
+      <> maybe [] (\x -> ["source"            .= x]) (giSource g)
+      <> maybe [] (\l -> ["lane"              .= l]) (giLane g)
 
 -- | One open hole in a file, as listed by @get_diagnostics@, @check_file@, and
 -- @fill_hole@.  The index is the 0-based @holeIndex@ that @get_goal@ /
