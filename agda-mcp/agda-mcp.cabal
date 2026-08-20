@@ -21,9 +21,11 @@ name:          agda-mcp
 version:       0.2.0
 synopsis:      MCP server for AI-assisted Agda proof development
 description:
-  An MCP (Model Context Protocol) server that wraps AgdaDojang to expose
-  Agda's proof engine to frontier coding agents (Claude Code, Codex CLI,
-  Cursor, etc.).  See README.md for the tool surface and architecture.
+  An MCP (Model Context Protocol) server exposing Agda's proof engine to
+  frontier coding agents (Claude Code, Codex CLI, Cursor, etc.): batch
+  typechecking verdicts, goal introspection via AgdaDojang's reflection
+  macro, and live scope/type/definition queries over Agda's own interaction
+  protocol.  See README.md for the tool surface and architecture.
 license:       Apache-2.0
 license-file:  ../LICENSE
 author:        William DeMeo

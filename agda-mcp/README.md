@@ -8,8 +8,13 @@
 > tools.
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
-[AgdaDojang]'s proof-state interaction to any MCP-compatible coding agent
-(Claude Code, Codex CLI, Cursor), or any other tool that speaks MCP.
+Agda's proof engine — batch typechecking verdicts, goal introspection, and
+live scope, type, and definition queries — to any MCP-compatible coding agent
+(Claude Code, Codex CLI, Cursor), or any other tool that speaks MCP.  It
+drives the pinned `agda` binary in two lanes (a batch subprocess for
+verdicts, Agda's own interaction protocol for knowledge), and uses
+[AgdaDojang]'s `reportGoalCtx` reflection macro for `get_goal`'s
+goal-and-context introspection.
 
 ```
   ┌──────────────────────────────────┐
