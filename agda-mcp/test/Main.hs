@@ -24,8 +24,9 @@
 --      server's own working directory, and every way a path can fail to name
 --      a readable file, each refused by name rather than crashing the call.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips,
---      including 2d: hole-enumeration parity against batch Agda, and 2f:
---      re-anchoring by position across a fill (#79).
+--      including 2d: hole-enumeration parity against batch Agda, the module
+--      name Agda itself resolves (#100), and 2f: re-anchoring by position
+--      across a fill (#79).
 --
 --   Tier 2 tests are skipped gracefully if Agda is not available, making the test
 --   suite safe to run in CI without a Nix shell.
@@ -78,6 +79,7 @@ import AgdaMCP.Agda
   , AgdaConfig (..)
   , runAgda , AgdaResult (..)
   , checkedFromSourceOf , defaultTimeoutSeconds
+  , agdaModuleNameOf , parseCheckingLine , progressModules
   )
 import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
@@ -101,7 +103,7 @@ import AgdaMCP.Project
 import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
-  , outputTailOf, parseCheckingLine, progressModules )
+  , outputTailOf )
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
@@ -398,6 +400,30 @@ pureTests = do
             , "-} still commented -}"
             , "module Real where"
             , "x = {!!}" ]))
+
+    -- agdaModuleNameOf: the name Agda resolved, which is the one get_goal
+    -- reports; moduleNameOf is only the fallback for when Agda did not say.
+    , runTest "agdaModuleNameOf: the line naming this file wins over a dependency's" $
+        assertEqual "name" (Just "Proofs.Use")
+          (agdaModuleNameOf "/lib/src/Proofs/Use.agda" (fakeResult 42 False (T.unlines
+            [ "Checking Proofs.Thing (/lib/src/Proofs/Thing.agda)."
+            , "Checking Proofs.Use (/lib/src/Proofs/Use.agda)."
+            , "/lib/src/Proofs/Use.agda:9.5-15: error: [UnsolvedInteractionMetas]" ])))
+
+    , runTest "agdaModuleNameOf: an anonymous header still gets Agda's name" $
+        assertEqual "name" (Just "AnonModule")
+          (agdaModuleNameOf "/r/AnonModule.agda" (fakeResult 42 False
+            "Checking AnonModule (/r/AnonModule.agda)."))
+
+    , runTest "agdaModuleNameOf: a silent (warm) run says nothing, not a guess" $
+        assertEqual "name" Nothing
+          (agdaModuleNameOf "/r/M.agda" (fakeResult 0 False ""))
+
+    , runTest "agdaModuleNameOf: prose beginning with Checking is not progress" $
+        assertEqual "name" Nothing
+          (agdaModuleNameOf "/r/M.agda" (fakeResult 42 False (T.unlines
+            [ "Checking that the expression zero has type Nat"
+            , "Checking Other (/r/Other.agda)." ])))
 
     -- fill_hole verdict classification (issue #69): whitelist, not blacklist.
     , runTest "errorTagsOf: collects error names in order, skips warnings" $
@@ -3809,6 +3835,7 @@ holeModelIntegrationTests cfg = do
       lagdaMd      = resources </> "LiterateMd.lagda.md"
       plainTwin    = resources </> "HolePlain.agda"
       blockComment = resources </> "BlockCommentModule.agda"
+      anonModule   = resources </> "AnonModule.agda"
       parityFixtures =
         [ variants
         , lagdaMd
@@ -3818,7 +3845,7 @@ holeModelIntegrationTests cfg = do
         , resources </> "LiterateOrg.lagda.org"
         , resources </> "LiterateTree.lagda.tree"
         ]
-  exists <- mapM doesFileExist (parityFixtures <> [plainTwin])
+  exists <- mapM doesFileExist (parityFixtures <> [plainTwin, anonModule])
   if not (and exists)
     then do
       hPutStrLn stderr "\n  [skip] hole-model fixtures not found"
@@ -3827,7 +3854,7 @@ holeModelIntegrationTests cfg = do
       hPutStrLn stderr
         "\n── Integration tests (tier 2d: hole model vs Agda, #71/#73) ──"
       parity <- mapM (agdaParityTest cfg) parityFixtures
-      before <- mapM BS.readFile (parityFixtures <> [plainTwin])
+      before <- mapM BS.readFile (parityFixtures <> [plainTwin, anonModule])
       results <- sequence
         [ runTest "get_goal: the ? hole in HoleVariants (index 3) has goal Nat" $ do
             result <- handleGetGoal cfg GetGoalParams
@@ -3929,6 +3956,23 @@ holeModelIntegrationTests cfg = do
               (Left err, _) -> pure (Fail $ "get_goal (.lagda.md) failed: " <> T.unpack (failureText err))
               (_, Left err) -> pure (Fail $ "get_goal (.agda) failed: " <> T.unpack (failureText err))
 
+        -- The half of #100 no source scan can answer: the fixture's header is
+        -- `module _ where`, so the declared name is `_` and only Agda knows the
+        -- file is AnonModule.  This test fails if the reported name ever goes
+        -- back to being read out of the source alone.
+        , runTest "get_goal: an anonymous module is reported by Agda's name, not its header (#100)" $ do
+            src <- TIO.readFile anonModule
+            result <- handleGetGoal cfg GetGoalParams
+              { ggFilePath = anonModule, ggHole = ByIndex 0 }
+            case result of
+              Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
+              Right info -> allOf
+                [ assertEqual "the header declares only _" (Just "_")
+                    (moduleNameOf (flavourOf anonModule) src)
+                , assertEqual "module" (Just "AnonModule") (giModule info)
+                , assertEqual "goal" "Nat" (giGoal info)
+                ]
+
         , runTest "fill_hole: prose {!!} decoys are not addressable (#73)" $ do
             -- LiterateMd has exactly one real hole; its prose decoys must
             -- not create an index 1.
@@ -3953,7 +3997,7 @@ holeModelIntegrationTests cfg = do
                   hs  -> pure . Fail $ "expected 1 hole, got " <> show (length hs)
         ]
       -- (f) byte-exact restore after in-place patching of non-{!!} holes.
-      after <- mapM BS.readFile (parityFixtures <> [plainTwin])
+      after <- mapM BS.readFile (parityFixtures <> [plainTwin, anonModule])
       restored <- runTest "hole-model tools restore fixtures byte-exactly" $
         assert "files unchanged after in-place patching" (before == after)
       pure (parity <> results <> [restored])

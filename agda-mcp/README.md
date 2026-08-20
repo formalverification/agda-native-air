@@ -160,7 +160,7 @@ All four tools share one definition of "hole", implemented in `AgdaMCP.Holes` an
 +  Literate files are recognized by extension (`.lagda` / `.lagda.tex`, `.lagda.md` / `.lagda.typ`, `.lagda.rst`, `.lagda.org`, `.lagda.tree`) and only their code regions are scanned, following the code-block rules of Agda 2.8.0's own literate preprocessor.
 +  `holeIndex` addresses holes in source order under this model, and all reported positions are 1-based (line, col) coordinates in the file as written — literate-file coordinates for literate sources, matching what an editor or Agda's error messages show.
 
-One lexical scan serves the scans that are not about holes, too.  `get_goal`'s `module` field and the `AgdaDojang.Debug` import it injects are read from the *code-only view* of the file — literate prose, comment text, and pragma text blanked, every character position preserved — so a prose paragraph opening with `module`, a commented-out `module M where`, or the embedded Haskell of a `{-# FOREIGN GHC ... #-}` pragma is never mistaken for the module header.  Before issue #100 the injection read that view and the name did not, so `get_goal` on a literate file could report a module name that appears only in its prose.
+One lexical scan serves the scans that are not about holes, too.  The `AgdaDojang.Debug` import `get_goal` injects must be placed *before* Agda runs, so its header search reads the *code-only view* of the file — literate prose, comment text, and pragma text blanked, every character position preserved — and a prose paragraph opening with `module`, a commented-out `module M where`, or the embedded Haskell of a `{-# FOREIGN GHC ... #-}` pragma is never mistaken for the module header.  Before issue #100 the injection read that view and the reported module name did not, so `get_goal` on a literate file could answer with a name that appears only in its prose.  The reported name is now Agda's own (see [`get_goal`](#get_goal) below); the code-only scan supplies the fallback.
 
 ### Stable hole handles (issue #79)
 
@@ -358,7 +358,7 @@ Given a file path and hole address, return the hole's expected type and its loca
 }
 ```
 
-`module` is the module's **declared** name — `Proofs.Use` for a module embedded at `src/Proofs/Use.agda`, not the file's base name — read from the code-only view of the source, so neither a prose line nor a commented-out header that opens with `module` is mistaken for the real one (issue #100).
+`module` is the name **Agda** resolved for this file, read from the `Checking M (path).` line of the very run this call made.  That is the name an `import` of the file must use and the name Agda's own messages print: `Proofs.Use` for a module embedded at `src/Proofs/Use.agda`, and `AnonModule` for a file whose header reads `module _ where`, which no reading of the source could supply.  When Agda does not say — a warm run prints nothing, and a parse error, a header that disagrees with its file name, or a timeout never reaches that line — the field falls back to the name the source *declares*, scanned off the code-only view so that neither prose nor a comment can supply it.  The two agree on a healthy file; where they differ, the difference is itself the diagnosis (issue #100).
 
 `verdict.exitCode` here is normally **non-zero even when the goal is right**: the injected macro leaves an interaction point behind, so this run is evidence about the introspection, not a judgement on the file.  Use `check_file` for that.
 

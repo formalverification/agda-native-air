@@ -80,6 +80,21 @@
 --     @checkedFromSource@, so an agent can distinguish a slow cold call that
 --     built @.agdai@ interfaces from a genuinely slow one.
 --
+--   Design note: the module name get_goal reports is Agda's own (issue #100).
+--     It is read from Agda's @Checking M (path).@ progress line in the run this
+--     call already makes, so it is the name Agda resolved from the include path:
+--     what an @import@ of this file must say, what Agda's own messages print,
+--     and the name of a file whose header is anonymous (@module _ where@), which
+--     no reading of the source can supply.  The source scan is the fallback for
+--     when Agda did not say — a warm run prints nothing, and a parse error, a
+--     header that does not match its file name, or a timeout never reaches the
+--     line — and there the name the header /claims/ is the answer worth having,
+--     since the claim is the diagnosis when Agda will not accept it.  This is
+--     the project's own thesis applied to its implementation: where Agda can
+--     answer, ask Agda; the scan is the pre-flight approximation, not the
+--     authority.  ('AgdaMCP.Agda.agdaModuleNameOf' reads the line;
+--     'AgdaMCP.Tools.CheckProject' has read the same one since #78.)
+--
 --   Design note: every line scan reads the code-only view (issues #73, #100).
 --     A source file's raw text carries things that look like Agda and are not: a
 --     literate prose paragraph opening with @module@, a commented-out
@@ -125,6 +140,7 @@ module AgdaMCP.Tools.ProofState
   , goalVerdictMeaning
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Exception (bracket_)
 import qualified Data.ByteString as BS
 import Data.List (find, findIndex)
@@ -133,8 +149,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
 import AgdaMCP.Agda
-  ( AgdaConfig, AgdaResult (..), agdaFlags, checkedFromSourceOf, debugLog
-  , parseGoalContext, reportExpr, runAgda, timeoutMessage
+  ( AgdaConfig, AgdaResult (..), agdaFlags, agdaModuleNameOf
+  , checkedFromSourceOf, debugLog, parseGoalContext, reportExpr, runAgda
+  , timeoutMessage
   )
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Holes
@@ -223,10 +240,13 @@ handleGetGoal cfg0 params =
                       pure . Right $ GoalInfo
                         { giGoal    = goal
                         , giContext = ctx
-                        -- The declared module name (e.g. FLRP.Bridge), parsed from the
-                        -- header — not the file's base name, and not a prose or
-                        -- comment line that looks like one (issue #100).
-                        , giModule  = moduleNameOf (flavourOf absPath) src
+                        -- The name Agda resolved for this file (e.g. FLRP.Bridge),
+                        -- from its own progress line in the run above; the name the
+                        -- source declares is the fallback for when Agda did not say,
+                        -- and is itself scanned off the code-only view, so neither
+                        -- answer can come from prose or a comment (issue #100).
+                        , giModule  = agdaModuleNameOf absPath result
+                                        <|> moduleNameOf (flavourOf absPath) src
                         , giElapsedMs         = Just (arElapsedMs result)
                         , giCheckedFromSource = checkedFromSourceOf result
                         , giVerdict = Just verdict

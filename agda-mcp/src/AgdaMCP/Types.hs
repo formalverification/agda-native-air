@@ -786,7 +786,7 @@ instance ToJSON TimeoutFailure where
 data GoalInfo = GoalInfo
   { giGoal              :: Text         -- ^ Pretty-printed goal type.
   , giContext           :: [CtxEntry]   -- ^ Local context (bound variables with types).
-  , giModule            :: Maybe Text   -- ^ Module name (if determinable).
+  , giModule            :: Maybe Text   -- ^ Module name: the one Agda resolved, else the one the source declares.
   , giElapsedMs         :: Maybe Int    -- ^ Wall-clock ms spent in the Agda subprocess.
   , giCheckedFromSource :: Maybe Bool   -- ^ Did Agda re-check from source (vs. load @.agdai@)?
   , giVerdict           :: Maybe Verdict        -- ^ What was run and what it means (#72).
