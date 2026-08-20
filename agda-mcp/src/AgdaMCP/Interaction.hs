@@ -42,7 +42,8 @@
 --     'show' is the escaper.  A raw @\\x@ in an expression rejects the whole
 --     line with a plain-text @cannot read:@ reply.
 --   * A file is (re)loaded only on evidence: first sight, a path switch, a
---     changed (mtime, size) stamp, changed flags, a failed previous load, or
+--     changed (mtime, size, fingerprint) stamp, changed flags, a failed
+--     previous load, or
 --     the client's own @reload: true@ (the escape hatch for a changed
 --     dependency, which no stamp on the queried file can see).  A file with
 --     open holes writes no interface, so an unconditional re-load would
@@ -84,6 +85,7 @@ module AgdaMCP.Interaction
   , LoadReport (..)
   , LoadAction (..)
   , LoadedInfo (..)
+  , peekLoadedGoals
     -- * Wire model (pure; exposed for testing)
   , IResponse (..)
   , IRange (..)
@@ -95,6 +97,9 @@ module AgdaMCP.Interaction
   , interactionPointsOf
   , goalsOf
   , goalInfoOf
+  , GoalContext (..)
+  , GoalCtxEntry (..)
+  , goalContextOf
   , pointContaining
     -- * IOTCM construction (pure; exposed for testing)
   , iotcmLine
@@ -132,6 +137,8 @@ import Control.Monad (forever)
 import Data.Aeson (Value (..), decodeStrict')
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
+import Data.Bits (xor)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
   (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
@@ -286,6 +293,51 @@ goalInfoOf :: IResponse -> Maybe Value
 goalInfoOf (IDisplayInfo "GoalSpecific" (Object io)) = KM.lookup "goalInfo" io
 goalInfoOf _ = Nothing
 
+-- | GoalContext: a goal's type and context as @Cmd_goal_type_context@
+-- reports them — the structured answer that lets @get_goal@ skip the
+-- reporting-macro injection entirely (issue #108).  Probed on Fixture01:
+-- the @type@ strings are byte-identical to what the macro path reports.
+data GoalContext = GoalContext
+  { gcType    :: Text
+  , gcEntries :: [GoalCtxEntry]
+  } deriving (Eq, Show)
+
+-- | GoalCtxEntry: one context entry of a goal display.  @geName@ is the
+-- reified name — what the goal display prints, primed under shadowing;
+-- @geInScope@ is False for an entry the hole cannot refer to by that name
+-- (a shadowed outer binding, or an implicit the clause never bound).  The
+-- wire carries no visible/hidden marker; that distinction exists only on
+-- the reporting-macro path.
+data GoalCtxEntry = GoalCtxEntry
+  { geName     :: Text
+  , geOriginal :: Text
+  , geBinding  :: Text
+  , geInScope  :: Bool
+  } deriving (Eq, Show)
+
+-- | goalContextOf: the first @GoalSpecific@/@GoalType@ answer in a
+-- collection, as data.
+goalContextOf :: [IResponse] -> Maybe GoalContext
+goalContextOf rs = listToMaybe
+  [ GoalContext t (maybe [] entriesFrom (KM.lookup "entries" gi))
+  | r <- rs
+  , Just (Object gi) <- [goalInfoOf r]
+  , textField "kind" gi == Just "GoalType"
+  , Just t <- [textField "type" gi]
+  ]
+  where
+    entriesFrom (Array a) = mapMaybe entryFrom (V.toList a)
+    entriesFrom _         = []
+    entryFrom (Object e)  = do
+      name <- textField "reifiedName" e
+      let orig = fromMaybe name (textField "originalName" e)
+      binding <- textField "binding" e
+      let inScope = case KM.lookup "inScope" e of
+            Just (Bool b) -> b
+            _             -> True
+      pure (GoalCtxEntry name orig binding inScope)
+    entryFrom _ = Nothing
+
 -- | pointContaining: the interaction point whose range contains the 1-based
 -- position.  With a column, containment is positional (start inclusive, end
 -- exclusive, matching the hole model's addressing), which is what distinguishes
@@ -423,17 +475,28 @@ data LoadState = LoadState
   , lsOutcome :: Either Text LoadedInfo  -- ^ Left: the load error's message.
   }
 
--- | The (mtime, size) stamp that gates re-loading.  Equality is the whole
--- interface; a stamp that could not be read is 'Nothing' at the use site and
--- never equal, so doubt re-loads.
-data FileStamp = FileStamp UTCTime Integer
+-- | The stamp that gates re-loading: (mtime, size, content fingerprint).
+-- Equality is the whole interface; a stamp that could not be read is
+-- 'Nothing' at the use site and never equal, so doubt re-loads.  The
+-- fingerprint (FNV-1a over the bytes) is what makes \"unchanged\" mean the
+-- bytes, not the metadata: a same-size rewrite under a coarse or restored
+-- mtime would otherwise read as unchanged and serve stale answers — to the
+-- reuse decision and to 'peekLoadedGoals' alike (a Copilot catch on the
+-- #108 review).  One file read per stamp; the sources this server checks
+-- make that microseconds.
+data FileStamp = FileStamp UTCTime Integer Word64
   deriving (Eq, Show)
 
--- | LoadedInfo: what a successful load leaves behind, the interaction points and
--- each visible goal's type.
+-- | LoadedInfo: what a successful load leaves behind — the interaction
+-- points, each visible goal's type, and the module name Agda announced for
+-- the file (its @Checking@ progress line; absent when the load reused an
+-- interface, but a stored name persists across later 'LoadReused' requests,
+-- so a lane often knows the name even when the batch lane's single run
+-- would not — issue #100's preference for Agda's own answer).
 data LoadedInfo = LoadedInfo
   { liPoints :: [IPoint]
   , liGoals  :: [LaneGoal]
+  , liModule :: Maybe Text
   } deriving (Eq, Show)
 
 -- | The per-root slot.  Holding the 'MVar' is holding the lane: requests,
@@ -836,7 +899,13 @@ spawnLane cfg root deadline = mask $ \restore -> do
           Right _ -> pure (Right (lane, flushSent))
           Left lf -> do
             stopLane lane
-            pure . Left $ lf { lfEvent = LaneSpawnFailure }
+            -- A flush TIMEOUT keeps its identity: it consumed the request's
+            -- bound, and callers that would otherwise fall back to a second
+            -- full run (get_goal, #108) must be able to see that.  Only the
+            -- crash flavors are rebranded as spawn failures.
+            pure . Left $ case lfEvent lf of
+              LaneTimeout -> lf
+              _           -> lf { lfEvent = LaneSpawnFailure }
     Right _ -> pure . Left $ LaneFailure
       { lfEvent      = LaneSpawnFailure
       , lfMessage    = "could not open the interaction child's pipes"
@@ -971,7 +1040,7 @@ data LoadAction
   = LoadReused    -- ^ Same file, same stamp, same flags, last load succeeded.
   | LoadFirst     -- ^ The lane had loaded nothing yet.
   | LoadSwitch    -- ^ The lane held a different file.
-  | LoadChanged   -- ^ The file's (mtime, size) stamp or flags changed.
+  | LoadChanged   -- ^ The file's stamp (mtime, size, fingerprint) or flags changed.
   | LoadRetry     -- ^ The previous load of this file failed.
   | LoadForced    -- ^ The client passed @reload: true@, the escape hatch
                   --   for a changed dependency, which no stamp on the
@@ -1056,18 +1125,82 @@ ensureLoaded lh force path flags = do
 -- load that produced neither is reported as such rather than guessed at.
 classifyLoad :: FilePath -> [IResponse] -> Either Text LoadedInfo
 classifyLoad path rs = case interactionPointsOf rs of
-  Just ps -> Right (LoadedInfo ps (goalsOf rs))
+  Just ps -> Right (LoadedInfo ps (goalsOf rs) announcedModule)
   Nothing -> Left $ case mapMaybe errorMessageOf rs of
     (msg : _) -> msg
     []        -> "agda reported neither interaction points nor an error while loading "
                  <> T.pack path
+  where
+    announcedModule = listToMaybe
+      [ name
+      | IRunningInfo msg <- rs
+      , (name, announced) <- mapMaybe parseCheckingLine (T.lines msg)
+      , equalFilePath announced path
+      ]
+
+-- | peekLoadedGoals: the goal types a root's lane already holds for a file,
+-- when — and only when — its recorded load still describes the file's
+-- current bytes.  Never spawns, loads, or blocks: a busy slot, a missing
+-- lane, another current file, a changed stamp, or a failed load all answer
+-- 'Nothing'.  This is what lets the batch tools fill their hole listings'
+-- @goal@ fields for free after live queries warmed the lane (issue #108),
+-- without a batch call ever paying an interaction-lane cost — the two-lane
+-- cost model stays intact.  Child liveness is deliberately not probed: the
+-- goals describe bytes, not a process, and a dead child's last load is
+-- still true of an unchanged file.  The flags must match too: 'ensureLoaded'
+-- treats changed effective flags as grounds to re-load, so a peek that
+-- ignored them could vouch for goals loaded under a configuration the
+-- caller no longer runs with (a Copilot catch on the PR 110 review).
+peekLoadedGoals
+  :: InteractionLanes -> FilePath -> FilePath -> [String]
+  -> IO (Maybe [LaneGoal])
+peekLoadedGoals il root path flags = do
+  m <- readMVar (ilSlots il)
+  case Map.lookup root m of
+    Nothing   -> pure Nothing
+    Just slot -> do
+      taken <- tryTakeMVar slot
+      case taken of
+        Nothing   -> pure Nothing
+        Just held -> do
+          -- Restored on every exit, the reaper's own rule: an asynchronous
+          -- exception between the take and the put would otherwise leave the
+          -- slot empty and every later request on this root blocked forever
+          -- (a Copilot catch on the #108 review — the same pattern this
+          -- module already hardened in 'reapSlot').
+          known <- (case held of
+                      Nothing   -> pure Nothing
+                      Just lane -> readIORef (laneLoad lane))
+                     `onException` putMVar slot held
+          putMVar slot held
+          case known of
+            Just ls
+              | equalFilePath (lsPath ls) path
+              , lsFlags ls == flags
+              , Right li <- lsOutcome ls -> do
+                  stamp <- stampOf path
+                  pure $ if stamp /= Nothing && stamp == lsStamp ls
+                           then Just (liGoals li)
+                           else Nothing
+            _ -> pure Nothing
 
 stampOf :: FilePath -> IO (Maybe FileStamp)
 stampOf path = do
-  r <- try $ FileStamp <$> getModificationTime path <*> getFileSize path
+  r <- try $ FileStamp
+         <$> getModificationTime path
+         <*> getFileSize path
+         <*> (fnv1a <$> BS.readFile path)
   pure $ case r of
     Left (_ :: IOException) -> Nothing
     Right s                 -> Just s
+
+-- | fnv1a: the 64-bit FNV-1a fingerprint of a byte string.  Not
+-- cryptographic and not meant to be: it distinguishes edits, not
+-- adversaries, and it costs no dependency.
+fnv1a :: BS.ByteString -> Word64
+fnv1a = BS.foldl' step 0xcbf29ce484222325
+  where
+    step h b = (h `xor` fromIntegral b) * 0x100000001b3
 
 elapsedMsBetween :: Word64 -> Word64 -> Int
 elapsedMsBetween start end =
