@@ -131,13 +131,33 @@ module AgdaMCP.Types
     -- * Tool results (outbound) — search
   , SearchResult (..)
   , DependenciesResult (..)
+    -- * Tool parameters (inbound) — live queries (issue #75)
+  , TypeOfParams (..)
+  , NormalizeParams (..)
+  , ResolveNameParams (..)
+  , DefinitionOfParams (..)
+  , ExportsOfParams (..)
+    -- * Tool results (outbound) — live queries (issue #75)
+  , LaneEcho (..)
+  , LiveMeta (..)
+  , LiveError (..)
+  , DefSite (..)
+  , ProvenanceEcho (..)
+  , NameCandidate (..)
+  , ExportEntry (..)
+  , TypeOfResult (..)
+  , NormalizeResult (..)
+  , ResolveNameResult (..)
+  , DefinitionOfResult (..)
+  , ExportsOfResult (..)
+  , InteractionFailure (..)
   ) where
 
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
   , object, withObject, withText
   )
-import Data.Aeson.Types (Object, Parser)
+import Data.Aeson.Types (Object, Pair, Parser)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -747,6 +767,10 @@ data ToolFailure
   | FailTimeout TimeoutFailure  -- ^ The call hit @--timeout@; rendered as JSON.
   | FailProject ProjectMismatch -- ^ The file belongs to a different checkout; rendered as JSON.
   | FailPath    PathFailure     -- ^ The path named no readable file; rendered as JSON.
+  | FailInteraction InteractionFailure
+                                -- ^ The interaction lane's process failed the
+                                --   call — a spawn failure, a timeout kill, or
+                                --   a crash; rendered as JSON (issue #75).
   deriving (Eq, Show)
 
 -- | The structured payload of a timed-out tool call: what went wrong, and what
@@ -1394,4 +1418,346 @@ instance ToJSON DependenciesResult where
     , "type"         .= depType r
     , "dependencies" .= depDependencies r
     , "neighbors"    .= depNeighbors r
+    ]
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § Live queries — the interaction lane's tools (issue #75)
+--
+-- Parameters and results for type_of, normalize, resolve_name, definition_of,
+-- and exports_of.  These tools answer from a persistent
+-- @agda --interaction-json@ child (AgdaMCP.Interaction) and NEVER carry a
+-- build verdict: interaction mode is tolerant by design, so the batch lane's
+-- @verdict@ contract (issue #72) stays with check_file, check_project, and
+-- fill_hole.  What these responses carry instead is the lane echo: which
+-- root's child answered, what it did to answer (spawned? re-loaded? why?),
+-- the exact IOTCM lines sent, and the timings.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | Parameters for the @type_of@ tool: infer the type of an expression in a
+-- file's scope, no edit required.  @line@ optionally scopes the question to
+-- the goal whose range contains that line, which is what makes local
+-- variables visible to the query.
+data TypeOfParams = TypeOfParams
+  { topFilePath :: FilePath
+  , topExpr     :: Text
+  , topLine     :: Maybe Int
+  } deriving (Eq, Show)
+
+instance FromJSON TypeOfParams where
+  parseJSON = withObject "TypeOfParams" $ \o ->
+    TypeOfParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
+
+-- | Parameters for the @normalize@ tool: evaluate an expression to normal
+-- form in a file's scope.  @line@ as in 'TypeOfParams'.
+data NormalizeParams = NormalizeParams
+  { nomFilePath :: FilePath
+  , nomExpr     :: Text
+  , nomLine     :: Maybe Int
+  } deriving (Eq, Show)
+
+instance FromJSON NormalizeParams where
+  parseJSON = withObject "NormalizeParams" $ \o ->
+    NormalizeParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
+
+-- | Parameters for the @resolve_name@ tool: what does this name resolve to
+-- here, and why?  @line@ as in 'TypeOfParams'; for scope questions it matters
+-- more, because a goal-scoped query sees local variables and, on a hole-free
+-- file, more of the opened names than the completed toplevel scope does (see
+-- docs/agda-mcp-interaction-lane.md § 2.6).
+data ResolveNameParams = ResolveNameParams
+  { rnpFilePath :: FilePath
+  , rnpName     :: Text
+  , rnpLine     :: Maybe Int
+  } deriving (Eq, Show)
+
+instance FromJSON ResolveNameParams where
+  parseJSON = withObject "ResolveNameParams" $ \o ->
+    ResolveNameParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
+
+-- | Parameters for the @definition_of@ tool: where is this name defined?
+data DefinitionOfParams = DefinitionOfParams
+  { dopFilePath :: FilePath
+  , dopName     :: Text
+  , dopLine     :: Maybe Int
+  } deriving (Eq, Show)
+
+instance FromJSON DefinitionOfParams where
+  parseJSON = withObject "DefinitionOfParams" $ \o ->
+    DefinitionOfParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
+
+-- | Parameters for the @exports_of@ tool: the public surface of a module, as
+-- seen from a file whose scope can name it.  The empty string names the
+-- file's own top-level module.
+data ExportsOfParams = ExportsOfParams
+  { eopFilePath :: FilePath
+  , eopModule   :: Text
+  } deriving (Eq, Show)
+
+instance FromJSON ExportsOfParams where
+  parseJSON = withObject "ExportsOfParams" $ \o ->
+    ExportsOfParams <$> o .: "filePath" <*> o .: "module"
+
+-- | LaneEcho: what the interaction lane did to answer this call (issue #75's
+-- analogue of the batch lane's verdict/command echo, issue #72).
+--
+-- @lchLoad@ is one of @reused@, @first@, @switch@, @changed@, @retry@ — the
+-- evidence that triggered (or spared) a re-load; @lchLoadElapsedMs@ is absent
+-- exactly when no load ran.  @lchIotcm@ is the exact wire lines this call
+-- sent, sentinel included, so a client can replay the call by hand.
+data LaneEcho = LaneEcho
+  { lchRoot          :: FilePath
+  , lchPid           :: Maybe Int
+  , lchSpawned       :: Bool
+  , lchLoad          :: Text
+  , lchLoadElapsedMs :: Maybe Int
+  , lchAgdaVersion   :: Maybe Text
+  , lchIotcm         :: [Text]
+  } deriving (Eq, Show)
+
+instance ToJSON LaneEcho where
+  toJSON l = object $
+    [ "root"    .= lchRoot l
+    , "spawned" .= lchSpawned l
+    , "load"    .= lchLoad l
+    , "iotcm"   .= lchIotcm l
+    ]
+    <> maybe [] (\x -> ["pid"           .= x]) (lchPid l)
+    <> maybe [] (\x -> ["loadElapsedMs" .= x]) (lchLoadElapsedMs l)
+    <> maybe [] (\x -> ["agdaVersion"   .= x]) (lchAgdaVersion l)
+
+-- | LiveMeta: the echo block shared by every live-query response —
+-- timing, cache evidence, the lane, and the same @command@ / @project@
+-- pair the batch tools report (issues #72, #76).  Serialized flattened into
+-- the response object by 'liveMetaPairs'.
+data LiveMeta = LiveMeta
+  { lmElapsedMs         :: Int
+  , lmCheckedFromSource :: Bool
+  , lmLane              :: LaneEcho
+  , lmCommand           :: CommandEcho
+  , lmProject           :: ProjectContext
+  } deriving (Eq, Show)
+
+liveMetaPairs :: LiveMeta -> [Pair]
+liveMetaPairs m =
+  [ "elapsedMs"         .= lmElapsedMs m
+  , "checkedFromSource" .= lmCheckedFromSource m
+  , "lane"              .= lmLane m
+  , "command"           .= lmCommand m
+  , "project"           .= lmProject m
+  ]
+
+-- | LiveError: an Agda-level negative answer, in band.  A query tool's
+-- product includes "it does not typecheck" and "that module is not in scope
+-- here", so these arrive inside a success-shaped response with the stage
+-- (@load@, @expression@, @name@, or @module@), Agda's own bracketed code when
+-- the message carried one, and the message.  Lane-level process failures are
+-- 'InteractionFailure' instead.
+data LiveError = LiveError
+  { lveStage   :: Text
+  , lveCode    :: Maybe Text
+  , lveMessage :: Text
+  } deriving (Eq, Show)
+
+instance ToJSON LiveError where
+  toJSON e = object $
+    [ "stage"   .= lveStage e
+    , "message" .= lveMessage e
+    ]
+    <> maybe [] (\c -> ["code" .= c]) (lveCode e)
+
+-- | DefSite: a definition's location — file plus a 1-based (line, col) range
+-- in that file's own coordinates — optionally with the qualified name it
+-- locates.
+data DefSite = DefSite
+  { dsQualified :: Maybe Text
+  , dsFile      :: FilePath
+  , dsLine      :: Int
+  , dsCol       :: Int
+  , dsEndLine   :: Int
+  , dsEndCol    :: Int
+  } deriving (Eq, Show)
+
+instance ToJSON DefSite where
+  toJSON d = object $
+    [ "file"    .= dsFile d
+    , "line"    .= dsLine d
+    , "col"     .= dsCol d
+    , "endLine" .= dsEndLine d
+    , "endCol"  .= dsEndCol d
+    ]
+    <> maybe [] (\q -> ["qualified" .= q]) (dsQualified d)
+
+-- | ProvenanceEcho: one step of a name's provenance chain — @its definition@,
+-- @the opening of M@, @the application of M@ — with its location when Agda's
+-- prose carried one (steps through other modules' scope information may not).
+data ProvenanceEcho = ProvenanceEcho
+  { peStep :: Text
+  , peSite :: Maybe DefSite
+  } deriving (Eq, Show)
+
+instance ToJSON ProvenanceEcho where
+  toJSON p = object $
+    ["step" .= peStep p]
+    <> maybe [] (\st -> ["site" .= st]) (peSite p)
+
+-- | NameCandidate: one resolution of a name — one @*@ bullet of Agda's
+-- WhyInScope answer, or one entry recovered from an AmbiguousName error.
+data NameCandidate = NameCandidate
+  { ncDescription :: Text             -- ^ E.g. @a defined name M.N.amb@.
+  , ncQualified   :: Maybe Text       -- ^ The fully qualified name.
+  , ncProvenance  :: [ProvenanceEcho] -- ^ Outermost step first.
+  , ncDefinition  :: Maybe DefSite    -- ^ The defining site, when located.
+  } deriving (Eq, Show)
+
+instance ToJSON NameCandidate where
+  toJSON c = object $
+    [ "description" .= ncDescription c
+    , "provenance"  .= ncProvenance c
+    ]
+    <> maybe [] (\q -> ["qualified"  .= q]) (ncQualified c)
+    <> maybe [] (\d -> ["definition" .= d]) (ncDefinition c)
+
+-- | ExportEntry: one name of a module's public surface, with its type as
+-- Agda printed it.
+data ExportEntry = ExportEntry
+  { exName :: Text
+  , exTerm :: Text
+  } deriving (Eq, Show)
+
+instance ToJSON ExportEntry where
+  toJSON e = object ["name" .= exName e, "type" .= exTerm e]
+
+-- | Result of @type_of@.  Exactly one of @type@ / @error@ is present.
+data TypeOfResult = TypeOfResult
+  { torExpr  :: Text
+  , torScope :: Text              -- ^ @toplevel@, or @goal N@ with its line.
+  , torType  :: Maybe Text
+  , torError :: Maybe LiveError
+  , torMeta  :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON TypeOfResult where
+  toJSON r = object $
+    [ "expr"  .= torExpr r
+    , "scope" .= torScope r
+    ]
+    <> maybe [] (\t -> ["type"  .= t]) (torType r)
+    <> maybe [] (\e -> ["error" .= e]) (torError r)
+    <> liveMetaPairs (torMeta r)
+
+-- | Result of @normalize@.  Exactly one of @normalForm@ / @error@ is present.
+data NormalizeResult = NormalizeResult
+  { nrExpr       :: Text
+  , nrScope      :: Text
+  , nrNormalForm :: Maybe Text
+  , nrError      :: Maybe LiveError
+  , nrMeta       :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON NormalizeResult where
+  toJSON r = object $
+    [ "expr"  .= nrExpr r
+    , "scope" .= nrScope r
+    ]
+    <> maybe [] (\t -> ["normalForm" .= t]) (nrNormalForm r)
+    <> maybe [] (\e -> ["error"      .= e]) (nrError r)
+    <> liveMetaPairs (nrMeta r)
+
+-- | Result of @resolve_name@.
+--
+-- @inScope@ is WhyInScope's own verdict on the name as written.  When it is
+-- false the candidates may still be non-empty: the § 2.6 recovery ran, and
+-- @recovered@ names the route — @ambiguous-name-error@ (the name is in scope
+-- ambiguously, or invisible to the completed toplevel scope) or
+-- @did-you-mean@ (Agda's suggestions, each then resolved for its chain).
+data ResolveNameResult = ResolveNameResult
+  { rnrName       :: Text
+  , rnrScope      :: Text
+  , rnrInScope    :: Bool
+  , rnrCandidates :: [NameCandidate]
+  , rnrRecovered  :: Maybe Text
+  , rnrError      :: Maybe LiveError
+  , rnrMeta       :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON ResolveNameResult where
+  toJSON r = object $
+    [ "name"       .= rnrName r
+    , "scope"      .= rnrScope r
+    , "inScope"    .= rnrInScope r
+    , "candidates" .= rnrCandidates r
+    ]
+    <> maybe [] (\x -> ["recovered" .= x]) (rnrRecovered r)
+    <> maybe [] (\e -> ["error"     .= e]) (rnrError r)
+    <> liveMetaPairs (rnrMeta r)
+
+-- | Result of @definition_of@: the located definitions of every candidate
+-- the name resolves to, plus the descriptions of candidates whose site the
+-- prose did not carry (so a partial answer is never mistaken for a total
+-- one).
+data DefinitionOfResult = DefinitionOfResult
+  { dorName        :: Text
+  , dorScope       :: Text
+  , dorDefinitions :: [DefSite]
+  , dorUnlocated   :: [Text]
+  , dorRecovered   :: Maybe Text
+  , dorError       :: Maybe LiveError
+  , dorMeta        :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON DefinitionOfResult where
+  toJSON r = object $
+    [ "name"        .= dorName r
+    , "scope"       .= dorScope r
+    , "definitions" .= dorDefinitions r
+    , "unlocated"   .= dorUnlocated r
+    ]
+    <> maybe [] (\x -> ["recovered" .= x]) (dorRecovered r)
+    <> maybe [] (\e -> ["error"     .= e]) (dorError r)
+    <> liveMetaPairs (dorMeta r)
+
+-- | Result of @exports_of@.  Exactly one of @exports@ / @error@ is present.
+data ExportsOfResult = ExportsOfResult
+  { exrModule  :: Text
+  , exrExports :: Maybe [ExportEntry]
+  , exrError   :: Maybe LiveError
+  , exrMeta    :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON ExportsOfResult where
+  toJSON r = object $
+    [ "module" .= exrModule r ]
+    <> maybe [] (\es -> ["exports" .= es]) (exrExports r)
+    <> maybe [] (\e  -> ["error"   .= e]) (exrError r)
+    <> liveMetaPairs (exrMeta r)
+
+-- | InteractionFailure: the interaction lane's process failed this call — it
+-- could not be spawned, it hit the timeout and was killed by the group
+-- ladder, or it crashed mid-command.  Serialized as the error text of an
+-- @isError@ tool result (never a JSON-RPC -32603, the issue-#101 rule), with
+-- everything a client needs to see what was attempted: the root, the wire
+-- lines sent, the child's last words, and the same command/project echo the
+-- successful path carries.
+data InteractionFailure = InteractionFailure
+  { xfEvent      :: Text            -- ^ @timeout@ | @crash@ | @spawn-failure@.
+  , xfMessage    :: Text
+  , xfStderrTail :: [Text]          -- ^ Newest first, bounded.
+  , xfElapsedMs  :: Int
+  , xfRoot       :: FilePath
+  , xfIotcm      :: [Text]
+  , xfCommand    :: CommandEcho
+  , xfProject    :: ProjectContext
+  } deriving (Eq, Show)
+
+instance ToJSON InteractionFailure where
+  toJSON f = object
+    [ "error"      .= xfMessage f
+    , "event"      .= xfEvent f
+    , "timedOut"   .= (xfEvent f == "timeout")
+    , "stderrTail" .= xfStderrTail f
+    , "elapsedMs"  .= xfElapsedMs f
+    , "root"       .= xfRoot f
+    , "iotcm"      .= xfIotcm f
+    , "command"    .= xfCommand f
+    , "project"    .= xfProject f
     ]

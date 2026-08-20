@@ -53,6 +53,7 @@ library
     AgdaMCP.Gate
     AgdaMCP.Corpus
     AgdaMCP.Tools.CheckProject
+    AgdaMCP.Tools.LiveQueries
     AgdaMCP.Tools.ProofState
     AgdaMCP.Tools.Search
   build-depends:

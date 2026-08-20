@@ -121,7 +121,7 @@ module AgdaMCP.Interaction
 
 import Control.Concurrent (ThreadId, forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
-  (MVar, modifyMVar, newMVar, putMVar, readMVar, takeMVar, tryTakeMVar)
+  (MVar, modifyMVar, newMVar, putMVar, readMVar, tryTakeMVar)
 import Control.Exception (SomeException, catch, throwIO, try)
 import Control.Monad (forever)
 import Data.Aeson (Value (..), decodeStrict')
@@ -640,18 +640,24 @@ withLane il cfg root body = do
         Just _  -> fmap (\l -> (l, True)) <$> spawnLane cfg root
     reviveOrSpawn Nothing = fmap (\l -> (l, True)) <$> spawnLane cfg root
 
--- | spawnLane: start @agda --interaction-json@ in the root, wire up the
--- stderr drainer, and flush the startup noise with one sentinel so no
--- command's response collection can misread it (§ 2.2 of the design
--- document).  Project flags do not ride the process argv — they ride each
--- @Cmd_load@ — so one child serves every file under its root.
+-- | spawnLane: start @agda --interaction-json@, wire up the stderr drainer,
+-- and flush the startup noise with one sentinel so no command's response
+-- collection can misread it (§ 2.2 of the design document).  Project flags do
+-- not ride the process argv — they ride each @Cmd_load@ — so one child serves
+-- every file under its root.
+--
+-- The child runs in the SERVER'S working directory, exactly as the batch
+-- lane's one-shot @agda@ does ('AgdaMCP.Agda.runAgda' passes no cwd): the
+-- server's @--agda-flags@ may name paths relative to that directory (the
+-- shipped @--library-file=agda/libraries@ is exactly that), and the two lanes
+-- must resolve one file against one tree.  The root parameter keys the lane's
+-- registry slot and bookkeeping; it is not a chdir.
 spawnLane :: AgdaConfig -> FilePath -> IO (Either LaneFailure Lane)
 spawnLane cfg root = do
   started <- try $ createProcess (proc (agdaBin cfg) ["--interaction-json"])
     { std_in  = CreatePipe
     , std_out = CreatePipe
     , std_err = CreatePipe
-    , cwd     = Just root
       -- Its own process group, exactly as the batch lane spawns agda, so the
       -- timeout ladder can reach any descendant.
     , create_group = True

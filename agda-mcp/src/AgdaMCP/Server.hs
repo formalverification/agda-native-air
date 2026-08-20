@@ -63,7 +63,10 @@ import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, Buffe
 
 import AgdaMCP.Agda (AgdaConfig)
 import AgdaMCP.Gate (GateConfig)
+import AgdaMCP.Interaction
+  (InteractionLanes, newInteractionLanes, shutdownLanes)
 import AgdaMCP.Tools.CheckProject (handleCheckProject)
+import AgdaMCP.Tools.LiveQueries
 import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
 import AgdaMCP.Types (CorpusIndex, ToolFailure (..))
@@ -131,10 +134,10 @@ mkError reqId code msg = object
 
 -- | Build the tool definitions list.
 --
--- Proof-state tools are always available.
+-- Proof-state and live-query tools are always available.
 -- Search tools are only registered when a corpus is loaded.
 toolDefinitions :: ServerConfig -> Value
-toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
+toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
   where
     -- The hole model shared by all four tool descriptions (issues #71/#73):
     -- every Agda hole syntax is enumerated, comments and prose never count,
@@ -280,6 +283,94 @@ toolDefinitions cfg = toJSON $ proofStateTools <> searchTools
           ]
           []
        ]
+    -- The interaction-lane tools (issue #75).  Their descriptions carry the
+    -- two-lane boundary — these inform and never decide a build verdict —
+    -- because an agent picks a tool by reading its description and nothing
+    -- else (the § 6 meta-suggestion of the feedback document).
+    liveQueryTools =
+      [ toolDef "type_of"
+          ("Infer the type of an Agda expression IN A FILE'S SCOPE, without \
+           \editing the file — the expression need not appear in it (Agda's \
+           \C-c C-d). Answers {expr, scope, type} on success and {expr, \
+           \scope, error: {stage, code?, message}} when the expression does \
+           \not typecheck there — that negative is an answer, not a tool \
+           \failure. "
+           <> liveLineNote <> " " <> liveLaneNote)
+          [ prop "filePath" "string"  liveFilePathDoc
+          , prop "expr"     "string"  "The Agda expression to type. It is sent \
+              \verbatim (any syntax a hole would accept); it does not have to \
+              \occur in the file."
+          , prop "line"     "integer" liveLineDoc
+          ]
+          ["filePath", "expr"]
+
+      , toolDef "normalize"
+          ("Evaluate an Agda expression to normal form IN A FILE'S SCOPE, \
+           \without editing the file (Agda's C-c C-n). Answers {expr, scope, \
+           \normalForm} on success and an in-band error object when the \
+           \expression does not typecheck there. "
+           <> liveLineNote <> " " <> liveLaneNote)
+          [ prop "filePath" "string"  liveFilePathDoc
+          , prop "expr"     "string"  "The Agda expression to evaluate, sent \
+              \verbatim; it does not have to occur in the file."
+          , prop "line"     "integer" liveLineDoc
+          ]
+          ["filePath", "expr"]
+
+      , toolDef "resolve_name"
+          ("What does this name resolve to here, and why? Answers every \
+           \candidate with its provenance chain — {description, qualified, \
+           \provenance: [{step, site?}], definition?} — resolving re-exports \
+           \and module applications that grep cannot see; an AmbiguousName \
+           \situation returns EVERY candidate. inScope is Agda's verdict on \
+           \the name as written; when it is false the tool still recovers \
+           \candidates where it can (recovered says how: \
+           \'ambiguous-name-error' — the name is in scope ambiguously or \
+           \invisible to the completed top-level scope — or 'did-you-mean', \
+           \Agda's own suggestions, each re-resolved for its chain). An empty \
+           \candidates list with inScope:false means the name really is \
+           \unknown there. "
+           <> liveLineNote <> " " <> liveLaneNote)
+          [ prop "filePath" "string"  liveFilePathDoc
+          , prop "name"     "string"  "The name to resolve, qualified or not, \
+              \exactly as it would appear in the file."
+          , prop "line"     "integer" liveLineDoc
+          ]
+          ["filePath", "name"]
+
+      , toolDef "definition_of"
+          ("Where is this name defined? Answers {definitions: [{qualified, \
+           \file, line, col, endLine, endCol}]} — the defining file and \
+           \position of every candidate the name resolves to, chased through \
+           \re-exports and barrel modules to the original definition (the \
+           \single most common grep, answered by the type-checker instead). \
+           \unlocated lists candidates whose site Agda's answer did not \
+           \carry, so a partial answer is never mistaken for a total one. "
+           <> liveLineNote <> " " <> liveLaneNote)
+          [ prop "filePath" "string"  liveFilePathDoc
+          , prop "name"     "string"  "The name to locate, qualified or not."
+          , prop "line"     "integer" liveLineDoc
+          ]
+          ["filePath", "name"]
+
+      , toolDef "exports_of"
+          ("The public surface of a module: every exported name with its \
+           \type, as {exports: [{name, type}]} — so a barrel omission is \
+           \caught before compiling against it. The module is named FROM A \
+           \FILE'S SCOPE: pass the module name as that file can write it \
+           \(imported directly or through re-exports); a module the file's \
+           \scope cannot name answers with an in-band NotInScope error. The \
+           \empty string names the file's own top-level module and lists its \
+           \definitions. "
+           <> liveLaneNote)
+          [ prop "filePath" "string"  liveFilePathDoc
+          , prop "module"   "string"  "The module whose exports to list, as \
+              \nameable in filePath's scope; \"\" for the file's own \
+              \top-level module."
+          ]
+          ["filePath", "module"]
+      ]
+
     searchTools
       | isJust (scCorpusIndex cfg) =
           [ toolDef "search_by_name"
@@ -576,6 +667,61 @@ latencyNote =
   <> " checkedFromSource is omitted when the run died before producing evidence"
   <> " either way (e.g. a startup failure, or a timeout before any output)."
 
+-- | liveLaneNote: the interaction-lane contract, stated in every live-query
+-- tool description (issue #75): the process model and its latency, the
+-- verdict boundary, the in-band error model, and the response echo.
+liveLaneNote :: Text
+liveLaneNote =
+  "LIVE QUERY (interaction lane): answered by a persistent agda \
+  \--interaction-json process this server keeps per project root. The file \
+  \is loaded once and re-loaded only when it changes on disk or its flags \
+  \change (lane.load in the response says what happened: reused, first, \
+  \switch, changed, or retry), so the FIRST question about a file costs one \
+  \load — seconds, comparable to one check_file — and every further question \
+  \about the unchanged file is milliseconds. Editing a dependency is picked \
+  \up when this file itself is next re-loaded. THIS TOOL INFORMS AND NEVER \
+  \DECIDES A BUILD VERDICT: interaction-mode agda is tolerant (it loads \
+  \files with open holes), so there is no success or verdict field here; \
+  \check_file, check_project, and fill_hole remain the only verdict sources. \
+  \A file that does not load answers with error.stage='load' carrying Agda's \
+  \message, and the query is not run. A process-level failure — timeout \
+  \(the same --timeout bound as the batch tools; the child is killed and \
+  \respawned on next use), crash, or could-not-start — is an isError result \
+  \whose text is a JSON object naming the event, the root, the exact IOTCM \
+  \lines sent, and agda's last stderr lines. EVERY response echoes: lane \
+  \{root, pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm}, command \
+  \{binary, args, cwd} (the persistent child; per-file flags ride the \
+  \Cmd_load line visible in lane.iotcm), project {the same block the batch \
+  \tools report}, elapsedMs, and checkedFromSource (whether this call \
+  \re-typechecked the file from source)."
+
+-- | liveLineNote: what the optional @line@ argument selects, and why it
+-- matters for scope questions (the probed § 2.6 degradation).
+liveLineNote :: Text
+liveLineNote =
+  "SCOPE: if line falls inside a hole, the query runs in that goal's scope — \
+  \local variables become visible, and names opened from file-local modules \
+  \resolve that the completed top-level scope of a hole-free file loses. \
+  \Otherwise it runs against the file's top-level scope. The response's \
+  \scope field says which happened."
+
+-- | liveFilePathDoc: the path rule for live-query tools — the batch tools'
+-- resolution rule (issue #101), plus what the file means to a scope query.
+liveFilePathDoc :: Text
+liveFilePathDoc =
+  "The Agda file whose scope answers the question. PASS AN ABSOLUTE PATH; a \
+  \relative one is resolved against THIS SERVER'S working directory, and a \
+  \path naming no readable file is refused with an error naming the path as \
+  \resolved. Every literate flavour Agda 2.8 supports is accepted, with all \
+  \positions in literate-file coordinates."
+
+-- | liveLineDoc: the @line@ property's contract.
+liveLineDoc :: Text
+liveLineDoc =
+  "Optional 1-based line in the file as written. Inside a hole: the query \
+  \runs in that goal's scope (locals visible). Elsewhere or omitted: the \
+  \file's top-level scope."
+
 -- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
 toolDef name desc props required = toolDefWith name desc props required []
@@ -640,19 +786,25 @@ runServer cfg = do
   -- Ensure line buffering for correct MCP framing.
   hSetBuffering stdin  LineBuffering
   hSetBuffering stdout LineBuffering
-  loop
+  -- The interaction lanes (issue #75) are runtime state, not configuration:
+  -- created here, threaded to dispatch, and shut down when stdin closes, so
+  -- no agda child outlives the server.
+  lanes <- newInteractionLanes
+  loop lanes
   where
-    loop = do
+    loop lanes = do
       eof <- isEOF
       if eof
-        then hPutStrLn stderr "agda-mcp: stdin closed, shutting down."
+        then do
+          shutdownLanes lanes
+          hPutStrLn stderr "agda-mcp: stdin closed, shutting down."
         else do
           line <- LBS.fromStrict <$> BS8.hGetLine stdin
           when (not $ LBS.null line) $
             case decode line of
               Nothing -> sendResponse $ mkError Nothing (-32700) "Parse error"
               Just req -> do
-                result <- try (handleRequest cfg req)
+                result <- try (handleRequest cfg lanes req)
                 case result of
                   Left (e :: SomeException) ->
                     case fromException e of
@@ -665,7 +817,7 @@ runServer cfg = do
                           "Internal error"
                   Right (Just r)  -> sendResponse r
                   Right Nothing   -> pure ()
-          loop
+          loop lanes
 
 sendResponse :: Value -> IO ()
 sendResponse v = do
@@ -674,7 +826,8 @@ sendResponse v = do
 
 
 -- | handleRequest: dispatcher
-handleRequest :: ServerConfig -> JsonRpcRequest -> IO (Maybe Value)
+handleRequest
+  :: ServerConfig -> InteractionLanes -> JsonRpcRequest -> IO (Maybe Value)
 
 -- Copilot suggested, "JSON-RPC notifications (requests without an id) must not
 -- receive a response. Currently handleRequest will still return Just ... for methods
@@ -691,7 +844,7 @@ handleRequest :: ServerConfig -> JsonRpcRequest -> IO (Maybe Value)
 -- lot of boilerplate for no practical gain right now.
 
 -- | MCP handshake: initialize
-handleRequest cfg req | rpcMethod req == "initialize" = do
+handleRequest cfg _lanes req | rpcMethod req == "initialize" = do
   let result = object
         [ "protocolVersion" .= ("2024-11-05" :: Text)
         , "capabilities"    .= object
@@ -705,16 +858,16 @@ handleRequest cfg req | rpcMethod req == "initialize" = do
   pure . Just $ mkResult (rpcId req) result
 
 -- MCP notification: initialized (no response)
-handleRequest _ req | rpcMethod req == "notifications/initialized" =
+handleRequest _ _lanes req | rpcMethod req == "notifications/initialized" =
   pure Nothing
 
 -- MCP: tools/list
-handleRequest cfg req | rpcMethod req == "tools/list" = do
+handleRequest cfg _lanes req | rpcMethod req == "tools/list" = do
   let result = object ["tools" .= toolDefinitions cfg]
   pure . Just $ mkResult (rpcId req) result
 
 -- MCP: tools/call
-handleRequest cfg req | rpcMethod req == "tools/call" = do
+handleRequest cfg lanes req | rpcMethod req == "tools/call" = do
   let params = fromMaybe (Object mempty) (rpcParams req)
   case params of
     Object o -> do
@@ -724,13 +877,13 @@ handleRequest cfg req | rpcMethod req == "tools/call" = do
           args = case KM.lookup "arguments" o of
             Just v  -> v
             Nothing -> Object mempty
-      result <- dispatchToolGuarded cfg toolName args
+      result <- dispatchToolGuarded cfg lanes toolName args
       pure . Just $ mkResult (rpcId req) result
     _ ->
       pure . Just $ mkError (rpcId req) (-32602) "Invalid params"
 
 -- Unrecognised method
-handleRequest _ req =
+handleRequest _ _lanes req =
   pure . Just $ mkError (rpcId req) (-32601) ("Method not found: " <> rpcMethod req)
 
 
@@ -762,9 +915,10 @@ handleRequest _ req =
 --
 -- Asynchronous exceptions are re-thrown rather than reported: a cancelled
 -- server is not a failed tool call, and the loop above is what shuts it down.
-dispatchToolGuarded :: ServerConfig -> Text -> Value -> IO Value
-dispatchToolGuarded cfg name args = do
-  outcome <- try (dispatchTool cfg name args >>= forceResponse)
+dispatchToolGuarded
+  :: ServerConfig -> InteractionLanes -> Text -> Value -> IO Value
+dispatchToolGuarded cfg lanes name args = do
+  outcome <- try (dispatchTool cfg lanes name args >>= forceResponse)
   case outcome of
     Right value -> pure value
     Left (e :: SomeException) -> case fromException e of
@@ -809,39 +963,39 @@ forceResponse value = do
 --
 -- Proof-state tools delegate to AgdaMCP.Tools.ProofState (IO, calls Agda).
 -- Search tools delegate to AgdaMCP.Tools.Search (pure, uses CorpusIndex).
-dispatchTool :: ServerConfig -> Text -> Value -> IO Value
+dispatchTool :: ServerConfig -> InteractionLanes -> Text -> Value -> IO Value
 
 -- Proof-state tools (existing M1-2)
-dispatchTool cfg "get_goal" args =
+dispatchTool cfg _lanes "get_goal" args =
   case Aeson.fromJSON args of
     Aeson.Success p -> failureToMcp <$> handleGetGoal (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg "fill_hole" args =
+dispatchTool cfg _lanes "fill_hole" args =
   case Aeson.fromJSON args of
     Aeson.Success p -> failureToMcp <$> handleFillHole (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg "check_file" args =
+dispatchTool cfg _lanes "check_file" args =
   case Aeson.fromJSON args of
     Aeson.Success p -> failureToMcp <$> handleCheckFile (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg "get_diagnostics" args =
+dispatchTool cfg _lanes "get_diagnostics" args =
   case Aeson.fromJSON args of
     Aeson.Success p -> failureToMcp <$> handleGetDiagnostics (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Whole-project gate (M1-5, issue #78).  The one tool that takes the gate
 -- configuration as well as the Agda one.
-dispatchTool cfg "check_project" args =
+dispatchTool cfg _lanes "check_project" args =
   case Aeson.fromJSON args of
     Aeson.Success p ->
       failureToMcp <$> handleCheckProject (scAgdaConfig cfg) (scGateConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Search tools (new M1-3)
-dispatchTool cfg "search_by_name" args =
+dispatchTool cfg _lanes "search_by_name" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
@@ -849,7 +1003,7 @@ dispatchTool cfg "search_by_name" args =
         Aeson.Success p -> pure . eitherToMcp $ handleSearchByName idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg "search_by_type" args =
+dispatchTool cfg _lanes "search_by_type" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
@@ -857,7 +1011,7 @@ dispatchTool cfg "search_by_type" args =
         Aeson.Success p -> pure . eitherToMcp $ handleSearchByType idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg "get_dependencies" args =
+dispatchTool cfg _lanes "get_dependencies" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
@@ -865,8 +1019,34 @@ dispatchTool cfg "get_dependencies" args =
         Aeson.Success p -> pure . eitherToMcp $ handleGetDependencies idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
+-- Live-query tools (issue #75): the interaction lane.
+dispatchTool cfg lanes "type_of" args =
+  case Aeson.fromJSON args of
+    Aeson.Success p -> failureToMcp <$> handleTypeOf lanes (scAgdaConfig cfg) p
+    Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+dispatchTool cfg lanes "normalize" args =
+  case Aeson.fromJSON args of
+    Aeson.Success p -> failureToMcp <$> handleNormalize lanes (scAgdaConfig cfg) p
+    Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+dispatchTool cfg lanes "resolve_name" args =
+  case Aeson.fromJSON args of
+    Aeson.Success p -> failureToMcp <$> handleResolveName lanes (scAgdaConfig cfg) p
+    Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+dispatchTool cfg lanes "definition_of" args =
+  case Aeson.fromJSON args of
+    Aeson.Success p -> failureToMcp <$> handleDefinitionOf lanes (scAgdaConfig cfg) p
+    Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+dispatchTool cfg lanes "exports_of" args =
+  case Aeson.fromJSON args of
+    Aeson.Success p -> failureToMcp <$> handleExportsOf lanes (scAgdaConfig cfg) p
+    Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
 -- Unknown tool
-dispatchTool _ name _ =
+dispatchTool _ _ name _ =
   pure $ toolError ("Unknown tool: " <> name)
 
 
@@ -897,10 +1077,11 @@ eitherToMcp = either toolError okToMcp
 failureToMcp :: ToJSON a => Either ToolFailure a -> Value
 failureToMcp = either render okToMcp
   where
-    render (FailMessage msg) = toolError msg
-    render (FailTimeout tf)  = structuredError (toJSON tf)
-    render (FailProject pm)  = structuredError (toJSON pm)
-    render (FailPath pf)     = structuredError (toJSON pf)
+    render (FailMessage msg)     = toolError msg
+    render (FailTimeout tf)      = structuredError (toJSON tf)
+    render (FailProject pm)      = structuredError (toJSON pm)
+    render (FailPath pf)         = structuredError (toJSON pf)
+    render (FailInteraction xf)  = structuredError (toJSON xf)
 
     structuredError payload = object
       [ "content" .= [ object [ "type" .= ("text" :: Text)
