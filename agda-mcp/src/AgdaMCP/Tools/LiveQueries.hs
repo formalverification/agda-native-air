@@ -3,49 +3,47 @@
 -- File: agda-native-air/agda-mcp/src/AgdaMCP/Tools/LiveQueries.hs
 --
 -- Description:
---   The interaction-lane tools (issue #75): type_of, normalize, resolve_name,
---   definition_of, and exports_of.  Each answers a read-only question about a
---   file's scope from the persistent @agda --interaction-json@ child that
---   AgdaMCP.Interaction runs per resolved project root — no edit to the file,
---   no cold subprocess per question, and no build verdict anywhere in the
---   response: interaction mode is tolerant by design, so verdicts stay with
---   the batch tools (the two-lane policy of
---   docs/agda-mcp-interaction-lane.md § 1).
+--   The interaction-lane tools: type_of, normalize, resolve_name, definition_of,
+--   and exports_of.  Each answers a read-only question about a file's scope from
+--   the persistent @agda --interaction-json@ child that AgdaMCP.Interaction runs
+--   per resolved project root.  There's no edit to the file, no cold subprocess
+--   per question, and no build verdict anywhere in the response; interaction mode
+--   is tolerant by design, so verdicts stay with the batch tools (the two
+--   interface lanes described in docs/agda-mcp-interaction-lane.md § 1).
 --
 --   Every handler shares one spine ('withLiveFile'): resolve and read the
---   requested path (issue #101), resolve its library context and refuse a
---   wrong-checkout call (issue #76), take the root's lane, and make sure the
---   file is loaded — re-loading only on evidence (first sight, switch,
---   changed stamp or flags, failed previous load).  The handlers then differ
---   only in which IOTCM command they send and how they shape its response.
+--   requested path, resolve its library context and refuse a wrong-checkout call,
+--   take the root's lane, and make sure the file is loaded (re-loading only on
+--   evidence: first sight, switch, changed stamp or flags, failed previous load).
+--   The handlers then differ only in which IOTCM command they send and how they
+--   shape its response.
 --
 --   Failure taxonomy, deliberately three-way:
 --
---   * A lane-process failure — spawn failure, timeout kill, crash — is a
---     'AgdaMCP.Types.InteractionFailure', an @isError@ tool result carrying
---     the root, the wire lines sent, and the child's last words (issue #101:
---     never an opaque -32603).
---   * An Agda-level negative — the file does not load, the expression does
---     not typecheck, the module is not in scope — is an in-band
---     'AgdaMCP.Types.LiveError' inside a success-shaped response, because
---     for a "check a term without committing to it" tool the negative answer
---     is a product, exactly as fill_hole's @type_error@ status is.
+--   * A lane-process failure (spawn failure, timeout kill, crash) is a
+--     'AgdaMCP.Types.InteractionFailure', an @isError@ tool result carrying the
+--     root, wire lines sent, and the child's last words (never an opaque -32603).
+--   * An Agda-level negative (the file does not load, the expression does not
+--     typecheck, the module is not in scope) is an in-band 'AgdaMCP.Types.LiveError'
+--     inside a success-shaped response, because for a "check a term without
+--     committing to it" tool the negative answer is a product, exactly as
+--     fill_hole's @type_error@ status is.
 --   * A path or project refusal is the same structured failure the batch
 --     tools raise, from the same 'withSourceFile' / 'withProject' seams.
 --
 --   Scope selection: an optional @line@ argument names the goal whose range
---   contains it, and the query runs goal-scoped there — which is what makes
---   local variables visible, and on a hole-free file is the difference
---   between seeing opened names and not (the § 2.6 degradation).  With no
---   line, or a line inside no goal, the query runs against the file's
---   top-level scope, and the response's @scope@ field says which happened.
+--   contains it, and the query runs goal-scoped there, which is what makes local
+--   variables visible, and on a hole-free file is the difference between seeing
+--   opened names and not (the § 2.6 degradation).  With no line, or a line inside
+--   no goal, the query runs against the file's top-level scope, and the-response's
+--   @scope@ field says which happened.
 --
 --   resolve_name additionally runs the § 2.6 recovery when WhyInScope says
---   "not in scope": an inference of the bare name whose AmbiguousName error
---   lists every candidate with its binding site, or whose did-you-mean
---   suggestions are each re-resolved for their full provenance chains.  The
---   response's @recovered@ field names the route taken, so a client can tell
---   a first-class answer from a reconstructed one.
+--   "not in scope": an inference of the bare name whose AmbiguousName error lists
+--   every candidate with its binding site, or whose did-you-mean suggestions are
+--   each re-resolved for their full provenance chains.  The response's
+--   @recovered@ field names the route taken, so a client can tell a first-class
+--   answer from a reconstructed one.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -96,9 +94,9 @@ data LiveCtx = LiveCtx
   }
 
 -- | withLiveFile: the spine shared by all five handlers.  Mirrors the batch
--- tools' 'AgdaMCP.Tools.ProofState.withProject' flag assembly exactly — the
+-- tools' 'AgdaMCP.Tools.ProofState.withProject' flag assembly exactly (the
 -- server's flags, plus what resolution implies, plus the file's own directory
--- when nothing else reaches it — so a lane load resolves against the same
+-- when nothing else reaches it) so a lane load resolves against the same
 -- tree as a batch check of the same file, by construction.
 withLiveFile
   :: InteractionLanes
@@ -131,13 +129,12 @@ withLiveFile lanes cfg0 requested reload body =
                             <$> interactionFailure pc cfg startNs lf
           Right result -> pure result
 
--- | interactionFailure: shape a lane-level failure, wherever in the request
--- it struck.  The telemetry is real on every path: 'lfSent' carries the
--- wire lines the failing request attempted — 'doomWith' records them for
--- mid-request failures, the spawn path for its startup flush — and the
--- elapsed time runs from the request's own start.  Empty lines mean the
--- child could not even be created, or the registry refused the request at
--- shutdown; there was genuinely nothing to echo.
+-- | interactionFailure: shape a lane-level failure, wherever in the request it
+-- struck.  The telemetry is real on every path: 'lfSent' carries the wire lines
+-- the failing request attempted ('doomWith' records them for mid-request fails,
+-- the spawn path for its startup flush) and elapsed time runs from the request's
+-- own start.  Empty lines mean the child could not even be created, or the
+-- registry refused the request at shutdown; there was genuinely nothing to echo.
 interactionFailure
   :: ProjectContext -> AgdaConfig -> Word64 -> LaneFailure
   -> IO InteractionFailure
@@ -164,8 +161,8 @@ eventText LaneShutdown     = "shutdown"
 -- | laneCommandEcho: the child's invocation.  The per-file flags ride each
 -- Cmd_load rather than the process argv (design document § 3), which is why
 -- this echo is short and the @lane.iotcm@ lines carry the flags.  The child
--- inherits the server's working directory — batch parity, so relative server
--- flags resolve identically in both lanes — and that is the cwd echoed.
+-- inherits the server's working directory (batch parity, so relative server
+-- flags resolve identically in both lanes) and that is the cwd echoed.
 laneCommandEcho :: AgdaConfig -> IO CommandEcho
 laneCommandEcho cfg = do
   cwd <- getCurrentDirectory `catch` \(_ :: IOException) -> pure "."
@@ -258,8 +255,8 @@ runShaped ctx cmd shape = do
 -- Response extraction
 -- ---------------------------------------------------------------------------
 
--- | answerOf: the expression answer of the given kind — @InferredType@ or
--- @NormalForm@, whose @expr@ field carries it — accepted from either wire
+-- | answerOf: the expression answer of the given kind (@InferredType@ or
+-- @NormalForm@, whose @expr@ field carries it) accepted from either wire
 -- position: a toplevel @DisplayInfo@ of that kind, or the same payload
 -- wrapped in a goal-scoped @GoalSpecific.goalInfo@.
 answerOf :: Text -> [IResponse] -> Maybe Text
@@ -284,8 +281,8 @@ whyInScopeMessageOf rs = listToMaybe
   [ m | IDisplayInfo "WhyInScope" (Object io) <- rs
       , Just m <- [textOf "message" io] ]
 
--- | moduleSurfaceOf: the full surface of a @ModuleContents@ answer — the
--- value members (@contents@), the exported nested modules (@names@ — probed:
+-- | moduleSurfaceOf: the full surface of a @ModuleContents@ answer; the
+-- value members (@contents@), the exported nested modules (@names@ probed:
 -- a nested @module@ appears there and nowhere in @contents@), and the
 -- @telescope@ passed through verbatim when nonempty (never observed under
 -- 2.8.0, where a parameterized module's binders arrive folded into each
@@ -384,7 +381,7 @@ handleTypeOf lanes cfg0 p =
             }
 
 -- | opaqueAnswer: the fallback error when Agda answered with neither the
--- expected payload nor an error — named as such rather than guessed at,
+-- expected payload nor an error; this is named as such rather than guessed at,
 -- with the stage supplied by the caller to match its 'queryError'.
 opaqueAnswer :: Text -> [IResponse] -> LiveError
 opaqueAnswer stage rs = LiveError
@@ -406,8 +403,8 @@ opaqueAnswer stage rs = LiveError
 -- normalize
 -- ---------------------------------------------------------------------------
 
--- | handleNormalize: Agda's @C-c C-n@ — evaluate an expression to normal
--- form in the file's scope.
+-- | handleNormalize: Agda's @C-c C-n@ (evaluate an expression to normal form
+-- in the file's scope).
 handleNormalize
   :: InteractionLanes -> AgdaConfig -> NormalizeParams
   -> IO (Either ToolFailure NormalizeResult)
@@ -451,8 +448,8 @@ data Resolution = Resolution
   , resError      :: Maybe LiveError
   }
 
--- | resolveMachinery: WhyInScope first; on "not in scope", the § 2.6
--- recovery — an inference of the bare name whose AmbiguousName error carries
+-- | resolveMachinery: WhyInScope first; on "not in scope" (the § 2.6 recovery)
+-- this is an inference of the bare name whose AmbiguousName error carries
 -- every candidate's binding site, or whose did-you-mean suggestions are each
 -- re-resolved for their chains.
 resolveMachinery
@@ -524,8 +521,8 @@ resolveMachinery ctx name mLine mCol = do
       , ncDefinition  = defSiteFrom (Just q) <$> mLoc
       }
 
--- | handleResolveName: the AmbiguousName moment — candidates with their
--- provenance chains.
+-- | handleResolveName: the AmbiguousName moment (candidates with their
+-- provenance chains).
 handleResolveName
   :: InteractionLanes -> AgdaConfig -> ResolveNameParams
   -> IO (Either ToolFailure ResolveNameResult)
@@ -553,7 +550,7 @@ handleResolveName lanes cfg0 p =
               }
 
 -- | handleDefinitionOf: the single most common grep an agent runs, answered
--- by the type-checker — through re-exports and module applications, which
+-- by the type-checker, through re-exports and module applications, which
 -- grep cannot see.
 handleDefinitionOf
   :: InteractionLanes -> AgdaConfig -> DefinitionOfParams

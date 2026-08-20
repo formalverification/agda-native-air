@@ -3,43 +3,41 @@
 -- File: agda-native-air/agda-mcp/src/AgdaMCP/Interaction.hs
 --
 -- Description:
---   The interaction lane (issue #75): a persistent @agda --interaction-json@
---   child per resolved project root, serving read-only knowledge queries —
---   types, normal forms, name resolution, module exports — as structured data.
+--   The interaction lane: a persistent @agda --interaction-json@ child per
+--   resolved project root, serving read-only knowledge queries (types, normal
+--   forms, name resolution, module exports) as structured data.
 --
---   This module is the process and protocol layer only.  The tool handlers
---   live in AgdaMCP.Tools.LiveQueries; the wire protocol itself — framing,
---   escaping, command shapes, response kinds, and every gotcha the design
---   observes — is documented in docs/agda-mcp-interaction-lane.md, which was
---   probed against the pinned Agda 2.8.0 before this module was written.
---   Where behavior here looks arbitrary (the sentinel after every command,
---   the startup flush, the reload policy), that document holds the measured
---   reason.
+--   This module is the process and protocol layer only.  The tool handlers live
+--   in AgdaMCP.Tools.LiveQueries; the wire protocol itself (framing, escaping,
+--   command shapes, response kinds, and every gotcha the design observes) is
+--   documented in docs/agda-mcp-interaction-lane.md, which was probed against the
+--   pinned Agda 2.8.0 before this module was written.  Where behavior here might
+--   seem arbitrary (the sentinel after every command, the startup flush, the
+--   reload policy), that document holds the measured reason.
 --
 --   The two-lane policy, restated where the second lane is implemented:
 --   nothing in this module ever produces a build verdict.  Interaction mode
---   is tolerant — @Cmd_load@ SUCCEEDS on a file with open holes — so
---   check_file, check_project, and fill_hole keep reading batch @agda@'s
---   exit code, and the tools built on this lane say in their descriptions
---   that they inform and never decide.
+--   is tolerant (@Cmd_load@ SUCCEEDS on a file with open holes) so check_file,
+--   check_project, and fill_hole keep reading batch @agda@'s exit code, and the
+--   tools built on this lane say in their descriptions that they inform and never
+--   decide.
 --
 --   Design notes, briefly (each is probed, none is assumed):
 --
---   * One child per resolved project root ('AgdaMCP.Project' supplies the
---     root, per call, exactly as it does for the batch tools).  Since #103 a
---     server is routinely asked about foreign checkouts, so the registry is
---     a map of roots, not a slot.
---   * Requests are serialized per lane under an 'MVar'.  The registry is
---     safe for concurrent callers on distinct roots, but the stdio server
---     loop that drives it today is itself serial, so at most one request is
---     ever in flight — capability, not yet behavior.  Responses are read
---     line by line, keyed on the JSON @kind@ field, never on line position;
---     @JSON> @ prompt markers float mid-stream and are stripped wherever
---     they appear.
---   * After every command the lane sends @Cmd_show_version@ and collects
---     until that sentinel's unmistakable response.  Commands execute
---     strictly in order (a reader thread queues them for a single
---     executor), so everything before the sentinel belongs to the command.
+--   * One child per resolved project root ('AgdaMCP.Project' supplies the root,
+--     per call, exactly as it does for the batch tools).  A server is now
+--     routinely asked about foreign checkouts, so the registry is a map of roots,
+--     not a slot.
+--   * Requests are serialized per lane under an 'MVar'.  The registry is safe for
+--     concurrent callers on distinct roots, but the stdio server loop that drives
+--     it today is itself serial, so at most one request is ever in flight; this
+--     is capability, not yet behavior.  Responses are read line by line, keyed on
+--     the JSON @kind@ field, never on line position; @JSON> @ prompt markers
+--     float mid-stream and are stripped wherever they appear.
+--   * After every command the lane sends @Cmd_show_version@ and collects until
+--     that sentinel's unmistakable response.  Commands execute strictly in order
+--     (a reader thread queues them for a single executor), so everything before
+--     the sentinel belongs to the command.
 --   * Every string embedded in an IOTCM line is a Haskell string literal;
 --     'show' is the escaper.  A raw @\\x@ in an expression rejects the whole
 --     line with a plain-text @cannot read:@ reply.
@@ -53,14 +51,13 @@
 --     is retried on every request, so a fix in a dependency is noticed at
 --     the first opportunity.
 --   * A hung command is handled with the issue-#77 ladder
---     ('AgdaMCP.Agda.escalateAndReap') applied to the child's process group,
---     and the lane is respawned on next use.  A crashed or hung lane
---     surfaces as structured data ('LaneFailure'), never as a bare JSON-RPC
---     -32603 — the #101 lesson.
+--     ('AgdaMCP.Agda.escalateAndReap') applied to the child's process group, and
+--     the lane is respawned on next use.  A crashed or hung lane surfaces as
+--     structured data ('LaneFailure'), never as a bare JSON-RPC -32603.
 --   * An idle lane is shut down by closing its stdin, which Agda answers by
---     exiting cleanly (probed: rc 0 on EOF); a reaper thread sweeps on a
---     fixed cadence.  Server shutdown latches the registry closed and drains
---     every lane, waiting for any a request still holds.
+--     exiting cleanly (probed: rc 0 on EOF); a reaper thread sweeps on a fixed
+--     cadence.  Server shutdown latches the registry closed and drains every
+--     lane, waiting for any a request still holds.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -179,10 +176,9 @@ data IResponse
   | IUnreadable Text          -- ^ A line that was not JSON.
   deriving (Eq, Show)
 
--- | IRange: a source range in the coordinates of the file as written —
--- 1-based line and column, literate coordinates for literate files (probed on
--- LiterateMd: the interaction point sits exactly where 'AgdaMCP.Holes' puts
--- the hole).
+-- | IRange: a source range in the coordinates of the file as written; 1-based
+-- line and column, literate coordinates for literate files (probed on LiterateMd:
+-- the interaction point sits exactly where 'AgdaMCP.Holes' puts the hole).
 data IRange = IRange
   { irLine    :: Int
   , irCol     :: Int
@@ -191,15 +187,14 @@ data IRange = IRange
   } deriving (Eq, Show)
 
 -- | IPoint: one interaction point, as announced by @Cmd_load@'s terminal
--- @InteractionPoints@ response.  The range is optional on the wire; a
--- rangeless point cannot be addressed by position and is kept only so the
--- count stays honest.
+-- @InteractionPoints@ response.  The range is optional on the wire; a rangeless
+-- point cannot be addressed by position and is kept only so the count stays honest.
 data IPoint = IPoint
   { ipId    :: Int
   , ipRange :: Maybe IRange
   } deriving (Eq, Show)
 
--- | LaneGoal: one visible goal from @AllGoalsWarnings@ — an interaction point
+-- | LaneGoal: one visible goal from @AllGoalsWarnings@, an interaction point
 -- together with the goal type Agda printed for it.  This is what lets a load
 -- answer "what does each hole want" with no source mutation at all.
 data LaneGoal = LaneGoal
@@ -212,8 +207,7 @@ data LaneGoal = LaneGoal
 --
 -- The marker is printed by the child's reader thread as it consumes input,
 -- concurrently with the executor's output, so it can stand alone, prefix a
--- response, or stack; it carries no framing information (§ 2.1 of the design
--- document).
+-- response, or stack; it carries no framing information (design doc § 2.1).
 stripPrompts :: Text -> Text
 stripPrompts t = case T.stripPrefix "JSON> " t of
   Just rest -> stripPrompts rest
@@ -265,12 +259,12 @@ errorMessageOf _ = Nothing
 
 -- | interactionPointsOf: the points of the first @InteractionPoints@ response
 -- in a collection, if any.  Its presence is what marks a load as successful
--- (§ 2.4 of the design document); a failed load never emits one.
+-- (design doc § 2.4); a failed load never emits one.
 interactionPointsOf :: [IResponse] -> Maybe [IPoint]
 interactionPointsOf rs = listToMaybe [ps | IInteractionPoints ps <- rs]
 
--- | goalsOf: the visible goals of the last @AllGoalsWarnings@ in a
--- collection — each goal's interaction point and printed type.
+-- | goalsOf: the visible goals of the last @AllGoalsWarnings@ in a collection;
+-- i.e., each goal's interaction point and printed type.
 goalsOf :: [IResponse] -> [LaneGoal]
 goalsOf rs = case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
   [] -> []
@@ -286,7 +280,7 @@ goalsOf rs = case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
       _ -> Nothing
     goalFrom _ = Nothing
 
--- | goalInfoOf: the @goalInfo@ object of a @GoalSpecific@ response — where
+-- | goalInfoOf: the @goalInfo@ object of a @GoalSpecific@ response; this is where
 -- goal-scoped answers (inferred types, goal contexts) live.
 goalInfoOf :: IResponse -> Maybe Value
 goalInfoOf (IDisplayInfo "GoalSpecific" (Object io)) = KM.lookup "goalInfo" io
@@ -294,11 +288,10 @@ goalInfoOf _ = Nothing
 
 -- | pointContaining: the interaction point whose range contains the 1-based
 -- position.  With a column, containment is positional (start inclusive, end
--- exclusive, matching the hole model's addressing) — which is what
--- distinguishes two goals sharing a line, whose scopes can differ (probed:
--- @(\ m -> {!!}) {!!}@ binds @m@ in the first hole only).  With a line
--- alone, the earliest point on that line wins, which the tool descriptions
--- state.
+-- exclusive, matching the hole model's addressing), which is what distinguishes
+-- two goals sharing a line, whose scopes can differ (probed: @(\ m -> {!!}) {!!}@
+-- binds @m@ in the first hole only).  With a line alone, the earliest point on
+-- that line wins, which the tool descriptions state.
 pointContaining :: Int -> Maybe Int -> [IPoint] -> Maybe IPoint
 pointContaining ln mCol ps = listToMaybe
   [ p | p <- ps, Just r <- [ipRange p], contains r ]
@@ -340,9 +333,9 @@ rangeField o = case KM.lookup "range" o of
 -- IOTCM construction
 -- ---------------------------------------------------------------------------
 
--- | hsShow: a Text as a Haskell string literal — the escaping the IOTCM
--- parser requires (§ 2.3 of the design document; probed: an unescaped @\\x@
--- rejects the whole line, and 'show'-style decimal escapes carry Unicode).
+-- | hsShow: a Text as a Haskell string literal, the escaping the IOTCM parser
+-- requires (design doc § 2.3; probed: an unescaped @\\x@ rejects the whole
+-- line, and 'show'-style decimal escapes carry Unicode).
 hsShow :: Text -> Text
 hsShow = T.pack . show . T.unpack
 
@@ -394,9 +387,9 @@ cmdGoalTypeContext :: Int -> Text
 cmdGoalTypeContext gid =
   "Cmd_goal_type_context Normalised " <> T.pack (show gid) <> " noRange \"\""
 
--- | cmdShowVersion: the sentinel.  State-free, fast, and its response —
--- @DisplayInfo@/@Version@ — occurs nowhere else, so it delimits the previous
--- command's output exactly (§ 2.1 of the design document).
+-- | cmdShowVersion: the sentinel.  State-free, fast, and its response
+-- (@DisplayInfo@/@Version@) occurs nowhere else, so it delimits the previous
+-- command's output exactly (design doc § 2.1).
 cmdShowVersion :: Text
 cmdShowVersion = "Cmd_show_version"
 
@@ -432,8 +425,8 @@ data LoadState = LoadState
 data FileStamp = FileStamp UTCTime Integer
   deriving (Eq, Show)
 
--- | LoadedInfo: what a successful load leaves behind — the interaction
--- points and each visible goal's type.
+-- | LoadedInfo: what a successful load leaves behind, the interaction points and
+-- each visible goal's type.
 data LoadedInfo = LoadedInfo
   { liPoints :: [IPoint]
   , liGoals  :: [LaneGoal]
@@ -444,12 +437,12 @@ data LoadedInfo = LoadedInfo
 -- concurrently.  @Nothing@ means no child is alive for this root.
 type LaneSlot = MVar (Maybe Lane)
 
--- | InteractionLanes: the registry — one slot per resolved project root —
--- plus the idle reaper's thread and the shutdown latch.  The latch is read
--- and written only under the 'ilSlots' lock, which is what orders every
--- request against 'shutdownLanes': a request that saw the registry open got
--- its slot into the map shutdown will drain, and one that arrives later is
--- refused before it can spawn anything.
+-- | InteractionLanes: the registry (one slot per resolved project root) plus the
+-- idle reaper's thread and the shutdown latch.  The latch is read and written
+-- only under the 'ilSlots' lock, which is what orders every request against
+-- 'shutdownLanes': a request that saw the registry open got its slot into the map
+-- shutdown will drain, and one that arrives later is refused before it can spawn
+-- anything.
 data InteractionLanes = InteractionLanes
   { ilSlots  :: MVar (Map FilePath LaneSlot)
   , ilReaper :: ThreadId
@@ -473,7 +466,7 @@ newInteractionLanes = do
   pure (InteractionLanes slots reaper closed)
   where
     -- Synchronous failures must not kill the reaper, but the asynchronous
-    -- 'ThreadKilled' from 'shutdownLanes' must — a blanket handler here would
+    -- 'ThreadKilled' from 'shutdownLanes' must; a blanket handler here would
     -- swallow it whenever the kill lands mid-sweep and leave the loop
     -- running forever (a Copilot review catch on PR 107).
     reapLoop slots = forever $ do
@@ -488,7 +481,7 @@ newInteractionLanes = do
       mapM_ (reapSlot now) (Map.elems m)
     -- Busy lanes (slot taken) are skipped, never waited on: the reaper must
     -- not queue behind a long request only to kill the lane that just
-    -- finished serving it.  Once taken, the slot is restored on EVERY exit —
+    -- finished serving it.  Once taken, the slot is restored on EVERY exit;
     -- an asynchronous kill landing between the take and the put would
     -- otherwise leave the slot empty, and every later request on that root
     -- would block forever on it.
@@ -506,14 +499,13 @@ newInteractionLanes = do
             then stopLane lane >> pure Nothing
             else pure (Just lane)
 
--- | shutdownLanes: latch the registry closed, stop the reaper, and stop
--- every lane — waiting for a slot an in-flight request still holds rather
--- than skipping it, or that request would restore a live child into a
--- detached slot nobody will ever look at again (a Copilot round-3 catch).
--- The wait is bounded in practice: the latch (set under the registry lock)
--- refuses new requests, and the holder finishes within its own @--timeout@.
--- In the shipped serial server no request can be in flight here at all, so
--- the take never blocks; the wait is for embeddings that cancel a server
+-- | shutdownLanes: latch the registry closed, stop the reaper, and stop every
+-- lane (waiting for a slot an in-flight request still holds rather than skipping
+-- it, or that request would restore a live child into a detached slot nobody ever
+-- looks at again).  The wait is bounded in practice: the latch (set under the
+-- registry lock) refuses new requests, and the holder finishes within its own
+-- @--timeout@.  In the shipped serial server no request can be in flight here at
+-- all, so the take never blocks; the wait is for embeddings that cancel a server
 -- while another thread is mid-request.  Harmless against lanes already dead,
 -- and idempotent.
 shutdownLanes :: InteractionLanes -> IO ()
@@ -530,7 +522,7 @@ shutdownLanes il = do
         Just lane -> stopLane lane >> putMVar slot Nothing
         Nothing   -> putMVar slot Nothing
 
--- | stopLane: close stdin — Agda exits cleanly on EOF (probed: rc 0) — then
+-- | stopLane: close stdin (Agda exits cleanly on EOF (probed: rc 0)) then
 -- make sure with the ladder.  'escalateAndReap' begins with SIGINT and always
 -- reaps, so a child that exited moments ago costs nothing further, and one
 -- that ignored the EOF cannot outlive the call.
@@ -547,14 +539,13 @@ stopLane lane = do
 -- | closeLaneHandles: release a dead lane's pipe handles, no signals.
 --
 -- The one caller is the revival path, where 'getProcessExitCode' has already
--- reaped the child — some time ago, possibly long ago.  Sending the ladder
--- there would be worse than the descriptor leak it fixes: 'groupAlive'
--- probes @kill(-pgid, 0)@, and a long-dead child's pgid can have been
--- recycled by an unrelated process group, which the ladder would then
--- SIGTERM.  (An interaction-mode agda spawns no descendants that could
--- legitimately outlive it — it never invokes GHC — so there is nothing for
--- the ladder to catch here anyway.)  The stderr drainer closes its own
--- handle at EOF.
+-- reaped the child some time ago.  Sending the ladder there would be worse than
+-- the descriptor leak it fixes: 'groupAlive' probes @kill(-pgid, 0)@, and a
+-- long-dead child's pgid can have been recycled by an unrelated process group,
+-- which the ladder would then SIGTERM.  (An interaction-mode agda spawns no
+-- descendants that could legitimately outlive it, since it never invokes GHC, so
+-- there is nothing for the ladder to catch here anyway.)  The stderr drainer
+-- closes its own handle at EOF.
 closeLaneHandles :: Lane -> IO ()
 closeLaneHandles lane = do
   ignoringIOErrors (hClose (laneIn lane))
@@ -565,7 +556,7 @@ monotonicSeconds = do
   ns <- getMonotonicTimeNSec
   pure (fromIntegral (ns `div` 1_000_000_000))
 
--- | ignoringIOErrors: best-effort cleanup — exactly 'IOException's, which is
+-- | ignoringIOErrors: best-effort cleanup, exactly 'IOException's, which is
 -- what the name says.  A blanket @SomeException@ here would also swallow the
 -- asynchronous cancellation a shutting-down server delivers, and cleanup
 -- that eats its caller's kill leaves the server running (the round-2 Copilot
@@ -589,7 +580,7 @@ trySynchronous act = try act >>= either sift (pure . Right)
 -- ---------------------------------------------------------------------------
 
 -- | LaneEvent: what class of thing went wrong with the lane itself.  A load
--- or query whose /Agda answer/ is an error is not a 'LaneFailure' — the lane
+-- or query whose /Agda answer/ is an error is not a 'LaneFailure'; the lane
 -- is healthy and the error is the answer; these events are about the process.
 data LaneEvent
   = LaneSpawnFailure   -- ^ The child could not be started.
@@ -606,7 +597,7 @@ data LaneFailure = LaneFailure
   , lfMessage    :: Text
   , lfStderrTail :: [Text]   -- ^ Newest first, bounded.
   , lfSent       :: [Text]   -- ^ The IOTCM lines the failing request had
-                             --   attempted, oldest first — so a spawn-phase
+                             --   attempted, oldest first, so a spawn-phase
                              --   failure still echoes its wire trail.
   } deriving (Eq, Show)
 
@@ -666,10 +657,10 @@ lanePidOf lh = pure (fromIntegral <$> lanePgid (lhLane lh))
 --
 -- Lifecycle, all on this seam: a child that died while idle is detected
 -- ('getProcessExitCode') and replaced before the body runs; a body that
--- doomed its lane (timeout, crash — the doom flag is set by 'runCmdOn') leaves
--- a killed process and an empty slot; a body that threw kills the lane —
--- the wire may hold another request's half-collected responses, which no
--- future request may inherit — and re-throws, with 'modifyMVar' restoring
+-- doomed its lane (timeout, crash; the doom flag is set by 'runCmdOn') leaves
+-- a killed process and an empty slot; a body that threw kills the lane
+-- (the wire may hold another request's half-collected responses, which no
+-- future request may inherit) and re-throws, with 'modifyMVar' restoring
 -- the now-dead lane to the slot, where the next request's liveness probe
 -- replaces it.  A healthy lane returns to the slot with its last-use stamp
 -- refreshed.
@@ -681,7 +672,7 @@ withLane
   -> (LaneHandle -> IO a)
   -> IO (Either LaneFailure a)
 withLane il cfg root body = do
-  -- One deadline for the whole request — spawn flush, load, and query share
+  -- One deadline for the whole request; spawn flush, load, and query share
   -- its remaining budget, so a first request is bounded by @--timeout@ once,
   -- not once per phase (a Copilot review catch on PR 107).
   deadline <- newDeadline (agdaTimeout cfg)
@@ -707,7 +698,7 @@ withLane il cfg root body = do
       -- Re-check the latch now that this slot is held: between the registry
       -- access above and here, a whole shutdown can have run and drained
       -- this very slot, and spawning after that would leak a child nothing
-      -- drains again.  The two checks close the window from both sides —
+      -- drains again.  The two checks close the window from both sides;
       -- either this request sees the latch, or shutdown's blocking drain
       -- waits for it and stops whatever it restores.
       closed <- readIORef (ilClosed il)
@@ -748,7 +739,7 @@ withLane il cfg root body = do
       case gone of
         Nothing -> pure (Right (lane, [], False))
         Just _  -> do
-          -- Dead while idle: release its handles (no ladder — the child died
+          -- Dead while idle: release its handles (no ladder, since the child died
           -- an unknown time ago, see 'closeLaneHandles') and start afresh.
           closeLaneHandles lane
           spawnFresh deadline
@@ -760,8 +751,8 @@ withLane il cfg root body = do
 
 -- | spawnLane: start @agda --interaction-json@, wire up the stderr drainer,
 -- and flush the startup noise with one sentinel so no command's response
--- collection can misread it (§ 2.2 of the design document).  Project flags do
--- not ride the process argv — they ride each @Cmd_load@ — so one child serves
+-- collection can misread it (design doc § 2.2).  Project flags do
+-- not ride the process argv (they ride each @Cmd_load@) so one child serves
 -- every file under its root.
 --
 -- The child runs in the SERVER'S working directory, exactly as the batch
@@ -792,11 +783,10 @@ spawnLane cfg root deadline = do
       , lfSent       = []
       }
     -- From here to the registry the child is owned by nobody: the setup runs
-    -- under 'mask' and the (interruptible) flush under 'onException'-cleanup,
-    -- so an exception at any point — asynchronous cancellation included —
-    -- stops the child instead of leaking a process no registry knows about
-    -- (a Copilot round-3 catch).  Asyncs still propagate; they are deferred
-    -- only across the non-blocking setup below.
+    -- under 'mask' and the (interruptible) flush under 'onException'-cleanup, so
+    -- an exception at any point (asynchronous cancellation included) stops the
+    -- child instead of leaking a process no registry knows about.  Asyncs still
+    -- propagate; they are deferred  only across the non-blocking setup below.
     Right (Just hIn, Just hOut, Just hErr, ph) -> mask $ \restore -> do
       hSetBinaryMode hOut True
       errTail <- newIORef []
@@ -816,10 +806,10 @@ spawnLane cfg root deadline = do
             , laneVersion = verRef
             , laneLastUse = useRef
             }
-      -- Flush startup noise on the requesting call's own deadline — the
-      -- flush is part of that request's budget, not a bound of its own.  A
-      -- child too broken to answer the first sentinel is reported as spawn
-      -- failure, since no request was under way.
+      -- Flush startup noise on the requesting call's own deadline; the flush is
+      -- part of that request's budget, not a bound of its own.  A child too
+      -- broken to answer the first sentinel is reported as spawn failure, since
+      -- no request was under way.
       sent     <- newIORef []
       doomed   <- newIORef False
       let lh = LaneHandle lane deadline sent False doomed
@@ -958,7 +948,7 @@ readResponseLine lh = loop
 -- Loading files
 -- ---------------------------------------------------------------------------
 
--- | LoadAction: what 'ensureLoaded' did, and why — echoed in every response
+-- | LoadAction: what 'ensureLoaded' did, and why, echoed in every response
 -- so a client can attribute the call's latency.
 data LoadAction
   = LoadReused    -- ^ Same file, same stamp, same flags, last load succeeded.
@@ -966,7 +956,7 @@ data LoadAction
   | LoadSwitch    -- ^ The lane held a different file.
   | LoadChanged   -- ^ The file's (mtime, size) stamp or flags changed.
   | LoadRetry     -- ^ The previous load of this file failed.
-  | LoadForced    -- ^ The client passed @reload: true@ — the escape hatch
+  | LoadForced    -- ^ The client passed @reload: true@, the escape hatch
                   --   for a changed dependency, which no stamp on the
                   --   queried file can see.
   deriving (Eq, Show)
@@ -985,7 +975,7 @@ data LoadReport = LoadReport
   } deriving (Eq, Show)
 
 -- | ensureLoaded: make the lane's state be about this file, re-loading only
--- on evidence (§ 3 of the design document): first sight, a path switch, a
+-- on evidence (design doc § 3): first sight, a path switch, a
 -- changed stamp, changed flags, a failed previous load, or the client's own
 -- @reload: true@ (evidence the stamp cannot carry — a changed dependency).
 -- The flags are the effective flag list the batch lane would run @agda@
@@ -1073,9 +1063,8 @@ elapsedMsBetween start end =
 
 -- | runQuery: one knowledge command against the lane's current state.
 -- Callers go through 'ensureLoaded' first; the file argument is the one the
--- IOTCM names, which must be the loaded file — a mismatch would trigger
--- Agda's implicit re-load with an argv the lane did not choose (§ 2.6 of the
--- design document).
+-- IOTCM names, which must be the loaded file; a mismatch would trigger Agda's
+-- implicit re-load with an argv the lane did not choose (design doc § 2.6).
 runQuery :: LaneHandle -> FilePath -> Text -> IO (Either LaneFailure [IResponse])
 runQuery lh path cmd = runCmdOn lh (Just (path, cmd))
 
@@ -1097,7 +1086,7 @@ data SrcLoc = SrcLoc
 -- | ProvenanceStep: one @- … at …@ step of a WhyInScope chain: the phrase
 -- (@its definition@, @the opening of M@, @the application of M@) and the
 -- location when the prose carried one (steps into other modules' scope
--- information print a bare @at@ — observed on the re-export fixture).
+-- information print a bare @at@, observed on the re-export fixture).
 data ProvenanceStep = ProvenanceStep
   { psStep     :: Text
   , psLocation :: Maybe SrcLoc
@@ -1233,7 +1222,7 @@ parseWhyInScope msg
       [] -> Nothing
       ws -> Just (last ws)
 
--- | parseAmbiguousName: the candidates of an @[AmbiguousName]@ error —
+-- | parseAmbiguousName: the candidates of an @[AmbiguousName]@ error,
 -- @Ambiguous name x. It could refer to any one of@ followed by
 -- @<qualified> bound at@ entries whose location may sit on the same or the
 -- following line.  This is the § 2.6 recovery path for names the toplevel
@@ -1273,8 +1262,8 @@ parseDidYouMean msg = case T.breakOn "did you mean" msg of
         let (name, rest') = T.breakOn "'" (T.drop 1 rest)
         in if T.null rest' then [] else name : quoted (T.drop 1 rest')
 
--- | errorCodeOf: Agda's own bracketed tag — @error: [AmbiguousName]@ →
--- @AmbiguousName@ — when the message carries one.
+-- | errorCodeOf: Agda's own bracketed tag  (@error: [AmbiguousName]@ →
+-- @AmbiguousName@) when the message carries one.
 errorCodeOf :: Text -> Maybe Text
 errorCodeOf msg = case T.breakOn "error: [" msg of
   (_, rest) | T.null rest -> Nothing
