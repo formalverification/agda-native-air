@@ -57,10 +57,6 @@ DOJANG_TRY        ?= $(PYTHON_TOOLS)/dojang_try.py
 EXTRACT_SCRIPT  ?= $(PYTHON_TOOLS)/dojang_extract.py
 SEARCH_SCRIPT   ?= $(PYTHON_TOOLS)/search.py
 
-# --- Demo arguments ---
-DEMO1 := --goal Nat --candidate "suc zero" --imports "open import Agda.Builtin.Nat"
-DEMO2 := --goal Nat --tactic applyReport:_+_ --imports "open import Agda.Builtin.Nat"
-
 # --- Data / transform paths ---
 DATA_DIR    := $(REPO_ROOT)/data
 EXAMPLE_AGDA:= $(DATA_DIR)/agda/agda-example.agda
@@ -84,8 +80,8 @@ AGDAI_FIND_PATH := $(AGDA_DIR)
 # Nice clean tree: hide transient/build stuff
 TREE_IGNORE := '_build|.tmp_*|.scratch_*|__pycache__|*.agdai|share|.git|.direnv|.venv|.mypy_cache|.pytest_cache'
 
-.PHONY: help check demo demo1 demo2 extract transform solve test \
-        eval-proof-completion demo-proof-completion eval-proof-completion-smoke demo-agent-bridge \
+.PHONY: help check extract transform solve test \
+        eval-proof-completion demo-proof-completion eval-proof-completion-smoke \
         probe-all clean clean-scratch clean-pycache clean-agda clean-build clean-data \
         wipe tree peek-extract
 
@@ -100,14 +96,11 @@ help:
 	@echo ""
 	@echo "AgdaDojang targets:"
 	@echo "  make check        - Type-check AgdaDojang macros"
-	@echo "  make demo1        - Run simple candidate: suc zero : Nat"
-	@echo "  make demo2        - Run reporting tactic: applyReport:_+_"
 	@echo ""
 	@echo "Proof-completion demo:"
 	@echo "  make eval-proof-completion        - Evaluate fixtures via report→policy→Agda-check"
 	@echo "  make demo-proof-completion        - Alias for eval-proof-completion"
 	@echo "  make eval-proof-completion-smoke  - Fast smoke run on a tiny fixture"
-	@echo "  make demo-agent-bridge            - Bridge sanity check on FixtureHoles"
 	@echo ""
 	@echo "End-to-end loop (toy example):"
 	@echo "  make extract      - Agda → JSON (AGDA2TRAIN-style) at $(RAW_JSON)"
@@ -129,8 +122,8 @@ help:
 # summary. Usage: make probe-all PROBE_JOBS=1 (or higher, but start at 1)
 PROBE_JOBS ?= 1
 PROBE_TARGETS := check peek-extract test-python-unittest test-python \
-                 eval-proof-completion eval-proof-completion-smoke demo-agent-bridge \
-                 extract demo demo1 demo2 help tree transform solve test
+                 eval-proof-completion eval-proof-completion-smoke \
+                 extract help tree transform solve test
 
 LOG_DIR := probe-logs
 probe-all:
@@ -159,20 +152,9 @@ probe-all:
 check:
 	$(AGDA) $(AGDA_FLAGS) $(AGDA_DIR)/AgdaDojang/Everything.agda
 
-# 1) Demos (use dojang_try.py). We forward the same AGDA_FLAGS the compiler uses.
-demo: demo1 demo2
-
-demo1:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(DOJANG_TRY) $(DEMO1) --agda-flags "$(AGDA_FLAGS)"
-
-demo2:
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) $(DOJANG_TRY) $(DEMO2) --agda-flags "$(AGDA_FLAGS)"
-
-# 2) The agent bridge is a sanity check for the whole loop (Agda → Python agent → Agda)
-#    on a fixed example before we add any model.
+# 1) The proof-completion evaluator is the sanity check for the whole loop
+#    (Agda → policy → Agda) on fixed examples before we add any model.
 FIXTURE_DIR := $(REPO_ROOT)/agda-dojang/data/fixtures
-FIXTURE_IN  := $(FIXTURE_DIR)/FixtureHoles.agda
-FIXTURE_OUT := $(abspath _build/FixtureHoles.agda)
 #
 # --- Proof-completion evaluator knobs (overridable) ---
 EVAL_FIXTURES   ?= $(FIXTURE_DIR)/Fixture*.agda
@@ -188,22 +170,7 @@ EVAL_XFAIL      ?=
 # ^ after support for this is added in eval_fixtures.py
 EVAL_CLEAN_FLAG := $(if $(filter 1,$(EVAL_CLEAN)),--clean,)
 #
-# 2.1) Run the agent bridge on the fixture file, keeping the workdir for inspection.
-demo-agent-bridge:
-	@mkdir -p _build
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) python/tools/agent_bridge.py \
-	  --input "$(FIXTURE_IN)" \
-	  --output "$(FIXTURE_OUT)" \
-	  --policy "$(EVAL_POLICY)" \
-	  --max-holes "$(EVAL_MAX_HOLES)" \
-	  --keep-workdir \
-	  --k "$(EVAL_K)" \
-	  --agda-bin "$(AGDA)" \
-	  --agda-flags "$(AGDA_FLAGS) -i $(FIXTURE_DIR)" \
-	  --report-expr "$(EVAL_REPORT_EXPR)"
-	$(AGDA) $(AGDA_FLAGS) -i "$(dir $(FIXTURE_OUT))" "$(FIXTURE_OUT)"
-#
-# 2.2) Run the full eval loop on the fixture file, writing JSONL + logs + scoreboard.
+# 1.1) Run the full eval loop on the fixture files, writing JSONL + logs + scoreboard.
 ## eval-proof-completion: Run fixture evaluator; writes JSONL + logs + scoreboard.
 eval-proof-completion:
 	@mkdir -p "$(EVAL_OUT_DIR)"
@@ -223,14 +190,14 @@ eval-proof-completion:
 ## demo-proof-completion: Alias for eval-proof-completion (kept for docs/checklists).
 demo-proof-completion: eval-proof-completion
 #
-# 2.3) A smoke test with tighter limits for quick feedback (e.g., in CI).
+# 1.2) A smoke test with tighter limits for quick feedback (e.g., in CI).
 eval-proof-completion-smoke:
 	$(MAKE) eval-proof-completion \
 	  EVAL_FIXTURES="$(FIXTURE_DIR)/FixtureLambda.agda" \
 	  EVAL_RUN_ID=smoke \
 	  EVAL_MAX_HOLES=1 EVAL_K=3 EVAL_TIMEOUT=10
 
-# 3) Extract: produce intermediate JSON from an example Agda file
+# 2) Extract: produce intermediate JSON from an example Agda file
 #    WHY: Stabilize a canonical intermediate we can diff/test before transforming.
 $(DATA_DIR):
 	mkdir -p $(DATA_DIR)
@@ -266,7 +233,7 @@ peek-extract:
 	@echo ">> head of $(RAW_JSON_ABS)"; head -n 40 "$(RAW_JSON_ABS)" || true
 
 
-# 4) Transform: run Scala transformer to emit ML-ready JSONL
+# 3) Transform: run Scala transformer to emit ML-ready JSONL
 #    WHY: Freeze the training-row schema (e.g., file/module/name/agdaType/proof/premises).
 transform:
 	@command -v $(SBT) >/dev/null || { echo "sbt not found (use nix shell or install sbt)"; exit 1; }
@@ -282,7 +249,7 @@ transform:
 	  $(SBT) 'runMain proofparser.transform.Agda2TrainTransformer ../data/agda-example.json ../data/train.jsonl'
 	@echo "✅ Wrote $(TRAIN_JSONL)"
 
-# 5) Solve: tiny benchmark loop (stub-friendly)
+# 4) Solve: tiny benchmark loop (stub-friendly)
 #    WHY: Quick pass/fail snapshot on a fixed suite before we add any model.
 solve:
 	@command -v $(PYTHON) >/dev/null || { echo "Python not found"; exit 1; }
@@ -306,7 +273,7 @@ solve:
 	  echo "ℹ️  No proof found within limits (exit $$rc) — not fatal for bench."; \
 	fi
 
-# 6) Pretty-print a *clean* directory tree for this subproject.
+# 5) Pretty-print a *clean* directory tree for this subproject.
 #    Uses the 'tree' utility if available; otherwise falls back to a portable renderer.
 tree:
 	@echo ">> Clean directory tree (excluding: $(TREE_IGNORE))"
