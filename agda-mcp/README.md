@@ -103,7 +103,7 @@ This is the minimum tooling required for an agent to do interactive proof develo
 
 | Tool | Description |
 |------|-------------|
-| `get_goal`         | Inspect the goal type and local context at a hole. |
+| `get_goal`         | Inspect the goal type and local context at a hole — answered by the interaction lane when it can (no file mutation, millisecond-warm), by the reporting-macro injection otherwise; the response's `source` field says which. |
 | `fill_hole`        | Substitute a candidate term into a hole and typecheck. |
 | `check_file`       | Load/reload an Agda file and return all diagnostics. |
 | `get_diagnostics`  | Lightweight summary: error/warning counts, open holes with positions. |
@@ -856,22 +856,25 @@ Similar configuration: point the MCP client at `scripts/run-server.sh` (or the
 
 ## Architecture Notes
 
-### v0: Subprocess-based
+### The batch lane: a subprocess per verdict
 
-The v0 implementation calls the `agda` binary as a subprocess for each
-tool invocation.  The approach was inherited from `agda-dojang`'s Python
-bridge (`agent_bridge.py`), which this server superseded and which retired
-in issue #109.  The marker protocol that bridge established
+The verdict-producing tools call the `agda` binary as a subprocess for each
+invocation; since issue #108, `get_goal` prefers the persistent interaction
+lane (next section) and reaches a subprocess only on its fallback path.  The
+approach was inherited from `agda-dojang`'s Python bridge
+(`agent_bridge.py`), which this server superseded and which retired in
+issue #109.  The marker protocol that bridge established
 (`AGDADOJANG_REQ_BEGIN/END`) is not legacy: `AgdaDojang.Debug` still emits
-it and this server still reads it.
+it on the fallback path and this server still reads it.
 
 **Advantages**: simple, decoupled from Agda's GHC version, reuses all
 existing AgdaDojang macros without modification.
 
-**In-place typechecking**.  All four tools typecheck the file at its real
-path on disk.  `get_goal` and `fill_hole` must alter the source (inject the
-reporting macro, or substitute a candidate), so they patch the file
-transiently and restore it afterwards under `bracket_`.  The original is
+**In-place typechecking**.  The batch tools typecheck the file at its real
+path on disk.  `fill_hole` — and `get_goal` on its fallback path (since issue
+#108 the lane answers it without touching the file when it can) — must alter
+the source (inject the reporting macro, or substitute a candidate), so they
+patch the file transiently and restore it afterwards under `bracket_`.  The original is
 captured and rewritten as raw bytes (`Data.ByteString`), so the file is
 returned byte-for-byte — no encoding or newline round-trip — even if Agda
 errors or the call is interrupted.  Checking in place, rather than against a
