@@ -72,6 +72,8 @@ module AgdaMCP.Agda
   , runCommand
   , AgdaResult (..)
   , timeoutMessage
+    -- * The group kill ladder, reusable (issues #77, #75)
+  , escalateAndReap
   ) where
 
 import Control.Concurrent (forkIO, killThread, threadDelay)
@@ -529,6 +531,34 @@ signalGroupVia :: Maybe Pid -> Signal -> IO ()
 signalGroupVia mPgid sig = case mPgid of
   Just pgid -> ignoringIOErrors (signalProcessGroup sig pgid)
   Nothing   -> pure ()
+
+-- | escalateAndReap: the issue-#77 kill ladder, packaged for callers that
+-- manage a process of their own — the interaction lane's persistent child
+-- (issue #75) — rather than going through 'runProcessBounded'.
+--
+-- Same rungs, same graces, same reasoning as the timeout path of
+-- 'raceProcess': SIGINT group-wide first (agda unwinds and may still flush),
+-- then SIGTERM, then SIGKILL, each rung taken while the process /group/ still
+-- has members, with the leader reaped through 'waitForProcess' on a dedicated
+-- thread so an unreapable process cannot hang the caller.  Total worst-case
+-- dwell is the sum of the three graces, a few seconds; the common case — a
+-- healthy child told to die — ends at the first rung in milliseconds.
+escalateAndReap :: ProcessHandle -> Maybe Pid -> IO ()
+escalateAndReap ph mPgid = do
+  exitVar <- newEmptyMVar
+  _ <- forkIO $ waitForProcess ph >>= putMVar exitVar
+  ignoringIOErrors (interruptProcessGroupOf ph)
+  intGone <- waitGroupGone mPgid exitVar interruptGraceMicros
+  termGone <-
+    if intGone then pure True
+    else do
+      signalGroupVia mPgid softwareTermination
+      ignoringIOErrors (terminateProcess ph)
+      waitGroupGone mPgid exitVar termGraceMicros
+  when (not termGone) $ do
+    signalGroupVia mPgid killProcess
+    void (waitGroupGone mPgid exitVar reapGraceMicros)
+  void (takeMVarWithin reapGraceMicros exitVar)
 
 -- | groupAlive: does the child's process group still have members?  Probed
 -- with the null signal (@kill(-pgid, 0)@), which delivers nothing but reports

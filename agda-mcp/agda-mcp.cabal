@@ -47,6 +47,7 @@ library
     AgdaMCP.Agda
     AgdaMCP.Diagnostics
     AgdaMCP.Holes
+    AgdaMCP.Interaction
     AgdaMCP.Path
     AgdaMCP.Project
     AgdaMCP.Gate
@@ -63,6 +64,9 @@ library
     , filepath      >= 1.4  && < 1.6
     , process       >= 1.6  && < 1.8
     , text          >= 2.0  && < 2.2
+      -- time: the (mtime, size) stamp that gates the interaction lane's
+      -- re-loads (issue #75).
+    , time          >= 1.12 && < 1.15
       -- unix: group-wide SIGTERM/SIGKILL escalation on timeout ('signalProcessGroup');
       -- 'System.Process.interruptProcessGroupOf' covers only SIGINT.
     , unix          >= 2.8  && < 2.9
