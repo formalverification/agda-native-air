@@ -117,7 +117,7 @@ Probed on this session's hardware, disk-warm `.agdai` interfaces throughout (the
 +  Batch lane: `agda <flags> <file>` = 2.78 s, then 2.60 s on the repeat — paid *per call*, so five scope questions cost ~13 s.
 +  Interaction lane: process start + `Cmd_load` = 2.59 s once; the same five knowledge queries after the load added less than measurement noise (2.580 s total for load *plus* all five, versus 2.589 s for load alone — each query is on the order of a millisecond).
 +  Micro-fixture floor: a nine-command batch against `TwoHoles.agda`, load included, completes in 0.04 s of wall clock.
-+  The #83 field test's shell baseline was a 10.0 s median per check.  The asymptotic claim for the tool descriptions: the first question about a file costs one load; every further question about that file is effectively free until it changes.
++  The #83 field test's shell baseline was a 10.0 s median per check.  The asymptotic claim for the tool descriptions, scoped to what a one-current-file lane can honestly promise: the first question about a file costs one load, and every further consecutive question about it is effectively free until the file changes or the lane's current file switches away — alternating between two files under one root pays the switched-to file's load each time (measured warm on the fixture pair: tens of milliseconds; a full re-typecheck for a holed file, which writes no interface).
 
 ## 3.  Process lifecycle
 

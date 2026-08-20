@@ -4741,6 +4741,26 @@ interactionWireTests = do
         r3 <- assertEqual "no code" Nothing (errorCodeOf "plain prose")
         pure (firstFailure [r1, r2, r3])
 
+    , -- The scoped params' column contract, at the parser: a lone column
+      -- would silently answer from the top-level scope while looking
+      -- honored, so it is rejected, as is the disagreeing pair.
+      runTest "live params: a column requires line, and col/column exclude each other" $ do
+        let parse v = Aeson.fromJSON v :: Aeson.Result TypeOfParams
+            obj kvs = Aeson.object kvs
+            bad r = case r of Aeson.Error _ -> True; _ -> False
+        r1 <- assert "col without line is rejected"
+                (bad (parse (obj [("filePath", "f"), ("expr", "e"), ("col", Aeson.Number 3)])))
+        r2 <- assert "column and col together are rejected"
+                (bad (parse (obj [ ("filePath", "f"), ("expr", "e")
+                                 , ("line", Aeson.Number 1)
+                                 , ("column", Aeson.Number 2), ("col", Aeson.Number 2)])))
+        r3 <- case parse (obj [ ("filePath", "f"), ("expr", "e")
+                              , ("line", Aeson.Number 4), ("col", Aeson.Number 9)]) of
+                Aeson.Success p -> assertEqual "line+col parses"
+                  (Just 4, Just 9) (topLine p, topColumn p)
+                Aeson.Error e   -> pure (Fail e)
+        pure (firstFailure [r1, r2, r3])
+
     , runTest "pointContaining: line picks earliest; a column picks the exact hole" $ do
         let ps = [ IPoint 0 (Just (IRange 22 5 22 9))
                  , IPoint 1 (Just (IRange 22 14 22 18))
@@ -5057,8 +5077,14 @@ interactionLaneTests cfg repoRoot = do
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
+            -- The expected lines come from the fixture itself (its two
+            -- `amb : Nat` signatures), so a comment edit above them cannot
+            -- silently invalidate the assertion.
+            src <- TIO.readFile (fx "ScopeAmbiguousComplete.agda")
+            let sigLines = [ i | (i, ln) <- zip [1 :: Int ..] (T.lines src)
+                               , T.strip ln == "amb : Nat" ]
             r1 <- assertEqual "recovered" (Just "did-you-mean") (dorRecovered res)
-            r2 <- assertEqual "definition lines" [20, 24]
+            r2 <- assertEqual "definition lines" sigLines
                     (sort (map dsLine (dorDefinitions res)))
             pure (firstFailure [r1, r2])
 

@@ -1437,15 +1437,19 @@ instance ToJSON DependenciesResult where
 -- spelling — @column@, or @col@ as the hole listings print it, so a goal
 -- entry can be passed back unchanged.  Both at once is rejected, for the
 -- same reason 'parseHoleRef' rejects it: the two can disagree, and no
--- handler should decide which was meant.
-scopeColumn :: Object -> Parser (Maybe Int)
-scopeColumn o = do
+-- handler should decide which was meant.  A column without a line is also
+-- rejected: the contract says the column sharpens @line@, and accepting a
+-- lone one would silently answer from the top-level scope while looking
+-- honored.
+scopeColumn :: Maybe Int -> Object -> Parser (Maybe Int)
+scopeColumn mLine o = do
   mColumn <- o .:? "column"
   mCol    <- o .:? "col"
   case (mColumn, mCol) of
     (Just _, Just _) -> fail "give column or col, not both"
-    (Just c, _)      -> pure (Just c)
-    (_, mc)          -> pure mc
+    (mc1, mc2)       -> case (mLine, maybe mc2 Just mc1) of
+      (Nothing, Just _) -> fail "column (or col) requires line"
+      (_, mc)           -> pure mc
 
 -- | Parameters for the @type_of@ tool: infer the type of an expression in a
 -- file's scope, no edit required.  @line@ (optionally sharpened by a column)
@@ -1461,9 +1465,10 @@ data TypeOfParams = TypeOfParams
   } deriving (Eq, Show)
 
 instance FromJSON TypeOfParams where
-  parseJSON = withObject "TypeOfParams" $ \o ->
-    TypeOfParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
-                 <*> scopeColumn o
+  parseJSON = withObject "TypeOfParams" $ \o -> do
+    mLine <- o .:? "line"
+    TypeOfParams <$> o .: "filePath" <*> o .: "expr" <*> pure mLine
+                 <*> scopeColumn mLine o
                  <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @normalize@ tool: evaluate an expression to normal
@@ -1477,9 +1482,10 @@ data NormalizeParams = NormalizeParams
   } deriving (Eq, Show)
 
 instance FromJSON NormalizeParams where
-  parseJSON = withObject "NormalizeParams" $ \o ->
-    NormalizeParams <$> o .: "filePath" <*> o .: "expr" <*> o .:? "line"
-                    <*> scopeColumn o
+  parseJSON = withObject "NormalizeParams" $ \o -> do
+    mLine <- o .:? "line"
+    NormalizeParams <$> o .: "filePath" <*> o .: "expr" <*> pure mLine
+                    <*> scopeColumn mLine o
                     <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @resolve_name@ tool: what does this name resolve to
@@ -1496,9 +1502,10 @@ data ResolveNameParams = ResolveNameParams
   } deriving (Eq, Show)
 
 instance FromJSON ResolveNameParams where
-  parseJSON = withObject "ResolveNameParams" $ \o ->
-    ResolveNameParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
-                      <*> scopeColumn o
+  parseJSON = withObject "ResolveNameParams" $ \o -> do
+    mLine <- o .:? "line"
+    ResolveNameParams <$> o .: "filePath" <*> o .: "name" <*> pure mLine
+                      <*> scopeColumn mLine o
                       <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @definition_of@ tool: where is this name defined?
@@ -1511,9 +1518,10 @@ data DefinitionOfParams = DefinitionOfParams
   } deriving (Eq, Show)
 
 instance FromJSON DefinitionOfParams where
-  parseJSON = withObject "DefinitionOfParams" $ \o ->
-    DefinitionOfParams <$> o .: "filePath" <*> o .: "name" <*> o .:? "line"
-                       <*> scopeColumn o
+  parseJSON = withObject "DefinitionOfParams" $ \o -> do
+    mLine <- o .:? "line"
+    DefinitionOfParams <$> o .: "filePath" <*> o .: "name" <*> pure mLine
+                       <*> scopeColumn mLine o
                        <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @exports_of@ tool: the public surface of a module, as

@@ -409,6 +409,10 @@ data Lane = Lane
   , laneLoad    :: IORef (Maybe LoadState)
   , laneVersion :: IORef (Maybe Text)    -- ^ From the most recent sentinel.
   , laneLastUse :: IORef Word            -- ^ Monotonic seconds, for the reaper.
+  , laneStopped :: IORef Bool            -- ^ Set by the first 'stopLane', so
+                                         --   later calls on converging failure
+                                         --   paths do not rerun the ladder
+                                         --   against a reaped child's pgid.
   }
 
 -- | What the lane last loaded, and what came of it.
@@ -530,11 +534,18 @@ shutdownLanes il = do
 -- For a child that is known dead but died an unknown time ago, use
 -- 'closeLaneHandles' instead: the ladder probes and signals the raw pgid,
 -- which may by then name an unrelated, recycled process group.
+--
+-- Idempotent: failure paths converge here from several directions (doomWith,
+-- the doom check in withLane, a failed startup flush), and only the first
+-- call may run the ladder — a second run would probe the now-reaped child's
+-- raw pgid, the same recycled-group hazard on a smaller window.
 stopLane :: Lane -> IO ()
 stopLane lane = do
-  ignoringIOErrors (hClose (laneIn lane))
-  escalateAndReap (laneProc lane) (lanePgid lane)
-  ignoringIOErrors (hClose (laneOut lane))
+  alreadyStopped <- atomicModifyIORef' (laneStopped lane) (\s -> (True, s))
+  if alreadyStopped then pure () else do
+    ignoringIOErrors (hClose (laneIn lane))
+    escalateAndReap (laneProc lane) (lanePgid lane)
+    ignoringIOErrors (hClose (laneOut lane))
 
 -- | closeLaneHandles: release a dead lane's pipe handles, no signals.
 --
@@ -764,7 +775,11 @@ withLane il cfg root body = do
 spawnLane
   :: AgdaConfig -> FilePath -> Deadline
   -> IO (Either LaneFailure (Lane, [Text]))
-spawnLane cfg root deadline = do
+spawnLane cfg root deadline = mask $ \restore -> do
+  -- The whole spawn runs masked, allocation included: a cancellation landing
+  -- between 'createProcess' returning and cleanup being installed would
+  -- otherwise leak the child and all three pipes.  Interruptibility is
+  -- restored only around the startup flush, the one blocking phase.
   started <- trySynchronous $ createProcess (proc (agdaBin cfg) ["--interaction-json"])
     { std_in  = CreatePipe
     , std_out = CreatePipe
@@ -782,19 +797,17 @@ spawnLane cfg root deadline = do
       , lfStderrTail = []
       , lfSent       = []
       }
-    -- From here to the registry the child is owned by nobody: the setup runs
-    -- under 'mask' and the (interruptible) flush under 'onException'-cleanup, so
-    -- an exception at any point (asynchronous cancellation included) stops the
-    -- child instead of leaking a process no registry knows about.  Asyncs still
-    -- propagate; they are deferred  only across the non-blocking setup below.
-    Right (Just hIn, Just hOut, Just hErr, ph) -> mask $ \restore -> do
-      hSetBinaryMode hOut True
-      errTail <- newIORef []
-      _ <- forkIO (drainStderr hErr errTail)
+    Right (Just hIn, Just hOut, Just hErr, ph) -> do
+      -- Build the lane record first — nothing below its construction can
+      -- throw — so 'stopLane' is installable as the one cleanup for every
+      -- later failure, exception or answered, and idempotence makes the
+      -- converging paths safe.
       pgid    <- getPid ph
+      errTail <- newIORef []
       loadRef <- newIORef Nothing
       verRef  <- newIORef Nothing
       useRef  <- newIORef =<< monotonicSeconds
+      stopRef <- newIORef False
       let lane = Lane
             { laneRoot    = root
             , laneProc    = ph
@@ -805,21 +818,25 @@ spawnLane cfg root deadline = do
             , laneLoad    = loadRef
             , laneVersion = verRef
             , laneLastUse = useRef
+            , laneStopped = stopRef
             }
-      -- Flush startup noise on the requesting call's own deadline; the flush is
-      -- part of that request's budget, not a bound of its own.  A child too
-      -- broken to answer the first sentinel is reported as spawn failure, since
-      -- no request was under way.
-      sent     <- newIORef []
-      doomed   <- newIORef False
-      let lh = LaneHandle lane deadline sent False doomed
-      flushed <- restore (runCmdOn lh Nothing) `onException` stopLane lane
-      flushSent <- laneSentLines lh
-      case flushed of
-        Right _ -> pure (Right (lane, flushSent))
-        Left lf -> do
-          stopLane lane
-          pure . Left $ lf { lfEvent = LaneSpawnFailure }
+      flip onException (stopLane lane) $ do
+        hSetBinaryMode hOut True
+        _ <- forkIO (drainStderr hErr errTail)
+        -- Flush startup noise on the requesting call's own deadline — the
+        -- flush is part of that request's budget, not a bound of its own.  A
+        -- child too broken to answer the first sentinel is reported as spawn
+        -- failure, since no request was under way.
+        sent     <- newIORef []
+        doomed   <- newIORef False
+        let lh = LaneHandle lane deadline sent False doomed
+        flushed <- restore (runCmdOn lh Nothing)
+        flushSent <- laneSentLines lh
+        case flushed of
+          Right _ -> pure (Right (lane, flushSent))
+          Left lf -> do
+            stopLane lane
+            pure . Left $ lf { lfEvent = LaneSpawnFailure }
     Right _ -> pure . Left $ LaneFailure
       { lfEvent      = LaneSpawnFailure
       , lfMessage    = "could not open the interaction child's pipes"

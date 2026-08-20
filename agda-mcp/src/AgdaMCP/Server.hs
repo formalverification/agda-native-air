@@ -41,7 +41,7 @@ module AgdaMCP.Server
   ) where
 
 import Control.Exception
-  (AsyncException, SomeException, evaluate, finally, fromException, throwIO, try)
+  (AsyncException, SomeException, bracket, evaluate, fromException, throwIO, try)
 import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
@@ -689,13 +689,17 @@ latencyNote =
 liveLaneNote :: Text
 liveLaneNote =
   "LIVE QUERY (interaction lane): answered by a persistent agda \
-  \--interaction-json process this server keeps per project root. The file \
-  \is loaded once and re-loaded only when it changes on disk or its flags \
-  \change (lane.load in the response says what happened: reused, first, \
-  \switch, changed, or retry), so the FIRST question about a file costs one \
-  \load — seconds, comparable to one check_file — and every further question \
-  \about the unchanged file is milliseconds. Editing a dependency is picked \
-  \up when this file itself is next re-loaded. THIS TOOL INFORMS AND NEVER \
+  \--interaction-json process this server keeps per project root, holding \
+  \ONE current file at a time. The current file is re-loaded only when it \
+  \changes on disk or its flags change, and switching to another file under \
+  \the same root re-loads the switched-to file (lane.load in the response \
+  \says what happened: reused, first, switch, changed, forced, or retry). So \
+  \the first question about a file costs one load — seconds, comparable to \
+  \one check_file — every further CONSECUTIVE question about it while \
+  \unchanged is milliseconds, and alternating between files pays the \
+  \switched-to file's load each time (a full re-typecheck for a file with \
+  \holes, which writes no interface). Editing a dependency is picked up \
+  \when this file itself is next re-loaded. THIS TOOL INFORMS AND NEVER \
   \DECIDES A BUILD VERDICT: interaction-mode agda is tolerant (it loads \
   \files with open holes), so there is no success or verdict field here; \
   \check_file, check_project, and fill_hole remain the only verdict sources. \
@@ -833,14 +837,11 @@ runServer cfg = do
   hSetBuffering stdin  LineBuffering
   hSetBuffering stdout LineBuffering
   -- The interaction lanes (issue #75) are runtime state, not configuration:
-  -- created here, threaded to dispatch, and shut down on EVERY exit path —
-  -- the asynchronous exceptions the dispatch deliberately re-throws escape
-  -- 'loop', and an embedding that cancels 'runServer' must not leave agda
-  -- children behind (a Copilot review catch on PR 107; in the shipped binary
-  -- the children would EOF-exit when the process dies anyway, but the
-  -- 'finally' is what makes the cleanup hold for any embedding).
-  lanes <- newInteractionLanes
-  loop lanes `finally` shutdownLanes lanes
+  -- acquired with 'bracket' so no exit path — and no cancellation landing
+  -- between construction and cleanup installation — can leak the registry's
+  -- reaper thread or an agda child (bracket's acquire runs masked, which is
+  -- what closes the construction gap a 'finally' after the fact cannot).
+  bracket newInteractionLanes shutdownLanes loop
   where
     loop lanes = do
       eof <- isEOF
