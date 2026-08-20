@@ -122,7 +122,7 @@ module AgdaMCP.Interaction
 import Control.Concurrent (ThreadId, forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
   (MVar, modifyMVar, newMVar, putMVar, readMVar, tryTakeMVar)
-import Control.Exception (SomeException, catch, throwIO, try)
+import Control.Exception (IOException, SomeException, catch, throwIO, try)
 import Control.Monad (forever)
 import Data.Aeson (Value (..), decodeStrict')
 import qualified Data.Aeson.Key as Key
@@ -783,16 +783,24 @@ data ReadEnd = ReadTimedOut | ReadEOF
 -- request's deadline.  Bytes are decoded as UTF-8 leniently, the same
 -- reasoning as the batch drainers: Agda's output routinely carries the
 -- goal's Unicode, and the handle's locale must not get a vote.
+--
+-- The inner 'try' catches 'IOException' only, and deliberately: it sits
+-- inside 'timeout', and a @SomeException@ handler there would swallow the
+-- timeout's own asynchronous exception, misreporting every hung read as a
+-- crash (caught by the tier-3 fake-binary tests).  An EOF or broken pipe is
+-- an 'IOException'; the timeout signal is not.
 readResponseLine :: LaneHandle -> IO (Either ReadEnd IResponse)
 readResponseLine lh = loop
   where
     loop = do
       left <- remainingMicros (lhDeadline lh)
       if left <= 0 then pure (Left ReadTimedOut) else do
-        got <- timeout left (try (BS8.hGetLine (laneOut (lhLane lh))))
+        got <- timeout left
+          (try (BS8.hGetLine (laneOut (lhLane lh)))
+             :: IO (Either IOException BS8.ByteString))
         case got of
           Nothing -> pure (Left ReadTimedOut)
-          Just (Left (_ :: SomeException)) -> pure (Left ReadEOF)
+          Just (Left _)    -> pure (Left ReadEOF)
           Just (Right raw) ->
             case parseResponseLine (TE.decodeUtf8With lenientDecode raw) of
               Nothing   -> loop

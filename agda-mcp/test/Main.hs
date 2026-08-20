@@ -100,6 +100,17 @@ import AgdaMCP.Project
   , libraryIncludeDirs, libraryIncludesOf, libraryNameOf, parseLibrariesFile
   , resolveProjectDir, selectedLibrariesOf, underAnyDir
   )
+import AgdaMCP.Interaction
+  ( IPoint (..), IRange (..), IResponse (..), LaneGoal (..)
+  , LoadReport (..), LoadedInfo (..)
+  , cmdLoad, ensureLoaded, goalsOf, hsShow
+  , interactionPointsOf, iotcmLine, newInteractionLanes, parseAmbiguousName
+  , parseDidYouMean, parseResponseLine, parseSrcLoc, parseWhyInScope
+  , pointContaining, shutdownLanes, stripPrompts, withLane
+  , InteractionLanes, LaneFailure (..), ProvenanceStep (..)
+  , ScopeCandidate (..), SrcLoc (..)
+  , errorCodeOf
+  )
 import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
@@ -107,6 +118,9 @@ import AgdaMCP.Tools.CheckProject
 import AgdaMCP.Tools.ProofState
   ( handleGetGoal, handleFillHole, handleCheckFile, handleGetDiagnostics
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
+import AgdaMCP.Tools.LiveQueries
+  ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
+  , handleTypeOf )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
 import AgdaMCP.Types
@@ -157,10 +171,11 @@ allOf (a : as) = do
 -- | failureText: flatten a structured 'ToolFailure' to its message, for test
 -- diagnostics that only want the prose.
 failureText :: ToolFailure -> Text
-failureText (FailMessage m)  = m
-failureText (FailTimeout tf) = tfMessage tf
-failureText (FailProject pm) = mismatchMessage pm
-failureText (FailPath pf)    = pathFailureMessage pf
+failureText (FailMessage m)      = m
+failureText (FailTimeout tf)     = tfMessage tf
+failureText (FailProject pm)     = mismatchMessage pm
+failureText (FailPath pf)        = pathFailureMessage pf
+failureText (FailInteraction xf) = xfMessage xf
 
 -- | fakeResult: a synthetic 'AgdaResult' for the pure 'checkedFromSourceOf'
 -- tests — exit code, timed-out flag, and stdout, with the fields the signal
@@ -1908,6 +1923,9 @@ timeoutTests = do
               Left (FailPath pf) ->
                 pure (Fail $ "expected FailTimeout, got FailPath: "
                              <> T.unpack (pathFailureMessage pf))
+              Left (FailInteraction xf) ->
+                pure (Fail $ "expected FailTimeout, got FailInteraction: "
+                             <> T.unpack (xfMessage xf))
               Left (FailTimeout tf) -> do
                 r1 <- assert ("elapsedMs = " <> show (tfElapsedMs tf)) (tfElapsedMs tf > 0)
                 case r1 of
@@ -4575,6 +4593,469 @@ reanchorTest cfg path =
 -- Main
 -- ---------------------------------------------------------------------------
 
+
+-- ---------------------------------------------------------------------------
+-- Tier 1h: the interaction lane's wire model and prose parsers (#75, no Agda)
+--
+-- Every string below is a captured transcript line from the probes recorded
+-- in docs/agda-mcp-interaction-lane.md, not an invented example: these tests
+-- pin the parsers to what Agda 2.8.0 actually said.
+-- ---------------------------------------------------------------------------
+
+interactionWireTests :: IO [Bool]
+interactionWireTests = do
+  hPutStrLn stderr "\n── Interaction wire model (tier 1h: #75, no Agda) ──"
+  sequence
+    [ runTest "stripPrompts: bare, prefixed, stacked, none" $ do
+        r1 <- assertEqual "bare" "" (stripPrompts "JSON> ")
+        r2 <- assertEqual "prefixed" "{\"kind\":\"Status\"}"
+                (stripPrompts "JSON> {\"kind\":\"Status\"}")
+        r3 <- assertEqual "stacked" "x" (stripPrompts "JSON> JSON> x")
+        r4 <- assertEqual "none" "{\"a\":1}" (stripPrompts "{\"a\":1}")
+        pure (firstFailure [r1, r2, r3, r4])
+
+    , runTest "parseResponseLine: InteractionPoints carries id and range" $ do
+        let ln = "{\"interactionPoints\":[{\"id\":0,\"range\":[{\"end\":{\"col\":9,\"line\":22,\"pos\":816},\"start\":{\"col\":5,\"line\":22,\"pos\":812}}]},{\"id\":1,\"range\":[{\"end\":{\"col\":9,\"line\":25,\"pos\":834},\"start\":{\"col\":5,\"line\":25,\"pos\":830}}]}],\"kind\":\"InteractionPoints\"}"
+        case parseResponseLine ln of
+          Just (IInteractionPoints ps@(p0 : _)) -> do
+            r1 <- assertEqual "count" 2 (length ps)
+            r2 <- assertEqual "first" (IPoint 0 (Just (IRange 22 5 22 9))) p0
+            pure (firstFailure [r1, r2])
+          other -> pure (Fail $ "unexpected parse: " <> show other)
+
+    , runTest "parseResponseLine: prompt-prefixed DisplayInfo, by info.kind" $ do
+        let ln = "JSON> {\"info\":{\"kind\":\"Version\",\"version\":\"2.8.0\"},\"kind\":\"DisplayInfo\"}"
+        case parseResponseLine ln of
+          Just (IDisplayInfo k _) -> assertEqual "info.kind" "Version" k
+          other -> pure (Fail $ "unexpected parse: " <> show other)
+
+    , runTest "parseResponseLine: 'cannot read:' is kept as unreadable" $ do
+        case parseResponseLine "cannot read: this is not an IOTCM line" of
+          Just (IUnreadable t) ->
+            assert "keeps the text" ("cannot read" `T.isPrefixOf` t)
+          other -> pure (Fail $ "unexpected parse: " <> show other)
+
+    , runTest "parseResponseLine: empty and pure-prompt lines are Nothing" $ do
+        r1 <- assert "empty" (isNothing (parseResponseLine ""))
+        r2 <- assert "prompt only" (isNothing (parseResponseLine "JSON> "))
+        pure (firstFailure [r1, r2])
+
+    , runTest "goalsOf: AllGoalsWarnings carries each goal's type" $ do
+        let ln = "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[{\"constraintObj\":{\"id\":0,\"range\":[{\"end\":{\"col\":9,\"line\":22,\"pos\":816},\"start\":{\"col\":5,\"line\":22,\"pos\":812}}]},\"kind\":\"OfType\",\"type\":\"Nat\"}],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+        case parseResponseLine ln of
+          Just resp -> case goalsOf [resp] of
+            [g] -> do
+              r1 <- assertEqual "id" 0 (lgId g)
+              r2 <- assertEqual "type" "Nat" (lgType g)
+              r3 <- assertEqual "range" (Just (IRange 22 5 22 9)) (lgRange g)
+              pure (firstFailure [r1, r2, r3])
+            gs -> pure (Fail $ "expected one goal, got " <> show (length gs))
+          Nothing -> pure (Fail "line did not parse")
+
+    , runTest "interactionPointsOf: absent on an error-only load" $ do
+        let errLn = "{\"info\":{\"error\":{\"message\":\"boom\"},\"kind\":\"Error\",\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+        case parseResponseLine errLn of
+          Just resp -> assert "no points" (isNothing (interactionPointsOf [resp]))
+          Nothing   -> pure (Fail "line did not parse")
+
+    , runTest "iotcmLine/cmdLoad: the exact wire shape, argv included" $
+        assertEqual "line"
+          "IOTCM \"/p/F.agda\" None Direct (Cmd_load \"/p/F.agda\" [\"-i\",\"/p\",\"-l\",\"lib\"])"
+          (iotcmLine "/p/F.agda" (cmdLoad "/p/F.agda" ["-i", "/p", "-l", "lib"]))
+
+    , runTest "hsShow: escaping is Haskell's — backslash, quote, newline, unicode" $ do
+        r1 <- assertEqual "backslash" "\"\\\\x -> x\"" (hsShow "\\x -> x")
+        r2 <- assertEqual "quote" "\"a\\\"b\"" (hsShow "a\"b")
+        r3 <- assertEqual "newline" "\"a\\nb\"" (hsShow "a\nb")
+        r4 <- assertEqual "unicode" "\"\\955x \\8594 x\"" (hsShow "\955x \8594 x")
+        pure (firstFailure [r1, r2, r3, r4])
+
+    , runTest "parseSrcLoc: same-line, cross-line, and point ranges" $ do
+        r1 <- assertEqual "same-line" (Just (SrcLoc "/p/F.agda" 16 13 16 29))
+                (parseSrcLoc "/p/F.agda:16.13-29")
+        r2 <- assertEqual "cross-line" (Just (SrcLoc "/p/F.agda" 9 6 10 2))
+                (parseSrcLoc "/p/F.agda:9.6-10.2")
+        r3 <- assertEqual "point" (Just (SrcLoc "/p/F.agda" 8 6 8 6))
+                (parseSrcLoc "/p/F.agda:8.6")
+        r4 <- assert "no colon" (isNothing (parseSrcLoc "not a location"))
+        pure (firstFailure [r1, r2, r3, r4])
+
+    , runTest "parseWhyInScope: two candidates, chains and definitions (#75 § 4)" $ do
+        let msg = "amb is in scope as\n  * a defined name A.Source1.amb brought into scope by\n    - the opening of Source1 at /fx/A.agda:9.6-13\n    - its definition at /fx/A.agda:4.3-6\n  * a defined name A.Source2.amb brought into scope by\n    - the opening of Source2 at /fx/A.agda:10.6-13\n    - its definition at /fx/A.agda:7.3-6"
+        case parseWhyInScope msg of
+          Just [c1, c2] -> do
+            r1 <- assertEqual "qualified 1" (Just "A.Source1.amb") (scQualified c1)
+            r2 <- assertEqual "definition 1" (Just (SrcLoc "/fx/A.agda" 4 3 4 6))
+                    (scDefinition c1)
+            r3 <- assertEqual "chain 1 length" 2 (length (scChain c1))
+            r4 <- assertEqual "qualified 2" (Just "A.Source2.amb") (scQualified c2)
+            pure (firstFailure [r1, r2, r3, r4])
+          other -> pure (Fail $ "unexpected: " <> show other)
+
+    , runTest "parseWhyInScope: re-export chain keeps location-less steps" $ do
+        let msg = "originalName is in scope as\n  * a defined name ReexportOrigin.originalName brought into scope by\n    - the opening of ReexportBarrel at\n    - the opening of ReexportOrigin at\n    - its definition at /res/ReexportOrigin.agda:14.1-13"
+        case parseWhyInScope msg of
+          Just [c] -> do
+            r1 <- assertEqual "chain length" 3 (length (scChain c))
+            r2 <- assertEqual "step sites"
+                    [Nothing, Nothing, Just (SrcLoc "/res/ReexportOrigin.agda" 14 1 14 13)]
+                    (map psLocation (scChain c))
+            r3 <- assertEqual "definition"
+                    (Just (SrcLoc "/res/ReexportOrigin.agda" 14 1 14 13))
+                    (scDefinition c)
+            pure (firstFailure [r1, r2, r3])
+          other -> pure (Fail $ "unexpected: " <> show other)
+
+    , runTest "parseWhyInScope: a variable bullet, and not-in-scope is Nothing" $ do
+        let varMsg = "x is in scope as\n  * a variable bound at /fx/C.agda:4.3-4"
+        r1 <- case parseWhyInScope varMsg of
+          Just [c] -> assertEqual "bound site"
+            (Just (SrcLoc "/fx/C.agda" 4 3 4 4)) (scDefinition c)
+          other -> pure (Fail $ "unexpected: " <> show other)
+        r2 <- assert "not in scope"
+          (isNothing (parseWhyInScope "zzz is not in scope."))
+        pure (firstFailure [r1, r2])
+
+    , runTest "parseAmbiguousName: candidates with wrapped locations" $ do
+        let msg = "1.1-4: error: [AmbiguousName]\nAmbiguous name amb. It could refer to any one of\n  Source1.amb bound at\n    /fx/A.agda:4.3-6\n  Source2.amb bound at\n    /fx/A.agda:7.3-6"
+        assertEqual "candidates"
+          [ ("Source1.amb", Just (SrcLoc "/fx/A.agda" 4 3 4 6))
+          , ("Source2.amb", Just (SrcLoc "/fx/A.agda" 7 3 7 6))
+          ]
+          (parseAmbiguousName msg)
+
+    , runTest "parseDidYouMean and errorCodeOf" $ do
+        let msg = "1.1-4: error: [NotInScope]\nNot in scope:\n  amb at 1.1-4\n    (did you mean\n       'Source1.amb' or\n       'Source2.amb'?)\nwhen scope checking amb"
+        r1 <- assertEqual "suggestions" ["Source1.amb", "Source2.amb"]
+                (parseDidYouMean msg)
+        r2 <- assertEqual "code" (Just "NotInScope") (errorCodeOf msg)
+        r3 <- assertEqual "no code" Nothing (errorCodeOf "plain prose")
+        pure (firstFailure [r1, r2, r3])
+
+    , runTest "pointContaining: containment decides, earliest wins, miss is Nothing" $ do
+        let ps = [ IPoint 0 (Just (IRange 22 5 22 9))
+                 , IPoint 1 (Just (IRange 25 5 27 9))
+                 , IPoint 2 Nothing
+                 ]
+        r1 <- assertEqual "line 22" (Just 0) (ipId <$> pointContaining 22 ps)
+        r2 <- assertEqual "line 26 (inside multi-line)" (Just 1)
+                (ipId <$> pointContaining 26 ps)
+        r3 <- assert "line 3 misses" (isNothing (pointContaining 3 ps))
+        pure (firstFailure [r1, r2, r3])
+    ]
+
+-- | firstFailure: fold sub-assertions into one result, first failure wins.
+firstFailure :: [TestResult] -> TestResult
+firstFailure rs = case [m | Fail m <- rs] of
+  []      -> Pass
+  (m : _) -> Fail m
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 3: the interaction lane against real Agda (#75)
+--
+-- The three § 4 moments of the feedback document run as tests here, plus the
+-- hole-enumeration parity that keeps the lexical model honest, the staleness
+-- policy, the in-band error shapes, and the structured process failures.
+-- Gated on the same probe as tier 2.
+-- ---------------------------------------------------------------------------
+
+interactionLaneTests :: AgdaConfig -> FilePath -> IO [Bool]
+interactionLaneTests cfg repoRoot = do
+  hPutStrLn stderr "\n── Interaction lane (tier 3: #75, Agda subprocess) ──"
+  let resources = repoRoot </> "agda-mcp" </> "test" </> "resources"
+      fx name   = resources </> name
+  lanes <- newInteractionLanes
+  results <- sequence
+    [ -- § 4 moment: resolve_name on the two-candidate fixture.
+      runTest "resolve_name: ScopeAmbiguous 'amb' returns both candidates with provenance (§ 4)" $ do
+        r <- handleResolveName lanes cfg ResolveNameParams
+               { rnpFilePath = fx "ScopeAmbiguous.agda"
+               , rnpName     = "amb"
+               , rnpLine     = Nothing
+               }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assertEqual "candidates" 2 (length (rnrCandidates res))
+            r2 <- assertEqual "qualified names"
+                    [ Just "ScopeAmbiguous.Source1.amb"
+                    , Just "ScopeAmbiguous.Source2.amb" ]
+                    (map ncQualified (rnrCandidates res))
+            r3 <- assert "each candidate carries a provenance chain"
+                    (all (not . null . ncProvenance) (rnrCandidates res))
+            r4 <- assert "each candidate is located"
+                    (all (isJust . ncDefinition) (rnrCandidates res))
+            pure (firstFailure [r1, r2, r3, r4])
+
+    , -- § 4 moment: type_of for an expression not present in the file.
+      runTest "type_of: expression absent from the file answers its type (§ 4)" $ do
+        r <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda"
+               , topExpr     = "implicitOnly {3}"
+               , topLine     = Nothing
+               }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assertEqual "type" (Just "Nat") (torType res)
+            r2 <- assert "no error" (isNothing (torError res))
+            pure (firstFailure [r1, r2])
+
+    , -- § 4 moment: definition_of for a re-exported name.
+      runTest "definition_of: re-exported name locates the origin file and line (§ 4)" $ do
+        r <- handleDefinitionOf lanes cfg DefinitionOfParams
+               { dopFilePath = fx "ReexportUse.agda"
+               , dopName     = "originalName"
+               , dopLine     = Nothing
+               }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> case dorDefinitions res of
+            [site] -> do
+              r1 <- assertEqual "file" (fx "ReexportOrigin.agda") (dsFile site)
+              r2 <- assertEqual "line" 14 (dsLine site)
+              r3 <- assertEqual "qualified"
+                      (Just "ReexportOrigin.originalName") (dsQualified site)
+              pure (firstFailure [r1, r2, r3])
+            sites -> pure (Fail $ "expected one site, got " <> show (length sites))
+
+    , runTest "normalize: computes in the file's scope" $ do
+        r <- handleNormalize lanes cfg NormalizeParams
+               { nomFilePath = fx "TwoHoles.agda"
+               , nomExpr     = "implicitOnly {suc 1}"
+               , nomLine     = Nothing
+               }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> assertEqual "normal form" (Just "2") (nrNormalForm res)
+
+    , runTest "exports_of: the barrel's surface, and \"\" for the file's own module" $ do
+        r1 <- handleExportsOf lanes cfg ExportsOfParams
+                { eopFilePath = fx "ReexportUse.agda", eopModule = "ReexportBarrel" }
+        a <- case r1 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> assertEqual "barrel exports"
+            (Just [ExportEntry "originalName" "Nat"]) (exrExports res)
+        r2 <- handleExportsOf lanes cfg ExportsOfParams
+                { eopFilePath = fx "TwoHoles.agda", eopModule = "" }
+        b <- case r2 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> assertEqual "own module"
+            (Just ["g", "h", "implicitOnly"])
+            (map exName <$> exrExports res)
+        pure (firstFailure [a, b])
+
+    , runTest "exports_of: a module the file's scope cannot name errors in band" $ do
+        r <- handleExportsOf lanes cfg ExportsOfParams
+               { eopFilePath = fx "ReexportUse.agda", eopModule = "Agda.Builtin.Bool" }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assert "no exports" (isNothing (exrExports res))
+            r2 <- assertEqual "stage" (Just "module") (lveStage <$> exrError res)
+            r3 <- assertEqual "code" (Just (Just "NotInScope"))
+                    (lveCode <$> exrError res)
+            pure (firstFailure [r1, r2, r3])
+
+    , runTest "type_of: an ill-typed expression errors in band, lane healthy after" $ do
+        r <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda"
+               , topExpr     = "Nat Nat"
+               , topLine     = Nothing
+               }
+        a <- case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assert "no type" (isNothing (torType res))
+            r2 <- assertEqual "stage" (Just "expression") (lveStage <$> torError res)
+            pure (firstFailure [r1, r2])
+        -- The same lane must answer the next question.
+        r2 <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda"
+               , topExpr     = "g"
+               , topLine     = Nothing
+               }
+        b <- case r2 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> assertEqual "type after error" (Just "Nat") (torType res)
+        pure (firstFailure [a, b])
+
+    , runTest "resolve_name: goal-scoped query sees a local variable" $ do
+        tmp <- scratchDir "lane-local"
+        let file = tmp </> "LaneLocal.agda"
+        TIO.writeFile file
+          "module LaneLocal where\nopen import Agda.Builtin.Nat\nf : Nat -> Nat -> Nat\nf x y = {!!}\n"
+        r <- handleResolveName lanes cfg ResolveNameParams
+               { rnpFilePath = file, rnpName = "x", rnpLine = Just 4 }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assert "scope names the goal" ("goal" `T.isPrefixOf` rnrScope res)
+            r2 <- assertEqual "one candidate" 1 (length (rnrCandidates res))
+            r3 <- assert "described as a variable"
+                    (all (("a variable" ==) . ncDescription) (rnrCandidates res))
+            pure (firstFailure [r1, r2, r3])
+
+    , runTest "staleness: an on-disk edit re-loads; an unchanged file is reused" $ do
+        tmp <- scratchDir "lane-stale"
+        let file = tmp </> "LaneStale.agda"
+        TIO.writeFile file
+          "module LaneStale where\nopen import Agda.Builtin.Nat\nf : Nat\nf = zero\n"
+        r1 <- handleTypeOf lanes cfg TypeOfParams
+                { topFilePath = file, topExpr = "f", topLine = Nothing }
+        a <- case r1 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> assertEqual "first load" "first"
+            (lchLoad (lmLane (torMeta res)))
+        r2 <- handleTypeOf lanes cfg TypeOfParams
+                { topFilePath = file, topExpr = "f", topLine = Nothing }
+        b <- case r2 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> assertEqual "unchanged is reused" "reused"
+            (lchLoad (lmLane (torMeta res)))
+        TIO.appendFile file "extra : Nat\nextra = suc zero\n"
+        r3 <- handleTypeOf lanes cfg TypeOfParams
+                { topFilePath = file, topExpr = "extra", topLine = Nothing }
+        c <- case r3 of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            x <- assertEqual "edit re-loads" "changed" (lchLoad (lmLane (torMeta res)))
+            y <- assertEqual "and the new definition answers" (Just "Nat") (torType res)
+            pure (firstFailure [x, y])
+        pure (firstFailure [a, b, c])
+
+    , runTest "load failure: a file that does not load errors in band with stage 'load'" $ do
+        tmp <- scratchDir "lane-broken"
+        let file = tmp </> "LaneBroken.agda"
+        TIO.writeFile file
+          "module LaneBroken where\nopen import Agda.Builtin.Nat\nbad : Nat\nbad = Nat\n"
+        r <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = file, topExpr = "zero", topLine = Nothing }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assert "no type" (isNothing (torType res))
+            r2 <- assertEqual "stage" (Just "load") (lveStage <$> torError res)
+            r3 <- assertEqual "code" (Just (Just "UnequalTerms"))
+                    (lveCode <$> torError res)
+            pure (firstFailure [r1, r2, r3])
+
+    , -- Parity: the lexical hole model against Agda's own interaction points,
+      -- across the fixture matrix the issue names (HoleVariants + the five
+      -- literate flavours), plus the two-hole pair.
+      runTest "parity: lane interaction points agree with Holes.findHoles across the matrix" $ do
+        let fixtures =
+              [ "HoleVariants.agda"
+              , "LiterateMd.lagda.md"
+              , "LiterateTex.lagda"
+              , "LiterateRst.lagda.rst"
+              , "LiterateOrg.lagda.org"
+              , "LiterateTree.lagda.tree"
+              , "TwoHoles.agda"
+              , "TwoHolesLiterate.lagda.md"
+              ]
+        checks <- mapM (parityCheck lanes cfg . fx) fixtures
+        pure (firstFailure checks)
+    ]
+
+  -- Process-failure shapes, driven by stand-in binaries so the ladder and the
+  -- classification are pinned without hanging a real Agda.
+  failureResults <- sequence
+    [ runTest "lane failure: a child that never answers is a structured spawn failure" $ do
+        script <- fakeLaneBinary "lane-hang" "#!/bin/sh\nexec sleep 60\n"
+        let cfgHang = cfg { agdaBin = script, agdaTimeout = Just 1 }
+        freshLanes <- newInteractionLanes
+        r <- handleTypeOf freshLanes cfgHang TypeOfParams
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing }
+        shutdownLanes freshLanes
+        case r of
+          Left (FailInteraction xf) -> do
+            r1 <- assertEqual "event" "spawn-failure" (xfEvent xf)
+            r2 <- assert "names the timeout"
+                    ("timed out" `T.isInfixOf` xfMessage xf)
+            pure (firstFailure [r1, r2])
+          Left other -> pure (Fail $ "wrong failure shape: " <> T.unpack (failureText other))
+          Right _    -> pure (Fail "unexpectedly succeeded")
+
+    , runTest "lane failure: a command that hangs after startup is a structured timeout" $ do
+        script <- fakeLaneBinary "lane-hang-late"
+          "#!/bin/sh\nprintf '{\"info\":{\"kind\":\"Version\",\"version\":\"9.9\"},\"kind\":\"DisplayInfo\"}\\n'\nexec sleep 60\n"
+        let cfgHang = cfg { agdaBin = script, agdaTimeout = Just 1 }
+        freshLanes <- newInteractionLanes
+        r <- handleTypeOf freshLanes cfgHang TypeOfParams
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing }
+        shutdownLanes freshLanes
+        case r of
+          Left (FailInteraction xf) -> do
+            r1 <- assertEqual "event" "timeout" (xfEvent xf)
+            r2 <- assert "the Cmd_load it sent is echoed"
+                    (any ("Cmd_load" `T.isInfixOf`) (xfIotcm xf))
+            pure (firstFailure [r1, r2])
+          Left other -> pure (Fail $ "wrong failure shape: " <> T.unpack (failureText other))
+          Right _    -> pure (Fail "unexpectedly succeeded")
+
+    , runTest "lane failure: a child that dies mid-request is a structured crash" $ do
+        script <- fakeLaneBinary "lane-die"
+          "#!/bin/sh\nprintf '{\"info\":{\"kind\":\"Version\",\"version\":\"9.9\"},\"kind\":\"DisplayInfo\"}\\n'\nexit 0\n"
+        let cfgDie = cfg { agdaBin = script, agdaTimeout = Just 5 }
+        freshLanes <- newInteractionLanes
+        r <- handleTypeOf freshLanes cfgDie TypeOfParams
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing }
+        shutdownLanes freshLanes
+        case r of
+          Left (FailInteraction xf) ->
+            assertEqual "event" "crash" (xfEvent xf)
+          Left other -> pure (Fail $ "wrong failure shape: " <> T.unpack (failureText other))
+          Right _    -> pure (Fail "unexpectedly succeeded")
+    ]
+
+  shutdownLanes lanes
+  pure (results <> failureResults)
+
+-- | parityCheck: one fixture's lane points against its lexical scan.
+parityCheck :: InteractionLanes -> AgdaConfig -> FilePath -> IO TestResult
+parityCheck lanes cfg file = do
+  src <- TIO.readFile file
+  let expected = [ (hsLine h, hsCol h) | h <- findHoles (flavourOf file) src ]
+  outcome <- withLane lanes cfg (takeDirectory file) $ \lh -> do
+    loaded <- ensureLoaded lh file (agdaFlags cfg <> ["-i", takeDirectory file])
+    pure $ case loaded of
+      Left lf -> Fail (T.unpack (lfMessage lf))
+      Right lr -> case lrOutcome lr of
+        Left msg -> Fail (takeFileName file <> " did not load: " <> T.unpack msg)
+        Right li ->
+          let got = [ (irLine r, irCol r)
+                    | p <- liPoints li, Just r <- [ipRange p] ]
+          in if got == expected
+               then Pass
+               else Fail $ takeFileName file <> ": lane " <> show got
+                           <> " vs lexical " <> show expected
+  pure $ case outcome of
+    Left lf -> Fail (T.unpack (lfMessage lf))
+    Right r -> r
+
+-- | scratchDir: a fresh writable directory for lane fixtures.
+scratchDir :: String -> IO FilePath
+scratchDir label = do
+  tmp <- getTemporaryDirectory
+  let dir = tmp </> ("agda-mcp-" <> label)
+  _ <- try (removeDirectoryRecursive dir) :: IO (Either SomeException ())
+  createDirectoryIfMissing True dir
+  pure dir
+
+-- | fakeLaneBinary: an executable stand-in for agda, for the process-failure
+-- tests.
+fakeLaneBinary :: String -> String -> IO FilePath
+fakeLaneBinary label body = do
+  dir <- scratchDir label
+  let script = dir </> "fake-agda.sh"
+  writeFile script body
+  perms <- getPermissions script
+  setPermissions script (setOwnerExecutable True perms)
+  pure script
+
+
 main :: IO ()
 main = do
   hPutStrLn stderr "agda-mcp test suite"
@@ -4599,6 +5080,8 @@ main = do
   gateResults <- gateTests
   -- Tier 1g: the requested path — how it resolves, and how it refuses (#101).
   pathResults <- pathTests
+  -- Tier 1h: the interaction lane's wire model and prose parsers (#75).
+  wireResults <- interactionWireTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -4618,11 +5101,18 @@ main = do
         "\n── Process tests (tier 2g: --cwd, #103): SKIPPED (executable not built or cabal absent) ──"
       pure []
     Just exe -> cwdProcessTests exe
+  -- Tier 3: the interaction lane (#75) — same gate as tier 2.
+  laneResults <- case mEnv of
+    Nothing -> do
+      hPutStrLn stderr "\n── Interaction lane (tier 3: #75): SKIPPED ──"
+      pure []
+    Just (cfg, _fixture, repoRoot) -> interactionLaneTests cfg repoRoot
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
-          <> pathResults <> integrationResults <> cwdResults
+          <> pathResults <> wireResults <> integrationResults <> cwdResults
+          <> laneResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed
