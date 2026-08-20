@@ -8,6 +8,10 @@
 --   This module provides pure and IO functions for:
 --   1. Parsing AGDADOJANG marker output from Agda's stderr.
 --   2. Running the Agda binary to typecheck a file.
+--   3. Reading Agda's own progress lines — @Checking M (path).@ — for the two
+--      facts they carry: whether the module was re-checked from source, and
+--      what Agda calls it (issues #77, #78, #100).  Anything a run of Agda can
+--      be asked is asked here, rather than re-derived from the source text.
 --
 --   Hole enumeration and splicing live in AgdaMCP.Holes (issues #71/#73).
 --
@@ -60,6 +64,9 @@ module AgdaMCP.Agda
     -- * Marker parsing (pure)
   , parseGoalContext
   , checkedFromSourceOf
+  , progressModules
+  , parseCheckingLine
+  , agdaModuleNameOf
     -- * Agda subprocess (IO)
   , runAgda
   , runCommand
@@ -73,6 +80,7 @@ import Control.Concurrent.MVar
 import Control.Exception (SomeException, bracket, catch, try)
 import Control.Monad (void, when)
 import qualified Data.ByteString as BS
+import Data.Maybe (listToMaybe)
 import Data.Text.IO as TIO
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -81,6 +89,7 @@ import Data.Text.Encoding.Error (lenientDecode)
 import GHC.Clock (getMonotonicTimeNSec)
 import System.Directory (findExecutable, getCurrentDirectory)
 import System.Exit (ExitCode (..))
+import System.FilePath (equalFilePath)
 import System.IO (Handle, hClose, hSetBinaryMode, stderr)
 import System.Posix.Signals
   (Signal, killProcess, nullSignal, signalProcessGroup, softwareTermination)
@@ -625,6 +634,10 @@ timeoutMessage cfg =
     secs = maybe defaultTimeoutSeconds id (boundedTimeout cfg)
 
 
+-- ---------------------------------------------------------------------------
+-- Agda's progress lines: was it re-checked, and which module is it?
+-- ---------------------------------------------------------------------------
+
 -- | checkedFromSourceOf: did Agda re-typecheck the module from source, or did it
 -- reuse an already-built interface?
 --
@@ -655,3 +668,65 @@ checkedFromSourceOf r
     combined    = arStdout r <> "\n" <> arStderr r
     sawPrefix p = any (T.isPrefixOf p . T.stripStart) (T.lines combined)
     completedOk = not (arTimedOut r) && arExitCode r == 0
+
+
+-- | progressModules: the modules Agda announced it was checking, in the order
+-- it announced them.
+--
+-- Agda prints @Checking M (/path/M.agda).@ when it re-typechecks a module from
+-- source — indented by import depth, and interleaved with whatever @make@ is
+-- printing — and prints nothing at all for a module it loaded from a warm
+-- @.agdai@ interface.  Two useful facts follow: the count of distinct names is
+-- how much of the project was actually rebuilt, and the last name is where a
+-- killed run got to.
+progressModules :: Text -> [(Text, FilePath)]
+progressModules txt = [ e | ln <- T.lines txt, Just e <- [parseCheckingLine ln] ]
+
+-- | parseCheckingLine: one @Checking M (/path/M.agda).@ line, or 'Nothing'.
+--
+-- The shape is required in full — the keyword, the parenthesised path, and the
+-- trailing period — so that a line of prose beginning with the word "Checking"
+-- is not mistaken for progress.  This mirrors what
+-- 'AgdaMCP.Diagnostics.parseDiagnostics' already treats as a block boundary.
+parseCheckingLine :: Text -> Maybe (Text, FilePath)
+parseCheckingLine raw = do
+  rest <- T.stripPrefix "Checking " (T.stripStart raw)
+  body <- T.stripSuffix "." (T.stripEnd rest)
+  let (nameT, parenT) = T.breakOn "(" body
+      name            = T.strip nameT
+  path <- T.stripSuffix ")" =<< T.stripPrefix "(" (T.stripEnd parenT)
+  if T.null name || T.null path then Nothing else Just (name, T.unpack path)
+
+-- | agdaModuleNameOf: the module name /Agda/ resolved for a file, read from its
+-- own progress line rather than from the file's text.
+--
+-- This is the authoritative answer to "what module is this?", and the one to
+-- prefer: Agda derives it from where the file sits on the include path, so it is
+-- the name an @import@ must use and the name Agda's own messages print —
+-- @Proofs.Use@ for a hierarchical module, @AnonModule@ for a file whose header
+-- reads @module _ where@, and never a name that merely /looks/ like a header
+-- somewhere in the source (issue #100).
+--
+-- It is a 'Maybe' because Agda does not always say, and the cases are worth
+-- keeping apart.  A warm run prints nothing at all, and a client that puts
+-- @--trace-imports=0@ in its flags silences the line outright (measured: levels
+-- 1 and up print it, 0 prints nothing).  A run that dies before it reaches
+-- /this/ file — a parse error, a header that does not match its file name, or a
+-- kill while its dependencies were still being checked — leaves only its
+-- dependencies' lines, which is why the answer is the line naming this file
+-- rather than the first line seen.
+--
+-- A timeout does /not/ by itself lose the name.  Agda prints the line when it
+-- starts checking a module, so a run killed mid-check has already printed it
+-- (measured: killed at ~1s, the line was there) — the same reason
+-- 'checkedFromSourceOf' reads such a run as a source re-check.  What drops the
+-- name on a timeout is the /response/: get_goal answers a timeout with a
+-- failure, and a failure carries no module field.  See Copilot's review of
+-- PR 105, which caught this doc claiming otherwise.
+agdaModuleNameOf :: FilePath -> AgdaResult -> Maybe Text
+agdaModuleNameOf path r =
+  listToMaybe
+    [ name
+    | (name, announced) <- progressModules (arStdout r <> "\n" <> arStderr r)
+    , equalFilePath announced path
+    ]

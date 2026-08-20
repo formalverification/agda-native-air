@@ -65,8 +65,6 @@
 module AgdaMCP.Tools.CheckProject
   ( handleCheckProject
     -- * Exposed for testing
-  , progressModules
-  , parseCheckingLine
   , failingModuleOf
   , gateFailureLines
   , outputTailOf
@@ -83,7 +81,7 @@ import qualified Data.Text as T
 import System.Directory (getCurrentDirectory)
 
 import AgdaMCP.Agda
-  ( AgdaConfig (..), AgdaResult (..), debugLog, runCommand )
+  ( AgdaConfig (..), AgdaResult (..), debugLog, progressModules, runCommand )
 import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
 import AgdaMCP.Gate
   ( GateConfig, GatePlan (..), checkTimeoutOf, resolveGate )
@@ -304,33 +302,6 @@ projectTimeoutMessage mBound =
 -- ---------------------------------------------------------------------------
 -- Reading the gate's output
 -- ---------------------------------------------------------------------------
-
--- | progressModules: the modules Agda announced it was checking, in the order
--- it announced them.
---
--- Agda prints @Checking M (/path/M.agda).@ when it re-typechecks a module from
--- source — indented by import depth, and interleaved with whatever @make@ is
--- printing — and prints nothing at all for a module it loaded from a warm
--- @.agdai@ interface.  Two useful facts follow: the count of distinct names is
--- how much of the project was actually rebuilt, and the last name is where a
--- killed run got to.
-progressModules :: Text -> [(Text, FilePath)]
-progressModules txt = [ e | ln <- T.lines txt, Just e <- [parseCheckingLine ln] ]
-
--- | parseCheckingLine: one @Checking M (/path/M.agda).@ line, or 'Nothing'.
---
--- The shape is required in full — the keyword, the parenthesised path, and the
--- trailing period — so that a line of prose beginning with the word "Checking"
--- is not mistaken for progress.  This mirrors what
--- 'AgdaMCP.Diagnostics.parseDiagnostics' already treats as a block boundary.
-parseCheckingLine :: Text -> Maybe (Text, FilePath)
-parseCheckingLine raw = do
-  rest <- T.stripPrefix "Checking " (T.stripStart raw)
-  body <- T.stripSuffix "." (T.stripEnd rest)
-  let (nameT, parenT) = T.breakOn "(" body
-      name            = T.strip nameT
-  path <- T.stripSuffix ")" =<< T.stripPrefix "(" (T.stripEnd parenT)
-  if T.null name || T.null path then Nothing else Just (name, T.unpack path)
 
 -- | failingModuleOf: where the gate stopped.
 --
