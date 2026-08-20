@@ -41,7 +41,7 @@ module AgdaMCP.Server
   ) where
 
 import Control.Exception
-  (AsyncException, SomeException, evaluate, fromException, throwIO, try)
+  (AsyncException, SomeException, evaluate, finally, fromException, throwIO, try)
 import Control.Monad (when)
 import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.=)
@@ -787,17 +787,19 @@ runServer cfg = do
   hSetBuffering stdin  LineBuffering
   hSetBuffering stdout LineBuffering
   -- The interaction lanes (issue #75) are runtime state, not configuration:
-  -- created here, threaded to dispatch, and shut down when stdin closes, so
-  -- no agda child outlives the server.
+  -- created here, threaded to dispatch, and shut down on EVERY exit path —
+  -- the asynchronous exceptions the dispatch deliberately re-throws escape
+  -- 'loop', and an embedding that cancels 'runServer' must not leave agda
+  -- children behind (a Copilot review catch on PR 107; in the shipped binary
+  -- the children would EOF-exit when the process dies anyway, but the
+  -- 'finally' is what makes the cleanup hold for any embedding).
   lanes <- newInteractionLanes
-  loop lanes
+  loop lanes `finally` shutdownLanes lanes
   where
     loop lanes = do
       eof <- isEOF
       if eof
-        then do
-          shutdownLanes lanes
-          hPutStrLn stderr "agda-mcp: stdin closed, shutting down."
+        then hPutStrLn stderr "agda-mcp: stdin closed, shutting down."
         else do
           line <- LBS.fromStrict <$> BS8.hGetLine stdin
           when (not $ LBS.null line) $

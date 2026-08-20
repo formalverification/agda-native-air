@@ -478,22 +478,7 @@ raceProcess cfg ph mPgid outVar errVar = do
       -- thread blocked in 'waitForProcess' sits in a foreign call, so
       -- 'killThread' on it could block indefinitely.  Letting it complete is
       -- what leaves no zombie.
-      ignoringIOErrors (interruptProcessGroupOf ph)
-      intGone <- waitGroupGone mPgid exitVar interruptGraceMicros
-      termGone <-
-        if intGone then pure True
-        else do
-          signalGroupVia mPgid softwareTermination
-          -- Belt and braces: reach the leader through the handle too, in case
-          -- the pgid was unavailable at spawn time.
-          ignoringIOErrors (terminateProcess ph)
-          waitGroupGone mPgid exitVar termGraceMicros
-      when (not termGone) $ do
-        signalGroupVia mPgid killProcess
-        void (waitGroupGone mPgid exitVar reapGraceMicros)
-      -- Reap the leader (bounded, so an unreapable process cannot hang the
-      -- call); with the group gone this returns immediately.
-      _ <- takeMVarWithin reapGraceMicros exitVar
+      ladderTo ph mPgid exitVar
       out <- takeMVarWithin drainGraceMicros outVar
       err <- takeMVarWithin drainGraceMicros errVar
       pure (Nothing, orEmpty out, orEmpty err)
@@ -534,30 +519,49 @@ signalGroupVia mPgid sig = case mPgid of
 
 -- | escalateAndReap: the issue-#77 kill ladder, packaged for callers that
 -- manage a process of their own — the interaction lane's persistent child
--- (issue #75) — rather than going through 'runProcessBounded'.
+-- (issue #75) — rather than going through 'runProcessBounded'.  It forks its
+-- own reaper thread and runs 'ladderTo' on it; see there for the rungs.
 --
--- Same rungs, same graces, same reasoning as the timeout path of
--- 'raceProcess': SIGINT group-wide first (agda unwinds and may still flush),
--- then SIGTERM, then SIGKILL, each rung taken while the process /group/ still
--- has members, with the leader reaped through 'waitForProcess' on a dedicated
--- thread so an unreapable process cannot hang the caller.  Total worst-case
--- dwell is the sum of the three graces, a few seconds; the common case — a
--- healthy child told to die — ends at the first rung in milliseconds.
+-- One caution for callers: the ladder probes and signals the child's process
+-- /group/ by raw pgid, which is only safe while the group is known to be
+-- occupied — a healthy child, or one that died moments ago.  For a child
+-- that died an unknown time ago (an idle lane found dead), the pgid may have
+-- been recycled by an unrelated group; close the handles instead and skip
+-- the ladder.
 escalateAndReap :: ProcessHandle -> Maybe Pid -> IO ()
 escalateAndReap ph mPgid = do
   exitVar <- newEmptyMVar
   _ <- forkIO $ waitForProcess ph >>= putMVar exitVar
+  ladderTo ph mPgid exitVar
+
+-- | ladderTo: the one kill ladder, shared by 'raceProcess' (the batch lane's
+-- timeout arm) and 'escalateAndReap' (the interaction lane) — SIGINT
+-- group-wide first (agda unwinds and may still flush), then SIGTERM, then
+-- SIGKILL, each rung taken while the process /group/ still has members, then
+-- a bounded reap of the leader through the caller's exit 'MVar'.  Total
+-- worst-case dwell is the sum of the three graces, a few seconds; the common
+-- case — a healthy child told to die — ends at the first rung in
+-- milliseconds.  The bracket 'cleanup' in 'runProcessBounded' is deliberately
+-- NOT this ladder: it is a non-blocking fire-and-forget for the
+-- async-exception unwind, where waiting on graces would recreate the hang it
+-- exists to remove.
+ladderTo :: ProcessHandle -> Maybe Pid -> MVar ExitCode -> IO ()
+ladderTo ph mPgid exitVar = do
   ignoringIOErrors (interruptProcessGroupOf ph)
   intGone <- waitGroupGone mPgid exitVar interruptGraceMicros
   termGone <-
     if intGone then pure True
     else do
       signalGroupVia mPgid softwareTermination
+      -- Belt and braces: reach the leader through the handle too, in case
+      -- the pgid was unavailable at spawn time.
       ignoringIOErrors (terminateProcess ph)
       waitGroupGone mPgid exitVar termGraceMicros
   when (not termGone) $ do
     signalGroupVia mPgid killProcess
     void (waitGroupGone mPgid exitVar reapGraceMicros)
+  -- Reap the leader (bounded, so an unreapable process cannot hang the
+  -- caller); with the group gone this returns immediately.
   void (takeMVarWithin reapGraceMicros exitVar)
 
 -- | groupAlive: does the child's process group still have members?  Probed

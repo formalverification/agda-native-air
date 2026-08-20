@@ -29,10 +29,13 @@
 --     root, per call, exactly as it does for the batch tools).  Since #103 a
 --     server is routinely asked about foreign checkouts, so the registry is
 --     a map of roots, not a slot.
---   * Requests are serialized per lane under an 'MVar'; distinct roots run
---     concurrently.  Responses are read line by line, keyed on the JSON
---     @kind@ field, never on line position; @JSON> @ prompt markers float
---     mid-stream and are stripped wherever they appear.
+--   * Requests are serialized per lane under an 'MVar'.  The registry is
+--     safe for concurrent callers on distinct roots, but the stdio server
+--     loop that drives it today is itself serial, so at most one request is
+--     ever in flight — capability, not yet behavior.  Responses are read
+--     line by line, keyed on the JSON @kind@ field, never on line position;
+--     @JSON> @ prompt markers float mid-stream and are stripped wherever
+--     they appear.
 --   * After every command the lane sends @Cmd_show_version@ and collects
 --     until that sentinel's unmistakable response.  Commands execute
 --     strictly in order (a reader thread queues them for a single
@@ -122,7 +125,10 @@ module AgdaMCP.Interaction
 import Control.Concurrent (ThreadId, forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
   (MVar, modifyMVar, newMVar, putMVar, readMVar, tryTakeMVar)
-import Control.Exception (IOException, SomeException, catch, throwIO, try)
+import Control.Exception
+  ( AsyncException, IOException, SomeException, catch, fromException
+  , onException, throwIO, try
+  )
 import Control.Monad (forever)
 import Data.Aeson (Value (..), decodeStrict')
 import qualified Data.Aeson.Key as Key
@@ -456,26 +462,39 @@ newInteractionLanes = do
   reaper <- forkIO (reapLoop slots)
   pure (InteractionLanes slots reaper)
   where
+    -- Synchronous failures must not kill the reaper, but the asynchronous
+    -- 'ThreadKilled' from 'shutdownLanes' must — a blanket handler here would
+    -- swallow it whenever the kill lands mid-sweep and leave the loop
+    -- running forever (a Copilot review catch on PR 107).
     reapLoop slots = forever $ do
       threadDelay 60_000_000
-      sweep slots `catch` \(_ :: SomeException) -> pure ()
+      sweep slots `catch` \(e :: SomeException) ->
+        case fromException e of
+          Just (a :: AsyncException) -> throwIO a
+          Nothing                    -> pure ()
     sweep slots = do
       m   <- readMVar slots
       now <- monotonicSeconds
       mapM_ (reapSlot now) (Map.elems m)
     -- Busy lanes (slot taken) are skipped, never waited on: the reaper must
     -- not queue behind a long request only to kill the lane that just
-    -- finished serving it.
+    -- finished serving it.  Once taken, the slot is restored on EVERY exit —
+    -- an asynchronous kill landing between the take and the put would
+    -- otherwise leave the slot empty, and every later request on that root
+    -- would block forever on it.
     reapSlot now slot = do
       taken <- tryTakeMVar slot
       case taken of
-        Nothing          -> pure ()
-        Just Nothing     -> putMVar slot Nothing
-        Just (Just lane) -> do
+        Nothing   -> pure ()
+        Just held -> (decide held >>= putMVar slot)
+                       `onException` putMVar slot held
+      where
+        decide Nothing = pure Nothing
+        decide (Just lane) = do
           lastUse <- readIORef (laneLastUse lane)
           if now >= lastUse && now - lastUse >= laneIdleSeconds
-            then stopLane lane >> putMVar slot Nothing
-            else putMVar slot (Just lane)
+            then stopLane lane >> pure Nothing
+            else pure (Just lane)
 
 -- | shutdownLanes: stop the reaper and close every lane.  Called on server
 -- exit; harmless against lanes already dead.
@@ -494,12 +513,32 @@ shutdownLanes il = do
 
 -- | stopLane: close stdin — Agda exits cleanly on EOF (probed: rc 0) — then
 -- make sure with the ladder.  'escalateAndReap' begins with SIGINT and always
--- reaps, so a child that already exited costs nothing further, and one that
--- ignored the EOF cannot outlive the call.
+-- reaps, so a child that exited moments ago costs nothing further, and one
+-- that ignored the EOF cannot outlive the call.
+--
+-- For a child that is known dead but died an unknown time ago, use
+-- 'closeLaneHandles' instead: the ladder probes and signals the raw pgid,
+-- which may by then name an unrelated, recycled process group.
 stopLane :: Lane -> IO ()
 stopLane lane = do
   ignoringIOErrors (hClose (laneIn lane))
   escalateAndReap (laneProc lane) (lanePgid lane)
+  ignoringIOErrors (hClose (laneOut lane))
+
+-- | closeLaneHandles: release a dead lane's pipe handles, no signals.
+--
+-- The one caller is the revival path, where 'getProcessExitCode' has already
+-- reaped the child — some time ago, possibly long ago.  Sending the ladder
+-- there would be worse than the descriptor leak it fixes: 'groupAlive'
+-- probes @kill(-pgid, 0)@, and a long-dead child's pgid can have been
+-- recycled by an unrelated process group, which the ladder would then
+-- SIGTERM.  (An interaction-mode agda spawns no descendants that could
+-- legitimately outlive it — it never invokes GHC — so there is nothing for
+-- the ladder to catch here anyway.)  The stderr drainer closes its own
+-- handle at EOF.
+closeLaneHandles :: Lane -> IO ()
+closeLaneHandles lane = do
+  ignoringIOErrors (hClose (laneIn lane))
   ignoringIOErrors (hClose (laneOut lane))
 
 monotonicSeconds :: IO Word
@@ -603,6 +642,10 @@ withLane
   -> (LaneHandle -> IO a)
   -> IO (Either LaneFailure a)
 withLane il cfg root body = do
+  -- One deadline for the whole request — spawn flush, load, and query share
+  -- its remaining budget, so a first request is bounded by @--timeout@ once,
+  -- not once per phase (a Copilot review catch on PR 107).
+  deadline <- newDeadline (agdaTimeout cfg)
   slot <- modifyMVar (ilSlots il) $ \m ->
     case Map.lookup root m of
       Just s  -> pure (m, s)
@@ -610,11 +653,10 @@ withLane il cfg root body = do
         s <- newMVar Nothing
         pure (Map.insert root s m, s)
   modifyMVar slot $ \held -> do
-    revived <- reviveOrSpawn held
+    revived <- reviveOrSpawn deadline held
     case revived of
       Left failure -> pure (Nothing, Left failure)
       Right (lane, spawned) -> do
-        deadline <- newDeadline (agdaTimeout cfg)
         sent     <- newIORef []
         doomed   <- newIORef False
         let lh = LaneHandle lane deadline sent spawned doomed
@@ -633,12 +675,17 @@ withLane il cfg root body = do
                 monotonicSeconds >>= writeIORef (laneLastUse lane)
                 pure (Just lane, Right a)
   where
-    reviveOrSpawn (Just lane) = do
+    reviveOrSpawn deadline (Just lane) = do
       gone <- getProcessExitCode (laneProc lane)
       case gone of
         Nothing -> pure (Right (lane, False))
-        Just _  -> fmap (\l -> (l, True)) <$> spawnLane cfg root
-    reviveOrSpawn Nothing = fmap (\l -> (l, True)) <$> spawnLane cfg root
+        Just _  -> do
+          -- Dead while idle: release its handles (no ladder — the child died
+          -- an unknown time ago, see 'closeLaneHandles') and start afresh.
+          closeLaneHandles lane
+          fmap (\l -> (l, True)) <$> spawnLane cfg root deadline
+    reviveOrSpawn deadline Nothing =
+      fmap (\l -> (l, True)) <$> spawnLane cfg root deadline
 
 -- | spawnLane: start @agda --interaction-json@, wire up the stderr drainer,
 -- and flush the startup noise with one sentinel so no command's response
@@ -652,8 +699,8 @@ withLane il cfg root body = do
 -- shipped @--library-file=agda/libraries@ is exactly that), and the two lanes
 -- must resolve one file against one tree.  The root parameter keys the lane's
 -- registry slot and bookkeeping; it is not a chdir.
-spawnLane :: AgdaConfig -> FilePath -> IO (Either LaneFailure Lane)
-spawnLane cfg root = do
+spawnLane :: AgdaConfig -> FilePath -> Deadline -> IO (Either LaneFailure Lane)
+spawnLane cfg root deadline = do
   started <- try $ createProcess (proc (agdaBin cfg) ["--interaction-json"])
     { std_in  = CreatePipe
     , std_out = CreatePipe
@@ -689,10 +736,10 @@ spawnLane cfg root = do
             , laneVersion = verRef
             , laneLastUse = useRef
             }
-      -- Flush startup noise.  A child too broken to answer the first
-      -- sentinel within the bound is reported as spawn failure, since no
-      -- request was under way.
-      deadline <- newDeadline (agdaTimeout cfg)
+      -- Flush startup noise on the requesting call's own deadline — the
+      -- flush is part of that request's budget, not a bound of its own.  A
+      -- child too broken to answer the first sentinel is reported as spawn
+      -- failure, since no request was under way.
       sent     <- newIORef []
       doomed   <- newIORef False
       let lh = LaneHandle lane deadline sent False doomed
@@ -712,7 +759,9 @@ spawnLane cfg root = do
 -- reports.  Interaction mode says little there, but what it says on the way
 -- down is exactly what a 'LaneCrash' needs to carry.
 drainStderr :: Handle -> IORef [Text] -> IO ()
-drainStderr h ref = loop `catch` \(_ :: SomeException) -> pure ()
+drainStderr h ref = do
+  loop `catch` \(_ :: SomeException) -> pure ()
+  ignoringIOErrors (hClose h)
   where
     keep = 40
     loop = do
@@ -729,6 +778,15 @@ drainStderr h ref = loop `catch` \(_ :: SomeException) -> pure ()
 -- | runCmdOn: send one command (or none, to flush) followed by the sentinel,
 -- and collect every response up to the sentinel's.
 --
+-- Both phases run under the request's deadline: the send too, because a
+-- child that stopped reading stdin leaves a large-enough write blocked in
+-- the pipe forever, which on a serial server is a wedge no later bound can
+-- catch (a Copilot review catch on PR 107).  The 'try' inside the 'timeout'
+-- is 'IOException'-only, for the same reason as 'readResponseLine': a
+-- blanket handler there would swallow the timeout's own asynchronous
+-- exception and misreport it as a crash.  The echo records the lines as
+-- attempted whatever became of the write.
+--
 -- On timeout or EOF the lane is doomed: its process group is killed by the
 -- issue-#77 ladder here and now (so nothing runs on unattended), and the doom
 -- flag tells 'withLane' not to return it to the slot.
@@ -737,12 +795,17 @@ runCmdOn lh mCmd = do
   let lane = lhLane lh
       lines' = [iotcmLine f c | Just (f, c) <- [mCmd]]
                <> [iotcmLine (laneRoot lane) cmdShowVersion]
-  sendOutcome <- try (mapM_ (sendLine lane) lines')
+  left <- remainingMicros (lhDeadline lh)
+  sendOutcome <- timeout left
+    (try (mapM_ (sendLine lane) lines') :: IO (Either IOException ()))
   atomicModifyIORef' (lhSent lh) (\ls -> (reverse lines' <> ls, ()))
   case sendOutcome of
-    Left (e :: SomeException) -> doomWith lh LaneCrash $
+    Nothing -> doomWith lh LaneTimeout $
+      "the interaction child stopped reading input"
+      <> maybe "" (\(_, c) -> " while being sent " <> c) mCmd
+    Just (Left e) -> doomWith lh LaneCrash $
       "the interaction child refused input: " <> T.pack (show e)
-    Right () -> collect []
+    Just (Right ()) -> collect []
   where
     collect acc = do
       r <- readResponseLine lh
