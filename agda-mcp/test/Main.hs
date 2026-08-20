@@ -62,8 +62,9 @@ import qualified Data.ByteString.Lazy as LBS
 import System.Directory
   ( Permissions, canonicalizePath, createDirectoryIfMissing, doesDirectoryExist
   , doesFileExist, emptyPermissions, findExecutable, getCurrentDirectory
-  , getPermissions, getTemporaryDirectory, makeAbsolute
-  , removeDirectoryRecursive, removeFile, setOwnerExecutable, setPermissions
+  , getModificationTime, getPermissions, getTemporaryDirectory, makeAbsolute
+  , removeDirectoryRecursive, removeFile, setModificationTime
+  , setOwnerExecutable, setPermissions
   )
 import System.Environment (setEnv)
 import System.Exit (ExitCode (..), exitFailure, exitSuccess)
@@ -150,6 +151,16 @@ assertEqual label expected actual
   | expected == actual = pure Pass
   | otherwise = pure . Fail $
       label <> ": expected " <> show expected <> ", got " <> show actual
+
+-- | injectionOnlyLanes: a shutdown-latched lane registry.  Handlers given it
+-- decline the interaction lane instantly, which is how tests that predate
+-- issue #108 keep pinning the batch/injection path deterministically (tier 3
+-- pins the lane path with a live registry).
+injectionOnlyLanes :: IO InteractionLanes
+injectionOnlyLanes = do
+  il <- newInteractionLanes
+  shutdownLanes il
+  pure il
 
 -- | nth: the i-th element of a list, or Nothing when the list is shorter than
 -- that.  Lets a test name the line it expects a value on without a separate
@@ -1813,6 +1824,7 @@ fakeTimeoutSecs = 1
 -- real Agda.
 timeoutTests :: IO [Bool]
 timeoutTests = do
+  injLanes <- injectionOnlyLanes
   hPutStrLn stderr "\n── Timeout tests (tier 1c: fake agda binary, #77) ──"
   fakeExists    <- doesFileExist fakeAgdaPath
   fixtureExists <- doesFileExist timeoutFixturePath
@@ -1908,9 +1920,10 @@ timeoutTests = do
       -- success-shaped response, so its failure must be the structured kind
       -- that still carries the call's measurements (a Copilot review catch on
       -- PR #89: a plain error string dropped elapsedMs on the floor).
-      gg <- handleGetGoal slowCfg GetGoalParams
+      gg <- handleGetGoal injLanes slowCfg GetGoalParams
         { ggFilePath = timeoutFixturePath
         , ggHole     = ByIndex 0
+        , ggReload  = False
         }
       resultsGoal <- sequence
         [ runTest "get_goal: a timeout is a structured failure carrying elapsedMs" $
@@ -1938,9 +1951,9 @@ timeoutTests = do
       -- check_file / get_diagnostics report the timeout as a failed check with an
       -- explanatory diagnostic, rather than as a silent "0 errors" summary of
       -- output Agda never produced.
-      chk  <- handleCheckFile slowCfg
+      chk  <- handleCheckFile injLanes slowCfg
                 (CheckFileParams timeoutFixturePath Nothing)
-      diag <- handleGetDiagnostics slowCfg
+      diag <- handleGetDiagnostics injLanes slowCfg
                 (GetDiagnosticsParams timeoutFixturePath Nothing)
       results4 <- sequence
         [ runTest "check_file: a timeout is success:false with a timeout diagnostic" $
@@ -2125,6 +2138,7 @@ withLibraryScene act = do
 -- | echoTests: tier 1d.
 echoTests :: IO [Bool]
 echoTests = do
+  injLanes <- injectionOnlyLanes
   hPutStrLn stderr "\n── Response echo and root resolution (tier 1d: #72/#76) ──"
   fakeExists    <- doesFileExist fakeAgdaPath
   fixtureExists <- doesFileExist timeoutFixturePath
@@ -2146,9 +2160,9 @@ echoTests = do
       -- One red run and one green run, from the same file: only the stand-in's
       -- exit status differs, so anything that changes between them is a
       -- function of the exit code.
-      red      <- withFakeExit 42 $ handleCheckFile echoCfg (CheckFileParams timeoutFixturePath Nothing)
-      redDiags <- withFakeExit 42 $ handleGetDiagnostics echoCfg (GetDiagnosticsParams timeoutFixturePath Nothing)
-      green    <- withFakeExit 0  $ handleCheckFile echoCfg (CheckFileParams timeoutFixturePath Nothing)
+      red      <- withFakeExit 42 $ handleCheckFile injLanes echoCfg (CheckFileParams timeoutFixturePath Nothing)
+      redDiags <- withFakeExit 42 $ handleGetDiagnostics injLanes echoCfg (GetDiagnosticsParams timeoutFixturePath Nothing)
+      green    <- withFakeExit 0  $ handleCheckFile injLanes echoCfg (CheckFileParams timeoutFixturePath Nothing)
 
       shape <- sequence
         [ runTest "check_file: success is read from the exit code, not from Agda's prose" $
@@ -2231,11 +2245,11 @@ echoTests = do
             targetB = rootB </> "src" </> "Target.agda"
             targetC = rootC </> "src" </> "Deep" </> "Target.agda"
             targetD = rootD </> "src" </> "Target.agda"
-        okA     <- handleCheckFile rootCfg (CheckFileParams targetA Nothing)
-        okC     <- handleCheckFile rootCfg (CheckFileParams targetC Nothing)
-        okD     <- handleCheckFile rootCfg (CheckFileParams targetD Nothing)
-        badB    <- handleCheckFile rootCfg (CheckFileParams targetB Nothing)
-        badDiag <- handleGetDiagnostics rootCfg (GetDiagnosticsParams targetB Nothing)
+        okA     <- handleCheckFile injLanes rootCfg (CheckFileParams targetA Nothing)
+        okC     <- handleCheckFile injLanes rootCfg (CheckFileParams targetC Nothing)
+        okD     <- handleCheckFile injLanes rootCfg (CheckFileParams targetD Nothing)
+        badB    <- handleCheckFile injLanes rootCfg (CheckFileParams targetB Nothing)
+        badDiag <- handleGetDiagnostics injLanes rootCfg (GetDiagnosticsParams targetB Nothing)
         beforeB <- BS.readFile targetB
         badFill <- handleFillHole rootCfg FillHoleParams
           { fhFilePath = targetB, fhHole = ByIndex 0, fhCandidate = "zero" }
@@ -2357,7 +2371,7 @@ echoTests = do
                     { agdaBin   = "/nonexistent/agda-must-not-run"
                     , agdaFlags = ["--library-file=" <> ghost, "-l", "agda-algebras"]
                     }
-              res <- handleCheckFile ghostCfg (CheckFileParams targetA Nothing)
+              res <- handleCheckFile injLanes ghostCfg (CheckFileParams targetA Nothing)
               withRight res $ \r -> do
                 let pc = fcrProject r
                 r1 <- assertEqual "librariesFile" (Just ghost) (pcLibrariesFile pc)
@@ -2386,7 +2400,7 @@ echoTests = do
                     { agdaBin   = "/nonexistent/agda-must-not-run"
                     , agdaFlags = ["--library-file=", "-l", "agda-algebras"]
                     }
-              res <- handleCheckFile emptyCfg (CheckFileParams targetA Nothing)
+              res <- handleCheckFile injLanes emptyCfg (CheckFileParams targetA Nothing)
               withRight res $ \r -> do
                 let pc = fcrProject r
                 r1 <- assert ("librariesFile should not be the cwd, got "
@@ -3157,29 +3171,30 @@ filePathTools = ["get_goal", "fill_hole", "check_file", "get_diagnostics"]
 pathTests :: IO [Bool]
 pathTests = do
   hPutStrLn stderr "\n── Requested-path resolution and refusal (tier 1g: #101) ──"
+  injLanes <- injectionOnlyLanes
   cwd <- getCurrentDirectory
   withClientScene $ \cs -> do
     let cfg = defaultConfig { agdaBin = "/nonexistent/agda-must-not-run" }
     -- The field-test call itself: the client's own relative path, sent to a
     -- server standing somewhere else.
-    relMiss  <- handleCheckFile cfg (CheckFileParams (csRelative cs) Nothing)
+    relMiss  <- handleCheckFile injLanes cfg (CheckFileParams (csRelative cs) Nothing)
     -- The two paths that must keep working: an absolute one, and a relative one
     -- that really is under the server's working directory (the in-repo client).
-    absOk    <- handleCheckFile cfg (CheckFileParams (csFile cs) Nothing)
-    relOk    <- handleCheckFile cfg (CheckFileParams timeoutFixturePath Nothing)
+    absOk    <- handleCheckFile injLanes cfg (CheckFileParams (csFile cs) Nothing)
+    relOk    <- handleCheckFile injLanes cfg (CheckFileParams timeoutFixturePath Nothing)
     -- The second defect: a path naming nothing, and the other three tools.
-    absMiss  <- handleCheckFile cfg (CheckFileParams (csMissing cs) Nothing)
-    diagMiss <- handleGetDiagnostics cfg (GetDiagnosticsParams (csMissing cs) Nothing)
-    goalMiss <- handleGetGoal cfg GetGoalParams
-      { ggFilePath = csMissing cs, ggHole = ByIndex 0 }
+    absMiss  <- handleCheckFile injLanes cfg (CheckFileParams (csMissing cs) Nothing)
+    diagMiss <- handleGetDiagnostics injLanes cfg (GetDiagnosticsParams (csMissing cs) Nothing)
+    goalMiss <- handleGetGoal injLanes cfg GetGoalParams
+      { ggFilePath = csMissing cs, ggHole = ByIndex 0, ggReload = False }
     fillMiss <- handleFillHole cfg FillHoleParams
       { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero" }
-    dirCall  <- handleCheckFile cfg (CheckFileParams (csRoot cs) Nothing)
+    dirCall  <- handleCheckFile injLanes cfg (CheckFileParams (csRoot cs) Nothing)
     -- A relative path that resolves to a directory that is really there: "test",
     -- from the test process's own working directory.
-    relDir   <- handleCheckFile cfg (CheckFileParams "test" Nothing)
-    emptyCall <- handleCheckFile cfg (CheckFileParams "" Nothing)
-    fifoCall <- handleCheckFile cfg (CheckFileParams (csFifo cs) Nothing)
+    relDir   <- handleCheckFile injLanes cfg (CheckFileParams "test" Nothing)
+    emptyCall <- handleCheckFile injLanes cfg (CheckFileParams "" Nothing)
+    fifoCall <- handleCheckFile injLanes cfg (CheckFileParams (csFifo cs) Nothing)
     fifoProj <- handleCheckProject cfg defaultGateConfig CheckProjectParams
       { cppTarget = Nothing, cppProjectPath = Just (csFifo cs)
       , cppMaxDiagnostics = Nothing }
@@ -3410,7 +3425,7 @@ pathTests = do
             ]
       ]
 
-    unreadable <- unreadableFileTest cfg cs
+    unreadable <- unreadableFileTest injLanes cfg cs
     pure (core <> unreadable)
 
 -- | unreadableFileTest: a file that exists and cannot be opened.
@@ -3422,8 +3437,8 @@ pathTests = do
 -- Skipped when the permission bits do not bite — running as root, or on a
 -- filesystem that ignores them — rather than asserted and failed, since neither
 -- says anything about this server.
-unreadableFileTest :: AgdaConfig -> ClientScene -> IO [Bool]
-unreadableFileTest cfg cs = do
+unreadableFileTest :: InteractionLanes -> AgdaConfig -> ClientScene -> IO [Bool]
+unreadableFileTest injLanes cfg cs = do
   let locked = csRoot cs </> "src" </> "Locked.agda"
   TIO.writeFile locked "module Locked where\n"
   before <- getPermissions locked
@@ -3431,7 +3446,7 @@ unreadableFileTest cfg cs = do
   stillReadable <- either (const False) (const True)
     <$> (try (BS.readFile locked) :: IO (Either SomeException BS.ByteString))
   result <- if stillReadable then pure Nothing
-            else Just <$> handleCheckFile cfg (CheckFileParams locked Nothing)
+            else Just <$> handleCheckFile injLanes cfg (CheckFileParams locked Nothing)
   setPermissions locked before
   removeFile locked
   case result of
@@ -3644,6 +3659,10 @@ probeAgdaEnv = do
 -- with a real Agda binary.
 integrationTests :: AgdaConfig -> FilePath -> FilePath -> IO [Bool]
 integrationTests cfg fixturePath repoRoot = do
+  -- These predate issue #108 and pin the injection/batch path; the latched
+  -- registry makes get_goal decline the lane deterministically, and tier 3
+  -- pins the lane path with a live one.
+  injLanes <- injectionOnlyLanes
   hPutStrLn stderr "\n── Integration tests (tier 2: Agda subprocess) ──"
   base <- sequence
     [ -- Issue #70 regression: the goal must be the hole's actual expected type,
@@ -3651,29 +3670,29 @@ integrationTests cfg fixturePath repoRoot = do
       -- exact strings (rather than mere non-emptiness) is what catches a macro
       -- that "reports something" but reports the wrong thing.
       runTest "get_goal: Fixture01 hole 0 goal is exactly \"A\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0 }
-        result <- handleGetGoal cfg params
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
+        result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "A" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 1 goal is exactly \"⊤\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 1 }
-        result <- handleGetGoal cfg params
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 1, ggReload = False }
+        result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "⊤" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 2 goal is exactly \"x ≡ x\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 2 }
-        result <- handleGetGoal cfg params
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 2, ggReload = False }
+        result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "x ≡ x" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 0 context contains 'x : A'" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0 }
-        result <- handleGetGoal cfg params
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
+        result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info ->
@@ -3705,7 +3724,7 @@ integrationTests cfg fixturePath repoRoot = do
     , runTest "check_file: Fixture01 reports holes" $ do
         let params = CheckFileParams
               { cfFilePath = fixturePath, cfMaxDiagnostics = Nothing }
-        result <- handleCheckFile cfg params
+        result <- handleCheckFile injLanes cfg params
         case result of
           Left err -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
           Right fcr ->
@@ -3718,7 +3737,7 @@ integrationTests cfg fixturePath repoRoot = do
     , runTest "check_file: a real check is not a timeout and carries elapsedMs" $ do
         let params = CheckFileParams
               { cfFilePath = fixturePath, cfMaxDiagnostics = Nothing }
-        result <- handleCheckFile cfg params
+        result <- handleCheckFile injLanes cfg params
         case result of
           Left err -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
           Right fcr -> do
@@ -3729,8 +3748,8 @@ integrationTests cfg fixturePath repoRoot = do
                           (fcrElapsedMs fcr > 0)
 
     , runTest "get_goal: a real goal query carries elapsedMs" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0 }
-        result <- handleGetGoal cfg params
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
+        result <- handleGetGoal injLanes cfg params
         case result of
           Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assert ("elapsedMs = " <> show (giElapsedMs info))
@@ -3752,7 +3771,7 @@ integrationTests cfg fixturePath repoRoot = do
     , runTest "get_diagnostics: Fixture01 reports holes" $ do
         let params = GetDiagnosticsParams
               { gdFilePath = fixturePath, gdMaxDiagnostics = Nothing }
-        result <- handleGetDiagnostics cfg params
+        result <- handleGetDiagnostics injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
           Right dr ->
@@ -3776,6 +3795,7 @@ integrationTests cfg fixturePath repoRoot = do
 -- exercises the transient import injection.  Skipped (with a note) if absent.
 hierIntegrationTests :: AgdaConfig -> FilePath -> IO [Bool]
 hierIntegrationTests cfg repoRoot = do
+  injLanes <- injectionOnlyLanes
   let hierSrc = repoRoot </> "agda-dojang" </> "data" </> "fixtures"
                         </> "hier-lib" </> "src"
       useFile = hierSrc </> "Proofs" </> "Use.agda"
@@ -3791,22 +3811,22 @@ hierIntegrationTests cfg repoRoot = do
       before <- BS.readFile useFile
       results <- sequence
         [ runTest "get_goal: Proofs.Use (hierarchical) returns a non-empty goal" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0 }
-            result <- handleGetGoal hierCfg params
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False }
+            result <- handleGetGoal injLanes hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
 
         , runTest "get_goal: Proofs.Use reports its declared (hierarchical) module name" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0 }
-            result <- handleGetGoal hierCfg params
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False }
+            result <- handleGetGoal injLanes hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "module" (Just "Proofs.Use") (giModule info)
 
         , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0 }
-            result <- handleGetGoal hierCfg params
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False }
+            result <- handleGetGoal injLanes hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info ->
@@ -3926,6 +3946,7 @@ fillVerdictTests cfg = do
 -- in-place patching of non-{!!} holes must still restore files byte-exactly.
 holeModelIntegrationTests :: AgdaConfig -> IO [Bool]
 holeModelIntegrationTests cfg = do
+  injLanes <- injectionOnlyLanes
   let resources    = "test" </> "resources"
       variants     = resources </> "HoleVariants.agda"
       lagdaMd      = resources </> "LiterateMd.lagda.md"
@@ -3957,8 +3978,8 @@ holeModelIntegrationTests cfg = do
       before <- mapM BS.readFile (parityFixtures <> [plainTwin, anonModule])
       results <- sequence
         [ runTest "get_goal: the ? hole in HoleVariants (index 3) has goal Nat" $ do
-            result <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = variants, ggHole = ByIndex 3 }
+            result <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = variants, ggHole = ByIndex 3, ggReload = False }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "goal" "Nat" (giGoal info)
@@ -3989,10 +4010,10 @@ holeModelIntegrationTests cfg = do
                   Pass   -> assertEqual "remainingHoles" (Just 3) (frRemainingHoles fr)
 
         , runTest "get_goal: {! zero !} in a .lagda.md ≡ the same code in a .agda" $ do
-            mdGoal    <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = lagdaMd, ggHole = ByIndex 0 }
-            plainGoal <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = plainTwin, ggHole = ByIndex 0 }
+            mdGoal    <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = lagdaMd, ggHole = ByIndex 0, ggReload = False }
+            plainGoal <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = plainTwin, ggHole = ByIndex 0, ggReload = False }
             case (mdGoal, plainGoal) of
               (Right md, Right plain) -> do
                 r1 <- assertEqual "goals agree" (giGoal plain) (giGoal md)
@@ -4030,8 +4051,8 @@ holeModelIntegrationTests cfg = do
                         , resources </> "LiterateOrg.lagda.org"
                         , resources </> "LiterateTree.lagda.tree"
                         ]
-            results <- mapM (\f -> handleGetGoal cfg GetGoalParams
-                              { ggFilePath = f, ggHole = ByIndex 0 }) files
+            results <- mapM (\f -> handleGetGoal injLanes cfg GetGoalParams
+                              { ggFilePath = f, ggHole = ByIndex 0, ggReload = False }) files
             let bad = [ (takeFileName f, r)
                       | (f, r) <- zip files results
                       , either (const True) ((/= "Nat") . giGoal) r
@@ -4043,10 +4064,10 @@ holeModelIntegrationTests cfg = do
         -- where` and BlockCommentModule's block comment holds `module Decoy
         -- where`.  This is the acceptance criterion of the issue.
         , runTest "get_goal: the reported module is declared, not read from prose or a comment (#100)" $ do
-            mdInfo <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = lagdaMd, ggHole = ByIndex 0 }
-            bcInfo <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = blockComment, ggHole = ByIndex 0 }
+            mdInfo <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = lagdaMd, ggHole = ByIndex 0, ggReload = False }
+            bcInfo <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = blockComment, ggHole = ByIndex 0, ggReload = False }
             case (mdInfo, bcInfo) of
               (Right md, Right bc) -> allOf
                 [ assertEqual "module (.lagda.md)" (Just "LiterateMd") (giModule md)
@@ -4062,8 +4083,8 @@ holeModelIntegrationTests cfg = do
         -- back to being read out of the source alone.
         , runTest "get_goal: an anonymous module is reported by Agda's name, not its header (#100)" $ do
             src <- TIO.readFile anonModule
-            result <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = anonModule, ggHole = ByIndex 0 }
+            result <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = anonModule, ggHole = ByIndex 0, ggReload = False }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -4082,8 +4103,8 @@ holeModelIntegrationTests cfg = do
         -- source says only _.
         , runTest "get_goal: with --trace-imports=0 the module falls back to the declared name (#100)" $ do
             let quietCfg = cfg { agdaFlags = agdaFlags cfg <> ["--trace-imports=0"] }
-            result <- handleGetGoal quietCfg GetGoalParams
-              { ggFilePath = anonModule, ggHole = ByIndex 0 }
+            result <- handleGetGoal injLanes quietCfg GetGoalParams
+              { ggFilePath = anonModule, ggHole = ByIndex 0, ggReload = False }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -4097,8 +4118,8 @@ holeModelIntegrationTests cfg = do
         -- failed with reportGoalCtx out of scope, because the injection read the
         -- decoy as an import and then the hole (decoy included) was replaced.
         , runTest "get_goal: a decoy import inside the hole does not break injection (#100)" $ do
-            result <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = holeDecoy, ggHole = ByIndex 0 }
+            result <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = holeDecoy, ggHole = ByIndex 0, ggReload = False }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -4111,8 +4132,8 @@ holeModelIntegrationTests cfg = do
         -- made Agda read the body as continuations of it — [ParseError] on a file
         -- that type-checks (measured before the fix).
         , runTest "get_goal: an indented module body still gets a well-placed import (#100)" $ do
-            result <- handleGetGoal cfg GetGoalParams
-              { ggFilePath = indentedBody, ggHole = ByIndex 0 }
+            result <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = indentedBody, ggHole = ByIndex 0, ggReload = False }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -4132,7 +4153,7 @@ holeModelIntegrationTests cfg = do
 
         , runTest "get_diagnostics: .lagda.md hole position is in literate coordinates" $ do
             src <- TIO.readFile lagdaMd
-            result <- handleGetDiagnostics cfg GetDiagnosticsParams
+            result <- handleGetDiagnostics injLanes cfg GetDiagnosticsParams
               { gdFilePath = lagdaMd, gdMaxDiagnostics = Nothing }
             case (result, expectedHolePos src) of
               (Left err, _)  -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
@@ -4242,9 +4263,10 @@ withFixtureDiagnostics
   :: AgdaConfig -> String -> FilePath
   -> (Text -> [Diagnostic] -> IO TestResult) -> IO Bool
 withFixtureDiagnostics cfg name file k = runTest name $ do
+  injLanes <- injectionOnlyLanes
   let path = diagnosticFixtureDir </> file
   src    <- TIO.readFile path
-  result <- handleCheckFile cfg
+  result <- handleCheckFile injLanes cfg
     CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Nothing }
   case result of
     Left err  -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
@@ -4260,6 +4282,7 @@ needCode c ds k = case byCode c ds of
 
 diagnosticIntegrationTests :: AgdaConfig -> IO [Bool]
 diagnosticIntegrationTests cfg = do
+  injLanes <- injectionOnlyLanes
   present <- doesFileExist (diagnosticFixtureDir </> "UnequalTerms.agda")
   if not present
     then do
@@ -4373,7 +4396,7 @@ diagnosticIntegrationTests cfg = do
           -- thing Agda happened to print.
         , runTest "diagnostics: maxDiagnostics caps the list and reports the total" $ do
             let path = diagnosticFixtureDir </> "ModuleDoesntExport.agda"
-            result <- handleCheckFile cfg
+            result <- handleCheckFile injLanes cfg
               CheckFileParams { cfFilePath = path, cfMaxDiagnostics = Just 1 }
             case result of
               Left err  -> pure (Fail $ "check_file failed: " <> T.unpack (failureText err))
@@ -4387,7 +4410,7 @@ diagnosticIntegrationTests cfg = do
           -- a capped payload must never read as a cleaner file.
         , runTest "get_diagnostics: counts are over all diagnostics, not the capped list" $ do
             let path = diagnosticFixtureDir </> "ModuleDoesntExport.agda"
-            result <- handleGetDiagnostics cfg
+            result <- handleGetDiagnostics injLanes cfg
               GetDiagnosticsParams { gdFilePath = path, gdMaxDiagnostics = Just 1 }
             case result of
               Left err -> pure (Fail $ "get_diagnostics failed: " <> T.unpack (failureText err))
@@ -4419,6 +4442,7 @@ diagnosticIntegrationTests cfg = do
 
 holeAddressingIntegrationTests :: AgdaConfig -> IO [Bool]
 holeAddressingIntegrationTests cfg = do
+  injLanes <- injectionOnlyLanes
   let resources = "test" </> "resources"
       twoHoles  = resources </> "TwoHoles.agda"
       twoHolesL = resources </> "TwoHolesLiterate.lagda.md"
@@ -4447,10 +4471,10 @@ holeAddressingIntegrationTests cfg = do
                 -- hands it back, and never learns which flavour it is talking to.
                 let mdRef    = ByPosition (hsLine mh) (hsCol mh)
                     plainRef = ByPosition (hsLine ph) (hsCol ph)
-                mdGoal    <- handleGetGoal cfg GetGoalParams
-                  { ggFilePath = lagdaMd,   ggHole = mdRef }
-                plainGoal <- handleGetGoal cfg GetGoalParams
-                  { ggFilePath = plainTwin, ggHole = plainRef }
+                mdGoal    <- handleGetGoal injLanes cfg GetGoalParams
+                  { ggFilePath = lagdaMd,   ggHole = mdRef, ggReload = False }
+                plainGoal <- handleGetGoal injLanes cfg GetGoalParams
+                  { ggFilePath = plainTwin, ggHole = plainRef, ggReload = False }
                 mdFill    <- handleFillHole cfg FillHoleParams
                   { fhFilePath = lagdaMd,   fhHole = mdRef,    fhCandidate = "zero" }
                 plainFill <- handleFillHole cfg FillHoleParams
@@ -4515,9 +4539,10 @@ holeAddressingIntegrationTests cfg = do
         -- the message a client sees is the one the resolver wrote.
         , runTest "get_goal: a prose position is a loud miss, not a nearby hole (#79)" $ do
             mdSrc  <- TIO.readFile lagdaMd
-            result <- handleGetGoal cfg GetGoalParams
+            result <- handleGetGoal injLanes cfg GetGoalParams
               { ggFilePath = lagdaMd
               , ggHole     = ByPosition (proseDecoyLine mdSrc) (proseDecoyCol mdSrc)
+              , ggReload  = False
               }
             case (result, findHoles LiterateMd mdSrc) of
               (Right _, _)  -> pure (Fail "a prose decoy position should address no hole")
@@ -4542,6 +4567,7 @@ holeAddressingIntegrationTests cfg = do
 reanchorTest :: AgdaConfig -> FilePath -> IO Bool
 reanchorTest cfg path =
   runTest ("re-anchoring after a fill: " <> takeFileName path) $ do
+    injLanes <- injectionOnlyLanes
     orig <- BS.readFile path
     src  <- TIO.readFile path
     let flav = flavourOf path
@@ -4572,10 +4598,10 @@ reanchorTest cfg path =
                 -- ask about the other hole with the handle held all along.
                 bracket_ (BS.writeFile path (TE.encodeUtf8 patchedSrc))
                          (BS.writeFile path orig) $ do
-                  goal  <- handleGetGoal cfg GetGoalParams
-                    { ggFilePath = path, ggHole = p1 }
-                  stale <- handleGetGoal cfg GetGoalParams
-                    { ggFilePath = path, ggHole = ByIndex 1 }
+                  goal  <- handleGetGoal injLanes cfg GetGoalParams
+                    { ggFilePath = path, ggHole = p1, ggReload = False }
+                  stale <- handleGetGoal injLanes cfg GetGoalParams
+                    { ggFilePath = path, ggHole = ByIndex 1, ggReload = False }
                   allOf
                     [ case goal of
                         Right info -> assertEqual "goal at the unmoved position" "Nat" (giGoal info)
@@ -5163,6 +5189,146 @@ interactionLaneTests cfg repoRoot = do
           Left other -> pure (Fail $ "wrong failure shape: " <> T.unpack (failureText other))
           Right _    -> pure (Fail "unexpectedly ran after shutdown")
 
+    , -- get_goal through the lane (#108): Agda's own goal display, no
+      -- injection — the goals must be byte-identical to what the macro path
+      -- asserts on this same fixture in tier 2, and the module name is the
+      -- one Agda announced at load.
+      runTest "get_goal: lane-sourced answers match the macro path's goals (#108)" $ do
+        let fixture = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
+            expect = [(0, "A"), (1, "⊤"), (2, "x ≡ x")]
+        checks <- mapM
+          (\(i, want) -> do
+            r <- handleGetGoal lanes cfg GetGoalParams
+                   { ggFilePath = fixture, ggHole = ByIndex i, ggReload = False }
+            case r of
+              Left err   -> pure (Fail $ "hole " <> show i <> ": "
+                                    <> T.unpack (failureText err))
+              Right info -> do
+                a <- assertEqual ("goal " <> show i) want (giGoal info)
+                b <- assertEqual "source" (Just "interaction-lane") (giSource info)
+                c <- assert "no verdict on the lane path" (isNothing (giVerdict info))
+                d <- assert "lane echo present" (isJust (giLane info))
+                e <- assertEqual "module" (Just "Fixture01") (giModule info)
+                pure (firstFailure [a, b, c, d, e]))
+          expect
+        pure (firstFailure checks)
+
+    , runTest "get_goal: lane-sourced context carries names and types (#108)" $ do
+        let fixture = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
+        r <- handleGetGoal lanes cfg GetGoalParams
+               { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False }
+        case r of
+          Left err   -> pure (Fail $ T.unpack (failureText err))
+          Right info -> assertEqual "context (name, type) pairs"
+            [("A", "Set"), ("x", "A")]
+            [(ctxName e, ctxType e) | e <- giContext info]
+
+    , runTest "get_goal: a literate file answers through the lane too (#108)" $ do
+        r <- handleGetGoal lanes cfg GetGoalParams
+               { ggFilePath = fx "LiterateMd.lagda.md", ggHole = ByIndex 0, ggReload = False }
+        case r of
+          Left err   -> pure (Fail $ T.unpack (failureText err))
+          Right info -> do
+            a <- assertEqual "source" (Just "interaction-lane") (giSource info)
+            b <- assert "a goal was reported" (not (T.null (giGoal info)))
+            c <- assertEqual "module" (Just "LiterateMd") (giModule info)
+            pure (firstFailure [a, b, c])
+
+    , -- The injection fallback still answers, and says it answered (#108):
+      -- a shutdown-latched registry is the cheap deterministic trigger.
+      runTest "get_goal: the injection fallback answers when the lane cannot (#108)" $ do
+        deadLanes <- newInteractionLanes
+        shutdownLanes deadLanes
+        let fixture = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
+        r <- handleGetGoal deadLanes cfg GetGoalParams
+               { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False }
+        case r of
+          Left err   -> pure (Fail $ T.unpack (failureText err))
+          Right info -> do
+            a <- assertEqual "goal" "A" (giGoal info)
+            b <- assertEqual "source" (Just "injected-macro") (giSource info)
+            c <- assert "the fallback carries the verdict echo" (isJust (giVerdict info))
+            pure (firstFailure [a, b, c])
+
+    , -- Hole-goal enrichment (#108): a free peek, so a cold registry keeps
+      -- the placeholder and a warm one fills real types — with the batch
+      -- verdict identical either way.
+      runTest "check_file: hole goals fill from a warm lane and only then (#108)" $ do
+        coldLanes <- newInteractionLanes
+        rCold <- handleCheckFile coldLanes cfg CheckFileParams
+                   { cfFilePath = fx "TwoHoles.agda", cfMaxDiagnostics = Nothing }
+        a <- case rCold of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right fcr -> assertEqual "cold: placeholders" ["?", "?"]
+                         (map hiGoal (fcrHoles fcr))
+        shutdownLanes coldLanes
+        _ <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda", topExpr = "g"
+               , topLine = Nothing, topColumn = Nothing, topReload = False }
+        rWarm <- handleCheckFile lanes cfg CheckFileParams
+                   { cfFilePath = fx "TwoHoles.agda", cfMaxDiagnostics = Nothing }
+        b <- case rWarm of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right fcr -> do
+            x <- assertEqual "warm: real goal types" ["Nat", "Nat"]
+                   (map hiGoal (fcrHoles fcr))
+            y <- assert "the batch verdict is still batch agda's"
+                   (not (fcrSuccess fcr) && vExitCode (fcrVerdict fcr) /= 0)
+            pure (firstFailure [x, y])
+        rDiag <- handleGetDiagnostics lanes cfg GetDiagnosticsParams
+                   { gdFilePath = fx "TwoHoles.agda", gdMaxDiagnostics = Nothing }
+        c <- case rDiag of
+          Left err -> pure (Fail $ T.unpack (failureText err))
+          Right dr -> assertEqual "get_diagnostics enriched too" ["Nat", "Nat"]
+                        (map hiGoal (drHoles dr))
+        pure (firstFailure [a, b, c])
+
+    , -- The stamp is the bytes, not the metadata (#108 review): a same-size
+      -- rewrite with its mtime restored must still read as changed, which
+      -- only the content fingerprint can see.
+      runTest "staleness: a same-size mtime-restored rewrite still re-loads" $ do
+        tmp <- scratchDir "lane-fp"
+        let file = tmp </> "LaneFp.agda"
+            v1 = "module LaneFp where\nopen import Agda.Builtin.Nat\nv : Nat\nv = 1234\n"
+            v2 = "module LaneFp where\nopen import Agda.Builtin.Nat\nv : Nat\nv = 4321\n"
+        if T.length v1 /= T.length v2
+          then pure (Fail "fixture versions must be the same length")
+          else do
+            TIO.writeFile file v1
+            r1 <- handleTypeOf lanes cfg TypeOfParams
+                    { topFilePath = file, topExpr = "v", topLine = Nothing
+                    , topColumn = Nothing, topReload = False }
+            a <- case r1 of
+              Left err -> pure (Fail $ T.unpack (failureText err))
+              Right _  -> pure Pass
+            mtime <- getModificationTime file
+            TIO.writeFile file v2
+            setModificationTime file mtime
+            r2 <- handleTypeOf lanes cfg TypeOfParams
+                    { topFilePath = file, topExpr = "v", topLine = Nothing
+                    , topColumn = Nothing, topReload = False }
+            b <- case r2 of
+              Left err  -> pure (Fail $ T.unpack (failureText err))
+              Right res -> assertEqual "fingerprint sees through the metadata"
+                             "changed" (lchLoad (lmLane (torMeta res)))
+            pure (firstFailure [a, b])
+
+    , -- get_goal carries the same dependency-staleness escape hatch as the
+      -- live-query tools (#108 review): reload: true forces a fresh load.
+      runTest "get_goal: reload forces a fresh lane load" $ do
+        r <- handleGetGoal lanes cfg GetGoalParams
+               { ggFilePath = fx "TwoHoles.agda"
+               , ggHole     = ByIndex 0
+               , ggReload   = True
+               }
+        case r of
+          Left err   -> pure (Fail $ T.unpack (failureText err))
+          Right info -> do
+            a <- assertEqual "source" (Just "interaction-lane") (giSource info)
+            b <- assertEqual "forced" (Just "forced")
+                   (lchLoad <$> giLane info)
+            pure (firstFailure [a, b])
+
     , -- The revival path: a child that died while the lane sat idle is
       -- replaced silently on the next request (its handles closed, its
       -- ladder deliberately skipped — see closeLaneHandles).
@@ -5231,7 +5397,10 @@ interactionLaneTests cfg repoRoot = do
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
-            r1 <- assertEqual "event" "spawn-failure" (xfEvent xf)
+            -- Since the #108 review round a startup-flush timeout keeps its
+            -- identity: it consumed the request's bound, and callers that
+            -- would otherwise fall back (get_goal) must be able to see that.
+            r1 <- assertEqual "event" "timeout" (xfEvent xf)
             r2 <- assert "names the timeout"
                     ("timed out" `T.isInfixOf` xfMessage xf)
             -- The startup flush's telemetry is real, not fabricated zeros
