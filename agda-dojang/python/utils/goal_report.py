@@ -1,65 +1,57 @@
 """
-report_parser.py
+goal_report.py
 
-File: agda-dojang/python/tools/report_parser.py
+File: agda-dojang/python/utils/goal_report.py
 
 Description:
-  - Parse Agda's stderr for subgoal reports (marked by AGDADOJANG_SUBGOALS_BEGIN/END).
-  - Extract structured goal information (index, visibility, type) from lines like
-    AGDADOJANG_GOAL:0:visible: <TYPE>.
-  - Also support a separate marker pair AGDADOJANG_REQ_BEGIN/END for policy requests
-    (goal + context) used by agent_bridge (Issue #23).
+  Parse the goal/context request block that AgdaDojang's reporting macros write
+  into Agda's output, delimited by the marker pair
+
+      AGDADOJANG_REQ_BEGIN … AGDADOJANG_REQ_END
+
+  `AgdaDojang.Debug.reportGoalCtx` emits a v0 line protocol between those
+  markers:
+
+      AGDADOJANG_GOAL: <goal>
+      AGDADOJANG_CTX_BEGIN
+      AGDADOJANG_CTX:<index>:<visibility>:<name>: <type>
+      AGDADOJANG_CTX_END
+
+  A JSON object between the same markers is accepted as a forward-compatible
+  alternative.  Either shape decodes to `{"goal": str, "context": [...]}`.
+
+Provenance:
+  Relocated from `tools/report_parser.py` when the legacy Python bridge
+  (`agent_bridge.py`, `report_parser.py`, `dojang_try.py`) was retired in
+  favour of the `agda-mcp` server (issue #109).  The parsing behaviour is
+  unchanged; only the subgoal-report half of the old module, which served
+  `dojang_try.py` alone, was dropped.  The proof-completion evaluator
+  (`tools/eval_fixtures.py`) is the remaining caller.
+
+  The marker protocol itself is live and shared, not legacy:
+  `agda/AgdaDojang/Debug.agda` writes it, and `AgdaMCP.Agda.parseGoalContext`
+  reads it on the Haskell side.
+
+Design notes:
+  + Total.  A missing, truncated, or malformed block yields `None`; nothing
+    here raises for an expected failure.
+  + Pure.  Stdlib only, no I/O, no subprocess, so this module's tests belong
+    to the no-Agda unit-test lane.
+  + When the output holds several complete blocks, the *last* one wins: a run
+    that re-checked a module leaves the freshest report at the end.
 """
 from __future__ import annotations
+
 import json
 import re
-from typing import List, Dict, Any, Optional
-
-_BEGIN = "AGDADOJANG_SUBGOALS_BEGIN"
-_END   = "AGDADOJANG_SUBGOALS_END"
-# Lines look like either:
-#   AGDADOJANG_GOAL:0:visible:  <TYPE>
-#   AGDADOJANG_GOAL:1:?arg:     <TYPE>          (solve-report variant)
-_LINE  = re.compile(r"^AGDADOJANG_GOAL:(\d+):([a-z?]+):\s+(.*)$")
-
-def has_markers(s: str) -> bool:
-    return _BEGIN in s and _END in s
-
-def parse_marked_report(stderr: str, source: str) -> Dict[str, Any]:
-    # Isolate the block between BEGIN/END, but stay robust to extra noise
-    try:
-        block = stderr.split(_BEGIN, 1)[1].split(_END, 1)[0]
-    except Exception:
-        raise ValueError("Report markers malformed or missing")
-
-    goals: List[Dict[str, Any]] = []
-    for raw_line in block.splitlines():
-        m = _LINE.match(raw_line.strip())
-        if not m:
-            continue
-        idx, vis, typ = m.group(1), m.group(2), m.group(3)
-        goals.append({
-            "index": int(idx),
-            "visibility": vis,      # visible|hidden|instance|?arg
-            "type": typ             # keep Agda’s rendering verbatim
-        })
-    return {
-        "kind": "subgoal-report",
-        "source": source,
-        "goals": goals,
-        "raw": {"stderr": stderr}
-    }
-
-
-# =============================================================================
-# Policy request markers (goal + context) for agent_bridge (Issue #23)
-# =============================================================================
+from typing import Any, Dict, List, Optional
 
 _REQ_BEGIN = "AGDADOJANG_REQ_BEGIN"
 _REQ_END   = "AGDADOJANG_REQ_END"
 
 _REQ_GOAL_PREFIX = "AGDADOJANG_GOAL:"
 _REQ_CTX_PREFIX  = "AGDADOJANG_CTX:"
+
 
 def _is_req_marker_line(line: str) -> bool:
     s = line.strip()
@@ -68,6 +60,7 @@ def _is_req_marker_line(line: str) -> bool:
         or s.startswith(_REQ_GOAL_PREFIX)
         or s.startswith(_REQ_CTX_PREFIX)
     )
+
 
 def _parse_req_ctx_line(line: str) -> Optional[Dict[str, Any]]:
     s = line.strip()
@@ -84,12 +77,6 @@ def _parse_req_ctx_line(line: str) -> Optional[Dict[str, Any]]:
         return None
     return {"index": idx, "visibility": vis.strip(), "name": name.strip(), "type": typ.strip()}
 
-def has_request_markers(s: str) -> bool:
-    """
-    True iff the output contains goal/context request markers.
-    Kept separate from has_markers() to avoid mixing two different report types.
-    """
-    return _REQ_BEGIN in s and _REQ_END in s
 
 def _extract_block(output: str, begin: str, end: str) -> Optional[str]:
     """
@@ -104,6 +91,7 @@ def _extract_block(output: str, begin: str, end: str) -> Optional[str]:
     if end_i < 0:
         return None
     return output[start:end_i]
+
 
 def extract_policy_request_from_output(output: str) -> Optional[Dict[str, Any]]:
     """
@@ -143,7 +131,7 @@ def _parse_request_as_json(block: str) -> Optional[Dict[str, Any]]:
 
 def _parse_request_as_lines(block: str) -> Optional[Dict[str, Any]]:
     """
-    Current v0 line protocol (matches your Debug.agda):
+    Current v0 line protocol (matches AgdaDojang/Debug.agda):
       AGDADOJANG_GOAL: <goal>
       AGDADOJANG_CTX_BEGIN
       AGDADOJANG_CTX:<i>:<vis>:<name>: <type>

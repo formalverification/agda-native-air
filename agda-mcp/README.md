@@ -859,9 +859,11 @@ Similar configuration: point the MCP client at `scripts/run-server.sh` (or the
 ### v0: Subprocess-based
 
 The v0 implementation calls the `agda` binary as a subprocess for each
-tool invocation.  This mirrors how `agda-dojang`'s Python tooling
-(`agent_bridge.py`) works and reuses the established marker protocol
-(`AGDADOJANG_REQ_BEGIN/END`).
+tool invocation.  The approach was inherited from `agda-dojang`'s Python
+bridge (`agent_bridge.py`), which this server superseded and which retired
+in issue #109.  The marker protocol that bridge established
+(`AGDADOJANG_REQ_BEGIN/END`) is not legacy: `AgdaDojang.Debug` still emits
+it and this server still reads it.
 
 **Advantages**: simple, decoupled from Agda's GHC version, reuses all
 existing AgdaDojang macros without modification.

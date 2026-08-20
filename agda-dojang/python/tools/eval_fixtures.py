@@ -53,38 +53,34 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Set
 
-from tools.report_parser import extract_policy_request_from_output
-from tools.policy_contract import build_request as build_policy_request
+from tools.policy_contract import (
+    build_request as build_policy_request,
+    parse_response_json as parse_policy_response_json,
+    POLICY_RESPONSE_SCHEMA_V0,
+)
 from utils.file_ops import write_text_atomic
+from utils.goal_report import extract_policy_request_from_output
 from utils.result import Err, Ok, Result
 from utils.types import PipelineError, CommandResult
 from utils.command_runner import run_command
 
-# Reuse the bridge’s well-tested behavior for:
-#  - hole finding/spans
-#  - shadow-mode flag/include filtering (avoids ambiguous module errors)
-#  - policy invocation contract
-#  - scratch-module rendering with context postulates
-from tools.agent_bridge import (  # type: ignore
-    BridgeConfig,
+# The primitives for driving Agda over one hole: hole finding/spans, shadow-mode
+# flag/include filtering (which avoids ambiguous-module errors), and reading a
+# verdict out of Agda's output.  These were the legacy bridge's; they live in
+# utils/agda_probe.py now that the bridge itself has retired (issue #109).
+from utils.agda_probe import (
     HoleSpan,
-    PolicyRequest,
+    ProbeConfig,
     build_candidate_variant,
     build_report_variant,
-    call_policy,
     collect_output,
+    ensure_overlay_dir,
+    filled_hole_still_unsolved,
+    find_next_hole,
+    only_unsolved_metas,
     read_text,
     run_agda,
-    _coerce_context,
-    _coerce_meta,
-    _extract_import_lines,
-    _extract_prelude_lines,
-    _only_unsolved_metas,
-    _filled_hole_still_unsolved,
-    _find_next_hole,
-    _render_candidate_scratch,
-    _strip_flag,
-    _ensure_overlay_dir,  # added earlier for ambiguity-avoidance
+    strip_flag,
 )
 
 
@@ -142,6 +138,33 @@ class FixtureSummary:
     expectedFail: bool = False
     evalOutcome: str = ""  # ok | fail | xfail | xpass
     schemaVersion: str = "eval-proof-completion.v0"
+
+
+# --- Policy-backend wire types -----------------------------------------------
+# The evaluator speaks to a policy backend over the versioned contract in
+# tools/policy_contract.py.  These three types are that conversation, in memory:
+# what we ask, what comes back, and each ranked candidate in it.
+
+@dataclass(frozen=True)
+class PolicyRequest:
+    goal: str
+    context: List[Dict[str, str]]  # [{"name":..., "type":...}, ...]
+    module: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
+
+
+@dataclass(frozen=True)
+class PolicyCandidate:
+    term: str
+    score: float
+    meta: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PolicyResponse:
+    schema: str
+    candidates: List[PolicyCandidate]
+    meta: Dict[str, Any]
 
 
 # =============================================================================
@@ -216,6 +239,42 @@ def _rm_tree_best_effort(path: Path) -> None:
         return
 
 
+def _json_dumps(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, indent=2)
+
+
+def _coerce_meta(raw: Any) -> Dict[str, Any]:
+    """
+    Coerce arbitrary JSON-ish values into a JSON-object-like dict.
+
+    Pyright-friendly: never returns None; keys are normalized to str.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): v for k, v in raw.items()}
+
+
+def _coerce_context(raw: Any) -> List[Dict[str, str]]:
+    """
+    Coerce a decoded request 'context' into exactly:
+      List[{"name": str, "type": str}]
+
+    This matches policy_fixture.py's expectations and keeps typing tight.
+    Extra keys (index/visibility/etc.) are ignored.
+    """
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        typ  = item.get("type")
+        if isinstance(name, str) and isinstance(typ, str):
+            out.append({"name": name, "type": typ})
+    return out
+
+
 def _write_jsonl_line(fp, obj: Dict[str, Any]) -> None:
     fp.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
@@ -242,18 +301,13 @@ def _status_from_run(res: Result[CommandResult, PipelineError]) -> Tuple[str, in
     return "type_error", rc, out
 
 
-def _bridge_cfg_for_fixture(cfg: EvalConfig, fixture: Path) -> BridgeConfig:
-    return BridgeConfig(
+def _probe_cfg_for_fixture(cfg: EvalConfig, fixture: Path) -> ProbeConfig:
+    return ProbeConfig(
         file=fixture.resolve(),
-        output=None,
-        policy_cmd=cfg.policy_cmd,
         agda_bin=cfg.agda_bin,
         agda_flags=cfg.agda_flags,
         include_dirs=list(cfg.include_dirs),
         timeout_sec=cfg.timeout_sec,
-        keep_workdir=cfg.keep_workdir,
-        max_holes=cfg.max_holes,
-        top_k=cfg.top_k,
         cwd=cfg.cwd,
         report_expr=cfg.report_expr,
     )
@@ -331,11 +385,85 @@ def _discover_fixtures(specs: Sequence[str]) -> List[Path]:
 
 
 # =============================================================================
+# Policy backend
+# =============================================================================
+
+def call_policy(
+    cfg: EvalConfig,
+    req: PolicyRequest,
+    workdir: Path,
+) -> Result[PolicyResponse, PipelineError]:
+    """
+    Call the policy backend as a local process.
+
+    We avoid stdin piping so we can reuse run_command:
+      - write req.json
+      - run: <policy_cmd> --in req.json --out -
+      - parse stdout as JSON
+    """
+    req_path = workdir / "policy_req.json"
+    req_obj = build_policy_request(
+        goal=req.goal,
+        context=req.context,
+        module=req.module,
+        meta=req.meta,
+    )
+    write_text_atomic(req_path, _json_dumps(req_obj) + "\n")
+
+    cmd = [*cfg.policy_cmd, "--in", str(req_path), "--out", "-", "--k", str(cfg.top_k)]
+    res = run_command(cmd, cwd=cfg.cwd, timeout=cfg.timeout_sec, merge_stderr=True)
+
+    if isinstance(res, Err):
+        e = res.error
+        return Err(PipelineError(
+            kind=e.kind,
+            cmd=e.cmd,
+            rc=e.rc,
+            stdout=e.stdout,
+            stderr=e.stderr,
+            message=f"policy backend failed: {e.message}",
+        ))
+
+    out = res.value.stdout.strip()
+    try:
+        parsed = parse_policy_response_json(out)
+    except Exception as ex:
+        return Err(PipelineError(
+            kind="OSError",
+            cmd=cmd,
+            rc=-1,
+            stdout=out,
+            stderr="",
+            message=f"policy backend returned invalid response: {ex}",
+        ))
+
+    if parsed.schema != POLICY_RESPONSE_SCHEMA_V0:
+        return Err(PipelineError(
+            kind="OSError",
+            cmd=cmd,
+            rc=-1,
+            stdout=out,
+            stderr="",
+            message=f"unsupported policy response schema: {parsed.schema!r}",
+        ))
+
+    cands: List[PolicyCandidate] = []
+    for c in parsed.candidates:
+        cands.append(PolicyCandidate(term=c.term, score=c.score, meta=_coerce_meta(c.meta)))
+
+    return Ok(PolicyResponse(
+        schema=parsed.schema,
+        candidates=cands,
+        meta=_coerce_meta(parsed.meta),
+    ))
+
+
+# =============================================================================
 # Core evaluation
 # =============================================================================
 
 def _run_report(
-    bridge_cfg: BridgeConfig,
+    probe_cfg: ProbeConfig,
     fixture_src: str,
     hole: HoleSpan,
     shadow_dir: Path,
@@ -345,23 +473,23 @@ def _run_report(
     Run the report variant and parse a policy request object from output.
     Returns (req_obj | None, merged_output).
     """
-    report_src = build_report_variant(bridge_cfg, fixture_src, hole)
-    shadow_file = shadow_dir / bridge_cfg.file.name
+    report_src = build_report_variant(probe_cfg, fixture_src, hole)
+    shadow_file = shadow_dir / probe_cfg.file.name
     write_text_atomic(shadow_file, report_src)
 
-    res = run_agda(bridge_cfg, shadow_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
+    res = run_agda(probe_cfg, shadow_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
     _rc, out = collect_output(res)
     req_obj = extract_policy_request_from_output(out)
     if isinstance(req_obj, dict):
         m = req_obj.get("module")
         if not isinstance(m, str) or not m:
-            req_obj["module"] = bridge_cfg.file.stem
+            req_obj["module"] = probe_cfg.file.stem
     return req_obj, out
 
 
 def _try_candidates_for_hole(
     cfg: EvalConfig,
-    bridge_cfg: BridgeConfig,
+    probe_cfg: ProbeConfig,
     fixture_id: str,
     fixture: Path,
     fixture_src: str,
@@ -406,7 +534,7 @@ def _try_candidates_for_hole(
         json.dumps(req_log_obj, ensure_ascii=False, indent=2) + "\n",
     )
 
-    pol = call_policy(bridge_cfg, req=req, workdir=shadow_dir)
+    pol = call_policy(cfg, req=req, workdir=shadow_dir)
     if isinstance(pol, Err):
         log_path = logs_dir / "policy_error.txt"
         write_text_atomic(log_path, pol.error.message + "\n")
@@ -459,17 +587,17 @@ def _try_candidates_for_hole(
         log_path = logs_dir / f"cand-{rank:02d}.txt"
 
         # Validate in a patched shadow copy of the *fixture module*.
-        shadow_file = shadow_dir / bridge_cfg.file.name
+        shadow_file = shadow_dir / probe_cfg.file.name
         trial_src = build_candidate_variant(fixture_src, hole, cand.term)
         write_text_atomic(shadow_file, trial_src)
 
         t0 = time.monotonic()
-        run_res = run_agda(bridge_cfg, shadow_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
+        run_res = run_agda(probe_cfg, shadow_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
         status, rc, out = _status_from_run(run_res)
         elapsed = int((time.monotonic() - t0) * 1000.0)
 
         # Accept “only unsolved metas” as long as the filled hole is no longer unsolved.
-        accepted = (status == "ok") or (_only_unsolved_metas(out) and not _filled_hole_still_unsolved(hole, out))
+        accepted = (status == "ok") or (only_unsolved_metas(out) and not filled_hole_still_unsolved(hole, out))
         if accepted:
             status = "ok"
 
@@ -498,7 +626,7 @@ def _try_candidates_for_hole(
 
 
 def _final_strict_check(
-    bridge_cfg: BridgeConfig,
+    probe_cfg: ProbeConfig,
     src: str,
     shadow_dir: Path,
     overlay: Path,
@@ -506,10 +634,10 @@ def _final_strict_check(
     """
     Return (finalStatus, rc, output) for strict final typecheck.
     """
-    final_file = shadow_dir / bridge_cfg.file.name
+    final_file = shadow_dir / probe_cfg.file.name
     write_text_atomic(final_file, src)
 
-    strict_cfg = BridgeConfig(**{**bridge_cfg.__dict__, "agda_flags": _strip_flag(bridge_cfg.agda_flags, "--allow-unsolved-metas")})
+    strict_cfg = ProbeConfig(**{**probe_cfg.__dict__, "agda_flags": strip_flag(probe_cfg.agda_flags, "--allow-unsolved-metas")})
     res = run_agda(strict_cfg, final_file, extra_include_dirs=[str(shadow_dir), str(overlay)])
     status, rc, out = _status_from_run(res)
     return status, rc, out
@@ -517,7 +645,7 @@ def _final_strict_check(
 
 def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[FixtureSummary, PipelineError]:
     fixture_id = fixture.stem
-    bridge_cfg = _bridge_cfg_for_fixture(cfg, fixture)
+    probe_cfg = _probe_cfg_for_fixture(cfg, fixture)
 
     r0 = read_text(fixture)
     if isinstance(r0, Err):
@@ -533,7 +661,7 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
     _mkdir_clean(shadow_dir)
 
     # Overlay (mirrors fixture parent minus this file) to avoid module ambiguity.
-    overlay = _ensure_overlay_dir(wdir, fixture.parent, fixture.name)
+    overlay = ensure_overlay_dir(wdir, fixture.parent, fixture.name)
 
     t_start = time.monotonic()
 
@@ -542,7 +670,7 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
     hole_index = 0
 
     while holes_solved < cfg.max_holes:
-        hole = _find_next_hole(src)
+        hole = find_next_hole(src)
         if hole is None:
             break
 
@@ -550,7 +678,7 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         logs_dir = _fixture_logs_dir(cfg, fixture_id, hole_index)
         _mkdir_clean(logs_dir)
 
-        req_obj, out = _run_report(bridge_cfg, src, hole, shadow_dir, overlay)
+        req_obj, out = _run_report(probe_cfg, src, hole, shadow_dir, overlay)
 
         # Save raw Agda output from the report step (even on success).
         report_log = logs_dir / "report_output.txt"
@@ -585,7 +713,7 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         report_out = out
         r1 = _try_candidates_for_hole(
             cfg=cfg,
-            bridge_cfg=bridge_cfg,
+            probe_cfg=probe_cfg,
             fixture_id=fixture_id,
             fixture=fixture,
             fixture_src=src,
@@ -622,14 +750,14 @@ def eval_one_fixture(cfg: EvalConfig, fixture: Path, results_fp) -> Result[Fixtu
         holes_solved += 1
         hole_index += 1
 
-    no_holes_left = (_find_next_hole(src) is None)
+    no_holes_left = (find_next_hole(src) is None)
     final_status: str = "unsolved"
     solved_path: Optional[str] = None
 
     # Always do a strict check when there are no holes left.
     # Special-case: fixtures with 0 holes should be treated as "ok" if they strictly typecheck.
     if no_holes_left:
-        final_status, _rc, out = _final_strict_check(bridge_cfg, src, shadow_dir, overlay)
+        final_status, _rc, out = _final_strict_check(probe_cfg, src, shadow_dir, overlay)
 
         # Save strict output (even for hole-free fixtures) for debugging/CI artifacts.
         strict_log = _work_root(cfg) / "logs" / fixture_id / "final_strict.txt"

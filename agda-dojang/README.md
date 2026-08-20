@@ -26,8 +26,6 @@ This is where learned policies are *executed*, *validated*, and *debugged*.
   - [Evaluator Output Artifacts](#evaluator-output-artifacts)
   - [AgdaDojang Layout](#agdadojang-layout)
 - [Python-side Tooling](#python-side-tooling)
-  - [`dojang_try.py`](#dojang_trypy)
-  - [`agent_bridge.py`](#agent_bridgepy)
   - [`eval_fixtures.py`](#eval_fixturespy)
   - [`search.py`](#searchpy)
   - [`policy_fixture.py`](#policy_fixturepy)
@@ -108,7 +106,7 @@ The interaction loop has three phases:
 
 The primary observation action.  When injected into a hole, it causes Agda to emit a
 structured `(goal, context)` block on stderr, then abort (via `typeError`).  The
-bridge parses this block and forwards it to the policy backend.
+evaluator parses this block and forwards it to the policy backend.
 
 **Defined in**: `AgdaDojang.Debug`
 
@@ -125,7 +123,7 @@ id : {A : Set} → A → A
 id x = {!!}                     -- ← hole to solve
 ```
 
-**Injected source (bridge replaces `{!!}` with the reporting expression)**:
+**Injected source (the evaluator replaces `{!!}` with the reporting expression)**:
 
 ```agda
 id x = reportGoalCtx ?          -- ← reporting macro + fresh hole
@@ -142,7 +140,7 @@ AGDADOJANG_CTX:1:hidden:A: Set₀
 AGDADOJANG_REQ_END
 ```
 
-**Parsed result** (what `report_parser.extract_policy_request_from_output` returns):
+**Parsed result** (what `utils/goal_report.py`'s `extract_policy_request_from_output` returns):
 
 ```json
 {
@@ -163,7 +161,7 @@ binders).
 
 ### Phase 2: Propose — policy request/response
 
-The bridge wraps the parsed observation into a versioned **policy request** and calls
+The evaluator wraps the parsed observation into a versioned **policy request** and calls
 the policy backend as a subprocess.
 
 **Policy request** (`agda-native-air/policy-request@v0`):
@@ -202,7 +200,7 @@ the policy backend as a subprocess.
 
 The contract is defined in `policy_contract.py`.  Any backend that speaks this JSON
 contract can be swapped in (scripted heuristic, LLM, fine-tuned model, MCP tool,
-etc.) without changing the bridge.
+etc.) without changing the evaluator.
 
 **CLI invocation**:
 
@@ -214,7 +212,7 @@ python3 python/tools/policy_fixture.py --in request.json --out - --k 5
 
 ### Phase 3: Validate — fill-hole round-trip
 
-The bridge substitutes the top candidate into the hole and runs Agda to typecheck.
+The evaluator substitutes the top candidate into the hole and runs Agda to typecheck.
 
 **Before (hole present)**:
 
@@ -232,7 +230,7 @@ id x = x
 
 **Agda typecheck result**: exit code 0 (success) → hole is marked solved.
 
-If the candidate fails to typecheck, the bridge tries the next candidate in rank
+If the candidate fails to typecheck, the evaluator tries the next candidate in rank
 order.  If all candidates are exhausted, the hole remains unsolved.
 
 ---
@@ -298,7 +296,7 @@ trivial = refine⟨ tt ⟩       -- ← candidate is tt
 
 **Semantics**: `inferType hole >>= checkType cand >>= unify hole cand`
 
-This is the macro that the bridge uses internally: it substitutes the candidate term
+This is the macro that the evaluator uses internally: it substitutes the candidate term
 directly in the source (no macro wrapper needed for the evaluator's validate step —
 it simply replaces `{!!}` with the candidate text).
 
@@ -486,25 +484,25 @@ agda-dojang
 │       └── Refine.agda        -- macros for attempting to fill a hole with candidate term
 └── python
     ├── tests
-    │   ├── test_agent_bridge.py                -- tests for agent bridge utils in agent_bridge.py.
+    │   ├── test_agda_probe.py                  -- tests the Agda-probing primitives in utils/agda_probe.py
     │   ├── test_eval_fixture_policy_request.py -- tests policy request in eval_fixtures.py has right shape/content
+    │   ├── test_goal_report.py                 -- tests the marker-block parser in utils/goal_report.py
+    │   ├── test_parse_request.py               -- tests request parsing/validation in policy_contract.py
     │   ├── test_policy_contract.py             -- tests policy contract in policy_contract.py
     │   ├── test_policy_fixture.py              -- tests policy fixture in policy_fixture.py adheres to contract
-    │   ├── test_rendering.py                   -- tests for the rendering.py utilities
-    │   └── test_report_parser.py               -- tests log parser that reads AgdaDojang's reporting macros output
+    │   └── test_rendering.py                   -- tests for the rendering.py utilities
     ├── tools
-    │   ├── agent_bridge.py    -- tiny deterministic "report → policy → patch → check" loop
-    │   ├── eval_fixtures.py   -- deterministic Agda-check evaluator + fixtures scoreboard
     │   ├── dojang_extract.py  -- AgdaDojang trace extractor
-    │   ├── dojang_try.py      -- AgdaDojang probe & tactics runner
+    │   ├── eval_fixtures.py   -- deterministic Agda-check evaluator + fixtures scoreboard
     │   ├── policy_contract.py -- canonical, versioned request/response contract for policy backends
     │   ├── policy_fixture.py  -- simple deterministic policy backend for tests and demos
     │   ├── prompt_baseline.py -- turn list of tasks into list of (context, goal, completion) attempts
-    │   ├── report_parser.py   -- parsing of Agda subgoal reports from stderr
     │   └── search.py          -- AgdaDojang search loop (BFS/beam)
     └── utils
+        ├── agda_probe.py      -- probe Agda about one hole: source surgery, invocation, verdict
         ├── command_runner.py  -- functional command execution utilities
         ├── file_ops.py        -- functional wrappers for file system operations
+        ├── goal_report.py     -- parse the AGDADOJANG_REQ marker block into {goal, context}
         ├── rendering.py       -- pure rendering helpers for building scratch modules
         ├── result.py          -- tiny Result type
         ├── run_unittests.py   -- pretty-ish unittest runner (stdlib only)
@@ -519,27 +517,14 @@ The `Everything` module re-exports the full AgdaDojang action vocabulary.
 
 AgdaDojang includes lightweight Python tools that orchestrate interaction with Agda.
 
-### `dojang_try.py`
-
-This script
-
-+  generates scratch Agda modules,
-+  inserts candidate terms or macro invocations,
-+  runs Agda on the generated code,
-+  parses emitted goals and diagnostics.
-
-It is primarily intended for **rapid experimentation** and debugging.
-
-
-### `agent_bridge.py`
-
-This is a tiny deterministic **integration bridge**:
-
-+  inject `reportGoalCtx` into the next `{!!}` hole to obtain `(goal, context)`,
-+  call a policy backend (local process) to get top-k candidates,
-+  try candidates in Agda and patch the first that typechecks.
-
-This is the v0 deliverable for "policy ↔ AgdaDojang integration" (Issue #23).
+**Retired (Issue #109)**.  The deterministic "report → policy → patch → check"
+bridge that once lived here (`agent_bridge.py`, the marker parser
+`report_parser.py`, and the `dojang_try.py` CLI front) has been removed.
+[`agda-mcp`](../agda-mcp/README.md) is its successor and the only agent-facing
+route into Agda: it is the Haskell port of the same loop, speaking the same
+marker protocol, with truthful verdicts and structured diagnostics on top.  The
+primitives the evaluator still needs moved to `python/utils/agda_probe.py` and
+`python/utils/goal_report.py`, with their tests.
 
 ### `eval_fixtures.py`
 
@@ -594,8 +579,8 @@ This type-checks all AgdaDojang macros.
 From `agda-dojang/`:
 
 ```bash
-make demo1    # Simple refinement demo
-make demo2    # Apply + subgoal reporting demo
+make eval-proof-completion-smoke   # Fast proof-completion run on one fixture
+make eval-proof-completion         # Full run over every fixture
 ```
 
 These demos serve as executable documentation.

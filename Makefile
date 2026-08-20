@@ -315,7 +315,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  dataset-stats dataset-stats-sample premise-eval-quick-sample premise-eval premise-eval-quick \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
                  extract-algebras-legacy extract-lib-old clean wipe tree probe-all \
-                 eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge \
+                 eval-proof-completion eval-proof-completion-smoke demo-proof-completion \
                  test-agda-dojang-integration \
                  project-lint project-update project-update-check _check-ghproject
 
@@ -1383,7 +1383,7 @@ smoke-sample:
 # 2.9. Proof Completion
 #
 #
-eval-proof-completion eval-proof-completion-smoke demo-proof-completion demo-agent-bridge:
+eval-proof-completion eval-proof-completion-smoke demo-proof-completion:
 	$(MAKE) -C agda-dojang $@
 
 # ------------------------------------------------------------------------------
@@ -1474,7 +1474,8 @@ test-agda-dojang:
 	  python/tests/test_rendering.py \
 	  python/tests/test_parse_request.py \
 	  python/tests/test_policy_contract.py \
-	  python/tests/test_report_parser.py
+	  python/tests/test_goal_report.py \
+	  python/tests/test_agda_probe.py
 	@if command -v agda >/dev/null 2>&1; then \
 	  echo "── [test-agda-dojang] Agda typecheck (AgdaDojang macros) ──"; \
 	  $(MAKE) -C $(AGDA_DOJANG) check; \
@@ -1495,7 +1496,6 @@ test-agda-dojang-integration:
 	fi
 	@echo "── [test-agda-dojang-integration] Python integration tests (requires Agda) ──"
 	cd $(AGDA_DOJANG) && PYTHONPATH=python $(PY) -m pytest -q \
-	  python/tests/test_agent_bridge.py \
 	  python/tests/test_eval_fixture_policy_request.py \
 	  python/tests/test_policy_fixture.py
 	@echo "✅ AgdaDojang integration tests passed."
