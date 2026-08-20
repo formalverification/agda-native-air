@@ -1474,7 +1474,9 @@ test-agda-dojang:
 	  python/tests/test_rendering.py \
 	  python/tests/test_parse_request.py \
 	  python/tests/test_policy_contract.py \
-	  python/tests/test_report_parser.py
+	  python/tests/test_report_parser.py \
+	  python/tests/test_goal_report.py \
+	  python/tests/test_agda_probe.py
 	@if command -v agda >/dev/null 2>&1; then \
 	  echo "── [test-agda-dojang] Agda typecheck (AgdaDojang macros) ──"; \
 	  $(MAKE) -C $(AGDA_DOJANG) check; \
