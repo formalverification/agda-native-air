@@ -148,7 +148,7 @@ def _split_flags(flag_str: str) -> List[str]:
     """
     Parse an Agda flag string into argv tokens.
 
-    Mirrors the small safety in dojang_try.py:
+    Carries one small safety forward from the retired dojang_try.py:
       - drop a dangling "-l" if present (avoids Agda parse error).
     """
     toks = shlex.split(flag_str) if flag_str else []
