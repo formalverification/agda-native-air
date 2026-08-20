@@ -97,13 +97,16 @@ MCP tool interface.
    JSON-RPC on stdio; an optional agda-strux JSONL corpus via `--corpus`.
 +  **Outputs**.  Structured tool results: goal/context, typecheck verdicts,
    diagnostics, and search hits.
-+  **Status**.  v0.2.0.  Eight tools: four proof-state (`get_goal`, `fill_hole`,
++  **Status**.  v0.2.0.  Thirteen tools: four proof-state (`get_goal`, `fill_hole`,
    `check_file`, `get_diagnostics`), the whole-project gate (`check_project`,
    which runs the project's own `make` target or `Everything` module and never
-   misreports its exit code), and three corpus-backed search tools
-   (`search_by_name`, `search_by_type`, `get_dependencies`, registered only when a
-   corpus is supplied).  The v0 implementation shells out to the `agda` binary once
-   per call; an Agda-as-a-library API is future work.
+   misreports its exit code), five live-query tools (`type_of`, `normalize`,
+   `resolve_name`, `definition_of`, `exports_of`), and three corpus-backed search
+   tools (`search_by_name`, `search_by_type`, `get_dependencies`, registered only
+   when a corpus is supplied).  Verdict-producing tools shell out to the `agda`
+   binary once per call; the live queries are answered by a persistent
+   `agda --interaction-json` child per project root (issue #75,
+   `docs/agda-mcp-interaction-lane.md`); an Agda-as-a-library API is future work.
 
 ### Interaction — `agda-dojang`
 
