@@ -15,9 +15,16 @@
 --   The index is loaded once at server startup via the @--corpus@ CLI flag.
 --
 --   Performance note (M1-3):
---     Name and type search are O(n) linear scans over the entry map.  For the
---     expected corpus sizes (agda-algebras ≈ 2–5k entries, stdlib ≈ 15k), this
---     completes in < 10ms.  M2-2 upgrades to inverted indices for sub-linear lookup.
+--     Name and type search are O(n) linear scans over the entry map.  Measured
+--     against the real agda-algebras corpus (issue #84) — 11,666 rows keyed to
+--     10,520 entries, 185 MB of JSONL — the whole file loads in 1.4 s to a
+--     308 MB resident footprint, and a search answers well inside the time an
+--     MCP round-trip costs anyway.  M2-2 (issue #16) upgrades to inverted
+--     indices for sub-linear lookup.
+--
+--     The footprint is what it is because 'CorpusEntry' keeps only the fields
+--     the search tools serve; see its Haddock in "AgdaMCP.Types" for what is
+--     read and dropped, and why.
 --
 -- See also:
 --   docs/representation.md §3 — canonical JSONL schema.
@@ -41,7 +48,6 @@ import Control.Exception (IOException, try)
 import Data.Aeson (eitherDecodeStrict')
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
-import Data.List (foldl')
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -191,18 +197,31 @@ entryToSearchResult e = SearchResult
 
 -- | Resolve a dependency token to matching corpus entries.
 --
--- The @dependencies@ field contains heuristic tokens extracted from the type
--- string (see agda-strux Extract.hs 'dependenciesFromTypeText').  These are
--- typically unqualified names like "Algebra", "hom", "Set".  We match them
--- against @prettyName@ (case-sensitive, since Agda names are case-sensitive).
+-- The @dependencies@ field holds tokens extracted from the type string (see
+-- agda-strux Extract.hs 'dependenciesFromTypeText').  What those tokens look
+-- like depends on the corpus, and the two shapes need different lookups:
 --
--- A token may match zero entries (external/stdlib dep not in corpus) or
--- multiple entries (common short names).  We cap at 5 matches per token to
--- avoid blowing up the response for very common names.
+--   +  A real extraction prints Agda's internal names, so the tokens are
+--      FULLY QUALIFIED — @Overture.Signatures.Signature@, not @Signature@.
+--      Those are exactly @prettyQname@ keys, so an exact map lookup resolves
+--      them in one step.  Matching only on @prettyName@ resolved none of
+--      them: driving the agda-algebras corpus through the real transport,
+--      @expand=true@ on an isomorphism lemma expanded 0 of its 9 tokens
+--      (issue #84).
+--   +  Shorter, unqualified tokens (@Algebra@, @hom@, @Set@) still occur, so
+--      the @prettyName@ scan remains as the fallback.  It is case-sensitive,
+--      Agda names being case-sensitive, and capped at 5 matches so a very
+--      common short name cannot blow up a response.
+--
+-- A token may match nothing at all, which is the honest answer for a
+-- dependency on the standard library or on @Agda.Primitive@.
 resolveDepToken :: CorpusIndex -> Text -> [SearchResult]
 resolveDepToken idx token =
-  take 5
-    . map entryToSearchResult
-    . filter (\e -> cePrettyName e == token)
-    . Map.elems
-    $ ciEntries idx
+  case Map.lookup token (ciEntries idx) of
+    Just entry -> [entryToSearchResult entry]
+    Nothing    ->
+      take 5
+        . map entryToSearchResult
+        . filter (\e -> cePrettyName e == token)
+        . Map.elems
+        $ ciEntries idx

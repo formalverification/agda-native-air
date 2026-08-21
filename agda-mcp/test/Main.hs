@@ -58,6 +58,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as LBS
 import System.Directory
   ( Permissions, canonicalizePath, createDirectoryIfMissing, doesDirectoryExist
@@ -1816,6 +1817,60 @@ proseDecoyCol src = maybe 1 snd (posOfNth 0 src "{!!}")
 -- | Path to the synthetic JSONL fixture (relative to agda-mcp/).
 corpusFixturePath :: FilePath
 corpusFixturePath = "test/resources/corpus-fixture.jsonl"
+-- | A minimal Full-format row, with an optional explicit @hasBody@.
+--
+-- Used to pin how 'CorpusEntry' answers @hasBody@ now that it does not retain
+-- the body: an explicit field wins, and otherwise a non-empty body implies one.
+rowWithBody :: Maybe Bool -> BS.ByteString
+rowWithBody explicitHasBody = BS8.pack $
+  "{\"file\":\"M.agda\",\"module\":\"M\",\"name\":\"f\",\"qname\":\"M.f\"\
+  \,\"prettyModule\":\"M\",\"prettyName\":\"f\",\"prettyQname\":\"M.f\"\
+  \,\"type\":\"A -> A\",\"typeAstVersion\":\"0.3-v0\",\"typeAst\":{}\
+  \,\"defKind\":\"function\",\"dependencies\":[\"A\"],\"astSize\":6\
+  \,\"body\":\"f x = x\""
+  <> maybe "" (\b -> ",\"hasBody\":" <> (if b then "true" else "false")) explicitHasBody
+  <> "}"
+
+-- | The same row with no @typeAst@ at all.
+rowWithoutTypeAst :: BS.ByteString
+rowWithoutTypeAst = BS8.pack
+  "{\"file\":\"M.agda\",\"module\":\"M\",\"name\":\"f\",\"qname\":\"M.f\"\
+  \,\"prettyModule\":\"M\",\"prettyName\":\"f\",\"prettyQname\":\"M.f\"\
+  \,\"type\":\"A -> A\",\"typeAstVersion\":\"0.3-v0\"\
+  \,\"defKind\":\"function\",\"dependencies\":[],\"astSize\":6,\"hasBody\":false}"
+
+-- | A two-entry index whose dependency tokens are FULLY QUALIFIED, the way a
+-- real extraction writes them.
+--
+-- Built in memory rather than added to the JSONL fixture so the fixture keeps
+-- its 24 rows and its unqualified-token case, which the prettyName fallback
+-- still has to serve.
+qualifiedTokenIndex :: CorpusIndex
+qualifiedTokenIndex =
+  CorpusIndex { ciEntries = entries, ciSize = Map.size entries }
+  where
+    entries = Map.fromList [ (cePrettyQname e, e) | e <- [caller, stranger, callee] ]
+
+    caller   = entry "M" "caller"   ["Other.Mod.callee"]
+    stranger = entry "M" "stranger" ["Not.In.This.Corpus"]
+    callee   = entry "Other.Mod" "callee" []
+
+    entry m n deps = CorpusEntry
+      { ceFile         = "src/" <> m <> ".agda"
+      , ceModule       = m
+      , ceName         = n
+      , ceQname        = m <> "." <> n
+      , cePrettyModule = m
+      , cePrettyName   = n
+      , cePrettyQname  = m <> "." <> n
+      , ceType         = "A -> A"
+      , ceTypeAstVer   = "0.3-v0"
+      , ceDefKind      = "function"
+      , ceDependencies = deps
+      , ceAstSize      = 6
+      , ceHasBody      = True
+      }
+
 -- | Helper: load the corpus fixture and run a test against the index.
 withCorpus :: String -> (CorpusIndex -> IO TestResult) -> IO Bool
 withCorpus name f = runTest name $ do
@@ -1850,7 +1905,26 @@ corpusTests = do
     , withCorpus "loadCorpus: entry with body (Domain)" $ \idx ->
         case Map.lookup "Algebras.Basic.Domain" (ciEntries idx) of
           Nothing -> pure (Fail "Domain entry not found")
-          Just e  -> assert "should have body" (ceHasBody e && isJust (ceBody e))
+          -- The index reports THAT a body exists, and deliberately does not
+          -- retain the body itself (issue #84 — in a real library the bodies
+          -- are most of the corpus).  `hasBody` is the field search results
+          -- carry, so it is the field to assert.
+          Just e  -> assert "should report a body" (ceHasBody e)
+    , runTest "CorpusEntry: hasBody is inferred from a body when the row omits it" $
+        case Aeson.eitherDecodeStrict' (rowWithBody Nothing) of
+          Left err -> pure (Fail ("decode failed: " <> err))
+          Right (e :: CorpusEntry) -> assert "body present, so hasBody" (ceHasBody e)
+    , runTest "CorpusEntry: an explicit hasBody wins over inference" $
+        case Aeson.eitherDecodeStrict' (rowWithBody (Just False)) of
+          Left err -> pure (Fail ("decode failed: " <> err))
+          Right (e :: CorpusEntry) -> assert "row said false" (not (ceHasBody e))
+    , runTest "CorpusEntry: a row with no typeAst still decodes" $
+        -- typeAst is read past, not required: nothing in the server interprets
+        -- it, so a corpus that omits it is still searchable.
+        case Aeson.eitherDecodeStrict' rowWithoutTypeAst of
+          Left err -> pure (Fail ("decode failed: " <> err))
+          Right (e :: CorpusEntry) ->
+            assertEqual "key" "M.f" (cePrettyQname e)
       -- search_by_name
     , withCorpus "search_by_name: 'Algebra' finds ≥1" $ \idx ->
         let results = searchByName "Algebra" Nothing idx
@@ -1907,6 +1981,21 @@ corpusTests = do
         case getDeps "Homomorphisms.Basic.hom" (Just False) idx of
           Left err  -> pure (Fail $ T.unpack err)
           Right dep -> assert "should be empty" (null (depNeighbors dep))
+      -- A real extraction prints Agda's internal names, so its dependency
+      -- tokens are fully qualified.  Resolving those needs an exact key
+      -- lookup, not the prettyName scan the fixture's short tokens exercise:
+      -- against the agda-algebras corpus, expand=true resolved 0 of 9 tokens
+      -- until this was fixed (issue #84).
+    , runTest "get_dependencies: expand resolves a FULLY QUALIFIED token" $
+        case getDeps "M.caller" (Just True) qualifiedTokenIndex of
+          Left err  -> pure (Fail $ T.unpack err)
+          Right dep ->
+            assertEqual "neighbor" ["Other.Mod.callee"]
+              (map srPrettyQname (depNeighbors dep))
+    , runTest "get_dependencies: a qualified token naming nothing resolves to nothing" $
+        case getDeps "M.stranger" (Just True) qualifiedTokenIndex of
+          Left err  -> pure (Fail $ T.unpack err)
+          Right dep -> assert "no neighbors" (null (depNeighbors dep))
       -- Tool handler layer
     , withCorpus "handleSearchByName: 'Term' finds ≥2" $ \idx ->
         let params = SearchByNameParams { sbnPattern = "Term", sbnLimit = Just 10 }

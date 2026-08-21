@@ -721,6 +721,8 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence i
 Registered only when `--corpus PATH` points at an agda-strux JSONL corpus.  All
 three are pure lookups on the in-memory index; they never invoke Agda.
 
+**At library scale**.  The published agda-algebras corpus (issue #84, dataset card at [`docs/corpora/agda-algebras-v0.md`](../docs/corpora/agda-algebras-v0.md)) is 11,666 rows and 185 MB of JSONL; it loads in about 1.4 s to a 308 MB resident footprint.  The index keeps only the fields these tools serve — the `typeAst` and the proof bodies are read and dropped, which is the difference between that and 2.7 GB — so `hasBody` tells an agent a proof term exists to go and read, and the corpus file is where to read it.  Two consequences of a real corpus worth knowing before you write a query: its dependency tokens are *fully qualified* (`Overture.Signatures.Signature`, not `Signature`), and 655 of its `prettyQname` keys are shared by more than one row, so the index holds 10,520 of the 11,666.  `make corpus-mcp-smoke` drives all three tools against it over this transport.
+
 #### `search_by_name`
 
 Find definitions whose name matches a substring (case-insensitive), capped by an
@@ -823,7 +825,9 @@ JSON-RPC framing.  It looks like this:
 ```
 
 Drop the `--corpus` line to run with only the four core proof-state tools; point it
-at a real agda-strux corpus (see `make extract-lib`) to search a whole library.
+at a real agda-strux corpus to search a whole library — `make extract-lib` then
+`make corpus` builds one, and [`docs/corpora/agda-algebras-v0.md`](../docs/corpora/agda-algebras-v0.md)
+describes the published agda-algebras corpus and how to reproduce it.
 The `--timeout 600` is deliberate rather than decorative: a first check of a large
 library builds its `.agdai` interfaces and can run for minutes, so the bound has to
 cover that cold call (see [Timeouts, cold calls, and latency](#timeouts-cold-calls-and-latency)).
