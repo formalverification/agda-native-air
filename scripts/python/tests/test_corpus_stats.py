@@ -32,6 +32,7 @@ from scripts.python.corpus.stats import (
     distribution,
     load_corpus,
     longest_path_length,
+    looks_qualified,
     module_graph,
     namespace_of,
     parse_dot,
@@ -187,7 +188,28 @@ def test_counts_by_orders_largest_first() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_definition_graph_separates_internal_from_external_edges() -> None:
+def test_looks_qualified_admits_a_qualified_name() -> None:
+    assert looks_qualified("Data.Fin.Base.Fin")
+    assert looks_qualified("Level.0ℓ")
+    # A field projection still denotes something.
+    assert looks_qualified("Agda.Builtin.Sigma.Σ.fst")
+
+
+def test_looks_qualified_rejects_what_a_tokenizer_leaves_behind() -> None:
+    # Truncations: the extractor's tokens really do end in a dot.
+    assert not looks_qualified("Agda.Primitive.")
+    assert not looks_qualified("Relation.Binary.Bundles.Setoid.")
+    # Bound variables and bare words.
+    assert not looks_qualified("ρᵃ")
+    assert not looks_qualified("lc")
+    assert not looks_qualified("OK")
+    # Degenerate shapes.
+    assert not looks_qualified("")
+    assert not looks_qualified(".")
+    assert not looks_qualified(".leading")
+
+
+def test_definition_graph_separates_internal_edges_from_unresolved_tokens() -> None:
     rows = (
         row("M.f", deps=("M.g", "Agda.Primitive.Level")),
         row("M.g", deps=("Data.Nat.ℕ",)),
@@ -196,9 +218,38 @@ def test_definition_graph_separates_internal_from_external_edges() -> None:
 
     assert g.nodes == 2
     assert g.internal_edges == 1
-    assert g.external_edges == 2
-    assert g.unresolved_tokens == 2
+    assert g.unresolved_occurrences == 2
+    assert g.distinct_unresolved == 2
     assert g.most_depended_upon[0] == {"name": "M.g", "count": 1}
+
+
+def test_definition_graph_counts_only_qualified_looking_tokens_as_candidates() -> None:
+    # Two unresolved tokens; only one could name a definition elsewhere.  An
+    # earlier version called both "edges leaving the corpus".
+    g = definition_graph((row("M.f", deps=("Data.Nat.ℕ", "ρᵃ")),))
+    assert g.unresolved_occurrences == 2
+    assert g.unresolved_qualified_looking == 1
+
+
+def test_definition_graph_is_reported_at_one_granularity() -> None:
+    # Two rows share a name, as 1,146 of agda-algebras' rows do.  Nodes,
+    # out-degree and in-degree must all describe the same 2-node graph.
+    rows = (
+        row("M.dup", deps=("M.g",)),
+        row("M.dup", deps=("Data.Nat.ℕ",)),
+        row("M.g"),
+    )
+    g = definition_graph(rows)
+
+    assert g.rows == 3
+    assert g.nodes == 2
+    assert g.collapsed_rows == 1
+    assert g.out_degree.count == g.nodes
+    assert g.in_degree.count == g.nodes
+    # The merged node's tokens are the union of its rows'.
+    assert g.out_degree.maximum == 2
+    assert g.internal_edges == 1
+    assert g.unresolved_occurrences == 1
 
 
 def test_definition_graph_dedupes_repeated_tokens_in_one_type() -> None:
@@ -214,14 +265,14 @@ def test_definition_graph_counts_recursion_as_a_self_loop() -> None:
     assert g.internal_edges == 1
 
 
-def test_definition_graph_ranks_the_external_targets_too() -> None:
+def test_definition_graph_ranks_the_unresolved_tokens_too() -> None:
     rows = (
         row("M.f", deps=("Agda.Primitive.Level",)),
         row("M.g", deps=("Agda.Primitive.Level",)),
         row("M.h", deps=("Data.Nat.ℕ",)),
     )
     g = definition_graph(rows)
-    assert g.most_external_targets[0] == {"name": "Agda.Primitive.Level", "count": 2}
+    assert g.most_referenced_unresolved[0] == {"name": "Agda.Primitive.Level", "count": 2}
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +355,8 @@ def test_build_stats_shape() -> None:
     # Only the one row with a body contributes to the body distribution.
     assert stats["sizes"]["bodyLength"]["count"] == 1
     assert stats["dependencyGraph"]["internalEdges"] == 1
+    assert stats["dependencyGraph"]["nodes"] == 3
+    assert stats["dependencyGraph"]["rows"] == 3
     assert stats["moduleGraph"]["nodes"] == 3
 
 

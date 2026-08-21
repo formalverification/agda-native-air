@@ -207,81 +207,129 @@ def top_n(tally: Dict[str, int], n: int = TOP_N) -> List[Dict[str, object]]:
     return [{"name": k, "count": v} for k, v in list(tally.items())[:n]]
 
 
+def looks_qualified(token: str) -> bool:
+    """Whether a dependency token even has the shape of a qualified name.
+
+    Tokens are tokenized out of a pretty-printed type, so the list also holds
+    bound variables (`ρᵃ`, `lc`), bare words (`OK`), and truncations that end
+    in a dot (`Agda.Primitive.`).  A token with at least one interior dot and
+    no empty segment could denote a definition somewhere else; the rest could
+    not.  This is a *shape* test and nothing more — it says a token is
+    eligible to be a name, not that any name exists.
+    """
+    parts = token.split(".")
+    return len(parts) > 1 and all(parts)
+
+
 @dataclass(frozen=True)
 class DefinitionGraph:
-    """Definition-level dependency shape, computed from the rows' `dependencies`."""
+    """Definition-level dependency shape, computed from the rows' `dependencies`.
 
+    Nodes are `prettyQname`s, and rows sharing one are merged (their dependency
+    tokens unioned), so every quantity here is at the same granularity.
+    Counting 11,666 rows as sources against 10,520 named nodes — which an
+    earlier version did — makes out-degree and in-degree describe different
+    graphs.
+    """
+
+    rows: int
     nodes: int
+    collapsed_rows: int
     internal_edges: int
-    external_edges: int
+    unresolved_occurrences: int
+    unresolved_qualified_looking: int
+    distinct_unresolved: int
     self_loops: int
-    unresolved_tokens: int
     out_degree: Distribution
     in_degree: Distribution
     most_depended_upon: List[Dict[str, object]]
-    most_external_targets: List[Dict[str, object]]
+    most_referenced_unresolved: List[Dict[str, object]]
 
     def to_json(self) -> Dict:
         return {
+            "rows": self.rows,
             "nodes": self.nodes,
+            "collapsedRows": self.collapsed_rows,
             "internalEdges": self.internal_edges,
-            "externalEdges": self.external_edges,
+            "unresolvedOccurrences": self.unresolved_occurrences,
+            "unresolvedQualifiedLooking": self.unresolved_qualified_looking,
+            "distinctUnresolvedTokens": self.distinct_unresolved,
             "selfLoops": self.self_loops,
-            "distinctUnresolvedTokens": self.unresolved_tokens,
             "outDegree": self.out_degree.to_json(),
             "inDegreeInternal": self.in_degree.to_json(),
             "mostDependedUpon": self.most_depended_upon,
-            "mostReferencedExternal": self.most_external_targets,
+            "mostReferencedUnresolved": self.most_referenced_unresolved,
         }
 
 
 def definition_graph(rows: Sequence[RowSummary]) -> DefinitionGraph:
-    """Dependency shape at definition level.
+    """Dependency shape at definition level, keyed by `prettyQname`.
 
-    An edge is *internal* when its token names a definition in this corpus and
-    *external* otherwise (standard library, `Agda.Primitive`, …).  Both counts
-    are reported: a corpus of 20k definitions with 200k outward edges into the
-    standard library is a different object from a closed graph, and a reader
-    choosing this corpus for retrieval needs to know which one it is.
+    An edge is *internal* when its token names a definition in this corpus.  A
+    token that names none is reported as an **unresolved token occurrence**,
+    not as an edge leaving the corpus: `dependencies` is heuristic, and calling
+    every unmatched token an external dependency would count `ρᵃ` and
+    `Agda.Primitive.` among a definition's dependencies.  `looks_qualified`
+    splits out the subset that could denote something elsewhere, which is a
+    lower bound on the real outward edges — resolving them properly needs an
+    index of the standard library, which this corpus does not have.
+
+    Even so, the split is the number that matters when choosing a corpus for
+    retrieval: a graph with as many outward candidates as internal edges is a
+    different object from a closed one.
     """
-    known = {row.pretty_qname for row in rows if row.pretty_qname}
+    # Merge rows that share a name, unioning their tokens: 1,146 of
+    # agda-algebras' 11,666 rows share a `prettyQname` with another row.
+    targets_by_name: Dict[str, Dict[str, None]] = {}
+    for row in rows:
+        if not row.pretty_qname:
+            continue
+        merged = targets_by_name.setdefault(row.pretty_qname, {})
+        # dict-as-ordered-set: two occurrences of one token are one dependency.
+        for token in row.dependencies:
+            merged.setdefault(token, None)
+
+    known = set(targets_by_name)
 
     internal_in: Dict[str, int] = {}
-    external_hits: Dict[str, int] = {}
+    unresolved_hits: Dict[str, int] = {}
     internal_edges = 0
-    external_edges = 0
+    unresolved_occurrences = 0
+    unresolved_qualified = 0
     self_loops = 0
     out_degrees: List[int] = []
 
-    for row in rows:
-        # Dedupe per definition: two occurrences of the same token in one type
-        # are one dependency, not two.
-        targets = tuple(dict.fromkeys(row.dependencies))
+    for name, targets in targets_by_name.items():
         out_degrees.append(len(targets))
         for token in targets:
             if token in known:
                 internal_edges += 1
-                if token == row.pretty_qname:
+                if token == name:
                     self_loops += 1
                 internal_in[token] = internal_in.get(token, 0) + 1
             else:
-                external_edges += 1
-                external_hits[token] = external_hits.get(token, 0) + 1
+                unresolved_occurrences += 1
+                if looks_qualified(token):
+                    unresolved_qualified += 1
+                unresolved_hits[token] = unresolved_hits.get(token, 0) + 1
 
     in_degrees = [internal_in.get(name, 0) for name in known]
     ranked_internal = dict(sorted(internal_in.items(), key=lambda kv: (-kv[1], kv[0])))
-    ranked_external = dict(sorted(external_hits.items(), key=lambda kv: (-kv[1], kv[0])))
+    ranked_unresolved = dict(sorted(unresolved_hits.items(), key=lambda kv: (-kv[1], kv[0])))
 
     return DefinitionGraph(
+        rows=len(rows),
         nodes=len(known),
+        collapsed_rows=len(rows) - len(known),
         internal_edges=internal_edges,
-        external_edges=external_edges,
+        unresolved_occurrences=unresolved_occurrences,
+        unresolved_qualified_looking=unresolved_qualified,
+        distinct_unresolved=len(unresolved_hits),
         self_loops=self_loops,
-        unresolved_tokens=len(external_hits),
         out_degree=distribution(out_degrees),
         in_degree=distribution(in_degrees),
         most_depended_upon=top_n(ranked_internal),
-        most_external_targets=top_n(ranked_external),
+        most_referenced_unresolved=top_n(ranked_unresolved),
     )
 
 
@@ -506,13 +554,24 @@ def render_markdown(stats: Dict) -> str:
         "",
         "## Dependency graph (definition level)",
         "",
+        "Nodes are `prettyQname`s; rows sharing a name are merged and their "
+        "dependency tokens unioned, so every quantity below is at one "
+        "granularity.  A token matching no definition here is an *unresolved "
+        "token*, not an edge leaving the corpus: `dependencies` is heuristic "
+        "and holds bound variables and truncated names as well as real ones.  "
+        "The qualified-looking subset is a lower bound on the real outward "
+        "edges.",
+        "",
         _table(
             ("Quantity", "Value"),
             (
-                ("Nodes (definitions)", dep["nodes"]),
+                ("Corpus rows", dep["rows"]),
+                ("Nodes (distinct names)", dep["nodes"]),
+                ("Rows merged into a shared name", dep["collapsedRows"]),
                 ("Edges within the corpus", dep["internalEdges"]),
-                ("Edges leaving the corpus", dep["externalEdges"]),
-                ("Distinct external targets", dep["distinctUnresolvedTokens"]),
+                ("Unresolved token occurrences", dep["unresolvedOccurrences"]),
+                ("…of which qualified-looking", dep["unresolvedQualifiedLooking"]),
+                ("Distinct unresolved tokens", dep["distinctUnresolvedTokens"]),
                 ("Self-loops (recursive definitions)", dep["selfLoops"]),
             ),
         ),
@@ -524,11 +583,11 @@ def render_markdown(stats: Dict) -> str:
             ((e["name"], e["count"]) for e in dep["mostDependedUpon"]),
         ),
         "",
-        "### Most referenced outside the corpus",
+        "### Most referenced unresolved tokens",
         "",
         _table(
-            ("Token", "References"),
-            ((e["name"], e["count"]) for e in dep["mostReferencedExternal"]),
+            ("Token", "Occurrences"),
+            ((e["name"], e["count"]) for e in dep["mostReferencedUnresolved"]),
         ),
     ]
 
