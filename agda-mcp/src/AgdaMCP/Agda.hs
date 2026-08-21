@@ -730,16 +730,33 @@ traceImportsLevel args = last (defaultLevel : mapMaybe levelIn args)
 -- @Checking@ (measured, as above), so this is the one thing a caller needs from
 -- the level.  "Muted" is about this flag family at Agda's default verbosity: a
 -- raised @-v@ prints the same progress lines again even at level 0 (measured),
--- which is why every caller reads the lines it did get before consulting this.  It is a complete test because the flag has exactly one arrival
--- path — the command line this server assembles.  A @{-# OPTIONS
--- --trace-imports=0 #-}@ pragma in the checked file and an @.agda-lib@ whose
--- @flags:@ field carries it are both rejected with @[OptionError] Unrecognized
--- option@, so neither the file nor its project can mute the channel behind the
--- server's back (issue #114).  Both lanes assemble their argv from the same
--- three parts (the server's @--agda-flags@, 'AgdaMCP.Project.projectExtraFlags',
--- and 'AgdaMCP.Project.fileDirIncludeFlags'), which is why one scan serves the
--- batch runner here, the lane's per-load @Cmd_load@ argv, and @check_project@'s
--- gate command alike.
+-- which is why every caller reads the lines it did get before consulting this.
+-- Both lanes assemble their argv from the same three parts (the server's
+-- @--agda-flags@, 'AgdaMCP.Project.projectExtraFlags', and
+-- 'AgdaMCP.Project.fileDirIncludeFlags'), which is why one scan serves the batch
+-- runner here, the lane's per-load @Cmd_load@ argv, and the @Everything@ gate's
+-- command alike.
+--
+-- What the scan covers, exactly.  Agda's own configuration cannot smuggle the
+-- flag past it: a @{-# OPTIONS --trace-imports=0 #-}@ pragma in the checked file
+-- and an @.agda-lib@ whose @flags:@ field carries it are both rejected with
+-- @[OptionError] Unrecognized option@ (measured, issue #114), so neither the
+-- file nor its project can mute the channel behind the server's back.  What the
+-- scan cannot see is an @--agda-bin@ naming a /wrapper/ that supplies flags of
+-- its own, the arrangement @agda-mcp/README.md@ recommends for a Nix-pinned
+-- client project: a wrapper injecting @--trace-imports=0@ would silence a cold
+-- run while this answers 'False', leaving the pre-#114 misreading alive in the
+-- one configuration the server has no view of (Copilot's round-2 review of PR
+-- 117).  Three facts bound that residue.  Agda offers no query for its effective
+-- trace level, so there is nothing to ask; declining to infer reuse whenever a
+-- wrapper /might/ be muting would abolish the 'False' answer in every
+-- configuration, the correct ones included; and a wrapper of the conventional
+-- shape passes the caller's arguments last (the shipped @agdaWithPackages@
+-- wrapper is literally @exec agda --with-compiler=... --library-file=... "$@"@),
+-- so an explicit level in @--agda-flags@ wins by the last-occurrence rule and
+-- the hole narrows to a muting wrapper under a server that names no level at
+-- all.  The shipped wrapper names no trace level, and a cold @check_file@
+-- through it answers @checkedFromSource: true@.
 --
 -- Why detect rather than repair.  The last-occurrence rule offers a repair as
 -- well: append @--trace-imports=1@ when, and only when, the effective level is

@@ -2817,13 +2817,23 @@ gateTests = do
                        (paramsAt (gsProject gs))
         maskedMake <- handleCheckProject agdaCfg (gateCfg ["masked-make"] 60)
                         (paramsAt (gsProject gs))
-        -- The same failing gate, run under an argv that mutes Agda's progress
-        -- channel (issue #114).  A configured --check-command is a vector this
-        -- server hands to the process, so the scan sees the flag there exactly
-        -- as it does in an Everything gate's assembled flags.
-        mutedRes  <- handleCheckProject agdaCfg
+        -- The same failing gate with --trace-imports=0 in the configured
+        -- command (issue #114, and Copilot's round-2 review of PR 117): a
+        -- --check-command is a script or wrapper whose internal agda call this
+        -- server neither writes nor reads, so the token proves nothing either
+        -- way and the count is left alone.
+        opaqueRes <- handleCheckProject agdaCfg
                        (gateCfg ["fail", "0", "--trace-imports=0"] 60)
                        (paramsAt (gsProject gs))
+        -- The Everything gate is the one whose agda argv the server assembles,
+        -- so it is the one the detection applies to.  The binary points nowhere
+        -- in this tier, which is immaterial: both runs fail identically and the
+        -- flag is the only difference between them.
+        everyOpen <- handleCheckProject agdaCfg defaultGateConfig
+                       (paramsAt (gsEntry gs))
+        everyMute <- handleCheckProject
+                       agdaCfg { agdaFlags = ["--trace-imports=0"] }
+                       defaultGateConfig (paramsAt (gsEntry gs))
 
         failing <- sequence
           [ runTest "check_project: a gate that fails mid-run is a non-success verdict" $
@@ -2866,20 +2876,35 @@ gateTests = do
               withRight failRes $ \r ->
                 assertEqual "modulesChecked" (Just 2) (cprModulesChecked r)
 
-          , runTest "check_project: a muted trace channel withholds modulesChecked (#114)" $
-              -- The count is a read of the lines --trace-imports=0 silences, so
-              -- under it the number is a floor at best and the field goes
-              -- absent.  Everything that does not depend on counting them
-              -- survives: the verdict, the structured first error, and the
-              -- module the gate stopped in (named from the located error's own
-              -- file, which is why it does not need the count to be complete).
-              withRight mutedRes $ \r -> allOf
-                [ assertEqual "modulesChecked" Nothing (cprModulesChecked r)
+          , runTest "check_project: a configured gate is opaque, flag or no flag (#114)" $
+              -- A --check-command may ignore the token, forward it, or invoke no
+              -- agda at all, so neither its presence nor its absence is evidence
+              -- about the channel: the count stays the best-effort read it has
+              -- always been, and the rest of the response is untouched.
+              withRight opaqueRes $ \r -> allOf
+                [ assertEqual "modulesChecked" (Just 2) (cprModulesChecked r)
                 , assert ("success was " <> show (cprSuccess r)) (not (cprSuccess r))
                 , assertEqual "firstError code" (Just "NotInScope")
                     (cprFirstError r >>= diagCode)
                 , assertEqual "failingModule" (Just "Gate.Broken")
                     (cprFailingModule r)
+                ]
+
+          , runTest "check_project: the Everything gate's muted argv withholds modulesChecked (#114)" $
+              -- The gate whose agda command this server assembles is the one
+              -- where the flag is evidence, so it is the one that degrades: a
+              -- count read off silenced lines would be a floor reported as a
+              -- total.  The control differs only in the flag.
+              allOf
+                [ withRight everyOpen $ \r ->
+                    assertEqual "channel open: a count, even if zero"
+                      (Just 0) (cprModulesChecked r)
+                , withRight everyMute $ \r ->
+                    assertEqual "channel muted: no count at all"
+                      Nothing (cprModulesChecked r)
+                , withRight everyMute $ \r ->
+                    assertEqual "gate" GateFromEverything
+                      (gateSource (cprGate r))
                 ]
           ]
 

@@ -1290,9 +1290,12 @@ data CheckProjectResult = CheckProjectResult
   , cprModulesChecked :: Maybe Int     -- ^ Distinct modules Agda re-typechecked from source
                                        --   during the run (@Just 0@ on a fully warm gate).  On
                                        --   a timeout this is how far it got.  Absent when the
-                                       --   gate's own argv muted Agda's progress channel
+                                       --   @Everything@ gate's argv — the one this server
+                                       --   assembles — muted Agda's progress channel
                                        --   (@--trace-imports=0@): a count read off silenced
                                        --   lines would be a floor reported as a total (#114).
+                                       --   A @make@ or @--check-command@ gate is opaque, and
+                                       --   its count stays a best-effort read.
   , cprOutputTail     :: Maybe Text    -- ^ The tail of the gate's output, bounded, whatever
                                        --   the verdict — absent only when the gate printed
                                        --   nothing.  A gate can fail for reasons Agda never

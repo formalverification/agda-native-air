@@ -184,23 +184,31 @@ runGate cfg gcfg params pc plan = do
         | success   = (Nothing, Nothing)
         | otherwise = failingModuleOf progress firstErr
       -- This counts the same progress lines 'AgdaMCP.Agda.checkedFromSourceOf'
-      -- reads, so a muted channel gets the same treatment (issue #114) — with
+      -- reads, so a muted channel gets the same treatment (issue #114), with
       -- the difference a count deserves.  One @Checking@ line settles a
       -- boolean, but no number of them settles a total once the channel that
       -- would have announced the rest is silenced: what survives
       -- @--trace-imports=0@ is a floor, and a floor reported as a total is the
-      -- wrong-over-absent trade this wave refuses.  So the count is withheld
-      -- whenever the argv this gate ran under mutes the channel, whether or
-      -- not something printed a line anyway.  That argv is the gate's own: the
-      -- server assembles it for an @Everything@ gate and for an operator's
-      -- @--check-command@, while a @make@ gate hides its agda invocation in a
-      -- recipe this server never reads, so there the count stays the
-      -- best-effort read it always was.  'failingModuleOf' needs no such care:
-      -- it degrades to the located error's file, and to no module rather than
-      -- to a wrong one.
-      rebuilt = length (nub (map fst progress))
+      -- wrong-over-absent trade this wave refuses.
+      --
+      -- The test applies to exactly one gate: the @Everything@ gate, whose agda
+      -- argv this server assembles ('AgdaMCP.Gate.everythingPlan') and whose
+      -- binary is @agdaBin@.  Every other gate is opaque, and treated so.  A
+      -- @make@ gate hides its agda call in a recipe this server never reads; an
+      -- operator's @--check-command@ is by design a script, a @just@ recipe or a
+      -- @nix develop --command@ wrapper ('AgdaMCP.Gate.GateConfig'), so a
+      -- @--trace-imports@ token in it need not reach agda at all, and its
+      -- absence says nothing about the agda call inside (Copilot's round-2
+      -- review of PR 117).  This is the same boundary 'reportedContext' draws
+      -- for the project echo, for the same reason: only the Everything gate's
+      -- invocation is this server's to describe.
+      --
+      -- 'failingModuleOf' needs no such care: it degrades to the located
+      -- error's file, and to no module rather than to a wrong one.
+      rebuilt      = length (nub (map fst progress))
+      serverArgv   = gateSource (gpGate plan) == GateFromEverything
       modulesChecked
-        | progressChannelMuted (ceArgs (arCommand result)) = Nothing
+        | serverArgv && progressChannelMuted (gpArgs plan) = Nothing
         | otherwise                                        = Just rebuilt
   pure CheckProjectResult
     { cprSuccess          = success

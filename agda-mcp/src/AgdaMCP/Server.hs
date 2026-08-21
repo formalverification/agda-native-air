@@ -609,9 +609,12 @@ projectPayloadNote =
   \modulesChecked counts the distinct \
   \modules agda re-typechecked from source, so it says how much of the project \
   \was actually rebuilt and, on a timeout, how far the run got; it is ABSENT \
-  \when the gate's own command line carries --trace-imports=0, which silences \
-  \those lines, since what could still be counted then is a floor and not a \
-  \total. outputTail is \
+  \when the gate is the Everything module and the agda command this server \
+  \assembled for it carries --trace-imports=0, which silences those lines, \
+  \since what could still be counted then is a floor and not a total. A make \
+  \or --check-command gate is opaque (its agda call lives inside a recipe or \
+  \script), so there the count is a best-effort read of whatever the gate \
+  \printed. outputTail is \
   \the bounded tail of the gate's stdout and stderr, returned whatever the \
   \verdict and absent only when the gate printed nothing, because a gate can \
   \fail for reasons agda never printed (no such target, a missing tool, a killed \
