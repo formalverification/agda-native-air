@@ -892,7 +892,13 @@ CORPUS_STATS        := $(PROJECT_ROOT)/scripts/python/corpus/stats.py
 # The scripts import scripts.python.utils, so the repo root must be importable.
 CORPUS_PY            = PYTHONPATH="$(PROJECT_ROOT)" $(PY)
 
-corpus: corpus-assemble corpus-stats
+# Sequenced through recursive make rather than declared as two prerequisites:
+# prerequisites are independent to make, so `make -j corpus` could run the stats
+# over a corpus.jsonl that assembly was still writing.  Both halves stay
+# independently callable.
+corpus:
+	@$(MAKE) --no-print-directory corpus-assemble
+	@$(MAKE) --no-print-directory corpus-stats
 
 corpus-nix:
 	@$(NIX_BACKEND) '$(MAKE) corpus'
