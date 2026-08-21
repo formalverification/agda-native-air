@@ -175,14 +175,19 @@ maxMessageChars = 2000
 --
 -- Three decisions, each stated because its alternative looks reasonable:
 --
---   * Both subject codes get the whole list, not a range-matched slice.  Agda
---     reports several unsolved metas in /one/ @[UnsolvedMetaVariables]@ whose
---     header range names one site, so matching metas to a diagnostic by range
---     would silently drop the metas at the others — and each meta carries its
---     own range here, so a client that wants the correspondence can still make
---     it.  The @[UnsolvedConstraints]@ sibling has no range at all and names
---     the metas in its constraint text, which is precisely where their types
---     are the missing half.
+--   * Both subject codes get the whole list, not a range-matched slice.  Probed
+--     on a two-site module: Agda reports every unsolved-meta site in /one/
+--     @[UnsolvedMetaVariables]@ whose header range is the union span of the
+--     sites (@10.9-13.15@) and whose body lists each of them, while the lane's
+--     @invisibleGoals@ carries all four metas across the two ranges.  So a
+--     range-matched payload would buy nothing — each meta carries its own range
+--     here, and a client that wants the correspondence can make it — while
+--     making the answer hostage to an undocumented property of that header:
+--     narrow it to the first site and the other sites' metas vanish silently.
+--     The @[UnsolvedConstraints]@ sibling has no range at all and names the
+--     metas in its constraint text, which is precisely where their types are
+--     the missing half, so a range rule would empty the very code that needs
+--     them most.
 --   * @[UnsolvedInteractionMetas]@ is not a subject code, though it is in the
 --     same 'unsolvedCodes' family for ordering: its subject is the file's open
 --     holes, which are the load's /visible/ goals and are already delivered as

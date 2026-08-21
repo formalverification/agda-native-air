@@ -5412,6 +5412,58 @@ interactionLaneTests cfg repoRoot = do
                  (  [ T.unpack (failureText e) | Left e <- [rCold, rWarm, rStale] ]
                  <> [ T.unpack (failureText e) | Left e <- [rCheck] ] )
 
+    , -- The multi-site case the unfiltered list exists for (#115).  Probed:
+      -- Agda reports every unsolved-meta site in ONE [UnsolvedMetaVariables]
+      -- whose header range is the union span of the sites, and the lane's
+      -- invisibleGoals carries all four metas across the two ranges.  A
+      -- payload matched to its diagnostic by range would be hostage to that
+      -- header spanning every site; the list is not, and this pins it.
+      runTest "get_diagnostics: every unsolved-meta site's metas arrive (#115)" $ do
+        tmp <- scratchDir "lane-metas-sites"
+        let file = tmp </> "TwoSites.agda"
+            src  = T.unlines
+              [ "module TwoSites where"
+              , ""
+              , "open import Agda.Builtin.Nat"
+              , ""
+              , "postulate"
+              , "  Bounded : Nat \8594 Set"
+              , "  blocked : {n m : Nat} \8594 Bounded (n + m)"
+              , ""
+              , "three : Bounded 3"
+              , "three = blocked"
+              , ""
+              , "four : Bounded 4"
+              , "four = blocked"
+              ]
+        TIO.writeFile file src
+        _ <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = file, topExpr = "three"
+               , topLine = Nothing, topColumn = Nothing, topReload = False }
+        r <- handleGetDiagnostics lanes cfg GetDiagnosticsParams
+               { gdFilePath = file, gdMaxDiagnostics = Nothing }
+        case r of
+          Left err -> pure (Fail $ T.unpack (failureText err))
+          Right dr -> do
+            -- The use sites are the second and third 'blocked' in the source;
+            -- the first is the postulate that declares it.
+            let corners g = ( rngStartLine g, rngStartCol g
+                            , rngEndLine g, rngEndCol g )
+                metas = invMetas (involvedIn
+                          (byCode "UnsolvedMetaVariables" (drDiagnostics dr)))
+                sites = nub (sort [ corners g | Just g <- map imRange metas ])
+                want  = sort [ corners g
+                             | Just g <- [ rangeOfNth 1 src "blocked"
+                                         , rangeOfNth 2 src "blocked" ] ]
+            a <- assertEqual "one diagnostic covers both sites" 1
+                   (length [ d | d <- drDiagnostics dr
+                               , diagCode d == Just "UnsolvedMetaVariables" ])
+            b <- assertEqual "four metas, two per site" 4 (length metas)
+            c <- assertEqual "both sites delivered, not just the first" want sites
+            d <- assertEqual "every meta is typed" ["Nat", "Nat", "Nat", "Nat"]
+                   (map imType metas)
+            pure (firstFailure [a, b, c, d])
+
     , -- The stamp is the bytes, not the metadata (#108 review): a same-size
       -- rewrite with its mtime restored must still read as changed, which
       -- only the content fingerprint can see.
