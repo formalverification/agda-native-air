@@ -905,7 +905,9 @@ bound too small is not a graceful degradation: it aborts exactly the call that w
 have built those interfaces, so the next call starts cold again.  Every proof-state
 response reports `elapsedMs` and `checkedFromSource`, so you can tell a slow cold call
 from a slow warm one (`checkedFromSource` is omitted when the run died before
-producing evidence either way — absent means unknown, not warm).
+producing evidence either way, and when your `--agda-flags` carry
+`--trace-imports=0`, which silences the progress lines it is read from — absent
+means unknown, not warm).
 
 #### Option B — `claude mcp add`
 

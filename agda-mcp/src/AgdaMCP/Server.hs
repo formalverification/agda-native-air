@@ -608,7 +608,13 @@ projectPayloadNote =
   \located error, a timeout included — the last module agda started. \
   \modulesChecked counts the distinct \
   \modules agda re-typechecked from source, so it says how much of the project \
-  \was actually rebuilt and, on a timeout, how far the run got. outputTail is \
+  \was actually rebuilt and, on a timeout, how far the run got; it is ABSENT \
+  \when the gate is the Everything module and the agda command this server \
+  \assembled for it carries --trace-imports=0, which silences those lines, \
+  \since what could still be counted then is a floor and not a total. A make \
+  \or --check-command gate is opaque (its agda call lives inside a recipe or \
+  \script), so there the count is a best-effort read of whatever the gate \
+  \printed. outputTail is \
   \the bounded tail of the gate's stdout and stderr, returned whatever the \
   \verdict and absent only when the gate printed nothing, because a gate can \
   \fail for reasons agda never printed (no such target, a missing tool, a killed \
@@ -728,7 +734,10 @@ latencyNote =
   <> " calls that reuse those interfaces are far faster."
   <> " Calls are bounded by the server's --timeout (default 300s)."
   <> " checkedFromSource is omitted when the run died before producing evidence"
-  <> " either way (e.g. a startup failure, or a timeout before any output)."
+  <> " either way (e.g. a startup failure, or a timeout before any output), and"
+  <> " when the flags this server runs with carry --trace-imports=0, which"
+  <> " silences the agda progress lines the field is read from: an absent field"
+  <> " means unknown, never a guess."
 
 -- | liveLaneNote: the interaction-lane contract, stated in every live-query
 -- tool description (issue #75): the process model and its latency, the
@@ -760,7 +769,10 @@ liveLaneNote =
   \{binary, args, cwd} (the persistent child; per-file flags ride the \
   \Cmd_load line visible in lane.iotcm), project {the same block the batch \
   \tools report}, elapsedMs, and checkedFromSource (whether this call \
-  \re-typechecked the file from source). Pass reload:true to force a fresh \
+  \re-typechecked the file from source — omitted, as in the batch tools, when \
+  \the evidence could not arrive: the flags carry --trace-imports=0, which \
+  \silences the progress lines it is read from, or the load failed before agda \
+  \announced this file, which establishes no reuse either). Pass reload:true to force a fresh \
   \load first — the escape hatch for a changed DEPENDENCY, which no stamp \
   \on the queried file can see; the response echoes lane.load='forced'."
 

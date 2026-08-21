@@ -233,7 +233,7 @@ The regression suite under `test/resources/diagnostics/` has one fixture per err
 
 The five query tools of the Tool Surface section share one implementation spine (`AgdaMCP.Tools.LiveQueries` over `AgdaMCP.Interaction`): resolve and read the requested path exactly as the batch tools do (issue #101), resolve the library context and refuse a wrong-checkout call (issue #76), then ask the root's persistent `agda --interaction-json` child, loading the file with the same effective flag list a batch check would run with — so both lanes resolve one file against one tree by construction.  The wire protocol, its probed gotchas, the process lifecycle (per-root children, evidence-gated re-loads, the #77 kill ladder on a hung command, idle reaping, crash restart), and the measured economics all live in [`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md).
 
-Every response carries the lane's own echo alongside the usual `command`/`project` pair: `lane {root, pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm}`, where `load` says why this call did or did not re-load (`reused`/`first`/`switch`/`changed`/`retry`) and `iotcm` is the exact wire lines sent, so a call can be replayed by hand.  Process-level failures (spawn, timeout, crash) are structured `isError` payloads naming the event, root, wire lines, and the child's last stderr lines — never a bare `-32603` (issue #101's rule).
+Every response carries the lane's own echo alongside the usual `command`/`project` pair: `lane {root, pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm}`, where `load` says why this call did or did not re-load (`reused`/`first`/`switch`/`changed`/`retry`) and `iotcm` is the exact wire lines sent, so a call can be replayed by hand.  `checkedFromSource` means on this lane what it means in the batch tools, read from the load's own progress lines: `false` for a reused load (no load ran, so nothing was checked), and absent when its evidence could not arrive — a per-load argv carrying `--trace-imports=0`, which silences those lines (issue #114), or a load that failed before Agda announced the file, which establishes no interface reuse either.  Process-level failures (spawn, timeout, crash) are structured `isError` payloads naming the event, root, wire lines, and the child's last stderr lines — never a bare `-32603` (issue #101's rule).
 
 ### Corpus-backed search tools (Milestone 1 [M1-3])
 
@@ -294,7 +294,7 @@ Every proof-state response reports what actually happened:
 | Field | Meaning |
 |-------|---------|
 | `elapsedMs`         | Wall-clock time in the `agda` subprocess, from a monotonic clock. |
-| `checkedFromSource` | `true` if Agda re-typechecked the module from source (a `Checking` line was observed, including runs that then failed or were killed mid-check), `false` if it reused `.agdai` interfaces (the run completed successfully in silence, which is Agda's warm signature, or printed `Loading` lines at raised verbosity) — the coarse signal that explains why the same call took three minutes once and 200 ms the next time.  **Omitted** when the run died before producing evidence either way (a startup failure, or a timeout before any output): an absent field means *unknown*, never a guess. |
+| `checkedFromSource` | `true` if Agda re-typechecked the module from source (a `Checking` line was observed, including runs that then failed or were killed mid-check), `false` if it reused `.agdai` interfaces (the run completed successfully in silence, which is Agda's warm signature, or printed `Loading` lines at raised verbosity) — the coarse signal that explains why the same call took three minutes once and 200 ms the next time.  **Omitted** when the run died before producing evidence either way (a startup failure, or a timeout before any output), and when the flags in force carry `--trace-imports=0`, which silences the progress lines the signal reads: a cold check is then indistinguishable from a warm one, so the field is withheld rather than reported as warm (issue #114).  Muting is about that flag family at Agda's default verbosity — a raised `-v` prints the same lines again even at level 0, and the field is then answered from what was printed, since observed evidence always outranks an inference from silence.  An absent field means *unknown*, never a guess. |
 
 On expiry the subprocess and its whole process group are killed and reaped —
 escalating SIGINT → SIGTERM → SIGKILL group-wide, so no runaway `agda` and no
@@ -688,7 +688,7 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence i
 |-------|---------|
 | `firstError`     | The first error-severity diagnostic, lifted out of the (capped) `diagnostics` list so a client need not scan it.  The list itself is the [structured-diagnostics](#structured-diagnostics-issue-74) shape, root-cause ordered and capped by `maxDiagnostics`. |
 | `failingModule` / `failingFile` | The module the gate stopped in, present **only when the check did not pass**: the one carrying `firstError`, or, when the gate failed without a located error (a timeout included), the last module `agda` started.  The module name comes from Agda's own `Checking M (path).` progress line.  A green gate has no failing module, so on a pass both are absent. |
-| `modulesChecked` | How many distinct modules `agda` re-typechecked from source, so how much of the project was actually rebuilt: 0 on a fully warm gate, the whole import graph on a cold one, and on a timeout, how far it got. |
+| `modulesChecked` | How many distinct modules `agda` re-typechecked from source, so how much of the project was actually rebuilt: 0 on a fully warm gate, the whole import graph on a cold one, and on a timeout, how far it got.  Absent when the gate is the `Everything` module and the `agda` command this server assembled for it carries `--trace-imports=0`, since the flag silences the very lines this counts and what could still be counted is then a floor rather than a total (issue #114).  Every other gate is opaque and treated so: a `make` recipe or a `--check-command` script chooses its own `agda` invocation, which this server neither writes nor reads, so there the count stays a best-effort read of whatever the gate printed. |
 | `outputTail`     | The bounded tail of the gate's stdout and stderr (40 lines / 4000 characters, elision counted), returned **whatever the verdict** and absent only when the gate printed nothing.  A gate can fail for reasons Agda never printed (no such target, a missing tool, a killed build) and a mask the two recognizers above miss is reported as a pass, so the evidence has to be in the response to be read. |
 | `timeoutSeconds` | The `--check-timeout` bound in effect; absent when unbounded. |
 
@@ -950,8 +950,13 @@ Two of its conclusions matter when writing new code: project resolution
 (`AgdaMCP.Project`) stays local because no Agda query exists for it, by
 measurement rather than oversight; and Agda's *silence* is weaker evidence
 than Agda's *answer* — a client flag (`--trace-imports=0`) can mute the
-progress channel that `checkedFromSource` infers from, which is issue
-#114's fix to make.
+progress channel that `checkedFromSource` infers from, which issue #114
+answered by reading the argv the server itself assembled
+(`AgdaMCP.Agda.progressChannelMuted`) and withholding every answer that
+would have rested on a silence the server caused: `checkedFromSource` in
+both lanes, and `check_project`'s `modulesChecked`.  The rule that
+generalizes: before inferring anything from what Agda did *not* say, check
+that the channel it would have said it on was open.
 
 
 ### Future: Agda-as-a-library

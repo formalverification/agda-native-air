@@ -1287,9 +1287,15 @@ data CheckProjectResult = CheckProjectResult
                                        --   checking.  Absent on a pass, where the last module
                                        --   started is simply the last module checked.
   , cprFailingFile    :: Maybe FilePath -- ^ That module's file.
-  , cprModulesChecked :: Int           -- ^ Distinct modules Agda re-typechecked from source
-                                       --   during the run (0 on a fully warm gate).  On a
-                                       --   timeout this is how far it got.
+  , cprModulesChecked :: Maybe Int     -- ^ Distinct modules Agda re-typechecked from source
+                                       --   during the run (@Just 0@ on a fully warm gate).  On
+                                       --   a timeout this is how far it got.  Absent when the
+                                       --   @Everything@ gate's argv — the one this server
+                                       --   assembles — muted Agda's progress channel
+                                       --   (@--trace-imports=0@): a count read off silenced
+                                       --   lines would be a floor reported as a total (#114).
+                                       --   A @make@ or @--check-command@ gate is opaque, and
+                                       --   its count stays a best-effort read.
   , cprOutputTail     :: Maybe Text    -- ^ The tail of the gate's output, bounded, whatever
                                        --   the verdict — absent only when the gate printed
                                        --   nothing.  A gate can fail for reasons Agda never
@@ -1309,7 +1315,6 @@ instance ToJSON CheckProjectResult where
     , "gate"             .= cprGate r
     , "diagnostics"      .= cprDiagnostics r
     , "diagnosticsTotal" .= cprDiagnosticsTotal r
-    , "modulesChecked"   .= cprModulesChecked r
     , "verdict"          .= cprVerdict r
     , "command"          .= cprCommand r
     , "project"          .= cprProject r
@@ -1317,6 +1322,7 @@ instance ToJSON CheckProjectResult where
     -- Emitted only when true, as 'pcLibrariesFileMissing' is: an absent key is
     -- the ordinary case, and a present one is a finding.
     <> [ "maskedFailure" .= True | cprMaskedFailure r ]
+    <> maybe [] (\n -> ["modulesChecked" .= n]) (cprModulesChecked r)
     <> maybe [] (\n -> ["timeoutSeconds" .= n]) (cprTimeoutSeconds r)
     <> maybe [] (\d -> ["firstError"     .= d]) (cprFirstError r)
     <> maybe [] (\m -> ["failingModule"  .= m]) (cprFailingModule r)
@@ -1625,7 +1631,13 @@ instance ToJSON LaneEcho where
 -- the response object by 'liveMetaPairs'.
 data LiveMeta = LiveMeta
   { lmElapsedMs         :: Int
-  , lmCheckedFromSource :: Bool
+  , lmCheckedFromSource :: Maybe Bool
+                          -- ^ 'Nothing' — and the key absent — when the
+                          --   evidence could not arrive: the per-load argv
+                          --   muted Agda's progress channel (#114), or the
+                          --   load failed before Agda announced the file.
+                          --   Serialized like the batch tools' field: an
+                          --   absent key means unknown, never a guess.
   , lmLane              :: LaneEcho
   , lmCommand           :: CommandEcho
   , lmProject           :: ProjectContext
@@ -1634,11 +1646,10 @@ data LiveMeta = LiveMeta
 liveMetaPairs :: LiveMeta -> [Pair]
 liveMetaPairs m =
   [ "elapsedMs"         .= lmElapsedMs m
-  , "checkedFromSource" .= lmCheckedFromSource m
   , "lane"              .= lmLane m
   , "command"           .= lmCommand m
   , "project"           .= lmProject m
-  ]
+  ] <> maybe [] (\b -> ["checkedFromSource" .= b]) (lmCheckedFromSource m)
 
 -- | LiveError: an Agda-level negative answer, in band.  A query tool's
 -- product includes "it does not typecheck" and "that module is not in scope

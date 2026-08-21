@@ -12,6 +12,10 @@
 --      facts they carry: whether the module was re-checked from source, and
 --      what Agda calls it (issues #77, #78, #100).  Anything a run of Agda can
 --      be asked is asked here, rather than re-derived from the source text.
+--      Since issue #114 that reading also asks whether the argv this server
+--      assembled left the channel open at all ('progressChannelMuted'): a
+--      client's @--trace-imports=0@ silences the lines, and an answer inferred
+--      from a silence the server itself caused is withheld rather than guessed.
 --
 --   Hole enumeration and splicing live in AgdaMCP.Holes (issues #71/#73).
 --
@@ -71,6 +75,9 @@ module AgdaMCP.Agda
   , progressModules
   , parseCheckingLine
   , agdaModuleNameOf
+    -- * The progress channel the two facts above are read from (issue #114)
+  , traceImportsLevel
+  , progressChannelMuted
     -- * Agda subprocess (IO)
   , runAgda
   , runCommand
@@ -86,7 +93,8 @@ import Control.Concurrent.MVar
 import Control.Exception (IOException, SomeException, bracket, catch, try)
 import Control.Monad (void, when)
 import qualified Data.ByteString as BS
-import Data.Maybe (listToMaybe)
+import Data.List (stripPrefix)
+import Data.Maybe (listToMaybe, mapMaybe)
 import Data.Text.IO as TIO
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -104,6 +112,7 @@ import System.Process
   , createProcess, getPid, interruptProcessGroupOf, proc
   , terminateProcess, waitForProcess
   )
+import Text.Read (readMaybe)
 
 import AgdaMCP.Types (CommandEcho (..), CtxEntry (..))
 
@@ -680,36 +689,137 @@ timeoutMessage cfg =
 -- Agda's progress lines: was it re-checked, and which module is it?
 -- ---------------------------------------------------------------------------
 
+-- | traceImportsLevel: the effective @--trace-imports@ level of an argument
+-- vector this server assembled — the level that decides whether Agda prints
+-- the progress lines the two answers below are read from.
+--
+-- The grammar is closed, and every clause was measured against the pinned Agda
+-- 2.8.0 (issue #114; transcripts in @docs/agda-mcp-ask-agda-audit.md@ § 4):
+--
+--   * @--trace-imports=N@ is the only level-carrying spelling.
+--   * The bare @--trace-imports@ means level 2.
+--   * No occurrence at all means level 1, Agda's own default.
+--   * The last occurrence wins: @--trace-imports=0 --trace-imports=1@ prints
+--     the progress lines and the reverse prints nothing.
+--   * A space-separated level is not one: @--trace-imports 0@ is the bare flag
+--     plus a second input file, which Agda refuses (@only one input file
+--     allowed@).  So the bare token decides the level and the @0@ is not read.
+--   * Abbreviated spellings are not accepted either — @--trace-imp=0@ is
+--     @[OptionError] Unrecognized option@ — so those two exact spellings are
+--     the whole grammar, and matching them exactly is complete.
+--
+-- A level that is not a number states no level: Agda rejects such an argv
+-- before it checks anything, so no run under one can reach the branch that
+-- reads this.
+traceImportsLevel :: [String] -> Int
+traceImportsLevel args = last (defaultLevel : mapMaybe levelIn args)
+  where
+    -- Agda's default when the flag is absent, and what the bare flag means.
+    defaultLevel = 1
+    bareLevel    = 2
+
+    levelIn arg
+      | arg == flag = Just bareLevel
+      | otherwise   = readMaybe =<< stripPrefix (flag <> "=") arg
+
+    flag = "--trace-imports"
+
+-- | progressChannelMuted: does this argv silence the progress lines outright?
+--
+-- Level 0 prints nothing at all, while level 1 (the default) and up print
+-- @Checking@ (measured, as above), so this is the one thing a caller needs from
+-- the level.  "Muted" is about this flag family at Agda's default verbosity: a
+-- raised @-v@ prints the same progress lines again even at level 0 (measured),
+-- which is why every caller reads the lines it did get before consulting this.
+-- Both lanes assemble their argv from the same three parts (the server's
+-- @--agda-flags@, 'AgdaMCP.Project.projectExtraFlags', and
+-- 'AgdaMCP.Project.fileDirIncludeFlags'), which is why one scan serves the batch
+-- runner here, the lane's per-load @Cmd_load@ argv, and the @Everything@ gate's
+-- command alike.
+--
+-- What the scan covers, exactly.  Agda's own configuration cannot smuggle the
+-- flag past it: a @{-# OPTIONS --trace-imports=0 #-}@ pragma in the checked file
+-- and an @.agda-lib@ whose @flags:@ field carries it are both rejected with
+-- @[OptionError] Unrecognized option@ (measured, issue #114), so neither the
+-- file nor its project can mute the channel behind the server's back.  What the
+-- scan cannot see is an @--agda-bin@ naming a /wrapper/ that supplies flags of
+-- its own, the arrangement @agda-mcp/README.md@ recommends for a Nix-pinned
+-- client project: a wrapper injecting @--trace-imports=0@ would silence a cold
+-- run while this answers 'False', leaving the pre-#114 misreading alive in the
+-- one configuration the server has no view of (Copilot's round-2 review of PR
+-- 117).  Three facts bound that residue.  Agda offers no query for its effective
+-- trace level, so there is nothing to ask; declining to infer reuse whenever a
+-- wrapper /might/ be muting would abolish the 'False' answer in every
+-- configuration, the correct ones included; and a wrapper of the conventional
+-- shape passes the caller's arguments last (the shipped @agdaWithPackages@
+-- wrapper is literally @exec agda --with-compiler=... --library-file=... "$@"@),
+-- so an explicit level in @--agda-flags@ wins by the last-occurrence rule and
+-- the hole narrows to a muting wrapper under a server that names no level at
+-- all.  The shipped wrapper names no trace level, and a cold @check_file@
+-- through it answers @checkedFromSource: true@.
+--
+-- Why detect rather than repair.  The last-occurrence rule offers a repair as
+-- well: append @--trace-imports=1@ when, and only when, the effective level is
+-- 0, which would keep the field truthful rather than absent and would never
+-- touch a deliberate level 2 or 3.  That variant is declined for now, because
+-- @--agda-bin@ may name a foreign toolchain (issue #103) and appending a flag
+-- an older @agda@ does not recognize would break every call: restoring needs a
+-- version gate that detecting does not.  It stays available on top of this the
+-- day the server gates on the child's reported version.
+progressChannelMuted :: [String] -> Bool
+progressChannelMuted = (< 1) . traceImportsLevel
+
 -- | checkedFromSourceOf: did Agda re-typecheck the module from source, or did it
 -- reuse an already-built interface?
 --
 -- A coarse but reliable cache signal, and the one an agent actually needs: it
 -- explains why the same call took 200 ms once and three minutes the time before.
--- The evidence, in order of authority (Agda 2.8.0 at default verbosity):
+-- The evidence, positive lines first and the inference from silence last (Agda
+-- 2.8.0 at default verbosity):
 --
 --   * A @Checking M (…/M.agda).@ line is printed the moment Agda starts
 --     re-typechecking a module from source — including runs that then fail or
 --     are killed mid-check — and reads as @Just True@.
---   * A run that /completed successfully/ without one reads as @Just False@:
---     a warm @agda@ exits 0 printing nothing at all, so silent success is
---     itself the interface-reuse signature.
 --   * A @Loading M (…/M.agdai).@ line (emitted only at raised verbosity) is
---     direct evidence of an interface read, so it also reads as @Just False@
---     when no source re-check was observed.
+--     direct evidence of an interface read, so it reads as @Just False@.
+--   * With neither line, the only evidence left is /silence/, and silence is
+--     believable only when the channel that would have spoken was open.  An
+--     argv carrying an effective @--trace-imports=0@ silences the progress
+--     lines outright, which gives a genuinely cold check the warm signature, so
+--     under one this answers 'Nothing' rather than @Just False@ (issue #114;
+--     reproduced end to end in @docs/agda-mcp-ask-agda-audit.md@ § 4).  The
+--     field exists to explain latency, and a wrong @false@ defeats that purpose
+--     in a way an absent field does not.  The argv read is the run's own
+--     ('arCommand', built from the very list handed to @createProcess@), so the
+--     detection cannot drift from the invocation it describes, and
+--     'progressChannelMuted' records why scanning it is the whole detection.
+--   * Otherwise a run that /completed successfully/ in silence reads as
+--     @Just False@: a warm @agda@ exits 0 printing nothing at all, so silent
+--     success is itself the interface-reuse signature.
 --   * Anything else — a run that failed or timed out before producing any
 --     evidence — is @Nothing@, and the response omits the field.  Defaulting
 --     to a Bool here would misread a startup failure or an early-killed cold
 --     call as a warm one.
+--
+-- Reading the positive lines /before/ the muting test is load-bearing, not
+-- merely tidy: the trace level is not the only thing that can print them.
+-- Measured, level 0 with a raised verbosity — @--trace-imports=0 -v import:20@ —
+-- prints the real @Checking M (…/M.agda).@ and @Loading  M (…/M.agdai).@ lines
+-- again, so muting withholds the inference from silence and never an answer
+-- something actually said.  Among the trace levels alone the order is
+-- immaterial: 3 prints both kinds and 0 prints neither.
 checkedFromSourceOf :: AgdaResult -> Maybe Bool
 checkedFromSourceOf r
   | sawPrefix "Checking " = Just True
-  | completedOk           = Just False
   | sawPrefix "Loading "  = Just False
+  | mutedChannel          = Nothing
+  | completedOk           = Just False
   | otherwise             = Nothing
   where
-    combined    = arStdout r <> "\n" <> arStderr r
-    sawPrefix p = any (T.isPrefixOf p . T.stripStart) (T.lines combined)
-    completedOk = not (arTimedOut r) && arExitCode r == 0
+    combined     = arStdout r <> "\n" <> arStderr r
+    sawPrefix p  = any (T.isPrefixOf p . T.stripStart) (T.lines combined)
+    completedOk  = not (arTimedOut r) && arExitCode r == 0
+    mutedChannel = progressChannelMuted (ceArgs (arCommand r))
 
 
 -- | progressModules: the modules Agda announced it was checking, in the order
@@ -752,7 +862,8 @@ parseCheckingLine raw = do
 -- It is a 'Maybe' because Agda does not always say, and the cases are worth
 -- keeping apart.  A warm run prints nothing at all, and a client that puts
 -- @--trace-imports=0@ in its flags silences the line outright (measured: levels
--- 1 and up print it, 0 prints nothing).  A run that dies before it reaches
+-- 1 and up print it, 0 prints nothing; 'traceImportsLevel' owns that grammar).
+-- A run that dies before it reaches
 -- /this/ file — a parse error, a header that does not match its file name, or a
 -- kill while its dependencies were still being checked — leaves only its
 -- dependencies' lines, which is why the answer is the line naming this file
