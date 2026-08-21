@@ -463,7 +463,7 @@ object AgdaJsonlDriver extends IOApp {
   // One-module run
   // ---------------------------------------------------------------------------
 
-  private def runOne(cfg: Config, mod: String): IO[ModuleRun] = {
+  private[extract] def runOne(cfg: Config, mod: String): IO[ModuleRun] = {
     // `out` and `log` are named after the *module*, not after its source file,
     // so a module's artifacts keep the same names whichever source extension
     // it happens to use.
@@ -477,7 +477,13 @@ object AgdaJsonlDriver extends IOApp {
         Files.createDirectories(log.getParent)
       }
 
-    val resumeCheck: IO[Option[ModuleRun]] =
+    // A resumed module reports the source it was extracted from, not the path
+    // it would have if it were a plain `.agda` file.  Recording the nominal
+    // path here made `inputFile` false for every literate module served by
+    // resume — which is the default path a rerun takes, and these records are
+    // now the coverage manifest.  `nominal` remains the fallback for the odd
+    // state where a valid output outlives its source.
+    def resumeCheck(input: Option[Path]): IO[Option[ModuleRun]] =
       if (!cfg.resume) IO.pure(None)
       else
         IO.blocking(Files.exists(out)).attempt.flatMap {
@@ -487,7 +493,7 @@ object AgdaJsonlDriver extends IOApp {
                 Some(
                   ModuleRun(
                     module = mod,
-                    inputFile = nominal.toString,
+                    inputFile = input.getOrElse(nominal).toString,
                     outputFile = out.toString,
                     logFile = log.toString,
                     skipped = true,
@@ -559,10 +565,13 @@ object AgdaJsonlDriver extends IOApp {
         )
     }
 
+    // Resolve the source once, before deciding anything: the resumed record
+    // and the backend call both need it.
     for {
-      _    <- ensureDirs
-      skip <- resumeCheck
-      res  <- skip match {
+      _     <- ensureDirs
+      input <- resolveModuleInput(cfg.srcDir, mod)
+      skip  <- resumeCheck(input)
+      res   <- skip match {
                 case Some(r) => {
                   val logMsg =
                     s"[AgdaJsonlDriver]  ⏭️  Skipping module $mod (output exists and is valid);\n" +
@@ -571,9 +580,9 @@ object AgdaJsonlDriver extends IOApp {
                   appendLogLine(log, logMsg.trim.replaceAll("\n", " ")) *> IO.pure(r)
                 }
                 case None =>
-                  resolveModuleInput(cfg.srcDir, mod).flatMap {
-                    case None        => IO.pure(missingInput)
-                    case Some(input) => runBackend(input)
+                  input match {
+                    case None    => IO.pure(missingInput)
+                    case Some(i) => runBackend(i)
                   }
               }
     } yield res

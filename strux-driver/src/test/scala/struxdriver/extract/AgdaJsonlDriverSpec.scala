@@ -110,6 +110,89 @@ final class AgdaJsonlDriverSpec extends AnyFreeSpec with Matchers {
     }
   }
 
+  "runOne on the resume path" - {
+
+    // A row that JsonlValidate accepts as a Full row, so an existing output
+    // counts as valid and resume takes over before any backend runs.
+    val validRow =
+      """{"file":"X","module":"M","name":"f","qname":"M.f","type":"A","kind":"definition","astSize":1}"""
+
+    /** A Config whose backend path does not exist: if resume fails to
+      * short-circuit, the run fails loudly instead of quietly passing. */
+    def resumeConfig(src: Path, out: Path): AgdaJsonlDriver.Config =
+      AgdaJsonlDriver.Config(
+        projectRoot = src,
+        agdaDir     = src,
+        srcDir      = src,
+        modulesFile = src.resolve("modules.txt"),
+        outDir      = out,
+        agdaJsonBin = src.resolve("no-such-agda-json"),
+        parallelism = 1,
+        resume      = true,
+        runner      = AgdaJsonlDriver.Runner.Local,
+        sparkMaster = "local[1]",
+        failOnError = false
+      )
+
+    def seedOutput(out: Path, mod: String): Unit = {
+      val jsonl = out.resolve("jsonl").resolve(mod.replace('.', '/') + ".jsonl")
+      Files.createDirectories(jsonl.getParent)
+      Files.write(jsonl, (validRow + "\n").getBytes(StandardCharsets.UTF_8))
+    }
+
+    "reports the literate source it was extracted from, not the nominal .agda" in
+      withTempSrcDir { src =>
+        val out = Files.createTempDirectory("agda-jsonl-out-")
+        val expected = touch(src, "Overture/Signatures.lagda.md")
+        seedOutput(out, "Overture.Signatures")
+
+        val run = AgdaJsonlDriver
+          .runOne(resumeConfig(src, out), "Overture.Signatures")
+          .unsafeRunSync()
+
+        run.skipped shouldBe true
+        run.ok shouldBe true
+        run.rows shouldBe 1L
+        // The defect this pins: `inputFile` used to be `.../Signatures.agda`,
+        // a file that does not exist, for every literate module resume served.
+        run.inputFile shouldBe expected.toString
+      }
+
+    "reports a plain .agda source unchanged" in withTempSrcDir { src =>
+      val out = Files.createTempDirectory("agda-jsonl-out-")
+      val expected = touch(src, "Everything.agda")
+      seedOutput(out, "Everything")
+
+      val run = AgdaJsonlDriver.runOne(resumeConfig(src, out), "Everything").unsafeRunSync()
+
+      run.skipped shouldBe true
+      run.inputFile shouldBe expected.toString
+    }
+
+    "falls back to the nominal path when a valid output outlives its source" in
+      withTempSrcDir { src =>
+        val out = Files.createTempDirectory("agda-jsonl-out-")
+        seedOutput(out, "Gone")
+
+        val run = AgdaJsonlDriver.runOne(resumeConfig(src, out), "Gone").unsafeRunSync()
+
+        run.skipped shouldBe true
+        run.inputFile shouldBe src.resolve("Gone.agda").toString
+      }
+
+    "with no output to resume from, and no source, reports every candidate" in
+      withTempSrcDir { src =>
+        val out = Files.createTempDirectory("agda-jsonl-out-")
+
+        val run = AgdaJsonlDriver.runOne(resumeConfig(src, out), "Absent").unsafeRunSync()
+
+        run.ok shouldBe false
+        run.skipped shouldBe false
+        run.validateErrors.mkString should include ("Absent.lagda.md")
+        run.validateErrors.mkString should include ("missing input file")
+      }
+  }
+
   "RunSummary.of" - {
 
     /** A ModuleRun with just the fields the summary reads. */
