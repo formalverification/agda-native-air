@@ -41,6 +41,7 @@ from scripts.python.corpus.assemble import (
     observed_type_ast_versions,
     outcome_of_result,
     parse_modules_file,
+    relative_to,
 )
 
 
@@ -133,6 +134,37 @@ def test_compute_coverage_sorts_outcomes_by_module() -> None:
     manifest = {"results": [_result("Z", True), _result("A", True)]}
     coverage = compute_coverage(manifest, ())
     assert [o.module for o in coverage.outcomes] == ["A", "Z"]
+
+
+def test_relative_to_factors_out_the_out_dir() -> None:
+    assert relative_to("/out", "/out/jsonl/A.jsonl") == "jsonl/A.jsonl"
+
+
+def test_relative_to_tolerates_a_trailing_slash() -> None:
+    assert relative_to("/out/", "/out/logs/A.log") == "logs/A.log"
+
+
+def test_relative_to_leaves_an_unrelated_path_alone() -> None:
+    # Not under the root: better an absolute path than a wrong relative one.
+    assert relative_to("/out", "/elsewhere/A.jsonl") == "/elsewhere/A.jsonl"
+    # A sibling whose name merely starts the same way is not "under" it.
+    assert relative_to("/out", "/outside/A.jsonl") == "/outside/A.jsonl"
+
+
+def test_relative_to_passes_empties_through() -> None:
+    assert relative_to("", "/out/A.jsonl") == "/out/A.jsonl"
+    assert relative_to("/out", "") == ""
+
+
+def test_coverage_to_json_reports_paths_relative_to_the_out_dir() -> None:
+    manifest = {"results": [_result("A", True)]}
+    doc = coverage_to_json(
+        compute_coverage(manifest, ("A",)), "agda-algebras", 1, out_root="/out"
+    )
+
+    assert doc["outRoot"] == "/out"
+    assert doc["modules"][0]["outputFile"] == "jsonl/A.jsonl"
+    assert doc["modules"][0]["logFile"] == "logs/A.log"
 
 
 def test_coverage_to_json_leads_with_failures() -> None:
@@ -242,6 +274,17 @@ def test_observed_type_ast_versions_reads_them_off_the_rows(tmp_path: Path) -> N
         + "\n",
     )
     assert observed_type_ast_versions(corpus).unwrap() == ("0.3-v0",)
+
+
+def test_observed_type_ast_versions_scans_past_any_sample_size(tmp_path: Path) -> None:
+    # A version that appears only late in the file must still be reported: a
+    # sampled scan would let provenance claim a single encoding for a corpus
+    # that has two.
+    rows = [json.dumps({"typeAstVersion": "0.3-v0"})] * 6000
+    rows.append(json.dumps({"typeAstVersion": "0.4-v0"}))
+    corpus = _write(tmp_path / "corpus.jsonl", "\n".join(rows) + "\n")
+
+    assert observed_type_ast_versions(corpus).unwrap() == ("0.3-v0", "0.4-v0")
 
 
 def test_observed_type_ast_versions_reports_a_bad_line(tmp_path: Path) -> None:

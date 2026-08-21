@@ -166,12 +166,29 @@ def compute_coverage(manifest: Dict, requested: Sequence[str]) -> Coverage:
     )
 
 
-def coverage_to_json(coverage: Coverage, library: str, requested: int) -> Dict:
+def relative_to(root: str, path: str) -> str:
+    """`path` relative to `root` when it is under it, else `path` unchanged.
+
+    The manifest records absolute paths, which name one machine's directory
+    layout.  A published coverage report is more useful — and comparable
+    between two machines — with the run's own out-dir factored out.
+    """
+    if not root or not path:
+        return path
+    root = root.rstrip("/")
+    return path[len(root) + 1 :] if path.startswith(root + "/") else path
+
+
+def coverage_to_json(
+    coverage: Coverage, library: str, requested: int, out_root: str = ""
+) -> Dict:
     """The `coverage.json` document.  Failures come first: they are the point."""
     return {
         "schema": COVERAGE_SCHEMA,
         "library": library,
         "modulesRequested": requested,
+        # Artifact paths below are relative to this, the extraction out-dir.
+        "outRoot": out_root,
         "summary": {
             "attempted": coverage.attempted,
             "succeeded": coverage.succeeded,
@@ -180,12 +197,12 @@ def coverage_to_json(coverage: Coverage, library: str, requested: int) -> Dict:
             "resumed": coverage.resumed,
             "rows": coverage.rows,
         },
-        "failures": [_outcome_to_json(o) for o in coverage.failures],
-        "modules": [_outcome_to_json(o) for o in coverage.outcomes],
+        "failures": [_outcome_to_json(o, out_root) for o in coverage.failures],
+        "modules": [_outcome_to_json(o, out_root) for o in coverage.outcomes],
     }
 
 
-def _outcome_to_json(o: ModuleOutcome) -> Dict:
+def _outcome_to_json(o: ModuleOutcome, out_root: str = "") -> Dict:
     return {
         "module": o.module,
         "status": o.status,
@@ -194,8 +211,8 @@ def _outcome_to_json(o: ModuleOutcome) -> Dict:
         "resumed": o.skipped,
         "exitCode": o.exit_code,
         "reasons": list(o.reasons),
-        "outputFile": o.output_file,
-        "logFile": o.log_file,
+        "outputFile": relative_to(out_root, o.output_file),
+        "logFile": relative_to(out_root, o.log_file),
     }
 
 
@@ -420,18 +437,19 @@ def gzip_file(source: Path, target: Path) -> Result[int, PipelineError]:
         )
 
 
-def observed_type_ast_versions(corpus: Path, limit: int = 5000) -> Result[Tuple[str, ...], PipelineError]:
-    """Distinct `typeAstVersion` values in the first `limit` rows.
+def observed_type_ast_versions(corpus: Path) -> Result[Tuple[str, ...], PipelineError]:
+    """Distinct `typeAstVersion` values across EVERY row.
 
-    The card must state the encoding version it ships; reading it back off the
-    rows is the only claim that cannot drift from the data.
+    The card must state the encoding version it ships, and reading it back off
+    the rows is the only claim that cannot drift from the data — so the scan
+    covers the whole file.  A sample would make the provenance record say
+    "these versions" while meaning "these versions in the part I looked at",
+    which is exactly the kind of claim a dataset card must not contain.
     """
     versions: List[str] = []
     try:
         with corpus.open("r", encoding="utf-8") as handle:
             for i, line in enumerate(handle):
-                if i >= limit:
-                    break
                 line = line.strip()
                 if not line:
                     continue
@@ -554,7 +572,12 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
     coverage_path = out_dir / "coverage.json"
     provenance_path = out_dir / "provenance.json"
     for path, document in (
-        (coverage_path, coverage_to_json(coverage, args.library, len(requested))),
+        (
+            coverage_path,
+            coverage_to_json(
+                coverage, args.library, len(requested), str(manifest.get("outDir", ""))
+            ),
+        ),
         (provenance_path, provenance),
     ):
         written = write_json(path, document)
