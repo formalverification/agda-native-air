@@ -62,7 +62,11 @@ final class ModelSpec extends AnyFunSuite with Matchers {
   }
 
   test("solved requires BOTH the empty obligation set and the batch verdict") {
-    val done = SearchState(content, Vector.empty, Vector.empty)
+    // States are unforgeable: `sealed abstract case class` generates no
+    // synthetic apply and no copy, so `SearchState(content, …)` and
+    // `state.copy(script = …)` do not compile — the only doors are initial
+    // and commit.  A hole-free initial state is a candidate, nothing more.
+    val done = SearchState.initial(content, Vector.empty)
     // Empty set alone is not enough: a failing final check refuses the claim.
     SolvedClaim.fromFinalCheck(done, checkSuccess = false, exitCode = 42).isLeft shouldBe true
     // Both together grant it.
@@ -124,11 +128,15 @@ final class ModelSpec extends AnyFunSuite with Matchers {
 
   test("oracle keys and state keys are distinct types with distinct content") {
     val ok = OracleKey(Fingerprint.of(content), 3, 8, "tt")
-    val sk = StateKey(Fingerprint.of(content))
+    val sk = StateKey(Fingerprint.of(content), Vector.empty)
     // Same fingerprint, different types: the compiler already refuses to mix
     // them; this pins that the values are not accidentally interconvertible.
     ok.contentFingerprint shouldBe sk.contentFingerprint
     (ok: Any) should not be (sk: Any)
+    // And the state key carries the committed script (the #112 lesson's own
+    // key), so two histories reaching one content stay distinct frontier
+    // entries unless P1 deliberately widens the dedup.
+    StateKey(sk.contentFingerprint, Vector(Move(3, 8, "tt"))) should not be sk
   }
 
   test("a committed edit changes the state key and every oracle key") {

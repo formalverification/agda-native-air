@@ -79,9 +79,11 @@ object TimingRow {
 }
 
 /** A decoded oracle answer plus the raw reply text (for the per-candidate log
-  * files) and whether it came from the memo.
+  * files), the client-observed round-trip milliseconds (0.0 on a memo hit,
+  * which spends none — this is the wall-clock the eval schema's `elapsedMs`
+  * is defined as), and whether it came from the memo.
   */
-final case class OracleAnswer[A](body: A, raw: String, cached: Boolean)
+final case class OracleAnswer[A](body: A, raw: String, clientMs: Double, cached: Boolean)
 
 final class Oracle private (
   client:      ToolCaller,
@@ -97,7 +99,7 @@ final class Oracle private (
                  s"check_file failed on $file: ${timed.value.text.take(400)}"))
       body  <- IO.fromEither(timed.value.decodeAs[CheckFileBody].leftMap(new RuntimeException(_)))
       _     <- record(ctx, timed, body.elapsedMs, body.checkedFromSource)
-    } yield OracleAnswer(body, timed.value.text, cached = false)
+    } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
   /** get_goal at one obligation: the goal type and resolved module name. */
   def getGoal(ctx: CallCtx, file: Path, ob: Obligation): IO[OracleAnswer[GetGoalBody]] =
@@ -110,7 +112,7 @@ final class Oracle private (
                  s"get_goal failed on $file at (${ob.line},${ob.col}): ${timed.value.text.take(400)}"))
       body  <- IO.fromEither(timed.value.decodeAs[GetGoalBody].leftMap(new RuntimeException(_)))
       _     <- record(ctx, timed, body.elapsedMs, None)
-    } yield OracleAnswer(body, timed.value.text, cached = false)
+    } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
   /** fill_hole as a probe: memoised on (content, hole, candidate).  The server
     * restores the file whatever the answer, so this never changes state; an
@@ -123,7 +125,7 @@ final class Oracle private (
         // A hit spends no oracle time; the ledger row says so explicitly.
         timings.update(_ :+ TimingRow(ctx.pass, ctx.fixtureId, ctx.phase, ctx.rank,
           clientMs = 0.0, serverElapsedMs = None, overheadMs = None, checkedFromSource = None, cached = true))
-          .as(hit.copy(cached = true))
+          .as(hit.copy(clientMs = 0.0, cached = true))
       case None =>
         for {
           timed  <- client.callTool("fill_hole", Json.obj(
@@ -134,10 +136,10 @@ final class Oracle private (
           answer <- if (timed.value.isError)
                       IO.pure(OracleAnswer(
                         ProbeOutcome(candidate, ProbeStatus.Crash, Vector.empty, Some(timed.value.text.take(400))),
-                        timed.value.text, cached = false))
+                        timed.value.text, timed.clientMs, cached = false))
                     else
                       IO.fromEither(timed.value.decodeAs[FillHoleBody].leftMap(new RuntimeException(_)))
-                        .map(b => OracleAnswer(b.toOutcome, timed.value.text, cached = false))
+                        .map(b => OracleAnswer(b.toOutcome, timed.value.text, timed.clientMs, cached = false))
           elapsed = timed.value.decodeAs[FillHoleBody].toOption.flatMap(_.elapsedMs)
           cfs     = timed.value.decodeAs[FillHoleBody].toOption.flatMap(_.checkedFromSource)
           _      <- record(ctx, timed, elapsed, cfs)

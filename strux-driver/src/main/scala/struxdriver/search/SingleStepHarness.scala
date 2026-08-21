@@ -291,28 +291,35 @@ object SingleStepHarness extends IOApp {
       t1     <- IO.monotonic
       _      <- oracle.recordProposal(CallCtx(pass, entry.id, "proposal", None), (t1 - t0).toNanos)
       fp      = Fingerprint.of(state.content)
-      probed <- cands.zipWithIndex.traverse { case (cand, i) =>
-                  oracle.probe(CallCtx(pass, entry.id, "fill_hole", Some(i)), workFile, fp, ob, cand)
+      // Ranks are 1..k in the eval schema (0 is reserved for its synthetic
+      // error rows), and log names follow the evaluator's cand-%02d pattern.
+      probed <- cands.zipWithIndex.map { case (cand, i) => (cand, i + 1) }.traverse { case (cand, rank) =>
+                  oracle.probe(CallCtx(pass, entry.id, "fill_hole", Some(rank)), workFile, fp, ob, cand)
                     .flatMap { ans =>
-                      val logPath = logsDir.resolve(s"cand-$i.json")
+                      val logPath = logsDir.resolve(f"cand-$rank%02d.json")
                       IO.blocking(Files.write(logPath, (ans.raw + "\n").getBytes(StandardCharsets.UTF_8)))
-                        .as((i, cand, ans))
+                        .as((rank, cand, ans))
                     }
                 }
-      rows    = probed.map { case (i, cand, ans) =>
+      rows    = probed.map { case (rank, cand, ans) =>
                   AttemptRow(
                     fixtureId     = entry.id,
                     module        = goal.body.module.getOrElse(""),
-                    fixturePath   = entry.obligationPath.toString,
+                    // The schema defines fixturePath as ABSOLUTE (agda-dojang/README.md),
+                    // so rows cannot depend on a consumer's working directory.
+                    fixturePath   = cfg.projectRoot.resolve(entry.obligationPath).toString,
                     holeIndex     = 0,
                     holeLine      = ob.line,
                     holeCol       = ob.col,
-                    candidateRank = i,
+                    candidateRank = rank,
                     candidate     = cand,
                     status        = ans.body.status.wire,
-                    elapsedMs     = extractElapsed(ans.raw),
+                    // Schema semantics: the attempt's client-observed wall clock,
+                    // as the Python evaluator measures it — never the server's
+                    // inner agda time, which lives in the timing ledger instead.
+                    elapsedMs     = Math.round(ans.clientMs),
                     rc            = oracle.exitCodeOf(ans.raw).getOrElse(-1),
-                    logPath       = cfg.runRoot.relativize(logsDir.resolve(s"cand-$i.json")).toString
+                    logPath       = cfg.runRoot.relativize(logsDir.resolve(f"cand-$rank%02d.json")).toString
                   )
                 }
       ranked  = Rank.order(probed.map(_._3.body))
@@ -348,11 +355,6 @@ object SingleStepHarness extends IOApp {
       ),
       rows
     )
-
-  private def extractElapsed(raw: String): Long =
-    io.circe.parser.parse(raw).toOption
-      .flatMap(_.hcursor.get[Long]("elapsedMs").toOption)
-      .getOrElse(0L)
 
   // --------------------------------------------------------------------------
   // Outputs

@@ -50,8 +50,13 @@ package struxdriver.search
 final case class Obligation(line: Int, col: Int, goal: String)
 
 /** A committed action: this candidate was spliced into the working copy at the
-  * hole that sat at (line, col).  Only `SearchState.commit` creates these; the
-  * proof script is a Vector[Move] and can therefore never contain a probe.
+  * hole that sat at (line, col).  `SearchState.commit` is the only code that
+  * creates these in practice, but Scala 2 cannot scope a constructor to one
+  * sibling method — so the invariant that matters is enforced one level up:
+  * `SearchState`'s own constructor (and its synthetic `apply`/`copy`) is
+  * private, every state is born through `initial` (empty script) or `commit`
+  * (appends exactly one Move), and a Move minted anywhere else is inert — no
+  * script can ever contain it.
   */
 final case class Move private[search] (line: Int, col: Int, candidate: String)
 
@@ -101,17 +106,27 @@ final case class OracleKey(contentFingerprint: String, line: Int, col: Int, cand
 
 /** Cache key for ENQUEUED STATES: the P1 frontier dedup.  Deliberately a
   * different type from OracleKey — #112's lesson is that conflating the two
-  * either re-runs Agda or wrongly prunes the frontier.  The content
-  * fingerprint alone identifies a state (the obligations are a function of the
-  * content); P1 decides whether the dedup also wants the script.
+  * either re-runs Agda or wrongly prunes the frontier — and keyed exactly as
+  * that lesson records it: content (the successor of the old key's
+  * imports+goal, via the fingerprint) plus the committed script.  Including
+  * the script is the conservative default: it can never wrongly prune two
+  * live states.  P1 may deliberately widen dedup to content-only (two
+  * histories reaching one content share every future), but that is a pruning
+  * decision to take knowingly, not a default to inherit silently.
   */
-final case class StateKey(contentFingerprint: String)
+final case class StateKey(contentFingerprint: String, script: Vector[Move])
 
 /** The search state: the working copy's content, the obligations still open in
   * it (ALL of which must be discharged — conjunctive), and the proof script of
-  * committed actions only.
+  * committed actions only.  Declared `sealed abstract case class` with a
+  * private constructor — the Scala 2 idiom that generates NO synthetic
+  * `apply` and NO `copy` — so a state can only be born through `initial`
+  * (empty script) or advanced through `commit` (appends exactly one Move).
+  * The probes-are-not-moves lesson is thereby held by the compiler, not by
+  * convention: a Move minted elsewhere in the package is inert, because no
+  * script outside those two doors can ever hold it.
   */
-final case class SearchState(
+sealed abstract case class SearchState private (
   content:     String,
   obligations: Vector[Obligation],
   script:      Vector[Move]
@@ -121,7 +136,7 @@ final case class SearchState(
     */
   def allDischarged: Boolean = obligations.isEmpty
 
-  def key: StateKey = StateKey(Fingerprint.of(content))
+  def key: StateKey = StateKey(Fingerprint.of(content), script)
 
   /** Commit a probed candidate at one of THIS state's obligations: splice it
     * into the content and adopt the oracle's re-anchored hole list as the new
@@ -136,11 +151,11 @@ final case class SearchState(
       Left(s"target obligation at (${target.line},${target.col}) is not open in this state")
     else
       Splice.holeAt(content, target.line, target.col, probe.candidate).map { spliced =>
-        SearchState(
+        new SearchState(
           content     = spliced,
           obligations = probe.holesAfter,
           script      = script :+ Move(target.line, target.col, probe.candidate)
-        )
+        ) {}
       }
 }
 
@@ -149,7 +164,7 @@ object SearchState {
     * oracle's check_file reported them, empty script.
     */
   def initial(content: String, obligations: Vector[Obligation]): SearchState =
-    SearchState(content, obligations, Vector.empty)
+    new SearchState(content, obligations, Vector.empty) {}
 }
 
 /** The one way to claim a proof is done.  Constructible only from a state with
