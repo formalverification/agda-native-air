@@ -318,6 +318,40 @@ make extract-lib RESUME=0
 make extract-lib PAR=16
 ```
 
+#### 5.1.7.  Packaging the extraction as a publishable corpus
+
+`extract-lib` leaves a per-module JSONL tree.  `make corpus` turns that tree into
+the artifacts a release needs, all under `data/corpora/<LIB_NAME>/<CORPUS_VERSION>/`:
+
+```sh
+make corpus-nix          # from outside a Nix shell (uses .#backend)
+make corpus              # when already inside one
+```
+
++  `corpus.jsonl` and `corpus.jsonl.gz` — every row of every module that
+   succeeded, concatenated in module-sorted order.  The gzip is reproducible
+   (no stored filename, `mtime=0`), so its digest is quotable.
++  `coverage.json` — modules attempted, succeeded, failed, and why, plus any
+   module that was in the modules file and never attempted.
++  `provenance.json` — the library commit, the flake-locked toolchain, the run
+   configuration, and the corpus digests.
++  `stats.json` and `stats.md` — definitions by kind and namespace, size
+   distributions, and dependency-graph shape.
+
+The two halves can be run separately (`make corpus-assemble`, `make corpus-stats`).
+`make corpus-stats` also reads `data/corpora-metadata/<LIB_NAME>/dependency-graph.dot`,
+which `make agda-algebras-metadata` wrote, for module-level import shape.
+
+Point agda-mcp at the result and drive its three search tools over the real
+JSON-RPC transport:
+
+```sh
+make corpus-mcp-smoke
+```
+
+The published corpus and its dataset card are described in
+`docs/corpora/agda-algebras-v0.md`.
+
 ### 5.2.  Proof-completion evaluator (AgdaDojang fixtures)
 
 The proof-completion evaluator is the core demo of the project's propose → check
@@ -621,7 +655,20 @@ Default library: `LIB_NAME=agda-algebras`
   * `data/agda-algebras/raw/logs/`
 * Manifests:
 
-  * `data/agda-algebras/manifests/<timestamp>.json`
+  * `data/agda-algebras/manifests/<timestamp>.json` — the Make wrapper's record
+    (exit code, Agda version, repo revision)
+  * `data/agda-algebras/raw/run-manifest.json` — the driver's record: run
+    configuration, a coverage summary, and one entry per module attempted
+    (`ok`, `rows`, `seconds`, `validateErrors`)
+* Assembled corpus (from `make corpus`):
+
+  * `data/corpora/agda-algebras/v0/corpus.jsonl` + `corpus.jsonl.gz`
+  * `data/corpora/agda-algebras/v0/coverage.json`
+  * `data/corpora/agda-algebras/v0/provenance.json`
+  * `data/corpora/agda-algebras/v0/stats.json` + `stats.md`
+
+All of the above is gitignored; the committed description of a published corpus
+is its dataset card under `docs/corpora/`.
 
 ### 11.2.  Non-corpus extract outputs
 
