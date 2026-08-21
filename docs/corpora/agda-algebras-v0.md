@@ -24,7 +24,7 @@ Everything in this section is recorded machine-readably in `provenance.json`; th
 | Agda standard library | 2.3, `/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3` |
 | GHC | 9.10.3 |
 | Toolchain pin | `flake.lock`: `nixpkgs-agda` at `9dcb002ca1690658be4a04645215baea8b95f31d`, `nixpkgs` at `b6018f87da91d19d0ab4cf979885689b469cdd41` |
-| Extraction run | 375 modules, `--runner spark` on `local[4]`, parallelism 8, no resume; 5 m 26 s wall, 7,055 s of module time |
+| Extraction run | 377 modules, `--runner spark` on `local[4]`, parallelism 8, no resume; 5 m 09 s wall, 6,653 s of module time |
 | Corpus SHA-256 | `acdfaa5766ed83c5055b5f9fee8a9eaeeeadbe4e98630d916352a7851845ed54` |
 | Gzip SHA-256 | `88bfd57097d98b3cc455b63899f191b312f3acc40f277cfe93fb40d5fac23238` |
 
@@ -32,25 +32,28 @@ The Nix store path of the standard library is itself the version pin: it names t
 
 ## Coverage
 
-Every module the library has was extracted, and every extraction succeeded.
+Every one of the library's 377 source files is a module, all 377 were extracted, and all 377 succeeded.  Nothing is excluded.
 
 | Quantity | Value |
 |---|---|
-| Modules requested | 375 |
-| Attempted | 375 |
-| Succeeded | 375 |
+| Source files under `src/` | 377 |
+| Modules requested | 377 |
+| Attempted | 377 |
+| Succeeded | 377 |
 | Failed | 0 |
 | Never attempted | 0 |
-| Modules contributing 0 rows | 59 |
+| Modules contributing 0 rows | 61 |
 
-The 59 zero-row modules are barrel modules: `Classical`, `Classical.Bundles`, `Overture`, `EverythingLegacy` and their kin consist of `import` lines, so there is nothing of their own to extract.  They are counted as successes because they are: Agda typechecked them and the backend correctly found no definitions belonging to them.
+The 61 zero-row modules are barrels: `Classical`, `Classical.Bundles`, `Overture`, `Everything`, `EverythingLegacy` and their kin consist of `import` lines, so there is nothing of their own to extract.  They are counted as successes because they are: Agda typechecked them and the backend correctly found no definitions belonging to them.
 
-Two of the library's 377 source files are not among the 375 modules, both for reasons that are not extraction failures:
+Two of those barrels reach the corpus only because the module scanner was fixed while this corpus was being prepared, and both are worth naming since an earlier draft of this card explained them away as non-modules:
 
-+  `src/agda-algebras.lagda.md` is the library's literate front page.  It declares no Agda module, and `agda-algebras` is not a well-formed module name, so the module scanner rejects it by name.
-+  `src/Everything.agda` is dropped by the metadata scanner, which reserves the name for the synthetic root module it generates to compute the dependency graph.  It is a pure barrel of `import` lines, so including it would have added a 376th module and zero rows.
++  `src/Everything.agda` was dropped by a scanner that discarded the name `Everything` — the name its own synthetic root module once had.  The root was renamed `MetadataEverything` and the discard stayed behind, excluding a real module.
++  `src/agda-algebras.lagda.md` was dropped by a module-name validator whose segment pattern omitted `-`.  A hyphen is an ordinary character in an Agda identifier, the file declares `module agda-algebras where` at line 84, and `Everything` imports it — so it is a module like any other.
 
-`coverage.json` records all 375 outcomes individually — rows, seconds, exit code, and any validation errors — so this table can be checked rather than taken on trust.
+Neither adds a row, both being barrels, so the corpus bytes are the same either way; what changed is that the coverage claim no longer needs an excuse.
+
+`coverage.json` records all 377 outcomes individually — rows, seconds, exit code, and any validation errors, with artifact paths relative to the run's out-dir — so this table can be checked rather than taken on trust.
 
 ## Statistics
 
@@ -64,7 +67,7 @@ Full tables, including the twenty most-depended-upon definitions and the module-
 | Top-level namespaces | 8 |
 | Definitions carrying a proof term | 10,629 |
 
-`prettyModule` counts (702) exceed source modules (375) because nested and parameterized submodules get their own normalized module name.
+`prettyModule` counts (702) exceed source modules (377) because nested and parameterized submodules get their own normalized module name.
 
 **By kind**.  10,748 functions (which is where theorems live — a proved statement is a function into its statement's type), 625 constructors, 165 records, 125 data types, 3 other.
 
@@ -72,7 +75,9 @@ Full tables, including the twenty most-depended-upon definitions and the module-
 
 **Sizes**.  Types have a median length of 411 characters and a p99 of 3,294 (max 87,235).  Proof terms have a median of 120 characters and a p99 of 30,502 — with a maximum of 8,386,647, so the tail is very long indeed (see Known gaps).  A definition takes a median of 7 top-level Π binders before its codomain, and at most 40; universe-polymorphic algebra spends a lot of its interface on levels and setoid parameters.
 
-**Dependency shape**.  At definition level, 10,520 nodes with 50,955 edges inside the corpus and 76,908 edges leaving it for 1,439 distinct external targets (chiefly `Agda.Primitive.Level`, 7,191 references, and the standard library's `Data.Fin`, `Data.Nat`, and `Relation.Binary.Bundles`).  A library corpus is not a closed graph, and any retrieval built on it should expect roughly three out of five type-level references to point outside.  At module level, Agda's own dependency graph over the 375 local plus 254 external modules is acyclic with 1,221 import edges and a longest import chain of 72.
+**Dependency shape**.  At definition level the graph is keyed by `prettyQname`: 10,520 nodes, into which the 11,666 rows collapse (1,146 rows share a name with another and are merged, their token sets unioned).  47,202 of the dependency tokens name a definition in this corpus.  The other 69,651 occurrences resolve to nothing here, and are reported as **unresolved tokens** rather than as edges leaving the corpus — `dependencies` is heuristic, and 32,367 of those occurrences are bound variables or truncations that could not name anything anywhere (`ρᵃ`, `Agda.Primitive.`).  The 37,284 that at least have the shape of a qualified name are a lower bound on the real outward edges, and they are dominated by `Agda.Primitive.Level` (6,425), `Agda.Primitive.Set` (2,889), and the standard library's `Data.Fin.Base.Fin` (2,722) and `Agda.Builtin.Nat.Nat` (2,688).  However that lower bound is read, a library corpus is not a closed graph.  A node depends on a median of 10 tokens and at most 56; the most depended-upon definition is `Overture.Signatures.Signature` with 3,542 references.
+
+At module level, Agda's dependency graph over the 377 local plus 254 external modules is acyclic, with 1,237 edges and a longest chain of 73.  Read those two numbers with the caveat in Known gaps: they describe the load order of one run, not the full import relation.
 
 ## Intended uses
 
@@ -90,6 +95,7 @@ These are properties of the corpus as shipped, not to-do items disguised as cave
 +  **1,146 rows are shadowed under `prettyQname`**.  655 qualified names occur more than once (worst: `Classical.Structures.Ring.absurdlambda`, 28 times), because normalization drops anonymous module segments and distinct definitions collapse onto one name.  A consumer keyed by `prettyQname` — `agda-mcp` keeps the last occurrence — therefore indexes 10,520 of the 11,666 rows.  Every row is still in the file; use `qname` when identity matters.  Tracked by issue #53.
 +  **Dependency tokens are heuristic**.  `dependencies` is extracted from the pretty-printed type by tokenization, not by name resolution.  Most tokens are fully-qualified names, but the list also contains bound variables (`ρᵃ`, `lc`), truncations ending in a dot (`Agda.Primitive.`, `Relation.Binary.Bundles.Setoid.`), and record-field projections.  Treat the field as a recall-oriented candidate set, not as resolved edges.  representation.md §4.2 and §6.4 state the same limitation.
 +  **Nine rows are over a megabyte each**, and the largest ten are 19% of the corpus by bytes.  They are machine-generated certificate proofs in `FLRP.Certificates.SmallLatticeReps` and `FLRP.Parachute` — the biggest is `FLRP.Certificates.SmallLatticeReps.SLR13.prinTrᵛ` at 8.5 MB.  A consumer that budgets per row rather than per corpus should filter on `astSize` or body length first.
++  **The module import graph is a load-order graph, not the import relation**.  `stats.json`'s `moduleGraph` comes from Agda's `--dependency-graph`, which records an edge when an import causes a *source read* — so the first module to import `Overture.Signatures` gets an edge and the other 34 that import it do not.  Measured: 35 files in `src/` import that module; the DOT records 9 in-edges.  Node count, acyclicity, and the longest chain are trustworthy; in-degree, out-degree, and "most imported" describe one traversal.  Use the definition-level graph, which is computed from the rows themselves, for anything that has to be complete.
 +  **No `ports`, `refsFromBody`, or `wires`**.  Those fields are planned for schema v1.0 and are not emitted by this backend (representation.md §6, issue #15), so body-level dependency edges are absent: the graph statistics above are type-level only.
 +  **Types are printed with Agda's internal pretty printer**, which fully qualifies names and does not reconstruct surface syntax.  A type in this corpus reads `Overture.Signatures.Signature 𝓞 𝓥` where the source reads `Signature 𝓞 𝓥`.  This is what makes string search over types work at all, but it means the strings are not source text.
 +  **`--safe` and `--cubical-compatible` status is not recorded** per row, so the corpus cannot be filtered by which pragma regime a definition was checked under.
@@ -116,7 +122,7 @@ make corpus-nix
 
 The first target generates the module list (typechecking the library once to get its dependency graph), then extracts every module through `agda-json`.  The second concatenates the per-module JSONL and writes `coverage.json`, `provenance.json`, `stats.json`, and `stats.md` under `data/corpora/agda-algebras/v0/`.
 
-Expect about six minutes of wall time with warm `.agdai` interfaces and considerably more from cold; the extraction is 7,055 seconds of module time at parallelism 8.  Byte-identical output is expected for the same library commit and the same toolchain: modules are concatenated in sorted order and the gzip is written with no stored filename and `mtime=0`.  Compare against the digests above.
+Expect about six minutes of wall time with warm `.agdai` interfaces and considerably more from cold; the extraction is 6,653 seconds of module time at parallelism 8.  Byte-identical output is expected for the same library commit and the same toolchain: modules are concatenated in sorted order and the gzip is written with no stored filename and `mtime=0`.  Compare against the digests above.
 
 ## Using it with agda-mcp
 
