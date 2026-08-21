@@ -767,8 +767,9 @@ liveLaneNote =
   \Cmd_load line visible in lane.iotcm), project {the same block the batch \
   \tools report}, elapsedMs, and checkedFromSource (whether this call \
   \re-typechecked the file from source — omitted, as in the batch tools, when \
-  \the flags carry --trace-imports=0, which silences the progress lines it is \
-  \read from). Pass reload:true to force a fresh \
+  \the evidence could not arrive: the flags carry --trace-imports=0, which \
+  \silences the progress lines it is read from, or the load failed before agda \
+  \announced this file, which establishes no reuse either). Pass reload:true to force a fresh \
   \load first — the escape hatch for a changed DEPENDENCY, which no stamp \
   \on the queried file can see; the response echoes lane.load='forced'."
 

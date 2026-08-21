@@ -1630,8 +1630,9 @@ data LiveMeta = LiveMeta
   { lmElapsedMs         :: Int
   , lmCheckedFromSource :: Maybe Bool
                           -- ^ 'Nothing' — and the key absent — when the
-                          --   per-load argv muted Agda's progress channel,
-                          --   the evidence this answer is read from (#114).
+                          --   evidence could not arrive: the per-load argv
+                          --   muted Agda's progress channel (#114), or the
+                          --   load failed before Agda announced the file.
                           --   Serialized like the batch tools' field: an
                           --   absent key means unknown, never a guess.
   , lmLane              :: LaneEcho

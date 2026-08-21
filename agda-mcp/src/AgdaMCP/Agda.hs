@@ -728,7 +728,9 @@ traceImportsLevel args = last (defaultLevel : mapMaybe levelIn args)
 --
 -- Level 0 prints nothing at all, while level 1 (the default) and up print
 -- @Checking@ (measured, as above), so this is the one thing a caller needs from
--- the level.  It is a complete test because the flag has exactly one arrival
+-- the level.  "Muted" is about this flag family at Agda's default verbosity: a
+-- raised @-v@ prints the same progress lines again even at level 0 (measured),
+-- which is why every caller reads the lines it did get before consulting this.  It is a complete test because the flag has exactly one arrival
 -- path — the command line this server assembles.  A @{-# OPTIONS
 -- --trace-imports=0 #-}@ pragma in the checked file and an @.agda-lib@ whose
 -- @flags:@ field carries it are both rejected with @[OptionError] Unrecognized
@@ -782,9 +784,13 @@ progressChannelMuted = (< 1) . traceImportsLevel
 --     to a Bool here would misread a startup failure or an early-killed cold
 --     call as a warm one.
 --
--- Reading the @Loading@ line before the inference from silence is a change of
--- reasoning order only: the two answer alike, and no level prints @Loading@
--- while muting @Checking@ (3 prints both, 0 prints neither).
+-- Reading the positive lines /before/ the muting test is load-bearing, not
+-- merely tidy: the trace level is not the only thing that can print them.
+-- Measured, level 0 with a raised verbosity — @--trace-imports=0 -v import:20@ —
+-- prints the real @Checking M (…/M.agda).@ and @Loading  M (…/M.agdai).@ lines
+-- again, so muting withholds the inference from silence and never an answer
+-- something actually said.  Among the trace levels alone the order is
+-- immaterial: 3 prints both kinds and 0 prints neither.
 checkedFromSourceOf :: AgdaResult -> Maybe Bool
 checkedFromSourceOf r
   | sawPrefix "Checking " = Just True

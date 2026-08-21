@@ -1111,9 +1111,11 @@ data LoadReport = LoadReport
                            -- source?  @Just True@ on a @Checking@ progress
                            -- line naming it; @Just False@ for 'LoadReused'
                            -- (no load ran, so nothing was checked) and for a
-                           -- load that announced nothing over an open
-                           -- channel; 'Nothing' when the per-load argv muted
-                           -- that channel — see 'loadCheckedFromSource'.
+                           -- load that succeeded in silence over an open
+                           -- channel; 'Nothing' when the argv muted that
+                           -- channel, and when the load failed before Agda
+                           -- announced the file, which establishes no reuse
+                           -- either — see 'loadCheckedFromSource'.
   , lrElapsedMs         :: Int
   } deriving (Eq, Show)
 
@@ -1161,7 +1163,7 @@ ensureLoaded lh force path flags = do
         Left lf -> pure (Left lf)
         Right rs -> do
           let outcome    = classifyLoad path rs
-              fromSource = loadCheckedFromSource path flags rs
+              fromSource = loadCheckedFromSource path flags outcome rs
           writeIORef (laneLoad (lhLane lh)) . Just $ LoadState
             { lsPath    = path
             , lsStamp   = stamp
@@ -1184,18 +1186,32 @@ ensureLoaded lh force path flags = do
 -- @Checking M (path).@ lines the batch lane reads (design document § 2.4), and
 -- the answer is a 'Maybe' for the same reason
 -- 'AgdaMCP.Agda.checkedFromSourceOf' is: a line naming this file is positive
--- evidence of a re-check, while no line is an inference from silence that holds
--- only while the channel is open.  The per-load argv rides the @Cmd_load@
--- itself, so an effective @--trace-imports=0@ in it mutes the @RunningInfo@
--- stream — probed, such a load emits none at all and goes straight to
--- @AllGoalsWarnings@ — and a genuine re-check would then read as reuse.  Under
--- one this answers 'Nothing', and the field goes absent (issue #114).
-loadCheckedFromSource :: FilePath -> [String] -> [IResponse] -> Maybe Bool
-loadCheckedFromSource path flags rs
+-- evidence of a re-check, while no line is an inference from /silence/, which
+-- carries only as far as its two premises.
+--
+-- Both premises are checked, and they are the batch signal's own.  The channel
+-- must have been open: the per-load argv rides the @Cmd_load@ itself, so an
+-- effective @--trace-imports=0@ in it mutes the @RunningInfo@ stream — probed,
+-- such a load emits none at all and goes straight to @AllGoalsWarnings@ — and a
+-- genuine re-check would then read as reuse (issue #114).  And the load must
+-- have /succeeded/, which on this lane means it announced interaction points
+-- (§ 2.4, the outcome passed in here so the two cannot disagree): the batch
+-- signal reads silent *success* as interface reuse, and a load that failed
+-- before Agda got to this file — a header that does not match its file name, a
+-- parse error, an option error — established no reuse either, so it is
+-- 'Nothing' rather than @Just False@ (Copilot's review of PR 117).  A load that
+-- failed while checking the file has already announced it, and the positive
+-- branch answers first, so nothing is lost by asking about success second.
+loadCheckedFromSource
+  :: FilePath -> [String] -> Either Text LoadedInfo -> [IResponse] -> Maybe Bool
+loadCheckedFromSource path flags outcome rs
   | any announcedThisFile rs   = Just True
   | progressChannelMuted flags = Nothing
+  | not loadedOk               = Nothing
   | otherwise                  = Just False
   where
+    loadedOk = either (const False) (const True) outcome
+
     announcedThisFile (IRunningInfo msg) =
       any (equalFilePath path . snd) (mapMaybe parseCheckingLine (T.lines msg))
     announcedThisFile _ = False

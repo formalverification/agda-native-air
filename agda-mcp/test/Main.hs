@@ -677,6 +677,16 @@ pureTests = do
         assertEqual "signal" (Just False)
           (checkedFromSourceOf (fakeResultUnder ["-i", "/x"] 0 False ""))
 
+    , runTest "checkedFromSourceOf: a 'Loading' line outranks a muted channel too" $
+        -- Not hypothetical: measured, --trace-imports=0 -v import:20 prints the
+        -- real progress lines again, so a warm run under a "muted" argv can
+        -- still say so.  The muting withholds the inference from silence, never
+        -- an answer Agda gave.
+        assertEqual "signal" (Just False)
+          (checkedFromSourceOf
+             (fakeResultUnder ["--trace-imports=0", "-v", "import:20"] 0 False
+                "Loading  Dep (/x/_build/2.8.0/agda/Dep.agdai)."))
+
     , runTest "checkedFromSourceOf: a 'Checking' line outranks a muted channel" $
         -- Pins the branch order rather than an observed agda behavior: muting
         -- withholds the inference from silence, never an answer something
@@ -4997,10 +5007,12 @@ interactionWireTests = do
       -- RunningInfo lines answer "did this load re-check the file?", and the
       -- same muting silences them (probed: a load whose per-load argv carries
       -- --trace-imports=0 emits no RunningInfo at all, going straight to
-      -- AllGoalsWarnings).
+      -- AllGoalsWarnings).  The outcome is passed in because the inference from
+      -- silence needs the load to have SUCCEEDED as well as the channel to have
+      -- been open, exactly as the batch signal reads silent *success*.
       runTest "loadCheckedFromSource: a line naming this file is a source re-check" $
         assertEqual "signal" (Just True)
-          (loadCheckedFromSource "/p/F.agda" []
+          (loadCheckedFromSource "/p/F.agda" [] loadedOk
              [ IRunningInfo "Checking Dep (/p/Dep.agda)."
              , IRunningInfo "  Checking F (/p/F.agda)."
              , IInteractionPoints []
@@ -5010,7 +5022,7 @@ interactionWireTests = do
         -- The file itself was not announced while the channel was open, so the
         -- silence about it is Agda's own answer: its interface was reused.
         assertEqual "signal" (Just False)
-          (loadCheckedFromSource "/p/F.agda" []
+          (loadCheckedFromSource "/p/F.agda" [] loadedOk
              [ IRunningInfo "Checking Dep (/p/Dep.agda)."
              , IInteractionPoints []
              ])
@@ -5019,13 +5031,29 @@ interactionWireTests = do
         allOf
           [ assertEqual "muted" Nothing
               (loadCheckedFromSource "/p/F.agda" ["-i", "/p", "--trace-imports=0"]
-                 [IInteractionPoints []])
+                 loadedOk [IInteractionPoints []])
           , assertEqual "open, for contrast" (Just False)
               (loadCheckedFromSource "/p/F.agda" ["-i", "/p"]
-                 [IInteractionPoints []])
+                 loadedOk [IInteractionPoints []])
           , assertEqual "a line still outranks the muting" (Just True)
               (loadCheckedFromSource "/p/F.agda" ["--trace-imports=0"]
+                 loadedOk [IRunningInfo "Checking F (/p/F.agda)."])
+          ]
+
+    , -- Copilot's review of PR 117: a load that failed before Agda announced
+      -- this file — a header that does not match its file name, a parse error,
+      -- an option error — established no interface reuse either, so the silence
+      -- means unknown and not `false`.  A load that failed WHILE checking the
+      -- file has already announced it, and that positive evidence still wins.
+      runTest "loadCheckedFromSource: a load that failed before announcing is unknown" $
+        allOf
+          [ assertEqual "failed, silent" Nothing
+              (loadCheckedFromSource "/p/F.agda" [] (loadFailed "ParseError") [])
+          , assertEqual "failed after announcing this file" (Just True)
+              (loadCheckedFromSource "/p/F.agda" [] (loadFailed "UnequalTerms")
                  [IRunningInfo "Checking F (/p/F.agda)."])
+          , assertEqual "succeeded in silence, for contrast" (Just False)
+              (loadCheckedFromSource "/p/F.agda" [] loadedOk [IInteractionPoints []])
           ]
 
     , runTest "pointContaining: line picks earliest; a column picks the exact hole" $ do
@@ -5045,6 +5073,16 @@ interactionWireTests = do
         r5 <- assert "line 3 misses" (isNothing (pointContaining 3 Nothing ps))
         pure (firstFailure [r1, r2, r3, r4, r5])
     ]
+
+-- | loadedOk / loadFailed: the two 'LoadReport' outcomes the lane's cache
+-- signal distinguishes.  A successful load is one that announced interaction
+-- points (design document § 2.4); a failed one carries Agda's message, and
+-- establishes neither a source re-check nor an interface reuse.
+loadedOk :: Either Text LoadedInfo
+loadedOk = Right (LoadedInfo [] [] [] Nothing)
+
+loadFailed :: Text -> Either Text LoadedInfo
+loadFailed code = Left ("/p/F.agda:1.1-8: error: [" <> code <> "]")
 
 -- | firstFailure: fold sub-assertions into one result, first failure wins.
 firstFailure :: [TestResult] -> TestResult
@@ -5306,7 +5344,37 @@ interactionLaneTests cfg repoRoot = do
             r2 <- assertEqual "stage" (Just "load") (lveStage <$> torError res)
             r3 <- assertEqual "code" (Just (Just "UnequalTerms"))
                     (lveCode <$> torError res)
-            pure (firstFailure [r1, r2, r3])
+            -- This load failed while CHECKING the file, so Agda announced it
+            -- and the cache signal has real evidence to report (the control for
+            -- the test below).
+            r4 <- assertEqual "checkedFromSource" (Just True)
+                    (lmCheckedFromSource (torMeta res))
+            pure (firstFailure [r1, r2, r3, r4])
+
+    , -- Copilot's review of PR 117: a load that fails BEFORE Agda announces the
+      -- file established no interface reuse, so its cache signal must be absent
+      -- rather than false.  A header that does not match its file name is the
+      -- deterministic case (a parse error behaves the same way); the test above
+      -- is the contrast, where checking had started and the field is true.
+      runTest "load failure: a load that failed before announcing has no cache signal" $ do
+        tmp <- scratchDir "lane-header"
+        let file = tmp </> "LaneHeader.agda"
+        TIO.writeFile file
+          "module NotTheFileName where\nopen import Agda.Builtin.Nat\nok : Nat\nok = 0\n"
+        r <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = file, topExpr = "zero", topLine = Nothing
+               , topColumn = Nothing, topReload = False }
+        case r of
+          Left err  -> pure (Fail $ T.unpack (failureText err))
+          Right res -> do
+            r1 <- assertEqual "stage" (Just "load") (lveStage <$> torError res)
+            r2 <- assertEqual "code" (Just (Just "ModuleNameDoesntMatchFileName"))
+                    (lveCode <$> torError res)
+            r3 <- assertEqual "checkedFromSource" Nothing
+                    (lmCheckedFromSource (torMeta res))
+            r4 <- assert "and no such key rides the response"
+                    (not ("\"checkedFromSource\"" `T.isInfixOf` encodeText res))
+            pure (firstFailure [r1, r2, r3, r4])
 
     , -- The recovery path (§ 2.6): a hole-free file's completed toplevel
       -- scope loses the two opens, so WhyInScope says not-in-scope and the
