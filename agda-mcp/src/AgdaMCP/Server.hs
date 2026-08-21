@@ -246,7 +246,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
               \interaction lane already holds a matching load of this exact \
               \file state (warmed by the live-query tools or get_goal — a \
               \free peek, never a lane call), and the placeholder '?' \
-              \otherwise."
+              \otherwise. That same peek is where an unsolved-meta \
+              \diagnostic's involved.metas comes from."
            <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
            <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
            <> holeModel)
@@ -261,7 +262,8 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
            \(line, col) position — that (line, col) being the address to pass \
            \back to get_goal and fill_hole — and goal type when the root's \
            \interaction lane already holds a matching load of this exact file \
-           \state (a free peek; '?' otherwise). "
+           \state (a free peek; '?' otherwise, and the same peek fills \
+           \involved.metas). "
            <> verdictNote
            <> " " <> batchNote
            <> " success and verdict are the same fields check_file returns, with \
@@ -540,11 +542,15 @@ diagnosticModel =
   \NotInScope / AmbiguousName / UnsolvedMetaVariables — branch on this rather \
   \than matching prose), file, range {startLine, startCol, endLine, endCol} in \
   \1-based coordinates of the file as written, the bounded full message body, \
-  \and involved {expected?, actual?, candidates?, metaTypes?} naming what the \
-  \message is about (the mismatched types, the \"did you mean\" or ambiguity \
-  \candidates, the missing exports, the origin of a clashing definition, or one \
-  \entry per unsolved meta or constraint). line and col are kept as aliases of \
-  \the range start. Diagnostics are ordered most-likely-root-cause first — \
+  \and involved {expected?, actual?, candidates?, metaTypes?, metas?} naming \
+  \what the message is about (the mismatched types, the \"did you mean\" or \
+  \ambiguity candidates, the missing exports, the origin of a clashing \
+  \definition, or one entry per unsolved meta or constraint). metaTypes is \
+  \always what Agda's prose said; metas is the unsolved metas as data — {name, \
+  \type, range} each, which the prose never prints — and check_file and \
+  \get_diagnostics carry it only when a warm interaction lane already held this \
+  \file's load. line and col are kept as aliases of the range start. \
+  \Diagnostics are ordered most-likely-root-cause first — \
   \unresolvable-file errors, then scope warnings that precede a hard error \
   \(e.g. ModuleDoesntExport before the NotInScope it causes), then scope \
   \errors, type errors, and unsolved metas — and identical repeats are \

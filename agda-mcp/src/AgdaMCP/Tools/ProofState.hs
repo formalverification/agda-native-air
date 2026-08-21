@@ -161,7 +161,8 @@ import AgdaMCP.Agda
   , checkedFromSourceOf, debugLog, parseGoalContext, reportExpr, runAgda
   , timeoutMessage
   )
-import AgdaMCP.Diagnostics (capDiagnostics, parseDiagnostics)
+import AgdaMCP.Diagnostics
+  ( attachUnsolvedMetas, capDiagnostics, parseDiagnostics )
 import AgdaMCP.Holes
   ( HoleSpan (..), LiterateFlavour, codeOnly, findHoles, flavourOf
   , injectReportExpr, resolveHoleRef, substituteHole
@@ -170,8 +171,8 @@ import AgdaMCP.Path (withSourceFile)
 import AgdaMCP.Interaction
   ( GoalContext (..), GoalCtxEntry (..), InteractionLanes, IPoint (..)
   , IRange (..), LaneEvent (..), LaneFailure (..), LaneGoal (..)
-  , LoadReport (..), LoadedInfo (..), cmdGoalTypeContext, ensureLoaded
-  , goalContextOf, peekLoadedGoals, runQuery, withLane
+  , LaneMeta (..), LoadReport (..), LoadedInfo (..), cmdGoalTypeContext
+  , ensureLoaded, goalContextOf, peekLoadedGoals, runQuery, withLane
   )
 import AgdaMCP.Project
   ( fileDirIncludeFlags, projectExtraFlags, resolveProject, withEffectiveFlags )
@@ -498,15 +499,17 @@ handleCheckFile lanes cfg0 params =
           success = arExitCode result == 0 && not (arTimedOut result)
       -- Fill each hole's goal type from the interaction lane when — and only
       -- when — a lane already holds a matching load of these very bytes
-      -- (issue #108).  A peek, never a spawn or a load: the batch tools'
-      -- cost model and verdict source are untouched, and the placeholder
-      -- "?" remains the answer when no warm lane can vouch for the types.
-      laneGoals <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
-      let holes = fillHoleGoals laneGoals
+      -- (issue #108), and from the same peek give the unsolved-meta
+      -- diagnostics each meta's name and type (issue #115).  A peek, never a
+      -- spawn or a load: the batch tools' cost model and verdict source are
+      -- untouched, and the placeholder "?" and the prose-only meta payload
+      -- remain the answer when no warm lane can vouch for more.
+      lanePeek <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
+      let holes = fillHoleGoals (liGoals <$> lanePeek)
                     (holeInfosOf (findHoles (flavourOf absPath) src))
       pure . Right $ FileCheckResult
         { fcrSuccess     = success
-        , fcrDiagnostics = diags
+        , fcrDiagnostics = attachUnsolvedMetas (involvedMetasOf lanePeek) diags
         , fcrDiagnosticsTotal = total
         , fcrHolesCount  = length holes
         , fcrHoles       = holes
@@ -554,16 +557,16 @@ handleGetDiagnostics lanes cfg0 params =
                        <> parseDiagnostics combined
           (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
           countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
-      -- The same warm-lane peek as check_file (issue #108).
-      laneGoals <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
+      -- The same warm-lane peek as check_file (issues #108 and #115).
+      lanePeek <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
       pure . Right $ DiagnosticsResult
         { drFilePath = gdFilePath params
         , drErrors   = countOf DiagError
         , drWarnings = countOf DiagWarning
-        , drHoles    = fillHoleGoals laneGoals
+        , drHoles    = fillHoleGoals (liGoals <$> lanePeek)
                          (holeInfosOf (findHoles (flavourOf absPath) src))
         , drSuccess  = arExitCode result == 0 && not (arTimedOut result)
-        , drDiagnostics = diags
+        , drDiagnostics = attachUnsolvedMetas (involvedMetasOf lanePeek) diags
         , drDiagnosticsTotal = total
         , drTimedOut = arTimedOut result
         , drElapsedMs = arElapsedMs result
@@ -741,6 +744,23 @@ fillHoleGoals (Just goals) hs = map fill hs
                   , not (T.null (lgType g)) ] of
       (t : _) -> h { hiGoal = t }
       []      -> h
+
+-- | involvedMetasOf: a warm lane's unsolved metas in the wire shape the
+-- diagnostics carry (issue #115) — the other half of the same peek
+-- 'fillHoleGoals' reads, and the same silence when the peek declined.
+--
+-- The lane's own range type becomes the diagnostics' one so a client parses a
+-- single range shape everywhere; both are 1-based line and column in the file
+-- as written, so this is a re-labelling and not a conversion.
+involvedMetasOf :: Maybe LoadedInfo -> [InvolvedMeta]
+involvedMetasOf = maybe [] (map involvedMeta . liMetas)
+  where
+    involvedMeta m = InvolvedMeta
+      { imName  = lmetaName m
+      , imType  = lmetaType m
+      , imRange = diagRangeOf <$> lmetaRange m
+      }
+    diagRangeOf r = DiagRange (irLine r) (irCol r) (irEndLine r) (irEndCol r)
 
 holeInfosOf :: [HoleSpan] -> [HoleInfo]
 holeInfosOf holes =

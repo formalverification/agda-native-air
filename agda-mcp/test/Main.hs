@@ -92,8 +92,8 @@ import AgdaMCP.Holes
 import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Path (ioProblem)
 import AgdaMCP.Diagnostics
-  ( capDiagnostics, defaultMaxDiagnostics, diagnosticRank, maxMessageChars
-  , maxMessageLines, parseDiagnostics )
+  ( attachUnsolvedMetas, capDiagnostics, defaultMaxDiagnostics, diagnosticRank
+  , maxMessageChars, maxMessageLines, parseDiagnostics )
 import AgdaMCP.Gate
   ( GateConfig (..), GatePlan (..), defaultGateConfig, findMakefileGate
   , makefileTargets, resolveGate )
@@ -103,9 +103,9 @@ import AgdaMCP.Project
   , resolveProjectDir, selectedLibrariesOf, underAnyDir
   )
 import AgdaMCP.Interaction
-  ( IPoint (..), IRange (..), IResponse (..), LaneGoal (..)
+  ( IPoint (..), IRange (..), IResponse (..), LaneGoal (..), LaneMeta (..)
   , LoadReport (..), LoadedInfo (..)
-  , cmdGoalTypeContext, cmdLoad, ensureLoaded, goalsOf, hsShow
+  , cmdGoalTypeContext, cmdLoad, ensureLoaded, goalsOf, hsShow, metasOf
   , interactionPointsOf, iotcmLine, newInteractionLanes, parseAmbiguousName
   , parseDidYouMean, parseResponseLine, parseSrcLoc, parseWhyInScope
   , pointContaining, shutdownLanes, stripPrompts, withLane
@@ -1072,6 +1072,46 @@ diagnosticTests = do
           , assertEqual "meta locations"
               ["/r/UnsolvedMetas.agda:26.9-16"]
               (invMetaTypes (involvedIn (byCode "UnsolvedMetaVariables" ds)))
+          ]
+
+    , -- The #115 enrichment as the pure transform it is: the metas land beside
+      -- the prose payload on every diagnostic of the unsolved family, nothing
+      -- else is touched, and the empty list is the identity — which is what
+      -- makes a cold or stale lane's response byte-identical to a pre-#115 one.
+      runTest "attachUnsolvedMetas: metas land beside metaTypes, and nowhere else" $ do
+        let ds    = parseDiagnostics (outUnsolvedMetas <> outNotInScope)
+            metas = [ InvolvedMeta "_n_4" "Nat" (Just (DiagRange 26 9 26 16))
+                    , InvolvedMeta "_m_5" "Nat" (Just (DiagRange 26 9 26 16))
+                    ]
+            enriched   = attachUnsolvedMetas metas ds
+            namesUnder c list = map imName (invMetas (involvedIn (byCode c list)))
+            encoded    = TE.decodeUtf8 (LBS.toStrict (Aeson.encode enriched))
+        allOf
+          [ assertEqual "an empty list is the identity, byte for byte"
+              (Aeson.encode ds) (Aeson.encode (attachUnsolvedMetas [] ds))
+          , assertEqual "the meta class carries them"
+              ["_n_4", "_m_5"] (namesUnder "UnsolvedMetaVariables" enriched)
+          , assertEqual "so does the constraint class, whose prose names them"
+              ["_n_4", "_m_5"] (namesUnder "UnsolvedConstraints" enriched)
+          , assertEqual "the prose payload survives untouched"
+              ["/r/UnsolvedMetas.agda:26.9-16"]
+              (invMetaTypes (involvedIn (byCode "UnsolvedMetaVariables" enriched)))
+          , assertEqual "an unrelated class is left alone"
+              [] (namesUnder "NotInScope" enriched)
+          , -- The open-hole class is in the same family for ordering, but its
+            -- subject is the visible goals, which the hole listing carries.
+            assertEqual "the open-hole class is not this payload's subject"
+              [] (namesUnder "UnsolvedInteractionMetas"
+                    (attachUnsolvedMetas metas
+                       [synthetic DiagError "UnsolvedInteractionMetas"]))
+          , assert ("the wire keys, in " <> T.unpack encoded)
+              (all (`T.isInfixOf` encoded)
+                 [ "\"metas\":[", "\"name\":\"_n_4\"", "\"type\":\"Nat\""
+                 , "\"metaTypes\":[" ])
+          , -- What the wire never carries: a field Agda did not print.
+            assertEqual "a nameless-typed, rangeless meta encodes as its name alone"
+              "{\"name\":\"_x_9\"}"
+              (Aeson.encode (InvolvedMeta "_x_9" "" Nothing))
           ]
 
       -- Root-cause ordering.
@@ -4679,6 +4719,23 @@ interactionWireTests = do
             gs -> pure (Fail $ "expected one goal, got " <> show (length gs))
           Nothing -> pure (Fail "line did not parse")
 
+    , -- The other half of the same response, and the wire asymmetry that
+      -- forces it to have its own reader: an invisible goal is *named*, not
+      -- numbered, so goalsOf's "id" reader cannot see one (issue #115).
+      runTest "metasOf: invisibleGoals carry each unsolved meta's name and type (#115)" $ do
+        let ln = "{\"info\":{\"errors\":[{\"message\":\"error: [UnsolvedConstraints]\\nFailed to solve the following constraints:\\n  _n_4 + _m_5 = 3 : Nat (blocked on _n_4)\"}],\"invisibleGoals\":[{\"constraintObj\":{\"name\":\"_n_4\",\"range\":[{\"end\":{\"col\":16,\"line\":28,\"pos\":1153},\"start\":{\"col\":9,\"line\":28,\"pos\":1146}}]},\"kind\":\"OfType\",\"type\":\"Nat\"},{\"constraintObj\":{\"name\":\"_m_5\",\"range\":[{\"end\":{\"col\":16,\"line\":28,\"pos\":1153},\"start\":{\"col\":9,\"line\":28,\"pos\":1146}}]},\"kind\":\"OfType\",\"type\":\"Nat\"}],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+        case parseResponseLine ln of
+          Just resp -> do
+            let ms = metasOf [resp]
+            r1 <- assertEqual "names" ["_n_4", "_m_5"] (map lmetaName ms)
+            r2 <- assertEqual "types" ["Nat", "Nat"] (map lmetaType ms)
+            r3 <- assertEqual "ranges, both the blocked use site"
+                    [Just (IRange 28 9 28 16), Just (IRange 28 9 28 16)]
+                    (map lmetaRange ms)
+            r4 <- assertEqual "goalsOf reads none of them" [] (map lgId (goalsOf [resp]))
+            pure (firstFailure [r1, r2, r3, r4])
+          Nothing -> pure (Fail "line did not parse")
+
     , runTest "interactionPointsOf: absent on an error-only load" $ do
         let errLn = "{\"info\":{\"error\":{\"message\":\"boom\"},\"kind\":\"Error\",\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
         case parseResponseLine errLn of
@@ -5282,6 +5339,130 @@ interactionLaneTests cfg repoRoot = do
           Right dr -> assertEqual "get_diagnostics enriched too" ["Nat", "Nat"]
                         (map hiGoal (drHoles dr))
         pure (firstFailure [a, b, c])
+
+    , -- Unsolved-meta enrichment (#115): the § 5 payload batch prose cannot
+      -- carry — each meta's name and type — filled from the very peek #108
+      -- uses, with the cold and stale responses left exactly as they were.
+      -- The fixture is the § 5 corpus one, copied so the stale case can edit
+      -- it; its `blocked` use site is where both metas are created.
+      runTest "get_diagnostics: unsolved metas fill from a warm lane and only then (#115)" $ do
+        let fixture = repoRoot </> "agda-mcp" </> "test" </> "resources"
+                        </> "diagnostics" </> "UnsolvedMetas.agda"
+        src <- TIO.readFile fixture
+        tmp <- scratchDir "lane-metas"
+        let file = tmp </> "UnsolvedMetas.agda"
+            diagnosticsOf r = GetDiagnosticsParams
+              { gdFilePath = r, gdMaxDiagnostics = Nothing }
+        TIO.writeFile file src
+        -- Cold: a registry that has never seen this root can vouch for
+        -- nothing, so the answer is the batch prose alone.
+        coldLanes <- newInteractionLanes
+        rCold     <- handleGetDiagnostics coldLanes cfg (diagnosticsOf file)
+        shutdownLanes coldLanes
+        -- Warm: one live query loads the file, and the stored load then
+        -- describes these very bytes.  The query's own answer is beside the
+        -- point; what matters is what the load left behind.
+        _     <- handleTypeOf lanes cfg TypeOfParams
+                   { topFilePath = file, topExpr = "three"
+                   , topLine = Nothing, topColumn = Nothing, topReload = False }
+        rWarm  <- handleGetDiagnostics lanes cfg (diagnosticsOf file)
+        -- The sibling tool reads the same peek, so it must answer the same.
+        rCheck <- handleCheckFile lanes cfg
+                    CheckFileParams { cfFilePath = file, cfMaxDiagnostics = Nothing }
+        -- Stale: the same lane, one appended comment later.  The append is at
+        -- the end, so Agda's own diagnostics are unchanged and the comparison
+        -- against the cold response is exact.
+        TIO.appendFile file "\n-- One more byte, so the recorded load no longer matches.\n"
+        rStale <- handleGetDiagnostics lanes cfg (diagnosticsOf file)
+        case (rCold, rWarm, rStale, rCheck) of
+          (Right cold, Right warm, Right stale, Right checked) -> do
+            let metasUnder c r = invMetas (involvedIn (byCode c (drDiagnostics r)))
+                warmMetas   = metasUnder "UnsolvedMetaVariables" warm
+                constraints = T.concat
+                  (invMetaTypes (involvedIn
+                     (byCode "UnsolvedConstraints" (drDiagnostics warm))))
+                site = rangeOfNth 1 src "blocked"
+            a <- assertEqual "cold: no metas" [] (metasUnder "UnsolvedMetaVariables" cold)
+            b <- assertEqual "stale: no metas" [] (metasUnder "UnsolvedMetaVariables" stale)
+            c <- assertEqual "cold and stale are byte-identical"
+                   (Aeson.encode (drDiagnostics cold))
+                   (Aeson.encode (drDiagnostics stale))
+            d <- assertEqual "warm: two metas, both Nat, both at the use site"
+                   [("Nat", site), ("Nat", site)]
+                   [ (imType m, imRange m) | m <- warmMetas ]
+            e <- assert ("warm: each meta is named, and the constraint prose names \
+                         \it — metas " <> show (map imName warmMetas)
+                         <> ", constraints " <> show constraints)
+                   (length warmMetas == 2
+                      && all (\m -> "_" `T.isPrefixOf` imName m
+                                      && imName m `T.isInfixOf` constraints)
+                             warmMetas)
+            f <- assertEqual "warm: the prose payload is still what Agda printed"
+                   1 (length (invMetaTypes (involvedIn
+                        (byCode "UnsolvedMetaVariables" (drDiagnostics warm)))))
+            g <- assertEqual "the verdict stays batch agda's throughout"
+                   [(False, 42), (False, 42), (False, 42)]
+                   [ (drSuccess r, vExitCode (drVerdict r)) | r <- [cold, warm, stale] ]
+            h <- assertEqual "check_file answers exactly the same metas"
+                   (map imName warmMetas)
+                   (map imName (invMetas (involvedIn
+                      (byCode "UnsolvedMetaVariables" (fcrDiagnostics checked)))))
+            pure (firstFailure [a, b, c, d, e, f, g, h])
+          _ -> pure . Fail $ "a batch call failed: " <> unwords
+                 (  [ T.unpack (failureText e) | Left e <- [rCold, rWarm, rStale] ]
+                 <> [ T.unpack (failureText e) | Left e <- [rCheck] ] )
+
+    , -- The multi-site case the unfiltered list exists for (#115).  Probed:
+      -- Agda reports every unsolved-meta site in ONE [UnsolvedMetaVariables]
+      -- whose header range is the union span of the sites, and the lane's
+      -- invisibleGoals carries all four metas across the two ranges.  A
+      -- payload matched to its diagnostic by range would be hostage to that
+      -- header spanning every site; the list is not, and this pins it.
+      runTest "get_diagnostics: every unsolved-meta site's metas arrive (#115)" $ do
+        tmp <- scratchDir "lane-metas-sites"
+        let file = tmp </> "TwoSites.agda"
+            src  = T.unlines
+              [ "module TwoSites where"
+              , ""
+              , "open import Agda.Builtin.Nat"
+              , ""
+              , "postulate"
+              , "  Bounded : Nat \8594 Set"
+              , "  blocked : {n m : Nat} \8594 Bounded (n + m)"
+              , ""
+              , "three : Bounded 3"
+              , "three = blocked"
+              , ""
+              , "four : Bounded 4"
+              , "four = blocked"
+              ]
+        TIO.writeFile file src
+        _ <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = file, topExpr = "three"
+               , topLine = Nothing, topColumn = Nothing, topReload = False }
+        r <- handleGetDiagnostics lanes cfg GetDiagnosticsParams
+               { gdFilePath = file, gdMaxDiagnostics = Nothing }
+        case r of
+          Left err -> pure (Fail $ T.unpack (failureText err))
+          Right dr -> do
+            -- The use sites are the second and third 'blocked' in the source;
+            -- the first is the postulate that declares it.
+            let corners g = ( rngStartLine g, rngStartCol g
+                            , rngEndLine g, rngEndCol g )
+                metas = invMetas (involvedIn
+                          (byCode "UnsolvedMetaVariables" (drDiagnostics dr)))
+                sites = nub (sort [ corners g | Just g <- map imRange metas ])
+                want  = sort [ corners g
+                             | Just g <- [ rangeOfNth 1 src "blocked"
+                                         , rangeOfNth 2 src "blocked" ] ]
+            a <- assertEqual "one diagnostic covers both sites" 1
+                   (length [ d | d <- drDiagnostics dr
+                               , diagCode d == Just "UnsolvedMetaVariables" ])
+            b <- assertEqual "four metas, two per site" 4 (length metas)
+            c <- assertEqual "both sites delivered, not just the first" want sites
+            d <- assertEqual "every meta is typed" ["Nat", "Nat", "Nat", "Nat"]
+                   (map imType metas)
+            pure (firstFailure [a, b, c, d])
 
     , -- The stamp is the bytes, not the metadata (#108 review): a same-size
       -- rewrite with its mtime restored must still read as changed, which

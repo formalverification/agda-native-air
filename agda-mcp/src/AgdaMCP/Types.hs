@@ -110,6 +110,7 @@ module AgdaMCP.Types
   , DiagSeverity (..)
   , DiagRange (..)
   , Involved (..)
+  , InvolvedMeta (..)
   , noInvolved
   , hasInvolved
   , plainDiagnostic
@@ -985,14 +986,50 @@ instance ToJSON DiagRange where
 -- | @UnsolvedMetaVariables@,  | 'invMetaTypes': one entry per meta or          |
 -- | @UnsolvedConstraints@,    | constraint Agda lists — locations for the meta |
 -- | @UnsolvedInteractionMetas@| classes, and the blocked constraint with its   |
--- |                           | type for @UnsolvedConstraints@.                |
+-- |                           | type for @UnsolvedConstraints@.  'invMetas'    |
+-- |                           | adds the first two codes' metas as data        |
+-- |                           | (name, type, range) from a warm lane (#115).   |
 -- +---------------------------+------------------------------------------------+
 data Involved = Involved
   { invExpected   :: Maybe Text  -- ^ The expected type, where Agda names one.
   , invActual     :: Maybe Text  -- ^ The actual (inferred) type, where Agda names one.
   , invCandidates :: [Text]      -- ^ The names involved, qualified as Agda prints them.
   , invMetaTypes  :: [Text]      -- ^ One entry per unsolved meta or constraint.
+  , invMetas      :: [InvolvedMeta]
+                                 -- ^ The unsolved metas as data, when a warm
+                                 --   interaction lane held them (issue #115);
+                                 --   empty otherwise, and never a substitute
+                                 --   for 'invMetaTypes', which is what Agda's
+                                 --   own prose said.
   } deriving (Eq, Show)
+
+-- | One unsolved metavariable, as data rather than as prose (issue #115).
+--
+-- Batch @agda@ names its unsolved metas by location and never prints their
+-- types, so the last row of the feedback document's § 5 corpus — \"each meta
+-- with its type and the constraint blocking it\" — is the one payload the
+-- prose cannot carry.  A warm interaction lane can: its load's
+-- @AllGoalsWarnings@ lists every meta with its name, its printed type, and
+-- its range, and 'AgdaMCP.Tools.ProofState' hands those to the unsolved
+-- diagnostics when — and only when — the lane's recorded load already
+-- describes the file's current bytes (a peek, never a lane call).  A cold or
+-- stale lane leaves this empty and the response byte-identical to what the
+-- batch prose alone produced.  The blocking constraint is not repeated here:
+-- Agda prints it in the @UnsolvedConstraints@ message, which 'invMetaTypes'
+-- already carries verbatim, and it names these very metas.
+data InvolvedMeta = InvolvedMeta
+  { imName  :: Text             -- ^ Agda's own name for the meta, e.g. @_n_4@.
+  , imType  :: Text             -- ^ The type it was created at, as Agda prints it.
+  , imRange :: Maybe DiagRange  -- ^ Where the term that left it unsolved sits.
+  } deriving (Eq, Show)
+
+-- | The wire form: the same @range@ shape a diagnostic carries, and @type@ or
+-- @range@ omitted rather than guessed at when the wire did not carry one.
+instance ToJSON InvolvedMeta where
+  toJSON m = object $
+    [ "name" .= imName m ]
+    <> (if T.null (imType m) then [] else ["type" .= imType m])
+    <> maybe [] (\r -> ["range" .= r]) (imRange m)
 
 -- | The empty payload: a diagnostic whose prose named nothing extractable.
 noInvolved :: Involved
@@ -1001,6 +1038,7 @@ noInvolved = Involved
   , invActual     = Nothing
   , invCandidates = []
   , invMetaTypes  = []
+  , invMetas      = []
   }
 
 -- | Did anything get extracted?  Drives omission of the @involved@ key, so an
@@ -1014,6 +1052,7 @@ instance ToJSON Involved where
     <> maybe [] (\a -> ["actual" .= a]) (invActual i)
     <> (if null (invCandidates i) then [] else ["candidates" .= invCandidates i])
     <> (if null (invMetaTypes i)  then [] else ["metaTypes"  .= invMetaTypes i])
+    <> (if null (invMetas i)      then [] else ["metas"      .= invMetas i])
 
 -- | A single diagnostic (error, warning, or info) from Agda.
 --
