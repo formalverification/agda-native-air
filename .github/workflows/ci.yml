@@ -200,7 +200,7 @@ jobs:
           make etl-proof-completion-dataset-smoke PROOF_COMPLETION_SMOKE_LIMIT=200
 
   python-agda-dojang:
-    name: Python • agda-dojang unit tests
+    name: Python • agda-dojang and scripts unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -221,6 +221,14 @@ jobs:
             python/tests/test_policy_contract.py \
             python/tests/test_goal_report.py \
             python/tests/test_agda_probe.py
+
+      # scripts/python/tests — repo-root tooling suites (corpus packaging,
+      # library metadata).  Pure, no Agda and no Nix; the repo root must be on
+      # PYTHONPATH because the tests import `scripts.python.*`.  Untested in CI
+      # is how two of these tests came to be calling signatures their subject
+      # had not had for a while (issue #84).
+      - name: Run scripts/python tests (no Agda required)
+        run: PYTHONPATH=. python3 -m pytest -q scripts/python/tests
 
   python-ml-pipeline:
     name: Python • ml-pipeline tests
