@@ -34,7 +34,8 @@
   *  -------
   *    <outDir>/jsonl/<Module>.jsonl
   *    <outDir>/logs/<Module>.log
-  *    <outDir>/run-manifest.json
+  *    <outDir>/run-manifest.json   -- run configuration, coverage summary,
+  *                                    and one record per module attempted
   *
   *  ============================================================================
   */
@@ -113,7 +114,11 @@ object AgdaJsonlDriver extends IOApp {
           fields += "seconds"        -> ujson.Num(r.seconds)
           fields += "rows"           -> ujson.Num(r.rows.toDouble)
           fields += "validateOk"     -> ujson.Bool(r.validateOk)
-          fields += "validateErrors" -> ujson.Arr(r.validateErrors.map(ujson.Str(_)))
+          // `Arr.from`, not `Arr(...)`: the varargs overload takes the whole
+          // Vector as a single element (via the Seq -> Value conversion) and
+          // writes `[["exit_code=1"]]` instead of `["exit_code=1"]` — which
+          // only became visible once these records reached the manifest.
+          fields += "validateErrors" -> ujson.Arr.from(r.validateErrors.map(ujson.Str(_)))
           ujson.Obj.from(fields)
         },
         json => {
@@ -143,6 +148,34 @@ object AgdaJsonlDriver extends IOApp {
       )
   }
 
+  // Coverage of one extraction run, in the terms a dataset card has to state:
+  // how many modules were asked for, how many produced valid JSONL, how many
+  // failed, and how many were served from an earlier run (resume).
+  //
+  // `succeeded` counts modules whose JSONL validated, whether it was written
+  // this run or skipped as already valid; `skipped` is the subset of those
+  // that resume served, so succeeded + failed = attempted.
+  final case class RunSummary(
+    attempted: Int,
+    succeeded: Int,
+    failed: Int,
+    skipped: Int,
+    rows: Long
+  ) extends Serializable
+
+  object RunSummary {
+    implicit val rw: ReadWriter[RunSummary] = macroRW
+
+    def of(results: Vector[ModuleRun]): RunSummary =
+      RunSummary(
+        attempted = results.size,
+        succeeded = results.count(_.ok),
+        failed    = results.count(r => !r.ok),
+        skipped   = results.count(_.skipped),
+        rows      = results.map(_.rows).sum
+      )
+  }
+
   final case class RunManifest(
     startedAt: String,
     finishedAt: String,
@@ -156,7 +189,15 @@ object AgdaJsonlDriver extends IOApp {
     resume: Boolean,
     runner: String,
     sparkMaster: String,
-    failOnError: Boolean
+    failOnError: Boolean,
+    summary: RunSummary,
+    // Per-module outcomes, sorted by module name so two runs over the same
+    // library produce byte-comparable manifests.  Without these the only
+    // record of *which* modules failed and why was a line on stdout, which is
+    // no use to a dataset card or to a downstream coverage report.  Matches
+    // the `results` field the Haskell runner (agda-strux/app/Runner.hs)
+    // already writes.
+    results: Vector[ModuleRun]
   ) extends Serializable
 
   object RunManifest { implicit val rw: ReadWriter[RunManifest] = macroRW }
@@ -381,8 +422,36 @@ object AgdaJsonlDriver extends IOApp {
   private def modPath(mod: String): String =
     mod.replace('.', java.io.File.separatorChar)
 
-  private def moduleToInput(srcDir: Path, mod: String): Path =
-    srcDir.resolve(modPath(mod) + ".agda")
+  // Agda source extensions, in the order this driver tries them.
+  //
+  // A module name does not determine its file extension: Agda 2.8.0 accepts a
+  // plain `.agda` file and six literate flavours, and a real library mixes
+  // them.  agda-algebras is literate Markdown almost throughout (375
+  // `.lagda.md` files against 2 plain `.agda`), so a driver that resolves only
+  // `.agda` reports an entire library as "missing input" (issue #84).
+  //
+  // The list was checked against the pinned Agda by feeding it a one-line
+  // module under each extension; `.lagda.html` is *not* an Agda source
+  // extension and is deliberately absent.
+  private[extract] val agdaSourceExtensions: Vector[String] =
+    Vector(".agda", ".lagda.md", ".lagda", ".lagda.rst", ".lagda.tex", ".lagda.org", ".lagda.typ")
+
+  // Candidate source paths for a module, in resolution order.  Pure — the
+  // filesystem decides which one exists (see `resolveModuleInput`).  Agda
+  // itself rejects a module that has two source files, so at most one
+  // candidate should exist; if more do, the first wins and the run is
+  // reproducible rather than order-dependent.
+  private[extract] def moduleInputCandidates(srcDir: Path, mod: String): Vector[Path] =
+    agdaSourceExtensions.map(ext => srcDir.resolve(modPath(mod) + ext))
+
+  // The path a module would have if it were a plain `.agda` file.  Used only
+  // to name a definite file in diagnostics when no candidate exists.
+  private[extract] def nominalModuleInput(srcDir: Path, mod: String): Path =
+    moduleInputCandidates(srcDir, mod).head
+
+  // First candidate that exists on disk, if any.
+  private[extract] def resolveModuleInput(srcDir: Path, mod: String): IO[Option[Path]] =
+    IO.blocking(moduleInputCandidates(srcDir, mod).find(Files.exists(_)))
 
   private def moduleToOutJsonl(outDir: Path, mod: String): Path =
     outDir.resolve("jsonl").resolve(modPath(mod) + ".jsonl")
@@ -395,9 +464,12 @@ object AgdaJsonlDriver extends IOApp {
   // ---------------------------------------------------------------------------
 
   private def runOne(cfg: Config, mod: String): IO[ModuleRun] = {
-    val input = moduleToInput(cfg.srcDir, mod)
-    val out   = moduleToOutJsonl(cfg.outDir, mod)
-    val log   = moduleToLog(cfg.outDir, mod)
+    // `out` and `log` are named after the *module*, not after its source file,
+    // so a module's artifacts keep the same names whichever source extension
+    // it happens to use.
+    val nominal = nominalModuleInput(cfg.srcDir, mod)
+    val out     = moduleToOutJsonl(cfg.outDir, mod)
+    val log     = moduleToLog(cfg.outDir, mod)
 
     val ensureDirs: IO[Unit] =
       IO.blocking {
@@ -415,7 +487,7 @@ object AgdaJsonlDriver extends IOApp {
                 Some(
                   ModuleRun(
                     module = mod,
-                    inputFile = input.toString,
+                    inputFile = nominal.toString,
                     outputFile = out.toString,
                     logFile = log.toString,
                     skipped = true,
@@ -432,10 +504,13 @@ object AgdaJsonlDriver extends IOApp {
           case _ => IO.pure(None)
         }
 
+    // No source file under any accepted extension.  Report every candidate we
+    // looked for: "missing input" with a single `.agda` path in it reads as an
+    // extraction bug when the real cause is a literate module.
     def missingInput: ModuleRun =
       ModuleRun(
         module = mod,
-        inputFile = input.toString,
+        inputFile = nominal.toString,
         outputFile = out.toString,
         logFile = log.toString,
         skipped = false,
@@ -444,10 +519,13 @@ object AgdaJsonlDriver extends IOApp {
         seconds = 0.0,
         rows = 0L,
         validateOk = false,
-        validateErrors = Vector(s"missing input file: $input")
+        validateErrors = Vector(
+          s"missing input file for module $mod; tried: " +
+            moduleInputCandidates(cfg.srcDir, mod).mkString(", ")
+        )
       )
 
-    val runBackend: IO[ModuleRun] = {
+    def runBackend(input: Path): IO[ModuleRun] = {
       val cmd = {
         val base = Seq(
           cfg.agdaJsonBin.toString,
@@ -493,9 +571,9 @@ object AgdaJsonlDriver extends IOApp {
                   appendLogLine(log, logMsg.trim.replaceAll("\n", " ")) *> IO.pure(r)
                 }
                 case None =>
-                  IO.blocking(Files.exists(input)).flatMap {
-                    case false => IO.pure(missingInput)
-                    case true  => runBackend
+                  resolveModuleInput(cfg.srcDir, mod).flatMap {
+                    case None        => IO.pure(missingInput)
+                    case Some(input) => runBackend(input)
                   }
               }
     } yield res
@@ -510,8 +588,7 @@ object AgdaJsonlDriver extends IOApp {
       .emits(modules)
       .covary[IO]
       .parEvalMapUnordered(cfg.parallelism) { m =>
-        val input = moduleToInput(cfg.srcDir, m)
-        Log.info(s"> Checking $m ($input).") *>
+        Log.info(s"> Checking $m (under ${cfg.srcDir}).") *>
           runOne(cfg, m).flatTap { r =>
             val status =
               if (r.ok) s"[AgdaJsonlDriver] ✅ [success] wrote ${r.rows} JSON records to ${r.outputFile}"
@@ -626,7 +703,9 @@ object AgdaJsonlDriver extends IOApp {
       resume      = cfg.resume,
       runner      = cfg.runner.asString,
       sparkMaster = cfg.sparkMaster,
-      failOnError = cfg.failOnError
+      failOnError = cfg.failOnError,
+      summary     = RunSummary.of(results),
+      results     = results.sortBy(_.module)
     )
 
     val out = cfg.outDir.resolve("run-manifest.json")
