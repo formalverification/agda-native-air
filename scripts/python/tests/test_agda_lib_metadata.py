@@ -70,12 +70,17 @@ def test_generate_everything_module(tmp_path: Path) -> None:
     modules = {"Algebra.Base", "Algebra.Lattice"}
     include_dirs = [tmp_path / "src"]  # not used directly here
 
-    everything, ordered = generate_everything_module(tmp_path, include_dirs, modules)
+    everything, ordered, root_module = generate_everything_module(
+        tmp_path, include_dirs, modules
+    )
     content = everything.read_text(encoding="utf-8")
 
-    assert everything.name == "Everything.agda"
+    # The synthetic root is `MetadataEverything`, not `Everything`: a library
+    # may already have a module of its own by that name (agda-algebras does).
+    assert root_module == "MetadataEverything"
+    assert everything.name == "MetadataEverything.agda"
     # We should get a header and two open imports
-    assert "module Everything where" in content
+    assert f"module {root_module} where" in content
     assert "open import Algebra.Base" in content
     assert "open import Algebra.Lattice" in content
     # ordered list is sorted
@@ -98,7 +103,7 @@ def test_parse_dependency_graph_modules(tmp_path: Path) -> None:
     dot_file = tmp_path / "dependency-graph.dot"
     dot_file.write_text(dot, encoding="utf-8")
 
-    mods = parse_dependency_graph_modules(dot_file)
+    mods = parse_dependency_graph_modules(dot_file, root_module_name="Everything")
     # Should include all labels except "Everything"
     assert "Agda.Primitive" in mods
     assert "Algebra.Base" in mods
