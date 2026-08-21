@@ -618,8 +618,20 @@ def compute(args: argparse.Namespace) -> Result[Dict, PipelineError]:
 # ---------------------------------------------------------------------------
 
 
+def _summary() -> str:
+    """The `Description:` line of this module's docstring, for `--help`.
+
+    Read by name rather than by line number: indexing into `__doc__` silently
+    produced an empty description the first time.
+    """
+    for line in (__doc__ or "").splitlines():
+        if line.startswith("Description:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[2].strip())
+    p = argparse.ArgumentParser(description=_summary())
     p.add_argument("--corpus", required=True, help="assembled corpus.jsonl")
     p.add_argument("--out-dir", required=True, help="where to write stats.json and stats.md")
     p.add_argument("--library", default="agda-algebras", help="library name for the record")

@@ -590,8 +590,20 @@ def _sha256_of(path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _summary() -> str:
+    """The `Description:` line of this module's docstring, for `--help`.
+
+    Read by name rather than by line number: indexing into `__doc__` silently
+    produced an empty description the first time.
+    """
+    for line in (__doc__ or "").splitlines():
+        if line.startswith("Description:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[2].strip())
+    p = argparse.ArgumentParser(description=_summary())
     p.add_argument("--jsonl-dir", required=True, help="per-module JSONL tree (<outDir>/jsonl)")
     p.add_argument("--run-manifest", required=True, help="<outDir>/run-manifest.json")
     p.add_argument("--modules-file", required=True, help="everything-modules.txt used for the run")

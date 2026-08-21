@@ -25,6 +25,7 @@ from typing import Sequence
 
 from scripts.python.corpus.stats import (
     RowSummary,
+    _summary,
     build_stats,
     counts_by,
     definition_graph,
@@ -361,3 +362,12 @@ def test_load_corpus_rejects_an_empty_corpus(tmp_path: Path) -> None:
 
 def test_load_corpus_reports_a_missing_file(tmp_path: Path) -> None:
     assert load_corpus(tmp_path / "absent.jsonl").is_err
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def test_summary_finds_the_description_line() -> None:
+    assert _summary().startswith("Summary statistics")

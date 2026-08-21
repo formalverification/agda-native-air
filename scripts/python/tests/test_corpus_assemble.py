@@ -28,6 +28,7 @@ from pathlib import Path
 
 from scripts.python.corpus.assemble import (
     Coverage,
+    _summary,
     build_provenance,
     compute_coverage,
     concatenate,
@@ -330,3 +331,14 @@ def test_build_provenance_records_source_toolchain_and_coverage() -> None:
         "failed": 1,
         "notAttempted": 0,
     }
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def test_summary_finds_the_description_line() -> None:
+    # Read by name, not by line number: indexing into __doc__ gave an empty
+    # --help description.
+    assert _summary().startswith("Assemble a publishable")
