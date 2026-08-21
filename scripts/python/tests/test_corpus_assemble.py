@@ -42,6 +42,7 @@ from scripts.python.corpus.assemble import (
     outcome_of_result,
     parse_modules_file,
     relative_to,
+    untracked_sources_under,
 )
 
 
@@ -331,6 +332,41 @@ def test_library_paths_in_reads_the_registered_agda_libs() -> None:
     )
 
 
+def test_untracked_sources_under_finds_a_module_that_would_be_extracted() -> None:
+    repo = Path("/lib")
+    untracked = (
+        "src/Scratch/Probe.lagda.md",   # extracted: the scanner globs src/
+        "src/Other.agda",               # extracted
+        "notes.md",                     # cannot reach the corpus
+        "docs/assets/portrait.jpg",     # cannot reach the corpus
+        "other/Elsewhere.agda",         # Agda source, but outside src/
+    )
+    assert untracked_sources_under("/lib/src", repo, untracked) == (
+        "src/Other.agda",
+        "src/Scratch/Probe.lagda.md",
+    )
+
+
+def test_untracked_sources_under_covers_every_literate_flavour() -> None:
+    repo = Path("/lib")
+    untracked = tuple(
+        f"src/M{i}{ext}"
+        for i, ext in enumerate(
+            (".agda", ".lagda", ".lagda.md", ".lagda.rst", ".lagda.tex", ".lagda.org")
+        )
+    )
+    assert len(untracked_sources_under("/lib/src", repo, untracked)) == len(untracked)
+
+
+def test_untracked_sources_under_ignores_a_src_dir_outside_the_checkout() -> None:
+    # A srcDir from another machine's layout attributes nothing.
+    assert untracked_sources_under("/elsewhere/src", Path("/lib"), ("src/A.agda",)) == ()
+
+
+def test_untracked_sources_under_handles_an_empty_src_dir() -> None:
+    assert untracked_sources_under("", Path("/lib"), ("src/A.agda",)) == ()
+
+
 def test_build_provenance_records_source_toolchain_and_coverage() -> None:
     coverage = Coverage(
         attempted=3, succeeded=2, failed=1, not_attempted=0, resumed=0, rows=20, outcomes=()
@@ -340,8 +376,11 @@ def test_build_provenance_records_source_toolchain_and_coverage() -> None:
         library_commit="cafe123",
         library_remote="git@github.com:ualib/agda-algebras.git",
         library_dirty=False,
+        library_untracked=7,
+        library_untracked_sources=("src/Scratch/Probe.lagda.md",),
         repo_commit="beef456",
         repo_dirty=True,
+        repo_untracked=2,
         manifest={
             "srcDir": "/src",
             "agdaJsonBin": "/bin/agda-json",
@@ -363,7 +402,12 @@ def test_build_provenance_records_source_toolchain_and_coverage() -> None:
 
     assert doc["source"]["commit"] == "cafe123"
     assert doc["source"]["workingTreeDirty"] is False
+    # A clean tracked tree is not the whole story: an untracked module under
+    # src/ is extracted like any other, so it is named rather than counted.
+    assert doc["source"]["untrackedFiles"] == 7
+    assert doc["source"]["untrackedSourcesUnderSrc"] == ["src/Scratch/Probe.lagda.md"]
     assert doc["producer"]["workingTreeDirty"] is True
+    assert doc["producer"]["untrackedFiles"] == 2
     assert doc["toolchain"]["agda"] == "Agda version 2.8.0"
     assert doc["toolchain"]["flakeInputs"]["nixpkgs"]["rev"] == "deadbeef"
     assert doc["corpus"]["sha256"] == "abc"

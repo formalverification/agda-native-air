@@ -274,8 +274,11 @@ def build_provenance(
     library_commit: str,
     library_remote: str,
     library_dirty: bool,
+    library_untracked: int,
+    library_untracked_sources: Sequence[str],
     repo_commit: str,
     repo_dirty: bool,
+    repo_untracked: int,
     manifest: Dict,
     coverage: Coverage,
     flake_pins: Dict[str, Dict[str, str]],
@@ -302,12 +305,19 @@ def build_provenance(
             "remote": library_remote,
             "commit": library_commit,
             "workingTreeDirty": library_dirty,
+            "untrackedFiles": library_untracked,
+            # The untracked files that can actually change the corpus: the
+            # metadata scanner globs the include dirs, so an untracked module
+            # under srcDir is extracted like any other.  A non-empty list here
+            # means the commit above does not fully describe what was read.
+            "untrackedSourcesUnderSrc": list(library_untracked_sources),
             "srcDir": manifest.get("srcDir", ""),
         },
         "producer": {
             "repository": "formalverification/agda-native-air",
             "commit": repo_commit,
             "workingTreeDirty": repo_dirty,
+            "untrackedFiles": repo_untracked,
             "extractor": "struxdriver.extract.AgdaJsonlDriver",
             "backend": manifest.get("agdaJsonBin", ""),
         },
@@ -362,9 +372,59 @@ def _git_or(args: Sequence[str], repo: Path, default: str) -> str:
 
 
 def _worktree_dirty(repo: Path) -> bool:
-    """True when tracked files differ from HEAD.  Untracked files do not count:
-    they cannot change what Agda read."""
+    """True when tracked files differ from HEAD."""
     return _git_or(["status", "--porcelain", "--untracked-files=no"], repo, "") != ""
+
+
+def _untracked_files(repo: Path) -> Tuple[str, ...]:
+    """Every untracked file in `repo`, as repo-relative paths.
+
+    `--untracked-files=all` rather than the default: git collapses an untracked
+    directory to a single `dir/` entry, which would hide the files inside it.
+    """
+    out = _git_or(["status", "--porcelain", "--untracked-files=all"], repo, "")
+    return tuple(
+        line[3:].strip('"')
+        for line in out.splitlines()
+        if line.startswith("?? ")
+    )
+
+
+def untracked_sources_under(
+    src_dir: str, repo: Path, untracked: Sequence[str]
+) -> Tuple[str, ...]:
+    """Untracked Agda sources inside the extracted include dir.
+
+    These are the untracked files that matter: the metadata scanner globs the
+    library's include dirs for `*.agda` / `*.lagda*`, so an untracked module
+    there IS extracted and DOES change the corpus.  Reporting only tracked
+    dirtiness would call such a tree clean — the original comment here claimed
+    untracked files "cannot change what Agda read", which was wrong (issue #84
+    review).
+
+    Other untracked files (notes, patches, images) are counted separately but
+    not listed: they cannot reach the corpus.
+    """
+    if not src_dir:
+        return ()
+    try:
+        rel_src = str(Path(src_dir).resolve().relative_to(repo.resolve()))
+    except ValueError:
+        # The src dir is not inside this checkout; nothing to attribute.
+        return ()
+    prefix = "" if rel_src == "." else rel_src.rstrip("/") + "/"
+    return tuple(
+        sorted(
+            path
+            for path in untracked
+            if path.startswith(prefix) and _is_agda_source(path)
+        )
+    )
+
+
+def _is_agda_source(path: str) -> bool:
+    """Whether a path is a file Agda would treat as a module source."""
+    return path.endswith(".agda") or ".lagda" in Path(path).name
 
 
 def concatenate(sources: Iterable[Path], target: Path) -> Result[Tuple[int, int, str], PipelineError]:
@@ -534,6 +594,9 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
         return Result.err(versions_result.unwrap_err())
 
     library_root = Path(args.library_root)
+    repo_root = Path(args.repo_root)
+    library_untracked = _untracked_files(library_root)
+    src_dir = str(manifest.get("srcDir", ""))
     flake_lock = load_json(Path(args.flake_lock)).map(flake_lock_pins).unwrap_or({})
     agda_libraries = (
         read_text(Path(args.agda_libraries_file)).map(library_paths_in).unwrap_or(())
@@ -546,8 +609,13 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
         library_commit=_git_or(["rev-parse", "HEAD"], library_root, "unknown"),
         library_remote=_git_or(["remote", "get-url", "origin"], library_root, "unknown"),
         library_dirty=_worktree_dirty(library_root),
-        repo_commit=_git_or(["rev-parse", "HEAD"], Path(args.repo_root), "unknown"),
-        repo_dirty=_worktree_dirty(Path(args.repo_root)),
+        library_untracked=len(library_untracked),
+        library_untracked_sources=untracked_sources_under(
+            src_dir, library_root, library_untracked
+        ),
+        repo_commit=_git_or(["rev-parse", "HEAD"], repo_root, "unknown"),
+        repo_dirty=_worktree_dirty(repo_root),
+        repo_untracked=len(_untracked_files(repo_root)),
         manifest=manifest,
         coverage=coverage,
         flake_pins=flake_lock,
