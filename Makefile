@@ -248,6 +248,17 @@ AGDA_LIB_METADATA_SCRIPT    := $(PROJECT_ROOT)/scripts/python/agda_lib_metadata.
 AGDA_LIB_METADATA_OUT       ?= $(DATA)/corpora-metadata/agda-algebras
 AGDA_ALGEBRAS_MODULES_FILE  ?= $(AGDA_LIB_METADATA_OUT)/everything-modules.txt
 #
+# The metadata script runs `agda --dependency-graph`, so it needs an Agda that
+# can see BOTH the pinned standard-library and agda-dojang.  The `agda` binary
+# on PATH inside a dev shell resolves libraries against its own nix-store
+# libraries file, which knows nothing about agda-dojang; only the project-local
+# file the flake shellHook writes does.  Pass it explicitly rather than relying
+# on the shell's `agda` wrapper function, which a Python subprocess cannot see.
+# Honours an inherited AGDA_LIBRARIES_FILE, and is simply omitted when the file
+# does not exist (outside a dev shell).
+AGDA_LIBRARIES_FILE         ?= $(AGDA_LIB_DIR)/libraries
+AGDA_LIBRARIES_FILE_ARG      = $(if $(wildcard $(AGDA_LIBRARIES_FILE)),--libraries-file $(AGDA_LIBRARIES_FILE),)
+#
 # What the driver calls "--agda-dir".
 # Should be "directory containing the Agda libraries file".
 # flake.nix writes: $(PROJECT_ROOT)/agda/libraries
@@ -305,6 +316,8 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  _check-sbt _check-python _check-spark _check-java-home _check-etl-agda-algebras-contract \
                  extract-lib extract-lib-nix extract-lib-smoke extract-lib-smoke-nix \
                  extract-algebras-backend extract-algebras agda-algebras-metadata metadata \
+                 corpus corpus-nix corpus-assemble corpus-stats corpus-mcp-smoke \
+                 test-scripts-python \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
                  agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-serve agda-mcp-clean \
                  extract extract-stdlib extract-categories transform a2t \
@@ -408,6 +421,11 @@ help:
 	@echo "  make etl                         - Spark ETL (JSONL -> Parquet) -> $(TRAIN_PARQUET)"
 	@echo "  make etl-agda-algebras           - Config-driven ETL for agda-algebras -> ml-pipeline/data/agda-algebras/"
 	@echo "  make etl-agda-algebras-smoke     - Fast deterministic ETL slice (CI-friendly)"
+	@echo "  make corpus / corpus-nix         - Assemble corpus + coverage + provenance + stats -> $(CORPUS_OUT_DIR)"
+	@echo "  make corpus-assemble             - Merge per-module JSONL; write coverage.json + provenance.json"
+	@echo "  make corpus-stats                - Summary statistics -> stats.json + stats.md"
+	@echo "  make corpus-mcp-smoke            - Drive agda-mcp's search tools against the assembled corpus"
+	@echo "  make test-scripts-python         - pytest scripts/python/tests"
 	@echo "  make etl-test                    - Run all Scala ETL tests (ml-pipeline/etl)"
 	@echo "  make etl-test-preprocess-agda    - Run ETL smoke test (etl.PreprocessAgdaSpec)"
 	@echo "  make etl-proof-completion-smoke  - Build proof-completion dataset from fixture JSONL + validate"
@@ -778,6 +796,7 @@ agda-algebras-metadata:
 	python3 $(AGDA_LIB_METADATA_SCRIPT) "$(AGDA_ALGEBRAS_ROOT)" \
 	  --lib-name agda-algebras \
 	  --out-dir $(AGDA_LIB_METADATA_OUT) \
+	  $(AGDA_LIBRARIES_FILE_ARG) \
 	  --format txt
 #
 metadata: agda-algebras-metadata # alias
@@ -842,6 +861,87 @@ extract-lib: _ensure-dirs _check-sbt _check-spark build-agda-json agda-algebras-
 	if [ "$$EXIT_CODE" -ne 0 ]; then \
 	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ) - [make extract-lib] ❌ FAIL (exit $$EXIT_CODE)"; \
 	  exit "$$EXIT_CODE"; \
+	fi
+#
+#
+# -------------------------------------------------------------------------------
+# + 1.6.1. Corpus packaging (issue #84)
+#
+# `extract-lib` leaves a per-module JSONL tree under $(LIB_RAW_ROOT); these
+# targets turn it into the four artifacts a published corpus needs:
+#
+#   +  corpus.jsonl / corpus.jsonl.gz — every row, concatenated deterministically
+#   +  coverage.json                  — modules attempted, succeeded, failed, why
+#   +  provenance.json                — library commit, toolchain pins, digests
+#   +  stats.json / stats.md          — the statistics a dataset card quotes
+#
+# Everything lands under $(CORPUS_OUT_DIR), which is gitignored: a 200 MB
+# corpus is a release asset, not a repository file.  The dataset card that
+# describes it IS committed, at $(CORPUS_CARD).
+#
+# `corpus` works outside a Nix shell (the Agda version then records as
+# "unknown"); `corpus-nix` runs it in .#backend so the provenance record can
+# ask the pinned `agda` its version.
+CORPUS_VERSION      ?= v0
+CORPUS_OUT_DIR      ?= $(DATA)/corpora/$(LIB_NAME)/$(CORPUS_VERSION)
+CORPUS_JSONL        ?= $(CORPUS_OUT_DIR)/corpus.jsonl
+CORPUS_CARD         ?= $(PROJECT_ROOT)/docs/corpora/$(LIB_NAME)-$(CORPUS_VERSION).md
+CORPUS_DEP_GRAPH    ?= $(LIB_CORPUS_META_DIR)/dependency-graph.dot
+CORPUS_ASSEMBLE     := $(PROJECT_ROOT)/scripts/python/corpus/assemble.py
+CORPUS_STATS        := $(PROJECT_ROOT)/scripts/python/corpus/stats.py
+# The scripts import scripts.python.utils, so the repo root must be importable.
+CORPUS_PY            = PYTHONPATH="$(PROJECT_ROOT)" $(PY)
+
+# Sequenced through recursive make rather than declared as two prerequisites:
+# prerequisites are independent to make, so `make -j corpus` could run the stats
+# over a corpus.jsonl that assembly was still writing.  Both halves stay
+# independently callable.
+corpus:
+	@$(MAKE) --no-print-directory corpus-assemble
+	@$(MAKE) --no-print-directory corpus-stats
+
+corpus-nix:
+	@$(NIX_BACKEND) '$(MAKE) corpus'
+
+corpus-assemble:
+	@echo ">> [corpus-assemble] $(LIB_NAME) $(CORPUS_VERSION) -> $(CORPUS_OUT_DIR)"
+	@$(CORPUS_PY) $(CORPUS_ASSEMBLE) \
+	  --jsonl-dir "$(LIB_JSONL_DIR)" \
+	  --run-manifest "$(LIB_RAW_ROOT)/run-manifest.json" \
+	  --modules-file "$(LIB_MODULES_FILE)" \
+	  --out-dir "$(CORPUS_OUT_DIR)" \
+	  --library "$(LIB_NAME)" \
+	  --library-root "$(AGDA_ALGEBRAS_ROOT)" \
+	  --repo-root "$(PROJECT_ROOT)" \
+	  --flake-lock "$(PROJECT_ROOT)/flake.lock" \
+	  --agda-libraries-file "$(AGDA_LIBRARIES_FILE)" \
+	  --gzip
+
+corpus-stats:
+	@echo ">> [corpus-stats] $(CORPUS_JSONL) -> $(CORPUS_OUT_DIR)/stats.{json,md}"
+	@$(CORPUS_PY) $(CORPUS_STATS) \
+	  --corpus "$(CORPUS_JSONL)" \
+	  --out-dir "$(CORPUS_OUT_DIR)" \
+	  --library "$(LIB_NAME)" \
+	  --dependency-graph "$(CORPUS_DEP_GRAPH)"
+
+# Load the assembled corpus into agda-mcp and drive the three search tools over
+# the real JSON-RPC transport.  Complements agda-mcp-smoke, which answers the
+# same questions against the 24-row test fixture.
+corpus-mcp-smoke:
+	@echo ">> [corpus-mcp-smoke] agda-mcp search tools against $(CORPUS_JSONL)"
+	@$(call run_backend,"$(PROJECT_ROOT)/scripts/corpus-mcp-smoke.sh" --corpus "$(CORPUS_JSONL)")
+
+# ---- Python script suites (scripts/python/tests) ----
+# pytest is not in the system python3; enter `nix develop .#mlPipeline` (or the
+# project venv) for it.  Skipping rather than failing keeps `make test-all`
+# usable on a machine without it.
+test-scripts-python:
+	@echo ">> [test-scripts-python] pytest in scripts/python/tests"
+	@if $(CORPUS_PY) -c 'import pytest' >/dev/null 2>&1; then \
+	  $(CORPUS_PY) -m pytest -q scripts/python/tests; \
+	else \
+	  echo "  pytest not available for $(PY); skipping (try: nix develop .#mlPipeline)"; \
 	fi
 #
 #
@@ -1506,7 +1606,7 @@ test-agda-dojang-all: test-agda-dojang test-agda-dojang-integration
 	@echo "✅ All AgdaDojang tests passed."
 
 
-test-all: test-strux-driver test-ml-pipeline test-agda-dojang backend-test
+test-all: test-strux-driver test-ml-pipeline test-agda-dojang test-scripts-python backend-test
 	@echo "✅ test-all completed."
 
 test-integration: ## Run strux-driver end-to-end integration tests

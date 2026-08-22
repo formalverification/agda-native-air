@@ -135,6 +135,23 @@ object Proc {
     }
   }
 
+  /** Run a short command and capture its trimmed stdout, or None if it fails.
+    *
+    * For provenance probes (`git rev-parse HEAD`, `git status --porcelain`)
+    * where a non-zero exit or a missing binary is an answer — "this directory
+    * is not a checkout" — rather than a failure worth aborting an extraction
+    * over.  Output is expected to be small; the whole of it is read.
+    */
+  def capture(cmd: Seq[String]): IO[Option[String]] =
+    IO.blocking {
+      val pb = new ProcessBuilder(cmd: _*)
+      pb.redirectErrorStream(false)
+      val p    = pb.start()
+      val text = new String(p.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
+      val code = p.waitFor()
+      if (code == 0) Some(text.trim) else None
+    }.handleError(_ => None)
+
   /** NOTE:
     * We time using IO.monotonic so it's unaffected by wall-clock changes.
     */

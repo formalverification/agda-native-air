@@ -64,6 +64,49 @@ tests = testGroup "agda-json"
       test_addcommexample_extracts_comm_and_where_lemma
   , testCase "typeAst: parses, tag == Type, and contains a Pi (Example.secId)"
       test_typeAst_contains_Pi_for_secId
+  , testGroup "include-path policy" includePathTests
+  ]
+
+
+--------------------------------------------------------------------------------
+-- Include-path policy
+--------------------------------------------------------------------------------
+--
+-- Which roots go on Agda's include path decides whether a module is findable
+-- under one name or two.  Extracting agda-algebras hit the two-names case:
+-- `src/Setoid/Categories/Algebra.lagda.md` is `Setoid.Categories.Algebra` from
+-- the library root and plain `Algebra` from its own directory, and the second
+-- reading collides with the standard library's `Algebra` (issue #84).  These
+-- tests pin the rule that resolves it without breaking the single-file usage
+-- the CLI documents.
+
+includePathTests :: [TestTree]
+includePathTests =
+  [ testCase "adds the input's own directory when no include covers it" $ do
+      dirs <- Run.includePathsFor "/lib/src/Foo/Bar.agda" ["/other/resources"]
+      assertEqual "input dir must be first, so the module is findable"
+        ["/lib/src/Foo", "/other/resources"] dirs
+
+  , testCase "adds the input's own directory when there are no includes at all" $ do
+      dirs <- Run.includePathsFor "/lib/src/Foo/Bar.agda" []
+      assertEqual "sole root is the input's directory" ["/lib/src/Foo"] dirs
+
+  , testCase "omits the input's own directory when an include already covers it" $ do
+      dirs <- Run.includePathsFor "/lib/src/Setoid/Categories/Algebra.lagda.md" ["/lib/src"]
+      assertEqual "library root alone names the module once" ["/lib/src"] dirs
+
+  , testCase "treats an include that IS the input's directory as covering it" $ do
+      dirs <- Run.includePathsFor "/lib/src/Foo.agda" ["/lib/src"]
+      assertEqual "no duplicate root" ["/lib/src"] dirs
+
+  , testCase "dirContains compares path components, not string prefixes" $ do
+      assertBool "/a/b contains /a/b/c.agda" (Run.dirContains "/a/b" "/a/b/c.agda")
+      assertBool "/a/bc does not contain /a/b/c.agda"
+        (not (Run.dirContains "/a/bc" "/a/b/c.agda"))
+      assertBool "a directory contains itself" (Run.dirContains "/a/b" "/a/b")
+
+  , testCase "dirContains reaches to any depth" $
+      assertBool "/a contains /a/b/c/d.agda" (Run.dirContains "/a" "/a/b/c/d.agda")
   ]
 
 

@@ -11,7 +11,8 @@
 --
 --   (1) Parse CLI arguments and open the output file handle.
 --   (2) Enter Agda's typechecking monad (TCM) in a way that:
---       - sets include paths
+--       - sets include paths (see 'includePathsFor' — which roots go on the
+--         path is not obvious, and getting it wrong fails whole modules)
 --       - respects Agda library settings (from nix shell's libraries file)
 --       - then runs a TCM action that does parse+typecheck+extract
 --
@@ -37,17 +38,20 @@
 module AgdaJsonl.Run
   ( main
   , runJsonl
+    -- * Include-path policy (exposed for tests)
+  , includePathsFor
+  , dirContains
   ) where
 import Control.Exception (catch, throwIO)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Time (getZonedTime, formatTime, defaultTimeLocale)
-import Data.List (nub)
+import Data.List (isPrefixOf, nub)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.Directory (doesFileExist, makeAbsolute)
 import System.Environment (getArgs)
 import System.Exit (die, ExitCode(..))
-import System.FilePath (takeDirectory)
+import System.FilePath (splitDirectories, takeDirectory)
 import System.IO
   ( BufferMode(LineBuffering)
   , Handle
@@ -114,7 +118,7 @@ runJsonl inputFile outputFile extraIncludes fmt = do
 
 runOnce :: Handle -> FilePath -> [FilePath] -> Cli.OutputFormat -> IO Extract.DumpStats
 runOnce h inputFile extraIncludes fmt = do
-  let includeDirs = nub (takeDirectory inputFile : extraIncludes)
+  includeDirs <- includePathsFor inputFile extraIncludes
 
   withAgda includeDirs inputFile $ \absInput absIncludes -> do
     -- Parse + typecheck *explicitly* (do not rely on interactive `check`).
@@ -157,6 +161,42 @@ runOnce h inputFile extraIncludes fmt = do
 --------------------------------------------------------------------------------
 -- Small helpers
 --------------------------------------------------------------------------------
+
+-- | Include paths for one extraction.
+--
+-- Agda finds a module by searching the include path, so the *root* of that
+-- module's own tree has to be on it.  Two usages want different roots:
+--
+--   + A standalone file checked where it sits — the documented
+--     @--input ../data/agda/Example.agda --include ../strux-driver/src/test/resources@
+--     usage.  The include supplies imports; what makes @Example@ itself
+--     findable is the file's own directory, so that directory must be added.
+--
+--   + One module of a library, extracted with the library root passed as
+--     @--include@ (how @AgdaJsonlDriver@ runs).  The root already makes
+--     @Setoid.Categories.Algebra@ findable, and adding the file's own
+--     directory as well ALSO makes it findable as top-level @Algebra@ — which
+--     collides with the standard library's @Algebra@ and fails the module with
+--     @AmbiguousTopLevelModuleName@ (issue #84: this cost two of
+--     agda-algebras' 375 modules).
+--
+-- So add the input's own directory only when no given include path already
+-- contains the input.  Each usage then gets exactly the roots it needs.
+includePathsFor :: FilePath -> [FilePath] -> IO [FilePath]
+includePathsFor inputFile extraIncludes = do
+  absInput    <- makeAbsolute inputFile
+  absIncludes <- mapM makeAbsolute extraIncludes
+  let covered = any (`dirContains` absInput) absIncludes
+  pure $ nub $
+    if covered then absIncludes else takeDirectory absInput : absIncludes
+
+-- | Does a directory contain a path, at any depth?
+--
+-- Compared on split path components, so @\/a\/bc@ does not count as containing
+-- @\/a\/b\/c@ the way a plain string prefix test would.
+dirContains :: FilePath -> FilePath -> Bool
+dirContains dir path =
+  splitDirectories dir `isPrefixOf` splitDirectories path
 
 -- | Convert FilePath -> Agda AbsolutePath safely.
 --

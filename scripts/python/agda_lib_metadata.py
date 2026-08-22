@@ -33,6 +33,13 @@ from pathlib import Path
 from typing import List, Tuple, Set
 
 
+# Name of the throwaway module this script generates to compute a dependency
+# graph over the whole library.  It must not collide with a module the library
+# actually has, and it must be excluded from the scanned module set — so both
+# the generator and the scanner read it from here rather than spelling it out.
+SYNTHETIC_ROOT_MODULE = "MetadataEverything"
+
+
 # -------------------------------
 # Tiny pure helpers
 # -------------------------------
@@ -77,10 +84,15 @@ def parse_agda_lib(lib_file: Path) -> Tuple[str, List[Path]]:
     return name, include_dirs
 
 
-def scan_local_modules(include_dirs: List[Path]) -> Set[str]:
+def scan_local_modules(
+    include_dirs: List[Path], exclude: Set[str] | None = None
+) -> Set[str]:
     """
     Scan the include dirs for *.agda / *.lagda* files and return the set of
     module names (e.g. Algebra.Base).
+
+    `exclude` drops names that are not part of the library — by default just
+    this script's synthetic root.
     """
     modules: Set[str] = set()
 
@@ -97,20 +109,34 @@ def scan_local_modules(include_dirs: List[Path]) -> Set[str]:
             for path in inc.rglob(pattern):
                 modules.add(path_to_module(path, inc))
 
-    # Never treat our synthetic Everything as a "real" local module.
-    modules.discard("Everything")
+    # Never treat our own synthetic root as a library module.  This used to
+    # discard "Everything" — the root's original name — and kept doing so after
+    # the rename, which silently excluded agda-algebras' real `Everything`
+    # module from every module list this script produced (issue #84).
+    for name in exclude if exclude is not None else {SYNTHETIC_ROOT_MODULE}:
+        modules.discard(name)
     return modules
 
 # -------------------------------
 # Agda module name sanity
 # -------------------------------
-_SEGMENT = r"[A-Za-z_][A-Za-z0-9_']*"
+# A hyphen is a perfectly ordinary character in an Agda identifier: Agda
+# reserves whitespace and `.;{}()@"`, and nothing else.  This pattern used to
+# omit `-` and was documented as rejecting "agda-algebras coming from
+# filenames" — but agda-algebras really does have a module of that name
+# (`src/agda-algebras.lagda.md` line 84, imported by `Everything`), so the
+# guard excluded a real module from every module list (issue #84).
+_SEGMENT = r"[A-Za-z_][A-Za-z0-9_'\-]*"
 _MODULE_RE = re.compile(rf"^{_SEGMENT}(?:\.{_SEGMENT})*$")
 
 def is_valid_agda_module_name(m: str) -> bool:
     """
     Best-effort validation of an Agda module name.
-    Prevents obvious parse errors such as 'agda-algebras' coming from filenames.
+
+    The point is to drop names that a *filename* produced but Agda would never
+    accept as a module — an empty segment, a leading digit, a space.  It is not
+    an implementation of Agda's lexer, so it stays permissive about characters
+    Agda permits.
     """
     return bool(_MODULE_RE.match(m))
 
@@ -130,7 +156,7 @@ def generate_everything_module(
     lib_root: Path,
     include_dirs: List[Path],
     modules: Set[str],
-    root_module_name: str = "MetadataEverything",
+    root_module_name: str = SYNTHETIC_ROOT_MODULE,
 ) -> Tuple[Path, List[str], str]:
     """
     Generate a temporary <root_module_name>.agda that 'open import's all modules
@@ -322,7 +348,7 @@ def main(argv: List[str] | None = None) -> int:
     all_local_modules = scan_local_modules(include_dirs)
     all_local_modules = filter_valid_modules(all_local_modules)
     everything, everything_mods, root_module_name = generate_everything_module(
-        lib_root, include_dirs, all_local_modules, root_module_name="MetadataEverything"
+        lib_root, include_dirs, all_local_modules, root_module_name=SYNTHETIC_ROOT_MODULE
     )
 
     # 6. Run Agda --dependency-graph starting from the synthetic root.

@@ -1338,12 +1338,28 @@ instance ToJSON CheckProjectResult where
 -- ═══════════════════════════════════════════════════════════════════════════
 --
 
--- | CorpusEntry: a single definition from the agda-strux JSONL corpus.
+-- | CorpusEntry: one definition of an agda-strux JSONL corpus, as the search
+-- index holds it.
 --
--- Corresponds to one line of the "Full" format output.
--- We parse all required fields; optional fields (@body@, @hasBody@) are
--- best-effort.  The @typeAst@ is stored as opaque JSON — we do not
--- interpret its structure in M1-3 (structural matching is an M2 goal).
+-- Corresponds to one line of the "Full" format output (docs/representation.md
+-- §3), but deliberately NOT to all of it: this is an index entry, not a copy
+-- of the row.  Two of the row's fields are read and then dropped rather than
+-- retained.
+--
+--   +  @typeAst@ — the structural AST.  No tool interprets it (structural
+--      matching is an M2 goal, issue #16); parsing it and keeping it is pure
+--      footprint.  Its version tag is kept, because that is what identifies
+--      the encoding a corpus was produced with.
+--   +  @body@ — the pretty-printed clause bodies.  What the search tools
+--      report is @hasBody@: whether a proof term exists to go and read.  In a
+--      real library the bodies ARE the corpus: agda-algebras' 11,666 rows run
+--      to 185 MB, of which nine rows are over a megabyte each, one of them
+--      8.5 MB.
+--
+-- Dropping the two took the resident footprint of the agda-algebras corpus
+-- from 2.73 GB to 308 MB, and its load from 3.5 s to 1.4 s (issue #84).  Both
+-- fields are still in the corpus file, which is where a consumer that wants
+-- them should read them from.
 data CorpusEntry = CorpusEntry
   { ceFile          :: Text           -- ^ Source file path used by extractor.
   , ceModule        :: Text           -- ^ Raw Agda module name.
@@ -1353,16 +1369,18 @@ data CorpusEntry = CorpusEntry
   , cePrettyName    :: Text           -- ^ Normalized unqualified name.
   , cePrettyQname   :: Text           -- ^ @prettyModule.prettyName@ — primary key.
   , ceType          :: Text           -- ^ Pretty-printed type signature.
-  , ceTypeAstVer    :: Text           -- ^ Version tag for typeAst encoding.
-  , ceTypeAst       :: Value          -- ^ Structural AST (opaque JSON for now).
+  , ceTypeAstVer    :: Text           -- ^ Version tag of the row's typeAst encoding.
   , ceDefKind       :: Text           -- ^ function | data | record | constructor | postulate | primitive | other
   , ceDependencies  :: [Text]         -- ^ Heuristic tokens from type (type-level deps).
   , ceAstSize       :: Int            -- ^ Character length of the @type@ string.
-  , ceBody          :: Maybe Text     -- ^ Pretty-printed clause bodies (may be absent).
-  , ceHasBody       :: Bool           -- ^ True iff body is present/non-empty.
+  , ceHasBody       :: Bool           -- ^ True iff the row carries a body/proof term.
   } deriving (Eq, Show)
 instance FromJSON CorpusEntry where
-  parseJSON = withObject "CorpusEntry" $ \o ->
+  parseJSON = withObject "CorpusEntry" $ \o -> do
+    -- `body` is read only to answer `hasBody` when the row omits that field,
+    -- and is not retained: `_body` goes out of scope with the parser.
+    _body <- o .:? "body" :: Parser (Maybe Text)
+    let bodyPresent = maybe False (not . T.null) _body
     CorpusEntry
       <$> o .:  "file"
       <*> o .:  "module"
@@ -1373,14 +1391,12 @@ instance FromJSON CorpusEntry where
       <*> o .:  "prettyQname"
       <*> o .:  "type"
       <*> o .:  "typeAstVersion"
-      <*> o .:  "typeAst"
       <*> o .:  "defKind"
       <*> o .:  "dependencies"
       <*> o .:  "astSize"
-      <*> o .:? "body"
-      <*> (maybe False id <$> o .:? "hasBody")
+      <*> (maybe bodyPresent id <$> o .:? "hasBody")
 instance ToJSON CorpusEntry where
-  toJSON e = object $
+  toJSON e = object
     [ "file"           .= ceFile e
     , "module"         .= ceModule e
     , "name"           .= ceName e
@@ -1390,12 +1406,11 @@ instance ToJSON CorpusEntry where
     , "prettyQname"    .= cePrettyQname e
     , "type"           .= ceType e
     , "typeAstVersion" .= ceTypeAstVer e
-    , "typeAst"        .= ceTypeAst e
     , "defKind"        .= ceDefKind e
     , "dependencies"   .= ceDependencies e
     , "astSize"        .= ceAstSize e
     , "hasBody"        .= ceHasBody e
-    ] <> maybe [] (\b -> ["body" .= b]) (ceBody e)
+    ]
 
 
 -- | CorpusIndex: in-memory corpus index.
