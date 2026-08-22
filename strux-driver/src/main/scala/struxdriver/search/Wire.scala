@@ -32,7 +32,7 @@
   */
 package struxdriver.search
 
-import io.circe.{Decoder, HCursor, Json}
+import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import io.circe.parser.{parse => parseJson}
 
 /** One hole as the server lists it (`[{index, line, col, goal}]`), the
@@ -52,14 +52,19 @@ object WireHole {
 }
 
 /** check_file, reduced to what the search reads: the exit-code-derived verdict
-  * (`success`), the hole list, and the measurements.
+  * (`success`), the hole list, and the measurements.  `holes`, `holesCount`,
+  * and `elapsedMs` are REQUIRED: the hole list is the obligation set and the
+  * elapsed time is the measurement, so a response missing either is wire
+  * drift that must fail loudly, never default silently (a defaulted-empty
+  * hole list would read as "no obligations").  The count is cross-checked
+  * against the list for the same reason.
   */
 final case class CheckFileBody(
   success:           Boolean,
   holes:             Vector[WireHole],
   holesCount:        Int,
   timedOut:          Boolean,
-  elapsedMs:         Option[Long],
+  elapsedMs:         Long,
   checkedFromSource: Option[Boolean],
   exitCode:          Option[Int]
 )
@@ -67,10 +72,12 @@ object CheckFileBody {
   implicit val decoder: Decoder[CheckFileBody] = (c: HCursor) =>
     for {
       success  <- c.get[Boolean]("success")
-      holes    <- c.getOrElse[Vector[WireHole]]("holes")(Vector.empty)
-      count    <- c.getOrElse[Int]("holesCount")(holes.size)
+      holes    <- c.get[Vector[WireHole]]("holes")
+      count    <- c.get[Int]("holesCount")
+      _        <- Either.cond(count == holes.size, (),
+                    DecodingFailure(s"check_file drift: holesCount $count but ${holes.size} holes listed", c.history))
       timedOut <- c.getOrElse[Boolean]("timedOut")(false)
-      elapsed  <- c.get[Option[Long]]("elapsedMs")
+      elapsed  <- c.get[Long]("elapsedMs")
       cfs      <- c.get[Option[Boolean]]("checkedFromSource")
       exit     <- c.downField("verdict").downField("exitCode").as[Option[Int]]
     } yield CheckFileBody(success, holes, count, timedOut, elapsed, cfs, exit)
@@ -84,7 +91,7 @@ final case class GetGoalBody(
   goal:      String,
   module:    Option[String],
   source:    Option[String],
-  elapsedMs: Option[Long]
+  elapsedMs: Long
 )
 object GetGoalBody {
   implicit val decoder: Decoder[GetGoalBody] = (c: HCursor) =>
@@ -92,7 +99,7 @@ object GetGoalBody {
       goal    <- c.get[String]("goal")
       module  <- c.get[Option[String]]("module")
       source  <- c.get[Option[String]]("source")
-      elapsed <- c.get[Option[Long]]("elapsedMs")
+      elapsed <- c.get[Long]("elapsedMs")
     } yield GetGoalBody(goal, module, source, elapsed)
 }
 
@@ -106,7 +113,7 @@ final case class FillHoleBody(
   holes:             Vector[WireHole],
   remainingHoles:    Int,
   message:           Option[String],
-  elapsedMs:         Option[Long],
+  elapsedMs:         Long,
   checkedFromSource: Option[Boolean],
   exitCode:          Option[Int]
 ) {
@@ -114,14 +121,24 @@ final case class FillHoleBody(
     ProbeOutcome(candidate, ProbeStatus.parse(status), holes.map(WireHole.toObligation), message)
 }
 object FillHoleBody {
+  /** `status`, `holes`, `remainingHoles`, and `elapsedMs` are REQUIRED, and
+    * the count is cross-checked against the list: `holes` decides ranking and
+    * `closesAll` (a silently-defaulted empty list would turn any Ok answer
+    * into a closer), and `elapsedMs` feeds the timing split — wire drift on
+    * either must fail the decode visibly, not bend the measurement.  Every
+    * captured response carries them on every status, empty list included on
+    * the type_error path (WireSpec pins this against the live captures).
+    */
   implicit val decoder: Decoder[FillHoleBody] = (c: HCursor) =>
     for {
       status    <- c.get[String]("status")
       candidate <- c.getOrElse[String]("candidate")("")
-      holes     <- c.getOrElse[Vector[WireHole]]("holes")(Vector.empty)
-      remaining <- c.getOrElse[Int]("remainingHoles")(holes.size)
+      holes     <- c.get[Vector[WireHole]]("holes")
+      remaining <- c.get[Int]("remainingHoles")
+      _         <- Either.cond(remaining == holes.size, (),
+                     DecodingFailure(s"fill_hole drift: remainingHoles $remaining but ${holes.size} holes listed", c.history))
       message   <- c.get[Option[String]]("message")
-      elapsed   <- c.get[Option[Long]]("elapsedMs")
+      elapsed   <- c.get[Long]("elapsedMs")
       cfs       <- c.get[Option[Boolean]]("checkedFromSource")
       exit      <- c.downField("verdict").downField("exitCode").as[Option[Int]]
     } yield FillHoleBody(status, candidate, holes, remaining, message, elapsed, cfs, exit)

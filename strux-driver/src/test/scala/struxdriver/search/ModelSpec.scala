@@ -69,7 +69,13 @@ final class ModelSpec extends AnyFunSuite with Matchers {
     val done = SearchState.initial(content, Vector.empty)
     // Empty set alone is not enough: a failing final check refuses the claim.
     SolvedClaim.fromFinalCheck(done, checkSuccess = false, exitCode = 42).isLeft shouldBe true
-    // Both together grant it.
+    // Evidence that disagrees with itself is refused: success is a function
+    // of the exit code alone, so "success" beside a non-zero exit is not a
+    // claim, it is a bug upstream.
+    SolvedClaim.fromFinalCheck(done, checkSuccess = true, exitCode = 42).isLeft shouldBe true
+    // Both together grant it.  (SolvedClaim is sealed abstract like
+    // SearchState, so `SolvedClaim(done, 0)` / `.copy` do not compile — the
+    // factory below is the only door.)
     SolvedClaim.fromFinalCheck(done, checkSuccess = true, exitCode = 0).isRight shouldBe true
   }
 

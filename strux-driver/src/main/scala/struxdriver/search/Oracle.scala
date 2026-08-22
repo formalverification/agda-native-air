@@ -98,7 +98,7 @@ final class Oracle private (
       _     <- IO.raiseWhen(timed.value.isError)(new RuntimeException(
                  s"check_file failed on $file: ${timed.value.text.take(400)}"))
       body  <- IO.fromEither(timed.value.decodeAs[CheckFileBody].leftMap(new RuntimeException(_)))
-      _     <- record(ctx, timed, body.elapsedMs, body.checkedFromSource)
+      _     <- record(ctx, timed, Some(body.elapsedMs), body.checkedFromSource)
     } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
   /** get_goal at one obligation: the goal type and resolved module name. */
@@ -111,7 +111,7 @@ final class Oracle private (
       _     <- IO.raiseWhen(timed.value.isError)(new RuntimeException(
                  s"get_goal failed on $file at (${ob.line},${ob.col}): ${timed.value.text.take(400)}"))
       body  <- IO.fromEither(timed.value.decodeAs[GetGoalBody].leftMap(new RuntimeException(_)))
-      _     <- record(ctx, timed, body.elapsedMs, None)
+      _     <- record(ctx, timed, Some(body.elapsedMs), None)
     } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
   /** fill_hole as a probe: memoised on (content, hole, candidate).  The server
@@ -133,16 +133,17 @@ final class Oracle private (
                       "line"      -> ob.line.asJson,
                       "column"    -> ob.col.asJson,
                       "candidate" -> candidate.asJson))
-          answer <- if (timed.value.isError)
-                      IO.pure(OracleAnswer(
+          // Decode exactly once; a strict-decoder failure on a normal reply is
+          // wire drift and raises, which the harness records as an anomaly.
+          decoded <- if (timed.value.isError) IO.pure(Option.empty[FillHoleBody])
+                     else IO.fromEither(timed.value.decodeAs[FillHoleBody].leftMap(new RuntimeException(_))).map(Option(_))
+          answer  = decoded match {
+                      case Some(b) => OracleAnswer(b.toOutcome, timed.value.text, timed.clientMs, cached = false)
+                      case None    => OracleAnswer(
                         ProbeOutcome(candidate, ProbeStatus.Crash, Vector.empty, Some(timed.value.text.take(400))),
-                        timed.value.text, timed.clientMs, cached = false))
-                    else
-                      IO.fromEither(timed.value.decodeAs[FillHoleBody].leftMap(new RuntimeException(_)))
-                        .map(b => OracleAnswer(b.toOutcome, timed.value.text, timed.clientMs, cached = false))
-          elapsed = timed.value.decodeAs[FillHoleBody].toOption.flatMap(_.elapsedMs)
-          cfs     = timed.value.decodeAs[FillHoleBody].toOption.flatMap(_.checkedFromSource)
-          _      <- record(ctx, timed, elapsed, cfs)
+                        timed.value.text, timed.clientMs, cached = false)
+                    }
+          _      <- record(ctx, timed, decoded.map(_.elapsedMs), decoded.flatMap(_.checkedFromSource))
           _      <- memo.update(_ + (key -> answer))
         } yield answer
     })

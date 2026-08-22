@@ -168,13 +168,19 @@ object SearchState {
 }
 
 /** The one way to claim a proof is done.  Constructible only from a state with
-  * no obligations left AND a final batch check_file whose `success` was true —
-  * the exit-code-derived verdict (agda-mcp README, issues #72/#69), mirroring
-  * eval_fixtures.py's `_final_strict_check`.  A lemma with two obligations and
-  * one discharged cannot reach this type; that is the #112 regression, pinned
-  * in ModelSpec.
+  * no obligations left AND a final batch check_file whose `success` was true
+  * with exit code 0 — the two are one fact by the server's contract (success
+  * is a function of the exit code alone, issues #72/#69), so evidence that
+  * disagrees with itself is refused rather than trusted halfway.  Mirrors
+  * eval_fixtures.py's `_final_strict_check`.  Declared `sealed abstract case
+  * class` with a private constructor, like SearchState above and for the same
+  * reason: in Scala 2 a concrete case class keeps public synthetic
+  * `apply`/`copy` whatever the constructor's access, so only the abstract
+  * form makes the claim unforgeable.  A lemma with two obligations and one
+  * discharged cannot reach this type; that is the #112 regression, pinned in
+  * ModelSpec.
   */
-final case class SolvedClaim private (state: SearchState, finalExitCode: Int)
+sealed abstract case class SolvedClaim private (state: SearchState, finalExitCode: Int)
 
 object SolvedClaim {
   def fromFinalCheck(state: SearchState, checkSuccess: Boolean, exitCode: Int): Either[String, SolvedClaim] =
@@ -182,8 +188,10 @@ object SolvedClaim {
       Left(s"${state.obligations.size} obligation(s) remain: not solved")
     else if (!checkSuccess)
       Left(s"final batch check failed (exit $exitCode): not solved")
+    else if (exitCode != 0)
+      Left(s"final check reported success but exit code $exitCode: inconsistent evidence, not solved")
     else
-      Right(SolvedClaim(state, exitCode))
+      Right(new SolvedClaim(state, exitCode) {})
 }
 
 /** Rank probe outcomes, lowest first — #112's "order by remaining obligations"

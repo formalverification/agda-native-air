@@ -25,11 +25,26 @@
   *       working copy, and — only if no obligation remains — claim solved via
   *       the final batch check (SolvedClaim).
   *
+  *  Exit code: anomalies (a fixture presenting the wrong hole count, an
+  *  oracle failure, a drifted wire shape) never abort the sweep — every
+  *  fixture is still driven and every artifact written — but any anomaly
+  *  makes the run exit non-zero, so a partial report can never hide under a
+  *  passing make target.
+  *
   *  Passes: `--passes 2` runs the whole sweep twice against ONE server
-  *  process; the second pass reads warm `.agdai` interfaces, and the report
-  *  keeps the passes separate so the split is quoted from the warm one.  The
-  *  probe memo is deliberately per-pass: sharing it across passes would turn
-  *  every warm-pass probe into a cache hit and measure nothing.
+  *  process; the report keeps the passes separate so the split is quoted from
+  *  the second, warm pass.  Warmth here means Agda's `.agdai` interfaces for
+  *  the IMPORTED libraries, which live with those libraries and are therefore
+  *  path-independent of the working copies (measured: the two passes of the
+  *  #113 sweep differ by ~2 % despite fresh per-pass directories).  The
+  *  fixture itself keeps a hole throughout probing, so it writes no interface
+  *  of its own, and the interaction lane reloads on every fixture switch
+  *  regardless of pathing (docs/agda-mcp-interaction-lane.md § 2.6) — so the
+  *  per-pass work directories cost no reusable warmth, and they buy pass
+  *  isolation: each pass's committed artifacts survive for post-mortem
+  *  instead of being overwritten by the next.  The probe memo is deliberately
+  *  per-pass: sharing it across passes would turn every warm-pass probe into
+  *  a cache hit and measure nothing.
   *
   *  Output, under --out-dir/--run-id
   *  --------------------------------
@@ -82,10 +97,15 @@ final case class HarnessConfig(
 
 /** One results.jsonl row: the eval-proof-completion.v0 attempt shape, so the
   * harness's judgements land in the same format the policy-backend evaluator
-  * writes (issue #113's "no private format" acceptance).
+  * writes (issue #113's "no private format" acceptance).  `fixtureId` is the
+  * fixture module STEM, exactly as the schema defines it (the evaluator uses
+  * `fixture.stem`); the benchmark index id rides the additive `benchmarkId`
+  * field instead, which is also the key the timing ledger and report use, so
+  * rows stay joinable without repurposing an established field.
   */
 final case class AttemptRow(
   fixtureId:     String,
+  benchmarkId:   String,
   module:        String,
   fixturePath:   String,
   holeIndex:     Int,
@@ -100,6 +120,7 @@ final case class AttemptRow(
 ) {
   def toJson: Json = Json.obj(
     "fixtureId"     -> fixtureId.asJson,
+    "benchmarkId"   -> benchmarkId.asJson,
     "module"        -> module.asJson,
     "fixturePath"   -> fixturePath.asJson,
     "holeIndex"     -> holeIndex.asJson,
@@ -234,6 +255,19 @@ object SingleStepHarness extends IOApp {
                    }
                  }
       _       <- writeOutputs(cfg, entries, result)
+      // Anomalies keep a sweep alive fixture-by-fixture, but they must not
+      // keep the RUN green: a broken server or drifted wire would otherwise
+      // yield a partial report under a passing make target — the silent
+      // breakage #112 records as this project's own failure mode.  Artifacts
+      // are all written above; the exit code now tells the truth.
+      anomalies = result.flatMap { case (pass, outs, _) =>
+                    outs.map(_._1).filter(_.anomaly.isDefined).map(o => (pass, o))
+                  }
+      _       <- anomalies.traverse_ { case (pass, o) =>
+                   IO.println(s"!! [pass $pass] ${o.fixtureId} anomaly: ${o.anomaly.getOrElse("")}")
+                 }
+      _       <- IO.raiseWhen(anomalies.nonEmpty)(new RuntimeException(
+                   s"${anomalies.size} fixture(s) ended in an anomaly; outputs are written but the run is not clean"))
     } yield ()
   }
 
@@ -278,6 +312,12 @@ object SingleStepHarness extends IOApp {
     step.handleErrorWith(e => IO.println(s">> [pass $pass] $fixtureId FAILED: ${e.getMessage}").as(anomaly(e.getMessage)))
   }
 
+  /** The schema's fixtureId: the fixture module stem (file name sans .agda). */
+  private def fixtureStem(entry: IndexEntry): String = {
+    val name = entry.obligationPath.getFileName.toString
+    name.stripSuffix(".agda")
+  }
+
   private def probeAndCommit(
     cfg: HarnessConfig, oracle: Oracle, pass: Int, entry: IndexEntry,
     workFile: Path, logsDir: Path, state: SearchState, ob: Obligation
@@ -303,7 +343,8 @@ object SingleStepHarness extends IOApp {
                 }
       rows    = probed.map { case (rank, cand, ans) =>
                   AttemptRow(
-                    fixtureId     = entry.id,
+                    fixtureId     = fixtureStem(entry),
+                    benchmarkId   = entry.id,
                     module        = goal.body.module.getOrElse(""),
                     // The schema defines fixturePath as ABSOLUTE (agda-dojang/README.md),
                     // so rows cannot depend on a consumer's working directory.

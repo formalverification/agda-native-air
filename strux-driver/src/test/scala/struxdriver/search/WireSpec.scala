@@ -38,7 +38,7 @@ final class WireSpec extends AnyFunSuite with Matchers {
     body.holesCount shouldBe 1
     body.holes.map(WireHole.toObligation) shouldBe Vector(Obligation(26, 8, "?"))
     body.timedOut shouldBe false
-    body.elapsedMs.isDefined shouldBe true
+    body.elapsedMs should be > 0L
   }
 
   test("get_goal: goal type, resolved module, and which lane answered") {
@@ -79,6 +79,26 @@ final class WireSpec extends AnyFunSuite with Matchers {
     // Its content is prose: the second-level parse fails, which the client
     // must treat as an answer about the call, not a transport failure.
     reply.bodyJson.isLeft shouldBe true
+  }
+
+  test("wire drift fails the decode instead of bending the data (round-2 review)") {
+    import io.circe.parser.parse
+    // A normal-looking ok reply MISSING the holes key must not decode — a
+    // defaulted-empty list would turn any Ok answer into a closer.
+    val noHoles = """{"status":"ok","candidate":"tt","remainingHoles":0,"elapsedMs":10}"""
+    parse(noHoles).toOption.get.as[FillHoleBody].isLeft shouldBe true
+    // A count that disagrees with the list is drift, not data.
+    val mismatch = """{"status":"ok","candidate":"tt","holes":[],"remainingHoles":1,"elapsedMs":10}"""
+    parse(mismatch).toOption.get.as[FillHoleBody].isLeft shouldBe true
+    // Missing elapsedMs silently vanishing from the split is the same trap.
+    val noElapsed = """{"status":"ok","candidate":"tt","holes":[],"remainingHoles":0}"""
+    parse(noElapsed).toOption.get.as[FillHoleBody].isLeft shouldBe true
+    // check_file: holesCount must agree with the list it counts.
+    val badCount = """{"success":true,"holes":[],"holesCount":3,"elapsedMs":5}"""
+    parse(badCount).toOption.get.as[CheckFileBody].isLeft shouldBe true
+    // And the LIVE type_error capture stays decodable: its holes list is
+    // genuinely empty with remainingHoles 0 — empty is data, absent is drift.
+    replyOf("wire-fill-hole-type-error.json", 5).decodeAs[FillHoleBody].isRight shouldBe true
   }
 
   test("envelope: lines for other ids and non-JSON noise are NotOurs, never fatal") {
