@@ -12,6 +12,18 @@ That prior work is also Copyright 2025-2026 William DeMeo.
 
 ---
 
-Documentation and datasets in this repository (docs/ and data/) are licensed
-separately under the Creative Commons Attribution 4.0 International License
-(CC-BY 4.0). See LICENSE-docs for details.
+Documentation in this repository (docs/) is licensed separately under the
+Creative Commons Attribution 4.0 International License (CC-BY 4.0). See
+LICENSE-docs for details.
+
+Datasets are licensed per dataset, not per repository, because this project
+does not own all of what it extracts. A corpus extracted from another Agda
+library is a derivative work of that library's source and is redistributed
+under that library's license, with the attribution that license requires; a
+corpus this project authors outright is dedicated to the public domain under
+CC0 1.0. Each published corpus states its own terms, its upstream commit, and
+its required citation in its dataset card under docs/corpora/.
+
+For example, the agda-algebras corpus (docs/corpora/agda-algebras-v0.md) is
+derived from ualib/agda-algebras' src/, which is licensed under the Apache
+License 2.0, and is redistributed under that license.

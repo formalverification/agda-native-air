@@ -1,7 +1,7 @@
 <!-- File: agda-native-air/README.md -->
 
 # Agda-native AIR
-[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.7.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/Haskell-GHC_9.8-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
+[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.8.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/Haskell-GHC_9.10.3-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
 
 *Agda-native Artificial Intelligence Reasoning environment*
 
@@ -180,6 +180,42 @@ We welcome contributors interested in
 +  constructive, algebraic, category theoretic mathematics, general type theory and/or HoTT.
 
 If you want to join us, please start by reading [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+---
+
+## Licensing
+
+Three kinds of thing live here and they are licensed differently, so the split is
+worth stating plainly.
+
++  **Code** — [Apache License 2.0](LICENSE).  This covers everything under
+   `agda-strux/`, `agda-mcp/`, `strux-driver/`, `ml-pipeline/`, `agda-dojang/`,
+   and `scripts/`.  It permits commercial use, redistribution, and use in
+   training or evaluating machine-learning models, asking only that you keep the
+   notices, include the license, and say what you changed.
++  **Documentation** — [CC-BY-4.0](LICENSE-docs).  Everything under `docs/`.
++  **Datasets** — *per dataset, named in the dataset's own card* under
+   [`docs/corpora/`](docs/corpora/).  Not per repository, because this project
+   does not own all of what it extracts.
+
+That last point is the one that surprises people, so here is the reasoning.  A
+corpus extracted from another Agda library is a derivative work of that library's
+source: its rows are that library's types and proof terms, rendered differently.
+This project cannot relicense them, so such a corpus is redistributed under the
+upstream license, with the attribution that license requires.  The
+[agda-algebras corpus](docs/corpora/agda-algebras-v0.md) is Apache-2.0 for
+exactly this reason, inherited from
+[`ualib/agda-algebras`](https://github.com/ualib/agda-algebras).  A corpus this
+project authors outright — one derived from fixtures written here, or a purely
+statistical summary — is dedicated to the public domain under
+[CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/), which is the
+least friction we can offer.
+
+**If you are assembling training data**, none of the above should slow you down:
+Apache-2.0 and CC0-1.0 are both standard permissive choices, and each corpus's
+card gives you the upstream commit and the citation to reproduce and credit it.
+If a license here is nonetheless in your way, open an issue and say which one and
+why — that is a bug in how we have set this up, not a position we are defending.
 
 ---
 

@@ -109,7 +109,7 @@ The corpus is derived from `agda-algebras`' `src/`, which is licensed under the 
 
 > The Agda Universal Algebra Library (`ualib/agda-algebras`), commit `ecc158a3730259b75d2ace4f5e30764e1c514380`, Apache-2.0.
 
-This card and the statistical summaries computed from the corpus are part of `agda-native-air`'s documentation and are licensed **CC-BY-4.0** (see `LICENSE-docs`), with the caveat that the tables quote identifiers from the library and those remain the library's.  `agda-native-air`'s `LICENSE-docs` puts `data/` under CC-BY-4.0 as a default for material this project authors; it does not, and cannot, relicense rows derived from someone else's Apache-2.0 source.  For this corpus the upstream license governs.
+This card and the statistical summaries computed from the corpus are part of `agda-native-air`'s documentation and are licensed **CC-BY-4.0** (see `LICENSE-docs`), with the caveat that the tables quote identifiers from the library and those remain the library's.  `agda-native-air` licenses datasets per dataset rather than per repository, precisely so that this distinction can be stated where it applies: see the "Licensing" section of that project's `README.md`.  For this corpus the upstream license governs.
 
 ## Reproducing it
 
