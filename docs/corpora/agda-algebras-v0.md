@@ -24,11 +24,13 @@ Everything in this section is recorded machine-readably in `provenance.json`; th
 | Agda standard library | 2.3, `/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3` |
 | GHC | 9.10.3 |
 | Toolchain pin | `flake.lock`: `nixpkgs-agda` at `9dcb002ca1690658be4a04645215baea8b95f31d`, `nixpkgs` at `b6018f87da91d19d0ab4cf979885689b469cdd41` |
-| Extraction run | 377 modules, `--runner spark` on `local[4]`, parallelism 8, no resume; 5 m 09 s wall, 6,653 s of module time |
+| Extraction run | 377 modules, `--runner spark` on `local[4]` (no fallback), parallelism 8, no resume; 5 m 39 s wall, 7,348 s of module time |
 | Corpus SHA-256 | `acdfaa5766ed83c5055b5f9fee8a9eaeeeadbe4e98630d916352a7851845ed54` |
 | Gzip SHA-256 | `88bfd57097d98b3cc455b63899f191b312f3acc40f277cfe93fb40d5fac23238` |
 
 The Nix store path of the standard library is itself the version pin: it names the exact derivation Agda typechecked against.
+
+Two things about *when* these were recorded, because a corpus is packaged after it is extracted and the difference matters.  The library commit, its dirty state, the module list, and the runner that actually ran are recorded by the extraction itself and read back from its manifest; `provenance.json` also reports what the checkout says at packaging time (`commitAtPackagingTime`, `commitMatchesCheckout`), so a library that moved in between is visible rather than silently relabelled.  The toolchain block is sampled when packaging runs and is marked `sampledAt: packaging-time`: the pinned Agda is linked into `agda-json`, so an `agda --version` cannot be an authoritative record of what typechecked the library — the `agda-json` path in the manifest is.
 
 ## Coverage
 
@@ -122,7 +124,9 @@ make corpus-nix
 
 The first target generates the module list (typechecking the library once to get its dependency graph), then extracts every module through `agda-json`.  The second concatenates the per-module JSONL and writes `coverage.json`, `provenance.json`, `stats.json`, and `stats.md` under `data/corpora/agda-algebras/v0/`.
 
-Expect about six minutes of wall time with warm `.agdai` interfaces and considerably more from cold; the extraction is 6,653 seconds of module time at parallelism 8.  Byte-identical output is expected for the same library commit and the same toolchain: modules are concatenated in sorted order and the gzip is written with no stored filename and `mtime=0`.  Compare against the digests above.
+Assembly refuses to write a corpus whose row count disagrees with the extraction manifest's, so a raw tree that changed after it was validated is an error rather than a quietly inconsistent release.
+
+Expect about six minutes of wall time with warm `.agdai` interfaces and considerably more from cold; the extraction is 7,348 seconds of module time at parallelism 8.  Byte-identical output is expected for the same library commit and the same toolchain: modules are concatenated in sorted order and the gzip is written with no stored filename and `mtime=0`.  Compare against the digests above.
 
 ## Using it with agda-mcp
 
