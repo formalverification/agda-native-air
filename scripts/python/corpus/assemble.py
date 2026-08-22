@@ -180,13 +180,21 @@ def relative_to(root: str, path: str) -> str:
 
 
 def coverage_to_json(
-    coverage: Coverage, library: str, requested: int, out_root: str = ""
+    coverage: Coverage,
+    library: str,
+    requested: int,
+    out_root: str = "",
+    requested_source: str = "run-manifest",
 ) -> Dict:
     """The `coverage.json` document.  Failures come first: they are the point."""
     return {
         "schema": COVERAGE_SCHEMA,
         "library": library,
         "modulesRequested": requested,
+        # "run-manifest" when the run recorded its own module list, which is
+        # the only source that cannot have changed since; "modules-file" when
+        # falling back to re-reading the file the run merely pointed at.
+        "modulesRequestedFrom": requested_source,
         # Artifact paths below are relative to this, the extraction out-dir.
         "outRoot": out_root,
         "summary": {
@@ -272,6 +280,8 @@ def build_provenance(
     *,
     library: str,
     library_commit: str,
+    library_commit_source: str,
+    library_commit_live: str,
     library_remote: str,
     library_dirty: bool,
     library_untracked: int,
@@ -304,6 +314,13 @@ def build_provenance(
             "library": library,
             "remote": library_remote,
             "commit": library_commit,
+            # Where the commit above came from, and what the checkout says now.
+            # They differ when the library moved between extraction and
+            # packaging, in which case the corpus describes `commit` and the
+            # checkout no longer does.
+            "commitRecordedBy": library_commit_source,
+            "commitAtPackagingTime": library_commit_live,
+            "commitMatchesCheckout": library_commit == library_commit_live,
             "workingTreeDirty": library_dirty,
             "untrackedFiles": library_untracked,
             # The untracked files that can actually change the corpus: the
@@ -322,6 +339,12 @@ def build_provenance(
             "backend": manifest.get("agdaJsonBin", ""),
         },
         "toolchain": {
+            # Unlike the commits above, these are read WHEN PACKAGING RUNS, not
+            # when the extraction did — the driver has no reliable way to
+            # record them (the pinned Agda is linked into `agda-json`, so an
+            # `agda --version` from PATH would describe a different binary).
+            # Said plainly here rather than left to be assumed.
+            "sampledAt": "packaging-time",
             "agda": agda_version,
             "agdaLibraries": list(agda_libraries),
             "flakeInputs": flake_pins,
@@ -329,7 +352,13 @@ def build_provenance(
         "run": {
             "startedAt": manifest.get("startedAt", ""),
             "finishedAt": manifest.get("finishedAt", ""),
+            # `runner` is what was asked for; `runnerEffective` is what ran.
+            # They differ when Spark failed and the driver fell back to local.
             "runner": manifest.get("runner", ""),
+            "runnerEffective": manifest.get(
+                "runnerEffective", manifest.get("runner", "")
+            ),
+            "sparkFallback": bool(manifest.get("sparkFallback", False)),
             "sparkMaster": manifest.get("sparkMaster", ""),
             "parallelism": manifest.get("parallelism", 0),
             "resume": manifest.get("resume", None),
@@ -569,10 +598,22 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
         return Result.err(manifest_result.unwrap_err())
     manifest = manifest_result.unwrap()
 
-    requested_result = read_text(Path(args.modules_file)).map(parse_modules_file)
-    if requested_result.is_err:
-        return Result.err(requested_result.unwrap_err())
-    requested = requested_result.unwrap()
+    # What the run was asked to cover.  The manifest's own snapshot is
+    # authoritative: `modulesFile` is only a path, and regenerating metadata
+    # between extraction and packaging would otherwise change what "requested"
+    # meant — marking new modules `not_attempted` and keeping removed ones.
+    # The file is the fallback for a manifest written before the snapshot
+    # existed.
+    manifest_modules = manifest.get("modules")
+    if isinstance(manifest_modules, list) and manifest_modules:
+        requested: Tuple[str, ...] = tuple(sorted(str(m) for m in manifest_modules))
+        requested_source = "run-manifest"
+    else:
+        requested_result = read_text(Path(args.modules_file)).map(parse_modules_file)
+        if requested_result.is_err:
+            return Result.err(requested_result.unwrap_err())
+        requested = requested_result.unwrap()
+        requested_source = "modules-file"
 
     coverage = compute_coverage(manifest, requested)
     if coverage.succeeded == 0:
@@ -589,6 +630,26 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
         return Result.err(concat.unwrap_err())
     rows, corpus_bytes, corpus_sha = concat.unwrap()
 
+    # The manifest counted the rows when it validated each module; this counted
+    # them again from the files on disk just now.  If a per-module JSONL was
+    # truncated or replaced in between, the two disagree — and publishing would
+    # ship a `coverage.json` whose row total contradicts `provenance.json`.
+    # Refuse rather than reconcile: the fix is to re-extract, not to pick one.
+    expected_rows = sum(o.rows for o in coverage.outcomes if o.status == "succeeded")
+    if rows != expected_rows:
+        return Result.err(
+            PipelineError(
+                ErrorType.VALIDATION_ERROR,
+                "assembled row count does not match the extraction manifest; "
+                "a per-module JSONL changed after it was validated",
+                context={
+                    "assembled": rows,
+                    "manifestExpected": expected_rows,
+                    "jsonlDir": args.jsonl_dir,
+                },
+            )
+        )
+
     versions_result = observed_type_ast_versions(corpus_path)
     if versions_result.is_err:
         return Result.err(versions_result.unwrap_err())
@@ -604,17 +665,38 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
         else ()
     )
 
+    # The library commit belongs to the extraction, not to this packaging run:
+    # `make corpus` consumes an existing raw tree, so checking out another
+    # commit in between would otherwise label old JSONL with the new one.  Use
+    # what the manifest recorded, and report the live checkout separately so a
+    # mismatch is visible rather than silently resolved.
+    recorded_commit = str(manifest.get("srcCommit", "") or "")
+    live_commit = _git_or(["rev-parse", "HEAD"], library_root, "unknown")
     provenance = build_provenance(
         library=args.library,
-        library_commit=_git_or(["rev-parse", "HEAD"], library_root, "unknown"),
+        library_commit=recorded_commit or live_commit,
+        library_commit_source="run-manifest" if recorded_commit else "packaging-time",
+        library_commit_live=live_commit,
         library_remote=_git_or(["remote", "get-url", "origin"], library_root, "unknown"),
-        library_dirty=_worktree_dirty(library_root),
+        library_dirty=(
+            bool(manifest.get("srcDirty"))
+            if recorded_commit
+            else _worktree_dirty(library_root)
+        ),
         library_untracked=len(library_untracked),
         library_untracked_sources=untracked_sources_under(
             src_dir, library_root, library_untracked
         ),
-        repo_commit=_git_or(["rev-parse", "HEAD"], repo_root, "unknown"),
-        repo_dirty=_worktree_dirty(repo_root),
+        # Same time-of-check reasoning as the library: the extraction was run
+        # by some commit of this repository, and packaging can happen from
+        # another without the rows changing.
+        repo_commit=str(manifest.get("producerCommit", "") or "")
+        or _git_or(["rev-parse", "HEAD"], repo_root, "unknown"),
+        repo_dirty=(
+            bool(manifest.get("producerDirty"))
+            if manifest.get("producerCommit")
+            else _worktree_dirty(repo_root)
+        ),
         repo_untracked=len(_untracked_files(repo_root)),
         manifest=manifest,
         coverage=coverage,
@@ -643,7 +725,11 @@ def assemble(args: argparse.Namespace) -> Result[Assembly, PipelineError]:
         (
             coverage_path,
             coverage_to_json(
-                coverage, args.library, len(requested), str(manifest.get("outDir", ""))
+                coverage,
+                args.library,
+                len(requested),
+                str(manifest.get("outDir", "")),
+                requested_source,
             ),
         ),
         (provenance_path, provenance),

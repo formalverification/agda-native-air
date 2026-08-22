@@ -28,7 +28,9 @@ from pathlib import Path
 
 from scripts.python.corpus.assemble import (
     Coverage,
+    _parser,
     _summary,
+    assemble,
     build_provenance,
     compute_coverage,
     concatenate,
@@ -300,6 +302,34 @@ def test_observed_type_ast_versions_reports_a_bad_line(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _provenance_args(**overrides: object) -> dict:
+    """Default arguments for `build_provenance`, overridable per test."""
+    args = {
+        "library": "agda-algebras",
+        "library_commit": "cafe123",
+        "library_commit_source": "run-manifest",
+        "library_commit_live": "cafe123",
+        "library_remote": "git@github.com:ualib/agda-algebras.git",
+        "library_dirty": False,
+        "library_untracked": 0,
+        "library_untracked_sources": (),
+        "repo_commit": "beef456",
+        "repo_dirty": False,
+        "repo_untracked": 0,
+        "manifest": _manifest(),
+        "coverage": Coverage(1, 1, 0, 0, 0, 10, ()),
+        "flake_pins": {},
+        "agda_libraries": (),
+        "agda_version": "Agda version 2.8.0",
+        "type_ast_versions": ("0.3-v0",),
+        "corpus_rows": 10,
+        "corpus_bytes": 100,
+        "corpus_sha256": "abc",
+    }
+    args.update(overrides)
+    return args
+
+
 def test_flake_lock_pins_keeps_the_revision_of_each_input() -> None:
     lock = {
         "nodes": {
@@ -367,6 +397,76 @@ def test_untracked_sources_under_handles_an_empty_src_dir() -> None:
     assert untracked_sources_under("", Path("/lib"), ("src/A.agda",)) == ()
 
 
+# ---------------------------------------------------------------------------
+# Time-of-check: what the manifest recorded vs what packaging can see
+# ---------------------------------------------------------------------------
+
+
+def _manifest(**kw: object) -> dict:
+    base = {
+        "srcDir": "/src",
+        "agdaJsonBin": "/bin/agda-json",
+        "startedAt": "t0",
+        "finishedAt": "t1",
+        "runner": "spark",
+        "sparkMaster": "local[4]",
+        "parallelism": 8,
+        "resume": False,
+        "results": [_result("A", True)],
+    }
+    base.update(kw)
+    return base
+
+
+def test_provenance_carries_the_runner_that_actually_ran() -> None:
+    # Spark failed and the driver fell back; publishing this as a Spark run
+    # would misdescribe how the rows were produced.
+    doc = build_provenance(**_provenance_args(
+        manifest=_manifest(runnerEffective="local", sparkFallback=True)
+    ))
+    assert doc["run"]["runner"] == "spark"
+    assert doc["run"]["runnerEffective"] == "local"
+    assert doc["run"]["sparkFallback"] is True
+
+
+def test_provenance_runner_defaults_to_the_requested_one() -> None:
+    # A manifest written before the driver recorded an effective runner.
+    doc = build_provenance(**_provenance_args(manifest=_manifest()))
+    assert doc["run"]["runnerEffective"] == "spark"
+    assert doc["run"]["sparkFallback"] is False
+
+
+def test_provenance_flags_a_library_that_moved_after_extraction() -> None:
+    doc = build_provenance(**_provenance_args(
+        library_commit="extracted111",
+        library_commit_source="run-manifest",
+        library_commit_live="moved222",
+    ))
+    # The corpus describes the commit it was extracted from, and says plainly
+    # that the checkout no longer does.
+    assert doc["source"]["commit"] == "extracted111"
+    assert doc["source"]["commitAtPackagingTime"] == "moved222"
+    assert doc["source"]["commitMatchesCheckout"] is False
+    assert doc["source"]["commitRecordedBy"] == "run-manifest"
+
+
+def test_provenance_says_when_the_commit_was_only_sampled_at_packaging_time() -> None:
+    doc = build_provenance(**_provenance_args(
+        library_commit="cafe123",
+        library_commit_source="packaging-time",
+        library_commit_live="cafe123",
+    ))
+    assert doc["source"]["commitRecordedBy"] == "packaging-time"
+    assert doc["source"]["commitMatchesCheckout"] is True
+
+
+def test_coverage_names_where_the_requested_list_came_from() -> None:
+    doc = coverage_to_json(
+        compute_coverage(_manifest(), ("A",)), "agda-algebras", 1, "/out", "modules-file"
+    )
+    assert doc["modulesRequestedFrom"] == "modules-file"
+
+
 def test_build_provenance_records_source_toolchain_and_coverage() -> None:
     coverage = Coverage(
         attempted=3, succeeded=2, failed=1, not_attempted=0, resumed=0, rows=20, outcomes=()
@@ -374,6 +474,8 @@ def test_build_provenance_records_source_toolchain_and_coverage() -> None:
     doc = build_provenance(
         library="agda-algebras",
         library_commit="cafe123",
+        library_commit_source="run-manifest",
+        library_commit_live="cafe123",
         library_remote="git@github.com:ualib/agda-algebras.git",
         library_dirty=False,
         library_untracked=7,
@@ -429,3 +531,125 @@ def test_summary_finds_the_description_line() -> None:
     # Read by name, not by line number: indexing into __doc__ gave an empty
     # --help description.
     assert _summary().startswith("Assemble a publishable")
+
+
+# ---------------------------------------------------------------------------
+# assemble() end to end, against a real extraction tree
+# ---------------------------------------------------------------------------
+
+
+ROW = '{"file":"X","module":"M","name":"f","qname":"M.f","prettyQname":"M.f",\
+"type":"A","kind":"definition","astSize":1,"typeAstVersion":"0.3-v0"}'
+
+
+def _extraction_tree(tmp_path: Path, rows_per_module: int = 2) -> Path:
+    """A minimal <outDir>: two modules' JSONL plus a matching run-manifest."""
+    out = tmp_path / "raw"
+    (out / "jsonl").mkdir(parents=True)
+    for mod in ("A", "B"):
+        (out / "jsonl" / f"{mod}.jsonl").write_text(
+            (ROW + "\n") * rows_per_module, encoding="utf-8"
+        )
+    manifest = {
+        "srcDir": str(tmp_path / "src"),
+        "outDir": str(out),
+        "agdaJsonBin": "/bin/agda-json",
+        "startedAt": "t0",
+        "finishedAt": "t1",
+        "runner": "spark",
+        "runnerEffective": "local",
+        "sparkFallback": True,
+        "sparkMaster": "local[4]",
+        "parallelism": 8,
+        "resume": False,
+        "srcCommit": "extracted111",
+        "srcDirty": False,
+        "producerCommit": "producer999",
+        "producerDirty": False,
+        "modules": ["A", "B"],
+        "results": [
+            _result("A", True, rows=rows_per_module),
+            _result("B", True, rows=rows_per_module),
+        ],
+    }
+    (out / "run-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "modules.txt").write_text("A\nB\n", encoding="utf-8")
+    return out
+
+
+def _args(tmp_path: Path, out: Path):
+    return _parser().parse_args([
+        "--jsonl-dir", str(out / "jsonl"),
+        "--run-manifest", str(out / "run-manifest.json"),
+        "--modules-file", str(tmp_path / "modules.txt"),
+        "--out-dir", str(tmp_path / "corpus"),
+        "--library-root", str(tmp_path),
+        "--repo-root", str(tmp_path),
+        "--flake-lock", str(tmp_path / "flake.lock"),
+        "--agda-version", "Agda version 2.8.0",
+    ])
+
+
+def test_assemble_writes_a_corpus_from_a_consistent_tree(tmp_path: Path) -> None:
+    out = _extraction_tree(tmp_path)
+    result = assemble(_args(tmp_path, out))
+
+    assert result.is_ok, result.unwrap_err() if result.is_err else ""
+    a = result.unwrap()
+    assert a.rows == 4
+    provenance = json.loads(a.provenance.read_text(encoding="utf-8"))
+    # Facts recorded by the run beat facts re-derived at packaging time.
+    assert provenance["source"]["commit"] == "extracted111"
+    assert provenance["source"]["commitRecordedBy"] == "run-manifest"
+    assert provenance["run"]["runnerEffective"] == "local"
+    assert provenance["run"]["sparkFallback"] is True
+    assert provenance["producer"]["commit"] == "producer999"
+    # Toolchain facts cannot be recorded by the run, and say so.
+    assert provenance["toolchain"]["sampledAt"] == "packaging-time"
+    coverage = json.loads(a.coverage.read_text(encoding="utf-8"))
+    assert coverage["modulesRequestedFrom"] == "run-manifest"
+
+
+def test_assemble_refuses_a_module_file_that_changed_after_validation(tmp_path: Path) -> None:
+    out = _extraction_tree(tmp_path)
+    # The manifest says B has 2 rows; the file on disk now has 1.  Assembly
+    # used to succeed and publish a coverage total contradicting provenance.
+    (out / "jsonl" / "B.jsonl").write_text(ROW + "\n", encoding="utf-8")
+
+    result = assemble(_args(tmp_path, out))
+
+    assert result.is_err
+    err = result.unwrap_err()
+    assert "does not match the extraction manifest" in err.message
+    assert err.context["assembled"] == 3
+    assert err.context["manifestExpected"] == 4
+
+
+def test_assemble_uses_the_manifest_module_list_over_a_changed_file(tmp_path: Path) -> None:
+    out = _extraction_tree(tmp_path)
+    # Metadata regenerated between extraction and packaging: the file now names
+    # a module the run never saw.  Reading the file would report it
+    # `not_attempted` and inflate `modulesRequested`.
+    (tmp_path / "modules.txt").write_text("A\nB\nC\n", encoding="utf-8")
+
+    a = assemble(_args(tmp_path, out)).unwrap()
+    coverage = json.loads(a.coverage.read_text(encoding="utf-8"))
+
+    assert coverage["modulesRequested"] == 2
+    assert coverage["summary"]["notAttempted"] == 0
+    assert coverage["modulesRequestedFrom"] == "run-manifest"
+
+
+def test_assemble_falls_back_to_the_modules_file_without_a_snapshot(tmp_path: Path) -> None:
+    out = _extraction_tree(tmp_path)
+    manifest = json.loads((out / "run-manifest.json").read_text(encoding="utf-8"))
+    del manifest["modules"]
+    del manifest["srcCommit"]
+    (out / "run-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    a = assemble(_args(tmp_path, out)).unwrap()
+    coverage = json.loads(a.coverage.read_text(encoding="utf-8"))
+    provenance = json.loads(a.provenance.read_text(encoding="utf-8"))
+
+    assert coverage["modulesRequestedFrom"] == "modules-file"
+    assert provenance["source"]["commitRecordedBy"] == "packaging-time"
