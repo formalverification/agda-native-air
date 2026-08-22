@@ -81,7 +81,8 @@ agent.
 ```sh
 git clone git@github.com:formalverification/agda-native-air.git
 cd agda-native-air
-nix develop          # provides GHC 9.8.2, Agda 2.8.0, Cabal, etc.
+nix develop          # Agda 2.8.0, Scala/sbt, Python; NOT a pinned GHC
+nix develop .#backend # add the pinned GHC 9.10.3 + Cabal (Haskell work)
 make check           # build + test all components
  ```
 

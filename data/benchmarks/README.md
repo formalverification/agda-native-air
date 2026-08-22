@@ -125,3 +125,11 @@ AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master nix develop .#backend
 
 Until those obligations are authored and committed, the suite is `agda-stdlib`
 only.
+
+## License
+
+These fixtures are Agda source written for this repository, so the repository's
+code license applies: [Apache-2.0](../../LICENSE).  They import the Agda
+standard library, which carries its own (MIT) license and is not vendored here.
+See the "Licensing" section of the top-level `README.md` for the wider policy on
+data.

@@ -1,7 +1,15 @@
 Creative Commons Attribution 4.0 International License
 
-The documentation (docs/) and datasets (data/) in this repository are
-licensed under the Creative Commons Attribution 4.0 International License.
+The documentation written for this repository (docs/) is licensed under the
+Creative Commons Attribution 4.0 International License.
+
+This grant covers material this project authored. It does NOT cover material
+imported from elsewhere, which this project has no standing to license. One
+such file exists today:
+
+  docs/feedback/flrp-agda-mcp-improvements.md
+      Imported verbatim from ualib/agda-algebras, and licensed by that
+      project under its own terms. Its header records the provenance.
 
 Copyright 2025-2026 William DeMeo and Contributors
 
@@ -28,3 +36,16 @@ Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
 
 Note: The source code in this repository is licensed separately under the
 Apache License, Version 2.0. See LICENSE for details.
+
+Note: Data is NOT covered by this license. Everything under data/ is either
+Agda source written here or material extracted from an Apache-2.0 library, so
+data defaults to the Apache License 2.0 (see LICENSE) -- for extracted material
+that is the upstream license passing through, not a claim of ownership. A
+published corpus states its own terms in its dataset card under docs/corpora/,
+and artifacts derived from a corpus inherit that corpus's terms.
+
+An earlier version of this file stated that data/ was CC-BY-4.0. That claim is
+withdrawn; it was not this project's to make for extracted material. Anyone who
+received data from this repository under CC-BY-4.0 may continue to rely on that
+grant for the copy they received. See the "Licensing" section of README.md for
+the full reasoning.

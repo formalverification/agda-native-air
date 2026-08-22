@@ -14,3 +14,13 @@ A golden snapshot produced by running the extractor on:
 
 We keep this JSONL to regression-test schema + normalization behavior without
 vendoring the full dependency closure of that module.
+
+## License
+
+`NoetherLike.agda` is written for this repository and is covered by its code
+license, [Apache-2.0](../../../LICENSE).
+
+`Noether.jsonl` is a golden snapshot extracted from `ualib/agda-algebras`
+(`src/Base/Homomorphisms/Noether.agda`), so it is a derivative work of that
+library and is redistributed under **its** license, Apache-2.0, with attribution
+to that project.  See the "Licensing" section of the top-level `README.md`.
