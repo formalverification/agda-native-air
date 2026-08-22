@@ -256,9 +256,16 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   }
 
   test("the adopted default dedup policy (measured on M1-5, issue #122)") {
-    // Placeholder pin at the conservative landed default; the M1-5 A/B
-    // measurement updates this alongside LoopConfig.default if content-only
-    // wins.  See the #113 thread for the numbers.
+    // Measured on the full M1-5 sweep pair (#113: beam-a-script-nopeek vs
+    // beam-b-content-nopeek): the two policies produced identical runs — 435
+    // probes, the same per-fixture statuses and solve set, zero dedup skips
+    // under either — because in this action space every candidate splices
+    // distinct text at the first open obligation, so identical content
+    // requires an identical script by construction.  Content-only therefore
+    // bought nothing, and the conservative script-inclusive key (which can
+    // never wrongly prune two live states) is adopted.  A proposer that
+    // emits hole-free compound candidates could reopen the question; that
+    // re-measurement belongs to P2 (#123).
     LoopConfig.default.dedup shouldBe DedupPolicy.ScriptInclusive
   }
 
