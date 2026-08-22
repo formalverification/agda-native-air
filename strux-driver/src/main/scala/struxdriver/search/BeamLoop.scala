@@ -40,12 +40,17 @@
   *
   *  The budget counts fill_hole probes that MISS the OracleKey memo — the
   *  ~2.6 s batch coin the P0 measurement on #113 identified as effectively
-  *  the entire cost.  Memo hits are free (no Agda runs).  The per-fixture
-  *  baseline check_file, the final strict checks (bounded by closing probes,
-  *  themselves budgeted), and the millisecond interaction-lane knowledge
-  *  calls (get_goal, type_of, peeks; bounded by beamWidth x maxDepth
-  *  expansions) are reported in the ledger but not gated: gating the
-  *  verification call would forfeit an already-found proof over accounting.
+  *  the entire cost.  Memo hits are free (no Agda runs), and stay free at
+  *  the cap: the loop consults the memo before the budget gate, so a replay
+  *  is served even with the budget spent and only a true miss is refused.
+  *  The per-fixture baseline check_file, the final strict checks (bounded by
+  *  closing probes, themselves budgeted), and the millisecond
+  *  interaction-lane knowledge calls (get_goal, type_of, peeks; bounded by
+  *  beamWidth x maxDepth expansions) are reported in the ledger but not
+  *  gated: gating the verification call would forfeit an already-found proof
+  *  over accounting.  Proposal ledger rows carry the proposer's OWN time:
+  *  oracle calls made through the seam during propose are subtracted, since
+  *  the ledger already carries them as their own rows.
   *
   *  Anomalies
   *  ---------
@@ -248,27 +253,35 @@ object BeamLoop {
             case (st1, Peek.Verdict.Reject(_)) =>
               probeCands(state, target, view, fp, rest, st1, acc)
             case (st1, _) =>
-              if (st1.stats.probes >= cfg.probeBudget) IO.pure((st1, BudgetHit: CandsOutcome))
-              else
-                for {
-                  ans <- oracle.probe(mkCtx("fill_hole", Some(rank)), workFile, fp, target, cand)
-                  st2  = if (ans.cached) st1.copy(stats = st1.stats.copy(memoHits = st1.stats.memoHits + 1))
-                         else st1.copy(stats = st1.stats.copy(probes = st1.stats.probes + 1))
-                  _   <- hooks.onProbe(ProbeEvent(state.script.size, target, rank, cand, ans, view))
-                  out <- if (ans.body.status != ProbeStatus.Ok)
-                           probeCands(state, target, view, fp, rest, st2, acc)
-                         else
-                           IO.fromEither(state.commit(target, ans.body)
-                               .left.map(e => new RuntimeException(s"commit refused mid-search: $e")))
-                             .flatMap { child =>
-                               if (child.allDischarged)
-                                 claim(child).map(c => (st2.copy(stats =
-                                   st2.stats.copy(finalChecks = st2.stats.finalChecks + 1)),
-                                   SolvedNow(c): CandsOutcome))
-                               else
-                                 probeCands(state, target, view, fp, rest, st2, acc :+ (child -> ans.body))
-                             }
-                } yield out
+              // Memo first, gate second: a cached answer is free and stays
+              // free at the cap — only a true miss can be refused for budget
+              // (Copilot round 1 on PR #126).
+              oracle.cachedProbe(mkCtx("fill_hole", Some(rank)), fp, target, cand).flatMap {
+                case None if st1.stats.probes >= cfg.probeBudget =>
+                  IO.pure((st1, BudgetHit: CandsOutcome))
+                case cached =>
+                  for {
+                    ans <- cached.fold(
+                             oracle.probe(mkCtx("fill_hole", Some(rank)), workFile, fp, target, cand))(
+                             IO.pure)
+                    st2  = if (ans.cached) st1.copy(stats = st1.stats.copy(memoHits = st1.stats.memoHits + 1))
+                           else st1.copy(stats = st1.stats.copy(probes = st1.stats.probes + 1))
+                    _   <- hooks.onProbe(ProbeEvent(state.script.size, target, rank, cand, ans, view))
+                    out <- if (ans.body.status != ProbeStatus.Ok)
+                             probeCands(state, target, view, fp, rest, st2, acc)
+                           else
+                             IO.fromEither(state.commit(target, ans.body)
+                                 .left.map(e => new RuntimeException(s"commit refused mid-search: $e")))
+                               .flatMap { child =>
+                                 if (child.allDischarged)
+                                   claim(child).map(c => (st2.copy(stats =
+                                     st2.stats.copy(finalChecks = st2.stats.finalChecks + 1)),
+                                     SolvedNow(c): CandsOutcome))
+                                 else
+                                   probeCands(state, target, view, fp, rest, st2, acc :+ (child -> ans.body))
+                               }
+                  } yield out
+              }
           }
         case _ => IO.pure((st, Done(acc)))
       }
@@ -279,10 +292,18 @@ object BeamLoop {
         target = state.obligations.head // never empty: discharged states are claimed, not enqueued
         gAns  <- oracle.getGoal(mkCtx("get_goal", None), workFile, target)
         view   = GoalView(gAns.body.goal, gAns.body.context, gAns.body.module)
+        rows0 <- oracle.timings.get.map(_.size)
         t0    <- IO.monotonic
         cands <- proposer.propose(state, target, view)
         t1    <- IO.monotonic
-        _     <- oracle.recordProposal(mkCtx("proposal", None), (t1 - t0).toNanos)
+        // Proposal time is the proposer's OWN work: the wall clock around
+        // propose minus whatever oracle calls it made through the seam, which
+        // the ledger already carries as their own rows (type_of today; P2 may
+        // add more) — otherwise those milliseconds are counted in two
+        // categories at once (Copilot round 1 on PR #126).
+        nested <- oracle.timings.get.map(_.drop(rows0).map(_.clientMs).sum)
+        _     <- oracle.recordProposal(mkCtx("proposal", None),
+                   math.max(0L, (t1 - t0).toNanos - Math.round(nested * 1e6)))
         st1    = st.copy(
                    stats    = st.stats.copy(expansions = st.stats.expansions + 1),
                    rootGoal = st.rootGoal.orElse(Some(view)))

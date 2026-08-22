@@ -37,7 +37,10 @@
   *
   *  Exit code: P0's discipline unchanged — anomalies never abort the sweep
   *  and never stop artifact writing, but any anomaly (or any fixture whose
-  *  search raised) makes the run exit non-zero.
+  *  search raised) makes the run exit non-zero.  An anomalous fixture keeps
+  *  its diagnostics: every attempt row written before the failure, the real
+  *  wall clock, and the probe/hit counts the hooks observed all survive into
+  *  results.jsonl and the report (the loop's other counters die with it).
   *
   *  Output, under --out-dir/--run-id
   *  --------------------------------
@@ -266,9 +269,11 @@ object ProofSearchLoop extends IOApp {
   /** Drive one fixture through the loop.  Any raise inside the search —
     * oracle failure, wire drift, a commit refusal, a final-check
     * disagreement — is caught here and reported as this fixture's anomaly,
-    * so one broken fixture cannot abort the sweep.
+    * so one broken fixture cannot abort the sweep.  Package-visible so the
+    * anomaly-recovery contract (rows, wall clock, and hook-observed counts
+    * survive a mid-search failure) is pinned by a pure test.
     */
-  private def runFixture(
+  private[search] def runFixture(
     cfg:    LoopHarnessConfig,
     oracle: Oracle,
     entry:  IndexEntry
@@ -296,90 +301,113 @@ object ProofSearchLoop extends IOApp {
         searchStatus = result.map(_.status.tag).getOrElse("anomaly")
       )
 
-    val step: IO[(LoopOutcome, FixtureRow, Vector[AttemptRow])] = for {
-      t0     <- IO.monotonic
-      staged <- Scaffold.stage(source, workDir, logsDir, oracle, mkCtx("check_file", None))
-      out    <- staged match {
-        case Left(msg) =>
+    // The per-fixture accumulators live OUTSIDE the recovered effect, so an
+    // anomaly mid-search keeps every attempt row already written, its real
+    // wall clock, and the probe/hit counts the hooks observed — a recovery
+    // that discarded them would strip results.jsonl of exactly the fixtures
+    // whose diagnostics matter most (Copilot round 1 on PR #126).  The
+    // loop's own internal counters (expansions, depth, …) die with the
+    // raise; the anomaly outcome carries what the hooks saw.
+    for {
+      rows    <- Ref.of[IO, Vector[AttemptRow]](Vector.empty)
+      counter <- Ref.of[IO, Int](0)
+      seen    <- Ref.of[IO, (Int, Int)]((0, 0)) // (memo misses, memo hits) observed by the hooks
+      t0      <- IO.monotonic
+      out     <- {
+        val step: IO[(LoopOutcome, FixtureRow, Vector[AttemptRow])] = for {
+          staged <- Scaffold.stage(source, workDir, logsDir, oracle, mkCtx("check_file", None))
+          out    <- staged match {
+            case Left(msg) =>
+              for {
+                t1 <- IO.monotonic
+                wallMs = (t1 - t0).toMillis
+              } yield (
+                LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
+                  solved = false, Vector.empty, LoopStats(), wallMs, Some(msg)),
+                fixtureRow("", None, None, wallMs, anomalous = true),
+                Vector.empty[AttemptRow]
+              )
+            case Right(st) =>
+              for {
+                proposer <- FixedProposer.create(st.content, name =>
+                              oracle.typeOf(mkCtx("type_of", None), st.workFile, name, None)
+                                .map(_.body.map(_.inferred)))
+                hooks    = BeamLoop.Hooks { ev =>
+                             for {
+                               n      <- counter.updateAndGet(_ + 1)
+                               logPath = logsDir.resolve(f"probe-$n%03d.json")
+                               _      <- IO.blocking(Files.write(logPath, (ev.answer.raw + "\n").getBytes(StandardCharsets.UTF_8)))
+                               row     = AttemptRow(
+                                           fixtureId     = stem,
+                                           benchmarkId   = entry.id,
+                                           module        = ev.goal.module.getOrElse(""),
+                                           fixturePath   = absPath,
+                                           holeIndex     = ev.depth,
+                                           holeLine      = ev.target.line,
+                                           holeCol       = ev.target.col,
+                                           candidateRank = ev.rank,
+                                           candidate     = ev.candidate,
+                                           status        = ev.answer.body.status.wire,
+                                           elapsedMs     = Math.round(ev.answer.clientMs),
+                                           rc            = oracle.exitCodeOf(ev.answer.raw).getOrElse(-1),
+                                           logPath       = cfg.runRoot.relativize(logPath).toString
+                                         )
+                               _      <- rows.update(_ :+ row)
+                               _      <- seen.update { case (m, h) =>
+                                           if (ev.answer.cached) (m, h + 1) else (m + 1, h) }
+                             } yield ()
+                           }
+                state0   = SearchState.initial(st.content, Vector(st.obligation))
+                result  <- BeamLoop.run(oracle, proposer, cfg.loop, mkCtx, st.workFile, state0, hooks)
+                t1      <- IO.monotonic
+                wallMs   = (t1 - t0).toMillis
+                solvedPath <- result.solved.traverse { claim =>
+                                val dir  = cfg.runRoot.resolve("solved")
+                                val file = dir.resolve(s"$stem.agda")
+                                IO.blocking {
+                                  Files.createDirectories(dir)
+                                  Files.write(file, claim.state.content.getBytes(StandardCharsets.UTF_8))
+                                  file.toString
+                                }
+                              }
+                attempts <- rows.get
+                module    = result.rootGoal.flatMap(_.module).getOrElse("")
+                outcome   = LoopOutcome(
+                              benchmarkId  = entry.id,
+                              difficulty   = entry.difficulty.tag,
+                              goal         = result.rootGoal.map(_.goal).getOrElse(entry.typeSig),
+                              module       = module,
+                              searchStatus = result.status.tag,
+                              solved       = result.solved.isDefined,
+                              script       = result.solved.map(_.state.script.map(_.candidate)).getOrElse(Vector.empty),
+                              stats        = result.stats,
+                              wallMs       = wallMs,
+                              anomaly      = None
+                            )
+              } yield (outcome, fixtureRow(module, Some(result), solvedPath, wallMs, anomalous = false), attempts)
+          }
+          _ <- IO.println(f">> ${entry.id}%-36s ${out._1.searchStatus}%-16s probes=${out._1.stats.probes}%3d depth=${out._1.stats.depthReached} ${if (out._1.solved) "SOLVED: " + out._1.script.mkString(" ; ") else ""}")
+        } yield out
+
+        step.handleErrorWith { e =>
           for {
-            t1 <- IO.monotonic
-            wallMs = (t1 - t0).toMillis
+            _        <- IO.println(s">> ${entry.id} FAILED: ${e.getMessage}")
+            t1       <- IO.monotonic
+            attempts <- rows.get
+            mh       <- seen.get
+            wallMs    = (t1 - t0).toMillis
+            // Partial stats, from the hooks: probes and hits are what the
+            // rows can vouch for; the rest is unknown and stays zero.
+            partial   = LoopStats(probes = mh._1, memoHits = mh._2)
           } yield (
             LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
-              solved = false, Vector.empty, LoopStats(), wallMs, Some(msg)),
+              solved = false, Vector.empty, partial, wallMs, Some(e.getMessage)),
             fixtureRow("", None, None, wallMs, anomalous = true),
-            Vector.empty[AttemptRow]
+            attempts
           )
-        case Right(st) =>
-          for {
-            rows    <- Ref.of[IO, Vector[AttemptRow]](Vector.empty)
-            counter <- Ref.of[IO, Int](0)
-            proposer <- FixedProposer.create(st.content, name =>
-                          oracle.typeOf(mkCtx("type_of", None), st.workFile, name, None)
-                            .map(_.body.map(_.inferred)))
-            hooks    = BeamLoop.Hooks { ev =>
-                         for {
-                           n      <- counter.updateAndGet(_ + 1)
-                           logPath = logsDir.resolve(f"probe-$n%03d.json")
-                           _      <- IO.blocking(Files.write(logPath, (ev.answer.raw + "\n").getBytes(StandardCharsets.UTF_8)))
-                           row     = AttemptRow(
-                                       fixtureId     = stem,
-                                       benchmarkId   = entry.id,
-                                       module        = ev.goal.module.getOrElse(""),
-                                       fixturePath   = absPath,
-                                       holeIndex     = ev.depth,
-                                       holeLine      = ev.target.line,
-                                       holeCol       = ev.target.col,
-                                       candidateRank = ev.rank,
-                                       candidate     = ev.candidate,
-                                       status        = ev.answer.body.status.wire,
-                                       elapsedMs     = Math.round(ev.answer.clientMs),
-                                       rc            = oracle.exitCodeOf(ev.answer.raw).getOrElse(-1),
-                                       logPath       = cfg.runRoot.relativize(logPath).toString
-                                     )
-                           _      <- rows.update(_ :+ row)
-                         } yield ()
-                       }
-            state0   = SearchState.initial(st.content, Vector(st.obligation))
-            result  <- BeamLoop.run(oracle, proposer, cfg.loop, mkCtx, st.workFile, state0, hooks)
-            t1      <- IO.monotonic
-            wallMs   = (t1 - t0).toMillis
-            solvedPath <- result.solved.traverse { claim =>
-                            val dir  = cfg.runRoot.resolve("solved")
-                            val file = dir.resolve(s"$stem.agda")
-                            IO.blocking {
-                              Files.createDirectories(dir)
-                              Files.write(file, claim.state.content.getBytes(StandardCharsets.UTF_8))
-                              file.toString
-                            }
-                          }
-            attempts <- rows.get
-            module    = result.rootGoal.flatMap(_.module).getOrElse("")
-            outcome   = LoopOutcome(
-                          benchmarkId  = entry.id,
-                          difficulty   = entry.difficulty.tag,
-                          goal         = result.rootGoal.map(_.goal).getOrElse(entry.typeSig),
-                          module       = module,
-                          searchStatus = result.status.tag,
-                          solved       = result.solved.isDefined,
-                          script       = result.solved.map(_.state.script.map(_.candidate)).getOrElse(Vector.empty),
-                          stats        = result.stats,
-                          wallMs       = wallMs,
-                          anomaly      = None
-                        )
-          } yield (outcome, fixtureRow(module, Some(result), solvedPath, wallMs, anomalous = false), attempts)
+        }
       }
-      _ <- IO.println(f">> ${entry.id}%-36s ${out._1.searchStatus}%-16s probes=${out._1.stats.probes}%3d depth=${out._1.stats.depthReached} ${if (out._1.solved) "SOLVED: " + out._1.script.mkString(" ; ") else ""}")
     } yield out
-
-    step.handleErrorWith { e =>
-      IO.println(s">> ${entry.id} FAILED: ${e.getMessage}").as((
-        LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
-          solved = false, Vector.empty, LoopStats(), 0L, Some(e.getMessage)),
-        fixtureRow("", None, None, 0L, anomalous = true),
-        Vector.empty[AttemptRow]
-      ))
-    }
   }
 
   // --------------------------------------------------------------------------

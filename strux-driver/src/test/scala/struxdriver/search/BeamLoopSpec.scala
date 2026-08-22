@@ -19,7 +19,10 @@
   *    - the depth bound (exhausted with depthCapped) and frontier exhaustion;
   *    - the dedup policies' semantics and the adopted default;
   *    - the peek gate (a rejected candidate is never probed);
-  *    - first-open-obligation selection (stated simplification, pinned).
+  *    - first-open-obligation selection (stated simplification, pinned);
+  *    - the round-1 review fixes on PR #126: a memo hit is served even at
+  *      the budget cap, and proposal ledger rows exclude the oracle calls
+  *      the proposer made through the seam.
   *
   *  ============================================================================
   */
@@ -208,6 +211,52 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     result.stats.dedupSkips shouldBe 1
     result.status shouldBe SearchStatus.Exhausted // depth bound cut the surviving child
     result.stats.depthCapped shouldBe true
+  }
+
+  test("a memo hit at the budget cap is still served; only a true miss is refused (round 1)") {
+    // Budget 1: candidate a misses and spends the whole budget; the duplicate
+    // a is a memo replay and must still be answered at the cap; b would be a
+    // real call and is the one the gate refuses.
+    val world = Map((3, 8, "a") -> fillTypeError("a", Vector((3, 8))))
+    val (result, log) = runLoop(world, Vector("a", "a", "b"), LoopConfig.default.copy(probeBudget = 1))
+    result.status shouldBe SearchStatus.BudgetExceeded
+    result.stats.probes shouldBe 1
+    result.stats.memoHits shouldBe 1              // the replay was served, not refused
+    log.count(_._1 == "fill_hole") shouldBe 1     // and it cost no transport call
+  }
+
+  test("proposal ledger rows exclude the oracle calls the proposer makes (round 1)") {
+    // A proposer that spends its time in one type_of call through the seam;
+    // the fake transport stamps that call at a fake 5 s, so a proposal row
+    // that still contained it could not read 0.
+    val io = for {
+      calls  <- Ref.of[IO, Vector[(String, Json)]](Vector.empty)
+      slowTypeOf = new ToolCaller {
+        val inner = scripted(pairWorld, Map.empty, calls)
+        def callTool(tool: String, args: Json): IO[Timed[ToolReply]] =
+          inner.callTool(tool, args).map { t =>
+            if (tool == "type_of") t.copy(clientNanos = 5000000000L) else t
+          }
+      }
+      oracle <- Oracle.create(slowTypeOf)
+      proposer = new Proposer {
+        def propose(state: SearchState, target: Obligation, goal: GoalView): IO[Vector[String]] =
+          oracle.typeOf(CallCtx(1, "fx", "type_of", None), Paths.get("/nowhere"), "suc", None)
+            .as(Vector("tt"))
+      }
+      s0      = SearchState.initial(content0, Vector(ob0))
+      _      <- BeamLoop.run(oracle, proposer, LoopConfig.default.copy(maxDepth = 1),
+                  (ph, rk) => CallCtx(1, "fx", ph, rk), tempWorkFile(), s0, BeamLoop.Hooks.none)
+      ledger <- oracle.timings.get
+    } yield ledger
+    val ledger = io.unsafeRunSync()
+    val proposal = ledger.filter(_.phase == "proposal")
+    val typeOf   = ledger.filter(_.phase == "type_of")
+    typeOf.map(_.clientMs).sum shouldBe 5000.0 +- 0.001 // ledgered once, as knowledge
+    proposal should have size 1
+    // The wall around propose is microseconds; minus the nested 5 s it clamps
+    // to zero — any double count would leave ~5000 ms here.
+    proposal.head.clientMs shouldBe 0.0
   }
 
   // --------------------------------------------------------------------------

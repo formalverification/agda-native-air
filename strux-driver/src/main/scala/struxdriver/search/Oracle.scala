@@ -143,18 +143,32 @@ final class Oracle private (
       _     <- record(ctx, timed, body.toOption.map(_.elapsedMs), None)
     } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
+  /** The memo's answer for a probe, when it already holds one — the same
+    * cached ledger row and zero-cost semantics as a memo hit inside `probe`,
+    * without ever risking an Agda call.  Exists as its own door so the P1
+    * loop can honor "memo hits are free" even at the probe budget's cap: a
+    * replay must never be refused for budget only a real call would spend
+    * (Copilot round 1 on PR #126).  `probe` itself answers hits through
+    * this same path, so the two can never drift.
+    */
+  def cachedProbe(ctx: CallCtx, contentFp: String, ob: Obligation, candidate: String): IO[Option[OracleAnswer[ProbeOutcome]]] =
+    memo.get.flatMap(_.get(OracleKey(contentFp, ob.line, ob.col, candidate)) match {
+      case Some(hit) =>
+        // A hit spends no oracle time; the ledger row says so explicitly.
+        timings.update(_ :+ TimingRow(ctx.pass, ctx.fixtureId, ctx.phase, ctx.rank,
+          clientMs = 0.0, serverElapsedMs = None, overheadMs = None, checkedFromSource = None, cached = true))
+          .as(Option(hit.copy(clientMs = 0.0, cached = true)))
+      case None => IO.pure(Option.empty[OracleAnswer[ProbeOutcome]])
+    })
+
   /** fill_hole as a probe: memoised on (content, hole, candidate).  The server
     * restores the file whatever the answer, so this never changes state; an
     * isError reply becomes a Crash outcome rather than aborting the run.
     */
   def probe(ctx: CallCtx, file: Path, contentFp: String, ob: Obligation, candidate: String): IO[OracleAnswer[ProbeOutcome]] = {
     val key = OracleKey(contentFp, ob.line, ob.col, candidate)
-    memo.get.flatMap(_.get(key) match {
-      case Some(hit) =>
-        // A hit spends no oracle time; the ledger row says so explicitly.
-        timings.update(_ :+ TimingRow(ctx.pass, ctx.fixtureId, ctx.phase, ctx.rank,
-          clientMs = 0.0, serverElapsedMs = None, overheadMs = None, checkedFromSource = None, cached = true))
-          .as(hit.copy(clientMs = 0.0, cached = true))
+    cachedProbe(ctx, contentFp, ob, candidate).flatMap {
+      case Some(hit) => IO.pure(hit)
       case None =>
         for {
           timed  <- client.callTool("fill_hole", Json.obj(
@@ -175,7 +189,7 @@ final class Oracle private (
           _      <- record(ctx, timed, decoded.map(_.elapsedMs), decoded.flatMap(_.checkedFromSource))
           _      <- memo.update(_ + (key -> answer))
         } yield answer
-    })
+    }
   }
 
   /** The candidateRank / rc pair the eval-schema rows want, without re-parsing
