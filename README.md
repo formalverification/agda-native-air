@@ -11,10 +11,10 @@ evaluation infrastructure that allows modern AI agents to work effectively with
 
 The project is organized around four core components.
 
-1. **Interaction** — programmatic access to Agda proof states and hole filling;
-2. **Bridge** — an MCP-based interface for AI agents;
-3. **Retrieval** — structured corpus extraction and search over Agda libraries;
-4. **Evaluation** — deterministic fixtures, logs, and reproducible proof-completion reports.
+1. **Interaction**: programmatic access to Agda proof states and hole filling;
+2. **Bridge**: an MCP-based interface for AI agents;
+3. **Retrieval**: structured corpus extraction and search over Agda libraries;
+4. **Evaluation**: deterministic fixtures, logs, and reproducible proof-completion reports.
 
 Agda remains the final arbiter of correctness.
 
@@ -29,10 +29,10 @@ Agda deserves its own serious path into AI-assisted formal reasoning.
 
 This repository focuses on building that path:
 
-- **AgdaDojang** — programmatic interaction with Agda;
-- **agda-mcp** — MCP bridge for frontier coding agents;
-- **structured extraction** — retrieval- and analysis-friendly Agda corpus data;
-- **deterministic evaluation** — reproducible proof-completion and benchmarking workflows.
+- **AgdaDojang**: programmatic interaction with Agda;
+- **agda-mcp**: MCP bridge for frontier coding agents;
+- **structured extraction**: retrieval- and analysis-friendly Agda corpus data;
+- **deterministic evaluation**: reproducible proof-completion and benchmarking workflows.
 
 The long-term vision is ambitious: AI systems that help with proof development,
 library growth, counterexample discovery, and eventually mathematical exploration.
@@ -117,13 +117,13 @@ The following is currently under development:
 
 For details, see
 
-+  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) - motivation and vision for the project
-+  [`docs/PLAN.md`](docs/PLAN.md) - project plan
-+  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md) - living project roadmap (milestones and issues, synced with GitHub)
-+  [`docs/roadmap.md`](docs/roadmap.md) - the frozen bootstrap plan the repository's issues were populated from
-+  [`docs/representation.md`](docs/representation.md) — data contracts / schemas
-+  [`docs/architecture.md`](docs/architecture.md) — system architecture overview
-+  [`docs/public-history.md`](docs/public-history.md) - notes on the early history of this repository
++  [`docs/MANIFESTO.md`](docs/MANIFESTO.md): motivation and vision for the project
++  [`docs/PLAN.md`](docs/PLAN.md): project plan
++  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md): living project roadmap (milestones and issues, synced with GitHub)
++  [`docs/roadmap.md`](docs/roadmap.md): the frozen bootstrap plan the repository's issues were populated from
++  [`docs/representation.md`](docs/representation.md): data contracts / schemas
++  [`docs/architecture.md`](docs/architecture.md): system architecture overview
++  [`docs/public-history.md`](docs/public-history.md): notes on the early history of this repository
 
 ---
 
@@ -188,13 +188,13 @@ If you want to join us, please start by reading [`CONTRIBUTING.md`](CONTRIBUTING
 Three kinds of thing live here and they are licensed differently, so the split is
 worth stating plainly.
 
-+  **Code** — [Apache License 2.0](LICENSE).  This covers everything under
++  **Code**: [Apache License 2.0](LICENSE).  This covers everything under
    `agda-strux/`, `agda-mcp/`, `strux-driver/`, `ml-pipeline/`, `agda-dojang/`,
    and `scripts/`.  It permits commercial use, redistribution, and use in
    training or evaluating machine-learning models, asking only that you keep the
    notices, include the license, and say what you changed.
-+  **Documentation** — [CC-BY-4.0](LICENSE-docs).  Everything under `docs/`.
-+  **Datasets** — *per dataset, named in the dataset's own card* under
++  **Documentation**: [CC-BY-4.0](LICENSE-docs).  Everything under `docs/`.
++  **Datasets**: *per dataset, named in the dataset's own card* under
    [`docs/corpora/`](docs/corpora/).  Not per repository, because this project
    does not own all of what it extracts.
 
@@ -215,7 +215,7 @@ least friction we can offer.
 Apache-2.0 and CC0-1.0 are both standard permissive choices, and each corpus's
 card gives you the upstream commit and the citation to reproduce and credit it.
 If a license here is nonetheless in your way, open an issue and say which one and
-why — that is a bug in how we have set this up, not a position we are defending.
+why; that is a bug in how we have set this up, not a position we are defending.
 
 ---
 
