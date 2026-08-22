@@ -8,7 +8,8 @@
   *  Purpose
   *  -------
   *  The search's view of agda-mcp: check_file (state observation and the final
-  *  verdict), get_goal (what a proposer sees), and fill_hole (the probe) —
+  *  verdict), get_goal (what a proposer sees), type_of (lane knowledge for
+  *  binder counts and peeks, issue #122), and fill_hole (the probe) —
   *  each timed, and probes memoised on OracleKey, since every miss costs an
   *  Agda subprocess (#112's "the oracle is the cost centre" lesson).
   *
@@ -112,6 +113,34 @@ final class Oracle private (
                  s"get_goal failed on $file at (${ob.line},${ob.col}): ${timed.value.text.take(400)}"))
       body  <- IO.fromEither(timed.value.decodeAs[GetGoalBody].leftMap(new RuntimeException(_)))
       _     <- record(ctx, timed, Some(body.elapsedMs), None)
+    } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
+
+  /** type_of on the interaction lane: the knowledge query behind the P1
+    * binder counts (phase "type_of") and the candidate pre-filter (phase
+    * "peek" — the ledger phase issue #122 adds).  Milliseconds once the lane
+    * has the file loaded, so it is NOT memoised: a memo would hide the lane
+    * reload cost the peek experiment must measure.  A reply-level failure
+    * (isError — e.g. a dead lane) degrades to a Left rather than aborting the
+    * sweep, because these calls inform proposals and peeks only; a Left never
+    * rejects a candidate and never decides anything.
+    */
+  def typeOf(ctx: CallCtx, file: Path, expr: String, pos: Option[(Int, Int)]): IO[OracleAnswer[Either[String, TypeOfBody]]] =
+    for {
+      timed <- client.callTool("type_of", Json.obj(
+                 (Vector(
+                   "filePath" -> file.toString.asJson,
+                   "expr"     -> expr.asJson
+                 ) ++ pos.toVector.flatMap { case (l, c) =>
+                   Vector("line" -> l.asJson, "column" -> c.asJson)
+                 }): _*))
+      body  <- if (timed.value.isError)
+                 IO.pure(Left(timed.value.text.take(400)): Either[String, TypeOfBody])
+               else
+                 // Wire drift on a normal reply still raises (strict decoders):
+                 // a drifted shape is an anomaly, not a rejected candidate.
+                 IO.fromEither(timed.value.decodeAs[TypeOfBody].leftMap(new RuntimeException(_)))
+                   .map(b => Right(b): Either[String, TypeOfBody])
+      _     <- record(ctx, timed, body.toOption.map(_.elapsedMs), None)
     } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
   /** fill_hole as a probe: memoised on (content, hole, candidate).  The server
