@@ -440,6 +440,9 @@ help:
 	@echo "  make project-lint                - Validate docs/GITHUB_PROJECT.md structure (offline)"
 	@echo "  make eval-benchmark              - Typecheck all benchmark gold solutions -> JSON report"
 	@echo "  make eval-benchmark-smoke        - CI slice (one obligation per tier) + determinism check"
+	@echo "  make proof-search-single-step    - Proof-search P0: k stub candidates vs one M1-5 obligation (PROOF_SEARCH_ID)"
+	@echo "  make proof-search-split          - Proof-search P0: full M1-5 sweep + oracle-vs-proposal timing split (issue 113)"
+	@echo "  make proof-search-it             - Proof-search P0: live two-obligation regression vs the real agda-mcp"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1541,6 +1544,62 @@ eval-benchmark-smoke: _check-sbt
 	$(PY) -c "import json,sys; sys.exit(0 if json.load(open('$$out1/gold-verification.json')).get('allPassed') else 1)" || { \
 	  echo "[eval-benchmark-smoke] FAIL: a gold solution did not typecheck"; exit 1; }; \
 	echo "[eval-benchmark-smoke] OK: $$n/$$n gold solutions verified; report deterministic (modulo wall-clock)"
+
+# Proof-search P0 (issue #113, sub-issue #119): the single-step harness over
+# the M1-5 benchmark, driving agda-mcp as its oracle, and the oracle-time vs
+# proposal-time measurement that settles the host-language fork.  Like the
+# eval-benchmark targets these need the Agda-capable dev shell (sbt + cabal +
+# the pinned agda), e.g.:
+#
+#     nix develop .#backend --command make proof-search-single-step
+#     nix develop .#backend --command make proof-search-split
+#
+# Outputs land under $(PROOF_SEARCH_OUT_DIR)/<run-id>/ (gitignored):
+# results.jsonl (eval-proof-completion.v0 attempt rows), timing.jsonl
+# (proof-search-timing.v0), report.json (the split, per pass and tier).
+PROOF_SEARCH_OUT_DIR ?= data/benchmarks/reports/proof-search
+PROOF_SEARCH_ID      ?= stdlib-nat-plus-identity-l
+PROOF_SEARCH_RUN_ID  ?= run-$(shell date -u +%Y%m%dT%H%M%SZ)
+PROOF_SEARCH_TIMEOUT ?= 600
+PROOF_SEARCH_PASSES  ?= 2
+
+# Resolve the agda-mcp server binary: respect a caller-set AGDA_MCP_BIN, else
+# build and ask cabal (exe:agda-mcp — the lib target trips Cabal-7130).
+define RESOLVE_AGDA_MCP_BIN
+  if [ -z "$${AGDA_MCP_BIN:-}" ]; then \
+    $(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:agda-mcp); \
+    AGDA_MCP_BIN="$$( \
+      $(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal list-bin exe:agda-mcp) \
+        | tr -d '\r' | awk '/agda-mcp$$/ {p=$$NF} END {print p}' )"; \
+  fi; \
+  test -n "$$AGDA_MCP_BIN" || { echo "ERROR: could not resolve the agda-mcp binary"; exit 1; }
+endef
+
+.PHONY: proof-search-single-step proof-search-split proof-search-it
+
+# One obligation (PROOF_SEARCH_ID), k stub candidates, one pass: which close it?
+proof-search-single-step: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [proof-search-single-step] $(PROOF_SEARCH_ID) against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.search.SingleStepHarness --index $(CURDIR)/$(BENCHMARK_INDEX) --ids $(PROOF_SEARCH_ID) --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --passes 1"
+
+# The full M1-5 sweep, twice against one server (pass 2 is the warm pass the
+# split is quoted from); prints the oracle-vs-proposal numbers for #113.
+proof-search-split: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [proof-search-split] full M1-5 sweep, $(PROOF_SEARCH_PASSES) passes, against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.search.SingleStepHarness --index $(CURDIR)/$(BENCHMARK_INDEX) --all --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --passes $(PROOF_SEARCH_PASSES)"
+
+# The live #112 regression test (SingleStepIntegrationSpec) against the real
+# server; the pure twin runs in plain `make test`.
+proof-search-it: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [proof-search-it] live two-obligation regression against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
+	  "testOnly struxdriver.search.SingleStepIntegrationSpec"
+
 
 
 
