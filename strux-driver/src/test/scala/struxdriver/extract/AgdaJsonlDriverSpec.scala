@@ -63,9 +63,11 @@ final class AgdaJsonlDriverSpec extends AnyFreeSpec with Matchers {
   "agdaSourceExtensions" - {
 
     "covers exactly the source extensions the pinned Agda accepts" in {
+      // Also exactly agda-mcp's file-flavour contract (Gate.everythingNames):
+      // the two components must agree on what an Agda source file is.
       AgdaJsonlDriver.agdaSourceExtensions.toSet shouldBe Set(
         ".agda", ".lagda", ".lagda.md", ".lagda.rst",
-        ".lagda.tex", ".lagda.org", ".lagda.typ"
+        ".lagda.tex", ".lagda.org", ".lagda.typ", ".lagda.tree"
       )
     }
 
@@ -311,7 +313,8 @@ final class AgdaJsonlDriverSpec extends AnyFreeSpec with Matchers {
     }
 
     "finds each of the other literate flavours" in withTempSrcDir { src =>
-      val flavours = Seq(".lagda", ".lagda.rst", ".lagda.tex", ".lagda.org", ".lagda.typ")
+      val flavours =
+        Seq(".lagda", ".lagda.rst", ".lagda.tex", ".lagda.org", ".lagda.typ", ".lagda.tree")
 
       flavours.zipWithIndex.foreach { case (ext, i) =>
         val mod      = s"Flavour.M$i"

@@ -190,6 +190,28 @@ object AgdaJsonlDriver extends IOApp {
     runner: String,
     sparkMaster: String,
     failOnError: Boolean,
+    // The runner that actually produced the rows, and whether it got there by
+    // falling back.  `runner` above is what was *asked* for: Spark falls back
+    // to the local runner on error, and a manifest that reported only the
+    // request published a fallback run as a Spark run.
+    runnerEffective: String,
+    sparkFallback: Boolean,
+    // The library commit the rows were extracted from, read at extraction
+    // time.  Packaging happens later and against whatever the checkout says
+    // then, so re-deriving this during packaging can label old JSONL with a
+    // new commit; recording it here is what lets the packager verify instead
+    // of assume.  "unknown" when srcDir is not in a git checkout.
+    srcCommit: String,
+    srcDirty: Boolean,
+    // The same two facts for the checkout that RAN the extraction.  Packaging
+    // can happen from a different commit of this repository, and the rows do
+    // not change when it does.
+    producerCommit: String,
+    producerDirty: Boolean,
+    // The exact module list this run worked from.  `modulesFile` is only a
+    // path, and regenerating metadata between extraction and packaging would
+    // otherwise silently change what "requested" meant.
+    modules: Vector[String],
     summary: RunSummary,
     // Per-module outcomes, sorted by module name so two runs over the same
     // library produce byte-comparable manifests.  Without these the only
@@ -430,11 +452,26 @@ object AgdaJsonlDriver extends IOApp {
   // `.lagda.md` files against 2 plain `.agda`), so a driver that resolves only
   // `.agda` reports an entire library as "missing input" (issue #84).
   //
-  // The list was checked against the pinned Agda by feeding it a one-line
-  // module under each extension; `.lagda.html` is *not* an Agda source
-  // extension and is deliberately absent.
+  // Each entry was checked against the pinned Agda by feeding it a one-line
+  // module under that extension.  `.lagda.html` is *not* an Agda source
+  // extension and is deliberately absent.  The set matches the file-flavour
+  // contract agda-mcp states (AgdaMCP.Gate.everythingNames, AgdaMCP.Holes),
+  // so the two components agree about what an Agda source file is.
   private[extract] val agdaSourceExtensions: Vector[String] =
-    Vector(".agda", ".lagda.md", ".lagda", ".lagda.rst", ".lagda.tex", ".lagda.org", ".lagda.typ")
+    Vector(
+      ".agda",
+      ".lagda.md",
+      ".lagda",
+      ".lagda.rst",
+      ".lagda.tex",
+      ".lagda.org",
+      ".lagda.typ",
+      // Forester.  Agda 2.8.0 accepts it (probed: `\agda{ … }` typechecks),
+      // and the metadata scanner's `*.lagda*` glob finds such a module — so
+      // omitting it here made the driver report a module the scanner had
+      // legitimately listed as missing.
+      ".lagda.tree"
+    )
 
   // Candidate source paths for a module, in resolution order.  Pure — the
   // filesystem decides which one exists (see `resolveModuleInput`).  Agda
@@ -698,7 +735,31 @@ object AgdaJsonlDriver extends IOApp {
   // Manifest write
   // ---------------------------------------------------------------------------
 
-  private def writeManifest(cfg: Config, startedAt: String, finishedAt: String, results: Vector[ModuleRun]): IO[Path] = {
+  // Read the commit and dirty state of the checkout a directory lives in.  A
+  // directory outside any git checkout answers ("unknown", false) rather than
+  // failing the run: provenance is a record, not a gate.
+  private def gitFacts(dir: Path): IO[(String, Boolean)] = {
+    def git(args: String*): IO[Option[String]] =
+      Proc.capture(Seq("git", "-C", dir.toString) ++ args)
+
+    for {
+      rev   <- git("rev-parse", "HEAD")
+      dirty <- git("status", "--porcelain", "--untracked-files=no")
+    } yield (rev.getOrElse("unknown"), dirty.exists(_.nonEmpty))
+  }
+
+  private def writeManifest(
+    cfg: Config,
+    startedAt: String,
+    finishedAt: String,
+    modules: Vector[String],
+    runnerEffective: Runner,
+    srcCommit: String,
+    srcDirty: Boolean,
+    producerCommit: String,
+    producerDirty: Boolean,
+    results: Vector[ModuleRun]
+  ): IO[Path] = {
     val manifest = RunManifest(
       startedAt   = startedAt,
       finishedAt  = finishedAt,
@@ -713,6 +774,13 @@ object AgdaJsonlDriver extends IOApp {
       runner      = cfg.runner.asString,
       sparkMaster = cfg.sparkMaster,
       failOnError = cfg.failOnError,
+      runnerEffective = runnerEffective.asString,
+      sparkFallback   = cfg.runner != runnerEffective,
+      srcCommit       = srcCommit,
+      srcDirty        = srcDirty,
+      producerCommit  = producerCommit,
+      producerDirty   = producerDirty,
+      modules         = modules.sorted,
       summary     = RunSummary.of(results),
       results     = results.sortBy(_.module)
     )
@@ -752,30 +820,44 @@ object AgdaJsonlDriver extends IOApp {
 
         t0 <- start
 
-        results <-
+        // Each branch reports which runner actually produced the rows, so a
+        // Spark run that fell back to local is recorded as local rather than
+        // published as a Spark run.
+        ran <-
           cfg.runner match {
             case Runner.Local =>
-              runLocally(cfg, mods)
+              runLocally(cfg, mods).map((_, Runner.Local))
 
             case Runner.Spark =>
-              runWithSpark(cfg, mods).handleErrorWith { e =>
+              runWithSpark(cfg, mods).map((_, Runner.Spark)).handleErrorWith { e =>
                 // automatic fallback
                 IO.println(s"[AgdaJsonlDriver]  ❌ Spark failed (${e.getClass.getSimpleName}): ${e.getMessage}") *>
                 IO.println(s"[AgdaJsonlDriver]       Falling back to local runner...") *>
-                runLocally(cfg.copy(runner = Runner.Local), mods)
+                runLocally(cfg.copy(runner = Runner.Local), mods).map((_, Runner.Local))
               }
 
             case Runner.Spark2 =>
-              runWithSpark(cfg, mods).handleErrorWith { e =>
+              runWithSpark(cfg, mods).map((_, Runner.Spark2)).handleErrorWith { e =>
                 IO.println(s"[AgdaJsonlDriver]  ❌ Spark failed (${e.getClass.getName}): ${e.getMessage}") *>
                 IO.blocking(e.printStackTrace()) *>
                 IO.println("[AgdaJsonlDriver]       Falling back to local runner...") *>
-                runLocally(cfg.copy(runner = Runner.Local), mods)
+                runLocally(cfg.copy(runner = Runner.Local), mods).map((_, Runner.Local))
               }
           }
 
+        (results, runnerEffective) = ran
+
         t1 <- IO.delay(Instant.now().toString)
-        mf <- writeManifest(cfg, t0, t1, results)
+        // Read the source's git facts now, while the tree is the one that was
+        // extracted; packaging happens later and cannot know this.
+        srcFacts      <- gitFacts(cfg.srcDir)
+        producerFacts <- gitFacts(cfg.projectRoot)
+        mf <- writeManifest(
+                cfg, t0, t1, mods, runnerEffective,
+                srcFacts._1, srcFacts._2,
+                producerFacts._1, producerFacts._2,
+                results
+              )
 
         okN  = results.count(_.ok)
         badN = results.size - okN

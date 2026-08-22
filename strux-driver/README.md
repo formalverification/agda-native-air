@@ -110,8 +110,9 @@ revisit them in the future when we need an etl pipeline.
    `coverage.json` (issue #84).
 
 +  **Source extensions**.  A module is looked for under `.agda` first, then
-   `.lagda.md`, `.lagda`, `.lagda.rst`, `.lagda.tex`, `.lagda.org`, and
-   `.lagda.typ` — every source extension the pinned Agda accepts.  A library
+   `.lagda.md`, `.lagda`, `.lagda.rst`, `.lagda.tex`, `.lagda.org`,
+   `.lagda.typ`, and `.lagda.tree` — every source extension the pinned Agda
+   accepts, and the same set as agda-mcp's file-flavour contract.  A library
    that is literate throughout (agda-algebras is 375 `.lagda.md` files against
    2 plain `.agda`) extracts without special-casing.
 
