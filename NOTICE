@@ -12,18 +12,27 @@ That prior work is also Copyright 2025-2026 William DeMeo.
 
 ---
 
-Documentation in this repository (docs/) is licensed separately under the
-Creative Commons Attribution 4.0 International License (CC-BY 4.0). See
-LICENSE-docs for details.
+Documentation written for this repository (docs/) is licensed separately under
+the Creative Commons Attribution 4.0 International License (CC-BY 4.0). See
+LICENSE-docs. That grant covers project-authored material only; documents
+imported verbatim from elsewhere are licensed by their source project, and are
+listed in LICENSE-docs.
 
-Datasets are licensed per dataset, not per repository, because this project
-does not own all of what it extracts. A corpus extracted from another Agda
-library is a derivative work of that library's source and is redistributed
-under that library's license, with the attribution that license requires; a
-corpus this project authors outright is dedicated to the public domain under
-CC0 1.0. Each published corpus states its own terms, its upstream commit, and
-its required citation in its dataset card under docs/corpora/.
+Data under data/ is licensed under the Apache License 2.0 by default, because
+it is either Agda source written here (the benchmark fixtures) or material
+extracted from an Apache-2.0 library (corpora and golden snapshots). For
+extracted material that is the upstream license passing through rather than a
+claim of ownership, and the attribution it requires is the upstream project's.
+
+A published corpus states its own terms, its upstream commit, and its citation
+in its dataset card under docs/corpora/; the card governs, and the default
+above applies to committed data that has no card. Artifacts derived from a
+corpus -- statistics, indices, digests -- inherit that corpus's terms.
 
 For example, the agda-algebras corpus (docs/corpora/agda-algebras-v0.md) is
 derived from ualib/agda-algebras' src/, which is licensed under the Apache
 License 2.0, and is redistributed under that license.
+
+An earlier version of this file stated that data/ was CC-BY-4.0. That claim is
+withdrawn. Anyone who received data from this repository under CC-BY-4.0 may
+continue to rely on that grant for the copy they received.

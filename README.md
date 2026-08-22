@@ -1,7 +1,7 @@
 <!-- File: agda-native-air/README.md -->
 
 # Agda-native AIR
-[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.8.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/Haskell-GHC_9.10.3-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
+[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.8.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/backend_GHC-9.10.3-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
 
 *Agda-native Artificial Intelligence Reasoning environment*
 
@@ -185,37 +185,76 @@ If you want to join us, please start by reading [`CONTRIBUTING.md`](CONTRIBUTING
 
 ## Licensing
 
-Three kinds of thing live here and they are licensed differently, so the split is
-worth stating plainly.
+Three kinds of thing live here and they are licensed differently.
 
-+  **Code**: [Apache License 2.0](LICENSE).  This covers everything under
-   `agda-strux/`, `agda-mcp/`, `strux-driver/`, `ml-pipeline/`, `agda-dojang/`,
-   and `scripts/`.  It permits commercial use, redistribution, and use in
-   training or evaluating machine-learning models, asking only that you keep the
-   notices, include the license, and say what you changed.
-+  **Documentation**: [CC-BY-4.0](LICENSE-docs).  Everything under `docs/`.
-+  **Datasets**: *per dataset, named in the dataset's own card* under
-   [`docs/corpora/`](docs/corpora/).  Not per repository, because this project
-   does not own all of what it extracts.
++  **Code** — [Apache License 2.0](LICENSE).  Everything under `agda-strux/`,
+   `agda-mcp/`, `strux-driver/`, `ml-pipeline/`, `agda-dojang/`, and `scripts/`.
+   It permits commercial use, redistribution, and use in training or evaluating
+   machine-learning models, asking only that you keep the notices, include the
+   license, and say what you changed.
++  **Documentation written here** — [CC-BY-4.0](LICENSE-docs).  This covers
+   `docs/` *except* for material imported from elsewhere, which this project has
+   no standing to license.  There is one such file today:
+   [`docs/feedback/flrp-agda-mcp-improvements.md`](docs/feedback/flrp-agda-mcp-improvements.md),
+   imported verbatim from [`ualib/agda-algebras`](https://github.com/ualib/agda-algebras)
+   and licensed by that project; its own header records the provenance.
++  **Data** — [Apache License 2.0](LICENSE) by default, and per dataset where a
+   dataset says otherwise.  See below, because the default is not arbitrary.
 
-That last point is the one that surprises people, so here is the reasoning.  A
-corpus extracted from another Agda library is a derivative work of that library's
-source: its rows are that library's types and proof terms, rendered differently.
-This project cannot relicense them, so such a corpus is redistributed under the
-upstream license, with the attribution that license requires.  The
-[agda-algebras corpus](docs/corpora/agda-algebras-v0.md) is Apache-2.0 for
-exactly this reason, inherited from
-[`ualib/agda-algebras`](https://github.com/ualib/agda-algebras).  A corpus this
-project authors outright — one derived from fixtures written here, or a purely
-statistical summary — is dedicated to the public domain under
-[CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/), which is the
-least friction we can offer.
+### Why data defaults to the code license
 
-**If you are assembling training data**, none of the above should slow you down:
-Apache-2.0 and CC0-1.0 are both standard permissive choices, and each corpus's
-card gives you the upstream commit and the citation to reproduce and credit it.
-If a license here is nonetheless in your way, open an issue and say which one and
-why; that is a bug in how we have set this up, not a position we are defending.
+Everything committed under `data/` is one of two things, and both land on
+Apache-2.0 by different routes.
+
++  **Agda source written here.**  The benchmark obligations and gold solutions
+   under `data/benchmarks/` are Agda modules; they are code, and the code license
+   covers them.
++  **Material extracted from an Apache-2.0 library.**  A corpus, or a golden
+   snapshot such as `data/agda/agda-algebras-regressions/Noether.jsonl`, consists
+   of another library's types and proof terms rendered differently.  That makes it
+   a derivative work of that library, and this project cannot relicense it.
+
+So the default is Apache-2.0, and it is *not* a claim that this project owns the
+contents — for extracted material it is the upstream license passing through, and
+the required attribution is upstream's.
+
+Two refinements sit on top of the default.
+
++  **A published corpus states its own terms** in its dataset card under
+   [`docs/corpora/`](docs/corpora/), together with the upstream commit and the
+   citation.  The card governs; the default applies to committed data that has no
+   card.
++  **Artifacts derived from a corpus inherit that corpus's terms.**  The
+   statistics, indices, and digests computed from a corpus are computed from its
+   rows, so they travel with it.  Only a dataset with no upstream-derived content
+   at all can be dedicated to the public domain under
+   [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/), and where that
+   is done its card says so.
+
+### What this changed, and for whom
+
+Before this policy, `LICENSE-docs` stated that `data/` was CC-BY-4.0.  That claim
+is withdrawn, because it was not this project's to make for extracted material.
+Two consequences worth stating plainly rather than leaving to be inferred:
+
++  For **extracted** data the CC-BY claim was never effective; the upstream
+   license always governed, and now the files say so.
++  For any **project-authored** data the terms do change, from CC-BY-4.0 to
+   Apache-2.0.  A licence already granted cannot be withdrawn: **anyone who
+   received data from this repository under CC-BY-4.0 may continue to rely on
+   that grant** for the copy they received.
+
+### If you are assembling training data
+
+Read the card for the corpus you want — it names the upstream commit, the
+governing license, and the citation.  For the corpora published so far that
+license is Apache-2.0, which does not obstruct training, evaluation, or
+redistribution.  A corpus inherited from a library with different terms would say
+so in its card, so check there rather than assuming this section covers every
+future case.
+
+If a license here is in your way, please open an issue saying which one and why.
+That would be a bug in how we have set this up, not a position we are defending.
 
 ---
 

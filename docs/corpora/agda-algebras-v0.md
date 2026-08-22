@@ -109,7 +109,9 @@ The corpus is derived from `agda-algebras`' `src/`, which is licensed under the 
 
 > The Agda Universal Algebra Library (`ualib/agda-algebras`), commit `ecc158a3730259b75d2ace4f5e30764e1c514380`, Apache-2.0.
 
-This card and the statistical summaries computed from the corpus are part of `agda-native-air`'s documentation and are licensed **CC-BY-4.0** (see `LICENSE-docs`), with the caveat that the tables quote identifiers from the library and those remain the library's.  `agda-native-air` licenses datasets per dataset rather than per repository, precisely so that this distinction can be stated where it applies: see the "Licensing" section of that project's `README.md`.  For this corpus the upstream license governs.
+**This card** — the prose you are reading, which `agda-native-air` wrote — is part of that project's documentation and is licensed **CC-BY-4.0** (see its `LICENSE-docs`).
+
+**`stats.json` and `stats.md` are not.**  They are computed from the corpus's rows and quote the library's identifiers, so they inherit the corpus's terms: **Apache-2.0**, like the corpus itself.  They also ship beside the corpus under `data/corpora/agda-algebras/v0/` and as release assets, not under `docs/`.  The rule `agda-native-air` applies is that an artifact derived from a corpus travels with that corpus; see the "Licensing" section of its `README.md`.
 
 ## Reproducing it
 
