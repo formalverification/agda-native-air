@@ -17,19 +17,33 @@ Why this is the shape it is comes down to one measured fact: **the oracle is the
 
 The prior attempt's central defect is designed out at the type level.  The retired `search.py` carried a single goal per state and declared victory when *any* subgoal closed — a lemma with two obligations counted as proved when one was discharged.  Here the state *is* the obligation set, "done" is emptiness of the whole set, and the only way to construct the `SolvedClaim` type is through a factory that demands both the empty set and the final green check.  A regression test pins exactly the two-obligation trap, both purely and against the live server.
 
-Where it stands.  P0 landed the substrate (state model, oracle client, single-step harness) and the measurement that fixed the economics.  P1 landed the loop with a fixed, non-learned action space — the P0 closers, the goal context's assumptions, and applications of the lemmas the fixture imports — and measured the baseline: **6 of 22 benchmark obligations solved (routine 6/7, compositional 0/10, non-obvious 0/5)**, which is *exactly* the ceiling of what that action space can express in term mode, so the number is saturated, not disappointing.  A measured `type_of` pre-filter cut oracle judgements by 88 % and end-to-end time by 4.5× at zero cost in solves.
+### Where it stands
 
-Where it goes.  The action space is the bottleneck, by construction and now by measurement.  P2 replaces the fixed space with candidates retrieved from a real library corpus (the `agda-strux` extraction and its search tools), behind the same `Proposer` interface the fixed space already implements.  P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract.  Every phase is scored on the same benchmark through the same JSONL schema, so the baselines stack: each phase must beat the last, on the same 22 obligations, in the same currency of oracle calls.
+P0 landed the substrate (state model, oracle client, single-step harness) and the measurement that fixed the economics.
+
+P1 landed the loop with a fixed, non-learned action space — the P0 closers, the goal context's assumptions, and applications of the lemmas the fixture imports — and measured the baseline: **6 of 22 benchmark obligations solved (routine 6/7, compositional 0/10, non-obvious 0/5)**, which is *exactly* the ceiling of what that action space can express in term mode, so the number is saturated, not disappointing.  A measured `type_of` pre-filter cut oracle judgements by 88 % and end-to-end time by 4.5× at zero cost in solves.
+
+### Where it goes
+
+The action space is the bottleneck, by construction and now by measurement.
+
+P2 replaces the fixed space with candidates retrieved from a real library corpus (the `agda-strux` extraction and its search tools), behind the same `Proposer` interface the fixed space already implements.
+
+P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract.
+
+Every phase is scored on the same benchmark through the same JSONL schema, so the baselines stack: each phase must beat the last, on the same 22 obligations, in the same currency of oracle calls.
 
 ## 1.  Context: why proof search, and why now
 
-The project's north star is AI agents that work effectively with Agda.  Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might help*; proof search is the part that *does mathematics* — proposes a step, submits it to the checker, and iterates.  It had exactly one prior implementation, `agda-dojang/python/tools/search.py`, dead since 2026-03-10 and archived under #112.
+The project's north star is AI agents that work effectively with Agda.
+
+Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might help*; proof search is the part that *does mathematics* — proposes a step, submits it to the checker, and iterates.  It had exactly one prior implementation, `agda-dojang/python/tools/search.py`, dead since 2026-03-10 and archived under #112.
 
 Three things changed by mid-2026 that made a proper restart worthwhile (#113):
 
-+  **The oracle is native.**  `agda-mcp` exposes `fill_hole`, `get_goal`, and `check_file` directly, and since the #68 hardening wave also answers scope, type, and definition questions mid-proof from a persistent interaction lane (#75, #107, #108) — precisely the information a proposer needs.
-+  **The corpus exists.**  `agda-strux` extraction plus `search_by_name` / `search_by_type` can supply candidate lemmas at scale; the old search's action space was hardcoded to two candidates.
-+  **The measurement exists.**  `data/benchmarks/` is the M1-5 suite (22 obligations, difficulty tiers `routine` / `compositional` / `non-obvious`), and the proof-completion evaluator already emits versioned JSONL (`eval-proof-completion.v0`), so search results sit beside the policy-backend baseline with no new measurement apparatus.
++  **The oracle is native**.  `agda-mcp` exposes `fill_hole`, `get_goal`, and `check_file` directly, and since the #68 hardening wave also answers scope, type, and definition questions mid-proof from a persistent interaction lane (#75, #107, #108) — precisely the information a proposer needs.
++  **The corpus exists**.  `agda-strux` extraction plus `search_by_name` / `search_by_type` can supply candidate lemmas at scale; the old search's action space was hardcoded to two candidates.
++  **The measurement exists**.  `data/benchmarks/` is the M1-5 suite (22 obligations, difficulty tiers `routine` / `compositional` / `non-obvious`), and the proof-completion evaluator already emits versioned JSONL (`eval-proof-completion.v0`), so search results sit beside the policy-backend baseline with no new measurement apparatus.
 
 Four lessons from #112 are load-bearing and appear throughout: report actions are peeks, not moves; partial application consumes visible binders only; there are two caches because the oracle is the cost centre; and children are ordered by remaining obligations.  The fifth inheritance is the defect: the old search was disjunctive where obligations are conjunctive.
 
@@ -37,8 +51,8 @@ Four lessons from #112 are load-bearing and appear throughout: report actions ar
 
 `agda-mcp` runs two lanes, and the search respects the boundary absolutely (docs/agda-mcp-interaction-lane.md):
 
-+  **Batch lane — verdicts.**  `check_file` and `fill_hole` derive success from a one-shot `agda` process's exit code.  This lane is the only judge: probe outcomes, commits, and the final claim all come from it.
-+  **Interaction lane — knowledge.**  A persistent `agda --interaction-json` child answers `get_goal`, `type_of`, and friends about a loaded file in milliseconds.  Knowledge informs proposals and pre-filters; it never decides anything.
++  **Batch lane** (verdicts).  `check_file` and `fill_hole` derive success from a one-shot `agda` process's exit code.  This lane is the only judge: probe outcomes, commits, and the final claim all come from it.
++  **Interaction lane** (knowledge).  A persistent `agda --interaction-json` child answers `get_goal`, `type_of` (and others) about a loaded file in milliseconds.  Knowledge informs proposals and pre-filters; it never decides anything.
 
 P0's measurement (issue #113, run `split-m15`) fixed the numbers the design lives by:
 
