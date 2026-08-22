@@ -204,28 +204,43 @@ object Peek {
     * `1`) but a meta blocks the folding (`suc _m_5` prints as written) —
     * measured on the wire: the 0<1+n goal displays `1 ≤ suc n` while `s≤s _`
     * infers `suc _m_5 ≤ suc _n_6`.  Matching text across that divergence
-    * needs one canonical form, so both sides expand numeral TOKENS to suc
-    * towers (`1` → `suc 0`, `2` → `suc (suc 0)`) before comparison.  Metas
-    * are already wildcards by the time literals are expanded, so their
-    * trailing digits are untouched.
+    * needs one canonical form, so SMALL numeral tokens (at most
+    * `MaxNumeralDigits` digits) expand to suc towers (`1` → `suc 0`, `2` →
+    * `suc (suc 0)`) before comparison, built iteratively.  Small only, and
+    * never recursively: Agda numerals are unbounded, and an unconditional
+    * `toLong` plus a per-successor recursion would turn a huge literal in a
+    * goal into a thrown conversion or a stack overflow — a fixture anomaly,
+    * where a peek must never be more than a keep-or-skip decision (Copilot
+    * round 2 on PR #126).  A numeral above the bound stays literal on BOTH
+    * sides, so numeral-vs-numeral still matches exactly; the suc-vs-numeral
+    * bridge is only ever needed for the handful of explicit constructor
+    * applications a candidate can wrap around a meta.  Metas are already
+    * wildcards by the time literals are expanded, so their trailing digits
+    * are untouched.
     */
+  private val MaxNumeralDigits = 2
+
   private def expandNumerals(s: String): String = {
     val num = Pattern.compile("""\b([0-9]+)\b""").matcher(s)
     val out = new StringBuilder
     var last = 0
     while (num.find()) {
       out.append(s.substring(last, num.start()))
-      out.append(sucTower(num.group(1).toLong))
+      val tok = num.group(1)
+      if (tok.length <= MaxNumeralDigits) out.append(sucTower(tok.toLong))
+      else out.append(tok)
       last = num.end()
     }
     out.append(s.substring(last))
     out.result()
   }
 
+  /** `n` as an explicit suc tower — `suc (suc (… 0 …))` — built with string
+    * repetition, no recursion.
+    */
   private def sucTower(n: Long): String =
     if (n <= 0) "0"
-    else if (n == 1) "suc 0"
-    else s"suc (${sucTower(n - 1)})"
+    else "suc (" * (n - 1).toInt + "suc 0" + ")" * (n - 1).toInt
 
   /** The peek verdict for one candidate, from the lane's answer.  `Keep`
     * means "probe it"; a peek can only ever skip a probe, never fabricate a

@@ -251,9 +251,12 @@ object ProofSearchLoop extends IOApp {
       _       <- IO.println(s">> run root: ${cfg.runRoot}")
       result  <- McpClient.resource(serverCfg).use { client =>
                    for {
-                     oracle <- Oracle.create(client)
-                     driven <- entries.traverse(e => runFixture(cfg, oracle, e))
-                     ledger <- oracle.timings.get
+                     // One ledger for the run; one oracle — and so one probe
+                     // memo — per fixture (see Oracle.create's second door).
+                     timings <- cats.effect.Ref.of[IO, Vector[TimingRow]](Vector.empty)
+                     driven  <- entries.traverse(e =>
+                                  Oracle.create(client, timings).flatMap(o => runFixture(cfg, o, e)))
+                     ledger  <- timings.get
                    } yield (driven, ledger)
                  }
       (driven, ledger) = result

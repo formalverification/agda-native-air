@@ -318,6 +318,29 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     LoopConfig.default.dedup shouldBe DedupPolicy.ScriptInclusive
   }
 
+  test("a beam-cut child does not poison a later path to the same state (round 2)") {
+    // Two histories reach one content: committing "f x" directly, and
+    // committing "f {!!}" then "x" into its sub-hole — the hole-free
+    // compound shape a P2 retrieval proposer can emit.  With beam 1 the
+    // direct child ranks worse (the world reports more holes for it) and is
+    // CUT at level 0; the two-step path then reaches the same content at
+    // level 1.  Under content-only dedup that state must still be
+    // expandable: a cut child was never expanded, so its key must not have
+    // entered the visited set.
+    val world = Map(
+      (3, 8,  "f {!!}") -> fillOk("f {!!}", Vector((3, 10))),
+      (3, 8,  "f x")    -> fillOk("f x", Vector((3, 20), (3, 25))), // ranked worse, beam-cut
+      (3, 10, "x")      -> fillOk("x", Vector((3, 15)))             // reaches "goal = f x" again
+    )
+    val (result, _) = runLoop(world, Vector("f {!!}", "f x", "x"),
+      LoopConfig.default.copy(beamWidth = 1, dedup = DedupPolicy.ContentOnly))
+    // Pre-fix this died at level 1 with dedupSkips = 1 and only 2 expansions;
+    // the re-reached state must be expanded instead.
+    result.stats.dedupSkips shouldBe 0
+    result.stats.expansions shouldBe 3
+    result.status shouldBe SearchStatus.Exhausted
+  }
+
   // --------------------------------------------------------------------------
   // The peek gate
   // --------------------------------------------------------------------------

@@ -96,7 +96,7 @@ P1's implementation is deliberately fixed and non-learned, in proposal order: th
 +  **Applications are parenthesized** (`(s≤s {!!})`), because a hole is an argument position as often as a right-hand side, and a verbatim splice of `s≤s {!!}` into a sub-hole reads as `s≤s sym {!!}` — a different term.  The first P1 sweep measured every depth-1 lemma application dying exactly this way.
 +  **The splitter is a proposal device, not an authority.**  It reads printed types (with their renamed binders, hidden groups, and newlines) well enough to count visible binders; the oracle polices what it gets wrong, because an overcount is refused as a type error and an undercount leaves a partial application the goal must then accept.
 
-The term-mode ceiling is a property of this space and must accompany its numbers: no case splits and no `with` means clause-restructuring golds are unreachable.  On M1-5 that is 16 of 22 (14 inductions, 2 case splits, plus a chain needing imports the obligation lacks); the six with expressible single-term golds are exactly the six P1 solves.
+The term-mode ceiling is a property of this space and must accompany its numbers: no case splits and no `with` means clause-restructuring golds are unreachable.  On M1-5 that is 16 of 22 (13 inductions, 2 case splits, and one single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six with expressible single-term golds are exactly the six P1 solves.
 
 ## 6.  The `type_of` peek (P1's measured experiment)
 
@@ -128,7 +128,7 @@ Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (con
 
 +  **P2 — retrieval proposals (#123).**  Replace the fixed lemma pool with candidates from `search_by_name` / `search_by_type` over a real `agda-strux` stdlib corpus, ranked by premise selection, behind the same `Proposer` seam.  Deliverables mirror P1's: uplift over 6/22, the proposal-vs-oracle split re-reported (retrieval makes proposal time real for the first time), the peek re-validated and possibly made default, and dedup re-measured if retrieval proposes hole-free compound terms.
 +  **P3 — policy proposals (#124).**  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines.  The closed propose–check–learn loop the project has been building toward.
-+  **Raising the ceiling** (unscheduled, the largest known win): term mode caps the suite at 6/22, and 14 of the 16 unreachable golds are structural inductions of a single shape (`f zero … = refl; f (suc n) … = cong g (f n …)`).  Reaching them needs case-split moves — plausibly via the interaction protocol's `Cmd_make_case` — which would change the state model's move vocabulary and is deliberately out of P1–P3 scope.
++  **Raising the ceiling** (unscheduled, the largest known win): term mode caps the suite at 6/22, and 13 of the 16 unreachable golds are structural inductions of a single shape (`f zero … = refl; f (suc n) … = cong g (f n …)`).  Reaching them needs case-split moves — plausibly via the interaction protocol's `Cmd_make_case` — which would change the state model's move vocabulary and is deliberately out of P1–P3 scope.
 +  **Recorded options, taken only if measurement demands**: parallel oracle workers (N servers over disjoint work copies) if wall time becomes the bottleneck; richer selection policies than first-open-obligation if multi-hole fixtures ever make selection order matter under budget.
 
 ## 10.  Decision log

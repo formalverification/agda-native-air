@@ -223,8 +223,19 @@ final class Oracle private (
 
 object Oracle {
   def create(client: ToolCaller): IO[Oracle] =
-    for {
-      memo <- Ref.of[IO, Map[OracleKey, OracleAnswer[ProbeOutcome]]](Map.empty)
-      tim  <- Ref.of[IO, Vector[TimingRow]](Vector.empty)
-    } yield new Oracle(client, memo, tim)
+    Ref.of[IO, Vector[TimingRow]](Vector.empty).flatMap(create(client, _))
+
+  /** Create with an externally owned timing ledger.  The P1 loop harness
+    * gives every FIXTURE a fresh oracle over one run-wide ledger: the probe
+    * memo's soundness assumption — same content, same verdict — holds within
+    * one working file's project context, and #122 scopes the memo to "the
+    * whole fixture run", so a memo spanning fixtures would both blur the
+    * per-fixture budget and, for content whose imports resolve differently
+    * by path, cache a wrong verdict (Copilot round 2 on PR #126).  The
+    * ledger, by contrast, is the RUN's measurement and accumulates across
+    * fixtures.
+    */
+  def create(client: ToolCaller, timings: Ref[IO, Vector[TimingRow]]): IO[Oracle] =
+    Ref.of[IO, Map[OracleKey, OracleAnswer[ProbeOutcome]]](Map.empty)
+      .map(new Oracle(client, _, timings))
 }

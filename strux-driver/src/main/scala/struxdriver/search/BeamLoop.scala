@@ -339,17 +339,27 @@ object BeamLoop {
           case (st2, BudgetHit) =>
             IO.pure(FixtureSearchResult(SearchStatus.BudgetExceeded, None, st2.rootGoal, st2.stats))
           case (st2, Done(children)) =>
-            // Dedup against everything ever enqueued, then rank and cut to the beam.
-            val (st3, kept) = children.foldLeft((st2, Vector.empty[(SearchState, ProbeOutcome)])) {
-              case ((s, keep), (child, probe)) =>
+            // Dedup the level against everything ever ENQUEUED (plus this
+            // level's own duplicates, via a temporary set), then rank, cut to
+            // the beam — and only the states that actually enter the frontier
+            // join the persistent visited set.  A child the beam cut was
+            // never expanded, so its key must not poison a later path to the
+            // same state (Copilot round 2 on PR #126): reachable only under
+            // content-only dedup with a proposer that emits hole-free
+            // compound candidates, but the invariant — visited means
+            // enqueued, never merely generated — is cheap to hold always.
+            val (st3, _, fresh) = children.foldLeft(
+              (st2, Set.empty[String], Vector.empty[(SearchState, ProbeOutcome)])) {
+              case ((s, seen, keep), (child, probe)) =>
                 val key = cfg.dedup.keyOf(child)
-                if (s.visited(key))
-                  (s.copy(stats = s.stats.copy(dedupSkips = s.stats.dedupSkips + 1)), keep)
-                else (s.copy(visited = s.visited + key), keep :+ (child -> probe))
+                if (s.visited(key) || seen(key))
+                  (s.copy(stats = s.stats.copy(dedupSkips = s.stats.dedupSkips + 1)), seen, keep)
+                else (s, seen + key, keep :+ (child -> probe))
             }
-            val next = kept.sortBy { case (_, probe) => Rank.of(probe) }
-                           .take(cfg.beamWidth).map(_._1)
-            level(next, depth + 1, st3)
+            val next = fresh.sortBy { case (_, probe) => Rank.of(probe) }
+                            .take(cfg.beamWidth).map(_._1)
+            val st4 = st3.copy(visited = st3.visited ++ next.map(cfg.dedup.keyOf))
+            level(next, depth + 1, st4)
         }
       }
 

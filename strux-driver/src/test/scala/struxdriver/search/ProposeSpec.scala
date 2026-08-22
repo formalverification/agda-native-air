@@ -124,6 +124,20 @@ final class ProposeSpec extends AnyFunSuite with Matchers {
     Peek.compatible("m + n ≡ n + m", "Set") shouldBe false
   }
 
+  test("compatible: unbounded numerals never throw; large ones match literally (round 2)") {
+    val huge = "340282366920938463463374607431768211456" // > Long.MaxValue
+    // A huge literal on either side is left as-is: literal-vs-literal still
+    // matches, metas still wildcard, and nothing converts or recurses.
+    Peek.compatible(s"$huge ≤ n", s"$huge ≤ _n_1") shouldBe true
+    Peek.compatible(s"$huge ≡ x", "_a_1 ≡ _b_2") shouldBe true
+    Peek.compatible(s"$huge ≤ n", "suc _m_1 ≤ _n_1") shouldBe false // no bridge above the bound
+    // Three-digit numerals stay literal too (the bound is two digits), and
+    // still match themselves exactly.
+    Peek.compatible("100 ≤ n", "100 ≤ _n_1") shouldBe true
+    // The small-numeral bridge that motivated canonicalization keeps working.
+    Peek.compatible("1 ≤ suc n", "suc _m_5 ≤ suc _n_6") shouldBe true
+  }
+
   test("judge: in-body errors reject, lane failures keep (peeks inform, never veto by absence)") {
     val err = TypeOfBody(None, Some(TypeOfError("NotInScope", "tt is not in scope")), 2)
     Peek.judge("⊤", Right(err)) shouldBe a[Peek.Verdict.Reject]
