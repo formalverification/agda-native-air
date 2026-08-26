@@ -10,7 +10,7 @@
   *  The agda-mcp wire shapes the search consumes, as circe decoders: the
   *  JSON-RPC envelope (whose tool payload is a JSON document INSIDE the
   *  `content[0].text` string — double-encoded, so unwrapping takes two parses)
-  *  and the bodies of check_file, get_goal, and fill_hole.
+  *  and the bodies of check_file, get_goal, fill_hole, and type_of.
   *
   *  Design notes
   *  ------------
@@ -83,12 +83,32 @@ object CheckFileBody {
     } yield CheckFileBody(success, holes, count, timedOut, elapsed, cfs, exit)
 }
 
-/** get_goal, reduced to what the search reads: the goal type, the module name
-  * Agda resolved, and which lane answered (`interaction-lane` vs
-  * `injected-macro`, issue #108).
+/** One local-context entry as get_goal reports it.  The lane path carries
+  * `{name, type}` only; the injected-macro path adds `visibility` and `index`
+  * (agda-mcp/README.md), so those stay optional while name and type — the
+  * fields the P1 assumption proposals read — are required.
+  */
+final case class CtxEntry(name: String, tpe: String, visibility: Option[String])
+object CtxEntry {
+  implicit val decoder: Decoder[CtxEntry] = (c: HCursor) =>
+    for {
+      name <- c.get[String]("name")
+      tpe  <- c.get[String]("type")
+      vis  <- c.get[Option[String]]("visibility")
+    } yield CtxEntry(name, tpe, vis)
+}
+
+/** get_goal, reduced to what the search reads: the goal type, the local
+  * context (the P1 assumption candidates), the module name Agda resolved, and
+  * which lane answered (`interaction-lane` vs `injected-macro`, issue #108).
+  * `context` is REQUIRED: both server paths serialize it unconditionally
+  * (AgdaMCP.Types.GoalInfo), so an absent list is wire drift, and a
+  * silently-defaulted empty one would starve the action space of every
+  * assumption without a visible failure.
   */
 final case class GetGoalBody(
   goal:      String,
+  context:   Vector[CtxEntry],
   module:    Option[String],
   source:    Option[String],
   elapsedMs: Long
@@ -97,10 +117,49 @@ object GetGoalBody {
   implicit val decoder: Decoder[GetGoalBody] = (c: HCursor) =>
     for {
       goal    <- c.get[String]("goal")
+      ctx     <- c.get[Vector[CtxEntry]]("context")
       module  <- c.get[Option[String]]("module")
       source  <- c.get[Option[String]]("source")
       elapsed <- c.get[Long]("elapsedMs")
-    } yield GetGoalBody(goal, module, source, elapsed)
+    } yield GetGoalBody(goal, ctx, module, source, elapsed)
+}
+
+/** type_of, the interaction-lane knowledge query the P1 proposer and peek
+  * read (docs/agda-mcp-interaction-lane.md § 5).  Verified on the wire
+  * (issue #122 probes, captures in test/resources/search/): a successful
+  * inference carries `type` — with under-determined metas ANSWERED, printed
+  * as named metas (`_x_9 ≡ _x_9`), never errored — while an expression Agda
+  * rejects carries an in-body `error` object with `isError` still false
+  * (NotInScope, CannotApply, UnequalTerms all arrive this way, in
+  * milliseconds once the file is loaded).  Exactly one of the two must be
+  * present; both or neither is drift.  These answers inform proposals and
+  * peeks only — they never decide anything (only fill_hole judges).
+  */
+final case class TypeOfError(code: String, message: String)
+object TypeOfError {
+  implicit val decoder: Decoder[TypeOfError] = (c: HCursor) =>
+    for {
+      code <- c.get[String]("code")
+      msg  <- c.get[String]("message")
+    } yield TypeOfError(code, msg)
+}
+
+final case class TypeOfBody(
+  inferred:  Option[String],
+  error:     Option[TypeOfError],
+  elapsedMs: Long
+)
+object TypeOfBody {
+  implicit val decoder: Decoder[TypeOfBody] = (c: HCursor) =>
+    for {
+      tpe     <- c.get[Option[String]]("type")
+      err     <- c.get[Option[TypeOfError]]("error")
+      _       <- Either.cond(tpe.isDefined != err.isDefined, (),
+                   DecodingFailure(
+                     s"type_of drift: expected exactly one of type/error, got type=${tpe.isDefined} error=${err.isDefined}",
+                     c.history))
+      elapsed <- c.get[Long]("elapsedMs")
+    } yield TypeOfBody(tpe, err, elapsed)
 }
 
 /** fill_hole, the oracle's judgement of one candidate.  `holes` describes the

@@ -101,6 +101,44 @@ final class WireSpec extends AnyFunSuite with Matchers {
     replyOf("wire-fill-hole-type-error.json", 5).decodeAs[FillHoleBody].isRight shouldBe true
   }
 
+  test("get_goal carries the context the P1 assumptions read (live capture, two entries)") {
+    val body = replyOf("wire-get-goal-context.json", 12).decodeAs[GetGoalBody].toOption.get
+    body.goal shouldBe "m + n ≡ n + m"
+    body.context shouldBe Vector(CtxEntry("m", "ℕ", None), CtxEntry("n", "ℕ", None))
+    body.module shouldBe Some("Nat-plus-comm")
+    body.source shouldBe Some("interaction-lane")
+  }
+
+  test("type_of ok: under-determined metas are ANSWERED as named metas, never errored (live capture)") {
+    val body = replyOf("wire-type-of-ok.json", 4).decodeAs[TypeOfBody].toOption.get
+    body.inferred shouldBe Some("_x_9 ≡ _x_9")
+    body.error shouldBe None
+  }
+
+  test("type_of rejections arrive as in-body errors with isError still false (live captures)") {
+    val nis = replyOf("wire-type-of-not-in-scope.json", 9)
+    nis.isError shouldBe false
+    val nisBody = nis.decodeAs[TypeOfBody].toOption.get
+    nisBody.inferred shouldBe None
+    nisBody.error.map(_.code) shouldBe Some("NotInScope")
+
+    val ca = replyOf("wire-type-of-cannot-apply.json", 2).decodeAs[TypeOfBody].toOption.get
+    ca.error.map(_.code) shouldBe Some("CannotApply")
+  }
+
+  test("type_of and get_goal drift fails the decode (issue #122 strictness)") {
+    import io.circe.parser.parse
+    // A reply with BOTH type and error, or NEITHER, is drift.
+    val both    = """{"type":"T","error":{"code":"X","message":"m"},"elapsedMs":1}"""
+    val neither = """{"elapsedMs":1}"""
+    parse(both).toOption.get.as[TypeOfBody].isLeft shouldBe true
+    parse(neither).toOption.get.as[TypeOfBody].isLeft shouldBe true
+    // get_goal without a context list is drift — a defaulted-empty one would
+    // silently starve the action space of every assumption.
+    val noCtx = """{"goal":"G","module":"M","source":"interaction-lane","elapsedMs":1}"""
+    parse(noCtx).toOption.get.as[GetGoalBody].isLeft shouldBe true
+  }
+
   test("envelope: lines for other ids and non-JSON noise are NotOurs, never fatal") {
     Wire.envelope(resource("wire-init.json"), 99) shouldBe Wire.Envelope.NotOurs
     Wire.envelope("not json at all", 1) shouldBe Wire.Envelope.NotOurs

@@ -57,6 +57,10 @@
   *      and per-fixture outcomes.
   *    work/, logs/  — working copies and raw replies.
   *
+  *  Since issue #122 the fixture-run scaffolding (index reading, work copies,
+  *  the baseline one-hole gate, JSONL writing) lives in Scaffold.scala, shared
+  *  with the P1 loop harness; this harness's behavior is unchanged.
+  *
   *  Invocation (see the proof-search-* Make targets)
   *  ------------------------------------------------
   *    sbt "runMain struxdriver.search.SingleStepHarness
@@ -75,8 +79,7 @@ import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path, Paths, StandardCopyOption}
-import scala.jdk.CollectionConverters._
+import java.nio.file.{Files, Path, Paths}
 
 import struxdriver.benchmark.{Obligation => IndexEntry}
 
@@ -180,9 +183,6 @@ object SingleStepHarness extends IOApp {
       |    [--passes N]           sweep repetitions against one server (default 1)
       |""".stripMargin
 
-  private val defaultAgdaFlags =
-    "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library"
-
   def run(args: List[String]): IO[ExitCode] =
     parseArgs(args) match {
       case Left(err)  => IO.println(s"error: $err\n\n$usage").as(ExitCode.Error)
@@ -220,7 +220,7 @@ object SingleStepHarness extends IOApp {
       outDir        = Paths.get(out),
       runId         = m.getOrElse("run-id", s"run-${System.currentTimeMillis()}"),
       serverBin     = Paths.get(bin),
-      agdaFlags     = m.getOrElse("agda-flags", defaultAgdaFlags),
+      agdaFlags     = m.getOrElse("agda-flags", Scaffold.defaultAgdaFlags),
       serverTimeout = tmo,
       projectRoot   = Paths.get(root).toAbsolutePath.normalize,
       passes        = passes
@@ -240,7 +240,7 @@ object SingleStepHarness extends IOApp {
       stderrLog  = cfg.runRoot.resolve("server-stderr.log")
     )
     for {
-      entries <- readIndex(cfg)
+      entries <- Scaffold.readIndex(cfg.index, cfg.ids)
       _       <- IO.raiseWhen(entries.isEmpty)(new RuntimeException("no obligations matched"))
       _       <- IO.blocking(Files.createDirectories(cfg.runRoot))
       _       <- IO.println(s">> proof-search single-step: ${entries.size} obligation(s), k=${Actions.stubActionSpace.size}, passes=${cfg.passes}")
@@ -271,13 +271,6 @@ object SingleStepHarness extends IOApp {
     } yield ()
   }
 
-  private def readIndex(cfg: HarnessConfig): IO[Vector[IndexEntry]] =
-    IO.blocking(Files.readAllLines(cfg.index, StandardCharsets.UTF_8).asScala.toVector)
-      .flatMap(_.filter(_.trim.nonEmpty).traverse(l =>
-        IO.fromEither(io.circe.parser.decode[IndexEntry](l).leftMap(e =>
-          new RuntimeException(s"bad index row: ${e.getMessage}")))))
-      .map(all => cfg.ids.fold(all)(want => all.filter(e => want(e.id))))
-
   /** Drive one fixture through one pass; anomalies (a fixture that does not
     * present exactly one obligation, or whose goal cannot be read) are
     * reported, not thrown, so one bad fixture cannot abort a sweep.
@@ -287,35 +280,25 @@ object SingleStepHarness extends IOApp {
     val workDir   = cfg.runRoot.resolve(s"work/pass-$pass/$fixtureId")
     val logsDir   = cfg.runRoot.resolve(s"logs/pass-$pass/$fixtureId")
     val source    = cfg.projectRoot.resolve(entry.obligationPath)
-    val workFile  = workDir.resolve(source.getFileName)
 
     def anomaly(msg: String): (FixtureOutcome, Vector[AttemptRow]) =
       (FixtureOutcome(fixtureId, entry.difficulty.tag, entry.typeSig, "", Vector.empty,
         None, None, committed = false, None, solved = false, Some(msg)), Vector.empty)
 
     val step: IO[(FixtureOutcome, Vector[AttemptRow])] = for {
-      _       <- IO.blocking { Files.createDirectories(workDir); Files.createDirectories(logsDir) }
-      _       <- IO.blocking(Files.copy(source, workFile, StandardCopyOption.REPLACE_EXISTING))
-      content <- IO.blocking(new String(Files.readAllBytes(workFile), StandardCharsets.UTF_8))
-      check   <- oracle.checkFile(CallCtx(pass, fixtureId, "check_file", None), workFile)
-      result  <- check.body.holes match {
-                   case Vector(h) =>
-                     val ob    = WireHole.toObligation(h)
-                     val state = SearchState.initial(content, Vector(ob))
-                     probeAndCommit(cfg, oracle, pass, entry, workFile, logsDir, state, ob)
-                   case hs =>
-                     IO.pure(anomaly(s"expected exactly 1 hole, check_file reported ${hs.size}"))
+      staged  <- Scaffold.stage(source, workDir, logsDir, oracle,
+                   CallCtx(pass, fixtureId, "check_file", None))
+      result  <- staged match {
+                   case Right(st) =>
+                     val state = SearchState.initial(st.content, Vector(st.obligation))
+                     probeAndCommit(cfg, oracle, pass, entry, st.workFile, logsDir, state, st.obligation)
+                   case Left(msg) =>
+                     IO.pure(anomaly(msg))
                  }
       _       <- IO.println(f">> [pass $pass] $fixtureId%-34s ${result._1.bestStatus.getOrElse("-")}%-11s closers=${result._1.closers.size} solved=${result._1.solved}")
     } yield result
 
     step.handleErrorWith(e => IO.println(s">> [pass $pass] $fixtureId FAILED: ${e.getMessage}").as(anomaly(e.getMessage)))
-  }
-
-  /** The schema's fixtureId: the fixture module stem (file name sans .agda). */
-  private def fixtureStem(entry: IndexEntry): String = {
-    val name = entry.obligationPath.getFileName.toString
-    name.stripSuffix(".agda")
   }
 
   private def probeAndCommit(
@@ -343,7 +326,7 @@ object SingleStepHarness extends IOApp {
                 }
       rows    = probed.map { case (rank, cand, ans) =>
                   AttemptRow(
-                    fixtureId     = fixtureStem(entry),
+                    fixtureId     = Scaffold.fixtureStem(entry),
                     benchmarkId   = entry.id,
                     module        = goal.body.module.getOrElse(""),
                     // The schema defines fixturePath as ABSOLUTE (agda-dojang/README.md),
@@ -414,11 +397,6 @@ object SingleStepHarness extends IOApp {
     // attempts to a schema consumer.  timing.jsonl keeps every pass.
     val attempts = result.filter(_._1 == lastPass).flatMap(_._2.flatMap(_._2))
 
-    def writeJsonl(path: Path, rows: Vector[Json]): IO[Unit] =
-      IO.blocking {
-        Files.write(path, rows.map(_.noSpaces).mkString("", "\n", "\n").getBytes(StandardCharsets.UTF_8)); ()
-      }
-
     val oraclePhases = Set("check_file", "get_goal", "fill_hole", "final_check")
 
     def aggregate(rows: Vector[TimingRow]): Json = {
@@ -481,8 +459,8 @@ object SingleStepHarness extends IOApp {
     )
 
     for {
-      _ <- writeJsonl(cfg.runRoot.resolve("results.jsonl"), attempts.map(_.toJson))
-      _ <- writeJsonl(cfg.runRoot.resolve("timing.jsonl"), ledger.map(_.asJson))
+      _ <- Scaffold.writeJsonl(cfg.runRoot.resolve("results.jsonl"), attempts.map(_.toJson))
+      _ <- Scaffold.writeJsonl(cfg.runRoot.resolve("timing.jsonl"), ledger.map(_.asJson))
       _ <- IO.blocking(Files.write(cfg.runRoot.resolve("report.json"),
              report.spaces2.getBytes(StandardCharsets.UTF_8)))
       _ <- IO.println(summarize(lastPass, ledger, outcomes))
@@ -512,7 +490,6 @@ object SingleStepHarness extends IOApp {
        |""".stripMargin
   }
 
-  private def round3(d: Double): BigDecimal = BigDecimal(d).setScale(3, BigDecimal.RoundingMode.HALF_UP)
-  private def pct(part: Double, whole: Double): BigDecimal =
-    if (whole <= 0) BigDecimal(0) else BigDecimal(part / whole * 100).setScale(2, BigDecimal.RoundingMode.HALF_UP)
+  private def round3(d: Double): BigDecimal = Scaffold.round3(d)
+  private def pct(part: Double, whole: Double): BigDecimal = Scaffold.pct(part, whole)
 }

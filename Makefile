@@ -443,6 +443,8 @@ help:
 	@echo "  make proof-search-single-step    - Proof-search P0: k stub candidates vs one M1-5 obligation (PROOF_SEARCH_ID)"
 	@echo "  make proof-search-split          - Proof-search P0: full M1-5 sweep + oracle-vs-proposal timing split (issue 113)"
 	@echo "  make proof-search-it             - Proof-search P0: live two-obligation regression vs the real agda-mcp"
+	@echo "  make proof-search-loop           - Proof-search P1: M1-5 beam search, per-tier solve counts (issue 122)"
+	@echo "  make proof-search-loop-it        - Proof-search P1: live full-search regression vs the real agda-mcp"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1599,6 +1601,36 @@ proof-search-it: _check-sbt
 	echo ">> [proof-search-it] live two-obligation regression against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
 	  "testOnly struxdriver.search.SingleStepIntegrationSpec"
+
+# Proof-search P1 (issue #122): the beam loop over the P0 state model with the
+# fixed action space (closers, goal-context assumptions, imported-lemma
+# applications with binder counts from lane type_of).  Tunables mirror the
+# stated #122 defaults; results/fixtures/timing land on the shared eval JSONL
+# schema under $(PROOF_SEARCH_OUT_DIR)/<run-id>/, and the report carries the
+# per-tier solve counts that are the phase's headline number.
+PROOF_SEARCH_BEAM     ?= 4
+PROOF_SEARCH_DEPTH    ?= 6
+PROOF_SEARCH_BUDGET   ?= 60
+PROOF_SEARCH_DEDUP    ?= script
+PROOF_SEARCH_PEEK     ?= off
+PROOF_SEARCH_LOOP_IDS ?= --all
+
+.PHONY: proof-search-loop proof-search-loop-it
+
+# The full M1-5 beam sweep (or --ids via PROOF_SEARCH_LOOP_IDS="--ids id1,id2").
+proof-search-loop: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [proof-search-loop] M1-5 beam search (beam=$(PROOF_SEARCH_BEAM) depth=$(PROOF_SEARCH_DEPTH) budget=$(PROOF_SEARCH_BUDGET) dedup=$(PROOF_SEARCH_DEDUP) peek=$(PROOF_SEARCH_PEEK)) against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.search.ProofSearchLoop --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --beam $(PROOF_SEARCH_BEAM) --max-depth $(PROOF_SEARCH_DEPTH) --probe-budget $(PROOF_SEARCH_BUDGET) --dedup $(PROOF_SEARCH_DEDUP) --peek $(PROOF_SEARCH_PEEK)"
+
+# The live full-search regression (LoopIntegrationSpec) against the real
+# server; the pure twins run in plain `make test`.
+proof-search-loop-it: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [proof-search-loop-it] live full-search regression against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
+	  "testOnly struxdriver.search.LoopIntegrationSpec"
 
 
 
