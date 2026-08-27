@@ -3,7 +3,7 @@
 File: `agda-native-air/docs/adr/0001-proof-search-on-agda-mcp.md`
 
 +  **Status**: Draft.
-+  **Date**: 2026-08-22 (P0 and P1 landed; P2 and P3 are direction).
++  **Date**: 2026-08-22 (P0 and P1 landed); 2026-08-27 (P2 landed; P3 is direction).
 +  **Tracking**: [#113](https://github.com/formalverification/agda-native-air/issues/113); phases [#119](https://github.com/formalverification/agda-native-air/issues/119) (P0, PR [#121](https://github.com/formalverification/agda-native-air/pull/121)), [#122](https://github.com/formalverification/agda-native-air/issues/122) (P1, PR [#126](https://github.com/formalverification/agda-native-air/pull/126)), [#123](https://github.com/formalverification/agda-native-air/issues/123) (P2), [#124](https://github.com/formalverification/agda-native-air/issues/124) (P3).
 +  **Ancestry**: issue #112 (post-mortem of the retired v0.3 `search.py`), whose four lessons this design encodes as types and tests rather than prose.
 
@@ -23,13 +23,13 @@ P0 landed the substrate (state model, oracle client, single-step harness) and th
 
 P1 landed the loop with a fixed, non-learned action space — the P0 closers, the goal context's assumptions, and applications of the lemmas the fixture imports — and measured the baseline: **6 of 22 benchmark obligations solved (routine 6/7, compositional 0/10, non-obvious 0/5)**, which is *exactly* the ceiling of what that action space can express in term mode, so the number is saturated, not disappointing.  A measured `type_of` pre-filter cut oracle judgements by 88 % and end-to-end time by 4.5× at zero cost in solves.
 
+P2 landed retrieval over a real standard-library corpus (55,576 rows, pinned to the toolchain's own stdlib) behind the same seam, and measured the honest thing: **retrieval adds zero term-mode solves on this suite — because the suite's ceiling binds any term-mode proposer, not because retrieval fails**.  The evidence separating those readings: a labeled control with the anti-gaming target exclusion off retrieves and commits all five admissible stdlib targets as one-shot applications (10/22), the failures under exclusion are overwhelmingly honest exhaustion rather than budget starvation, and a wire fact pinned along the way (`fill_hole` refuses blocked-constraint sub-holes) explains exactly which lemma class term mode cannot refine through.  The peek re-validated on retrieval candidates and its default flipped to ON; the benchmark extension that gives retrieval something honest to win is filed as #129.
+
 ### Where it goes
 
-The action space is the bottleneck, by construction and now by measurement.
+After P2 the bottleneck is no longer the action space but the move vocabulary: term mode caps this suite whatever the proposer.
 
-P2 replaces the fixed space with candidates retrieved from a real library corpus (the `agda-strux` extraction and its search tools), behind the same `Proposer` interface the fixed space already implements.
-
-P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract.
+P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract; #129 extends the benchmark so a proposer that finds the right lemma in a haystack can be told apart from one that cannot; case-split moves (§10) are the eventual ceiling-raiser.
 
 Every phase is scored on the same benchmark through the same JSONL schema, so the baselines stack: each phase must beat the last, on the same 22 obligations, in the same currency of oracle calls.
 
@@ -106,11 +106,23 @@ What the wire probes established (captures in `strux-driver/src/test/resources/s
 
 Measured end to end on M1-5: the same 6 solves with byte-identical scripts; probes 435 → 50 (−88.5 %); batch oracle time 1227 s → 209 s; wall 21.5 min → 4.7 min (4.5×); probe precision 6.7 % → 70 %; and the chain-burners stopped burning (budget-exceeded became honest depth-capped exhaustion).  Two rules keep it sound in spirit: a peek can only ever *skip* a judgement, never substitute for one, and any failure to peek keeps the candidate.  It ships opt-in (`--peek on`) until it re-validates on P2's retrieval candidates, whose types will exercise renderings this suite cannot.
 
-## 7.  Reporting: one schema for every phase
+## 7.  The P2 retrieval proposer (#123, `Retrieve.scala`)
 
-Every run writes the shared eval schema, so search results sit beside the policy-backend evaluator's with no private format: `results.jsonl` (one `eval-proof-completion.v0` row per judged candidate; `fixtureId` is the module stem, `benchmarkId` the additive join key, `elapsedMs` client-observed wall clock), `fixtures.jsonl` (per-fixture summaries on the same schema, plus additive `searchStatus`), `timing.jsonl` (the `proof-search-timing.v0` ledger, per call, with `type_of` and `peek` phases beside P0's, cache hits marked, and proposal rows carrying the proposer's *own* time — nested oracle calls are subtracted, since the ledger already carries them), and `report.json` (config, per-tier solve counts, per-fixture outcomes, the batch/knowledge/proposal split).  Solved proofs land as typecheckable artifacts under the run's `solved/`.
+P2 widens WHAT is proposed, not how it is judged: a `RetrievalProposer` behind the same seam, COMPOSED around the fixed space (closers, assumptions, and `using`-list applications stay — they carry the constructors the corpus does not row — so the P2 space is a superset of P1's by construction and any measured delta is attributable to retrieval).  Its substrate is a real corpus of the standard library — 55,576 rows extracted from the pinned Nix-store stdlib 2.3, provenance and digests in `docs/corpora/agda-stdlib-v0.md` — served by `agda-mcp --corpus` through `search_by_name` / `search_by_type` / `get_dependencies`, driven as a client like everything else.
 
-## 8.  Where it stands: the numbers
+**Scope** is the load-bearing decision.  A candidate must resolve in the fixture's module, and `open import M using (xs)` still grants qualified access to ALL of `M` (verified against the pinned toolchain), so the legal pool is every corpus row whose module the fixture imports or whose module extends one at a dot boundary (nested record modules; re-export `Core` modules).  Rendering walks a ladder — bare when the importing module's `using` list opens the name (so it dedups against the fixed space), the row's `prettyQname` verbatim, the importing module qualifying the bare name — and the lane arbitrates: the first rendering `type_of` answers wins, and a name the lane cannot type stays out.  Widening a fixture's import surface itself (committing `import M` lines as moves) is explicitly out of scope: a new move vocabulary, and a change to what the benchmark states.
+
+**Exclusion** is what keeps the measurement honest: every M1-5 obligation IS a stdlib lemma, so the corpus contains the answers verbatim.  A row whose bare name equals the obligation's hole name is excluded (this deliberately also catches record-field projections of the target), and a row whose type normalises — whitespace, `∀` sugar, positional binder renaming — to the obligation's stated type is excluded as an exact-statement alias; a differently-stated but convertible lemma is legitimately in the space, because using it is a real proof step.  Exclusions are NAMED per fixture in `report.json`, never silently applied, and the whole policy has a labeled off-switch (`--exclude-target off`) for exactly one purpose: the mechanism-control sweep that proves the retrieve→rank→type→apply→commit chain finds the needle when one exists, so a null headline is distinguishable from broken machinery.
+
+**Ranking** is deterministic and stated as the placeholder it is: token overlap between the goal display and the corpus type string (corpus tokens reduced to bare segments, since the corpus writes `Agda.Builtin.Nat._+_` where a goal shows `+`), a name-fragment bonus capped at one (stdlib names spell statements in operator glyphs), a penalty for pure-symbol operators the goal never mentions (without it the `+` goal ranks the `*`-and-`+` semiring bundles above the `+` lemmas — measured on a shakedown), ties broken cheap-before-expensive on approximate arity and then on the qname.  The scorer is its own seam; premise-selection scores replace it when the Phase 2 artifacts exist, and nothing else moves.
+
+**Candidate shapes** are three per lemma, and the third is a wire fact this phase probed and pinned (captures `wire-fill-hole-blocked-{subholes,metas}.json`): `fill_hole` REFUSES a candidate whose sub-holes or metas carry blocked constraints — `(+-comm {!!} {!!})` at `m + n ≡ n + m` is a `type_error` (`[UnsolvedConstraints]`, blocked on argument metas under the non-injective `_+_`), and `(+-comm _ _)` fails identically — so the alias-stated equational class can only ever commit FULLY APPLIED.  Hence, per ranked lemma: the hole-free `_`-form (closes in one probe when unification solves the arguments, which needs a constructor-rigid conclusion), bounded argument-SATURATED forms over the goal context's assumptions (every tuple, arity ≤ 3, ≤ 27 tuples — the peek prunes wrong tuples exactly, since a hole-free candidate's inferred type carries no metas), and the `{!!}`-refinement form P1 measured.  The `_`- and saturated forms are hole-free compound candidates — the class the P1 dedup A/B was waiting for.  Binder counts still come from the lane, which the wire shows expands alias types on qualified names (`Data.Nat.Properties.+-comm` infers `(x y : ℕ) → x + y ≡ y + x`, capture `wire-type-of-qualified.json`); the corpus type string ranks, never counts.
+
+## 8.  Reporting: one schema for every phase
+
+Every run writes the shared eval schema, so search results sit beside the policy-backend evaluator's with no private format: `results.jsonl` (one `eval-proof-completion.v0` row per judged candidate; `fixtureId` is the module stem, `benchmarkId` the additive join key, `elapsedMs` client-observed wall clock), `fixtures.jsonl` (per-fixture summaries on the same schema, plus additive `searchStatus`), `timing.jsonl` (the `proof-search-timing.v0` ledger, per call, with `type_of`, `peek`, and P2's `retrieval` phases beside P0's, cache hits marked, and proposal rows carrying the proposer's *own* time — nested oracle calls are subtracted, since the ledger already carries them), and `report.json` (config, per-tier solve counts, per-fixture outcomes, the batch/knowledge/retrieval/proposal split, and — for retrieval runs — the corpus provenance block and the per-fixture retrieval honesty ledger: hits, scope cuts, NAMED exclusions, truncated queries).  Solved proofs land as typecheckable artifacts under the run's `solved/`.
+
+## 9.  Where it stands: the numbers
 
 P0 (issue #113, the measurement that settled the fork): oracle 180 calls per pass at ~2.6–2.9 s each, 99.79 % of oracle time in the Agda subprocess, transport 0.21 %, proposal 2.3 ms total.
 
@@ -124,14 +136,25 @@ P1 (issue #113, PR #126; beam 4, depth 6, budget 60):
 
 Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (content-only measured identical here and can only start mattering when a proposer emits hole-free compound candidates — re-measure in P2); the peek is a validated cost lever, opt-in for now; and the baseline every later phase must beat is **6/22, at 435 probes without the peek or 50 with it**.
 
-## 9.  Where it is going
+P2 (issue #113, the same knobs, retrieval composed around the fixed space, target exclusion on unless stated):
 
-+  **P2 — retrieval proposals (#123).**  Replace the fixed lemma pool with candidates from `search_by_name` / `search_by_type` over a real `agda-strux` stdlib corpus, ranked by premise selection, behind the same `Proposer` seam.  Deliverables mirror P1's: uplift over 6/22, the proposal-vs-oracle split re-reported (retrieval makes proposal time real for the first time), the peek re-validated and possibly made default, and dedup re-measured if retrieval proposes hole-free compound terms.
+| configuration | solved | probes | wall |
+|---|---|---|---|
+| A — retrieval, no peek | 5/22 — the P1 set minus prod-mk-pair (budget ordering: its depth-2 chain no longer fits 60 probes behind 40 un-peeked root candidates) | 635 | 30.9 min |
+| B — retrieval, peek on | **6/22 — the P1 set, identical scripts** | 113 | 8.1 min |
+| C — A with content-only dedup | identical to A, per fixture; zero skips either way | 635 | 30.9 min |
+| D — A with exclusion OFF (labeled control) | 10/22 — the honest five plus all five admissible targets, each a one-shot saturated application | 514 | 25.8 min |
+
+The reading: **the suite's term-mode ceiling binds any term-mode proposer**.  Retrieval widened the legal pool from `using`-list handfuls to thousands of in-scope rows (plus-comm: 4,012 across its two goals) and honestly exhausted 15 of 16 unsolved fixtures under the peek; the control shows the retrieve→rank→apply→commit chain committing every needle the exclusion had removed.  The split re-measured with a real corpus in the loop: batch oracle 1,778 s versus retrieval 5.6 s plus proposal 3.6 s on sweep A — P0's conclusion stands.  The economics to beat from here are sweep B's: 6/22 at 113 probes, 8.1 min.
+
+## 10.  Where it is going
+
++  **P2 — retrieval proposals (#123): done** (§7 and §9).  What it hands on: the seam now carries three candidate shapes, the scorer inside `RetrievalProposer` is its own interface awaiting premise-selection scores, the peek default is ON, and the honest conclusion — the suite's term-mode ceiling binds any term-mode proposer — is filed as the benchmark extension #129, so retrieval's ranking value becomes measurable without gaming.
 +  **P3 — policy proposals (#124).**  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines.  The closed propose–check–learn loop the project has been building toward.
 +  **Raising the ceiling** (unscheduled, the largest known win): term mode caps the suite at 6/22, and 13 of the 16 unreachable golds are structural inductions of a single shape (`f zero … = refl; f (suc n) … = cong g (f n …)`).  Reaching them needs case-split moves — plausibly via the interaction protocol's `Cmd_make_case` — which would change the state model's move vocabulary and is deliberately out of P1–P3 scope.
 +  **Recorded options, taken only if measurement demands**: parallel oracle workers (N servers over disjoint work copies) if wall time becomes the bottleneck; richer selection policies than first-open-obligation if multi-hole fixtures ever make selection order matter under budget.
 
-## 10.  Decision log
+## 11.  Decision log
 
 | # | Decision | Status | Evidence |
 |---|---|---|---|
@@ -139,10 +162,13 @@ Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (con
 | 2 | The client lives in Scala (`strux-driver`); no in-process Haskell rewrite | Adopted (P0) | Transport is 0.21 % of oracle time (#113 measurement) |
 | 3 | Budgets are denominated in batch oracle calls, not seconds | Adopted (P1) | Batch call ≈ 2.6 s import loading dominates all else (#113) |
 | 4 | Judgements memoised on `OracleKey`; hits free, including at the budget cap | Adopted (P1) | OracleMemoSpec; BeamLoopSpec cap test (PR #126 round 1) |
-| 5 | Frontier dedup keys on content + script (script-inclusive) | Adopted (P1), revisit in P2 | A/B measured identical on M1-5; pinned in BeamLoopSpec |
+| 5 | Frontier dedup keys on content + script (script-inclusive) | Adopted (P1); P2 re-measured with hole-free compounds present: stands | Both A/Bs identical, zero skips either way; pinned in BeamLoopSpec |
 | 6 | First-open-obligation selection | Adopted (P1), simplification | Sound under conjunctive re-anchoring; pinned in BeamLoopSpec |
 | 7 | Application candidates parenthesized | Adopted (P1) | First sweep: every depth-1 application died unparenthesized |
-| 8 | `type_of` peek: informs only, opt-in | Adopted (P1), default revisited in P2 | −88.5 % probes, 4.5× wall, zero solve cost on M1-5 |
+| 8 | `type_of` peek: informs only; default ON since P2 | Adopted (P1); default flipped (P2) | P1: −88.5 % probes at zero solve cost; P2: re-validated on retrieval candidates, restored a budget-ordering loss; pinned in BeamLoopSpec |
+| 11 | Retrieval scope: modules the fixture imports, qualified access; import-widening is out of scope | Adopted (P2) | Qualified access toolchain-verified; #123 design comment; RetrieveSpec |
+| 12 | Target exclusion by name and normalised statement, NAMED in reports, with a labeled off-switch control | Adopted (P2) | Control run commits all five admitted targets (10/22 vs 5/22); RetrieveSpec |
+| 13 | Three candidate shapes: `_`-form, bounded saturation over the context, `{!!}`-refinement | Adopted (P2) | fill_hole refuses blocked-constraint sub-holes (captures wire-fill-hole-blocked-*); control solves are saturated one-shots |
 | 9 | Anomalies never abort a sweep, always redden the run, and keep their diagnostics | Adopted (P0/P1) | #112's silent-breakage failure mode; LoopHarnessSpec |
 | 10 | All reporting on `eval-proof-completion.v0` beside the policy baseline | Adopted (P0/P1) | #113 acceptance: no private formats |
 
