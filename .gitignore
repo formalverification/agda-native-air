@@ -15,6 +15,7 @@ agda/
 ml-pipeline/data/
 strux-driver/output/
 data/agda-algebras/
+data/agda-stdlib/
 data/corpora-metadata/
 data/corpora/
 data/*.jsonl
