@@ -80,20 +80,32 @@ trait Proposer {
   def propose(state: SearchState, target: Obligation, goal: GoalView): IO[Vector[String]]
 }
 
-/** Parse the lemma pool off a fixture's source: every name imported through a
-  * `using ( … )` list, in file order.  Deliberately line-scoped and small —
+/** One `open import M using ( … )` line of a fixture: the module name and the
+  * names its `using` list opens, in file order.
+  */
+final case class ImportedModule(module: String, usingNames: Vector[String])
+
+/** Parse the import structure off a fixture's source: every `open import M
+  * using ( … )` line, in file order.  Deliberately line-scoped and small —
   * the M1-5 fixtures import exactly this way (one `open import M using (…)`
   * per line) — and the oracle polices anything a fancier import form would
   * need; a fixture importing without `using` contributes no lemma names.
+  * P1 reads the flattened `usingNames` (the fixed lemma pool); P2's
+  * retrieval (issue #123) additionally reads the module names, because
+  * `open import M using (xs)` still grants QUALIFIED access to all of `M` —
+  * that is the whole scope of what retrieval may legally propose.
   */
 object Imports {
   private val UsingLine =
-    """^\s*open\s+import\s+\S+\s+using\s*\(\s*(.*?)\s*\)\s*$""".r
+    """^\s*open\s+import\s+(\S+)\s+using\s*\(\s*(.*?)\s*\)\s*$""".r
+
+  def imported(source: String): Vector[ImportedModule] =
+    source.linesIterator.collect { case UsingLine(module, names) =>
+      ImportedModule(module, names.split(";").toVector.map(_.trim).filter(_.nonEmpty))
+    }.toVector
 
   def usingNames(source: String): Vector[String] =
-    source.linesIterator.collect { case UsingLine(names) =>
-      names.split(";").toVector.map(_.trim).filter(_.nonEmpty)
-    }.toVector.flatten.distinct
+    imported(source).flatMap(_.usingNames).distinct
 }
 
 /** The fixed action space.  `lemmaType` is the lane `type_of` lookup the

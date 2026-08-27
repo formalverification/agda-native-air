@@ -144,4 +144,58 @@ final class WireSpec extends AnyFunSuite with Matchers {
     Wire.envelope("not json at all", 1) shouldBe Wire.Envelope.NotOurs
     Wire.envelope("""{"error":{"code":-32700,"message":"Parse error"},"id":null,"jsonrpc":"2.0"}""", 1) shouldBe Wire.Envelope.NotOurs
   }
+
+  // --------------------------------------------------------------------------
+  // The P2 (#123) captures
+  // --------------------------------------------------------------------------
+
+  test("type_of on a qualified name expands the alias type (live capture — retrieval's binder counts)") {
+    // Data.Nat.Properties.+-comm is DECLARED as `Commutative _+_`; the lane's
+    // Normalised printer answers the expanded pi type, which is what makes
+    // the pi splitter's binder counts work for retrieval candidates.
+    val body = replyOf("wire-type-of-qualified.json", 3).decodeAs[TypeOfBody].toOption.get
+    body.inferred shouldBe Some("(x y : ℕ) → x + y ≡ y + x")
+    body.error shouldBe None
+  }
+
+  test("fill_hole refuses blocked-constraint sub-holes AND blocked metas (live captures — why saturated forms exist)") {
+    // `(+-comm {!!} {!!})` at `m + n ≡ n + m`: the argument metas sit under
+    // the non-injective `_+_`, the constraints block, and the judgement is
+    // type_error — refinement can NOT walk through this lemma class.
+    val subholes = replyOf("wire-fill-hole-blocked-subholes.json", 4).decodeAs[FillHoleBody].toOption.get
+    subholes.status shouldBe "type_error"
+    subholes.message.getOrElse("") should include ("UnsolvedConstraints")
+    // `(+-comm _ _)` fails the same way: underscores buy nothing here.
+    val metas = replyOf("wire-fill-hole-blocked-metas.json", 5).decodeAs[FillHoleBody].toOption.get
+    metas.status shouldBe "type_error"
+    metas.message.getOrElse("") should include ("UnsolvedConstraints")
+  }
+
+  test("search_by_name: a bare JSON array of SearchHit rows, qualified alias-form types (live capture)") {
+    val hits = replyOf("wire-search-by-name.json", 2).decodeAs[Vector[SearchHit]].toOption.get
+    hits should not be empty
+    hits.head.prettyQname shouldBe "Data.Nat.Properties.+-comm"
+    hits.head.bareName shouldBe "+-comm"
+    hits.head.defKind shouldBe "function"
+    hits.head.module shouldBe "Data.Nat.Properties"
+    // The corpus states the type through the Algebra.Definitions alias, fully
+    // qualified with an embedded newline — what the scorer must normalise.
+    hits.head.tpe should include ("Algebra.Definitions.Commutative")
+    hits.head.tpe should include ("\n")
+  }
+
+  test("search_by_type: substring hits across the whole corpus, lexicographic, limit-truncated (live capture)") {
+    val hits = replyOf("wire-search-by-type.json", 3).decodeAs[Vector[SearchHit]].toOption.get
+    hits.size shouldBe 3 // the query asked limit=3 over a corpus with far more matches
+    hits.map(_.prettyQname) shouldBe hits.map(_.prettyQname).sorted
+  }
+
+  test("get_dependencies: neighbors expand to SearchHit rows; absent neighbors default empty (live capture)") {
+    val deps = replyOf("wire-get-dependencies.json", 4).decodeAs[DependenciesBody].toOption.get
+    deps.name shouldBe "Data.Nat.Properties.+-comm"
+    deps.neighbors should not be empty
+    // Without expansion the field may be absent — the decoder defaults, never fails.
+    val bare = """{"name":"X","type":"T","dependencies":["A","B"]}"""
+    io.circe.parser.parse(bare).toOption.get.as[DependenciesBody].toOption.get.neighbors shouldBe Vector.empty
+  }
 }

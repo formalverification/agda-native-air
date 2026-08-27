@@ -203,6 +203,51 @@ object FillHoleBody {
     } yield FillHoleBody(status, candidate, holes, remaining, message, elapsed, cfs, exit)
 }
 
+/** One corpus hit, as `search_by_name` / `search_by_type` return it and as
+  * `get_dependencies` lists its `neighbors` (agda-mcp/README.md; the body of
+  * the two search tools is a bare JSON ARRAY of these).  Every field is
+  * REQUIRED: the server serializes all five unconditionally
+  * (AgdaMCP.Types.SearchResult), so an absent one is wire drift, and the P2
+  * retrieval proposer (issue #123) reads all of them — `prettyQname` and
+  * `module` for scope and rendering, `type` for ranking, `defKind` for the
+  * function filter.
+  */
+final case class SearchHit(
+  prettyQname: String,
+  tpe:         String,
+  defKind:     String,
+  module:      String,
+  hasBody:     Boolean
+) {
+  /** The bare (unqualified) name: the last dot segment.  Agda identifiers
+    * cannot contain `.`, so this is exact, not heuristic.
+    */
+  def bareName: String = prettyQname.substring(prettyQname.lastIndexOf('.') + 1)
+}
+object SearchHit {
+  implicit val decoder: Decoder[SearchHit] = (c: HCursor) =>
+    for {
+      qn   <- c.get[String]("prettyQname")
+      tpe  <- c.get[String]("type")
+      kind <- c.get[String]("defKind")
+      mod  <- c.get[String]("module")
+      body <- c.get[Boolean]("hasBody")
+    } yield SearchHit(qn, tpe, kind, mod, body)
+}
+
+/** get_dependencies, reduced to what the P2 retrieval expansion reads: the
+  * expanded `neighbors` entries (present only when `expand` was true; the
+  * dependency tokens themselves are already inside each neighbor's row).
+  */
+final case class DependenciesBody(name: String, neighbors: Vector[SearchHit])
+object DependenciesBody {
+  implicit val decoder: Decoder[DependenciesBody] = (c: HCursor) =>
+    for {
+      name      <- c.get[String]("name")
+      neighbors <- c.getOrElse[Vector[SearchHit]]("neighbors")(Vector.empty)
+    } yield DependenciesBody(name, neighbors)
+}
+
 /** A tool call's reply, unwrapped one level: `isError` from the result, and
   * the raw `content[0].text` (a JSON document for normal replies; prose or a
   * JSON object for errors).

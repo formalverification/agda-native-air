@@ -98,7 +98,10 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
       agdaFlags     = "",
       serverTimeout = 1,
       projectRoot   = root,
-      loop          = LoopConfig.default
+      loop          = LoopConfig.default,
+      proposerKind  = "fixed",
+      corpus        = None,
+      retrieval     = RetrievalConfig.default
     )
     val entry = IndexEntry(
       id             = "test-anomaly",
