@@ -98,7 +98,7 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
       agdaFlags     = "",
       serverTimeout = 1,
       projectRoot   = root,
-      loop          = LoopConfig.default,
+      loop          = LoopConfig.default.copy(peek = false), // fakes no lane; see BeamLoopSpec.noPeek
       proposerKind  = "fixed",
       corpus        = None,
       retrieval     = RetrievalConfig.default

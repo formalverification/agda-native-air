@@ -110,7 +110,14 @@ object DedupPolicy {
   }
 }
 
-/** The loop's tunables, with the #122 stated defaults. */
+/** The loop's tunables, with the #122 stated defaults — except the peek,
+  * whose default the #122 measurement deliberately left to P2: it flipped to
+  * ON when the #123 sweeps re-validated it on retrieval candidates (same
+  * solve set as the best no-peek run plus a budget-ordering loss restored,
+  * probes −82 %, zero solves lost across 1,567 rejections, qualified
+  * renderings included; numbers on #113).  `--peek off` remains for
+  * measurement.
+  */
 final case class LoopConfig(
   beamWidth:   Int,
   maxDepth:    Int,
@@ -121,7 +128,7 @@ final case class LoopConfig(
 object LoopConfig {
   val default: LoopConfig =
     LoopConfig(beamWidth = 4, maxDepth = 6, probeBudget = 60,
-               dedup = DedupPolicy.ScriptInclusive, peek = false)
+               dedup = DedupPolicy.ScriptInclusive, peek = true)
 }
 
 /** How one fixture's search ended — each a distinct reported status. */

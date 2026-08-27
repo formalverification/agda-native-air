@@ -37,6 +37,13 @@ import java.nio.file.{Files, Paths}
 
 final class BeamLoopSpec extends AnyFunSuite with Matchers {
 
+  /** The loop-mechanics tests fake the batch oracle only, so they run with
+    * the peek off: they pin budget/dedup/depth semantics, and the P2 default
+    * flip (#123) must not silently reroute them through a lane they do not
+    * fake.  The peek's own gate test opts back in explicitly.
+    */
+  private val noPeek = LoopConfig.default.copy(peek = false)
+
   // A miniature working copy shaped like the TwoObligations fixture.
   private val content0 = "module M where\ngoal : Pair\ngoal = {!!}\n"
   private val ob0      = Obligation(3, 8, "Pair")
@@ -151,7 +158,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   // --------------------------------------------------------------------------
 
   test("multi-obligation solve: commits through both sub-obligations, then the final gate") {
-    val (result, log) = runLoop(pairWorld, pairCands, LoopConfig.default)
+    val (result, log) = runLoop(pairWorld, pairCands, noPeek)
     result.status shouldBe SearchStatus.Solved
     val claim = result.solved.getOrElse(fail("no claim"))
     claim.state.script.map(_.candidate) shouldBe Vector("pair {!!} {!!}", "tt", "tt")
@@ -163,7 +170,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   }
 
   test("first-open-obligation selection: the second sub-hole is probed only after the first commits") {
-    val (_, log) = runLoop(pairWorld, pairCands, LoopConfig.default)
+    val (_, log) = runLoop(pairWorld, pairCands, noPeek)
     val fillTargets = log.collect { case ("fill_hole", args) =>
       (args.hcursor.get[Int]("line").toOption.get, args.hcursor.get[Int]("column").toOption.get)
     }
@@ -180,7 +187,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   test("#112 regression: budget dies after one of two obligations discharged — never solved") {
     // Budget 4: root spends 3 probes (ok, te, te); depth 1 spends 1 (te on
     // pair@3,13 — the world only accepts tt there, which the gate then blocks).
-    val (result, _) = runLoop(pairWorld, pairCands, LoopConfig.default.copy(probeBudget = 4))
+    val (result, _) = runLoop(pairWorld, pairCands, noPeek.copy(probeBudget = 4))
     result.status shouldBe SearchStatus.BudgetExceeded
     result.solved shouldBe None
     // An ok commit happened (the pair application), obligations were being
@@ -193,7 +200,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   // --------------------------------------------------------------------------
 
   test("budget exhaustion mid-expansion reports budget_exceeded, not exhausted") {
-    val (result, log) = runLoop(pairWorld, pairCands, LoopConfig.default.copy(probeBudget = 2))
+    val (result, log) = runLoop(pairWorld, pairCands, noPeek.copy(probeBudget = 2))
     result.status shouldBe SearchStatus.BudgetExceeded
     result.stats.probes shouldBe 2
     log.count(_._1 == "fill_hole") shouldBe 2 // the third candidate was never probed
@@ -202,7 +209,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   test("memo hits are free: a duplicate candidate costs no probe budget and its child dedups") {
     val (result, log) = runLoop(pairWorld,
       Vector("pair {!!} {!!}", "pair {!!} {!!}", "bad", "bad2"),
-      LoopConfig.default.copy(probeBudget = 3, maxDepth = 1))
+      noPeek.copy(probeBudget = 3, maxDepth = 1))
     // Four candidates, but the duplicate fill_hole is answered from the memo:
     // three transport calls, three budgeted probes, one hit, one dedup skip.
     log.count(_._1 == "fill_hole") shouldBe 3
@@ -218,7 +225,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     // a is a memo replay and must still be answered at the cap; b would be a
     // real call and is the one the gate refuses.
     val world = Map((3, 8, "a") -> fillTypeError("a", Vector((3, 8))))
-    val (result, log) = runLoop(world, Vector("a", "a", "b"), LoopConfig.default.copy(probeBudget = 1))
+    val (result, log) = runLoop(world, Vector("a", "a", "b"), noPeek.copy(probeBudget = 1))
     result.status shouldBe SearchStatus.BudgetExceeded
     result.stats.probes shouldBe 1
     result.stats.memoHits shouldBe 1              // the replay was served, not refused
@@ -245,7 +252,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
             .as(Vector("tt"))
       }
       s0      = SearchState.initial(content0, Vector(ob0))
-      _      <- BeamLoop.run(oracle, proposer, LoopConfig.default.copy(maxDepth = 1),
+      _      <- BeamLoop.run(oracle, proposer, noPeek.copy(maxDepth = 1),
                   (ph, rk) => CallCtx(1, "fx", ph, rk), tempWorkFile(), s0, BeamLoop.Hooks.none)
       ledger <- oracle.timings.get
     } yield ledger
@@ -268,7 +275,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
       (3, 8, "a") -> fillTypeError("a", Vector((3, 8))),
       (3, 8, "b") -> fillTypeError("b", Vector((3, 8)))
     )
-    val (result, _) = runLoop(world, Vector("a", "b"), LoopConfig.default)
+    val (result, _) = runLoop(world, Vector("a", "b"), noPeek)
     result.status shouldBe SearchStatus.Exhausted
     result.stats.depthCapped shouldBe false
     result.stats.expansions shouldBe 1
@@ -280,7 +287,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
       val col = 8 + 2 * i
       (3, col, "s {!!}") -> fillOk("s {!!}", Vector((3, col + 2)))
     }.toMap
-    val (result, _) = runLoop(world, Vector("s {!!}"), LoopConfig.default.copy(maxDepth = 3))
+    val (result, _) = runLoop(world, Vector("s {!!}"), noPeek.copy(maxDepth = 3))
     result.status shouldBe SearchStatus.Exhausted
     result.stats.depthCapped shouldBe true
     result.stats.expansions shouldBe 3
@@ -314,8 +321,24 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     // bought nothing, and the conservative script-inclusive key (which can
     // never wrongly prune two live states) is adopted.  A proposer that
     // emits hole-free compound candidates could reopen the question; that
-    // re-measurement belongs to P2 (#123).
+    // re-measurement belongs to P2 (#123) — and P2 ran it: with the `_`- and
+    // saturated forms present (hole-free compounds, the stated trigger), the
+    // two policies again produced identical sweeps (5/22, 635 probes, zero
+    // skips under either; #113 P2 comment, runs p2-a vs p2-c).  The decision
+    // stands, now with its trigger tested.
     LoopConfig.default.dedup shouldBe DedupPolicy.ScriptInclusive
+  }
+
+  test("the adopted default peek policy (re-validated on retrieval candidates, issue #123)") {
+    // #122 measured the peek's uplift but left it opt-in pending retrieval
+    // candidates, whose qualified renderings the P1 suite could not
+    // exercise.  P2's sweeps answered (numbers on #113): same solve set as
+    // the best no-peek run PLUS a budget-ordering loss restored
+    // (prod-mk-pair's depth-2 chain no longer fit budget 60 un-peeked),
+    // probes 635 → 113, wall 30.9 → 8.1 min, 1,567 rejections with zero
+    // solves lost.  The default is ON; `--peek off` remains a measurement
+    // knob.
+    LoopConfig.default.peek shouldBe true
   }
 
   test("a beam-cut child does not poison a later path to the same state (round 2)") {
@@ -333,7 +356,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
       (3, 10, "x")      -> fillOk("x", Vector((3, 15)))             // reaches "goal = f x" again
     )
     val (result, _) = runLoop(world, Vector("f {!!}", "f x", "x"),
-      LoopConfig.default.copy(beamWidth = 1, dedup = DedupPolicy.ContentOnly))
+      noPeek.copy(beamWidth = 1, dedup = DedupPolicy.ContentOnly))
     // Pre-fix this died at level 1 with dedupSkips = 1 and only 2 expansions;
     // the re-reached state must be expanded instead.
     result.stats.dedupSkips shouldBe 0
@@ -360,7 +383,7 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
         "type" -> Json.fromString("_p_1"), "elapsedMs" -> Json.fromInt(1)).noSpaces
     )
     val (result, log) = runLoop(pairWorld, Vector("pair {!!} {!!}", "tt"),
-      LoopConfig.default.copy(peek = true, maxDepth = 1), types)
+      noPeek.copy(peek = true, maxDepth = 1), types)
     val probed = log.collect { case ("fill_hole", a) => a.hcursor.get[String]("candidate").toOption.get }
     probed should contain("pair {!!} {!!}")
     probed should not contain "tt"

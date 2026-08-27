@@ -184,7 +184,8 @@ object ProofSearchLoop extends IOApp {
       |    [--max-depth N]        depth bound: max committed moves (default 6)
       |    [--probe-budget N]     per-fixture budget of memo-missing fill_hole probes (default 60)
       |    [--dedup script|content]  frontier dedup policy (default script)
-      |    [--peek on|off]        type_of pre-filter before each probe (default off)
+      |    [--peek on|off]        type_of pre-filter before each probe (default on
+      |                           since the #123 re-validation; off for measurement)
       |    [--proposer fixed|retrieval]  the space behind the seam (default fixed)
       |    [--corpus PATH]        agda-strux corpus JSONL; the server starts with
       |                           --corpus so the search tools register (required

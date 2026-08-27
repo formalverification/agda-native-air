@@ -1656,7 +1656,7 @@ PROOF_SEARCH_BEAM     ?= 4
 PROOF_SEARCH_DEPTH    ?= 6
 PROOF_SEARCH_BUDGET   ?= 60
 PROOF_SEARCH_DEDUP    ?= script
-PROOF_SEARCH_PEEK     ?= off
+PROOF_SEARCH_PEEK     ?= on
 # P2 retrieval knobs (issue #123).  PROPOSER=retrieval requires CORPUS (the
 # server is started with --corpus so the search tools register); EXCLUDE=off
 # is the labeled mechanism-control sweep only, never a headline.
