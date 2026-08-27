@@ -202,9 +202,27 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     val gts = Set("+", "≡")
     // +-suc's type mentions + and ≡ qualified, and its name contains "+".
     TokenOverlapScorer.score(gts, plusSuc) shouldBe 5
-    // *-comm's alias-form type mentions only ≡ of the goal's tokens.
-    TokenOverlapScorer.score(gts, mulComm) shouldBe 2
-    TokenOverlapScorer.score(gts, leRefl) shouldBe 0
+    // *-comm's alias-form type mentions only ≡ of the goal's tokens, and its
+    // `*` is a misfit operator: 2*1 + 0 - 1.
+    TokenOverlapScorer.score(gts, mulComm) shouldBe 1
+    // ≤-refl: no overlap, no name hit, `≤` misfit.
+    TokenOverlapScorer.score(gts, leRefl) shouldBe -1
+  }
+
+  test("scorer: the name bonus is capped, and the arity tie-break reads the corpus type (shakedown lessons)") {
+    val gts = Set("+", "≡")
+    // A symbol-soup name carrying BOTH goal operators gains one, not two —
+    // otherwise `[m+n]∸[m+o]≡n∸o` outranks the `+` lemma family.
+    val soup = SearchHit("Data.Nat.Properties.+-cancelˡ-≡",
+      "(m n o : Agda.Builtin.Nat.Nat) → m Agda.Builtin.Nat.+ n Agda.Builtin.Equality.≡ m Agda.Builtin.Nat.+ o → n Agda.Builtin.Equality.≡ o",
+      "function", "Data.Nat.Properties", hasBody = true)
+    TokenOverlapScorer.score(gts, soup) shouldBe 5
+    // Approximate visible arity: pi-form corpus types count their visible
+    // binders; alias-form types (no arrows) count 0 — cheap-looking, with
+    // the lane as the real authority later.
+    TokenOverlapScorer.approxVisibleArity(soup) shouldBe 4
+    TokenOverlapScorer.approxVisibleArity(mulComm) shouldBe 0
+    TokenOverlapScorer.approxVisibleArity(trans) shouldBe 2
   }
 
   // --------------------------------------------------------------------------
@@ -248,16 +266,16 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     cands.take(3) shouldBe Vector("refl", "m", "n")
 
     // Retrieval, in score order: +-suc (5) bare — its importing module's
-    // using list opens it; then *-comm (2) and trans (2) tied, qname order;
-    // then ≤-refl (0), nullary so a single bare-name shape.  Per lemma: the
-    // `_`-form, the saturated tuples over the context (m, n), then the
-    // `{!!}`-form; every applied shape parenthesized.
+    // using list opens it; then trans (2), then *-comm (1, its `*` a misfit
+    // operator), then ≤-refl (-1), nullary so a single bare-name shape.  Per
+    // lemma: the `_`-form, the saturated tuples over the context (m, n),
+    // then the `{!!}`-form; every applied shape parenthesized.
     def threeShapes(l: String) = Vector(
       s"($l _ _)", s"($l m m)", s"($l m n)", s"($l n m)", s"($l n n)", s"($l {!!} {!!})")
     cands.drop(3) shouldBe (
       threeShapes("+-suc") ++
-      threeShapes("Data.Nat.Properties.*-comm") ++
-      threeShapes("Relation.Binary.PropositionalEquality.trans") :+
+      threeShapes("Relation.Binary.PropositionalEquality.trans") ++
+      threeShapes("Data.Nat.Properties.*-comm") :+
       "Data.Nat.Properties.≤-refl"
     )
 
@@ -286,8 +304,8 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     s.inScope should be < s.hits          // Data.List.Base.map was cut by scope
     s.laneRejected shouldBe 0
     s.proposedLemmas shouldBe Vector(
-      "+-suc", "Data.Nat.Properties.*-comm",
-      "Relation.Binary.PropositionalEquality.trans", "Data.Nat.Properties.≤-refl")
+      "+-suc", "Relation.Binary.PropositionalEquality.trans",
+      "Data.Nat.Properties.*-comm", "Data.Nat.Properties.≤-refl")
     s.truncated shouldBe 0
   }
 

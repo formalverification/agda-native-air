@@ -248,12 +248,35 @@ object TokenOverlapScorer extends CandidateScorer {
     seg.stripPrefix("_").stripSuffix("_")
   }
 
+  private val Structural = Set("(", ")", "{", "}", "⦃", "⦄", "→", ":", "∀", ".", ";")
+
   override def score(goalTokens: Set[String], hit: SearchHit): Int = {
     val typeTokens = Statements.tokens(hit.tpe).map(bareToken).toSet
     val overlap    = goalTokens.count(typeTokens)
-    val nameHits   = goalTokens.count(hit.bareName.contains(_))
-    2 * overlap + nameHits
+    // The name bonus is capped at one: stdlib names spell whole statements in
+    // operator glyphs (`[m+n]∸[m+o]≡n∸o` contains both `+` and `≡`), and an
+    // uncapped count hands the top ranks to symbol-soup names over the lemma
+    // families the goal actually mentions (measured on the first shakedown).
+    val nameHit = if (goalTokens.exists(hit.bareName.contains(_))) 1 else 0
+    // Operators the goal never mentions are evidence of a different statement
+    // family: without this penalty the `+ ≡` goal ranks the `*`-and-`+`
+    // semiring bundles above the `+` lemmas themselves (second shakedown).
+    // Pure-symbol tokens only — identifiers and numerals are not penalized,
+    // because record/alias heads and literals appear in perfectly relevant
+    // statements.
+    val misfits = typeTokens.count(t =>
+      !goalTokens(t) && !Structural(t) && t.nonEmpty && !t.exists(_.isLetterOrDigit))
+    2 * overlap + nameHit - misfits
   }
+
+  /** Approximate visible arity read off the CORPUS type string, for the
+    * cheap-before-expensive rank tie-break only.  An alias-form type
+    * (`Commutative _≡_ _+_`, no arrows) counts 0 — correctly cheap-looking,
+    * since its real binders surface only through the lane, which is the
+    * authority as ever; the splitter tolerates the qualified names.
+    */
+  def approxVisibleArity(hit: SearchHit): Int =
+    Actions.bindersOfPrinted(hit.tpe).count(_.visibility == Visibility.Visible)
 }
 
 /** Query derivation from what the goal shows.  Local variables (the context's
@@ -328,7 +351,7 @@ final class RetrievalProposer private (
       functions = surviving.filter(_.defKind == "function")
       _        <- statsRef.update(s => s.copy(nonFunction = s.nonFunction + (surviving.size - functions.size)))
       goalSet   = gts.toSet
-      ranked0   = functions.sortBy(h => (-scorer.score(goalSet, h), h.prettyQname))
+      ranked0   = functions.sortBy(rankKey(goalSet))
       expanded <- if (cfg.expandDeps) expandTop(ranked0, goalSet) else IO.pure(ranked0)
       top       = expanded.take(cfg.topK)
       resolved <- top.traverse(resolve).map(_.flatten)
@@ -349,8 +372,15 @@ final class RetrievalProposer private (
         .filter(n => !cfg.excludeTarget || exclusion.reasonFor(n).isEmpty)
         .filter(_.defKind == "function")
       (ranked ++ extra).groupBy(_.prettyQname).toVector.map(_._2.head)
-        .sortBy(h => (-scorer.score(goalSet, h), h.prettyQname))
+        .sortBy(rankKey(goalSet))
     }
+
+  /** The total rank: score first, then cheap before expensive (#112's lesson
+    * four, on the retrieval pool — approximate arity from the corpus type),
+    * then the qname so ranking is total and deterministic.
+    */
+  private def rankKey(goalSet: Set[String])(h: SearchHit): (Int, Int, String) =
+    (-scorer.score(goalSet, h), TokenOverlapScorer.approxVisibleArity(h), h.prettyQname)
 
   private def query(q: IO[Vector[SearchHit]]): IO[Vector[SearchHit]] =
     q.flatTap(hs => statsRef.update(s => s.copy(

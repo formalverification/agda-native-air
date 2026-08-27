@@ -973,9 +973,13 @@ corpus-stdlib-nix:
 # Load the assembled corpus into agda-mcp and drive the three search tools over
 # the real JSON-RPC transport.  Complements agda-mcp-smoke, which answers the
 # same questions against the 24-row test fixture.
+# The probe patterns default to agda-algebras names; another library's lane
+# overrides them (the stdlib corpus: CORPUS_SMOKE_NAME_PATTERN=+-comm).
+CORPUS_SMOKE_TYPE_PATTERN ?= Algebra
+CORPUS_SMOKE_NAME_PATTERN ?= ∘-hom
 corpus-mcp-smoke:
 	@echo ">> [corpus-mcp-smoke] agda-mcp search tools against $(CORPUS_JSONL)"
-	@$(call run_backend,"$(PROJECT_ROOT)/scripts/corpus-mcp-smoke.sh" --corpus "$(CORPUS_JSONL)")
+	@$(call run_backend,"$(PROJECT_ROOT)/scripts/corpus-mcp-smoke.sh" --corpus "$(CORPUS_JSONL)" --type-pattern "$(CORPUS_SMOKE_TYPE_PATTERN)" --name-pattern "$(CORPUS_SMOKE_NAME_PATTERN)")
 
 # ---- Python script suites (scripts/python/tests) ----
 # pytest is not in the system python3; enter `nix develop .#mlPipeline` (or the
