@@ -31,7 +31,7 @@ P2 replaces the fixed space with candidates retrieved from a real library corpus
 
 P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract.
 
-Every phase is scored on the same benchmark through the same JSONL schema, so the baselines stack: each phase must beat the last, on the same 22 obligations, in the same currency of oracle calls.
+Every phase is scored on the same benchmark through the same JSONL schema, so the baselines stack: each phase must beat the last, on the same obligations, in the same currency of oracle calls.  The 22 stdlib obligations P0/P1 were measured on are frozen; the suite has since grown an agda-algebras tier (21 obligations, #127) cut from the corpus itself, and every consumer keys per-tier numbers off the index, so the stacked baselines stay quotable per tier.
 
 ## 1.  Context: why proof search, and why now
 
@@ -43,7 +43,7 @@ Three things changed by mid-2026 that made a proper restart worthwhile (#113):
 
 +  **The oracle is native**.  `agda-mcp` exposes `fill_hole`, `get_goal`, and `check_file` directly, and since the #68 hardening wave also answers scope, type, and definition questions mid-proof from a persistent interaction lane (#75, #107, #108) — precisely the information a proposer needs.
 +  **The corpus exists**.  `agda-strux` extraction plus `search_by_name` / `search_by_type` can supply candidate lemmas at scale; the old search's action space was hardcoded to two candidates.
-+  **The measurement exists**.  `data/benchmarks/` is the M1-5 suite (22 obligations, difficulty tiers `routine` / `compositional` / `non-obvious`), and the proof-completion evaluator already emits versioned JSONL (`eval-proof-completion.v0`), so search results sit beside the policy-backend baseline with no new measurement apparatus.
++  **The measurement exists**.  `data/benchmarks/` is the M1-5 suite (43 obligations across two libraries: the frozen 22-obligation stdlib tier, plus the 21-obligation agda-algebras tier of #127, mined from the corpus so the suite exercises the thing retrieval searches; difficulty tiers `routine` / `compositional` / `non-obvious`), and the proof-completion evaluator already emits versioned JSONL (`eval-proof-completion.v0`), so search results sit beside the policy-backend baseline with no new measurement apparatus.
 
 Four lessons from #112 are load-bearing and appear throughout: report actions are peeks, not moves; partial application consumes visible binders only; there are two caches because the oracle is the cost centre; and children are ordered by remaining obligations.  The fifth inheritance is the defect: the old search was disjunctive where obligations are conjunctive.
 
@@ -96,7 +96,7 @@ P1's implementation is deliberately fixed and non-learned, in proposal order: th
 +  **Applications are parenthesized** (`(s≤s {!!})`), because a hole is an argument position as often as a right-hand side, and a verbatim splice of `s≤s {!!}` into a sub-hole reads as `s≤s sym {!!}` — a different term.  The first P1 sweep measured every depth-1 lemma application dying exactly this way.
 +  **The splitter is a proposal device, not an authority.**  It reads printed types (with their renamed binders, hidden groups, and newlines) well enough to count visible binders; the oracle polices what it gets wrong, because an overcount is refused as a type error and an undercount leaves a partial application the goal must then accept.
 
-The term-mode ceiling is a property of this space and must accompany its numbers: no case splits and no `with` means clause-restructuring golds are unreachable.  On M1-5 that is 16 of 22 (13 inductions, 2 case splits, and one single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six with expressible single-term golds are exactly the six P1 solves.
+The term-mode ceiling is a property of this space and must accompany its numbers: no case splits and no `with` means clause-restructuring golds are unreachable.  On the stdlib tier that is 16 of 22 (13 inductions, 2 case splits, and one single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six with expressible single-term golds are exactly the six P1 solves.  The agda-algebras tier (#127) was mined for single-term golds precisely so this ceiling cannot bind it — 21 of 21 are term-expressible by construction — which moves the whole gap onto the action space: its `using`-list stratum is reachable by the fixed space in principle, and its wholesale-import stratum is starved of `using` lists by design, so uplift there is attributable to retrieval (P2) and nothing else.
 
 ## 6.  The `type_of` peek (P1's measured experiment)
 

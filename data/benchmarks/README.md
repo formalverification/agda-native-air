@@ -12,8 +12,12 @@ ground truth for a benchmark entry.
 
 ## Contents (v0)
 
-The current suite has **22 obligations**, all drawn from `agda-stdlib`, spanning
-the three difficulty tiers of `docs/benchmarks/taxonomy.md`:
+The current suite has **43 obligations** from two libraries, spanning the three
+difficulty tiers of `docs/benchmarks/taxonomy.md`.
+
+The **`agda-stdlib` tier** (22 obligations) is the original M1-5 cut and is
+**frozen**: the P1 baseline (issue #113) is quoted against it, so it only ever
+grows by whole new tiers, never by edits.
 
 | Tier | Count | Examples |
 |---|---|---|
@@ -21,9 +25,51 @@ the three difficulty tiers of `docs/benchmarks/taxonomy.md`:
 | `compositional` | 10 | `+-comm`, `+-assoc`, `*-zeroʳ`, `length-++`, `map-id`, `++-assoc` |
 | `non-obvious` | 5 | `*-comm`, `*-distribʳ-+`, `*-distribˡ-+`, `*-assoc`, `map′` (`Dec`) |
 
-Domains covered: arithmetic, list, logic, maybe, order.  `agda-algebras`
-obligations are planned for a later round (see `docs/benchmarks/obligations.md`);
-they require a local `agda-algebras` checkout and so are tracked separately.
+Domains covered: arithmetic, list, logic, maybe, order.
+
+The **`agda-algebras` tier** (21 obligations, issue #127) is the re-cut second
+half of #13, mined from the agda-algebras corpus so the benchmark and the
+corpus are cut from the same library at the same commit:
+
+| Tier | Count | Examples |
+|---|---|---|
+| `routine` | 6 | `lift∼lower` (`refl`), the `Op` projection, `Image F ∋ (F ⟨$⟩ a)` |
+| `compositional` | 10 | `SurjInv` inverse law, `⊙-injective`, `𝒾𝒹`/`⊙-hom`, `mon→hom`, `≥`-laws |
+| `non-obvious` | 5 | `≤-reflexive`, `≤-trans`, `≤-trans-≅`, `kercon`, `ker-in-con` |
+
+Domains: setoid, algebra, universe.
+
+### agda-algebras tier: selection criteria and provenance
+
++  **Library commit**: `a5f9acb5f869bf675544705ab29c0cb6e4ee2531` — equal by
+   construction to the corpus provenance commit (dataset card
+   `docs/corpora/agda-algebras-v0.1.md`) and to the `agda-algebras-src` flake
+   input, so the benchmark's library, the corpus's library, and the toolchain's
+   library can never drift apart silently.
++  **Corpus-mined**: candidates are corpus rows with `defKind: function`, a
+   body, and a *single-term* proof (length-bounded, transport-marker-free) in
+   the `Overture`/`Setoid` namespaces — the committed filter is
+   `scripts/python/corpus/mine_benchmark_candidates.py`; run it as
+   `python3 scripts/python/corpus/mine_benchmark_candidates.py --corpus
+   data/corpora/agda-algebras/v0.1/corpus.jsonl.gz`.  Tier classification,
+   import strata, and deprecation checks are then by hand against the library
+   source, per the taxonomy.
++  **Single-term golds only**: the P1 term-mode ceiling therefore does not bind
+   this tier — every gold is expressible as one `fill_hole` term by
+   construction (21/21).  What binds is the action space, which is the point:
++  **Import strata** (recorded per obligation in `tags`):
+   `stratum:using` (10 obligations) imports its lemma pool through narrow
+   `using` lists, so the P1 fixed action space keeps footing;
+   `stratum:wholesale` (11 obligations) opens agda-algebras modules with **no**
+   `using` list, starving the fixed space by design so that P2 retrieval
+   uplift on these rows is attributable to retrieval and nothing else.
++  **Wholesale-stratum semantics, stated plainly**: opening a module wholesale
+   brings the restated lemma's own library name into scope (fixture
+   definitions carry a prime — `lift∼lower′` — to avoid the clash).  A
+   searcher that retrieves and applies the library's original lemma has
+   legitimately found the needle in the haystack; excluding the target from
+   the candidate pool is the P2 target-exclusion policy's job, not the
+   fixture's.
 
 ## Directory Layout
 
@@ -40,14 +86,14 @@ data/benchmarks/
 │       ├── Nat-plus-identityL.agda
 │       ├── Nat-plus-comm.agda
 │       └── ...
-└── agda-algebras-v0/                  # planned — requires a local agda-algebras checkout
-    ├── obligations/
-    └── gold/
+└── agda-algebras-v0/
+    ├── obligations/                   # 21 modules, one {!!} hole each
+    └── gold/                          # solved twins
 ```
 
 Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
-the proposed obligation catalog (including the planned `agda-algebras` entries)
-lives in `docs/benchmarks/obligations.md`.
+the original design catalog lives in `docs/benchmarks/obligations.md` (its
+`agda-algebras` sketches are superseded by the committed tier above).
 
 ## Fixture Convention
 
@@ -112,19 +158,21 @@ records a wall-clock `timestamp` and per-obligation `elapsedMs`; the run is
 deterministic modulo those fields, and `eval-benchmark-smoke` strips them before
 checking that two runs match.
 
-## agda-algebras obligations (planned)
+## The agda-algebras library
 
-`agda-algebras` is not Nix-managed; it requires a local clone.  Set
-`AGDA_ALGEBRAS_ROOT` to the checkout root (the directory containing the
-`.agda-lib` file) before entering the shell, and the flake registers the library
-so its modules become importable:
+The library is Nix-managed since #127: the flake pins `ualib/agda-algebras` at
+the benchmark commit as the `agda-algebras-src` input and builds it once into a
+store path with prebuilt `.agdai` interfaces (Cachix-cached), which every
+Agda-capable shell registers automatically — CI and fresh machines need no
+checkout and no library build.  A developer working against a live checkout
+still overrides it the old way:
 
 ```sh
 AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master nix develop .#backend
 ```
 
-Until those obligations are authored and committed, the suite is `agda-stdlib`
-only.
+`EvalBenchmark` passes `--library agda-algebras` for this tier's rows only, so
+the frozen stdlib rows are verified in an unchanged environment.
 
 ## License
 
