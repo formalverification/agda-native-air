@@ -187,8 +187,7 @@ final case class Config(
   mode:             Mode,
   indexPath:        Path,
   outDir:           Path,
-  projectRoot:      Path,
-  agdaAlgebrasSrc:  Option[Path]
+  projectRoot:      Path
 )
 
 
@@ -230,21 +229,21 @@ object Filter {
 
   /** Partition obligations into available and skipped.
     *
-    * agda-algebras obligations are skipped when agdaAlgebrasSrc is None.
-    * Obligations whose gold file is missing are also skipped — verify-gold only
+    * Obligations whose gold file is missing are skipped — verify-gold only
     * consumes the gold, so the obligation file's presence is not checked here.
+    * agda-algebras rows are no longer conditional: the flake pins the library
+    * (issue #127), so "a gold is not done until it type-checks" holds for the
+    * whole index, and an unregistered library fails the check loudly instead
+    * of shrinking the suite silently.
     */
   def filterAvailable(
     obligations:     Vector[Obligation],
-    agdaAlgebrasSrc: Option[Path],
     projectRoot:     Path
   ): (Vector[Obligation], Vector[String]) = {
     val (available, skipped) =
       obligations.partitionMap { ob =>
         val skip: Option[String] =
-          if (ob.source == "agda-algebras" && agdaAlgebrasSrc.isEmpty)
-            Some(ob.id)
-          else if (!Files.isRegularFile(projectRoot.resolve(ob.goldPath)))
+          if (!Files.isRegularFile(projectRoot.resolve(ob.goldPath)))
             Some(ob.id)
           else
             None
@@ -286,12 +285,21 @@ object GoldVerifier {
       // the registered libraries must be named explicitly, and the gold file's own
       // directory must be added to the include path (-i) for its top-level module
       // name to resolve.
+      // agda-algebras obligations additionally need that library, which the
+      // flake shellHook always registers (a live checkout when
+      // AGDA_ALGEBRAS_ROOT is set, the flake-pinned store copy otherwise).
+      // The agda-stdlib rows keep their original invocation untouched, so the
+      // frozen P1 baseline is verified in an unchanged environment.
+      val extraLibs =
+        if (ob.source == "agda-algebras") Vector("--library", "agda-algebras")
+        else Vector.empty[String]
       val cmd = Vector(
         "agda",
         "--no-default-libraries",
         "--library-file", librariesFile,
         "--library", "standard-library",
-        "--library", "agda-dojang",
+        "--library", "agda-dojang"
+      ) ++ extraLibs ++ Vector(
         "-i", goldAbs.getParent.toString,
         goldAbs.toString
       )
@@ -437,13 +445,6 @@ object CliParser {
       val projectRoot =
         Paths.get(m.getOrElse("project-root", ".")).toAbsolutePath.normalize()
 
-      // Accept AGDA_ALGEBRAS_ROOT (the name the flake and Makefile use) as well as
-      // the legacy AGDA_ALGEBRAS_SRC; either signals that agda-algebras is available.
-      val agdaAlgebrasSrc =
-        sys.env.get("AGDA_ALGEBRAS_ROOT")
-          .orElse(sys.env.get("AGDA_ALGEBRAS_SRC"))
-          .map(s => Paths.get(s).toAbsolutePath.normalize())
-
       for {
         md <- mode
         ix <- m.get("index").toRight(s"Missing --index\n\n$usage")
@@ -452,8 +453,7 @@ object CliParser {
         indexPath        = Paths.get(ix).toAbsolutePath.normalize(),
         outDir           = Paths.get(m.getOrElse("out-dir", "data/benchmarks/reports"))
                             .toAbsolutePath.normalize(),
-        projectRoot      = projectRoot,
-        agdaAlgebrasSrc  = agdaAlgebrasSrc
+        projectRoot      = projectRoot
       )
     }
   }
@@ -484,7 +484,7 @@ object EvalBenchmark extends IOApp {
 
         // Filter for available obligations.
         (available, skipped) = Filter.filterAvailable(
-          allObligations, config.agdaAlgebrasSrc, config.projectRoot
+          allObligations, config.projectRoot
         )
         _ <- IO.println(
                s"Benchmark index: ${allObligations.size} obligations " +

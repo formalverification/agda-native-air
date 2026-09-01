@@ -1512,7 +1512,7 @@ BENCHMARK_INDEX        ?= data/benchmarks/benchmark-index.jsonl
 BENCHMARK_REPORT_DIR   ?= data/benchmarks/reports
 BENCHMARK_REPORT       ?= $(BENCHMARK_REPORT_DIR)/gold-verification.json
 # CI smoke slice: one obligation per difficulty tier.
-BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map
+BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map algebras-overture-lift-lower algebras-homs-comp-hom algebras-kernels-ker-in-con
 
 .PHONY: eval-benchmark eval-benchmark-gold eval-benchmark-smoke
 
