@@ -24,4 +24,4 @@ open import Setoid.Subalgebras
 ≤-reflexive′ : {𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥}
                {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ}
   →  𝑨 ≤ 𝑨
-≤-reflexive′ {𝑨 = 𝑨} = 𝒾𝒹 , id-is-injective {𝑨 = {!!}
+≤-reflexive′ {𝑨 = 𝑨} = {!!}
