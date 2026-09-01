@@ -345,25 +345,26 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
   // The peek gate
   // --------------------------------------------------------------------------
 
-  test("peek: a rejected candidate is never probed; a kept one is; lane failure keeps") {
+  test("peek: applications are gated, hole-free candidates are not (#127)") {
     val types = Map(
-      // tt is rejected by the lane (NotInScope) — its probe must never happen.
-      "tt" -> Json.obj(
-        "error" -> Json.obj(
-          "code" -> Json.fromString("NotInScope"),
-          "message" -> Json.fromString("Not in scope: tt"),
-          "stage" -> Json.fromString("expression")),
-        "elapsedMs" -> Json.fromInt(1)).noSpaces,
-      // The application peeks compatible with the goal G? No — "Pair-ish"
-      // vs canned goal "G" would reject; give it a meta so it matches anything.
+      // A hole-carrying application whose inferred type cannot match the
+      // canned goal "G": peeked, rejected, and its probe must never happen.
+      "bad _" -> Json.obj(
+        "type" -> Json.fromString("NotTheGoal"), "elapsedMs" -> Json.fromInt(1)).noSpaces,
+      // An application that peeks compatible (a bare meta matches anything).
       "pair _ _" -> Json.obj(
         "type" -> Json.fromString("_p_1"), "elapsedMs" -> Json.fromInt(1)).noSpaces
     )
-    val (result, log) = runLoop(pairWorld, Vector("pair {!!} {!!}", "tt"),
+    val (result, log) = runLoop(pairWorld, Vector("pair {!!} {!!}", "bad {!!}", "tt"),
       LoopConfig.default.copy(peek = true, maxDepth = 1), types)
     val probed = log.collect { case ("fill_hole", a) => a.hcursor.get[String]("candidate").toOption.get }
     probed should contain("pair {!!} {!!}")
-    probed should not contain "tt"
+    probed should not contain "bad {!!}"
+    // tt is hole-free: probed straight away, never peeked — the #127 sweep
+    // measured the textual judgement false-rejecting closers on goals whose
+    // sides are definitionally equal but textually distinct, and a closer's
+    // probe costs no more than its peek saves.
+    probed should contain("tt")
     result.stats.peeks shouldBe 2
     result.stats.peekRejects shouldBe 1
   }

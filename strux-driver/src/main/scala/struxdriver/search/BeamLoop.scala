@@ -237,7 +237,16 @@ object BeamLoop {
       cands match {
         case (cand, rank) +: rest =>
           val peeked: IO[(St, Peek.Verdict)] =
-            if (!cfg.peek) IO.pure((st, Peek.Verdict.Keep))
+            // Hole-free candidates (closers, context assumptions) skip the
+            // gate: they cost one probe each and are exactly where the
+            // peek's textual judgement false-rejects — measured on the #127
+            // tier, where `refl` closes goals whose two sides are
+            // definitionally equal but textually distinct
+            // (`lift ∘ lower ≡ 𝑖𝑑 (Lift b A)`), and the peek-on sweep lost
+            // the solve that the peek-off control found in one probe.  The
+            // peek's economics come from pruning the hole-carrying
+            // application fan-out, which stays gated.
+            if (!cfg.peek || !cand.contains("{!!}")) IO.pure((st, Peek.Verdict.Keep))
             else
               oracle.typeOf(mkCtx("peek", Some(rank)), workFile, Peek.metaForm(cand),
                             Some((target.line, target.col)))

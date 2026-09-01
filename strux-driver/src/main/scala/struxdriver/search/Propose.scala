@@ -47,7 +47,13 @@
   *  is rejected when the lane rejects the expression, or when the inferred
   *  type cannot textually match the goal even with every meta read as a
   *  wildcard (same meta, same text — so `_x_9 ≡ _x_9` refuses `m + n ≡ n + m`
-  *  but accepts `n ≡ n`).  Peeks inform probe SELECTION only: they never
+  *  but accepts `n ≡ n`).  That same-text rule also refuses goals whose two
+  *  sides are definitionally equal but textually distinct — routine in the
+  *  agda-algebras tier (`lift ∘ lower ≡ 𝑖𝑑 (Lift b A)` closes by `refl`) —
+  *  so the loop exempts hole-free candidates (closers, assumptions) from the
+  *  gate: their probe costs no more than the peek it would replace, and the
+  *  peek's savings live in the hole-carrying application fan-out (#127's
+  *  measured false rejection).  Peeks inform probe SELECTION only: they never
   *  enter the script and never decide anything — only fill_hole judges — so
   *  a lane failure keeps the candidate rather than dropping it.
   *
