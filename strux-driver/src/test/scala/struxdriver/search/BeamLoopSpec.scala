@@ -360,10 +360,11 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     val probed = log.collect { case ("fill_hole", a) => a.hcursor.get[String]("candidate").toOption.get }
     probed should contain("pair {!!} {!!}")
     probed should not contain "bad {!!}"
-    // tt is hole-free: probed straight away, never peeked — the #127 sweep
+    // tt is a closer: probed straight away, never peeked — the #127 sweep
     // measured the textual judgement false-rejecting closers on goals whose
     // sides are definitionally equal but textually distinct, and a closer's
-    // probe costs no more than its peek saves.
+    // probe costs no more than its peek saves.  (Only the closers are
+    // exempt; a hole-free assumption would still be gated.)
     probed should contain("tt")
     result.stats.peeks shouldBe 2
     result.stats.peekRejects shouldBe 1

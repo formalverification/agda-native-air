@@ -237,16 +237,17 @@ object BeamLoop {
       cands match {
         case (cand, rank) +: rest =>
           val peeked: IO[(St, Peek.Verdict)] =
-            // Hole-free candidates (closers, context assumptions) skip the
-            // gate: they cost one probe each and are exactly where the
-            // peek's textual judgement false-rejects — measured on the #127
-            // tier, where `refl` closes goals whose two sides are
-            // definitionally equal but textually distinct
-            // (`lift ∘ lower ≡ 𝑖𝑑 (Lift b A)`), and the peek-on sweep lost
-            // the solve that the peek-off control found in one probe.  The
-            // peek's economics come from pruning the hole-carrying
-            // application fan-out, which stays gated.
-            if (!cfg.peek || !cand.contains("{!!}")) IO.pure((st, Peek.Verdict.Keep))
+            // The nullary closers skip the gate: a closer costs one probe,
+            // no more than its peek, and the peek's textual judgement
+            // measurably false-rejects them — on the #127 tier `refl`
+            // closes goals whose two sides are definitionally equal but
+            // textually distinct (`lift ∘ lower ≡ 𝑖𝑑 (Lift b A)`), and the
+            // peek-on sweep lost the solve the peek-off control found in
+            // one probe.  ONLY the closers: exempting every hole-free
+            // candidate (assumptions included) was measured to reprobe the
+            // context at every expansion and give back the peek's entire
+            // savings (833 probes vs 193 on the same suite).
+            if (!cfg.peek || FixedProposer.closers.contains(cand)) IO.pure((st, Peek.Verdict.Keep))
             else
               oracle.typeOf(mkCtx("peek", Some(rank)), workFile, Peek.metaForm(cand),
                             Some((target.line, target.col)))

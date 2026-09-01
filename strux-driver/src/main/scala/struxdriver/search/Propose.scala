@@ -50,10 +50,13 @@
   *  but accepts `n ≡ n`).  That same-text rule also refuses goals whose two
   *  sides are definitionally equal but textually distinct — routine in the
   *  agda-algebras tier (`lift ∘ lower ≡ 𝑖𝑑 (Lift b A)` closes by `refl`) —
-  *  so the loop exempts hole-free candidates (closers, assumptions) from the
-  *  gate: their probe costs no more than the peek it would replace, and the
-  *  peek's savings live in the hole-carrying application fan-out (#127's
-  *  measured false rejection).  Peeks inform probe SELECTION only: they never
+  *  so the loop exempts the two nullary closers from the gate: a closer's
+  *  probe costs no more than the peek it would replace, and the peek's
+  *  savings live in the application fan-out and the context assumptions,
+  *  which stay gated (#127's measured false rejection, and its measured
+  *  counter-experiment: exempting all hole-free candidates reprobes the
+  *  context every expansion and costs the savings).  Peeks inform probe
+  *  SELECTION only: they never
   *  enter the script and never decide anything — only fill_hole judges — so
   *  a lane failure keeps the candidate rather than dropping it.
   *
@@ -116,7 +119,7 @@ final class FixedProposer private (
   cache:     Ref[IO, Map[String, Option[Vector[Binder]]]]
 ) extends Proposer {
 
-  private val closers = Vector("refl", "tt")
+  private val closers = FixedProposer.closers
 
   private def bindersOf(name: String): IO[Option[Vector[Binder]]] =
     cache.get.flatMap(_.get(name) match {
@@ -151,6 +154,16 @@ final class FixedProposer private (
 }
 
 object FixedProposer {
+  /** The nullary closers, shared with the loop's peek gate: these two are
+    * exempt from peeking (a closer's probe costs no more than its peek, and
+    * the textual judge measurably false-rejects them on goals whose sides
+    * are definitionally equal but textually distinct — #127).  Assumptions
+    * stay gated: their fan-out scales with the context, and exempting every
+    * hole-free candidate was measured to cost the peek's entire savings
+    * (run-127-full-peek-on-4: 833 probes vs 193).
+    */
+  val closers: Vector[String] = Vector("refl", "tt")
+
   def create(fixtureSource: String, lemmaType: String => IO[Either[String, Option[String]]]): IO[FixedProposer] =
     Ref.of[IO, Map[String, Option[Vector[Binder]]]](Map.empty)
       .map(new FixedProposer(Imports.usingNames(fixtureSource), lemmaType, _))
