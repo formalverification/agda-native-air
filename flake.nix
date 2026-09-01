@@ -7,10 +7,13 @@
 #
 #   1) One command dev env: `nix develop`. Batteries included.
 #   2) CPU-first by default (portable), GPU opt-in (Linux/NVIDIA).
-#   3) Agda works out-of-the-box with stdlib + agda-dojang registered
-#      *project-locally* (no ~/.agda needed).
-#   4) Optional external Agda libraries (agda-algebras, agda-categories,
-#      TypeTopology) via environment variables — no flake edits required.
+#   3) Agda works out-of-the-box with stdlib + agda-dojang + agda-algebras
+#      registered *project-locally* (no ~/.agda needed).  agda-algebras is a
+#      flake input pinned at the benchmark-suite commit (issue #127), built
+#      once into a store path with prebuilt interfaces; AGDA_ALGEBRAS_ROOT
+#      overrides it with a live checkout.
+#   4) Optional external Agda libraries (agda-categories, TypeTopology) via
+#      environment variables — no flake edits required.
 #   5) Keep things explicit & well-commented for future edits.
 #
 #
@@ -34,6 +37,10 @@
 #       AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master  nix develop
 #       AGDA_CATEGORIES_ROOT=~/git/agda-categories           nix develop
 #       AGDA_TYPETOPOLOGY_ROOT=~/git/TypeTopology            nix develop
+#
+#     agda-algebras alone has a fallback: when AGDA_ALGEBRAS_ROOT is unset,
+#     the flake-pinned store copy (with prebuilt interfaces) is registered
+#     instead, so `-l agda-algebras` always resolves.
 #
 #     If the `.agda-lib` file is found, the library is registered and the
 #     agda() wrapper passes `--library <name>` automatically.
