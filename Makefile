@@ -887,7 +887,7 @@ extract-lib: _ensure-dirs _check-sbt _check-spark build-agda-json agda-algebras-
 # `corpus` works outside a Nix shell (the Agda version then records as
 # "unknown"); `corpus-nix` runs it in .#backend so the provenance record can
 # ask the pinned `agda` its version.
-CORPUS_VERSION      ?= v0
+CORPUS_VERSION      ?= v0.1
 CORPUS_OUT_DIR      ?= $(DATA)/corpora/$(LIB_NAME)/$(CORPUS_VERSION)
 CORPUS_JSONL        ?= $(CORPUS_OUT_DIR)/corpus.jsonl
 CORPUS_CARD         ?= $(PROJECT_ROOT)/docs/corpora/$(LIB_NAME)-$(CORPUS_VERSION).md
