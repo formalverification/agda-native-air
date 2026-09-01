@@ -128,6 +128,24 @@ final class ModelSpec extends AnyFunSuite with Matchers {
     Splice.holeAt(content, 99, 1, "tt").isLeft shouldBe true  // beyond the file
   }
 
+  test("splice reads columns as codepoints, not UTF-16 units (#127 regression)") {
+    // 𝑖𝑑 is two astral-plane glyphs: 2 codepoints, 4 UTF-16 units.  Agda and
+    // the server count the former; a splicer indexing the latter either
+    // refuses the commit or corrupts the line.  Both holes below sit AFTER
+    // the glyphs, exactly the shape the agda-algebras tier commits produce
+    // (e.g. `lift∼lower = (𝑖𝑑 {!!} {!!})`).
+    val line = "lift∼lower = (𝑖𝑑 {!!} {!!})"
+    val cp1  = 1 + line.codePointCount(0, line.indexOf("{!!}"))
+    val cp2  = 1 + line.codePointCount(0, line.lastIndexOf("{!!}"))
+    val once = Splice.holeAt(line, 1, cp1, "tt")
+    once.toOption.get shouldBe "lift∼lower = (𝑖𝑑 tt {!!})"
+    Splice.holeAt(once.toOption.get, 1, cp2 - 2, "tt")
+      .toOption.get shouldBe "lift∼lower = (𝑖𝑑 tt tt)"
+    // And a UTF-16-unit column (what the buggy arithmetic produced) refuses
+    // rather than splicing at a shifted offset.
+    Splice.holeAt(line, 1, line.indexOf("{!!}") + 1, "tt").isLeft shouldBe true
+  }
+
   // --------------------------------------------------------------------------
   // Lesson 3: two caches, two key types
   // --------------------------------------------------------------------------
