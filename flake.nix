@@ -88,13 +88,24 @@
   # you can override nixpkgs-agda in flake.lock (see commands below).
   inputs.nixpkgs-agda.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+  # agda-algebras, pinned at the exact commit the benchmark fixtures and the
+  # corpus were cut from (issue #127; see data/benchmarks/README.md and
+  # docs/corpora/agda-algebras-v0.1.md — the three records must agree).
+  # Packaged below like the standard library: a derivation that typechecks
+  # the library once and ships its .agdai interfaces, so CI and fresh
+  # machines get a warm library from Cachix instead of a per-run rebuild.
+  inputs.agda-algebras-src = {
+    url = "github:ualib/agda-algebras/a5f9acb5f869bf675544705ab29c0cb6e4ee2531";
+    flake = false;
+  };
+
   # The github-project roadmap engine (docs/GITHUB_PROJECT.md tooling),
   # pinned here in flake.lock; upgrade deliberately with
   # `nix flake update github-project`.  See the Makefile's project-*
   # targets and issue #92.
   inputs.github-project.url = "github:williamdemeo/github-project";
 
-  outputs = { self, nixpkgs, nixpkgs-agda, github-project }:
+  outputs = { self, nixpkgs, nixpkgs-agda, github-project, agda-algebras-src }:
   let
     systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
 
@@ -119,9 +130,27 @@
     # but we still write a project-local libraries file so users don't need ~/.agda.
     mkAgdaEnv = pkgs: pkgs.agda.withPackages (p: [ p.standard-library ]);
 
+    # ---- Helper: flake-pinned agda-algebras ----------------------------------
+    # Same packaging shape as the Nix stdlib: $out carries the .agda-lib, src/,
+    # and prebuilt _build/2.8.0 interfaces — measured: every module except the
+    # two Everything* barrels themselves, at a ~79 MB store path built in
+    # ~15 minutes cold.  Must use the same agdaPackages set as mkAgdaEnv so
+    # the library is checked by the same Agda + stdlib the shells use.
+    mkAgdaAlgebrasPkg = pkgs: pkgs.agdaPackages.mkDerivation {
+      pname = "agda-algebras";
+      version = "unstable-2026-08-31";
+      src = agda-algebras-src;
+      everythingFile = "src/Everything.agda";
+      buildInputs = [ pkgs.agdaPackages.standard-library ];
+      meta = {
+        description = "The Agda Universal Algebra Library, pinned at the benchmark-suite commit";
+        homepage = "https://github.com/ualib/agda-algebras";
+      };
+    };
+
     # ---- Helper: complete Agda shell setup ------------------------------------
     # Single entry-point for all Agda configuration in any devShell.
-    # Call as: ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
+    # Call as: ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
     #
     # What it does (in order):
     #   1. Locates the repo root via git (falls back to $PWD).
@@ -144,7 +173,7 @@
     #     Nix string interpolation from eating them.
     #   - The Nix interpolation ${agdaStdlibPkg} is the one exception — it
     #     resolves to the Nix store path of the standard library at eval time.
-    mkAgdaShellSetup = agdaStdlibPkg: ''
+    mkAgdaShellSetup = agdaStdlibPkg: agdaAlgebrasPkg: ''
       # ==== Locate repo root ====
       # Three candidates, most explicit first, each validated against a marker
       # that only this repository carries: agda-dojang/agda-dojang.agda-lib.
@@ -273,6 +302,18 @@
         fi
       }
 
+      # agda-algebras defaults to the flake-pinned store copy when no live
+      # checkout is named: the pin is the SAME commit the benchmark fixtures
+      # and the corpus were cut from, and the store copy ships prebuilt
+      # .agdai interfaces (Cachix-cached), so CI and fresh machines pay a
+      # download, not a library build.  Exporting AGDA_ALGEBRAS_ROOT before
+      # entering the shell still overrides it, exactly as before.
+      _AGDA_ALGEBRAS_SOURCE="live checkout"
+      if [ -z "$AGDA_ALGEBRAS_ROOT" ]; then
+        AGDA_ALGEBRAS_ROOT="${agdaAlgebrasPkg}"
+        _AGDA_ALGEBRAS_SOURCE="flake pin"
+      fi
+
       # Register each supported external library.
       # The env var values are double-quoted: if unset, the empty string is
       # passed and the -n test inside _register_agda_lib skips it.
@@ -303,11 +344,9 @@
       echo "     * standard-library (Nix-managed)"
       echo "     * agda-dojang (repo-local)"
       if [ -n "$_AGDA_REG_agda_algebras" ]; then
-        echo "     * agda-algebras ($AGDA_ALGEBRAS_ROOT)"
-      elif [ -n "$AGDA_ALGEBRAS_ROOT" ]; then
-        echo "     ! agda-algebras: FAILED to register (see warning above)"
+        echo "     * agda-algebras ($AGDA_ALGEBRAS_ROOT; $_AGDA_ALGEBRAS_SOURCE)"
       else
-        echo "     - agda-algebras: set AGDA_ALGEBRAS_ROOT to enable"
+        echo "     ! agda-algebras: FAILED to register (see warning above)"
       fi
       if [ -n "$_AGDA_REG_agda_categories" ]; then
         echo "     * agda-categories ($AGDA_CATEGORIES_ROOT)"
@@ -356,6 +395,15 @@
 
   in {
     formatter = forAllSystems ({ pkgsStable, ... }: pkgsStable.nixpkgs-fmt);
+
+    # The flake-pinned agda-algebras with prebuilt interfaces, exposed so CI
+    # (and a developer warming the Cachix cache) can build it explicitly:
+    #   nix build .#agda-algebras && cachix push formalverification result
+    # The Agda-capable devShells depend on it via mkAgdaShellSetup, so the
+    # first `nix develop` after a pin bump builds (or downloads) it too.
+    packages = forAllSystems ({ pkgsAgda, ... }: {
+      agda-algebras = mkAgdaAlgebrasPkg pkgsAgda;
+    });
 
     # Roadmap-engine apps re-exported under a ghproject- prefix, so
     # `nix run .#ghproject-update -- docs/GITHUB_PROJECT.md` runs the
@@ -456,7 +504,7 @@ PY
 
             # Configure Agda: project-local libraries, external lib registration,
             # and the agda() wrapper function.
-            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
+            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
 
             echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             echo "~ Examples (things you can try right now!)"
@@ -509,7 +557,7 @@ PY
 
             # Configure Agda: project-local libraries, external lib registration,
             # and the agda() wrapper function.
-            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
+            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
 
             echo "🛠  backend shell — Agda + GHC/Cabal are pinned together"
             echo "   ROOT      : $ROOT"
@@ -615,7 +663,7 @@ PY
 
             # Configure Agda: project-local libraries, external lib registration,
             # and the agda() wrapper function.
-            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library}
+            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
 
             echo "   ROOT      : $ROOT"
             echo "   AGDA_DIR  : $AGDA_DIR"
