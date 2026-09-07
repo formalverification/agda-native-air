@@ -4,9 +4,9 @@
 
 An agda-strux JSONL corpus of the whole of [`ualib/agda-algebras`][agda-algebras]: one row per definition, carrying the definition's normalized name, its pretty-printed type, a structural encoding of that type, its dependency tokens, and its proof term where it has one.
 
-v0.1 is a re-cut of [v0](agda-algebras-v0.md) at a newer library commit; the schema, the pipeline, and the reading of every statistic are unchanged.  The re-pin exists for one reason: the benchmark tier of issue #127 is mined from this corpus, and its provenance commitment is that the benchmark's library commit and the corpus's library commit are the same — the tier PR (#132) records that commit in `data/benchmarks/README.md` and pins it as the `agda-algebras-src` flake input.  v0.1 was first cut at `a5f9acb5` (2026-08-31); before it was published, the library's FLRP program landed its Kurzweil-surjectivity theorem (ualib/agda-algebras#569) and a follow-up tidy on master, and the corpus moved with it so that work is retrievable.  This card describes the final cut, at `4662373d`.
+v0.1 is a re-cut of [v0](agda-algebras-v0.md) at a newer library commit; the schema, the pipeline, and the reading of every statistic are unchanged.  The re-pin exists for one reason: the benchmark tier of issue [#127] is mined from this corpus, and its provenance commitment is that the benchmark's library commit and the corpus's library commit are the same; the tier PR ([#132]) records that commit in `data/benchmarks/README.md` and pins it as the `agda-algebras-src` flake input.  v0.1 was first cut at `a5f9acb5` (2026-08-31); before it was published, the library's FLRP program landed its Kurzweil-surjectivity theorem (ualib/agda-algebras#569) and a follow-up tidy on master, and the corpus moved with it so that work is retrievable.  This card describes the final cut, at `4662373d`.
 
-+  **Corpus**: `corpus.jsonl` — 13,123 rows, 224,646,301 bytes; `corpus.jsonl.gz` — 5,709,185 bytes.
++  **Corpus**:  `corpus.jsonl` is 13,123 rows, 224,646,301 bytes; `corpus.jsonl.gz` is 5,709,185 bytes.
 +  **Row schema**: agda-strux Full JSONL, [`docs/representation.md`](../representation.md) §3; `typeAstVersion` `0.3-v0` on every row.
 +  **Companion artifacts**: `coverage.json` (per-module outcomes), `provenance.json` (commits, pins, digests), `stats.json` and `stats.md` (the statistics quoted below).
 
@@ -57,28 +57,35 @@ Full tables, including the twenty most-depended-upon definitions and the module-
 
 **By kind**.  12,161 functions, 649 constructors, 184 records, 126 data types, 3 other.
 
-**By namespace**.  `FLRP` 4,283; `Classical` 3,095; `Setoid` 2,530; `Legacy` 1,856; `Examples` 1,043; `Overture` 237; `Order` 54; `Exercises` 25.  Relative to the first v0.1 cut at `a5f9acb5` the growth is concentrated in `Classical` (+479) and `FLRP` (+256) — the Kurzweil-surjectivity theorem and its group-theoretic prerequisites.
+**By namespace**.  `FLRP` 4,283; `Classical` 3,095; `Setoid` 2,530; `Legacy` 1,856; `Examples` 1,043; `Overture` 237; `Order` 54; `Exercises` 25.  Relative to the first v0.1 cut at `a5f9acb5` the growth is concentrated in `Classical` (+479) and `FLRP` (+256) (the Kurzweil-surjectivity theorem and its group-theoretic prerequisites).
 
-**Sizes**.  Types have a median length of 422 characters and a p99 of 3,218 (max 109,095).  Proof terms have a median of 126 characters and a p99 of 31,724 — with a maximum of 11,557,651, the same machine-generated certificate row as before (see Known gaps).  A definition takes a median of 7 top-level Π binders before its codomain, and at most 36.
+**Sizes**.  Types have a median length of 422 characters and a p99 of 3,218 (max 109,095).  Proof terms have a median of 126 characters and a p99 of 31,724, with a maximum of 11,557,651, the same machine-generated certificate row as before (see [Known gaps](#known-gaps).  A definition takes a median of 7 top-level Π binders before its codomain, and at most 36.
 
-**Dependency shape**.  At definition level the graph is keyed by `prettyQname`: 11,865 nodes, into which the 13,123 rows collapse (1,258 rows share a name with another and are merged).  53,687 of the dependency tokens name a definition in this corpus; the other 78,068 occurrences resolve to nothing here and are reported as unresolved tokens, of which 41,702 at least have the shape of a qualified name — a lower bound on the real outward edges, dominated by `Agda.Primitive.Level` (6,985) and the standard library's `Data.Fin.Base.Fin` (2,928).  The most depended-upon definition is `Overture.Signatures.Signature` with 3,735 references.
+**Dependency shape**.  At definition level the graph is keyed by `prettyQname`: 11,865 nodes, into which the 13,123 rows collapse (1,258 rows share a name with another and are merged).  53,687 of the dependency tokens name a definition in this corpus; the other 78,068 occurrences resolve to nothing here and are reported as unresolved tokens, of which 41,702 at least have the shape of a qualified name, which is a lower bound on the real outward edges, dominated by `Agda.Primitive.Level` (6,985) and the standard library's `Data.Fin.Base.Fin` (2,928).  The most depended-upon definition is `Overture.Signatures.Signature` with 3,735 references.
 
 At module level, Agda's dependency graph over 672 modules (local plus external) is acyclic, with 1,315 edges and a longest chain of 80.  The v0 caveat stands: that DOT is a load-order graph, not the import relation; use the definition-level graph for anything that has to be complete.
 
 ## Intended uses
 
-The same four as v0 — retrieval for proof assistance, training and evaluation data, measuring a library, schema regression — plus the one this cut exists for:
+The same four as v0,
 
-+  **Benchmark curation** (issue #127).  The agda-algebras tier of `data/benchmarks/` — added by the tier PR, #132 — is mined from this corpus's rows (`scripts/python/corpus/mine_benchmark_candidates.py`, committed there) and its fixtures are cut from the same library commit, so "the benchmark's library" and "the corpus's library" cannot drift apart silently.
++ retrieval for proof assistance, 
++ training and evaluation data, 
++ measuring a library, 
++ schema regression
+
+plus the one this cut exists for,
+
++  **Benchmark curation** (issue #127).  The agda-algebras tier of `data/benchmarks/` (added by the tier PR [#132]) is mined from this corpus's rows (`scripts/python/corpus/mine_benchmark_candidates.py`, committed there) and its fixtures are cut from the same library commit, so "the benchmark's library" and "the corpus's library" cannot drift apart silently.
 
 It is **not** a benchmark: no held-out split, no difficulty labels; see `data/benchmarks/`.
 
 ## Known gaps
 
-All seven v0 gaps carry over unchanged in kind; the numbers that moved:
+All seven v0 gaps carry over unchanged in kind; the numbers that moved are as follows:
 
-+  **1,258 rows are shadowed under `prettyQname`** (733 qualified names occur more than once; worst `Classical.Structures.Ring.absurdlambda`, 28 times).  A consumer keyed by `prettyQname` indexes 11,865 of the 13,123 rows.  Use `qname` when identity matters.  Tracked by issue #53.
-+  **Twelve rows are over a megabyte each**, and the largest ten are 25.9 % of the corpus by bytes — machine-generated certificate and table rows in `FLRP` and `Examples`; the biggest is still 11.5 MB.  Filter on `astSize` or body length before budgeting per row.
++  **1,258 rows are shadowed under `prettyQname`** (733 qualified names occur more than once; worst `Classical.Structures.Ring.absurdlambda`, 28 times).  A consumer keyed by `prettyQname` indexes 11,865 of the 13,123 rows.  Use `qname` when identity matters.  Tracked by issue [#53].
++  **Twelve rows are over a megabyte each**, and the largest ten are 25.9 % of the corpus by bytes; these are machine-generated certificate and table rows in `FLRP` and `Examples`; the biggest is still 11.5 MB.  Filter on `astSize` or body length before budgeting per row.
 +  Dependency tokens remain heuristic; the module DOT remains load-order; types remain internal-printer strings; `--safe`/`--cubical-compatible` regimes remain unrecorded; one library, one commit.
 
 ## License and attribution
@@ -96,10 +103,13 @@ make extract-lib-nix AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master RESUME=
 make corpus-nix CORPUS_VERSION=v0.1
 ```
 
-Artifacts land under `data/corpora/agda-algebras/v0.1/`.  Byte-identical output is expected for the same library commit and toolchain (sorted concatenation, gzip with no filename and `mtime=0`); compare against the digests above.  The generated `Everything*` barrels may or may not be present in the checkout; they contribute no rows, so `corpus.jsonl` and its digests are unaffected — only `coverage.json`'s module count varies with them.  Expect six to seven minutes of wall time with warm `.agdai` interfaces.
+Artifacts land under `data/corpora/agda-algebras/v0.1/`.  Byte-identical output is expected for the same library commit and toolchain (sorted concatenation, gzip with no filename and `mtime=0`); compare against the digests above.  The generated `Everything*` barrels may or may not be present in the checkout; they contribute no rows, so `corpus.jsonl` and its digests are unaffected; only `coverage.json`'s module count varies with them.  Expect six to seven minutes of wall time with warm `.agdai` interfaces.
 
 ## Using it with agda-mcp
 
 As for v0: `gunzip -k corpus.jsonl.gz && agda-mcp --corpus corpus.jsonl [flags]` registers `search_by_name`, `search_by_type`, and `get_dependencies`; `make corpus-mcp-smoke CORPUS_VERSION=v0.1` drives them over the real JSON-RPC transport.
 
+[#53]: https://github.com/formalverification/agda-native-air/issues/53
+[#127]: https://github.com/formalverification/agda-native-air/issues/127
+[#132]: https://github.com/formalverification/agda-native-air/pull/132
 [agda-algebras]: https://github.com/ualib/agda-algebras
