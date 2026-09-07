@@ -2,7 +2,7 @@
 
 # Corpus dataset cards
 
-This directory holds one dataset card per corpus cut.  The card is the committed description of a published corpus (provenance, coverage, statistics, known gaps, and the reproduction recipe) while the corpus artifacts themselves (`corpus.jsonl.gz` and its companions) are **release assets**, never repository files: everything under `data/` is gitignored, and a GitHub release is what makes a cut durable, citable, and downloadable.
+This directory holds one dataset card per corpus cut.  The card is the committed description of a published corpus (provenance, coverage, statistics, known gaps, and the reproduction recipe) while the corpus artifacts themselves (`corpus.jsonl.gz` and its companions) are **release assets**, never repository files: corpus outputs under `data/corpora/` are gitignored, and a GitHub release is what makes a cut durable, citable, and downloadable.
 
 ## Publishing a corpus release
 
