@@ -166,6 +166,30 @@ records a wall-clock `timestamp` and per-obligation `elapsedMs`; the run is
 deterministic modulo those fields, and `eval-benchmark-smoke` strips them before
 checking that two runs match.
 
+### Checking a single fixture in an editor
+
+Each agda-algebras fixture directory carries its own `.agda-lib` project file
+(`gold/` and `obligations/` separately: the twin modules share top-level
+names, so one shared library would make every module ambiguous).  Any tool
+that resolves the nearest project file — agda-mode in an editor, agda-mcp's
+`check_file`, or a bare `agda` — can therefore check a fixture in isolation.
+One caveat for the CLI: Agda anchors project discovery at the *current
+directory*, not the target file, so run it from the fixture's own directory
+(editors do this naturally):
+
+```sh
+cd data/benchmarks/agda-algebras-v0/gold
+agda --library-file=../../../../agda/libraries Homs-comp-hom.agda
+```
+
+The `depend:` names resolve against the repo registry `agda/libraries`,
+which every dev-shell entry (re)writes.  A gold checks green; an obligation
+checks to exactly one `UnsolvedInteractionMetas` error at its hole — the
+expected outcome for a file whose point is the open hole (in an editor it
+simply loads, hole open).  The harness itself never relies on these project
+files: `EvalBenchmark` and the search loop pass their library flags
+explicitly, so fixture verification is identical with or without them.
+
 ## The agda-algebras library
 
 The library is Nix-managed since #127: the flake pins `ualib/agda-algebras` at

@@ -1,0 +1,6 @@
+-- data/benchmarks/agda-algebras-v0/obligations/agda-algebras-v0-obligations.agda-lib
+-- Project file for the obligation fixtures; see the twin file in ../gold/ for
+-- the rationale and for why the two directories must not share one library.
+name: agda-algebras-v0-obligations
+include: .
+depend: standard-library agda-dojang agda-algebras
