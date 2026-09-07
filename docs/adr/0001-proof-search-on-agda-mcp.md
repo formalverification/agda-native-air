@@ -19,11 +19,17 @@ The prior attempt's central defect is designed out at the type level.  The retir
 
 ### Where it stands
 
-P0 landed the substrate (state model, oracle client, single-step harness) and the measurement that fixed the economics.
+**P0** landed the substrate (state model, oracle client, single-step harness) and the measurement that fixed the economics.
 
-P1 landed the loop with a fixed, non-learned action space — the P0 closers, the goal context's assumptions, and applications of the lemmas the fixture imports — and measured the baseline: **6 of 22 benchmark obligations solved (routine 6/7, compositional 0/10, non-obvious 0/5)**, which is *exactly* the ceiling of what that action space can express in term mode, so the number is saturated, not disappointing.  A measured `type_of` pre-filter cut oracle judgements by 88 % and end-to-end time by 4.5× at zero cost in solves.
+**P1** landed the loop with a fixed, non-learned action space:
 
-P2 landed retrieval over a real standard-library corpus (55,576 rows, pinned to the toolchain's own stdlib) behind the same seam, and measured the honest thing: **retrieval adds zero term-mode solves on this suite — because the suite's ceiling binds any term-mode proposer, not because retrieval fails**.  The evidence separating those readings: a labeled control with the anti-gaming target exclusion off retrieves and commits all five admissible stdlib targets as one-shot applications (10/22), the failures under exclusion are overwhelmingly honest exhaustion rather than budget starvation, and a wire fact pinned along the way (`fill_hole` refuses blocked-constraint sub-holes) explains exactly which lemma class term mode cannot refine through.  The peek re-validated on retrieval candidates and its default flipped to ON; the benchmark extension that gives retrieval something honest to win is filed as #129.
++ the P0 closers, 
++ the goal context's assumptions, and
++ applications of the lemmas the fixture imports,
+
+and measured the baseline: **6 of 22 benchmark obligations solved (routine 6/7, compositional 0/10, non-obvious 0/5)**, which is *exactly* the ceiling of what that action space can express in term mode, so the number is saturated, not disappointing.  A measured `type_of` pre-filter cut oracle judgements by 88 % and end-to-end time by 4.5× at zero cost in solves.
+
+P2 landed retrieval over a real standard-library corpus (55,576 rows, pinned to the toolchain's own stdlib) behind the same seam, and measured the honest thing: **retrieval adds zero term-mode solves on this suite because the suite's ceiling binds any term-mode proposer, not because retrieval fails**.  The evidence separating those readings: a labeled control with the anti-gaming target exclusion off retrieves and commits all five admissible stdlib targets as one-shot applications (10/22), the failures under exclusion are overwhelmingly honest exhaustion rather than budget starvation, and a wire fact pinned along the way (`fill_hole` refuses blocked-constraint sub-holes) explains exactly which lemma class term mode cannot refine through.  The peek re-validated on retrieval candidates and its default flipped to ON; the benchmark extension that gives retrieval something honest to win is filed as #129.
 
 ### Where it goes
 
@@ -65,12 +71,12 @@ Consequences, all of which are now code: the budget is denominated in batch judg
 
 ## 3.  The state model (P0, `Model.scala`)
 
-+  **A state is an obligation set, a working-copy content, and a script.**  `SearchState(content, obligations, script)` with conjunctive semantics: solved means the *whole set* is empty.  There is no per-goal success anywhere in the model, so #112's disjunctive defect is unrepresentable.
-+  **Probes are not moves.**  `fill_hole` restores the file server-side, so every probe is a peek; `ProbeOutcome` (what the oracle said) and `Move` (an action committed to the working copy) are distinct types, and the script has type `Vector[Move]`.
-+  **States are unforgeable.**  `SearchState` and `SolvedClaim` are `sealed abstract case class`es with private constructors — the Scala 2 idiom that suppresses the synthetic `apply` and `copy` — so a state is born only through `initial` or `commit`, and a claim only through `fromFinalCheck`, which refuses an inhabited obligation set, a failed check, and even internally inconsistent evidence (success reported beside a non-zero exit).
-+  **The obligation set is the oracle's, not ours.**  Every `fill_hole` response carries the re-anchored hole list describing the file as that candidate would leave it (issue #79); `commit` adopts that list wholesale, so client-side hole arithmetic can never drift from Agda's.
-+  **Two caches, two key types.**  `OracleKey(contentFingerprint, line, col, candidate)` memoises judgements — same content, same hole, same candidate is one Agda call per fixture run, by construction.  `StateKey(contentFingerprint, script)` identifies states for frontier dedup.  Conflating them either re-runs Agda or wrongly prunes the frontier (#112's lesson), so they are distinct case classes.
-+  **Strict wire decoders.**  The response fields the search acts on (`holes`, counts, `elapsedMs`, `context`) are required, and counts are cross-checked against lists: a drifted server shape fails the decode visibly instead of bending ranking or measurement.  Every decoder is pinned against responses captured verbatim from the live server.
++  **A state is an obligation set, a working-copy content, and a script**.  `SearchState(content, obligations, script)` with conjunctive semantics: solved means the *whole set* is empty.  There is no per-goal success anywhere in the model, so #112's disjunctive defect is unrepresentable.
++  **Probes are not moves**.  `fill_hole` restores the file server-side, so every probe is a peek; `ProbeOutcome` (what the oracle said) and `Move` (an action committed to the working copy) are distinct types, and the script has type `Vector[Move]`.
++  **States are unforgeable**.  `SearchState` and `SolvedClaim` are `sealed abstract case class`es with private constructors — the Scala 2 idiom that suppresses the synthetic `apply` and `copy` — so a state is born only through `initial` or `commit`, and a claim only through `fromFinalCheck`, which refuses an inhabited obligation set, a failed check, and even internally inconsistent evidence (success reported beside a non-zero exit).
++  **The obligation set is the oracle's, not ours**.  Every `fill_hole` response carries the re-anchored hole list describing the file as that candidate would leave it (issue #79); `commit` adopts that list wholesale, so client-side hole arithmetic can never drift from Agda's.
++  **Two caches, two key types**.  `OracleKey(contentFingerprint, line, col, candidate)` memoises judgements — same content, same hole, same candidate is one Agda call per fixture run, by construction.  `StateKey(contentFingerprint, script)` identifies states for frontier dedup.  Conflating them either re-runs Agda or wrongly prunes the frontier (#112's lesson), so they are distinct case classes.
++  **Strict wire decoders**.  The response fields the search acts on (`holes`, counts, `elapsedMs`, `context`) are required, and counts are cross-checked against lists: a drifted server shape fails the decode visibly instead of bending ranking or measurement.  Every decoder is pinned against responses captured verbatim from the live server.
 
 ## 4.  The loop (P1, `BeamLoop.scala`)
 
@@ -79,7 +85,7 @@ Level-synchronous beam search.  Each frontier state is expanded at its **first o
 +  **Termination is a distinct per-fixture status**: `solved` (the claim was granted), `exhausted` (the frontier emptied, or the depth bound cut a live frontier), `budget_exceeded` (the probe budget ran out with work remaining).
 +  **The budget counts fill_hole probes that miss the memo** — the ~2.6 s coin.  Memo hits are free and stay free at the cap (the loop consults the memo before the budget gate).  The baseline `check_file`, the final strict checks, and the knowledge calls are ledgered but not gated; they are bounded structurally (one `get_goal` per expansion, expansions ≤ beam × depth, final checks ≤ closing probes).
 +  **Defaults**: beam 4, depth 6, budget 60 — tunables on the Make target (`PROOF_SEARCH_BEAM/DEPTH/BUDGET/DEDUP/PEEK`).
-+  **Anomalies are loud and non-fatal.**  A commit the state refuses, a wire drift, or a closing probe whose final check disagrees raises out of that fixture; the sweep continues, every artifact is written (an anomalous fixture keeps its attempt rows, wall clock, and probe counts), and the run exits non-zero.  This is P0's discipline, inherited from #112's own failure mode: a harness that exits 0 while writing broken rows lets breakage sit silent for months.
++  **Anomalies are loud and non-fatal**.  A commit the state refuses, a wire drift, or a closing probe whose final check disagrees raises out of that fixture; the sweep continues, every artifact is written (an anomalous fixture keeps its attempt rows, wall clock, and probe counts), and the run exits non-zero.  This is P0's discipline, inherited from #112's own failure mode: a harness that exits 0 while writing broken rows lets breakage sit silent for months.
 
 ## 5.  The action space and the proposer seam (P1, `Propose.scala`)
 
@@ -94,7 +100,7 @@ trait Proposer {
 P1's implementation is deliberately fixed and non-learned, in proposal order: the P0 closers (`refl`, `tt`); the goal context's assumptions by name (from `get_goal`'s context, decoded strictly); and applications of every name the fixture imports through `using` lists — one `{!!}` per remaining visible binder via the landed partial-application arithmetic, binder counts read from lane `type_of` answers through a deliberately small pi-type splitter (arrows at bracket depth 0), applications ordered cheap-before-expensive (#112's lesson four, applied to proposal order because the budget can run out mid-expansion).  Two hard-won details are pinned in tests:
 
 +  **Applications are parenthesized** (`(s≤s {!!})`), because a hole is an argument position as often as a right-hand side, and a verbatim splice of `s≤s {!!}` into a sub-hole reads as `s≤s sym {!!}` — a different term.  The first P1 sweep measured every depth-1 lemma application dying exactly this way.
-+  **The splitter is a proposal device, not an authority.**  It reads printed types (with their renamed binders, hidden groups, and newlines) well enough to count visible binders; the oracle polices what it gets wrong, because an overcount is refused as a type error and an undercount leaves a partial application the goal must then accept.
++  **The splitter is a proposal device, not an authority**.  It reads printed types (with their renamed binders, hidden groups, and newlines) well enough to count visible binders; the oracle polices what it gets wrong, because an overcount is refused as a type error and an undercount leaves a partial application the goal must then accept.
 
 The term-mode ceiling is a property of this space and must accompany its numbers: no case splits and no `with` means clause-restructuring golds are unreachable.  On M1-5 that is 16 of 22 (13 inductions, 2 case splits, and one single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six with expressible single-term golds are exactly the six P1 solves.
 
@@ -150,7 +156,7 @@ The reading: **the suite's term-mode ceiling binds any term-mode proposer**.  Re
 ## 10.  Where it is going
 
 +  **P2 — retrieval proposals (#123): done** (§7 and §9).  What it hands on: the seam now carries three candidate shapes, the scorer inside `RetrievalProposer` is its own interface awaiting premise-selection scores, the peek default is ON, and the honest conclusion — the suite's term-mode ceiling binds any term-mode proposer — is filed as the benchmark extension #129, so retrieval's ranking value becomes measurable without gaming.
-+  **P3 — policy proposals (#124).**  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines.  The closed propose–check–learn loop the project has been building toward.
++  **P3 — policy proposals (#124)**.  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines.  The closed propose–check–learn loop the project has been building toward.
 +  **Raising the ceiling** (unscheduled, the largest known win): term mode caps the suite at 6/22, and 13 of the 16 unreachable golds are structural inductions of a single shape (`f zero … = refl; f (suc n) … = cong g (f n …)`).  Reaching them needs case-split moves — plausibly via the interaction protocol's `Cmd_make_case` — which would change the state model's move vocabulary and is deliberately out of P1–P3 scope.
 +  **Recorded options, taken only if measurement demands**: parallel oracle workers (N servers over disjoint work copies) if wall time becomes the bottleneck; richer selection policies than first-open-obligation if multi-hole fixtures ever make selection order matter under budget.
 
