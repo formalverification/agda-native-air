@@ -41,7 +41,7 @@ Domains: setoid, algebra, universe.
 
 ### agda-algebras tier: selection criteria and provenance
 
-+  **Library commit**: `a5f9acb5f869bf675544705ab29c0cb6e4ee2531` — equal by
++  **Library commit**: `4662373d281daf0f20a6319f1a46755a45d33293` — equal by
    construction to the corpus provenance commit (dataset card
    `docs/corpora/agda-algebras-v0.1.md`) and to the `agda-algebras-src` flake
    input, so the benchmark's library, the corpus's library, and the toolchain's

@@ -102,7 +102,7 @@
   # the library once and ships its .agdai interfaces, so CI and fresh
   # machines get a warm library from Cachix instead of a per-run rebuild.
   inputs.agda-algebras-src = {
-    url = "github:ualib/agda-algebras/a5f9acb5f869bf675544705ab29c0cb6e4ee2531";
+    url = "github:ualib/agda-algebras/4662373d281daf0f20a6319f1a46755a45d33293";
     flake = false;
   };
 
@@ -139,13 +139,14 @@
 
     # ---- Helper: flake-pinned agda-algebras ----------------------------------
     # Same packaging shape as the Nix stdlib: $out carries the .agda-lib, src/,
-    # and prebuilt _build/2.8.0 interfaces — measured: every module except the
-    # two Everything* barrels themselves, at a ~79 MB store path built in
-    # ~15 minutes cold.  Must use the same agdaPackages set as mkAgdaEnv so
-    # the library is checked by the same Agda + stdlib the shells use.
+    # and prebuilt _build/2.8.0 interfaces — measured at the 2026-09-07 pin:
+    # every module except the two Everything* barrels themselves (407 of 409),
+    # an ~84 MB store path built in ~15 minutes cold.  Must use the same
+    # agdaPackages set as mkAgdaEnv so the library is checked by the same
+    # Agda + stdlib the shells use.
     mkAgdaAlgebrasPkg = pkgs: pkgs.agdaPackages.mkDerivation {
       pname = "agda-algebras";
-      version = "unstable-2026-08-31";
+      version = "unstable-2026-09-07";
       src = agda-algebras-src;
       everythingFile = "src/Everything.agda";
       buildInputs = [ pkgs.agdaPackages.standard-library ];
