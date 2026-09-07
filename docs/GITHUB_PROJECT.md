@@ -882,7 +882,7 @@ See PR #45 for details.
 
 ---
 
-### Issue M1-5: Curate baseline benchmark — 20 to 50 proof obligations from `agda-algebras` + `agda-stdlib` (#13, closed)
+### Issue M1-5: Curate baseline benchmark: 20 to 50 proof obligations from `agda-algebras` + `agda-stdlib` (#13, closed)
 
 **Labels:** `agda-strux`, `eval`
 
@@ -1159,17 +1159,15 @@ development.  This is the second publication target.
 
 <!-- BEGIN GENERATED: milestone-3 -->
 
-### Issue M3-1: AI-assisted extension of `agda-algebras` — case study (#23)
+### Issue M3-1: AI-assisted extension of `agda-algebras` (case study) (#23)
 
 **Labels:** `eval`, `research`
 
-#### Description
+## Description
 
-Use the full system (agda-mcp + retrieval + frontier agent) to formalize and
-streamline results in universal algebra.  Focus on areas relevant to the FLRP
-or the active mathematical agenda.
+Use the full system (agda-mcp + retrieval + frontier agent) to formalize and streamline results in universal algebra.  Focus on areas relevant to the FLRP or the active mathematical agenda.
 
-#### Tasks
+### Tasks
 
 - [ ] Identify 3–5 candidate results for AI-assisted formalization
 - [ ] Attempt each with the agent, recording the full interaction
@@ -1177,7 +1175,7 @@ or the active mathematical agenda.
 - [ ] Commit successful formalizations to `agda-algebras` (or a fork)
 - [ ] Write up the experience as a case study
 
-#### Acceptance criteria
+### Acceptance criteria
 
 - [ ] At least 2 non-trivial results are formalized with AI assistance
 - [ ] Detailed interaction logs exist for each attempt
