@@ -313,7 +313,8 @@ final class RetrievalProposer private (
   lemmaType: String => IO[Either[String, Option[String]]],
   cfg:       RetrievalConfig,
   poolCache: Ref[IO, Map[String, Vector[String]]],           // goal display -> candidate texts
-  nameCache: Ref[IO, Map[String, Option[(String, Vector[Binder])]]], // qname -> accepted (rendering, binders)
+  nameCache: Ref[IO, Map[String, Option[(String, Vector[Binder], String)]]], // qname -> accepted (rendering, binders, lane-printed type)
+  targetRef: Ref[IO, Option[Option[String]]],                // fetched? -> target's lane-printed type (None inside = lane could not type it)
   statsRef:  Ref[IO, RetrievalStats]
 ) extends Proposer {
 
@@ -374,7 +375,39 @@ final class RetrievalProposer private (
   private def resolveTopK(ranked: Vector[SearchHit]): IO[Vector[(String, Vector[Binder])]] =
     ranked.foldLeftM(Vector.empty[(String, Vector[Binder])]) { (acc, hit) =>
       if (acc.size >= cfg.topK) IO.pure(acc)
-      else resolve(hit).map(acc ++ _.toVector)
+      else resolve(hit).flatMap {
+        case None => IO.pure(acc)
+        case Some((rendered, binders, printed)) =>
+          // The lane-form statement check (#130 review): the syntactic rule
+          // in TargetExclusion compares corpus text against index prose,
+          // two notations that agree only in unit tests — the published
+          // sweeps recorded ZERO statement exclusions.  Here both sides are
+          // the LANE's printing, so the exact-statement-alias rule finally
+          // has teeth: a differently named row whose lane-printed type
+          // normalises to the target's is excluded, NAMED, and its slot
+          // stays open.
+          targetPrinted.flatMap {
+            case Some(t) if cfg.excludeTarget &&
+                Statements.normalize(printed) == Statements.normalize(t) =>
+              statsRef.update(st => st.copy(
+                excluded = (st.excluded :+ s"statement:${hit.prettyQname}").distinct)).as(acc)
+            case _ => IO.pure(acc :+ ((rendered, binders)))
+          }
+      }
+    }
+
+  /** The target's own lane-printed type, fetched once per fixture through
+    * the same `type_of` door the candidates use (the hole's definition is in
+    * scope in its own module).  `Some(None)` records a lane that could not
+    * type it — the check is then skipped and the name rule carries alone.
+    */
+  private def targetPrinted: IO[Option[String]] =
+    targetRef.get.flatMap {
+      case Some(cached) => IO.pure(cached)
+      case None =>
+        lemmaType(exclusion.holeName)
+          .map(_.toOption.flatten)
+          .flatTap(t => targetRef.set(Some(t)))
     }
 
   /** One-hop dependency expansion of the top-scored lemmas.  Fresh neighbors
@@ -419,7 +452,7 @@ final class RetrievalProposer private (
     * answer.  Cached per qname: a lemma's rendering and type never change
     * within one fixture's search.
     */
-  private def resolve(hit: SearchHit): IO[Option[(String, Vector[Binder])]] =
+  private def resolve(hit: SearchHit): IO[Option[(String, Vector[Binder], String)]] =
     nameCache.get.flatMap(_.get(hit.prettyQname) match {
       case Some(done) => IO.pure(done)
       case None =>
@@ -436,11 +469,11 @@ final class RetrievalProposer private (
           .flatTap(r => nameCache.update(_ + (hit.prettyQname -> r)))
     })
 
-  private def tryLadder(renderings: Vector[String]): IO[Option[(String, Vector[Binder])]] =
+  private def tryLadder(renderings: Vector[String]): IO[Option[(String, Vector[Binder], String)]] =
     renderings match {
       case r +: rest =>
         lemmaType(r).flatMap {
-          case Right(Some(printed)) => IO.pure(Some((r, Actions.bindersOfPrinted(printed))))
+          case Right(Some(printed)) => IO.pure(Some((r, Actions.bindersOfPrinted(printed), printed)))
           case _                    => tryLadder(rest)
         }
       case _ => IO.pure(None)
@@ -498,8 +531,9 @@ object RetrievalProposer {
     scorer:    CandidateScorer = TokenOverlapScorer
   ): IO[RetrievalProposer] =
     for {
-      pool  <- Ref.of[IO, Map[String, Vector[String]]](Map.empty)
-      names <- Ref.of[IO, Map[String, Option[(String, Vector[Binder])]]](Map.empty)
-      stats <- Ref.of[IO, RetrievalStats](RetrievalStats())
-    } yield new RetrievalProposer(base, corpus, scope, exclusion, scorer, lemmaType, cfg, pool, names, stats)
+      pool   <- Ref.of[IO, Map[String, Vector[String]]](Map.empty)
+      names  <- Ref.of[IO, Map[String, Option[(String, Vector[Binder], String)]]](Map.empty)
+      target <- Ref.of[IO, Option[Option[String]]](None)
+      stats  <- Ref.of[IO, RetrievalStats](RetrievalStats())
+    } yield new RetrievalProposer(base, corpus, scope, exclusion, scorer, lemmaType, cfg, pool, names, target, stats)
 }

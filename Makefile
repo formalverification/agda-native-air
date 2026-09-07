@@ -1667,7 +1667,7 @@ PROOF_SEARCH_EXCLUDE  ?= on
 PROOF_SEARCH_EXPAND_DEPS ?= off
 # --corpus is passed only when the retrieval proposer is selected, so the
 # fixed baseline drives the identical ten-tool server P1 measured against.
-PROOF_SEARCH_CORPUS_ARGS = $(if $(filter retrieval,$(PROOF_SEARCH_PROPOSER)),--corpus $(CURDIR)/$(PROOF_SEARCH_CORPUS) --retrieve-k $(PROOF_SEARCH_RETRIEVE_K) --exclude-target $(PROOF_SEARCH_EXCLUDE) --expand-deps $(PROOF_SEARCH_EXPAND_DEPS),)
+PROOF_SEARCH_CORPUS_ARGS = $(if $(filter retrieval,$(PROOF_SEARCH_PROPOSER)),--corpus $(abspath $(PROOF_SEARCH_CORPUS)) --retrieve-k $(PROOF_SEARCH_RETRIEVE_K) --exclude-target $(PROOF_SEARCH_EXCLUDE) --expand-deps $(PROOF_SEARCH_EXPAND_DEPS),)
 PROOF_SEARCH_LOOP_IDS ?= --all
 
 .PHONY: proof-search-loop proof-search-loop-it proof-search-retrieval-it

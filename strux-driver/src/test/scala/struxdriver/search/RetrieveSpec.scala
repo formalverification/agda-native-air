@@ -337,6 +337,49 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     s.laneRejected should be >= 3
   }
 
+  test("imports: a whole-module open enters the retrieval scope with no lemma names (#130 review)") {
+    val src  = "module M where\nopen import AgdaDojang.Debug\nopen import Data.Nat.Properties\n"
+    val mods = Imports.imported(src)
+    mods should contain (ImportedModule("AgdaDojang.Debug", Vector.empty))
+    mods should contain (ImportedModule("Data.Nat.Properties", Vector.empty))
+    Imports.usingNames(src) shouldBe empty
+    ImportScope(mods).importingModuleOf("Data.Nat.Properties").map(_.module) shouldBe
+      Some("Data.Nat.Properties")
+  }
+
+  test("propose: a same-statement alias is excluded by the lane-form rule, freeing its slot (#130 review)") {
+    // The alias: a different bare name, and a corpus type in the QUALIFIED
+    // internal form — so the name rule passes it and the syntactic statement
+    // rule (index prose vs corpus text, two notations) cannot see it.  Only
+    // the lane-form comparison can: the lane prints it identically to the
+    // target's own type.
+    val alias = SearchHit(
+      "Data.Nat.Properties.+-comm′",
+      "(m n : Agda.Builtin.Nat.Nat) → Agda.Builtin.Equality._≡_ (Agda.Builtin.Nat._+_ m n) (Agda.Builtin.Nat._+_ n m)",
+      "function", "Data.Nat.Properties", hasBody = true)
+    val laneT = laneTypes +
+      ("+-comm"                      -> "(m n : ℕ) → m + n ≡ n + m") +
+      ("Data.Nat.Properties.+-comm′" -> "(m n : ℕ) → m + n ≡ n + m")
+    val rows = (corpusRows :+ alias).sortBy(_.prettyQname)
+
+    val lane1 = new FakeLane(laneT)
+    val p1 = RetrievalProposer.create(baseFixed, new CannedCorpus(rows), scope, exclusion,
+      lane1.lemmaType, cfg4).unsafeRunSync()
+    val cands1 = p1.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    (cands1.mkString(" ") should not).include("+-comm′")
+    val st1 = p1.stats.unsafeRunSync()
+    st1.excluded should contain ("statement:Data.Nat.Properties.+-comm′")
+    (st1.proposedLemmas should not).contain("Data.Nat.Properties.+-comm′")
+
+    // The control: with exclusion off the same alias IS proposed, proving it
+    // was the lane rule that removed it and not the ladder or the ranking.
+    val lane2 = new FakeLane(laneT)
+    val p2 = RetrievalProposer.create(baseFixed, new CannedCorpus(rows), scope, exclusion,
+      lane2.lemmaType, cfg4.copy(excludeTarget = false)).unsafeRunSync()
+    val cands2 = p2.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    cands2 should contain ("(Data.Nat.Properties.+-comm′ _ _)")
+  }
+
   test("propose: the pool is memoised per goal display") {
     val (proposer, corpus, _) = freshProposer()
     proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()

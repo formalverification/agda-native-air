@@ -293,6 +293,11 @@ object ProofSearchLoop extends IOApp {
       _       <- IO.blocking(Files.createDirectories(cfg.runRoot))
       _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"} proposer=${cfg.proposerKind}${cfg.corpus.fold("")(c => s" corpus=$c retrieveK=${cfg.retrieval.topK} excludeTarget=${if (cfg.retrieval.excludeTarget) "on" else "off"}")}")
       _       <- IO.println(s">> run root: ${cfg.runRoot}")
+      // Hash the corpus and read its provenance sibling BEFORE the sweep: a
+      // malformed sibling fails the run here, in seconds, rather than
+      // silently dropping the provenance block from a finished report
+      // (#130 review).  An absent sibling stays legitimate (digest-only).
+      corpusInfo <- cfg.corpus.traverse(corpusProvenance)
       result  <- McpClient.resource(serverCfg).use { client =>
                    for {
                      // One ledger for the run; one oracle — and so one probe
@@ -304,7 +309,6 @@ object ProofSearchLoop extends IOApp {
                    } yield (driven, ledger)
                  }
       (driven, ledger) = result
-      corpusInfo <- cfg.corpus.traverse(corpusProvenance)
       _       <- writeOutputs(cfg, entries, driven, ledger, corpusInfo)
       anomalies = driven.collect { case (o, _, _) if o.anomaly.isDefined => o }
       _       <- anomalies.traverse_(o =>
@@ -520,9 +524,17 @@ object ProofSearchLoop extends IOApp {
                 }
       prov   <- IO.blocking {
                   val p = corpus.resolveSibling("provenance.json")
-                  if (Files.exists(p))
-                    io.circe.parser.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)).toOption
-                  else None
+                  if (!Files.exists(p)) None
+                  else io.circe.parser.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)) match {
+                    case Right(j) => Some(j)
+                    case Left(e) =>
+                      // Malformed is not absent: this block exists to pin
+                      // WHAT was retrieved from, so a sibling that cannot be
+                      // parsed fails the run rather than vanishing (#130
+                      // review).  Remove or fix the sibling to proceed.
+                      throw new RuntimeException(
+                        s"corpus provenance sibling is malformed: $p — ${e.message}")
+                  }
                 }
     } yield Json.obj(
       "path"       -> corpus.toString.asJson,
