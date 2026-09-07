@@ -141,10 +141,6 @@ Once a library is registered (its line changes to a `*` entry), a module that
 imports it type-checks directly; e.g. `agda MyModule.agda` or
 `nix develop .#backend --command agda MyModule.agda`.
 
-Reproducible, no-clone registration (pinning the library in the flake so
-collaborators need no local checkout) is deferred future work, tracked in
-[#54](https://github.com/formalverification/agda-native-air/issues/54).
-
 ---
 
 ## 2.  First commands to run (sanity)
