@@ -59,7 +59,7 @@ Full tables, including the twenty most-depended-upon definitions and the module-
 
 **By namespace**.  `FLRP` 4,283; `Classical` 3,095; `Setoid` 2,530; `Legacy` 1,856; `Examples` 1,043; `Overture` 237; `Order` 54; `Exercises` 25.  Relative to the first v0.1 cut at `a5f9acb5` the growth is concentrated in `Classical` (+479) and `FLRP` (+256) (the Kurzweil-surjectivity theorem and its group-theoretic prerequisites).
 
-**Sizes**.  Types have a median length of 422 characters and a p99 of 3,218 (max 109,095).  Proof terms have a median of 126 characters and a p99 of 31,724, with a maximum of 11,557,651, the same machine-generated certificate row as before (see [Known gaps](#known-gaps).  A definition takes a median of 7 top-level Π binders before its codomain, and at most 36.
+**Sizes**.  Types have a median length of 422 characters and a p99 of 3,218 (max 109,095).  Proof terms have a median of 126 characters and a p99 of 31,724, with a maximum of 11,557,651, the same machine-generated certificate row as before (see [Known gaps](#known-gaps)).  A definition takes a median of 7 top-level Π binders before its codomain, and at most 36.
 
 **Dependency shape**.  At definition level the graph is keyed by `prettyQname`: 11,865 nodes, into which the 13,123 rows collapse (1,258 rows share a name with another and are merged).  53,687 of the dependency tokens name a definition in this corpus; the other 78,068 occurrences resolve to nothing here and are reported as unresolved tokens, of which 41,702 at least have the shape of a qualified name, which is a lower bound on the real outward edges, dominated by `Agda.Primitive.Level` (6,985) and the standard library's `Data.Fin.Base.Fin` (2,928).  The most depended-upon definition is `Overture.Signatures.Signature` with 3,735 references.
 
@@ -82,11 +82,11 @@ It is **not** a benchmark: no held-out split, no difficulty labels; see `data/be
 
 ## Known gaps
 
-All seven v0 gaps carry over unchanged in kind; the numbers that moved are as follows:
+All eight v0 gaps carry over unchanged in kind; the numbers that moved are as follows:
 
-+  **1,258 rows are shadowed under `prettyQname`** (733 qualified names occur more than once; worst `Classical.Structures.Ring.absurdlambda`, 28 times).  A consumer keyed by `prettyQname` indexes 11,865 of the 13,123 rows.  Use `qname` when identity matters.  Tracked by issue [#53].
-+  **Twelve rows are over a megabyte each**, and the largest ten are 25.9 % of the corpus by bytes; these are machine-generated certificate and table rows in `FLRP` and `Examples`; the biggest is still 11.5 MB.  Filter on `astSize` or body length before budgeting per row.
-+  Dependency tokens remain heuristic; the module DOT remains load-order; types remain internal-printer strings; `--safe`/`--cubical-compatible` regimes remain unrecorded; one library, one commit.
++  **1,258 rows are shadowed under `prettyQname`** (733 qualified names occur more than once; worst `Classical.Structures.Ring.absurdlambda`, 28 times).  A consumer keyed by `prettyQname` indexes 11,865 of the 13,123 rows.  Use `qname` when identity matters.  Tracked by issue [#144].
++  **Twelve rows are over a megabyte each**, and the largest ten are 25.9 % of the corpus by bytes; these are machine-generated certificate and table rows in `FLRP` and `Examples`; the biggest is still 11.5 MB.  Filter on body length (or serialized row length) before budgeting per row; `astSize` is the pretty-printed *type's* length and bounds nothing about the body.
++  Dependency tokens remain heuristic; the module DOT remains load-order; `ports`, `refsFromBody`, and `wires` remain unemitted, so body-level dependency edges are still absent and the graph statistics are type-level only (issue [#15]); types remain internal-printer strings; `--safe`/`--cubical-compatible` regimes remain unrecorded; one library, one commit.
 
 ## License and attribution
 
@@ -109,7 +109,8 @@ Artifacts land under `data/corpora/agda-algebras/v0.1/`.  Byte-identical output 
 
 As for v0: `gunzip -k corpus.jsonl.gz && agda-mcp --corpus corpus.jsonl [flags]` registers `search_by_name`, `search_by_type`, and `get_dependencies`; `make corpus-mcp-smoke CORPUS_VERSION=v0.1` drives them over the real JSON-RPC transport.
 
-[#53]: https://github.com/formalverification/agda-native-air/issues/53
+[#15]: https://github.com/formalverification/agda-native-air/issues/15
+[#144]: https://github.com/formalverification/agda-native-air/issues/144
 [#127]: https://github.com/formalverification/agda-native-air/issues/127
 [#132]: https://github.com/formalverification/agda-native-air/pull/132
 [agda-algebras]: https://github.com/ualib/agda-algebras
