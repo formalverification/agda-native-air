@@ -222,39 +222,6 @@ object IndexParser {
 
 
 // =============================================================================
-// Filtering (pure)
-// =============================================================================
-
-object Filter {
-
-  /** Partition obligations into available and skipped.
-    *
-    * Obligations whose gold file is missing are skipped — verify-gold only
-    * consumes the gold, so the obligation file's presence is not checked here.
-    * agda-algebras rows are no longer conditional: the flake pins the library
-    * (issue #127), so "a gold is not done until it type-checks" holds for the
-    * whole index, and an unregistered library fails the check loudly instead
-    * of shrinking the suite silently.
-    */
-  def filterAvailable(
-    obligations:     Vector[Obligation],
-    projectRoot:     Path
-  ): (Vector[Obligation], Vector[String]) = {
-    val (available, skipped) =
-      obligations.partitionMap { ob =>
-        val skip: Option[String] =
-          if (!Files.isRegularFile(projectRoot.resolve(ob.goldPath)))
-            Some(ob.id)
-          else
-            None
-        skip.toRight(ob)
-      }
-    (available, skipped)
-  }
-}
-
-
-// =============================================================================
 // Gold Verification (effectful)
 // =============================================================================
 
@@ -482,17 +449,12 @@ object EvalBenchmark extends IOApp {
                new RuntimeException("No obligations parsed from index")
              )
 
-        // Filter for available obligations.
-        (available, skipped) = Filter.filterAvailable(
-          allObligations, config.projectRoot
-        )
+        // No pre-filtering: every indexed row is verified.  A missing gold
+        // file surfaces as a failed GoldResult from verifyOne (which checks
+        // for it before spawning Agda), so the whole-index guarantee holds —
+        // a row can fail, but it can never be dropped silently (#132 review).
         _ <- IO.println(
-               s"Benchmark index: ${allObligations.size} obligations " +
-               s"(${available.size} available, ${skipped.size} skipped)"
-             )
-        _ <- IO.whenA(skipped.nonEmpty)(
-               IO.println(s"  Skipped: ${skipped.take(5).mkString(", ")}" +
-                          (if (skipped.size > 5) "..." else ""))
+               s"Benchmark index: ${allObligations.size} obligations"
              )
 
         // Dispatch.
@@ -500,7 +462,7 @@ object EvalBenchmark extends IOApp {
           case Mode.VerifyGold =>
             for {
               _       <- IO.println("\n--- Gold verification ---")
-              results <- GoldVerifier.verifyAll(available, config.projectRoot)
+              results <- GoldVerifier.verifyAll(allObligations, config.projectRoot)
               report   = Report.buildGoldReport(results)
               path    <- Report.writeReport(report, config.outDir)
               _       <- IO.println(

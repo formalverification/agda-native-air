@@ -47,7 +47,10 @@ Domains: setoid, algebra, universe.
    input, so the benchmark's library, the corpus's library, and the toolchain's
    library can never drift apart silently.
 +  **Corpus-mined**: candidates are corpus rows with `defKind: function`, a
-   body, and a *single-term* proof (length-bounded, transport-marker-free) in
+   body, and a *plausibly single-term* proof (length-bounded,
+   transport-marker-free — an approximation, since the corpus records no
+   per-row clause count; single-term-ness is established when each gold is
+   restated and type-checked as one term) in
    the `Overture`/`Setoid` namespaces — the committed filter is
    `scripts/python/corpus/mine_benchmark_candidates.py`; run it as
    `python3 scripts/python/corpus/mine_benchmark_candidates.py --corpus
@@ -58,9 +61,9 @@ Domains: setoid, algebra, universe.
    this tier — every gold is expressible as one `fill_hole` term by
    construction (21/21).  What binds is the action space, which is the point:
 +  **Import strata** (recorded per obligation in `tags`):
-   `stratum:using` (10 obligations) imports its lemma pool through narrow
+   `stratum:using` (11 obligations) imports its lemma pool through narrow
    `using` lists, so the P1 fixed action space keeps footing;
-   `stratum:wholesale` (11 obligations) opens agda-algebras modules with **no**
+   `stratum:wholesale` (10 obligations) opens agda-algebras modules with **no**
    `using` list, starving the fixed space by design so that P2 retrieval
    uplift on these rows is attributable to retrieval and nothing else.
 +  **Wholesale-stratum semantics, stated plainly**: opening a module wholesale
@@ -103,7 +106,12 @@ Each obligation is a self-contained Agda module:
 +  It contains exactly **one** `{!!}` hole to be filled.
 +  The module name matches the filename stem.
 +  Any prerequisite lemmas are provided as explicit imports — the obligation may
-   import lemmas, just not the definition it is asked to prove.
+   import lemmas, just not the definition it is asked to prove.  Wholesale-stratum
+   agda-algebras fixtures qualify this deliberately: their module-wide `open`
+   necessarily brings the restated lemma's own library name into scope (see the
+   stratum semantics above) — the gold still never *applies* it, and keeping the
+   original reachable is the stratum's point, since retrieving it is a legitimate
+   find and excluding it is the P2 target-exclusion policy's job.
 
 The corresponding gold file is identical except the hole is replaced with the
 correct proof term.

@@ -5,12 +5,13 @@ Description: Mine benchmark-obligation candidates from a library corpus.
 
   The agda-algebras benchmark tier (issue #127) is cut from the corpus
   itself, so that the benchmark and the corpus can never drift apart:
-  a candidate is a corpus row whose committed proof is a SINGLE TERM
-  (the P1 term-mode searcher cannot restructure clauses, so a fixture
-  whose gold needs pattern matching would price the tier out of the
-  instrument it exists to calibrate).  This filter is the reproducible
-  half of curation; the by-hand half (taxonomy tier, import stratum,
-  deprecation checks against the library source) happens on its output.
+  a candidate is a corpus row whose committed proof plausibly restates
+  as a SINGLE TERM (the P1 term-mode searcher cannot restructure
+  clauses, so a fixture whose gold needs pattern matching would price
+  the tier out of the instrument it exists to calibrate).  This filter
+  is the reproducible half of curation; the by-hand half (taxonomy
+  tier, import stratum, deprecation checks against the library source,
+  and the single-term restatement itself) happens on its output.
 
   Usage, from the repository root:
 
@@ -24,14 +25,25 @@ Description: Mine benchmark-obligation candidates from a library corpus.
 
 Design notes:
 
-  Bodies in the corpus are Agda's pretty-printed internal terms.  Two
-  facts drive the predicates below, both observed on the real corpus:
-  clause-defined functions concatenate their clause bodies (so any
-  multi-clause definition is long), and --cubical-compatible elaboration
-  litters transport helpers with primTransp/primHComp/primComp — never
-  surface syntax a fixture author could write.  `@N` de Bruijn markers
-  for the definition's own binders are fine: they name the ∀-bound
-  variables an obligation restates explicitly.
+  Bodies in the corpus are Agda's pretty-printed internal terms.  Three
+  facts drive the predicates below, all observed on the real corpus:
+  clause-defined functions join their clause bodies with newlines; the
+  printer ALSO wraps long single terms across lines (on v0.1, 12 of the
+  tier's 21 single-term source lemmas carry layout newlines), so a
+  newline cannot serve as a clause signal; and --cubical-compatible
+  elaboration litters transport helpers with primTransp/primHComp/
+  primComp — never surface syntax a fixture author could write.  `@N`
+  de Bruijn markers for the definition's own binders are fine: they name
+  the ∀-bound variables an obligation restates explicitly.
+
+  The length bound is therefore an APPROXIMATION of single-term-ness,
+  tuned for recall: it rejects long clause concatenations and
+  certificate-scale terms, but a short multi-clause definition passes
+  it (#132 review).  The corpus schema records no per-row clause count —
+  that field is the precise signal and is tracked as an agda-strux
+  follow-up — so single-term-ness is ESTABLISHED during the by-hand
+  half: a candidate only becomes a fixture once its gold is restated
+  and type-checked as one term.
 """
 
 from __future__ import annotations
@@ -90,11 +102,16 @@ def is_generated_name(qname: str) -> bool:
     return any(marker in qname for marker in GENERATED_NAME_MARKERS)
 
 
-def is_single_term_body(body: str, max_chars: int) -> bool:
-    """A body a fixture author could restate as one proof term.
+def is_candidate_body(body: str, max_chars: int) -> bool:
+    """A body a fixture author could PLAUSIBLY restate as one proof term.
 
-    Length bounds out multi-clause concatenations (and certificate-scale
-    terms); the marker scan bounds out cubical transport helpers.
+    An approximation, not a guarantee (see the module design notes): the
+    length bound rejects long clause concatenations and certificate-scale
+    terms but admits a short multi-clause body, and newlines are layout
+    as often as clause joins, so they are deliberately not consulted.
+    The marker scan bounds out cubical transport helpers.  Single-term-
+    ness is established downstream, when the gold is authored and
+    type-checked as one term.
     """
     return (
         0 < len(body) <= max_chars
@@ -109,7 +126,7 @@ def is_candidate(row: dict, namespaces: Sequence[str], max_body_chars: int) -> b
         and isinstance(row.get("body"), str)
         and in_namespaces(row.get("prettyQname", ""), namespaces)
         and not is_generated_name(row.get("prettyQname", ""))
-        and is_single_term_body(row["body"], max_body_chars)
+        and is_candidate_body(row["body"], max_body_chars)
     )
 
 

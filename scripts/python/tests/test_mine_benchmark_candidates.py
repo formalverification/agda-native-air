@@ -25,8 +25,8 @@ from typing import Dict
 from scripts.python.corpus.mine_benchmark_candidates import (
     candidates_in,
     is_candidate,
+    is_candidate_body,
     is_generated_name,
-    is_single_term_body,
 )
 
 NAMESPACES = ("Overture", "Setoid")
@@ -63,12 +63,36 @@ def test_namespace_fence() -> None:
 
 def test_transport_noise_is_rejected() -> None:
     body = "Agda.Primitive.Cubical.primTransp (λ i → @9) @1"
-    assert not is_single_term_body(body, 250)
+    assert not is_candidate_body(body, 250)
 
 
-def test_clause_concatenation_is_length_bounded() -> None:
-    assert not is_single_term_body("Setoid.X.f " * 40, 250)
-    assert not is_single_term_body("", 250)
+def test_long_clause_concatenation_is_length_bounded() -> None:
+    assert not is_candidate_body("Setoid.X.f " * 40, 250)
+    assert not is_candidate_body("", 250)
+
+
+def test_wrapped_single_term_with_newline_is_kept() -> None:
+    # The internal printer wraps long single terms across lines; on the v0.1
+    # corpus 12 of the tier's 21 single-term source lemmas carry such layout
+    # newlines, so a newline must never be read as a clause separator (#132
+    # review).  This body is the real (wrapped) `Setoid.Functions.Basic.
+    # lift∼lower` shape.
+    body = (
+        "Relation.Binary.Structures.IsEquivalence.refl\n"
+        "(Relation.Binary.Bundles.Setoid.isEquivalence @2)"
+    )
+    assert is_candidate_body(body, 250)
+
+
+def test_short_multi_clause_body_passes_by_design() -> None:
+    # DOCUMENTED LIMITATION (#132 review): clause bodies are joined with
+    # newlines, and a short multi-clause definition therefore passes the
+    # length-bounded approximation — indistinguishable from a wrapped single
+    # term without a per-row clause count in the corpus schema.  Single-term-
+    # ness is established when the gold is authored and type-checked as one
+    # term; this test pins the filter's deliberate inclusiveness.
+    body = "Agda.Builtin.Nat.Nat.zero\nAgda.Builtin.Nat.Nat.suc @0"
+    assert is_candidate_body(body, 250)
 
 
 def test_generated_definitions_are_rejected() -> None:

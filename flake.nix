@@ -139,16 +139,19 @@
 
     # ---- Helper: flake-pinned agda-algebras ----------------------------------
     # Same packaging shape as the Nix stdlib: $out carries the .agda-lib, src/,
-    # and prebuilt _build/2.8.0 interfaces — measured at the 2026-09-07 pin:
-    # every module except the two Everything* barrels themselves (407 of 409),
-    # an ~84 MB store path built in ~15 minutes cold.  Must use the same
+    # and prebuilt _build/2.8.0 interfaces.  The pinned agdaPackages builder's
+    # default buildPhase is `agda --build-library`, which type-checks every
+    # module the .agda-lib exposes — measured at the 2026-09-07 pin: all 407
+    # committed modules interfaced, an ~84 MB store path built in ~15 minutes
+    # cold.  (The library's Everything.agda barrel is generated and git-ignored
+    # upstream, so it is absent from the flake source; the builder takes no
+    # everythingFile argument, per the #132 review.)  Must use the same
     # agdaPackages set as mkAgdaEnv so the library is checked by the same
     # Agda + stdlib the shells use.
     mkAgdaAlgebrasPkg = pkgs: pkgs.agdaPackages.mkDerivation {
       pname = "agda-algebras";
       version = "unstable-2026-09-07";
       src = agda-algebras-src;
-      everythingFile = "src/Everything.agda";
       buildInputs = [ pkgs.agdaPackages.standard-library ];
       meta = {
         description = "The Agda Universal Algebra Library, pinned at the benchmark-suite commit";
@@ -318,6 +321,15 @@
       # entering the shell still overrides it, exactly as before.
       _AGDA_ALGEBRAS_SOURCE="live checkout"
       if [ -z "$AGDA_ALGEBRAS_ROOT" ]; then
+        # Deliberately NOT exported (#132 review): the fallback feeds the
+        # library REGISTRATION below, so type-checking sees the store pin in
+        # every shell.  Child processes such as `make` do not inherit it, and
+        # that is the intended boundary — the corpus/metadata lanes record git
+        # provenance (commit, dirty state) that a store path cannot supply, so
+        # they must be pointed at a live checkout explicitly (the Makefile's
+        # AGDA_ALGEBRAS_ROOT default, docs/HowToRun.md §1.3).  Exporting the
+        # user's own AGDA_ALGEBRAS_ROOT before shell entry overrides both, as
+        # before.
         AGDA_ALGEBRAS_ROOT="${agdaAlgebrasPkg}"
         _AGDA_ALGEBRAS_SOURCE="flake pin"
       fi

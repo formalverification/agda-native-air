@@ -102,13 +102,16 @@ nix develop .#backend
 +  `make extract-lib-nix`
 +  `make extract-lib-smoke-nix`
 
-### 1.3.  Registering external Agda libraries (optional)
+### 1.3.  Registering external Agda libraries
 
-Every Agda-equipped shell registers `standard-library` and the repo-local
-`agda-dojang` by default.  To type-check against an external library from a local
-checkout — `agda-algebras`, `agda-categories`, or `TypeTopology` — point the
-matching `*_ROOT` environment variable at the **library root** (the directory that
-contains the `.agda-lib` file) before entering the shell:
+Every Agda-equipped shell registers three libraries by default:
+`standard-library` (Nix-managed), the repo-local `agda-dojang`, and
+`agda-algebras` — the last from the `agda-algebras-src` flake input, a store
+copy pinned at the benchmark-suite commit with prebuilt `.agdai` interfaces
+(pulled from Cachix, so no library build; see `data/benchmarks/README.md`).
+Setting `AGDA_ALGEBRAS_ROOT` before entering the shell overrides the pin with
+a live checkout; `agda-categories` and `TypeTopology` remain opt-in the same
+way:
 
 ```sh
 AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master  nix develop .#backend
@@ -117,16 +120,22 @@ AGDA_TYPETOPOLOGY_ROOT=~/git/TypeTopology            nix develop .#backend
 ```
 
 The shell hook searches each root for a `.agda-lib`, registers what it finds, and
-prints a summary.  Libraries that are not registered show how to enable them:
+prints a summary; unregistered libraries show how to enable them:
 
 ```
    Agda libraries:
      * standard-library (Nix-managed)
      * agda-dojang (repo-local)
-     - agda-algebras: set AGDA_ALGEBRAS_ROOT to enable
+     * agda-algebras (/nix/store/…-agda-algebras-unstable-…; flake pin)
      - agda-categories: set AGDA_CATEGORIES_ROOT to enable
      - TypeTopology: set AGDA_TYPETOPOLOGY_ROOT to enable
 ```
+
+One boundary to know: the pin serves **type-checking**.  The corpus and
+metadata lanes (§10) record git provenance — commit and dirty state — that a
+store path cannot supply, so they keep requiring a live checkout, pointed at
+explicitly via `AGDA_ALGEBRAS_ROOT` (the hook's fallback is deliberately not
+exported to child processes such as `make`).
 
 Once a library is registered (its line changes to a `*` entry), a module that
 imports it type-checks directly — e.g. `agda MyModule.agda` or
