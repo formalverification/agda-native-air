@@ -7,7 +7,7 @@
   *  Purpose
   *  -------
   *  The P2 (#123) live transport test: start the REAL agda-mcp with
-  *  `--corpus` pointing at the committed mini-corpus (eight real rows from
+  *  `--corpus` pointing at the committed mini-corpus (nine real rows from
   *  the agda-stdlib extraction, test/resources/search/corpus-mini.jsonl) and
   *  drive the three search tools through the landed client — the whole
   *  chain the retrieval proposer rides: ServerConfig's corpus flag, the

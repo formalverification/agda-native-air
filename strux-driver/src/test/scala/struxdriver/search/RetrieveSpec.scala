@@ -14,7 +14,7 @@
   *  truncation at the limit), and the lane is a recording fake.  What is
   *  pinned: the statement normaliser, the goal tokeniser, the scorer's
   *  qualified-token reduction, the import-scope rule, both target-exclusion
-  *  rules and their off-switch, the rendering ladder, the two candidate
+  *  rules and their off-switch, the rendering ladder, the three candidate
   *  shapes, ranking determinism, composition with the base proposer, the
   *  per-goal memo, and the truncation stat.
   *
@@ -316,6 +316,25 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
       cfg4.copy(excludeTarget = false)).unsafeRunSync()
     val cands = p.propose(state0, state0.obligations.head, goal).unsafeRunSync()
     cands should contain ("(Data.Nat.Properties.+-comm _ _)")
+  }
+
+  test("propose: a lane-rejected row does not consume a topK slot (#130 review)") {
+    // Three high-ranking ghosts (goal-identical types, zero approximate
+    // arity, so they sort above +-suc) that the lane cannot render at any
+    // ladder rung.  Under the old take-before-resolve order, topK = 2 was
+    // consumed by two ghosts and the pool came back empty; the cut must
+    // instead fall after resolution, so +-suc still arrives.
+    val ghosts = Vector("Data.Nat.Properties.ghost-a", "Data.Nat.Properties.ghost-b",
+                        "Data.Nat.Properties.ghost-c")
+      .map(q => SearchHit(q, "m + n ≡ n + m", "function", "Data.Nat.Properties", hasBody = true))
+    val (proposer, _, _) =
+      freshProposer(cfg = cfg4.copy(topK = 2), rows = (corpusRows ++ ghosts).sortBy(_.prettyQname))
+    val cands = proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    cands should contain ("(+-suc _ _)")
+    val s = proposer.stats.unsafeRunSync()
+    s.proposedLemmas should contain ("+-suc")
+    (s.proposedLemmas should not).contain("Data.Nat.Properties.ghost-a")
+    s.laneRejected should be >= 3
   }
 
   test("propose: the pool is memoised per goal display") {

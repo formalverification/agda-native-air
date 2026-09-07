@@ -240,7 +240,12 @@ object ProofSearchLoop extends IOApp {
                   case p @ ("fixed" | "retrieval") => Right(p)
                   case other                       => Left(s"bad --proposer: $other (fixed|retrieval)")
                 }
-      corpus  = m.get("corpus").map(Paths.get(_))
+      // A relative --corpus is resolved against --project-root, so the server
+      // (which resolves relative paths against ITS cwd) and corpusProvenance
+      // (which opens the path from the sbt process cwd) see one absolute
+      // path instead of two different files (#130 review).
+      rootAbs = Paths.get(root).toAbsolutePath.normalize
+      corpus  = m.get("corpus").map(Paths.get(_)).map(p => if (p.isAbsolute) p else rootAbs.resolve(p).normalize)
       _      <- if (prop == "retrieval" && corpus.isEmpty)
                   Left("--proposer retrieval requires --corpus") else Right(())
       topK   <- intOf(m, "retrieve-k", RetrievalConfig.default.topK, 1)
@@ -254,7 +259,7 @@ object ProofSearchLoop extends IOApp {
       serverBin     = Paths.get(bin),
       agdaFlags     = m.getOrElse("agda-flags", Scaffold.defaultAgdaFlags),
       serverTimeout = tmo,
-      projectRoot   = Paths.get(root).toAbsolutePath.normalize,
+      projectRoot   = rootAbs,
       loop          = LoopConfig(beam, depth, budget, dedup, peek),
       proposerKind  = prop,
       corpus        = corpus,

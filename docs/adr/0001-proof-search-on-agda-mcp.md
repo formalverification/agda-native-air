@@ -104,7 +104,7 @@ The modern form of #112's "report actions are peeks": before spending ~2.6 s jud
 
 What the wire probes established (captures in `strux-driver/src/test/resources/search/`): under-determined metas are ANSWERED, not errored — the lane prints named metas (`sym _` infers `_y_8 ≡ _x_7`) — and bad expressions come back as in-body errors (`NotInScope`, `CannotApply`, `UnequalTerms`) in 1–3 ms.  The filter therefore rejects on a lane error, or when the inferred type cannot textually match the goal display with every meta read as a wildcard — the *same* meta being the *same* wildcard, so `refl`'s `_x_9 ≡ _x_9` is rejected at `m + n ≡ n + m` and kept at `n ≡ n`.  One rendering divergence needed canonicalization: Agda folds closed naturals to numerals in goal displays (`1 ≤ suc n`) but a meta blocks the folding in inferred types (`suc _m_5 ≤ suc _n_6`), so numeral tokens are expanded to `suc` towers before comparison; without this the peek falsely rejects `(s≤s {!!})` and costs a solve.
 
-Measured end to end on M1-5: the same 6 solves with byte-identical scripts; probes 435 → 50 (−88.5 %); batch oracle time 1227 s → 209 s; wall 21.5 min → 4.7 min (4.5×); probe precision 6.7 % → 70 %; and the chain-burners stopped burning (budget-exceeded became honest depth-capped exhaustion).  Two rules keep it sound in spirit: a peek can only ever *skip* a judgement, never substitute for one, and any failure to peek keeps the candidate.  It ships opt-in (`--peek on`) until it re-validates on P2's retrieval candidates, whose types will exercise renderings this suite cannot.
+Measured end to end on M1-5: the same 6 solves with byte-identical scripts; probes 435 → 50 (−88.5 %); batch oracle time 1227 s → 209 s; wall 21.5 min → 4.7 min (4.5×); probe precision 6.7 % → 70 %; and the chain-burners stopped burning (budget-exceeded became honest depth-capped exhaustion).  Two rules keep it sound in spirit: a peek can only ever *skip* a judgement, never substitute for one, and any failure to peek keeps the candidate.  It shipped opt-in (`--peek on`) through P1; P2 performed that re-validation on retrieval candidates (and the peek restored a budget-ordering loss there), so the default is now ON (decision 8).
 
 ## 7.  The P2 retrieval proposer (#123, `Retrieve.scala`)
 
@@ -134,7 +134,7 @@ P1 (issue #113, PR #126; beam 4, depth 6, budget 60):
 | dedup content-only, no peek | identical to baseline, per fixture | 435 | 21.6 min |
 | dedup script, peek on | 6/22, byte-identical scripts | 50 | 4.7 min |
 
-Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (content-only measured identical here and can only start mattering when a proposer emits hole-free compound candidates — re-measure in P2); the peek is a validated cost lever, opt-in for now; and the baseline every later phase must beat is **6/22, at 435 probes without the peek or 50 with it**.
+Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (content-only measured identical here and can only start mattering when a proposer emits hole-free compound candidates — re-measure in P2); the peek is a validated cost lever (opt-in at P1; P2's re-validation flipped it default-ON); and the baseline every later phase must beat is **6/22, at 435 probes without the peek or 50 with it**.
 
 P2 (issue #113, the same knobs, retrieval composed around the fixed space, target exclusion on unless stated):
 

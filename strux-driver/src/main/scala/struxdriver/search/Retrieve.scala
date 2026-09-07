@@ -106,8 +106,10 @@ trait CorpusSearch {
   def dependenciesOf(prettyQname: String): IO[Vector[SearchHit]]
 }
 
-/** Retrieval tunables.  `topK` bounds the LEMMAS proposed per goal (each
-  * contributes up to two candidate shapes); `queryLimit` is the per-query
+/** Retrieval tunables.  `topK` bounds the LEMMAS proposed per goal — each
+  * accepted lemma then contributes an `_`-form, zero or more bounded
+  * saturated forms, and a `{!!}`-refinement form, so the candidate count
+  * per lemma varies (see `shapes`); `queryLimit` is the per-query
   * result cap sent to the server — the server truncates lexicographically at
   * its own default of 20, so the client must ask wide (Data.Nat.Properties
   * alone is ~2000 rows) and rank itself, and a query that returns exactly
@@ -353,27 +355,52 @@ final class RetrievalProposer private (
       goalSet   = gts.toSet
       ranked0   = functions.sortBy(rankKey(goalSet))
       expanded <- if (cfg.expandDeps) expandTop(ranked0, goalSet) else IO.pure(ranked0)
-      top       = expanded.take(cfg.topK)
-      resolved <- top.traverse(resolve).map(_.flatten)
+      resolved <- resolveTopK(expanded)
       _        <- statsRef.update(s => s.copy(proposedLemmas = (s.proposedLemmas ++ resolved.map(_._1)).distinct))
     } yield resolved.flatMap { case (rendered, binders) =>
       shapes(rendered, binders, goal.context.map(_.name))
     }
   }
 
-  /** One-hop dependency expansion of the top-scored lemmas: in-scope function
-    * neighbors join the pool (still subject to exclusion), re-ranked with
-    * everything else before the topK cut.
+  /** Walk the ranked list, resolving renderings through the lane, until
+    * `topK` lemmas have been ACCEPTED or the list is exhausted.  The cut is
+    * taken after resolution, not before: a high-ranked row the ladder cannot
+    * render must not consume a slot, or eight rejections starve the pool
+    * while rank nine resolves (#130 review; the b-sweep ledger showed 18 of
+    * 22 fixtures under-filled this way, e.g. one accepted lemma from 166
+    * available).  Rejections still pay their lane calls and still count in
+    * `laneRejected`.
+    */
+  private def resolveTopK(ranked: Vector[SearchHit]): IO[Vector[(String, Vector[Binder])]] =
+    ranked.foldLeftM(Vector.empty[(String, Vector[Binder])]) { (acc, hit) =>
+      if (acc.size >= cfg.topK) IO.pure(acc)
+      else resolve(hit).map(acc ++ _.toVector)
+    }
+
+  /** One-hop dependency expansion of the top-scored lemmas.  Fresh neighbors
+    * go through the SAME honesty-ledger accounting as initial hits — counted
+    * into `hits`/`inScope`, exclusions NAMED in `excluded`, the non-function
+    * cut counted — so an expansion-only target is reported, never silently
+    * dropped (#130 review); survivors re-rank with everything else before
+    * the topK cut.
     */
   private def expandTop(ranked: Vector[SearchHit], goalSet: Set[String]): IO[Vector[SearchHit]] =
-    ranked.take(3).traverse(h => corpus.dependenciesOf(h.prettyQname)).map { nss =>
-      val extra = nss.flatten
-        .filter(n => scope.importingModuleOf(n.module).isDefined)
-        .filter(n => !cfg.excludeTarget || exclusion.reasonFor(n).isEmpty)
-        .filter(_.defKind == "function")
-      (ranked ++ extra).groupBy(_.prettyQname).toVector.map(_._2.head)
+    for {
+      nss      <- ranked.take(3).traverse(h => corpus.dependenciesOf(h.prettyQname))
+      known     = ranked.map(_.prettyQname).toSet
+      fresh     = nss.flatten.groupBy(_.prettyQname).toVector.map(_._2.head)
+                    .filterNot(h => known.contains(h.prettyQname))
+      inScope   = fresh.filter(h => scope.importingModuleOf(h.module).isDefined)
+      _        <- statsRef.update(s => s.copy(hits = s.hits + fresh.size, inScope = s.inScope + inScope.size))
+      kept     <- if (cfg.excludeTarget) {
+                    val (excluded, keep) = inScope.partitionMap(h =>
+                      exclusion.reasonFor(h).toLeft(h))
+                    statsRef.update(s => s.copy(excluded = (s.excluded ++ excluded).distinct)).as(keep)
+                  } else IO.pure(inScope)
+      functions = kept.filter(_.defKind == "function")
+      _        <- statsRef.update(s => s.copy(nonFunction = s.nonFunction + (kept.size - functions.size)))
+    } yield (ranked ++ functions).groupBy(_.prettyQname).toVector.map(_._2.head)
         .sortBy(rankKey(goalSet))
-    }
 
   /** The total rank: score first, then cheap before expensive (#112's lesson
     * four, on the retrieval pool — approximate arity from the corpus type),
