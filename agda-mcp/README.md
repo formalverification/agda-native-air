@@ -999,6 +999,7 @@ to keep in step with an upstream API.
 ## Related Documents
 
 - [`agda-dojang/README.md`](../agda-dojang/README.md): Action space reference (the macros this server wraps).
+- [`docs/adr/0002-agda-mcp.md`](../docs/adr/0002-agda-mcp.md): The server's design record (every decision, the evidence that earned it, and its open follow-ups); read it before the two notes below.
 - [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md): The interaction lane's design record — the two-lane policy, the wire protocol as observed, lifecycle, and economics (issue #75).
 - [`docs/agda-mcp/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp/agda-mcp-ask-agda-audit.md): The issue-#106 audit — every answer computed from source text, its verdict, and the diagnostics and `checkedFromSource` measurements.
 - [`docs/policy_contract.md`](../docs/policy_contract.md): Policy backend JSON contract (compatible with our tool schemas).

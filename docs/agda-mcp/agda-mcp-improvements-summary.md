@@ -81,6 +81,7 @@ Status is as of 2026-08-20.
 ## Where the details live
 
 +  Issue #68 (tracking): verification results, the full plan, and sequencing rationale.
++  `docs/adr/0002-agda-mcp.md`: the design record distilled from this summary and the notes below, decision by decision, with the Milestone 5 follow-ups named.
 +  `docs/feedback/flrp-agda-mcp-improvements.md`: the field report with the § 7 verification addendum; § 5 is the error corpus the diagnostics fixtures are built from.
 +  `agda-mcp/README.md`: tool-by-tool reference, architecture notes, and the response-field tables.
 +  `docs/agda-mcp/agda-mcp-environment.md`: what the server and its shellHook write where, how the library context is resolved per call, and the operator checklist for pointing a client at one worktree among several.
