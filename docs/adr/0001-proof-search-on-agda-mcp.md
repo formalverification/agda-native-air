@@ -142,16 +142,16 @@ P1 (issue #113, PR #126; beam 4, depth 6, budget 60):
 
 Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (content-only measured identical here and can only start mattering when a proposer emits hole-free compound candidates — re-measure in P2); the peek is a validated cost lever (opt-in at P1; P2's re-validation flipped it default-ON); and the baseline every later phase must beat is **6/22, at 435 probes without the peek or 50 with it**.
 
-P2 (issue #113, the same knobs, retrieval composed around the fixed space, target exclusion on unless stated):
+P2 (issue #113, the same knobs, retrieval composed around the fixed space, target exclusion on unless stated).  Measured twice: first at the initial P2 code, then re-measured after the #130 review fixes changed real pool composition — the topK cut had fallen before lane resolution, so 18 of 22 fixtures had been searching pools of one or two lemmas instead of eight.  The table is the post-fix record (runs `p2fix-{a,b,c,d}`); the review round's wall clocks ran on a loaded machine, so the call counts are the comparable columns:
 
-| configuration | solved | probes | wall |
-|---|---|---|---|
-| A — retrieval, no peek | 5/22 — the P1 set minus prod-mk-pair (budget ordering: its depth-2 chain no longer fits 60 probes behind 40 un-peeked root candidates) | 635 | 30.9 min |
-| B — retrieval, peek on | **6/22 — the P1 set, identical scripts** | 113 | 8.1 min |
-| C — A with content-only dedup | identical to A, per fixture; zero skips either way | 635 | 30.9 min |
-| D — A with exclusion OFF (labeled control) | 10/22 — the honest five plus all five admissible targets, each a one-shot saturated application | 514 | 25.8 min |
+| configuration | solved | probes |
+|---|---|---|
+| A — retrieval, no peek | 4/22 — the P1 set minus prod-mk-pair and zero-lt-suc (budget ordering: 17 of 22 fixtures now exhaust the 60-probe budget against full eight-lemma pools) | 1,064 |
+| B — retrieval, peek on | **6/22 — the P1 set, identical scripts** | 526 |
+| C — A with content-only dedup | identical to A, per fixture, probe for probe; zero skips either way | 1,064 |
+| D — A with exclusion OFF (labeled control) | 9/22 — A's honest four plus all five admissible targets, each a one-shot saturated application | 943 |
 
-The reading: **the suite's term-mode ceiling binds any term-mode proposer**.  Retrieval widened the legal pool from `using`-list handfuls to thousands of in-scope rows (plus-comm: 4,012 across its two goals) and honestly exhausted 15 of 16 unsolved fixtures under the peek; the control shows the retrieve→rank→apply→commit chain committing every needle the exclusion had removed.  The split re-measured with a real corpus in the loop: batch oracle 1,778 s versus retrieval 5.6 s plus proposal 3.6 s on sweep A — P0's conclusion stands.  The economics to beat from here are sweep B's: 6/22 at 113 probes, 8.1 min.
+The reading survives the re-measurement and sharpens: **the suite's term-mode ceiling binds any term-mode proposer**.  Retrieval widened the legal pool from `using`-list handfuls to thousands of in-scope rows and — with the pools genuinely full — still adds zero solves under exclusion, while the control commits every needle the exclusion had removed (all five, both rounds).  The peek's value grows with pool width: pre-fix it recovered one budget-ordering loss, post-fix two (A→B), skipping 3,734 of 4,262 judgements.  The strengthened lane-form statement exclusion fired zero times in every run — the stdlib corpus holds no in-scope statement alias of any target — so its regression test, not a sweep, pins that mechanism.  The oracle-dominance split holds at post-fix scale: on sweep A, batch oracle 3,019 s against retrieval 7.9 s plus knowledge 66.5 s.  The economics to beat from here are sweep B's: 6/22 at 526 probes.
 
 ## 10.  Where it is going
 
