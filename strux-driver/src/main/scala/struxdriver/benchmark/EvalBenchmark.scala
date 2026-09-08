@@ -445,6 +445,13 @@ object EvalBenchmark extends IOApp {
         indexResult <- IndexParser.parseIndex(config.indexPath)
         (allObligations, parseErrors) = indexResult
         _ <- parseErrors.traverse_(e => IO.println(s"  WARN: $e"))
+        // A benchmark index must parse in full: a malformed row that is
+        // merely warned about would shrink the suite silently, and a report
+        // could pass after dropping an indexed row (#132 review, round 2).
+        _ <- IO.raiseWhen(parseErrors.nonEmpty)(
+               new RuntimeException(
+                 s"${parseErrors.size} index row(s) failed to parse; fix the index rather than running a shrunken suite")
+             )
         _ <- IO.raiseWhen(allObligations.isEmpty)(
                new RuntimeException("No obligations parsed from index")
              )

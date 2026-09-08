@@ -49,7 +49,7 @@ make eval-proof-completion-smoke
 - [10.  Smoke, audit, probe-all](#10--smoke-audit-probe-all)
 - [11.  Where outputs land](#11--where-outputs-land)
 - [12.  Debugging playbook](#12--debugging-playbook)
-- [13.  agda-mcp: AI-assisted proof development ](#13--agda-mcp--ai-assisted-proof-development)
+- [13.  agda-mcp: AI-assisted proof development ](#13--agda-mcp-ai-assisted-proof-development)
 - [14.  Known good sequences](#14--known-good-sequences)
 - [15.  Cleaning](#15--cleaning)
 
@@ -108,7 +108,7 @@ Every Agda-equipped shell registers three libraries by default:
 `standard-library` (Nix-managed), the repo-local `agda-dojang`, and
 `agda-algebras`, the last from the `agda-algebras-src` flake input, a store
 copy pinned at the benchmark-suite commit with prebuilt `.agdai` interfaces
-(pulled from Cachix, so no library build; see `data/benchmarks/README.md`).
+(pulled from the project Cachix cache, which the flake's `nixConfig` registers as a substituter — Nix asks once to trust it — so no library build; see `data/benchmarks/README.md`).
 Setting `AGDA_ALGEBRAS_ROOT` before entering the shell overrides the pin with
 a live checkout; `agda-categories` and `TypeTopology` remain opt-in the same
 way:
@@ -1006,7 +1006,7 @@ shell — not your project's shell.  (`run-server.sh` does `nix develop <agda-na
 not the server.)  So `-l agda-algebras` has to resolve in *this* repo's `agda/libraries`,
 and setting `AGDA_ALGEBRAS_ROOT` is exactly what puts it there: `run-server.sh` passes the
 variable into the `.#backend` shell, whose hook appends your library's `.agda-lib` to
-`agda/libraries` (see [§1.3](#13--registering-external-agda-libraries-optional)).  This is
+`agda/libraries` (see [§1.3](#13--registering-external-agda-libraries)).  This is
 verified to propagate through `run-server.sh`; when registration seems not to happen it is
 almost always one of two things:
 
@@ -1022,7 +1022,7 @@ almost always one of two things:
 Do **not** hand-edit `agda/libraries` to work around this: the hook regenerates that file
 on every shell entry, so a manual line is wiped the next time the server starts.
 `AGDA_ALGEBRAS_ROOT` is the durable fix.  For a different library, set the matching
-`*_ROOT` variable and `-l <name>`; see [§1.3](#13--registering-external-agda-libraries-optional)
+`*_ROOT` variable and `-l <name>`; see [§1.3](#13--registering-external-agda-libraries)
 for the supported set.
 
 **You cannot get a silent answer about the wrong worktree.**  A stale `AGDA_ALGEBRAS_ROOT`

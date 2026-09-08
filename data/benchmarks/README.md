@@ -168,9 +168,10 @@ two runs match.
 
 The library is Nix-managed and its flake pins `ualib/agda-algebras` at the
 benchmark commit as the `agda-algebras-src` input and builds it once into a store
-path with prebuilt `.agdai` interfaces (Cachix-cached), which every Agda-capable
-shell registers automatically; CI and fresh machines need no checkout and no
-library build.  A developer working against a live checkout still overrides it the
+path with prebuilt `.agdai` interfaces, published to the project Cachix cache;
+the flake's `nixConfig` registers that substituter, so CI and fresh machines
+(after accepting the cache on first use) pull rather than build, and need no
+checkout.  A developer working against a live checkout still overrides it the
 old way:
 
 ```sh

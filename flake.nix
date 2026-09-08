@@ -86,6 +86,15 @@
 {
   description = "agda-native-air: reproducible dev shells for AgdaDojang + Python/Scala (+ optional GPU)";
 
+  # The project binary cache: prebuilt agda-algebras interfaces, the Agda
+  # toolchain, and friends.  Registering it here means a fresh machine PULLS
+  # instead of building (Nix prompts once to trust the substituter); CI
+  # configures the same cache via cachix-action (#132 review).
+  nixConfig = {
+    extra-substituters = [ "https://formalverification.cachix.org" ];
+    extra-trusted-public-keys = [ "formalverification.cachix.org-1:KG/AJuuli2F4/bA56rUYC9V8ZE/Zw6iZjxJEf40cQOo=" ];
+  };
+
   # ---- Inputs ---------------------------------------------------------------
   # Keep general tools on stable.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
@@ -321,6 +330,11 @@
       # entering the shell still overrides it, exactly as before.
       _AGDA_ALGEBRAS_SOURCE="live checkout"
       if [ -z "$AGDA_ALGEBRAS_ROOT" ]; then
+        # If the parent exported the variable EMPTY, a plain assignment would
+        # keep the export attribute and leak the store path to child `make`
+        # processes after all (#132 review); unset first, so the fallback is
+        # shell-local whatever the parent did.
+        unset AGDA_ALGEBRAS_ROOT
         # Deliberately NOT exported (#132 review): the fallback feeds the
         # library REGISTRATION below, so type-checking sees the store pin in
         # every shell.  Child processes such as `make` do not inherit it, and

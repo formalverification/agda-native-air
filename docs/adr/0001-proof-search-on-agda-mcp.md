@@ -40,7 +40,7 @@ it is going.
 
 **Why this shape**?
 
-It is comes down to one measured fact: **the oracle is the entire cost**.
+It comes down to one measured fact: **the oracle is the entire cost**.
 Each `fill_hole` judgement spawns a batch Agda process that spends ~2.6 seconds
 loading the standard library's interfaces before it checks anything; everything
 else the searcher does (building candidates, ranking states, bookkeeping) costs
