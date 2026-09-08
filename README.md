@@ -117,6 +117,7 @@ The following is currently under development:
 
 For details, see
 
++  [`docs/README.md`](docs/README.md): the index of `docs/`, what lives where and a reading order
 +  [`docs/MANIFESTO.md`](docs/MANIFESTO.md): motivation and vision for the project
 +  [`docs/PLAN.md`](docs/PLAN.md): project plan
 +  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md): living project roadmap (milestones and issues, synced with GitHub)
