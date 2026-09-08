@@ -58,7 +58,8 @@ final case class ServerConfig(
   agdaFlags:  String,
   timeoutSec: Int,
   cwd:        Path,
-  stderrLog:  Path
+  stderrLog:  Path,
+  corpus:     Option[Path] = None // --corpus PATH registers the three search tools (issue #123)
 ) {
   /** Outer client bound per call: the server's own Agda bound plus slack for
     * everything around it, so the client outlives any call the server itself
@@ -207,7 +208,7 @@ object McpClient {
         cfg.bin.toString,
         "--agda-flags", cfg.agdaFlags,
         "--timeout", cfg.timeoutSec.toString
-      )
+      ) ++ cfg.corpus.toList.flatMap(p => List("--corpus", p.toString))
       val pb = new ProcessBuilder(cmd.asJava)
       pb.directory(cfg.cwd.toFile)
       pb.redirectError(ProcessBuilder.Redirect.to(new File(cfg.stderrLog.toString)))

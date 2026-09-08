@@ -665,12 +665,12 @@ Default library: `LIB_NAME=agda-algebras`
   * `data/agda-algebras/raw/run-manifest.json`: the driver's record: run
     configuration, a coverage summary, and one entry per module attempted
     (`ok`, `rows`, `seconds`, `validateErrors`)
-* Assembled corpus (from `make corpus`):
+* Assembled corpus (from `make corpus`; `$(CORPUS_VERSION)` defaults to `v0.1`):
 
-  * `data/corpora/agda-algebras/v0/corpus.jsonl` + `corpus.jsonl.gz`
-  * `data/corpora/agda-algebras/v0/coverage.json`
-  * `data/corpora/agda-algebras/v0/provenance.json`
-  * `data/corpora/agda-algebras/v0/stats.json` + `stats.md`
+  * `data/corpora/agda-algebras/v0.1/corpus.jsonl` + `corpus.jsonl.gz`
+  * `data/corpora/agda-algebras/v0.1/coverage.json`
+  * `data/corpora/agda-algebras/v0.1/provenance.json`
+  * `data/corpora/agda-algebras/v0.1/stats.json` + `stats.md`
 
 All of the above is gitignored; the committed description of a published corpus
 is its dataset card under `docs/corpora/`.

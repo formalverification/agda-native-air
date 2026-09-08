@@ -82,7 +82,7 @@ final class LoopIntegrationSpec extends AnyFunSuite with Matchers {
         _       = chk.body.success shouldBe false // an open hole is never green
         content <- IO.blocking(new String(Files.readAllBytes(fixture), StandardCharsets.UTF_8))
         s0      = SearchState.initial(content, chk.body.holes.map(WireHole.toObligation))
-        result <- BeamLoop.run(oracle, proposer, LoopConfig.default,
+        result <- BeamLoop.run(oracle, proposer, LoopConfig.default.copy(peek = false), // the P1-pinned no-peek probe counts
                     (ph, rk) => CallCtx(1, "two-obligations", ph, rk), fixture, s0, BeamLoop.Hooks.none)
       } yield result
     }

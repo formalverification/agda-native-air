@@ -152,9 +152,9 @@ graph TD
 Not all work fits the `[MN-k]` planning grid.  Issues filed in response to field experience carry no `[MN-k]` identifier, so the engine cannot render them into the generated regions below; they are tracked directly on GitHub and summarized here by their tracking issues.
 
 +  The agda-mcp field-test hardening wave, tracked by [#68](https://github.com/formalverification/agda-native-air/issues/68): trust fixes (#69–#73), reach (#74–#77) — including the live scope/type/definition queries and the persistent interaction lane they ride (#75) and get_goal re-sourced through that lane (#108) — ergonomics (#78, #79), the path-resolution and missing-file fix the #83 field test surfaced (#101), the module name `get_goal` reports (#100), the ask-Agda audit that turned that fix's lesson into the server's stated rule (#106, with probe-backed follow-ups #114 and #115), and its measurement and publication companions (#83, #85, #86).  See `docs/agda-mcp-improvements-summary.md` for an executive summary and `docs/feedback/flrp-agda-mcp-improvements.md` for the field report that motivated it.
-+  Proof search on agda-mcp, tracked by [#113](https://github.com/formalverification/agda-native-air/issues/113): a native obligation-set search loop over the `fill_hole` / `get_goal` oracle, opened when #112 archived the dead v0.3 `search.py` so its four lessons survive as tests and types rather than history.  P0 — the conjunctive state model, the single-step harness over M1-5, and the oracle-vs-proposal timing split that settles the host-language fork — is [#119](https://github.com/formalverification/agda-native-air/issues/119); P1 — the beam loop over that state model with a fixed action space, its budgets, the `type_of`-peek experiment, and the per-tier M1-5 baseline every later phase has to beat — is [#122](https://github.com/formalverification/agda-native-air/issues/122).
++  Proof search on agda-mcp, tracked by [#113](https://github.com/formalverification/agda-native-air/issues/113): a native obligation-set search loop over the `fill_hole` / `get_goal` oracle, opened when #112 archived the dead v0.3 `search.py` so its four lessons survive as tests and types rather than history.  P0 — the conjunctive state model, the single-step harness over M1-5, and the oracle-vs-proposal timing split that settles the host-language fork — is [#119](https://github.com/formalverification/agda-native-air/issues/119); P1 — the beam loop over that state model with a fixed action space, its budgets, the `type_of`-peek experiment, and the per-tier M1-5 baseline every later phase has to beat — is [#122](https://github.com/formalverification/agda-native-air/issues/122); P2 — proposals from retrieval over a pinned agda-stdlib corpus behind the P1 proposer seam, with the target-exclusion policy, the labeled mechanism control, and the peek and dedup handoffs re-measured — is [#123](https://github.com/formalverification/agda-native-air/issues/123).
 +  In-place checking of library-embedded modules (#66, #67), an earlier field-driven fix in the same spirit.
-+  Agda-Nix library management follow-ons (#54, #55) and the `makeOverlay` optimization (#43).
++  Agda-Nix library management follow-ons (#54, #55), flake shell-hygiene fixes (#96), and the `makeOverlay` optimization (#43).
 
 ---
 
@@ -883,7 +883,7 @@ See PR #45 for details.
 
 ---
 
-### Issue M1-5: Curate baseline benchmark — 20 to 50 proof obligations from `agda-algebras` + `agda-stdlib` (#13, closed)
+### Issue M1-5: Curate baseline benchmark: 20 to 50 proof obligations from `agda-algebras` + `agda-stdlib` (#13, closed)
 
 **Labels:** `agda-strux`, `eval`
 
@@ -1160,17 +1160,15 @@ development.  This is the second publication target.
 
 <!-- BEGIN GENERATED: milestone-3 -->
 
-### Issue M3-1: AI-assisted extension of `agda-algebras` — case study (#23)
+### Issue M3-1: AI-assisted extension of `agda-algebras` (case study) (#23)
 
 **Labels:** `eval`, `research`
 
-#### Description
+## Description
 
-Use the full system (agda-mcp + retrieval + frontier agent) to formalize and
-streamline results in universal algebra.  Focus on areas relevant to the FLRP
-or the active mathematical agenda.
+Use the full system (agda-mcp + retrieval + frontier agent) to formalize and streamline results in universal algebra.  Focus on areas relevant to the FLRP or the active mathematical agenda.
 
-#### Tasks
+### Tasks
 
 - [ ] Identify 3–5 candidate results for AI-assisted formalization
 - [ ] Attempt each with the agent, recording the full interaction
@@ -1178,7 +1176,7 @@ or the active mathematical agenda.
 - [ ] Commit successful formalizations to `agda-algebras` (or a fork)
 - [ ] Write up the experience as a case study
 
-#### Acceptance criteria
+### Acceptance criteria
 
 - [ ] At least 2 non-trivial results are formalized with AI assistance
 - [ ] Detailed interaction logs exist for each attempt
