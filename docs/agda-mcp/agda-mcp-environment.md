@@ -1,4 +1,4 @@
-<!-- File: agda-native-air/docs/agda-mcp-environment.md -->
+<!-- File: agda-native-air/docs/agda-mcp/agda-mcp-environment.md -->
 
 # agda-mcp: what the server writes, and which tree it checks
 
@@ -8,7 +8,7 @@ Short answer: the MCP setup created it, by way of the flake's shellHook, and it 
 
 ## 1.  Reproduction
 
-The MCP client launches the server through [`scripts/run-server.sh`](../scripts/run-server.sh), which enters `nix develop .#backend`.  `nix develop` runs the shellHook in the **caller's working directory**, and an MCP client spawns its servers with its own project as the working directory.  The hook then did this:
+The MCP client launches the server through [`scripts/run-server.sh`](../../scripts/run-server.sh), which enters `nix develop .#backend`.  `nix develop` runs the shellHook in the **caller's working directory**, and an MCP client spawns its servers with its own project as the working directory.  The hook then did this:
 
 ```sh
 ROOT="$PWD"
@@ -82,9 +82,9 @@ Two further environment facts an operator needs.
 
 Before any of that, a prior question the server used to answer silently: **which file did you name?**  A relative `filePath` is resolved against the *server's* working directory, because that is the only directory the server knows — it is a separate process and is never told where its client stands — and `scripts/run-server.sh` pins that directory to this repository.  A relative path that really does name a file there is checked, which is what keeps the in-repo client working; one that does not is refused with a `pathError` object naming the path as resolved, the working directory it was resolved against, and the rule (issue #101).  Guessing instead — trying the path under each registered library root — was rejected for the reason this whole section exists: it would sometimes answer green about a tree nobody named.
 
-`agda/libraries` is shared, mutable, process-global state: the hook rewrites it on **every** shell entry from whatever `AGDA_ALGEBRAS_ROOT` (or `AGDA_CATEGORIES_ROOT`, …) is in effect at that moment.  With one worktree per branch — the `ualib/agda-algebras` workflow — a second shell entry elsewhere silently repoints the registry a long-running server is still reading.  That is the hazard § 3.6 of [the field report](feedback/flrp-agda-mcp-improvements.md) describes: not a crash, but a green answer about a tree nobody asked about.
+`agda/libraries` is shared, mutable, process-global state: the hook rewrites it on **every** shell entry from whatever `AGDA_ALGEBRAS_ROOT` (or `AGDA_CATEGORIES_ROOT`, …) is in effect at that moment.  With one worktree per branch — the `ualib/agda-algebras` workflow — a second shell entry elsewhere silently repoints the registry a long-running server is still reading.  That is the hazard § 3.6 of [the field report](../feedback/flrp-agda-mcp-improvements.md) describes: not a crash, but a green answer about a tree nobody asked about.
 
-The server now resolves the library context per call, in [`agda-mcp/src/AgdaMCP/Project.hs`](../agda-mcp/src/AgdaMCP/Project.hs):
+The server now resolves the library context per call, in [`agda-mcp/src/AgdaMCP/Project.hs`](../../agda-mcp/src/AgdaMCP/Project.hs):
 
 1.  Walk up from the requested file to the nearest `*.agda-lib`, stopping at a repository boundary (a directory holding `.git`) so the search cannot wander into an unrelated checkout above the project.
 2.  Read the registry `agda` will actually use — the `--library-file` from the server's flags, else `$AGDA_DIR/libraries`, else `~/.agda/libraries` — **fresh on every call**, because a registry snapshotted at startup is not necessarily the one the next call will read.

@@ -116,7 +116,7 @@ This is the minimum tooling required for an agent to do interactive proof develo
 
 ### Live scope, type, and definition queries (issue #75)
 
-These answer read-only questions from a persistent `agda --interaction-json` child kept per project root — the second lane of the server, designed in [`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md).  The child holds one current file at a time, re-loaded only when it changes (or when the client passes `reload: true`); the first question about a file costs one load, every further consecutive question about it is milliseconds, and switching files under a root re-loads the switched-to file.  They inform and never decide a build verdict: interaction-mode Agda is tolerant (it loads files with open holes), so `success`/`verdict` remain exclusively the batch tools' fields, and an Agda-level negative — the file does not load, the expression does not typecheck, the module is not in scope — arrives *in band* as an `error: {stage, code?, message}` object, because for a check-a-term-without-committing tool the negative answer is a product.
+These answer read-only questions from a persistent `agda --interaction-json` child kept per project root — the second lane of the server, designed in [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md).  The child holds one current file at a time, re-loaded only when it changes (or when the client passes `reload: true`); the first question about a file costs one load, every further consecutive question about it is milliseconds, and switching files under a root re-loads the switched-to file.  They inform and never decide a build verdict: interaction-mode Agda is tolerant (it loads files with open holes), so `success`/`verdict` remain exclusively the batch tools' fields, and an Agda-level negative — the file does not load, the expression does not typecheck, the module is not in scope — arrives *in band* as an `error: {stage, code?, message}` object, because for a check-a-term-without-committing tool the negative answer is a product.
 
 | Tool | Description |
 |------|-------------|
@@ -168,7 +168,7 @@ Every proof-state response — success, timeout, or refusal — carries three ke
 Two properties are contractual, not incidental.
 
 +  **`success` is a function of the exit code alone**.  Never of the diagnostics text.  A change in Agda's message format can empty the `diagnostics` list (e.g., the position-parsing drift that #74 fixed) but it cannot turn a failing build green.  The test suite pins this with a stand-in binary that exits non-zero while printing nothing an error parser could latch onto.
-+  **A wrong tree is an error, not a wrong answer**.  If the requested file belongs to a different checkout of a library this server has registered elsewhere, the call fails with a `rootMismatch` object naming both roots, *before* `agda` is spawned and before any in-place patching.  The one limit: that comparison is against the registry, so a configured `--library-file` that does not exist leaves nothing to compare against, which the response reports as `project.librariesFileMissing` rather than leaving you to infer it.  See [`docs/agda-mcp-environment.md`](../docs/agda-mcp-environment.md) for the resolution rules and the operator checklist.
++  **A wrong tree is an error, not a wrong answer**.  If the requested file belongs to a different checkout of a library this server has registered elsewhere, the call fails with a `rootMismatch` object naming both roots, *before* `agda` is spawned and before any in-place patching.  The one limit: that comparison is against the registry, so a configured `--library-file` that does not exist leaves nothing to compare against, which the response reports as `project.librariesFileMissing` rather than leaving you to infer it.  See [`docs/agda-mcp/agda-mcp-environment.md`](../docs/agda-mcp/agda-mcp-environment.md) for the resolution rules and the operator checklist.
 
 There is no `strict` option to opt into: this server shells out to batch `agda` per call, so unsolved metavariables, unsolved constraints, and open holes have always made it red.  What was missing was saying so.
 
@@ -231,7 +231,7 @@ The regression suite under `test/resources/diagnostics/` has one fixture per err
 
 ### Live queries over the interaction lane (issue #75)
 
-The five query tools of the Tool Surface section share one implementation spine (`AgdaMCP.Tools.LiveQueries` over `AgdaMCP.Interaction`): resolve and read the requested path exactly as the batch tools do (issue #101), resolve the library context and refuse a wrong-checkout call (issue #76), then ask the root's persistent `agda --interaction-json` child, loading the file with the same effective flag list a batch check would run with — so both lanes resolve one file against one tree by construction.  The wire protocol, its probed gotchas, the process lifecycle (per-root children, evidence-gated re-loads, the #77 kill ladder on a hung command, idle reaping, crash restart), and the measured economics all live in [`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md).
+The five query tools of the Tool Surface section share one implementation spine (`AgdaMCP.Tools.LiveQueries` over `AgdaMCP.Interaction`): resolve and read the requested path exactly as the batch tools do (issue #101), resolve the library context and refuse a wrong-checkout call (issue #76), then ask the root's persistent `agda --interaction-json` child, loading the file with the same effective flag list a batch check would run with — so both lanes resolve one file against one tree by construction.  The wire protocol, its probed gotchas, the process lifecycle (per-root children, evidence-gated re-loads, the #77 kill ladder on a hung command, idle reaping, crash restart), and the measured economics all live in [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md).
 
 Every response carries the lane's own echo alongside the usual `command`/`project` pair: `lane {root, pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm}`, where `load` says why this call did or did not re-load (`reused`/`first`/`switch`/`changed`/`retry`) and `iotcm` is the exact wire lines sent, so a call can be replayed by hand.  `checkedFromSource` means on this lane what it means in the batch tools, read from the load's own progress lines: `false` for a reused load (no load ran, so nothing was checked), and absent when its evidence could not arrive — a per-load argv carrying `--trace-imports=0`, which silences those lines (issue #114), or a load that failed before Agda announced the file, which establishes no interface reuse either.  Process-level failures (spawn, timeout, crash) are structured `isError` payloads naming the event, root, wire lines, and the child's last stderr lines — never a bare `-32603` (issue #101's rule).
 
@@ -916,7 +916,7 @@ commands, serving the five read-only query tools.  It delivers the persistent
 state and millisecond warm latency the library plan promises, for queries only
 — verdicts stay with batch `agda`, whose tolerance rules are the ones a build
 enforces.  Protocol, lifecycle, and measurements:
-[`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md).
+[`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md).
 
 ### Ask Agda rather than re-derive (issue #106)
 
@@ -949,7 +949,7 @@ the declared-name scan as the `<|>` fallback (PRs 105 and 110).
 The audit that applied this rule to every derived answer in the server —
 verdicts, the issues that delegated each one, and the measurements for
 diagnostics and `checkedFromSource` — is
-[`docs/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp-ask-agda-audit.md).
+[`docs/agda-mcp/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp/agda-mcp-ask-agda-audit.md).
 Two of its conclusions matter when writing new code: project resolution
 (`AgdaMCP.Project`) stays local because no Agda query exists for it, by
 measurement rather than oversight; and Agda's *silence* is weaker evidence
@@ -999,8 +999,8 @@ to keep in step with an upstream API.
 ## Related Documents
 
 - [`agda-dojang/README.md`](../agda-dojang/README.md): Action space reference (the macros this server wraps).
-- [`docs/agda-mcp-interaction-lane.md`](../docs/agda-mcp-interaction-lane.md): The interaction lane's design record — the two-lane policy, the wire protocol as observed, lifecycle, and economics (issue #75).
-- [`docs/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp-ask-agda-audit.md): The issue-#106 audit — every answer computed from source text, its verdict, and the diagnostics and `checkedFromSource` measurements.
+- [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md): The interaction lane's design record — the two-lane policy, the wire protocol as observed, lifecycle, and economics (issue #75).
+- [`docs/agda-mcp/agda-mcp-ask-agda-audit.md`](../docs/agda-mcp/agda-mcp-ask-agda-audit.md): The issue-#106 audit — every answer computed from source text, its verdict, and the diagnostics and `checkedFromSource` measurements.
 - [`docs/policy_contract.md`](../docs/policy_contract.md): Policy backend JSON contract (compatible with our tool schemas).
 - [`docs/architecture.md`](../docs/architecture.md): System architecture overview.
 

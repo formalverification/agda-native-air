@@ -167,7 +167,7 @@ maxMessageChars = 2000
 -- The one payload of the § 5 corpus batch prose cannot deliver: Agda names its
 -- unsolved metas by location and never prints their types, while a load on the
 -- interaction lane lists each meta with its name, type, and range (measured in
--- docs/agda-mcp-ask-agda-audit.md § 3).  The caller supplies them from a warm
+-- docs/agda-mcp/agda-mcp-ask-agda-audit.md § 3).  The caller supplies them from a warm
 -- lane's stored load and nothing else — never by asking a lane anything, so no
 -- batch call pays a lane cost and no verdict is touched.  With an empty list
 -- this is the identity, which is what makes a cold or stale lane's response

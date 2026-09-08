@@ -106,7 +106,7 @@ MCP tool interface.
    when a corpus is supplied).  Verdict-producing tools shell out to the `agda`
    binary once per call; the live queries are answered by a persistent
    `agda --interaction-json` child per project root (issue #75,
-   `docs/agda-mcp-interaction-lane.md`); an Agda-as-a-library API is future work.
+   `docs/agda-mcp/agda-mcp-interaction-lane.md`); an Agda-as-a-library API is future work.
 
 ### Interaction — `agda-dojang`
 

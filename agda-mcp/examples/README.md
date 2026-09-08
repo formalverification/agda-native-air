@@ -91,7 +91,7 @@ tree and reporting success.  Every response also carries a `project` block namin
 the tree it checked, so you can confirm this without triggering the failure.
 
 Copy the template into each worktree separately and set `AGDA_ALGEBRAS_ROOT` to
-that worktree.  See [`docs/agda-mcp-environment.md`](../../docs/agda-mcp-environment.md)
+that worktree.  See [`docs/agda-mcp/agda-mcp-environment.md`](../../docs/agda-mcp/agda-mcp-environment.md)
 for the resolution rules and for what the server writes where.
 
 ## `check_project` on an external project

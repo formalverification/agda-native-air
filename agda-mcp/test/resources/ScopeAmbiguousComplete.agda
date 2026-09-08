@@ -5,7 +5,7 @@
 -- Description:
 --   The hole-free twin of ScopeAmbiguous.agda.  With no interaction point, the
 --   module completes on load and its toplevel scope no longer carries the names
---   the two opens brought in (docs/agda-mcp-interaction-lane.md § 2.6), so a
+--   the two opens brought in (docs/agda-mcp/agda-mcp-interaction-lane.md § 2.6), so a
 --   WhyInScope on `amb` answers "not in scope" and resolve_name must recover
 --   through Agda's own did-you-mean suggestions, re-resolving each suggested
 --   qualified spelling for its full provenance chain, which the completed scope

@@ -15,7 +15,7 @@
 --   The trailing hole is load-bearing: a file with no interaction points
 --   is completed on load, and its completed top-level scope no longer
 --   carries names brought in by opening file-local modules (probed under
---   Agda 2.8.0; see docs/agda-mcp-interaction-lane.md).  The open goal
+--   Agda 2.8.0; see docs/agda-mcp/agda-mcp-interaction-lane.md).  The open goal
 --   keeps the inside scope live, which is also the field shape: the ≈sym
 --   ambiguity was met mid-proof, holes open.
 module ScopeAmbiguous where
