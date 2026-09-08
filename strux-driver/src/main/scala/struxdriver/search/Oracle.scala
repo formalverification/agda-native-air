@@ -192,6 +192,35 @@ final class Oracle private (
     }
   }
 
+  /** The corpus search tools (issue #123): pure in-memory lookups on the
+    * server's loaded corpus, ledgered under the "retrieval" phase — ms-scale,
+    * but P2 is the first proposer whose proposal time can be material, so
+    * they are measured, not assumed.  A reply-level failure RAISES rather
+    * than degrading: these tools exist only when the server was started with
+    * `--corpus`, so a failure means broken run configuration, not a bad
+    * candidate — the harness reports it as the fixture's anomaly.
+    */
+  def searchByName(ctx: CallCtx, pattern: String, limit: Int): IO[Vector[SearchHit]] =
+    corpusCall[Vector[SearchHit]](ctx, "search_by_name",
+      Json.obj("pattern" -> pattern.asJson, "limit" -> limit.asJson))
+
+  def searchByType(ctx: CallCtx, pattern: String, limit: Int): IO[Vector[SearchHit]] =
+    corpusCall[Vector[SearchHit]](ctx, "search_by_type",
+      Json.obj("pattern" -> pattern.asJson, "limit" -> limit.asJson))
+
+  def dependenciesOf(ctx: CallCtx, prettyQname: String): IO[Vector[SearchHit]] =
+    corpusCall[DependenciesBody](ctx, "get_dependencies",
+      Json.obj("name" -> prettyQname.asJson, "expand" -> true.asJson)).map(_.neighbors)
+
+  private def corpusCall[A: io.circe.Decoder](ctx: CallCtx, tool: String, args: Json): IO[A] =
+    for {
+      timed <- client.callTool(tool, args)
+      _     <- IO.raiseWhen(timed.value.isError)(new RuntimeException(
+                 s"$tool failed (is the server running with --corpus?): ${timed.value.text.take(400)}"))
+      body  <- IO.fromEither(timed.value.decodeAs[A].leftMap(new RuntimeException(_)))
+      _     <- record(ctx, timed, None, None)
+    } yield body
+
   /** The candidateRank / rc pair the eval-schema rows want, without re-parsing
     * at the call site: fill_hole's verdict exit code when the reply had one.
     */

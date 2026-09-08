@@ -317,6 +317,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  extract-lib extract-lib-nix extract-lib-smoke extract-lib-smoke-nix \
                  extract-algebras-backend extract-algebras agda-algebras-metadata metadata \
                  corpus corpus-nix corpus-assemble corpus-stats corpus-mcp-smoke \
+                 corpus-stdlib corpus-stdlib-nix \
                  test-scripts-python \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
                  agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-serve agda-mcp-clean \
@@ -425,6 +426,7 @@ help:
 	@echo "  make corpus-assemble             - Merge per-module JSONL; write coverage.json + provenance.json"
 	@echo "  make corpus-stats                - Summary statistics -> stats.json + stats.md"
 	@echo "  make corpus-mcp-smoke            - Drive agda-mcp's search tools against the assembled corpus"
+	@echo "  make corpus-stdlib / -nix        - Extract + package the pinned Nix-store agda-stdlib corpus (issue 123)"
 	@echo "  make test-scripts-python         - pytest scripts/python/tests"
 	@echo "  make etl-test                    - Run all Scala ETL tests (ml-pipeline/etl)"
 	@echo "  make etl-test-preprocess-agda    - Run ETL smoke test (etl.PreprocessAgdaSpec)"
@@ -443,8 +445,10 @@ help:
 	@echo "  make proof-search-single-step    - Proof-search P0: k stub candidates vs one M1-5 obligation (PROOF_SEARCH_ID)"
 	@echo "  make proof-search-split          - Proof-search P0: full M1-5 sweep + oracle-vs-proposal timing split (issue 113)"
 	@echo "  make proof-search-it             - Proof-search P0: live two-obligation regression vs the real agda-mcp"
-	@echo "  make proof-search-loop           - Proof-search P1: M1-5 beam search, per-tier solve counts (issue 122)"
+	@echo "  make proof-search-loop           - Proof-search P1/P2: M1-5 beam search, per-tier solve counts (issues 122/123)"
+	@echo "                                     P2 knobs: PROOF_SEARCH_PROPOSER=retrieval PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RETRIEVE_K=8 PROOF_SEARCH_EXCLUDE=on"
 	@echo "  make proof-search-loop-it        - Proof-search P1: live full-search regression vs the real agda-mcp"
+	@echo "  make proof-search-retrieval-it   - Proof-search P2: live corpus-tool transport test (issue 123)"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -808,7 +812,12 @@ metadata: agda-algebras-metadata # alias
 #
 # Main target: agda-json backend build
 # assumes tools available, but will still build backend via nix
-extract-lib: _ensure-dirs _check-sbt _check-spark build-agda-json agda-algebras-metadata
+# The metadata prerequisite is substitutable: the agda-algebras lane scans its
+# checkout for the module list and DOT graph, while a lane that supplies its
+# own LIB_MODULES_FILE (corpus-stdlib) passes EXTRACT_LIB_METADATA_DEP= to
+# skip a scan of the wrong library.
+EXTRACT_LIB_METADATA_DEP ?= agda-algebras-metadata
+extract-lib: _ensure-dirs _check-sbt _check-spark build-agda-json $(EXTRACT_LIB_METADATA_DEP)
 	@set -u -o pipefail; \
 	mkdir -p "$(LIB_JSONL_DIR)" "$(LIB_LOG_DIR)" "$(LIB_MANIFEST_DIR)"; \
 	TS="$$(date -u +%Y%m%dT%H%M%SZ)"; \
@@ -930,12 +939,47 @@ corpus-stats:
 	  --library "$(LIB_NAME)" \
 	  --dependency-graph "$(CORPUS_DEP_GRAPH)"
 
+# -----------------------------------------------------------------------------
+# The stdlib corpus lane (issue #123): extract the pinned Nix-store stdlib —
+# read-only, with its prebuilt interfaces, so the whole 1153-module run is
+# minutes — then package it with coverage, provenance, and stats.  The store
+# path is discovered from the shellHook-written libraries file, so the corpus
+# is pinned to the SAME stdlib the benchmark toolchain resolves; the module
+# list is generated here (find over src/), so the agda-algebras metadata
+# prerequisite is skipped, and the dependency DOT comes from
+# scripts/corpus-stdlib-depgraph.sh (see its header for why the algebras
+# scanner cannot do it).  RESUME=0 is the default: a publishable corpus wants
+# the from-scratch run the extraction skill calls for.
+corpus-stdlib: _ensure-dirs
+	@set -e; \
+	STDLIB_LIB=$$(grep -o '/nix/store/[^ ]*standard-library[^ ]*\.agda-lib' "$(AGDA_LIB_DIR)/libraries" | head -1); \
+	test -n "$$STDLIB_LIB" || { echo "ERROR: no store stdlib in $(AGDA_LIB_DIR)/libraries; enter nix develop once to write it"; exit 1; }; \
+	STDLIB_ROOT=$$(dirname "$$STDLIB_LIB"); \
+	META="$(DATA)/corpora-metadata/agda-stdlib"; mkdir -p "$$META"; \
+	( cd "$$STDLIB_ROOT/src" && find . -name '*.agda' | sed 's|^\./||; s|\.agda$$||; s|/|.|g' | sort ) > "$$META/all-modules.txt"; \
+	echo ">> [corpus-stdlib] $$(wc -l < "$$META/all-modules.txt") modules from $$STDLIB_ROOT/src"; \
+	$(MAKE) extract-lib LIB_NAME=agda-stdlib LIB_SRC_DIR="$$STDLIB_ROOT/src" \
+	  LIB_MODULES_FILE="$$META/all-modules.txt" EXTRACT_LIB_METADATA_DEP= RESUME=$(STDLIB_CORPUS_RESUME); \
+	"$(PROJECT_ROOT)/scripts/corpus-stdlib-depgraph.sh" \
+	  "$(DATA)/agda-stdlib/raw/run-manifest.json" "$$META/dependency-graph.dot" "$(AGDA_LIB_DIR)/libraries"; \
+	$(MAKE) corpus LIB_NAME=agda-stdlib AGDA_ALGEBRAS_ROOT="$$STDLIB_ROOT" \
+	  LIB_MODULES_FILE="$$META/all-modules.txt"
+
+STDLIB_CORPUS_RESUME ?= 0
+
+corpus-stdlib-nix:
+	@$(NIX_ALL) '$(MAKE) corpus-stdlib'
+
 # Load the assembled corpus into agda-mcp and drive the three search tools over
 # the real JSON-RPC transport.  Complements agda-mcp-smoke, which answers the
 # same questions against the 24-row test fixture.
+# The probe patterns default to agda-algebras names; another library's lane
+# overrides them (the stdlib corpus: CORPUS_SMOKE_NAME_PATTERN=+-comm).
+CORPUS_SMOKE_TYPE_PATTERN ?= Algebra
+CORPUS_SMOKE_NAME_PATTERN ?= ∘-hom
 corpus-mcp-smoke:
 	@echo ">> [corpus-mcp-smoke] agda-mcp search tools against $(CORPUS_JSONL)"
-	@$(call run_backend,"$(PROJECT_ROOT)/scripts/corpus-mcp-smoke.sh" --corpus "$(CORPUS_JSONL)")
+	@$(call run_backend,"$(PROJECT_ROOT)/scripts/corpus-mcp-smoke.sh" --corpus "$(CORPUS_JSONL)" --type-pattern "$(CORPUS_SMOKE_TYPE_PATTERN)" --name-pattern "$(CORPUS_SMOKE_NAME_PATTERN)")
 
 # ---- Python script suites (scripts/python/tests) ----
 # pytest is not in the system python3; enter `nix develop .#mlPipeline` (or the
@@ -1612,17 +1656,28 @@ PROOF_SEARCH_BEAM     ?= 4
 PROOF_SEARCH_DEPTH    ?= 6
 PROOF_SEARCH_BUDGET   ?= 60
 PROOF_SEARCH_DEDUP    ?= script
-PROOF_SEARCH_PEEK     ?= off
+PROOF_SEARCH_PEEK     ?= on
+# P2 retrieval knobs (issue #123).  PROPOSER=retrieval requires CORPUS (the
+# server is started with --corpus so the search tools register); EXCLUDE=off
+# is the labeled mechanism-control sweep only, never a headline.
+PROOF_SEARCH_PROPOSER ?= fixed
+PROOF_SEARCH_CORPUS   ?= data/corpora/agda-stdlib/v0/corpus.jsonl
+PROOF_SEARCH_RETRIEVE_K ?= 8
+PROOF_SEARCH_EXCLUDE  ?= on
+PROOF_SEARCH_EXPAND_DEPS ?= off
+# --corpus is passed only when the retrieval proposer is selected, so the
+# fixed baseline drives the identical ten-tool server P1 measured against.
+PROOF_SEARCH_CORPUS_ARGS = $(if $(filter retrieval,$(PROOF_SEARCH_PROPOSER)),--corpus $(abspath $(PROOF_SEARCH_CORPUS)) --retrieve-k $(PROOF_SEARCH_RETRIEVE_K) --exclude-target $(PROOF_SEARCH_EXCLUDE) --expand-deps $(PROOF_SEARCH_EXPAND_DEPS),)
 PROOF_SEARCH_LOOP_IDS ?= --all
 
-.PHONY: proof-search-loop proof-search-loop-it
+.PHONY: proof-search-loop proof-search-loop-it proof-search-retrieval-it
 
 # The full M1-5 beam sweep (or --ids via PROOF_SEARCH_LOOP_IDS="--ids id1,id2").
 proof-search-loop: _check-sbt
 	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
-	echo ">> [proof-search-loop] M1-5 beam search (beam=$(PROOF_SEARCH_BEAM) depth=$(PROOF_SEARCH_DEPTH) budget=$(PROOF_SEARCH_BUDGET) dedup=$(PROOF_SEARCH_DEDUP) peek=$(PROOF_SEARCH_PEEK)) against $$AGDA_MCP_BIN"; \
+	echo ">> [proof-search-loop] M1-5 beam search (beam=$(PROOF_SEARCH_BEAM) depth=$(PROOF_SEARCH_DEPTH) budget=$(PROOF_SEARCH_BUDGET) dedup=$(PROOF_SEARCH_DEDUP) peek=$(PROOF_SEARCH_PEEK) proposer=$(PROOF_SEARCH_PROPOSER)) against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.search.ProofSearchLoop --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --beam $(PROOF_SEARCH_BEAM) --max-depth $(PROOF_SEARCH_DEPTH) --probe-budget $(PROOF_SEARCH_BUDGET) --dedup $(PROOF_SEARCH_DEDUP) --peek $(PROOF_SEARCH_PEEK)"
+	  "runMain struxdriver.search.ProofSearchLoop --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --beam $(PROOF_SEARCH_BEAM) --max-depth $(PROOF_SEARCH_DEPTH) --probe-budget $(PROOF_SEARCH_BUDGET) --dedup $(PROOF_SEARCH_DEDUP) --peek $(PROOF_SEARCH_PEEK) --proposer $(PROOF_SEARCH_PROPOSER) $(PROOF_SEARCH_CORPUS_ARGS)"
 
 # The live full-search regression (LoopIntegrationSpec) against the real
 # server; the pure twins run in plain `make test`.
@@ -1631,6 +1686,14 @@ proof-search-loop-it: _check-sbt
 	echo ">> [proof-search-loop-it] live full-search regression against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
 	  "testOnly struxdriver.search.LoopIntegrationSpec"
+
+# The live corpus-tool transport test (RetrievalIntegrationSpec, issue #123)
+# against the real server started with --corpus on the committed mini-corpus.
+proof-search-retrieval-it: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [proof-search-retrieval-it] live corpus-tool transport test against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
+	  "testOnly struxdriver.search.RetrievalIntegrationSpec"
 
 
 

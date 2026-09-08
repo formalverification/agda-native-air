@@ -74,7 +74,11 @@ import java.nio.file.{Files, Path, Paths}
 
 import struxdriver.benchmark.{Obligation => IndexEntry}
 
-/** Loop-harness configuration, parsed from argv. */
+/** Loop-harness configuration, parsed from argv.  `proposerKind` selects the
+  * space behind the P1 seam: "fixed" (the P1 baseline) or "retrieval" (the
+  * P2 corpus-backed space, issue #123 — requires `corpus`, which the server
+  * is started with so the search tools register).
+  */
 final case class LoopHarnessConfig(
   index:         Path,
   ids:           Option[Set[String]], // None = --all
@@ -84,7 +88,10 @@ final case class LoopHarnessConfig(
   agdaFlags:     String,
   serverTimeout: Int,
   projectRoot:   Path,
-  loop:          LoopConfig
+  loop:          LoopConfig,
+  proposerKind:  String,
+  corpus:        Option[Path],
+  retrieval:     RetrievalConfig
 ) {
   def runRoot: Path = outDir.resolve(runId)
 }
@@ -135,7 +142,8 @@ final case class LoopOutcome(
   script:       Vector[String],
   stats:        LoopStats,
   wallMs:       Long,
-  anomaly:      Option[String]
+  anomaly:      Option[String],
+  retrieval:    Option[Json] = None // the P2 per-fixture retrieval stats (issue #123)
 ) {
   def toJson: Json = Json.obj(
     "benchmarkId"  -> benchmarkId.asJson,
@@ -155,7 +163,8 @@ final case class LoopOutcome(
     "depthReached" -> stats.depthReached.asJson,
     "depthCapped"  -> stats.depthCapped.asJson,
     "wallMs"       -> wallMs.asJson,
-    "anomaly"      -> anomaly.asJson
+    "anomaly"      -> anomaly.asJson,
+    "retrieval"    -> retrieval.getOrElse(Json.Null)
   ).dropNullValues
 }
 
@@ -175,7 +184,16 @@ object ProofSearchLoop extends IOApp {
       |    [--max-depth N]        depth bound: max committed moves (default 6)
       |    [--probe-budget N]     per-fixture budget of memo-missing fill_hole probes (default 60)
       |    [--dedup script|content]  frontier dedup policy (default script)
-      |    [--peek on|off]        type_of pre-filter before each probe (default off)
+      |    [--peek on|off]        type_of pre-filter before each probe (default on
+      |                           since the #123 re-validation; off for measurement)
+      |    [--proposer fixed|retrieval]  the space behind the seam (default fixed)
+      |    [--corpus PATH]        agda-strux corpus JSONL; the server starts with
+      |                           --corpus so the search tools register (required
+      |                           by --proposer retrieval)
+      |    [--retrieve-k N]       lemmas proposed per goal (default 8)
+      |    [--exclude-target on|off]  the anti-gaming target exclusion (default on;
+      |                           off is the labeled mechanism-control sweep only)
+      |    [--expand-deps on|off] one-hop get_dependencies expansion (default off)
       |""".stripMargin
 
   def run(args: List[String]): IO[ExitCode] =
@@ -218,6 +236,21 @@ object ProofSearchLoop extends IOApp {
                   case "off" => Right(false)
                   case other => Left(s"bad --peek: $other (on|off)")
                 }
+      prop   <- m.get("proposer").fold[Either[String, String]](Right("fixed")) {
+                  case p @ ("fixed" | "retrieval") => Right(p)
+                  case other                       => Left(s"bad --proposer: $other (fixed|retrieval)")
+                }
+      // A relative --corpus is resolved against --project-root, so the server
+      // (which resolves relative paths against ITS cwd) and corpusProvenance
+      // (which opens the path from the sbt process cwd) see one absolute
+      // path instead of two different files (#130 review).
+      rootAbs = Paths.get(root).toAbsolutePath.normalize
+      corpus  = m.get("corpus").map(Paths.get(_)).map(p => if (p.isAbsolute) p else rootAbs.resolve(p).normalize)
+      _      <- if (prop == "retrieval" && corpus.isEmpty)
+                  Left("--proposer retrieval requires --corpus") else Right(())
+      topK   <- intOf(m, "retrieve-k", RetrievalConfig.default.topK, 1)
+      excl   <- onOff(m, "exclude-target", RetrievalConfig.default.excludeTarget)
+      deps   <- onOff(m, "expand-deps", RetrievalConfig.default.expandDeps)
     } yield LoopHarnessConfig(
       index         = Paths.get(ix),
       ids           = ids,
@@ -226,10 +259,20 @@ object ProofSearchLoop extends IOApp {
       serverBin     = Paths.get(bin),
       agdaFlags     = m.getOrElse("agda-flags", Scaffold.defaultAgdaFlags),
       serverTimeout = tmo,
-      projectRoot   = Paths.get(root).toAbsolutePath.normalize,
-      loop          = LoopConfig(beam, depth, budget, dedup, peek)
+      projectRoot   = rootAbs,
+      loop          = LoopConfig(beam, depth, budget, dedup, peek),
+      proposerKind  = prop,
+      corpus        = corpus,
+      retrieval     = RetrievalConfig.default.copy(topK = topK, excludeTarget = excl, expandDeps = deps)
     )
   }
+
+  private def onOff(m: Map[String, String], key: String, dflt: Boolean): Either[String, Boolean] =
+    m.get(key).fold[Either[String, Boolean]](Right(dflt)) {
+      case "on"  => Right(true)
+      case "off" => Right(false)
+      case other => Left(s"bad --$key: $other (on|off)")
+    }
 
   // --------------------------------------------------------------------------
   // The run
@@ -241,14 +284,20 @@ object ProofSearchLoop extends IOApp {
       agdaFlags  = cfg.agdaFlags,
       timeoutSec = cfg.serverTimeout,
       cwd        = cfg.projectRoot,
-      stderrLog  = cfg.runRoot.resolve("server-stderr.log")
+      stderrLog  = cfg.runRoot.resolve("server-stderr.log"),
+      corpus     = cfg.corpus
     )
     for {
       entries <- Scaffold.readIndex(cfg.index, cfg.ids)
       _       <- IO.raiseWhen(entries.isEmpty)(new RuntimeException("no obligations matched"))
       _       <- IO.blocking(Files.createDirectories(cfg.runRoot))
-      _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"}")
+      _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"} proposer=${cfg.proposerKind}${cfg.corpus.fold("")(c => s" corpus=$c retrieveK=${cfg.retrieval.topK} excludeTarget=${if (cfg.retrieval.excludeTarget) "on" else "off"}")}")
       _       <- IO.println(s">> run root: ${cfg.runRoot}")
+      // Hash the corpus and read its provenance sibling BEFORE the sweep: a
+      // malformed sibling fails the run here, in seconds, rather than
+      // silently dropping the provenance block from a finished report
+      // (#130 review).  An absent sibling stays legitimate (digest-only).
+      corpusInfo <- cfg.corpus.traverse(corpusProvenance)
       result  <- McpClient.resource(serverCfg).use { client =>
                    for {
                      // One ledger for the run; one oracle — and so one probe
@@ -260,7 +309,7 @@ object ProofSearchLoop extends IOApp {
                    } yield (driven, ledger)
                  }
       (driven, ledger) = result
-      _       <- writeOutputs(cfg, entries, driven, ledger)
+      _       <- writeOutputs(cfg, entries, driven, ledger, corpusInfo)
       anomalies = driven.collect { case (o, _, _) if o.anomaly.isDefined => o }
       _       <- anomalies.traverse_(o =>
                    IO.println(s"!! ${o.benchmarkId} anomaly: ${o.anomaly.getOrElse("")}"))
@@ -315,6 +364,10 @@ object ProofSearchLoop extends IOApp {
       rows    <- Ref.of[IO, Vector[AttemptRow]](Vector.empty)
       counter <- Ref.of[IO, Int](0)
       seen    <- Ref.of[IO, (Int, Int)]((0, 0)) // (memo misses, memo hits) observed by the hooks
+      // Outer, like `rows`, so the anomaly path can snapshot the retrieval
+      // ledger accumulated BEFORE a mid-fixture raise (#130 review, round 3):
+      // the honesty ledger matters most precisely on failed runs.
+      retrRef <- Ref.of[IO, Option[RetrievalProposer]](None)
       t0      <- IO.monotonic
       out     <- {
         val step: IO[(LoopOutcome, FixtureRow, Vector[AttemptRow])] = for {
@@ -332,9 +385,33 @@ object ProofSearchLoop extends IOApp {
               )
             case Right(st) =>
               for {
-                proposer <- FixedProposer.create(st.content, name =>
+                base     <- FixedProposer.create(st.content, name =>
                               oracle.typeOf(mkCtx("type_of", None), st.workFile, name, None)
                                 .map(_.body.map(_.inferred)))
+                // P2 (#123): retrieval composes AROUND the fixed space —
+                // never replaces it — so the searched space is a superset of
+                // P1's by construction and any delta is retrieval's.
+                retriever <- if (cfg.proposerKind == "retrieval")
+                               RetrievalProposer.create(
+                                 base      = base,
+                                 corpus    = new CorpusSearch {
+                                   def byName(pattern: String, limit: Int) =
+                                     oracle.searchByName(mkCtx("retrieval", None), pattern, limit)
+                                   def byType(pattern: String, limit: Int) =
+                                     oracle.searchByType(mkCtx("retrieval", None), pattern, limit)
+                                   def dependenciesOf(qname: String) =
+                                     oracle.dependenciesOf(mkCtx("retrieval", None), qname)
+                                 },
+                                 scope     = ImportScope(Imports.imported(st.content)),
+                                 exclusion = TargetExclusion(entry.hole, entry.typeSig),
+                                 lemmaType = name =>
+                                   oracle.typeOf(mkCtx("type_of", None), st.workFile, name, None)
+                                     .map(_.body.map(_.inferred)),
+                                 cfg       = cfg.retrieval
+                               ).map(Option(_))
+                             else IO.pure(Option.empty[RetrievalProposer])
+                _        <- retrRef.set(retriever)
+                proposer  = retriever.getOrElse(base)
                 hooks    = BeamLoop.Hooks { ev =>
                              for {
                                n      <- counter.updateAndGet(_ + 1)
@@ -375,6 +452,7 @@ object ProofSearchLoop extends IOApp {
                               }
                 attempts <- rows.get
                 module    = result.rootGoal.flatMap(_.module).getOrElse("")
+                retrStats <- retriever.traverse(_.stats.map(retrievalJson))
                 outcome   = LoopOutcome(
                               benchmarkId  = entry.id,
                               difficulty   = entry.difficulty.tag,
@@ -385,7 +463,8 @@ object ProofSearchLoop extends IOApp {
                               script       = result.solved.map(_.state.script.map(_.candidate)).getOrElse(Vector.empty),
                               stats        = result.stats,
                               wallMs       = wallMs,
-                              anomaly      = None
+                              anomaly      = None,
+                              retrieval    = retrStats
                             )
               } yield (outcome, fixtureRow(module, Some(result), solvedPath, wallMs, anomalous = false), attempts)
           }
@@ -402,9 +481,13 @@ object ProofSearchLoop extends IOApp {
             // Partial stats, from the hooks: probes and hits are what the
             // rows can vouch for; the rest is unknown and stays zero.
             partial   = LoopStats(probes = mh._1, memoHits = mh._2)
+            // The retrieval ledger accumulated before the raise: every cut
+            // already counted stays counted (#130 review, round 3).
+            retr     <- retrRef.get.flatMap(_.traverse(_.stats.map(retrievalJson)))
           } yield (
             LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
-              solved = false, Vector.empty, partial, wallMs, Some(e.getMessage)),
+              solved = false, Vector.empty, partial, wallMs, Some(e.getMessage),
+              retrieval = retr),
             fixtureRow("", None, None, wallMs, anomalous = true),
             attempts
           )
@@ -417,8 +500,60 @@ object ProofSearchLoop extends IOApp {
   // Outputs
   // --------------------------------------------------------------------------
 
+  /** One fixture's retrieval stats as report JSON — the honesty ledger the
+    * P2 design comment on #123 promises: every cut counted, exclusions named.
+    */
+  private def retrievalJson(s: RetrievalStats): Json = Json.obj(
+    "queries"        -> s.queries.asJson,
+    "truncated"      -> s.truncated.asJson,
+    "hits"           -> s.hits.asJson,
+    "inScope"        -> s.inScope.asJson,
+    "excluded"       -> s.excluded.asJson,
+    "nonFunction"    -> s.nonFunction.asJson,
+    "laneRejected"   -> s.laneRejected.asJson,
+    "proposedLemmas" -> s.proposedLemmas.asJson
+  )
+
+  /** The corpus provenance block for report.json: the artifact's own sha256
+    * plus the assembly's provenance.json, embedded verbatim when it sits
+    * beside the corpus (the corpus lanes put it there) — so a run report
+    * pins WHAT was retrieved from, not just where it lay on disk.
+    */
+  private def corpusProvenance(corpus: Path): IO[Json] =
+    for {
+      digest <- IO.blocking {
+                  val md = java.security.MessageDigest.getInstance("SHA-256")
+                  val in = Files.newInputStream(corpus)
+                  try {
+                    val buf = new Array[Byte](1 << 16)
+                    Iterator.continually(in.read(buf)).takeWhile(_ >= 0)
+                      .foreach(n => md.update(buf, 0, n))
+                  } finally in.close()
+                  md.digest().map(b => f"$b%02x").mkString
+                }
+      prov   <- IO.blocking {
+                  val p = corpus.resolveSibling("provenance.json")
+                  if (!Files.exists(p)) None
+                  else io.circe.parser.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)) match {
+                    case Right(j) => Some(j)
+                    case Left(e) =>
+                      // Malformed is not absent: this block exists to pin
+                      // WHAT was retrieved from, so a sibling that cannot be
+                      // parsed fails the run rather than vanishing (#130
+                      // review).  Remove or fix the sibling to proceed.
+                      throw new RuntimeException(
+                        s"corpus provenance sibling is malformed: $p — ${e.message}")
+                  }
+                }
+    } yield Json.obj(
+      "path"       -> corpus.toString.asJson,
+      "sha256"     -> digest.asJson,
+      "provenance" -> prov.getOrElse(Json.Null)
+    ).dropNullValues
+
   private val batchPhases     = Set("check_file", "fill_hole", "final_check")
   private val knowledgePhases = Set("get_goal", "type_of", "peek")
+  private val retrievalPhases = Set("retrieval")
 
   private def aggregate(rows: Vector[TimingRow]): Json = {
     def phaseObj(phases: Set[String]) = {
@@ -441,6 +576,11 @@ object ProofSearchLoop extends IOApp {
     Json.obj(
       "batch"     -> phaseObj(batchPhases),
       "knowledge" -> phaseObj(knowledgePhases),
+      // P2 (#123): corpus lookups are the proposer's tool calls — its own
+      // category in the split, since retrieval is the first proposer whose
+      // time can be material.  BeamLoop already subtracts these rows from
+      // the proposal rows, so the categories never double-count.
+      "retrieval" -> phaseObj(retrievalPhases),
       "proposal"  -> Json.obj(
         "calls"    -> proposal.size.asJson,
         "clientMs" -> Scaffold.round3(proposal.map(_.clientMs).sum).asJson),
@@ -450,10 +590,11 @@ object ProofSearchLoop extends IOApp {
   }
 
   private def writeOutputs(
-    cfg:     LoopHarnessConfig,
-    entries: Vector[IndexEntry],
-    driven:  Vector[(LoopOutcome, FixtureRow, Vector[AttemptRow])],
-    ledger:  Vector[TimingRow]
+    cfg:        LoopHarnessConfig,
+    entries:    Vector[IndexEntry],
+    driven:     Vector[(LoopOutcome, FixtureRow, Vector[AttemptRow])],
+    ledger:     Vector[TimingRow],
+    corpusInfo: Option[Json]
   ): IO[Unit] = {
     val outcomes = driven.map(_._1)
     val tiers    = Vector("routine", "compositional", "non-obvious")
@@ -477,18 +618,24 @@ object ProofSearchLoop extends IOApp {
       "schemaVersion" -> "proof-search-loop-report.v0".asJson,
       "runId"         -> cfg.runId.asJson,
       "config" -> Json.obj(
-        "beamWidth"   -> cfg.loop.beamWidth.asJson,
-        "maxDepth"    -> cfg.loop.maxDepth.asJson,
-        "probeBudget" -> cfg.loop.probeBudget.asJson,
-        "dedup"       -> cfg.loop.dedup.tag.asJson,
-        "peek"        -> cfg.loop.peek.asJson
+        "beamWidth"     -> cfg.loop.beamWidth.asJson,
+        "maxDepth"      -> cfg.loop.maxDepth.asJson,
+        "probeBudget"   -> cfg.loop.probeBudget.asJson,
+        "dedup"         -> cfg.loop.dedup.tag.asJson,
+        "peek"          -> cfg.loop.peek.asJson,
+        "proposer"      -> cfg.proposerKind.asJson,
+        "retrieveK"     -> cfg.retrieval.topK.asJson,
+        "queryLimit"    -> cfg.retrieval.queryLimit.asJson,
+        "excludeTarget" -> cfg.retrieval.excludeTarget.asJson,
+        "expandDeps"    -> cfg.retrieval.expandDeps.asJson
       ),
+      "corpus" -> corpusInfo.getOrElse(Json.Null),
       "obligations" -> entries.size.asJson,
       "timestamp"   -> java.time.Instant.now().toString.asJson,
       "perTier"     -> Json.obj(tiers.map(t => t -> tierBlock(t)): _*),
       "split"       -> aggregate(ledger),
       "outcomes"    -> Json.arr(outcomes.map(_.toJson): _*)
-    )
+    ).dropNullValues
 
     for {
       _ <- Scaffold.writeJsonl(cfg.runRoot.resolve("results.jsonl"), driven.flatMap(_._3).map(_.toJson))
@@ -509,13 +656,14 @@ object ProofSearchLoop extends IOApp {
     }.mkString("\n|")
     val batch  = ledger.filter(r => batchPhases(r.phase) && !r.cached)
     val know   = ledger.filter(r => knowledgePhases(r.phase) && !r.cached)
+    val retr   = ledger.filter(r => retrievalPhases(r.phase) && !r.cached)
     val peeks  = outcomes.map(_.stats.peeks).sum
     val prej   = outcomes.map(_.stats.peekRejects).sum
     f"""
        |== proof-search loop (beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"}) ==
        |$perTier
        |solved total: ${outcomes.count(_.solved)}/${outcomes.size}
-       |oracle: batch ${batch.size} calls ${batch.map(_.clientMs).sum / 1000.0}%.1f s; knowledge ${know.size} calls ${know.map(_.clientMs).sum / 1000.0}%.1f s; memo hits ${ledger.count(_.cached)}
+       |oracle: batch ${batch.size} calls ${batch.map(_.clientMs).sum / 1000.0}%.1f s; knowledge ${know.size} calls ${know.map(_.clientMs).sum / 1000.0}%.1f s; retrieval ${retr.size} calls ${retr.map(_.clientMs).sum / 1000.0}%.1f s; memo hits ${ledger.count(_.cached)}
        |peek:   $peeks peeks, $prej rejected (probes skipped)
        |""".stripMargin
   }
