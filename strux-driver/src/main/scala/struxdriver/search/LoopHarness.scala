@@ -364,6 +364,10 @@ object ProofSearchLoop extends IOApp {
       rows    <- Ref.of[IO, Vector[AttemptRow]](Vector.empty)
       counter <- Ref.of[IO, Int](0)
       seen    <- Ref.of[IO, (Int, Int)]((0, 0)) // (memo misses, memo hits) observed by the hooks
+      // Outer, like `rows`, so the anomaly path can snapshot the retrieval
+      // ledger accumulated BEFORE a mid-fixture raise (#130 review, round 3):
+      // the honesty ledger matters most precisely on failed runs.
+      retrRef <- Ref.of[IO, Option[RetrievalProposer]](None)
       t0      <- IO.monotonic
       out     <- {
         val step: IO[(LoopOutcome, FixtureRow, Vector[AttemptRow])] = for {
@@ -406,6 +410,7 @@ object ProofSearchLoop extends IOApp {
                                  cfg       = cfg.retrieval
                                ).map(Option(_))
                              else IO.pure(Option.empty[RetrievalProposer])
+                _        <- retrRef.set(retriever)
                 proposer  = retriever.getOrElse(base)
                 hooks    = BeamLoop.Hooks { ev =>
                              for {
@@ -476,9 +481,13 @@ object ProofSearchLoop extends IOApp {
             // Partial stats, from the hooks: probes and hits are what the
             // rows can vouch for; the rest is unknown and stays zero.
             partial   = LoopStats(probes = mh._1, memoHits = mh._2)
+            // The retrieval ledger accumulated before the raise: every cut
+            // already counted stays counted (#130 review, round 3).
+            retr     <- retrRef.get.flatMap(_.traverse(_.stats.map(retrievalJson)))
           } yield (
             LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
-              solved = false, Vector.empty, partial, wallMs, Some(e.getMessage)),
+              solved = false, Vector.empty, partial, wallMs, Some(e.getMessage),
+              retrieval = retr),
             fixtureRow("", None, None, wallMs, anomalous = true),
             attempts
           )

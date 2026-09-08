@@ -236,15 +236,18 @@ object SearchHit {
 }
 
 /** get_dependencies, reduced to what the P2 retrieval expansion reads: the
-  * expanded `neighbors` entries (present only when `expand` was true; the
-  * dependency tokens themselves are already inside each neighbor's row).
+  * expanded `neighbors` entries.  The only client call site sends
+  * `expand: true`, so the server always serializes the field; decoding it as
+  * REQUIRED means wire drift fails the decode instead of silently reporting
+  * an expansion that never happened (#130 review, round 3 — the same
+  * strictness rule the rest of this file pins).
   */
 final case class DependenciesBody(name: String, neighbors: Vector[SearchHit])
 object DependenciesBody {
   implicit val decoder: Decoder[DependenciesBody] = (c: HCursor) =>
     for {
       name      <- c.get[String]("name")
-      neighbors <- c.getOrElse[Vector[SearchHit]]("neighbors")(Vector.empty)
+      neighbors <- c.get[Vector[SearchHit]]("neighbors")
     } yield DependenciesBody(name, neighbors)
 }
 

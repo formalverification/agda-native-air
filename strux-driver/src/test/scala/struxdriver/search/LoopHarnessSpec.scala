@@ -80,6 +80,80 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     }
   }
 
+  test("an anomalous RETRIEVAL fixture keeps its accumulated ledger (#130 round 3)") {
+    // The corpus queries answer and the ledger accumulates (hits, inScope,
+    // proposedLemmas); then the transport dies on a probe.  The recovered
+    // outcome must carry the retrieval snapshot — the honesty ledger matters
+    // most precisely on failed runs.
+    val searchHit: String =
+      """[{"prettyQname":"TestLib.helper","type":"U → T","defKind":"function","module":"TestLib","hasBody":true}]"""
+    // Per-expression lane answers: the target ("goal") and the lemma
+    // ("helper") must print DIFFERENT types, or the lane-form statement
+    // exclusion (correctly) removes the lemma as a target alias.
+    def typeOfReply(expr: String): String =
+      if (expr == "helper") """{"type":"U → T","elapsedMs":1}"""
+      else """{"type":"T","elapsedMs":1}"""
+    val retrievalDyingCaller: ToolCaller = new ToolCaller {
+      def callTool(tool: String, args: Json): IO[Timed[ToolReply]] = tool match {
+        case "check_file"     => IO.pure(Timed(ToolReply(isError = false, checkOneHole), 1000000L))
+        case "get_goal"       => IO.pure(Timed(ToolReply(isError = false, goalReply), 1000000L))
+        case "type_of"        =>
+          val expr = args.hcursor.get[String]("expr").toOption.getOrElse("")
+          IO.pure(Timed(ToolReply(isError = false, typeOfReply(expr)), 1000000L))
+        case "search_by_name" => IO.pure(Timed(ToolReply(isError = false, searchHit), 1000000L))
+        case "search_by_type" => IO.pure(Timed(ToolReply(isError = false, "[]"), 1000000L))
+        case "fill_hole"      => IO.raiseError(new RuntimeException("transport died on the first probe"))
+        case other            => IO.raiseError(new RuntimeException(s"unexpected tool: $other"))
+      }
+    }
+    val root = Files.createTempDirectory(
+      Files.createDirectories(Paths.get(sys.props("user.dir"), "target", "loop-harness-spec")), "root-")
+    val oblDir = Files.createDirectories(root.resolve("obl"))
+    Files.write(oblDir.resolve("Test.agda"),
+      "module Test where\nopen import TestLib using ( helper )\ngoal : T\ngoal = {!!}\n".getBytes(StandardCharsets.UTF_8))
+    val cfg = LoopHarnessConfig(
+      index         = root.resolve("unused.jsonl"),
+      ids           = None,
+      outDir        = root.resolve("out"),
+      runId         = "t-retr",
+      serverBin     = root.resolve("unused-bin"),
+      agdaFlags     = "",
+      serverTimeout = 1,
+      projectRoot   = root,
+      loop          = LoopConfig.default.copy(peek = false),
+      proposerKind  = "retrieval",
+      corpus        = Some(root.resolve("unused-corpus.jsonl")),
+      retrieval     = RetrievalConfig.default
+    )
+    val entry = IndexEntry(
+      id             = "test-retr-anomaly",
+      source         = "test",
+      module         = "Test",
+      obligationPath = Paths.get("obl/Test.agda"),
+      goldPath       = Paths.get("obl/Test.agda"),
+      goldTerm       = "",
+      hole           = "goal",
+      typeSig        = "T",
+      difficulty     = Difficulty.Routine,
+      domain         = "",
+      proofStrategy  = "",
+      tags           = Vector.empty
+    )
+
+    val (outcome, row, attempts) = (for {
+      oracle <- Oracle.create(retrievalDyingCaller)
+      out    <- ProofSearchLoop.runFixture(cfg, oracle, entry)
+    } yield out).unsafeRunSync()
+
+    outcome.searchStatus shouldBe "anomaly"
+    outcome.anomaly.getOrElse("") should include ("transport died")
+    row.searchStatus shouldBe "anomaly"
+    attempts shouldBe empty // the transport died on the FIRST probe
+    val retr = outcome.retrieval.getOrElse(fail("retrieval ledger lost on the anomaly path"))
+    retr.hcursor.get[Int]("hits").toOption.getOrElse(0) should be >= 1
+    retr.hcursor.get[Vector[String]]("proposedLemmas").toOption.getOrElse(Vector.empty) should contain ("helper")
+  }
+
   test("an anomalous fixture keeps its rows, wall clock, and hook-observed counts") {
     val root = Files.createTempDirectory(
       Files.createDirectories(Paths.get(sys.props("user.dir"), "target", "loop-harness-spec")), "root-")

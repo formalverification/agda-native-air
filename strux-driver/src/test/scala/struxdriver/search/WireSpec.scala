@@ -190,12 +190,14 @@ final class WireSpec extends AnyFunSuite with Matchers {
     hits.map(_.prettyQname) shouldBe hits.map(_.prettyQname).sorted
   }
 
-  test("get_dependencies: neighbors expand to SearchHit rows; absent neighbors default empty (live capture)") {
+  test("get_dependencies: neighbors expand to SearchHit rows; a MISSING field fails the decode (#130 round 3)") {
     val deps = replyOf("wire-get-dependencies.json", 4).decodeAs[DependenciesBody].toOption.get
     deps.name shouldBe "Data.Nat.Properties.+-comm"
     deps.neighbors should not be empty
-    // Without expansion the field may be absent — the decoder defaults, never fails.
+    // The client always sends expand=true, so the server always serializes
+    // `neighbors`; an absent field is wire drift and must fail the decode,
+    // never default to "no expansion happened".
     val bare = """{"name":"X","type":"T","dependencies":["A","B"]}"""
-    io.circe.parser.parse(bare).toOption.get.as[DependenciesBody].toOption.get.neighbors shouldBe Vector.empty
+    io.circe.parser.parse(bare).toOption.get.as[DependenciesBody].isLeft shouldBe true
   }
 }

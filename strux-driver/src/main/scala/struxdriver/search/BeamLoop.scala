@@ -112,11 +112,11 @@ object DedupPolicy {
 
 /** The loop's tunables, with the #122 stated defaults — except the peek,
   * whose default the #122 measurement deliberately left to P2: it flipped to
-  * ON when the #123 sweeps re-validated it on retrieval candidates (same
-  * solve set as the best no-peek run plus a budget-ordering loss restored,
-  * probes −82 %, zero solves lost across 1,567 rejections, qualified
-  * renderings included; numbers on #113).  `--peek off` remains for
-  * measurement.
+  * ON when the #123 sweeps re-validated it on retrieval candidates, and the
+  * post-review re-measurement strengthened the case (two budget-ordering
+  * losses restored, 4/22 → 6/22; probes 1,064 → 526; 3,734 of 4,262
+  * judgements skipped with zero solves lost, qualified renderings included;
+  * numbers on #113).  `--peek off` remains for measurement.
   */
 final case class LoopConfig(
   beamWidth:   Int,

@@ -321,23 +321,23 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     // bought nothing, and the conservative script-inclusive key (which can
     // never wrongly prune two live states) is adopted.  A proposer that
     // emits hole-free compound candidates could reopen the question; that
-    // re-measurement belongs to P2 (#123) — and P2 ran it: with the `_`- and
-    // saturated forms present (hole-free compounds, the stated trigger), the
-    // two policies again produced identical sweeps (5/22, 635 probes, zero
-    // skips under either; #113 P2 comment, runs p2-a vs p2-c).  The decision
-    // stands, now with its trigger tested.
+    // re-measurement belongs to P2 (#123) — and P2 ran it twice: with the
+    // `_`- and saturated forms present (hole-free compounds, the stated
+    // trigger), the two policies produced identical sweeps in both rounds
+    // (post-fix: 4/22, 1,064 probes, probe for probe, zero skips under
+    // either; #113 P2 comments, runs p2fix-a vs p2fix-c).  The decision
+    // stands, now with its trigger tested at full pool width.
     LoopConfig.default.dedup shouldBe DedupPolicy.ScriptInclusive
   }
 
   test("the adopted default peek policy (re-validated on retrieval candidates, issue #123)") {
     // #122 measured the peek's uplift but left it opt-in pending retrieval
     // candidates, whose qualified renderings the P1 suite could not
-    // exercise.  P2's sweeps answered (numbers on #113): same solve set as
-    // the best no-peek run PLUS a budget-ordering loss restored
-    // (prod-mk-pair's depth-2 chain no longer fit budget 60 un-peeked),
-    // probes 635 → 113, wall 30.9 → 8.1 min, 1,567 rejections with zero
-    // solves lost.  The default is ON; `--peek off` remains a measurement
-    // knob.
+    // exercise.  P2's sweeps answered, twice (numbers on #113): the P1
+    // solve set restored in full where no-peek loses budget-ordering
+    // casualties — post-fix 4/22 → 6/22, probes 1,064 → 526, 3,734 of
+    // 4,262 judgements skipped with zero solves lost.  The default is ON;
+    // `--peek off` remains a measurement knob.
     LoopConfig.default.peek shouldBe true
   }
 
