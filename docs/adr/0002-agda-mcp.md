@@ -1,49 +1,126 @@
-# ADR 0002: agda-mcp — batch verdicts, a live knowledge lane, and Agda as the only authority
+# ADR 0002: agda-mcp
 
 File: `agda-native-air/docs/adr/0002-agda-mcp.md`
 
-+  **Status**: Accepted.  Every decision below is landed on `main`; the follow-ups each one still owes are named in its section and tracked in Milestone 5.
-+  **Date**: 2026-09-07 (the day the [#68] hardening wave closed complete; the field record runs 2026-08-21 through 2026-09-04).
++  **Status**: Accepted.  Every decision below is landed on `main`; follow-ups each one requires are named in its section and tracked in Milestone 5.
++  **Date**: 2026-09-07 (the day [#68] hardening wave was closed as complete; the field record runs 2026-08-21 through 2026-09-04).
 +  **Tracking**: [#148] (this record); [#68] (the wave, closed) and its children [#69]–[#79]; the fixes that followed from it, [#100], [#101], [#103], [#106], [#108], [#114], [#115]; Milestone 5 ([#134]–[#139], [#145]–[#147]) for what is open.
-+  **Ancestry**: [#10] (M1-2, the four-tool server, PR [#38]); [#11] (M1-3, the corpus tools, PR [#44]); [#66] (in-place checking, PR [#67]); and `docs/feedback/flrp-agda-mcp-improvements.md` (imported by PR [#80]), the field report whose § 7 verification addendum is where most of the decisions below were earned.
++  **Ancestry**: [#10] (M1-2, the four-tool server, PR [#38]); [#11] (M1-3, the corpus tools, PR [#44]); [#66] (in-place checking, PR [#67]); and [`feedback/flrp-agda-mcp-improvements.md`] (imported by PR [#80]), the field report whose § 7 verification addendum is where most of the decisions below were earned.
 
 ## Executive summary
 
-`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent thirteen tools over the pinned `agda`: four proof-state tools (`check_file`, `get_diagnostics`, `get_goal`, `fill_hole`), the whole-project gate (`check_project`), five live queries (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`), and three corpus lookups (`search_by_name`, `search_by_type`, `get_dependencies`) when started with `--corpus`.  This document is the design record: what was decided, the evidence that earned each decision, and what each one still owes.  The deep notes it distills stay where they are, under `docs/agda-mcp/`, and every decision links to its own.
+`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent thirteen tools over the pinned `agda`.
 
-The design in one paragraph.  The server runs Agda in two lanes and lets only one of them judge.  The *batch lane* spawns the real `agda` once per call and derives every verdict from that process's exit code, never from its prose; the verdict travels with the exact command it is equivalent to, the resolved binary and working directory, and the project the file was resolved to, so a client can check the claim instead of trusting it.  The *interaction lane* keeps one persistent `agda --interaction-json` child per project root and answers questions about a loaded file in milliseconds: what is this expression's type, what does this name resolve to and why, what does this module export, what does this hole want.  Those answers inform and never decide, because interaction-mode Agda is tolerant by design: it loads a file with open holes where batch Agda exits 42.  Underneath both lanes sits one rule: when Agda can answer a question, ask Agda; anything the server derives from source text is a pre-flight approximation and a fallback, never the authority.
++  **Proof-state tools**: `check_file`, `get_diagnostics`, `get_goal`, `fill_hole`.
++  **Whole-project gate**: `check_project`.
++  **Live queries**: `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`.
++  **Corpus lookups**: `search_by_name`, `search_by_type`, `get_dependencies` when started with `--corpus`.
 
-Why it is shaped this way comes down to one field datum and one measurement.  The datum: in July 2026 a Claude Code session formalized about 1200 lines of literate Agda in `ualib/agda-algebras` with the server configured and its four tools listed, and never called it once, because nothing said whether green meant the build passed, and the two tools with no shell equivalent were unreliable on the literate files that repository is made of.  The measurement: a batch judgement costs about 2.6 s of interface loading on a standard-library fixture, while a question about a file the lane has loaded costs 1–3 ms.  So verdicts are made expensive and unimpeachable, knowledge is made cheap and explicitly non-authoritative, and every response and every tool description says which of the two it is.
+This document is the design record: what was decided, the evidence that earned each decision, and what each one still owes.  The deep notes it distills stay where they are, under `docs/agda-mcp/`, and every decision links to its own note.
+
+**The design in five minutes**.
+
+The server runs Agda in two lanes and lets only one of them judge.
+
++  The *batch lane* spawns the real `agda` once per call and derives every verdict from that process's exit code, never from its prose.
+
+   The verdict travels with:
+
+   + the command to which it is equivalent, 
+   + the resolved binary and working directory, and
+   + the project to which the file resolved,
+
+   so a client can check the claim instead of trusting it.
+
++  The *interaction lane* keeps one persistent `agda --interaction-json` child per project root and answers questions about a loaded file in milliseconds: 
+
+   + what is this expression's type,
+   + what does this name resolve to and why,
+   + what does this module export, 
+   + what does this hole want.
+
+   Those answers inform and never decide, because interaction-mode Agda is tolerant by design: it loads a file with open holes where batch Agda exits 42.
+
+Underneath both lanes sits one rule: when Agda can answer a question, ask Agda; anything the server derives from source text is a pre-flight approximation and a fallback, never the authority.
+
+Why it is shaped this way comes down to one field datum and one measurement.
+
+**The datum**.  In July 2026 a Claude Code session formalized about 1200 lines of literate Agda in `ualib/agda-algebras` with the server configured and its four tools listed, and never called it once, because nothing said whether green meant the build passed, and the two tools with no shell equivalent were unreliable on the literate files that repository is made of.
+
+**The measurement**.  A batch judgment costs about 2.6 s of interface loading on a standard-library fixture, while a question about a file the lane has loaded costs 1–3 ms.  So verdicts are made expensive and unimpeachable, knowledge is made cheap and explicitly non-authoritative, and every response and every tool description says which of the two it is.
 
 ### Where it stands
 
-The [#68] wave closed complete on 2026-09-07: its eleven children ([#69]–[#79]) and the fixes that followed from them ([#100], [#101], [#103], [#106], [#108], [#114], [#115]) are all merged.  Nine field sessions between 2026-08-21 and 2026-09-04, in `agda-algebras` and in `formal-ledger-specifications`, record the server as the primary development instrument, with warm `check_file` rounds of 2–35 s against 20 s to 10 min for the shell equivalents, and with the project echo cited in nearly every report as the affordance that made a cross-worktree verdict trustworthy (§ 12).
+The [#68] wave closed as complete on 2026-09-07: its eleven children ([#69]–[#79]) and the fixes that followed from them ([#100], [#101], [#103], [#106], [#108], [#114], [#115]) are all merged.
+
+Nine field sessions between 2026-08-21 and 2026-09-04, in `agda-algebras` and in `formal-ledger-specifications`, record the server as the primary development instrument, with warm `check_file` rounds of 2–35 s against 20 s to 10 min for the shell equivalents, and with the project echo cited in nearly every report as the affordance that made a cross-worktree verdict trustworthy (§ 12 below).
 
 ### Where it goes
 
-Milestone 5 collects the ergonomics the field record asked for (§ 13): a profiling tool, many-files-one-call forms, an opt-in apply for `fill_hole`, registry hygiene across worktrees, a reason beside `checkedFromSource`, queries inside a parameterized module's scope, and two payload fixes.  Corpus-backed retrieval *as server tools* is issue [#17] (M2-3), whose design map is a forward pointer from this record, not part of it.
+Milestone 5 collects the ergonomics the field record asked for (§ 13):
+
++ a profiling tool,
++ many-files-one-call forms,
++ an opt-in apply for `fill_hole`,
++ registry hygiene across worktrees,
++ a reason beside `checkedFromSource`,
++ queries inside a parameterized module's scope,
++ two payload fixes.
+
+Corpus-backed retrieval *as server tools* is issue [#17] (M2-3), whose design map is a forward pointer from this record, not part of it.
+
+---
 
 ## 1.  Context: the field test that shaped the server
 
 The server's first shape (M1-2, PR [#38]) was four tools, each spawning a batch `agda` over a transient copy of the file, with `get_goal` reading a goal through the `AgdaDojang.Debug` reporting macro.  Issue [#66] (PR [#67]) moved checking in place, at the file's real path with the bytes restored afterwards, because a scratch copy of a hierarchically-named module fails with `ModuleDefinedInOtherFile`.  M1-3 (PR [#44]) added the three corpus tools.  That was the server the field session met.
 
-The session (`ualib/agda-algebras` issue 459, PR 507) wrote its own post-mortem, which is `docs/feedback/flrp-agda-mcp-improvements.md`.  Its § 2 reconstructs the decision an agent makes at each check: a verdict it cannot trust costs more than no verdict; its edit unit is a whole module; every module is `.lagda.md`; its questions were about scope, not goals; and it could not tell what the server was doing.  Its § 0 asked that every claim be re-verified before an issue was filed, and the § 7 addendum (2026-07-29; scripted MCP sessions against `911ae18`, cross-checked with direct `agda` runs) did so, with the following result:
+The session (`ualib/agda-algebras` Issue [#459], PR [#507]) wrote its own post-mortem, which is [`feedback/flrp-agda-mcp-improvements.md`].  Its § 2 reconstructs the decision an agent makes at each check: a verdict it cannot trust costs more than no verdict; its edit unit is a whole module; every module is `.lagda.md`; its questions were about scope, not goals; and it could not tell what the server was doing.  Its § 0 asked that every claim be re-verified before an issue was filed, and the § 7 addendum (2026-07-29; scripted MCP sessions against `911ae18`, cross-checked with direct `agda` runs) did so, with the following result:
 
-+  **Confirmed, and worse than reported**.  `fill_hole` answered `ok` for a candidate that left an unsolved implicit, where `agda` on identical content exits 42 ([#69]); `get_goal` reported the reporting macro's own unsolved type, `(x₁ : _3 x) → _5 x x₁`, where the fixture documents `A` ([#70], a long-standing defect that an April transcript had rationalized as "mutual dependency between holes"); hole detection matched only the literal token `{!!}`, missing `{! !}`, `{! e !}`, and `?` in every flavour while counting, and filling, tokens in comments and prose ([#71], [#73]).
++  **Confirmed** (and even worse than reported).
+
+   +  `fill_hole` answered `ok` for a candidate that left an unsolved implicit, where `agda` on identical content exits 42 ([#69]);
+   +  `get_goal` reported the reporting macro's own unsolved type, `(x₁ : _3 x) → _5 x x₁`, where the fixture documents `A` ([#70], a long-standing defect that an April transcript had rationalized as "mutual dependency between holes");
+   +  hole detection matched only the literal token `{!!}`, missing `{! !}`, `{! e !}`, and `?` in every flavour while counting, and filling, tokens in comments and prose ([#71], [#73]).
+
 +  **Refuted**.  `check_file` was never green on unsolved metas: the server was batch-strict from the start, because it runs `agda <file>` per call.  What was missing was saying so, which became [#72].
+
 +  **Found while re-testing**.  No diagnostic carried a position, because the parser expected Agda's old `file:10,5-15` format and 2.8.0 emits `file:9.12-13` ([#74]); `--timeout` was parsed and never enforced ([#77]).
 
-The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [#71], [#73], [#72]), P1 is reach beyond the shell ([#74], [#75], [#76], [#77]), P2 is economics and ergonomics ([#78], [#79]); its acceptance metric was blunt, that the next real literate-repository session reaches for the server instead of the shell.  Three later issues came from the wave's own measurements rather than from the report: [#101] from the [#83] field test (the one agent that reached for the server on its own sent a relative path, got a bare `-32603`, wrote "the MCP agda server crashed", and never called it again), [#100] from a literate fixture whose prose named the module, and [#106] from reviewing [#100]'s fix, which spawned [#114] and [#115] by probe.  Issue [#103] made a second consumer project (fls) a client with its own toolchain, and [#108] moved `get_goal` onto the lane once [#75] had built it.
+The wave's plan kept the document's own priorities:
 
-## 2.  The two-lane architecture ([#75], [#108]; `docs/agda-mcp/agda-mcp-interaction-lane.md`)
++  P0 is trust ([#69], [#70], [#71], [#73], [#72]),
++  P1 is reach beyond the shell ([#74], [#75], [#76], [#77]),
++  P2 is economics and ergonomics ([#78], [#79]).
+
+Its acceptance metric was blunt, that the next real literate-repository session reaches for the server instead of the shell.
+
+Three later issues came from the wave's own measurements rather than from the report:
+
++ [#101] from the [#83] field test (the one agent that reached for the server on its own sent a relative path, got a bare `-32603`, wrote "the MCP agda server crashed", and never called it again),
++ [#100] from a literate fixture whose prose named the module,
++ [#106] from reviewing [#100]'s fix, which spawned [#114] and [#115] by probe.
+
+Issue [#103] made a second consumer project (fls) a client with its own toolchain, and [#108] moved `get_goal` onto the lane once [#75] had built it.
+
+---
+
+## 2.  The two-lane architecture
+
+(See also [#75], [#108], and [`agda-mcp/agda-mcp-interaction-lane.md`].)
 
 **Decision**.  Verdicts come from a batch `agda` process spawned per call; knowledge comes from a persistent `agda --interaction-json` child per resolved project root; and the boundary is policy, held by tool descriptions and reviews, not a convention.
 
-+  **Batch lane, verdicts**: `check_file`, `get_diagnostics`, `fill_hole`, and `check_project`, plus `get_goal`'s fallback path.  Each spawns the real `agda` at the file's real path, patches in place when it must (`fill_hole`'s candidate, the reporting macro), and restores the bytes under `bracket_` on every path, timeout included.  The cost is a cold process per call, deliberately: a verdict is always batch Agda's own exit code.
-+  **Interaction lane, knowledge**: `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`, and since [#108] `get_goal`'s primary path (`Cmd_goal_type_context` returns Agda's own goal display as data, with no file mutation; the response says `source: "interaction-lane"`, and the injected-macro path remains as `source: "injected-macro"` for a lane that cannot serve the file, and as the one path that reports binder visibility).  Interaction mode loads a file with open holes and *succeeds*, which is exactly why it may never decide a verdict; the tool descriptions say this out loud.
++  **Batch lane** (verdicts): `check_file`, `get_diagnostics`, `fill_hole`, and `check_project`, plus `get_goal`'s fallback path.  Each spawns the real `agda` at the file's real path, patches in place when it must (`fill_hole`'s candidate, the reporting macro), and restores the bytes under `bracket_` on every path, timeout included.  The cost is a cold process per call, deliberately: a verdict is always batch Agda's own exit code.
+
++  **Interaction lane** (knowledge): `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`, and since [#108] `get_goal`'s primary path (`Cmd_goal_type_context` returns Agda's own goal display as data, with no file mutation; the response says `source: "interaction-lane"`, and the injected-macro path remains as `source: "injected-macro"` for a lane that cannot serve the file, and as the one path that reports binder visibility).  Interaction mode loads a file with open holes and *succeeds*, which is exactly why it may never decide a verdict; the tool descriptions say this out loud.
+
 +  **A peek is not a call**.  The batch tools may read a warm lane's *stored* load to enrich a response, filling hole listings' `goal` fields ([#108]) and unsolved metas' names and types ([#115]), and only when the lane's recorded load matches the file's current bytes; a cold or stale lane leaves the response byte-identical, and no batch tool ever spawns, loads, or waits on a lane.
+
 +  **The lexical layer is demoted, not deleted**.  `AgdaMCP.Holes` stays the splicing engine (a pre-Agda source edit needs a source view) and the fallback for files Agda refuses to load; it is never again the authority for anything Agda can answer, and parity tests hold it to the lane's `InteractionPoints` across the fixture matrix.
-+  **`scope_at` was omitted rather than approximated**: no interaction command enumerates the names in scope, and the bar (§ 2.2 of the field report) is to ship only where the server beats the shell.  The finding is recorded on [#75].
+
++  **`scope_at` was omitted rather than approximated**: no interaction command enumerates the names in scope, and the bar (§ 2.2 of the field report) is to ship a tool only if it helps the server beat the shell.  The finding is recorded on [#75].
+
 +  **Corpus tools ride neither lane**; they are pure lookups on an in-memory index (§ 10).
 
 **Evidence**.  The lane note was written from live probes of the protocol under the pinned Agda 2.8.0 before the Haskell existed, and the implementation cites it.  The economics, measured disk-warm: a batch call costs 2.78 s and 2.60 s on the repeat, paid per call; the lane's process start plus `Cmd_load` costs 2.59 s once, and five knowledge queries after it added less than measurement noise (2.580 s for the load plus five, against 2.589 s for the load alone).  Switching between two files under one root pays the switched-to file's load, tens of milliseconds warm.  The [#83] shell baseline was a 10.0 s median per check.  Three protocol facts are load-bearing and were each probed: commands execute strictly in order, so a `Cmd_show_version` sentinel after every command frames responses without heuristics or timeouts; a per-load argv must carry the resolved project flags, because `Cmd_load` with an empty list inherits no useful context; and a hole-free file's completed top-level scope loses file-local `open`s, so `resolve_name` prefers a goal-scoped query whenever the file has an interaction point.
@@ -52,7 +129,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PRs [#107] and [#110]).  Open: queries inside a parameterized module's scope ([#139], [M5-6]); an honest payload when hole goals degrade to `?` because the lane holds no matching load ([#146], [M5-8]); many-files-one-call forms of `check_file` and `exports_of` ([#135], [M5-2]); and in-band cancellation via `Cmd_abort` instead of the kill ladder, noted as follow-on work in the lane note.
 
-## 3.  The verdict discipline ([#69], [#72], [#78]; `agda-mcp/README.md`)
+---
+
+## 3.  The verdict discipline
+
+(See also [#69], [#72], [#78] and [`agda-mcp/README.md`])
 
 **Decision**.  `success` is a function of the exit code alone, and every verdict says what ran and what green means.
 
@@ -62,11 +143,15 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 +  `get_goal`'s batch path reports a non-zero `exitCode` even when the goal is right, because the injected macro leaves an interaction point behind, and its description says so; a lane-sourced answer carries no verdict at all.
 +  `check_project` ([#78], PR [#98]) is the one deliberate departure, and only in the safe direction: `success` is a conjunction of exit 0, finishing inside the bound, and no failure evidence in the output, so a wrapper that ends in `echo` and reports exit 0 for a failed `make` comes back as `success: false` with `maskedFailure: true`.  The recognizers (an Agda error diagnostic, GNU make's own `*** ... Error N` line) are a list, not a theory, so `outputTail` is returned whatever the verdict; evidence can turn a green gate red, never a red gate green.  The gate is discovered in a fixed order (a named `make` target; `--check-command`, run directly with no shell; the nearest Makefile's `check`; `agda` on the `Everything` module; else a failure naming what was searched), and a check that did not happen is never reported as a pass.
 
-**Evidence**.  The § 7 verification of the field report is the record of what an untrustworthy verdict costs, and the consumer-side document written after the RP-3 session (`docs/feedback/agent-case-for-corpus-proof-search.md` § 1) names the discipline's effect: it "removes an agent's ability to talk itself into 'probably green'".  The 2026-08-21 field report used the `verdict` echo to quote a check in a PR body "as a checkable claim rather than an assertion".
+**Evidence**.  The § 7 verification of the field report is the record of what an untrustworthy verdict costs, and the consumer-side document written after the RP-3 session ([`feedback/agent-case-for-corpus-proof-search.md`] § 1) names the discipline's effect: it "removes an agent's ability to talk itself into 'probably green'".  The 2026-08-21 field report used the `verdict` echo to quote a check in a PR body "as a checkable claim rather than an assertion".
 
 **Status**.  Adopted (PRs [#81], [#95], [#98]).  No open follow-up.
 
-## 4.  Ask Agda, don't re-derive ([#100], [#106]; `docs/agda-mcp/agda-mcp-ask-agda-audit.md`)
+---
+
+## 4.  Ask Agda, don't re-derive
+
+(See also [#100], [#106] and [`agda-mcp/agda-mcp-ask-agda-audit.md`].)
 
 **Decision**.  `answer = whatAgdaSaid <|> whatWeDerived`.  When Agda can answer a question, in output a call already captures or through a lane query, Agda's answer is the authority; a local derivation from source text is a pre-flight approximation and a fallback, and a change in Agda's output degrades a field to the derived value, never to a wrong value.  The rule is written where a new tool's author will read it, in the README's architecture notes, and [#106] audited it across every derived answer in the server.
 
@@ -79,7 +164,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PRs [#105], [#110], [#116]).  No open follow-up; the rule is the review question for every new field.
 
-## 5.  Project resolution and transparency ([#76], [#101], [#103]; `docs/agda-mcp/agda-mcp-environment.md`)
+---
+
+## 5.  Project resolution and transparency
+
+(See also [#76], [#101], [#103] and [`agda-mcp/agda-mcp-environment.md`].)
 
 **Decision**.  The library context is resolved per call from the requested file, echoed in full, and a wrong tree is an error, not a wrong answer.
 
@@ -93,7 +182,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PRs [#95], [#102], [#104]).  Open: the registry's one-absolute-path-per-library shape goes stale under worktree churn (three sessions in two weeks hit it), and [#137] ([M5-4]) chooses between a parent-directory registration and lazy resolution.
 
-## 6.  Structured diagnostics ([#74]; `agda-mcp/README.md`)
+---
+
+## 6.  Structured diagnostics
+
+(See also [#74] and `agda-mcp/README.md`)
 
 **Decision**.  Diagnostics are data beside the prose, in a shape a client can branch on.
 
@@ -105,7 +198,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PRs [#94] and [#118]).  Open: `UnsolvedConstraints` restates the whole meta dump beside the `UnsolvedMetaVariables` list that was the useful part, "a hundred lines for six metas" ([#145], [M5-7]).
 
-## 7.  The hole model ([#70], [#71], [#73], [#79]; `agda-mcp/README.md`)
+---
+
+## 7.  The hole model
+
+(See also [#70], [#71], [#73], [#79] and [`agda-mcp/README.md`])
 
 **Decision**.  A hole is what Agda would treat as an interaction point, addressed by position, and every answer re-anchors the client.
 
@@ -117,7 +214,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PRs [#82], [#88], [#99]).  Open: `fill_hole` restores the file even when the candidate is accepted, so every accepted candidate is re-applied by hand, and [#136] ([M5-3]) chooses between an opt-in `apply` and a returned patch.
 
-## 8.  Evidence-channel honesty ([#114], [#115])
+---
+
+## 8.  Evidence-channel honesty
+
+(See also [#114], [#115].)
 
 **Decision**.  Before inferring anything from what Agda did *not* say, check that the channel it would have said it on was open; an absent field means unknown, never a guess.
 
@@ -129,7 +230,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PRs [#117] and [#118]).  Open: `checkedFromSource: false` right after an edit reads as "stale" until one remembers interfaces are content-hashed, and [#138] ([M5-5]) adds a reason beside the boolean.
 
-## 9.  Enforced timeouts, timing, and cache visibility ([#77])
+---
+
+## 9.  Enforced timeouts, timing, and cache visibility
+
+(See also [#77].)
 
 **Decision**.  Every call is bounded, the bound is enforced by killing the process, and every response says how long it took and whether Agda re-checked from source.
 
@@ -143,7 +248,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PR [#89]; the lane's deadline in PR [#107]).  Open: there is no profiling lane, so the 2026-08-30 and 2026-09-04 sessions measured with `/usr/bin/time` and `agda --profile=internal` from the shell, and [#134] ([M5-1]) proposes `profile_file`.
 
-## 10.  Corpus tools ([#11], M1-3; `agda-mcp/README.md`)
+---
+
+## 10.  Corpus tools
+
+(See also [#11], M1-3 and `agda-mcp/README.md`.)
 
 **Decision**.  Three pure lookups over an in-memory index of an `agda-strux` JSONL corpus, registered only when the server starts with `--corpus`, and never invoking Agda: `search_by_name` (case-insensitive substring over names), `search_by_type` (substring over printed types), and `get_dependencies` (a definition's dependency list, optionally expanded one hop).
 
@@ -151,7 +260,11 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 **Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.
 
-## 11.  Environment and registration ([#76], [#103], [#133]; `docs/agda-mcp/agda-mcp-environment.md`)
+---
+
+## 11.  Environment and registration
+
+(See also [#76], [#103], [#133] and [`agda-mcp/agda-mcp-environment.md`].)
 
 **Decision**.  The server is a separate process with its own toolchain and working directory, and the client registration says so explicitly rather than relying on anything the operator's shell provides.
 
@@ -163,6 +276,8 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 **Evidence**.  The reproduction in the environment note (a foreign `git init` directory acquiring `agda/libraries`, `agda/defaults`, and `target/` on shell entry, with a registry line pointing at a path that does not exist) and its after-fix table; [#133]'s diagnosis, in which every fls checkout's `.mcp.json` was a dangling symlink and the tooling copy was a byte-for-byte agda-algebras registration.
 
 **Status**.  Adopted (PRs [#95] and [#104]; the registrations live in claude-tooling).  Open: [#137] ([M5-4]), as in § 5.
+
+---
 
 ## 12.  Where it stands: the field record
 
@@ -182,6 +297,8 @@ The wave's plan kept the document's own priorities: P0 is trust ([#69], [#70], [
 
 Two honest patterns run through the record.  Hole-driven development was mostly unused, and the reports say that was the right call: when an agent can read the sources into context and design the proof whole, write-then-check wins, and holes pay when goal types are genuinely unknown.  And the server's value in these sessions was latency, structured diagnostics, and the project echo, not capability the shell lacks; the shell stayed better for per-file sweeps and for the final whole-library gate.  Both patterns are inputs to Milestone 5 and to [#17].
 
+---
+
 ## 13.  Where it goes
 
 +  **Milestone 5, AgdaMCP as a daily research instrument**, filed from the field record: `profile_file` ([#134], [M5-1]); many-files-one-call forms of `check_file` and `exports_of` ([#135], [M5-2]); `fill_hole` opt-in apply or a returned patch ([#136], [M5-3]); registry hygiene across worktrees ([#137], [M5-4]); a reason beside `checkedFromSource` ([#138], [M5-5]); `type_of` inside a parameterized module's scope ([#139], [M5-6]); the `UnsolvedConstraints` restatement ([#145], [M5-7]); honest degraded hole goals ([#146], [M5-8]); and a worked validation-oracle example for `exports_of` ([#147], [M5-9]).
@@ -189,6 +306,8 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 +  **The wave's measurement and publication companions**: the remaining [#83] arms ([M1-7]), the demo page ([#85], [M1-8]), and the tool paper ([#14], [M1-6]), for which this record is the design summary.
 +  **Recorded and deliberately not taken**: `roots/list` for client-relative paths (needs a bidirectional transport); `Cmd_abort` in place of the lane's kill ladder; streaming progress and `since`-narrowing for `check_project`; and the restore variant of [#114], until a version gate exists for foreign `--agda-bin` toolchains.
 +  **Agda as a library** remains the long-term plan for the batch lane's latency; the interaction lane already delivers persistent state and millisecond warm latency for queries, and nothing in this record depends on the library plan landing.
+
+---
 
 ## 14.  Decision log
 
@@ -214,12 +333,47 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 | 18 | Corpus tools are pure in-memory lookups, registered only with `--corpus` | Adopted ([#11], PR [#44]) | 1.4 s load, 308 MB resident at library scale |
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
 
+---
+
 ## References
 
-+  Issues: [#68] (the wave, with verification results and sequencing), its children [#69], [#70], [#71], [#72], [#73], [#74], [#75], [#76], [#77], [#78], [#79]; the follow-on fixes [#100], [#101], [#103], [#106], [#108], [#114], [#115], [#133]; the companions [#83] (M1-7), [#85] (M1-8), [#14] (M1-6); the forward pointer [#17] (M2-3); Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147]; the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
-+  PRs: [#38] (M1-2), [#44] (M1-3), [#67] ([#66]), [#80] (the field report), [#81] ([#69]), [#82] ([#70]), [#88] ([#71], [#73]), [#89] ([#77]), [#94] ([#74]), [#95] ([#72], [#76]), [#98] ([#78]), [#99] ([#79]), [#102] ([#101]), [#104] ([#103]), [#105] ([#100]), [#107] ([#75]), [#110] ([#108]), [#116] ([#106]), [#117] ([#114]), [#118] ([#115]).
-+  Docs: [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../agda-mcp/agda-mcp-interaction-lane.md) (the two-lane policy, the protocol as observed, lifecycle, economics), [`docs/agda-mcp/agda-mcp-ask-agda-audit.md`](../agda-mcp/agda-mcp-ask-agda-audit.md) (the rule, the inventory, two measurements), [`docs/agda-mcp/agda-mcp-environment.md`](../agda-mcp/agda-mcp-environment.md) (what is written where, which tree is checked, the operator checklist), [`docs/agda-mcp/agda-mcp-improvements-summary.md`](../agda-mcp/agda-mcp-improvements-summary.md) (the wave, fix by fix, with PR numbers), [`agda-mcp/README.md`](../../agda-mcp/README.md) (the tool contracts and response-field tables), [`docs/feedback/flrp-agda-mcp-improvements.md`](../feedback/flrp-agda-mcp-improvements.md) (the field report and its verification addendum), [`docs/feedback/agent-case-for-corpus-proof-search.md`](../feedback/agent-case-for-corpus-proof-search.md) (the consumer-side case), [`docs/mcp-field-reports.md`](../mcp-field-reports.md) (the session record), [`docs/adr/0001-proof-search-on-agda-mcp.md`](0001-proof-search-on-agda-mcp.md) (the search built on this server).
-+  Code map (`agda-mcp/src/AgdaMCP/`): `Agda.hs` (the batch subprocess, the kill ladder, `checkedFromSourceOf`, `progressChannelMuted`), `Interaction.hs` (the lane registry and runner), `Project.hs` (root resolution, the registry, the mismatch refusal), `Holes.hs` (the hole model and the code-only view), `Diagnostics.hs` (prose to structured diagnostics), `Gate.hs` (which command is the gate), `Corpus.hs` (the index), `Tools/ProofState.hs`, `Tools/CheckProject.hs`, `Tools/LiveQueries.hs`, `Tools/Search.hs`, and `Server.hs` (the transport); tests in `agda-mcp/test/Main.hs` with fixtures under `agda-mcp/test/resources/`.
++  **Issues**:
+
+   + [#68] the wave, with verification results and sequencing,
+   + its children [#69], [#70], [#71], [#72], [#73], [#74], [#75], [#76], [#77], [#78], [#79];
+   + the follow-on fixes [#100], [#101], [#103], [#106], [#108], [#114], [#115], [#133];
+   + the companions [#83] (M1-7), [#85] (M1-8), [#14] (M1-6);
+   + the forward pointer [#17] (M2-3);
+   + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147];
+   + the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
+
++  **PRs**: [#38] (M1-2), [#44] (M1-3), [#67] ([#66]), [#80] (the field report), [#81] ([#69]), [#82] ([#70]), [#88] ([#71], [#73]), [#89] ([#77]), [#94] ([#74]), [#95] ([#72], [#76]), [#98] ([#78]), [#99] ([#79]), [#102] ([#101]), [#104] ([#103]), [#105] ([#100]), [#107] ([#75]), [#110] ([#108]), [#116] ([#106]), [#117] ([#114]), [#118] ([#115]).
+
++  **Docs**:
+
+   + [`agda-mcp/agda-mcp-interaction-lane.md`] the two-lane policy, the protocol as observed, lifecycle, economics,
+   + [`agda-mcp/agda-mcp-ask-agda-audit.md`] the rule, the inventory, two measurements,
+   + [`agda-mcp/agda-mcp-environment.md`] what is written where, which tree is checked, the operator checklist,
+   + [`agda-mcp/agda-mcp-improvements-summary.md`] the wave, fix by fix, with PR numbers,
+   + [`agda-mcp/README.md`] the tool contracts and response-field tables,
+   + [`feedback/flrp-agda-mcp-improvements.md`] the field report and its verification addendum,
+   + [`feedback/agent-case-for-corpus-proof-search.md`] the consumer-side case,
+   + [`mcp-field-reports.md`] the session record,
+   + [`adr/0001-proof-search-on-agda-mcp.md`] the search built on this server.
+
++  **Code map** (`agda-mcp/src/AgdaMCP/`):
+
+   + `Agda.hs`: the batch subprocess, the kill ladder, `checkedFromSourceOf`, `progressChannelMuted`,
+   + `Interaction.hs`: the lane registry and runner,
+   + `Project.hs`: root resolution, the registry, the mismatch refusal,
+   + `Holes.hs`: the hole model and the code-only view,
+   + `Diagnostics.hs`: prose to structured diagnostics,
+   + `Gate.hs`: which command is the gate,
+   + `Corpus.hs`: the index,
+   + `Tools/ProofState.hs`, `Tools/CheckProject.hs`, `Tools/LiveQueries.hs`, `Tools/Search.hs`,
+   + `Server.hs`: the transport,
+   +  `agda-mcp/test/Main.hs`: tests,
+   +  `agda-mcp/test/resources/`: fixtures.
 
 <!-- GitHub references: one definition per issue or PR cited above; PRs resolve to /pull/, issues to /issues/. -->
 [#10]: https://github.com/formalverification/agda-native-air/issues/10
@@ -279,3 +433,15 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 [#146]: https://github.com/formalverification/agda-native-air/issues/146
 [#147]: https://github.com/formalverification/agda-native-air/issues/147
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
+
+[#459]: https://github.com/ualib/agda-algebras/issues/459
+[#507]: https://github.com/ualib/agda-algebras/pull/507
+[`agda-mcp/agda-mcp-ask-agda-audit.md`]: ../agda-mcp/agda-mcp-ask-agda-audit.md
+[`agda-mcp/agda-mcp-environment.md`]: ../agda-mcp/agda-mcp-environment.md
+[`agda-mcp/agda-mcp-improvements-summary.md`]: ../agda-mcp/agda-mcp-improvements-summary.md
+[`agda-mcp/agda-mcp-interaction-lane.md`]: ../agda-mcp/agda-mcp-interaction-lane.md
+[`agda-mcp/README.md`]: ../agda-mcp/README.md
+[`feedback/flrp-agda-mcp-improvements.md`]: ../feedback/flrp-agda-mcp-improvements.md
+[`feedback/agent-case-for-corpus-proof-search.md`]: ../feedback/agent-case-for-corpus-proof-search.md
+[`mcp-field-reports.md`]: ../mcp-field-reports.md
+[`adr/0001-proof-search-on-agda-mcp.md`]: 0001-proof-search-on-agda-mcp.md
