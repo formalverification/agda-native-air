@@ -3,7 +3,7 @@
 File: `agda-native-air/docs/adr/0002-agda-mcp.md`
 
 +  **Status**: Accepted.  Every decision below is landed on `main`; follow-ups each one requires are named in its section and tracked in Milestone 5.
-+  **Date**: 2026-09-07 (the day [#68] hardening wave was closed as complete; the field record runs 2026-08-21 through 2026-09-04).
++  **Date**: 2026-09-07 (the day the [#68] hardening wave was closed as complete; the field record runs 2026-08-21 through 2026-09-04).
 +  **Tracking**: [#148] (this record); [#68] (the wave, closed) and its children [#69]–[#79]; the fixes that followed from it, [#100], [#101], [#103], [#106], [#108], [#114], [#115]; Milestone 5 ([#134]–[#139], [#145]–[#147]) for what is open.
 +  **Ancestry**: [#10] (M1-2, the four-tool server, PR [#38]); [#11] (M1-3, the corpus tools, PR [#44]); [#66] (in-place checking, PR [#67]); and [`feedback/flrp-agda-mcp-improvements.md`] (imported by PR [#80]), the field report whose § 7 verification addendum is where most of the decisions below were earned.
 
@@ -24,7 +24,7 @@ The server runs Agda in two lanes and lets only one of them judge.
 
 +  The *batch lane* spawns the real `agda` once per call and derives every verdict from that process's exit code, never from its prose.
 
-   The verdict travels with:
+   The verdict travels with the following:
 
    + the command to which it is equivalent, 
    + the resolved binary and working directory, and
@@ -32,7 +32,7 @@ The server runs Agda in two lanes and lets only one of them judge.
 
    so a client can check the claim instead of trusting it.
 
-+  The *interaction lane* keeps one persistent `agda --interaction-json` child per project root and answers questions about a loaded file in milliseconds: 
++  The *interaction lane* keeps one persistent `agda --interaction-json` child per project root and answers questions about a loaded file in milliseconds, such as the following:
 
    + what is this expression's type,
    + what does this name resolve to and why,
@@ -57,7 +57,7 @@ Nine field sessions between 2026-08-21 and 2026-09-04, in `agda-algebras` and in
 
 ### Where it goes
 
-Milestone 5 collects the ergonomics the field record asked for (§ 13):
+Milestone 5 collects the ergonomics the field record asked for (§ 13), as follows:
 
 + a profiling tool,
 + many-files-one-call forms,
@@ -87,7 +87,7 @@ The session (`ualib/agda-algebras` Issue [#459], PR [#507]) wrote its own post-m
 
 +  **Found while re-testing**.  No diagnostic carried a position, because the parser expected Agda's old `file:10,5-15` format and 2.8.0 emits `file:9.12-13` ([#74]); `--timeout` was parsed and never enforced ([#77]).
 
-The wave's plan kept the document's own priorities:
+The wave's plan kept the document's own priorities, as follows:
 
 +  P0 is trust ([#69], [#70], [#71], [#73], [#72]),
 +  P1 is reach beyond the shell ([#74], [#75], [#76], [#77]),
@@ -95,7 +95,7 @@ The wave's plan kept the document's own priorities:
 
 Its acceptance metric was blunt, that the next real literate-repository session reaches for the server instead of the shell.
 
-Three later issues came from the wave's own measurements rather than from the report:
+Three later issues came from the wave's own measurements rather than from the report, as follows:
 
 + [#101] from the [#83] field test (the one agent that reached for the server on its own sent a relative path, got a bare `-32603`, wrote "the MCP agda server crashed", and never called it again),
 + [#100] from a literate fixture whose prose named the module,
@@ -133,7 +133,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 3.  The verdict discipline
 
-(See also [#69], [#72], [#78] and [`agda-mcp/README.md`])
+(See also [#69], [#72], [#78], and [`agda-mcp/README.md`].)
 
 **Decision**.  `success` is a function of the exit code alone, and every verdict says what ran and what green means.
 
@@ -151,7 +151,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 4.  Ask Agda, don't re-derive
 
-(See also [#100], [#106] and [`agda-mcp/agda-mcp-ask-agda-audit.md`].)
+(See also [#100], [#106], and [`agda-mcp/agda-mcp-ask-agda-audit.md`].)
 
 **Decision**.  `answer = whatAgdaSaid <|> whatWeDerived`.  When Agda can answer a question, in output a call already captures or through a lane query, Agda's answer is the authority; a local derivation from source text is a pre-flight approximation and a fallback, and a change in Agda's output degrades a field to the derived value, never to a wrong value.  The rule is written where a new tool's author will read it, in the README's architecture notes, and [#106] audited it across every derived answer in the server.
 
@@ -168,7 +168,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 5.  Project resolution and transparency
 
-(See also [#76], [#101], [#103] and [`agda-mcp/agda-mcp-environment.md`].)
+(See also [#76], [#101], [#103], and [`agda-mcp/agda-mcp-environment.md`].)
 
 **Decision**.  The library context is resolved per call from the requested file, echoed in full, and a wrong tree is an error, not a wrong answer.
 
@@ -186,7 +186,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 6.  Structured diagnostics
 
-(See also [#74] and `agda-mcp/README.md`)
+(See also [#74] and [`agda-mcp/README.md`].)
 
 **Decision**.  Diagnostics are data beside the prose, in a shape a client can branch on.
 
@@ -202,7 +202,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 7.  The hole model
 
-(See also [#70], [#71], [#73], [#79] and [`agda-mcp/README.md`])
+(See also [#70], [#71], [#73], [#79], and [`agda-mcp/README.md`].)
 
 **Decision**.  A hole is what Agda would treat as an interaction point, addressed by position, and every answer re-anchors the client.
 
@@ -242,7 +242,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 +  The default bound was raised from 30 s to 300 s so cold interface builds are not aborted, and the shipped registrations pass 600 s; sizing the bound too small is not a graceful degradation, since it aborts exactly the call that would have built the interfaces.  `check_project` has its own `--check-timeout` (default 1800 s), because a whole-project gate legitimately runs for tens of minutes.  The lane shares one deadline across a request's phases, pipe writes included, and kills its child by the same ladder.
 +  Every response carries `elapsedMs` and the tri-state `checkedFromSource` of § 8, so a client can tell a slow cold call from a slow warm one, which § 3.7 of the field report says is the only way an advantage influences a decision.
 
-**One correction to the record**.  The 2026-09-01 fls report praises a 173 s check that "moved itself to the background and notified on completion".  That is the client harness backgrounding a long tool call; the server's contribution is the bound that makes a long call safe to wait on.  The behaviour is real and worth having, but it is not a server decision, and this record does not claim it as one.
+**One correction to the record**.  The 2026-09-01 fls report praises a 173 s check that "moved itself to the background and notified on completion".  That is the client harness backgrounding a long tool call; the server's contribution is the bound that makes a long call safe to wait on.  The behavior is real and worth having, but it is not a server decision, and this record does not claim it as one.
 
 **Evidence**.  [#77]'s finding that `FillTimeout` was unreachable code; the suite's pinning of the restore on the timeout path; the per-call timings across the field record (§ 12).
 
@@ -252,7 +252,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 10.  Corpus tools
 
-(See also [#11], M1-3 and `agda-mcp/README.md`.)
+(See also [#11] (M1-3) and [`agda-mcp/README.md`].)
 
 **Decision**.  Three pure lookups over an in-memory index of an `agda-strux` JSONL corpus, registered only when the server starts with `--corpus`, and never invoking Agda: `search_by_name` (case-insensitive substring over names), `search_by_type` (substring over printed types), and `get_dependencies` (a definition's dependency list, optionally expanded one hop).
 
@@ -264,7 +264,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 11.  Environment and registration
 
-(See also [#76], [#103], [#133] and [`agda-mcp/agda-mcp-environment.md`].)
+(See also [#76], [#103], [#133], and [`agda-mcp/agda-mcp-environment.md`].)
 
 **Decision**.  The server is a separate process with its own toolchain and working directory, and the client registration says so explicitly rather than relying on anything the operator's shell provides.
 
@@ -372,8 +372,8 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
    + `Corpus.hs`: the index,
    + `Tools/ProofState.hs`, `Tools/CheckProject.hs`, `Tools/LiveQueries.hs`, `Tools/Search.hs`,
    + `Server.hs`: the transport,
-   +  `agda-mcp/test/Main.hs`: tests,
-   +  `agda-mcp/test/resources/`: fixtures.
+   + `agda-mcp/test/Main.hs`: tests,
+   + `agda-mcp/test/resources/`: fixtures.
 
 <!-- GitHub references: one definition per issue or PR cited above; PRs resolve to /pull/, issues to /issues/. -->
 [#10]: https://github.com/formalverification/agda-native-air/issues/10
@@ -440,7 +440,7 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 [`agda-mcp/agda-mcp-environment.md`]: ../agda-mcp/agda-mcp-environment.md
 [`agda-mcp/agda-mcp-improvements-summary.md`]: ../agda-mcp/agda-mcp-improvements-summary.md
 [`agda-mcp/agda-mcp-interaction-lane.md`]: ../agda-mcp/agda-mcp-interaction-lane.md
-[`agda-mcp/README.md`]: ../agda-mcp/README.md
+[`agda-mcp/README.md`]: ../../agda-mcp/README.md
 [`feedback/flrp-agda-mcp-improvements.md`]: ../feedback/flrp-agda-mcp-improvements.md
 [`feedback/agent-case-for-corpus-proof-search.md`]: ../feedback/agent-case-for-corpus-proof-search.md
 [`mcp-field-reports.md`]: ../mcp-field-reports.md

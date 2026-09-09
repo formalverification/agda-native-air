@@ -1023,7 +1023,7 @@ to keep in step with an upstream API.
 [hackage-mcp-server]: https://hackage.haskell.org/package/mcp-server
 [rust-sdk]: https://github.com/modelcontextprotocol/rust-sdk
 [AgdaDojang]: ../agda-dojang/
-[MANIFESTO]: ../MANIFESTO.md
+[MANIFESTO]: ../docs/MANIFESTO.md
 [PLAN]: ../docs/PLAN.md
 [M1-2]: https://github.com/formalverification/agda-native-air/issues/10
 [M1-3]: https://github.com/formalverification/agda-native-air/issues/11
