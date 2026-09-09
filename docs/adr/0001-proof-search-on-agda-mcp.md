@@ -4,8 +4,8 @@ File: `agda-native-air/docs/adr/0001-proof-search-on-agda-mcp.md`
 
 +  **Status**: Draft.
 +  **Date**: 2026-08-22 (P0 and P1 landed); 2026-08-27 (P2 landed; P3 is direction).
-+  **Tracking**: [#113](https://github.com/formalverification/agda-native-air/issues/113); phases [#119](https://github.com/formalverification/agda-native-air/issues/119) (P0, PR [#121](https://github.com/formalverification/agda-native-air/pull/121)), [#122](https://github.com/formalverification/agda-native-air/issues/122) (P1, PR [#126](https://github.com/formalverification/agda-native-air/pull/126)), [#123](https://github.com/formalverification/agda-native-air/issues/123) (P2, PR [#130](https://github.com/formalverification/agda-native-air/pull/130)), [#124](https://github.com/formalverification/agda-native-air/issues/124) (P3).
-+  **Ancestry**: Issue #112 (post-mortem of the retired v0.3 `search.py`), whose
++  **Tracking**: [#113]; phases [#119] (P0, PR [#121]), [#122] (P1, PR [#126]), [#123] (P2, PR [#130]), [#124] (P3).
++  **Ancestry**: Issue [#112] (post-mortem of the retired v0.3 `search.py`), whose
    four lessons this design encodes as types and tests rather than prose.
 
 ## Executive summary
@@ -76,20 +76,20 @@ server.
 
 and measured the baseline: **6 of 22 benchmark obligations solved (routine 6/7, compositional 0/10, non-obvious 0/5)**, which is *exactly* the ceiling of what that action space can express in term mode, so the number is saturated, not disappointing.  A measured `type_of` pre-filter cut oracle judgements by 88 % and end-to-end time by 4.5× at zero cost in solves.
 
-P2 landed retrieval over a real standard-library corpus (55,576 rows, pinned to the toolchain's own stdlib) behind the same seam, and measured the honest thing: **retrieval adds zero term-mode solves on this suite because the suite's ceiling binds any term-mode proposer, not because retrieval fails**.  The evidence separating those readings: a labeled control with the anti-gaming target exclusion off retrieves and commits all five admissible stdlib targets as one-shot applications, in both measurement rounds (post-fix 9/22 against 4/22 under exclusion), and a wire fact pinned along the way (`fill_hole` refuses blocked-constraint sub-holes) explains exactly which lemma class term mode cannot refine through.  The peek re-validated on retrieval candidates and its default flipped to ON; the benchmark extension that gives retrieval something honest to win is filed as #129.
+P2 landed retrieval over a real standard-library corpus (55,576 rows, pinned to the toolchain's own stdlib) behind the same seam, and measured the honest thing: **retrieval adds zero term-mode solves on this suite because the suite's ceiling binds any term-mode proposer, not because retrieval fails**.  The evidence separating those readings: a labeled control with the anti-gaming target exclusion off retrieves and commits all five admissible stdlib targets as one-shot applications, in both measurement rounds (post-fix 9/22 against 4/22 under exclusion), and a wire fact pinned along the way (`fill_hole` refuses blocked-constraint sub-holes) explains exactly which lemma class term mode cannot refine through.  The peek re-validated on retrieval candidates and its default flipped to ON; the benchmark extension that gives retrieval something honest to win is filed as [#129].
 
 ### Where it goes
 
 After P2 the bottleneck is no longer the action space but the move vocabulary: term mode caps this suite whatever the proposer.
 
-P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract; #129 extends the benchmark so a proposer that finds the right lemma in a haystack can be told apart from one that cannot; case-split moves (§10) are the eventual ceiling-raiser.
+P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract; [#129] extends the benchmark so a proposer that finds the right lemma in a haystack can be told apart from one that cannot; case-split moves (§10) are the eventual ceiling-raiser.
 
 Every phase is scored on the same benchmark through the same JSONL schema, so the
 baselines stack: each phase must beat the last, on the same obligations, in the
 same currency of oracle calls.
 
 The 22 stdlib obligations P0/P1 were measured on are frozen; the suite has since
-grown an agda-algebras tier (21 obligations, #127) cut from the corpus itself, and
+grown an agda-algebras tier (21 obligations, [#127]) cut from the corpus itself, and
 every consumer keys per-tier numbers off the index, so the stacked baselines stay
 quotable per tier.
 
@@ -101,26 +101,26 @@ Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might
 help*; proof search is the part that *does mathematics*: propose a step, submit it
 to the checker, and iterate.  It had exactly one prior implementation,
 `agda-dojang/python/tools/search.py`, dead since 2026-03-10 and archived under
-#112.
+[#112].
 
-Three things changed by mid-2026 that made a proper restart worthwhile (#113):
+Three things changed by mid-2026 that made a proper restart worthwhile ([#113]):
 
 +  **The oracle is native**.  `agda-mcp` exposes `fill_hole`, `get_goal`, and
-   `check_file` directly, and since the #68 hardening wave also answers scope,
+   `check_file` directly, and since the [#68] hardening wave also answers scope,
    type, and definition questions mid-proof from a persistent interaction lane
-   (#75, #107, #108), which is precisely the information a proposer needs.
+   ([#75], [#107], [#108]), which is precisely the information a proposer needs.
 +  **The corpus exists**.  `agda-strux` extraction plus `search_by_name` /
    `search_by_type` can supply candidate lemmas at scale; the old search's action
    space, for development/testing, was hardcoded to two candidates.
 +  **The measurement exists**.  `data/benchmarks/` is the [M1-5] suite (43
    obligations across two libraries: the frozen 22-obligation stdlib tier, plus
-   the 21-obligation agda-algebras tier of PR #127, mined from the corpus so the
+   the 21-obligation agda-algebras tier of [#127], mined from the corpus so the
    suite exercises the thing retrieval searches; difficulty tiers `routine` /
    `compositional` / `non-obvious`), and the proof-completion evaluator already
    emits versioned JSONL (`eval-proof-completion.v0`), so search results sit
    beside the policy-backend baseline with no new measurement apparatus.
 
-Four lessons from #112 are load-bearing and appear throughout:
+Four lessons from [#112] are load-bearing and appear throughout:
 
 + report actions are peeks, not moves;
 + partial application consumes visible binders only;
@@ -143,7 +143,7 @@ obligations are conjunctive.
    answers `get_goal`, `type_of` (and others) about a loaded file in milliseconds.
    Knowledge informs proposals and pre-filters; it never decides anything.
 
-P0's measurement (#113, run `split-m15`) fixed the numbers the design lives by:
+P0's measurement ([#113], run `split-m15`) fixed the numbers the design lives by:
 
 +  Oracle calls are effectively 100% of wall time; proposal time is milliseconds
    per fixture.
@@ -172,7 +172,7 @@ P0's measurement (#113, run `split-m15`) fixed the numbers the design lives by:
 +  **A state is an obligation set, a working-copy content, and a script**.
    `SearchState(content, obligations, script)` with conjunctive semantics: solved
    means the *whole set* is empty.  There is no per-goal success anywhere in the
-   model, so #112's disjunctive defect is unrepresentable.
+   model, so [#112]'s disjunctive defect is unrepresentable.
 +  **Probes are not moves**.  `fill_hole` restores the file server-side, so every
    probe is a peek; `ProbeOutcome` (what the oracle said) and `Move` (an action
    committed to the working copy) are distinct types, and the script has type
@@ -185,13 +185,13 @@ P0's measurement (#113, run `split-m15`) fixed the numbers the design lives by:
    evidence (success reported beside a non-zero exit).
 +  **The obligation set is the oracle's, not ours**.  Every `fill_hole` response
    carries the re-anchored hole list describing the file as that candidate would
-   leave it (Issue #79); `commit` adopts that list wholesale, so client-side hole
+   leave it (Issue [#79]); `commit` adopts that list wholesale, so client-side hole
    arithmetic can never drift from Agda's.
 +  **Two caches, two key types**.  `OracleKey(contentFingerprint, line, col, candidate)`
    memoises judgements: same content, same hole, same candidate is one Agda call
    per fixture run, by construction.  `StateKey(contentFingerprint, script)`
    identifies states for frontier dedup.  Conflating them either re-runs Agda or
-   wrongly prunes the frontier (#112's lesson), so they are distinct case classes.
+   wrongly prunes the frontier ([#112]'s lesson), so they are distinct case classes.
 +  **Strict wire decoders**.  The response fields the search acts on (`holes`,
    counts, `elapsedMs`, `context`) are required, and counts are cross-checked
    against lists: a drifted server shape fails the decode visibly instead of
@@ -238,7 +238,7 @@ P0's measurement (#113, run `split-m15`) fixed the numbers the design lives by:
    drift, or a closing probe whose final check disagrees raises out of that
    fixture; the sweep continues, every artifact is written (an anomalous fixture
    keeps its attempt rows, wall clock, and probe counts), and the run exits
-   non-zero.  (This is P0's discipline, inherited from #112's own failure mode: a
+   non-zero.  (This is P0's discipline, inherited from [#112]'s own failure mode: a
    harness that exits 0 while writing broken rows lets breakage sit silent for
    months.)
 
@@ -264,7 +264,7 @@ P1's implementation is deliberately fixed and non-learned, in proposal order:
    +  binder counts read from lane `type_of` answers through a deliberately small
       pi-type splitter (arrows at bracket depth 0); 
 
-   +  applications ordered cheap-before-expensive (#112's lesson four, applied to
+   +  applications ordered cheap-before-expensive ([#112]'s lesson four, applied to
       proposal order because the budget can run out mid-expansion).
 
 Two hard-won details are pinned in tests:
@@ -287,7 +287,7 @@ On the stdlib tier that is 16 of 22 (13 inductions, 2 case splits, and one
 single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six
 with expressible single-term golds are exactly the six P1 solves.
 
-The agda-algebras tier (#127) was mined for single-term golds precisely so this
+The agda-algebras tier ([#127]) was mined for single-term golds precisely so this
 ceiling cannot bind it (21 of 21 are term-expressible by construction) which moves
 the whole gap onto the action space: its `using`-list stratum is reachable by the
 fixed space in principle, and its wholesale-import stratum is starved of `using`
@@ -296,7 +296,7 @@ else.
 
 ## 6.  The `type_of` peek (P1's measured experiment)
 
-The modern form of #112's "report actions are peeks": before spending ~2.6 s
+The modern form of [#112]'s "report actions are peeks": before spending ~2.6 s
 judging a candidate, ask the interaction lane to *infer the type* of the candidate
 with `_` metas in place of its holes, at the goal, in milliseconds, and skip the
 judgement when the answer cannot fit.
@@ -337,7 +337,7 @@ opt-in (`--peek on`) through P1; P2 performed that re-validation on retrieval
 candidates (and the peek restored a budget-ordering loss there), so the default
 is now ON (decision 8).
 
-## 7.  The P2 retrieval proposer (#123, `Retrieve.scala`)
+## 7.  The P2 retrieval proposer ([#123], `Retrieve.scala`)
 
 P2 widens WHAT is proposed, not how it is judged: a `RetrievalProposer` behind the same seam, COMPOSED around the fixed space (closers, assumptions, and `using`-list applications stay — they carry the constructors the corpus does not row — so the P2 space is a superset of P1's by construction and any measured delta is attributable to retrieval).  Its substrate is a real corpus of the standard library — 55,576 rows extracted from the pinned Nix-store stdlib 2.3, provenance and digests in `docs/corpora/agda-stdlib-v0.md` — served by `agda-mcp --corpus` through `search_by_name` / `search_by_type` / `get_dependencies`, driven as a client like everything else.
 
@@ -355,11 +355,11 @@ Every run writes the shared eval schema, so search results sit beside the policy
 
 ## 9.  Where it stands: the numbers
 
-**P0** (Issue #113, the measurement that settled the fork).  Oracle 180 calls per
+**P0** (Issue [#113], the measurement that settled the fork).  Oracle 180 calls per
 pass at ~2.6–2.9 s each, 99.79 % of oracle time in the Agda subprocess, transport
 0.21 %, proposal 2.3 ms total.
 
-**P1** (Issue #113, PR #126; beam 4, depth 6, budget 60).
+**P1** (Issue [#113], PR [#126]; beam 4, depth 6, budget 60).
 
 | configuration                    | solved                                       | probes | wall     |
 |----------------------------------|----------------------------------------------|--------|----------|
@@ -374,7 +374,7 @@ cost lever (opt-in at P1; P2's re-validation flipped it default-ON); and the
 baseline every later phase must beat is **6/22, at 435 probes without the peek or
 50 with it**.
 
-P2 (issue #113, the same knobs, retrieval composed around the fixed space, target exclusion on unless stated).  Measured twice: first at the initial P2 code, then re-measured after the #130 review fixes changed real pool composition — the topK cut had fallen before lane resolution, so 18 of 22 fixtures had been searching pools of one or two lemmas instead of eight.  The table is the post-fix record (runs `p2fix-{a,b,c,d}`); the review round's wall clocks ran on a loaded machine, so the call counts are the comparable columns:
+P2 (issue [#113], the same knobs, retrieval composed around the fixed space, target exclusion on unless stated).  Measured twice: first at the initial P2 code, then re-measured after the [#130] review fixes changed real pool composition — the topK cut had fallen before lane resolution, so 18 of 22 fixtures had been searching pools of one or two lemmas instead of eight.  The table is the post-fix record (runs `p2fix-{a,b,c,d}`); the review round's wall clocks ran on a loaded machine, so the call counts are the comparable columns:
 
 | configuration | solved | probes |
 |---|---|---|
@@ -387,8 +387,8 @@ The reading survives the re-measurement and sharpens: **the suite's term-mode ce
 
 ## 10.  Where it is going
 
-+  **P2 — retrieval proposals: infrastructure landed** (§7 and §9; the phase's issue #123/[M2-10] stays open for the stage-two measurement over the agda-algebras corpus, where the wholesale stratum gives retrieval something honest to win).  What the landed half hands on: the seam now carries three candidate shapes, the scorer inside `RetrievalProposer` is its own interface awaiting premise-selection scores, the peek default is ON, and the honest conclusion — the suite's term-mode ceiling binds any term-mode proposer — is filed as the benchmark extension #129, so retrieval's ranking value becomes measurable without gaming.
-+  **P3 — policy proposals (#124)**.  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines.  The closed propose–check–learn loop the project has been building toward.
++  **P2 — retrieval proposals: infrastructure landed** (§7 and §9; the phase's issue [#123]/[M2-10] stays open for the stage-two measurement over the agda-algebras corpus, where the wholesale stratum gives retrieval something honest to win).  What the landed half hands on: the seam now carries three candidate shapes, the scorer inside `RetrievalProposer` is its own interface awaiting premise-selection scores, the peek default is ON, and the honest conclusion — the suite's term-mode ceiling binds any term-mode proposer — is filed as the benchmark extension [#129], so retrieval's ranking value becomes measurable without gaming.
++  **P3 — policy proposals ([#124])**.  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines.  The closed propose–check–learn loop the project has been building toward.
 +  **Raising the ceiling** (unscheduled, the largest known win): term mode caps the suite at 6/22, and 13 of the 16 unreachable golds are structural inductions of a single shape (`f zero … = refl; f (suc n) … = cong g (f n …)`).  Reaching them needs case-split moves — plausibly via the interaction protocol's `Cmd_make_case` — which would change the state model's move vocabulary and is deliberately out of P1–P3 scope.
 +  **Recorded options, taken only if measurement demands**: parallel oracle workers (N servers over disjoint work copies) if wall time becomes the bottleneck; richer selection policies than first-open-obligation if multi-hole fixtures ever make selection order matter under budget.
 
@@ -396,22 +396,40 @@ The reading survives the re-measurement and sharpens: **the suite's term-mode ce
 
 | # | Decision | Status | Evidence |
 |---|---|---|---|
-| 1 | Obligation sets are conjunctive; `SolvedClaim` requires the empty set AND a final green batch check | Adopted (P0) | #112 post-mortem; pinned in ModelSpec and live in SingleStepIntegrationSpec |
-| 2 | The client lives in Scala (`strux-driver`); no in-process Haskell rewrite | Adopted (P0) | Transport is 0.21 % of oracle time (#113 measurement) |
-| 3 | Budgets are denominated in batch oracle calls, not seconds | Adopted (P1) | Batch call ≈ 2.6 s import loading dominates all else (#113) |
-| 4 | Judgements memoised on `OracleKey`; hits free, including at the budget cap | Adopted (P1) | OracleMemoSpec; BeamLoopSpec cap test (PR #126 round 1) |
+| 1 | Obligation sets are conjunctive; `SolvedClaim` requires the empty set AND a final green batch check | Adopted (P0) | [#112] post-mortem; pinned in ModelSpec and live in SingleStepIntegrationSpec |
+| 2 | The client lives in Scala (`strux-driver`); no in-process Haskell rewrite | Adopted (P0) | Transport is 0.21 % of oracle time ([#113] measurement) |
+| 3 | Budgets are denominated in batch oracle calls, not seconds | Adopted (P1) | Batch call ≈ 2.6 s import loading dominates all else ([#113]) |
+| 4 | Judgements memoised on `OracleKey`; hits free, including at the budget cap | Adopted (P1) | OracleMemoSpec; BeamLoopSpec cap test (PR [#126] round 1) |
 | 5 | Frontier dedup keys on content + script (script-inclusive) | Adopted (P1); P2 re-measured with hole-free compounds present: stands | Both A/Bs identical, zero skips either way; pinned in BeamLoopSpec |
 | 6 | First-open-obligation selection | Adopted (P1), simplification | Sound under conjunctive re-anchoring; pinned in BeamLoopSpec |
 | 7 | Application candidates parenthesized | Adopted (P1) | First sweep: every depth-1 application died unparenthesized |
 | 8 | `type_of` peek: informs only; default ON since P2 | Adopted (P1); default flipped (P2) | P1: −88.5 % probes at zero solve cost; P2: re-validated on retrieval candidates, restored a budget-ordering loss; pinned in BeamLoopSpec |
-| 11 | Retrieval scope: modules the fixture imports, qualified access; import-widening is out of scope | Adopted (P2) | Qualified access toolchain-verified; #123 design comment; RetrieveSpec |
+| 11 | Retrieval scope: modules the fixture imports, qualified access; import-widening is out of scope | Adopted (P2) | Qualified access toolchain-verified; [#123] design comment; RetrieveSpec |
 | 12 | Target exclusion by name and normalised statement, NAMED in reports, with a labeled off-switch control | Adopted (P2) | Control run commits all five admitted targets in both measurement rounds (post-fix 9/22 vs 4/22); RetrieveSpec |
 | 13 | Three candidate shapes: `_`-form, bounded saturation over the context, `{!!}`-refinement | Adopted (P2) | fill_hole refuses blocked-constraint sub-holes (captures wire-fill-hole-blocked-*); control solves are saturated one-shots |
-| 9 | Anomalies never abort a sweep, always redden the run, and keep their diagnostics | Adopted (P0/P1) | #112's silent-breakage failure mode; LoopHarnessSpec |
-| 10 | All reporting on `eval-proof-completion.v0` beside the policy baseline | Adopted (P0/P1) | #113 acceptance: no private formats |
+| 9 | Anomalies never abort a sweep, always redden the run, and keep their diagnostics | Adopted (P0/P1) | [#112]'s silent-breakage failure mode; LoopHarnessSpec |
+| 10 | All reporting on `eval-proof-completion.v0` beside the policy baseline | Adopted (P0/P1) | [#113] acceptance: no private formats |
 
 ## References
 
-+  Issues: [#112](https://github.com/formalverification/agda-native-air/issues/112) (post-mortem), [#113](https://github.com/formalverification/agda-native-air/issues/113) (tracking, with the P0 and P1 measurement comments), [#119](https://github.com/formalverification/agda-native-air/issues/119)/[#122](https://github.com/formalverification/agda-native-air/issues/122)/[#123](https://github.com/formalverification/agda-native-air/issues/123)/[#124](https://github.com/formalverification/agda-native-air/issues/124) (phases); PRs [#121](https://github.com/formalverification/agda-native-air/pull/121) (P0), [#126](https://github.com/formalverification/agda-native-air/pull/126) (P1), [#130](https://github.com/formalverification/agda-native-air/pull/130) (P2).
++  Issues: [#112] (post-mortem), [#113] (tracking, with the P0 and P1 measurement comments), [#119]/[#122]/[#123]/[#124] (phases); PRs [#121] (P0), [#126] (P1), [#130] (P2).
 +  Docs: `docs/agda-mcp/agda-mcp-interaction-lane.md` (the two-lane policy and the lane protocol), `agda-mcp/README.md` (tool contracts), `data/benchmarks/README.md` and `docs/benchmarks/taxonomy.md` (the suite), `agda-dojang/README.md` (the result schema).
 +  Code map (`strux-driver/src/main/scala/struxdriver/search/`): `Model.scala` (state, claims, keys), `Wire.scala` (strict decoders), `McpClient.scala` (transport), `Oracle.scala` (timed, memoised calls), `Actions.scala` (application arithmetic, pi splitter), `Propose.scala` (proposer seam, fixed space, peek), `Retrieve.scala` (the P2 retrieval proposer), `BeamLoop.scala` (the loop), `Scaffold.scala` (shared fixture scaffolding), `SingleStepHarness.scala` (P0 entry), `LoopHarness.scala` (P1 entry); tests beside them in `src/test/scala/struxdriver/search/`, wire captures in `src/test/resources/search/`.
+
+<!-- GitHub references: one definition per issue or PR cited above; PRs resolve to /pull/, issues to /issues/. -->
+[#68]: https://github.com/formalverification/agda-native-air/issues/68
+[#75]: https://github.com/formalverification/agda-native-air/issues/75
+[#79]: https://github.com/formalverification/agda-native-air/issues/79
+[#107]: https://github.com/formalverification/agda-native-air/pull/107
+[#108]: https://github.com/formalverification/agda-native-air/issues/108
+[#112]: https://github.com/formalverification/agda-native-air/issues/112
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#119]: https://github.com/formalverification/agda-native-air/issues/119
+[#121]: https://github.com/formalverification/agda-native-air/pull/121
+[#122]: https://github.com/formalverification/agda-native-air/issues/122
+[#123]: https://github.com/formalverification/agda-native-air/issues/123
+[#124]: https://github.com/formalverification/agda-native-air/issues/124
+[#126]: https://github.com/formalverification/agda-native-air/pull/126
+[#127]: https://github.com/formalverification/agda-native-air/issues/127
+[#129]: https://github.com/formalverification/agda-native-air/issues/129
+[#130]: https://github.com/formalverification/agda-native-air/pull/130
