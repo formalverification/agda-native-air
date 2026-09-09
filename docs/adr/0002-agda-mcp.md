@@ -22,7 +22,7 @@ This document is the design record: what was decided, the evidence that earned e
 
 The server runs Agda in two lanes and lets only one of them judge.
 
-+  The *batch lane* spawns the real `agda` once per call and derives every verdict from that process's exit code, never from its prose.
++  The *batch lane* spawns a real batch process once per call, `agda` on the file for the per-file tools and the project's own gate for `check_project`, and derives every verdict from that process's exit code, never from its prose (§ 3 records the one departure, which can turn a green gate red and never the reverse).
 
    The verdict travels with the following:
 
@@ -109,9 +109,9 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 (See also [#75], [#108], and [`agda-mcp/agda-mcp-interaction-lane.md`].)
 
-**Decision**.  Verdicts come from a batch `agda` process spawned per call; knowledge comes from a persistent `agda --interaction-json` child per resolved project root; and the boundary is policy, held by tool descriptions and reviews, not a convention.
+**Decision**.  Verdicts come from a batch process spawned per call, `agda` for the per-file tools and the project's own gate for `check_project`; knowledge comes from a persistent `agda --interaction-json` child per resolved project root; and the boundary is policy, held by tool descriptions and reviews, not a convention.
 
-+  **Batch lane** (verdicts): `check_file`, `get_diagnostics`, `fill_hole`, and `check_project`, plus `get_goal`'s fallback path.  Each spawns the real `agda` at the file's real path, patches in place when it must (`fill_hole`'s candidate, the reporting macro), and restores the bytes under `bracket_` on every path, timeout included.  The cost is a cold process per call, deliberately: a verdict is always batch Agda's own exit code.
++  **Batch lane** (verdicts): the per-file tools `check_file`, `get_diagnostics`, and `fill_hole`, plus `get_goal`'s fallback path, each spawn the real `agda` at the file's real path, patch in place when they must (`fill_hole`'s candidate, the reporting macro), and restore the bytes under `bracket_` on every path, timeout included.  `check_project` runs the project's own gate instead (a `make` target, an operator-configured command, or `agda` on the `Everything` module; § 3), as a bounded subprocess under the same kill ladder, and never patches a file.  The cost is a cold process per call, deliberately: a verdict is always a real batch run's own exit code, Agda's for the per-file tools and the gate's for `check_project`.
 
 +  **Interaction lane** (knowledge): `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`, and since [#108] `get_goal`'s primary path (`Cmd_goal_type_context` returns Agda's own goal display as data, with no file mutation; the response says `source: "interaction-lane"`, and the injected-macro path remains as `source: "injected-macro"` for a lane that cannot serve the file, and as the one path that reports binder visibility).  Interaction mode loads a file with open holes and *succeeds*, which is exactly why it may never decide a verdict; the tool descriptions say this out loud.
 
@@ -137,7 +137,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Decision**.  `success` is a function of the exit code alone, and every verdict says what ran and what green means.
 
-+  Every proof-state response carries `verdict` (`equivalentTo`, the exact `agda` command the call is equivalent to; `meaning`, one sentence; `exitCode`, Agda's own), `command` (`binary` resolved against `PATH`, `args`, `cwd`), and `project` (§ 5).  A change in Agda's message format can empty the diagnostics list; it cannot turn a failing build green.  The suite pins this with a stand-in binary that exits non-zero while printing nothing a parser could latch onto.
++  Every batch proof-state response carries `verdict` (`equivalentTo`, the exact `agda` command the call is equivalent to; `meaning`, one sentence; `exitCode`, Agda's own), `command` (`binary` resolved against `PATH`, `args`, `cwd`), and `project` (§ 5); the one response shape without a `verdict` is a lane-sourced `get_goal`, which carries `command`, `project`, and the lane echo instead (below).  A change in Agda's message format can empty the diagnostics list; it cannot turn a failing build green.  The suite pins this with a stand-in binary that exits non-zero while printing nothing a parser could latch onto.
 +  `fill_hole` tolerates exactly one class of error on an otherwise green file: the `[UnsolvedInteractionMetas]` of the file's other open holes and of sub-holes inside the candidate.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` is a type error ([#69], PR [#81]); that is the FLRP "implicits under a defined function" pattern that cost the field session a build cycle.
 +  There is no `strict` option, because there was never a lenient mode; the work of [#72] was contractual, not semantic, and the four tool descriptions now carry the client-visible contract, so a `tools/list` dump alone answers whether green means the build passes (the report's § 6 meta-suggestion).
 +  `get_goal`'s batch path reports a non-zero `exitCode` even when the goal is right, because the injected macro leaves an interaction point behind, and its description says so; a lane-sourced answer carries no verdict at all.
@@ -313,7 +313,7 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 
 | # | Decision | Status | Evidence |
 |---|---|---|---|
-| 1 | Two lanes: batch `agda` per call for verdicts, a persistent `--interaction-json` child per root for knowledge; the lane never decides a verdict | Adopted ([#75], PR [#107]) | Interaction mode loads holed files where batch exits 42; 2.6 s per batch call against 1–3 ms per lane query |
+| 1 | Two lanes: a batch process per call for verdicts (`agda` on the file, or the project's gate for `check_project`), a persistent `--interaction-json` child per root for knowledge; the lane never decides a verdict | Adopted ([#75], PR [#107]) | Interaction mode loads holed files where batch exits 42; 2.6 s per batch call against 1–3 ms per lane query |
 | 2 | `get_goal` answers from the lane first, with injection as the stated fallback and the only path reporting binder visibility | Adopted ([#108], PR [#110]) | Byte-identical goals on the fixture matrix; no file mutation on the happy path |
 | 3 | A batch tool may peek at a warm lane's stored load, never call it; a cold or stale lane leaves the response byte-identical | Adopted ([#108], [#115]) | Enrichment tests pin both shapes |
 | 4 | `scope_at` omitted rather than approximated with grep | Adopted ([#75]) | No protocol command enumerates a scope |
