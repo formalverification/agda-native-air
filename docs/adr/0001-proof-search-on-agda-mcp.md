@@ -5,17 +5,64 @@ File: `agda-native-air/docs/adr/0001-proof-search-on-agda-mcp.md`
 +  **Status**: Draft.
 +  **Date**: 2026-08-22 (P0 and P1 landed); 2026-08-27 (P2 landed; P3 is direction).
 +  **Tracking**: [#113](https://github.com/formalverification/agda-native-air/issues/113); phases [#119](https://github.com/formalverification/agda-native-air/issues/119) (P0, PR [#121](https://github.com/formalverification/agda-native-air/pull/121)), [#122](https://github.com/formalverification/agda-native-air/issues/122) (P1, PR [#126](https://github.com/formalverification/agda-native-air/pull/126)), [#123](https://github.com/formalverification/agda-native-air/issues/123) (P2, PR [#130](https://github.com/formalverification/agda-native-air/pull/130)), [#124](https://github.com/formalverification/agda-native-air/issues/124) (P3).
-+  **Ancestry**: issue #112 (post-mortem of the retired v0.3 `search.py`), whose four lessons this design encodes as types and tests rather than prose.
++  **Ancestry**: Issue #112 (post-mortem of the retired v0.3 `search.py`), whose
+   four lessons this design encodes as types and tests rather than prose.
 
 ## Executive summary
 
-We are building a machine that proves small Agda theorems by search, with Agda itself as the only judge of every step.  This document is the design record: what the search is, why it is shaped the way it is, what has been measured, and where it is going.
+We are building a machine that proves small Agda theorems by search, with Agda
+itself as the only judge of every step.  This document is the design record: what
+the search is, why it is shaped the way it is, what has been measured, and where
+it is going.
 
-The idea in one paragraph.  A theorem with a hole in its proof is an *obligation*.  The searcher keeps a set of unfinished obligations for the file it is working on, and repeatedly plays a simple move: pick the first open obligation, propose a handful of candidate terms that might fill it, and ask Agda — through the `agda-mcp` server's `fill_hole` tool — whether each candidate typechecks there.  A candidate that typechecks is *committed*: it is spliced into the working copy of the file, and any fresh holes it contains (a candidate may be a partial application like `_,_ {!!} {!!}`, whose two holes become two new obligations) replace the obligation it discharged.  The search fans out over these states in a beam: at each depth it keeps only the few most promising states and expands those.  A proof is *claimed* only when a state has no obligations left AND a final, strict, whole-file check by Agda comes back green.  Nothing the searcher believes is ever trusted: Agda's exit code is the sole source of truth, at every step and again at the end.
+**The idea in six sentences**.
 
-Why this is the shape it is comes down to one measured fact: **the oracle is the entire cost**.  Each `fill_hole` judgement spawns a batch Agda process that spends ~2.6 seconds loading the standard library's interfaces before it checks anything; everything else the searcher does — building candidates, ranking states, bookkeeping — costs microseconds, and even the server's persistent "interaction lane" answers questions about a loaded file in 1–3 milliseconds.  So the design optimizes exactly one quantity, the *number of batch judgements*, and treats everything that can reduce that number as nearly free: judgements are memoised, budgets are denominated in judgements, and a millisecond-scale `type_of` "peek" can pre-filter candidates before they cost a judgement.  This is also why the searcher's host language is irrelevant and was chosen by measurement rather than taste (transport overhead is 0.21 % of oracle time; the client lives in Scala beside the benchmark and corpus machinery).
++  A theorem with a hole in its proof is an *obligation*.
 
-The prior attempt's central defect is designed out at the type level.  The retired `search.py` carried a single goal per state and declared victory when *any* subgoal closed — a lemma with two obligations counted as proved when one was discharged.  Here the state *is* the obligation set, "done" is emptiness of the whole set, and the only way to construct the `SolvedClaim` type is through a factory that demands both the empty set and the final green check.  A regression test pins exactly the two-obligation trap, both purely and against the live server.
++  The searcher keeps a set of unfinished obligations for the file it is working
+   on, and repeatedly plays a simple move: pick the first open obligation,
+   propose a handful of candidate terms that might fill it, and ask Agda, through
+   the `agda-mcp` server's `fill_hole` tool, whether each candidate typechecks there.
+
++  A candidate that typechecks is *committed*: it is spliced into the working
+   copy of the file, and any fresh holes it contains (a candidate may be a partial
+   application like `_,_ {!!} {!!}`, whose two holes become two new obligations)
+   replace the obligation it discharged.
+
++  The search fans out over these states in a beam: at each depth it keeps only
+   the few most promising states and expands those.
+
++  A proof is *claimed* only when a state has no obligations left AND a final,
+   strict, whole-file check by Agda comes back green.
+
++  Nothing the searcher believes is ever trusted: Agda's exit code is the sole
+   source of truth, at every step and again at the end.
+
+**Why this shape**?
+
+It comes down to one measured fact: **the oracle is the entire cost**.
+Each `fill_hole` judgement spawns a batch Agda process that spends ~2.6 seconds
+loading the standard library's interfaces before it checks anything; everything
+else the searcher does (building candidates, ranking states, bookkeeping) costs
+microseconds, and even the server's persistent "interaction lane" answers
+questions about a loaded file in 1–3 milliseconds.
+
+So the design optimizes exactly one quantity, the *number of batch judgements*,
+and treats everything that can reduce that number as nearly free: judgements are
+memoised, budgets are denominated in judgements, and a millisecond-scale `type_of`
+"peek" can pre-filter candidates before they cost a judgement.  This is also why
+the searcher's host language is irrelevant and was chosen by measurement rather
+than taste (transport overhead is 0.21 % of oracle time; the client lives in Scala
+beside the benchmark and corpus machinery).
+
+The prior attempt's central defect is designed out at the type level.  The retired
+`search.py` carried a single goal per state and declared victory when *any*
+subgoal closed; a lemma with two obligations counted as proved when one was
+discharged.  Here the state *is* the obligation set, "done" is emptiness of the
+whole set, and the only way to construct the `SolvedClaim` type is through a
+factory that demands both the empty set and the final green check.  A regression
+test pins exactly the two-obligation trap, both purely and against the live
+server.
 
 ### Where it stands
 
@@ -37,55 +84,163 @@ After P2 the bottleneck is no longer the action space but the move vocabulary: t
 
 P3 replaces retrieval ranking with a learned policy over the existing policy-backend contract; #129 extends the benchmark so a proposer that finds the right lemma in a haystack can be told apart from one that cannot; case-split moves (§10) are the eventual ceiling-raiser.
 
-Every phase is scored on the same benchmark through the same JSONL schema, so the baselines stack: each phase must beat the last, on the same 22 obligations, in the same currency of oracle calls.
+Every phase is scored on the same benchmark through the same JSONL schema, so the
+baselines stack: each phase must beat the last, on the same obligations, in the
+same currency of oracle calls.
+
+The 22 stdlib obligations P0/P1 were measured on are frozen; the suite has since
+grown an agda-algebras tier (21 obligations, #127) cut from the corpus itself, and
+every consumer keys per-tier numbers off the index, so the stacked baselines stay
+quotable per tier.
 
 ## 1.  Context: why proof search, and why now
 
 The project's north star is AI agents that work effectively with Agda.
 
-Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might help*; proof search is the part that *does mathematics* — proposes a step, submits it to the checker, and iterates.  It had exactly one prior implementation, `agda-dojang/python/tools/search.py`, dead since 2026-03-10 and archived under #112.
+Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might
+help*; proof search is the part that *does mathematics*: propose a step, submit it
+to the checker, and iterate.  It had exactly one prior implementation,
+`agda-dojang/python/tools/search.py`, dead since 2026-03-10 and archived under
+#112.
 
 Three things changed by mid-2026 that made a proper restart worthwhile (#113):
 
-+  **The oracle is native**.  `agda-mcp` exposes `fill_hole`, `get_goal`, and `check_file` directly, and since the #68 hardening wave also answers scope, type, and definition questions mid-proof from a persistent interaction lane (#75, #107, #108) — precisely the information a proposer needs.
-+  **The corpus exists**.  `agda-strux` extraction plus `search_by_name` / `search_by_type` can supply candidate lemmas at scale; the old search's action space was hardcoded to two candidates.
-+  **The measurement exists**.  `data/benchmarks/` is the M1-5 suite (22 obligations, difficulty tiers `routine` / `compositional` / `non-obvious`), and the proof-completion evaluator already emits versioned JSONL (`eval-proof-completion.v0`), so search results sit beside the policy-backend baseline with no new measurement apparatus.
++  **The oracle is native**.  `agda-mcp` exposes `fill_hole`, `get_goal`, and
+   `check_file` directly, and since the #68 hardening wave also answers scope,
+   type, and definition questions mid-proof from a persistent interaction lane
+   (#75, #107, #108), which is precisely the information a proposer needs.
++  **The corpus exists**.  `agda-strux` extraction plus `search_by_name` /
+   `search_by_type` can supply candidate lemmas at scale; the old search's action
+   space, for development/testing, was hardcoded to two candidates.
++  **The measurement exists**.  `data/benchmarks/` is the [M1-5] suite (43
+   obligations across two libraries: the frozen 22-obligation stdlib tier, plus
+   the 21-obligation agda-algebras tier of PR #127, mined from the corpus so the
+   suite exercises the thing retrieval searches; difficulty tiers `routine` /
+   `compositional` / `non-obvious`), and the proof-completion evaluator already
+   emits versioned JSONL (`eval-proof-completion.v0`), so search results sit
+   beside the policy-backend baseline with no new measurement apparatus.
 
-Four lessons from #112 are load-bearing and appear throughout: report actions are peeks, not moves; partial application consumes visible binders only; there are two caches because the oracle is the cost centre; and children are ordered by remaining obligations.  The fifth inheritance is the defect: the old search was disjunctive where obligations are conjunctive.
+Four lessons from #112 are load-bearing and appear throughout:
+
++ report actions are peeks, not moves;
++ partial application consumes visible binders only;
++ there are two caches because the oracle is the cost centre;
++ children are ordered by remaining obligations.
+
+The fifth inheritance is the defect: the old search was disjunctive where
+obligations are conjunctive.
 
 ## 2.  The oracle and its economics
 
-`agda-mcp` runs two lanes, and the search respects the boundary absolutely (docs/agda-mcp-interaction-lane.md):
+`agda-mcp` runs two lanes, and the search respects the boundary absolutely
+(docs/agda-mcp-interaction-lane.md):
 
-+  **Batch lane** (verdicts).  `check_file` and `fill_hole` derive success from a one-shot `agda` process's exit code.  This lane is the only judge: probe outcomes, commits, and the final claim all come from it.
-+  **Interaction lane** (knowledge).  A persistent `agda --interaction-json` child answers `get_goal`, `type_of` (and others) about a loaded file in milliseconds.  Knowledge informs proposals and pre-filters; it never decides anything.
++  **Batch lane** (verdicts).  `check_file` and `fill_hole` derive success from a
+   one-shot `agda` process's exit code.  This lane is the only judge: probe
+   outcomes, commits, and the final claim all come from it.
 
-P0's measurement (issue #113, run `split-m15`) fixed the numbers the design lives by:
++  **Interaction lane** (knowledge).  A persistent `agda --interaction-json` child
+   answers `get_goal`, `type_of` (and others) about a loaded file in milliseconds.
+   Knowledge informs proposals and pre-filters; it never decides anything.
 
-+  Oracle calls are effectively 100 % of wall time; proposal time is milliseconds per fixture.
-+  Each batch call costs ~2.6–2.9 s on stdlib fixtures, and the cost is per-spawn import-graph loading, not checking: a builtins-only fixture answers the same call in ~0.2 s.
-+  Transport plus server handling is 0.21 % of oracle time (~6 ms/call), which killed the "rewrite the client in Haskell for latency" fork: no host language avoids the batch subprocess, so the client stays in Scala (`strux-driver`), beside the benchmark runner and the corpus.
-+  P1 added a refinement: the interaction lane reuses loaded interfaces in memory, so switching it to a new file costs ~220 ms, and *questions* about a loaded file cost 1–3 ms.  Knowledge is two to three orders of magnitude cheaper than judgement.
+P0's measurement (#113, run `split-m15`) fixed the numbers the design lives by:
 
-Consequences, all of which are now code: the budget is denominated in batch judgements; judgements are memoised; knowledge calls are unbudgeted but ledgered; and any pre-filter cheaper than ~2.6 s that rejects even a small fraction of candidates pays for itself.
++  Oracle calls are effectively 100% of wall time; proposal time is milliseconds
+   per fixture.
++  Each batch call costs ~2.6–2.9 s on stdlib fixtures, and the cost is per-spawn
+   import-graph loading, not checking: a builtins-only fixture answers the same
+   call in ~0.2 s.
++  Transport plus server handling is 0.21% of oracle time (~6 ms/call), which
+   killed the "rewrite the client in Haskell for latency" fork: no host language
+   avoids the batch subprocess, so the client stays in Scala (`strux-driver`),
+   beside the benchmark runner and the corpus.
++  P1 added a refinement: the interaction lane reuses loaded interfaces in memory,
+   so switching it to a new file costs ~220 ms, and *questions* about a loaded
+   file cost 1–3 ms.  Knowledge is two to three orders of magnitude cheaper than
+   judgement.
+
+**Consequences** all of which are now code.
+
++  The budget is denominated in batch judgements.
++  Judgements are memoised.
++  Knowledge calls are unbudgeted but ledgered.
++  Any pre-filter cheaper than ~2.6 s that rejects even a small fraction of
+   candidates pays for itself.
 
 ## 3.  The state model (P0, `Model.scala`)
 
-+  **A state is an obligation set, a working-copy content, and a script**.  `SearchState(content, obligations, script)` with conjunctive semantics: solved means the *whole set* is empty.  There is no per-goal success anywhere in the model, so #112's disjunctive defect is unrepresentable.
-+  **Probes are not moves**.  `fill_hole` restores the file server-side, so every probe is a peek; `ProbeOutcome` (what the oracle said) and `Move` (an action committed to the working copy) are distinct types, and the script has type `Vector[Move]`.
-+  **States are unforgeable**.  `SearchState` and `SolvedClaim` are `sealed abstract case class`es with private constructors — the Scala 2 idiom that suppresses the synthetic `apply` and `copy` — so a state is born only through `initial` or `commit`, and a claim only through `fromFinalCheck`, which refuses an inhabited obligation set, a failed check, and even internally inconsistent evidence (success reported beside a non-zero exit).
-+  **The obligation set is the oracle's, not ours**.  Every `fill_hole` response carries the re-anchored hole list describing the file as that candidate would leave it (issue #79); `commit` adopts that list wholesale, so client-side hole arithmetic can never drift from Agda's.
-+  **Two caches, two key types**.  `OracleKey(contentFingerprint, line, col, candidate)` memoises judgements — same content, same hole, same candidate is one Agda call per fixture run, by construction.  `StateKey(contentFingerprint, script)` identifies states for frontier dedup.  Conflating them either re-runs Agda or wrongly prunes the frontier (#112's lesson), so they are distinct case classes.
-+  **Strict wire decoders**.  The response fields the search acts on (`holes`, counts, `elapsedMs`, `context`) are required, and counts are cross-checked against lists: a drifted server shape fails the decode visibly instead of bending ranking or measurement.  Every decoder is pinned against responses captured verbatim from the live server.
++  **A state is an obligation set, a working-copy content, and a script**.
+   `SearchState(content, obligations, script)` with conjunctive semantics: solved
+   means the *whole set* is empty.  There is no per-goal success anywhere in the
+   model, so #112's disjunctive defect is unrepresentable.
++  **Probes are not moves**.  `fill_hole` restores the file server-side, so every
+   probe is a peek; `ProbeOutcome` (what the oracle said) and `Move` (an action
+   committed to the working copy) are distinct types, and the script has type
+   `Vector[Move]`.
++  **States are unforgeable**.  `SearchState` and `SolvedClaim` are `sealed
+   abstract case class`es with private constructors (the Scala 2 idiom that
+   suppresses the synthetic `apply` and `copy`) so a state is born only through
+   `initial` or `commit`, and a claim only through `fromFinalCheck`, which refuses
+   an inhabited obligation set, a failed check, and even internally inconsistent
+   evidence (success reported beside a non-zero exit).
++  **The obligation set is the oracle's, not ours**.  Every `fill_hole` response
+   carries the re-anchored hole list describing the file as that candidate would
+   leave it (Issue #79); `commit` adopts that list wholesale, so client-side hole
+   arithmetic can never drift from Agda's.
++  **Two caches, two key types**.  `OracleKey(contentFingerprint, line, col, candidate)`
+   memoises judgements: same content, same hole, same candidate is one Agda call
+   per fixture run, by construction.  `StateKey(contentFingerprint, script)`
+   identifies states for frontier dedup.  Conflating them either re-runs Agda or
+   wrongly prunes the frontier (#112's lesson), so they are distinct case classes.
++  **Strict wire decoders**.  The response fields the search acts on (`holes`,
+   counts, `elapsedMs`, `context`) are required, and counts are cross-checked
+   against lists: a drifted server shape fails the decode visibly instead of
+   bending ranking or measurement.  Every decoder is pinned against responses
+   captured verbatim from the live server.
 
 ## 4.  The loop (P1, `BeamLoop.scala`)
 
-Level-synchronous beam search.  Each frontier state is expanded at its **first open obligation** — a fixed selection policy, stated and pinned as a deliberate simplification, sound because the set is conjunctive and every commit re-anchors from the oracle (selection order affects which proofs are found under budget, never whether a found proof is real).  Expansion writes the state's content to the working file, reads the goal (`get_goal`), asks the proposer for candidates, optionally peeks each, and probes the survivors.  Ok probes commit to children; children are deduped against every state ever enqueued, ranked by the landed `Rank` on their creating probe (fewer remaining obligations first), and the best `beamWidth` become the next level.  A probe that closes every obligation is claimed immediately through the final batch gate: search work after a proof would be budget spent for nothing.
+**Level-synchronous beam search**.
 
-+  **Termination is a distinct per-fixture status**: `solved` (the claim was granted), `exhausted` (the frontier emptied, or the depth bound cut a live frontier), `budget_exceeded` (the probe budget ran out with work remaining).
-+  **The budget counts fill_hole probes that miss the memo** — the ~2.6 s coin.  Memo hits are free and stay free at the cap (the loop consults the memo before the budget gate).  The baseline `check_file`, the final strict checks, and the knowledge calls are ledgered but not gated; they are bounded structurally (one `get_goal` per expansion, expansions ≤ beam × depth, final checks ≤ closing probes).
-+  **Defaults**: beam 4, depth 6, budget 60 — tunables on the Make target (`PROOF_SEARCH_BEAM/DEPTH/BUDGET/DEDUP/PEEK`).
-+  **Anomalies are loud and non-fatal**.  A commit the state refuses, a wire drift, or a closing probe whose final check disagrees raises out of that fixture; the sweep continues, every artifact is written (an anomalous fixture keeps its attempt rows, wall clock, and probe counts), and the run exits non-zero.  This is P0's discipline, inherited from #112's own failure mode: a harness that exits 0 while writing broken rows lets breakage sit silent for months.
++  **Expansion**. Each frontier state is **expanded** at its *first open obligation*:
+   a fixed selection policy, stated and pinned as a deliberate simplification, sound
+   because the set is conjunctive and every commit re-anchors from the oracle.
+   (Selection order affects which proofs are found under budget, never whether a
+   found proof is real.)
+
+   Expansion writes the state's content to the working file, reads the goal
+   (`get_goal`), asks the proposer for candidates, optionally peeks each, and probes
+   the survivors.
+
++  **Probes**.  Ok probes commit to children; children are deduped against every
+   state ever enqueued, ranked by the landed `Rank` on their creating probe (fewer
+   remaining obligations first), and the best `beamWidth` become the next level.
+   A probe that closes every obligation is claimed immediately through the final
+   batch gate. (Search work after a proof would be budget spent for nothing.)
+
++  **Termination** is a distinct per-fixture status:
+
+   + `solved`: the claim was granted,
+   + `exhausted`: the frontier emptied, or the depth bound cut a live frontier,
+   + `budget_exceeded`: the probe budget ran out with work remaining.
+
++  **Budget**.  The budget counts `fill_hole` probes that miss the memo
+   (the ~2.6 s coin).  Memo hits are free and stay free at the cap (the loop
+   consults the memo before the budget gate).  The baseline `check_file`, the
+   final strict checks, and the knowledge calls are ledgered but not gated; they
+   are bounded structurally (one `get_goal` per expansion, expansions ≤ beam ×
+   depth, final checks ≤ closing probes).
+
++  **Defaults**: beam 4, depth 6, budget 60, all tunable on the Make target
+   (`PROOF_SEARCH_BEAM/DEPTH/BUDGET/DEDUP/PEEK`).
+
++  **Anomalies** are loud and non-fatal.  A commit the state refuses, a wire
+   drift, or a closing probe whose final check disagrees raises out of that
+   fixture; the sweep continues, every artifact is written (an anomalous fixture
+   keeps its attempt rows, wall clock, and probe counts), and the run exits
+   non-zero.  (This is P0's discipline, inherited from #112's own failure mode: a
+   harness that exits 0 while writing broken rows lets breakage sit silent for
+   months.)
 
 ## 5.  The action space and the proposer seam (P1, `Propose.scala`)
 
@@ -97,20 +252,90 @@ trait Proposer {
 }
 ```
 
-P1's implementation is deliberately fixed and non-learned, in proposal order: the P0 closers (`refl`, `tt`); the goal context's assumptions by name (from `get_goal`'s context, decoded strictly); and applications of every name the fixture imports through `using` lists — one `{!!}` per remaining visible binder via the landed partial-application arithmetic, binder counts read from lane `type_of` answers through a deliberately small pi-type splitter (arrows at bracket depth 0), applications ordered cheap-before-expensive (#112's lesson four, applied to proposal order because the budget can run out mid-expansion).  Two hard-won details are pinned in tests:
+P1's implementation is deliberately fixed and non-learned, in proposal order:
 
-+  **Applications are parenthesized** (`(s≤s {!!})`), because a hole is an argument position as often as a right-hand side, and a verbatim splice of `s≤s {!!}` into a sub-hole reads as `s≤s sym {!!}` — a different term.  The first P1 sweep measured every depth-1 lemma application dying exactly this way.
-+  **The splitter is a proposal device, not an authority**.  It reads printed types (with their renamed binders, hidden groups, and newlines) well enough to count visible binders; the oracle polices what it gets wrong, because an overcount is refused as a type error and an undercount leaves a partial application the goal must then accept.
++  the P0 closers (`refl`, `tt`);
 
-The term-mode ceiling is a property of this space and must accompany its numbers: no case splits and no `with` means clause-restructuring golds are unreachable.  On M1-5 that is 16 of 22 (13 inductions, 2 case splits, and one single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six with expressible single-term golds are exactly the six P1 solves.
++  the goal context's assumptions by name (from `get_goal`'s context, decoded strictly);
+
++  applications of every name the fixture imports through `using` lists, one
+   `{!!}` per remaining visible binder via the landed partial-application arithmetic;
+
+   +  binder counts read from lane `type_of` answers through a deliberately small
+      pi-type splitter (arrows at bracket depth 0); 
+
+   +  applications ordered cheap-before-expensive (#112's lesson four, applied to
+      proposal order because the budget can run out mid-expansion).
+
+Two hard-won details are pinned in tests:
+
++  **Applications are parenthesized** (`(s≤s {!!})`), because a hole is an
+   argument position as often as a right-hand side, and a verbatim splice of `s≤s
+   {!!}` into a sub-hole reads as `s≤s sym {!!}`, which is a different term.  The
+   first P1 sweep measured every depth-1 lemma application dying exactly this way.
+
++  **The splitter is a proposal device**, not an authority.  It reads printed
+   types (with their renamed binders, hidden groups, and newlines) well enough to
+   count visible binders; the oracle polices what it gets wrong, because an
+   overcount is refused as a type error and an undercount leaves a partial
+   application the goal must then accept.
+
+The term-mode ceiling is a property of this space and must accompany its numbers:
+no case splits and no `with` means clause-restructuring golds are unreachable.
+
+On the stdlib tier that is 16 of 22 (13 inductions, 2 case splits, and one
+single-clause `≡-Reasoning` chain needing imports the obligation lacks); the six
+with expressible single-term golds are exactly the six P1 solves.
+
+The agda-algebras tier (#127) was mined for single-term golds precisely so this
+ceiling cannot bind it (21 of 21 are term-expressible by construction) which moves
+the whole gap onto the action space: its `using`-list stratum is reachable by the
+fixed space in principle, and its wholesale-import stratum is starved of `using`
+lists by design, so uplift there is attributable to retrieval (P2) and nothing
+else.
 
 ## 6.  The `type_of` peek (P1's measured experiment)
 
-The modern form of #112's "report actions are peeks": before spending ~2.6 s judging a candidate, ask the interaction lane to *infer the type* of the candidate with `_` metas in place of its holes, at the goal, in milliseconds — and skip the judgement when the answer cannot fit.
+The modern form of #112's "report actions are peeks": before spending ~2.6 s
+judging a candidate, ask the interaction lane to *infer the type* of the candidate
+with `_` metas in place of its holes, at the goal, in milliseconds, and skip the
+judgement when the answer cannot fit.
 
-What the wire probes established (captures in `strux-driver/src/test/resources/search/`): under-determined metas are ANSWERED, not errored — the lane prints named metas (`sym _` infers `_y_8 ≡ _x_7`) — and bad expressions come back as in-body errors (`NotInScope`, `CannotApply`, `UnequalTerms`) in 1–3 ms.  The filter therefore rejects on a lane error, or when the inferred type cannot textually match the goal display with every meta read as a wildcard — the *same* meta being the *same* wildcard, so `refl`'s `_x_9 ≡ _x_9` is rejected at `m + n ≡ n + m` and kept at `n ≡ n`.  One rendering divergence needed canonicalization: Agda folds closed naturals to numerals in goal displays (`1 ≤ suc n`) but a meta blocks the folding in inferred types (`suc _m_5 ≤ suc _n_6`), so numeral tokens are expanded to `suc` towers before comparison; without this the peek falsely rejects `(s≤s {!!})` and costs a solve.
+### What the wire probes established
 
-Measured end to end on M1-5: the same 6 solves with byte-identical scripts; probes 435 → 50 (−88.5 %); batch oracle time 1227 s → 209 s; wall 21.5 min → 4.7 min (4.5×); probe precision 6.7 % → 70 %; and the chain-burners stopped burning (budget-exceeded became honest depth-capped exhaustion).  Two rules keep it sound in spirit: a peek can only ever *skip* a judgement, never substitute for one, and any failure to peek keeps the candidate.  It shipped opt-in (`--peek on`) through P1; P2 performed that re-validation on retrieval candidates (and the peek restored a budget-ordering loss there), so the default is now ON (decision 8).
+(Captures in `strux-driver/src/test/resources/search/`.)
+
+Under-determined metas are ANSWERED, not errored, the lane prints named metas
+(`sym _` infers `_y_8 ≡ _x_7`), and bad expressions come back as in-body errors
+(`NotInScope`, `CannotApply`, `UnequalTerms`) in 1–3 ms.
+
+The filter therefore rejects on a lane error, or when the inferred type cannot
+textually match the goal display with every meta read as a wildcard, where the
+*same* meta is the *same* wildcard, so `refl`'s `_x_9 ≡ _x_9` is rejected at
+`m + n ≡ n + m` and kept at `n ≡ n`.
+
+One rendering divergence needed canonicalization: Agda folds closed naturals to
+numerals in goal displays (`1 ≤ suc n`) but a meta blocks the folding in inferred
+types (`suc _m_5 ≤ suc _n_6`), so numeral tokens are expanded to `suc` towers
+before comparison; without this the peek falsely rejects `(s≤s {!!})` and costs a
+solve.
+
+**Measured** end to end on [M1-5].
+
+The same 6 solves with byte-identical scripts:
+
++ probes 435 → 50 (−88.5 %);
++ batch oracle time 1227 s → 209 s;
++ wall 21.5 min → 4.7 min (4.5×);
++ probe precision 6.7 % → 70 %.
+
+Chain-burners stopped burning (budget-exceeded became honest depth-capped exhaustion).
+
+Two rules keep it sound in spirit: a peek can only ever *skip* a judgement, never
+substitute for one, and any failure to peek keeps the candidate.  It shipped
+opt-in (`--peek on`) through P1; P2 performed that re-validation on retrieval
+candidates (and the peek restored a budget-ordering loss there), so the default
+is now ON (decision 8).
 
 ## 7.  The P2 retrieval proposer (#123, `Retrieve.scala`)
 
@@ -130,17 +355,24 @@ Every run writes the shared eval schema, so search results sit beside the policy
 
 ## 9.  Where it stands: the numbers
 
-P0 (issue #113, the measurement that settled the fork): oracle 180 calls per pass at ~2.6–2.9 s each, 99.79 % of oracle time in the Agda subprocess, transport 0.21 %, proposal 2.3 ms total.
+**P0** (Issue #113, the measurement that settled the fork).  Oracle 180 calls per
+pass at ~2.6–2.9 s each, 99.79 % of oracle time in the Agda subprocess, transport
+0.21 %, proposal 2.3 ms total.
 
-P1 (issue #113, PR #126; beam 4, depth 6, budget 60):
+**P1** (Issue #113, PR #126; beam 4, depth 6, budget 60).
 
-| configuration | solved | probes | wall |
-|---|---|---|---|
-| baseline (dedup script, no peek) | 6/22 — routine 6/7, comp. 0/10, non-obv. 0/5 | 435 | 21.5 min |
-| dedup content-only, no peek | identical to baseline, per fixture | 435 | 21.6 min |
-| dedup script, peek on | 6/22, byte-identical scripts | 50 | 4.7 min |
+| configuration                    | solved                                       | probes | wall     |
+|----------------------------------|----------------------------------------------|--------|----------|
+| baseline (dedup script, no peek) | 6/22 — routine 6/7, comp. 0/10, non-obv. 0/5 | 435    | 21.5 min |
+| dedup content-only, no peek      | identical to baseline, per fixture           | 435    | 21.6 min |
+| dedup script, peek on            | 6/22, byte-identical scripts                 |  50    |  4.7 min |
 
-Decisions taken from those numbers: `StateKey` dedup stays script-inclusive (content-only measured identical here and can only start mattering when a proposer emits hole-free compound candidates — re-measure in P2); the peek is a validated cost lever (opt-in at P1; P2's re-validation flipped it default-ON); and the baseline every later phase must beat is **6/22, at 435 probes without the peek or 50 with it**.
+Decisions taken from those numbers: `StateKey` dedup stays script-inclusive
+(content-only measured identical here and can only start mattering when a proposer
+emits hole-free compound candidates, re-measure in P2); the peek is a validated
+cost lever (opt-in at P1; P2's re-validation flipped it default-ON); and the
+baseline every later phase must beat is **6/22, at 435 probes without the peek or
+50 with it**.
 
 P2 (issue #113, the same knobs, retrieval composed around the fixed space, target exclusion on unless stated).  Measured twice: first at the initial P2 code, then re-measured after the #130 review fixes changed real pool composition — the topK cut had fallen before lane resolution, so 18 of 22 fixtures had been searching pools of one or two lemmas instead of eight.  The table is the post-fix record (runs `p2fix-{a,b,c,d}`); the review round's wall clocks ran on a loaded machine, so the call counts are the comparable columns:
 

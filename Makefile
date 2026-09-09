@@ -1555,8 +1555,8 @@ eval-proof-completion eval-proof-completion-smoke demo-proof-completion:
 BENCHMARK_INDEX        ?= data/benchmarks/benchmark-index.jsonl
 BENCHMARK_REPORT_DIR   ?= data/benchmarks/reports
 BENCHMARK_REPORT       ?= $(BENCHMARK_REPORT_DIR)/gold-verification.json
-# CI smoke slice: one obligation per difficulty tier.
-BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map
+# CI smoke slice: one obligation per difficulty tier per library (six total).
+BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map algebras-overture-lift-lower algebras-homs-comp-hom algebras-kernels-ker-in-con
 
 .PHONY: eval-benchmark eval-benchmark-gold eval-benchmark-smoke
 
@@ -1568,9 +1568,9 @@ eval-benchmark eval-benchmark-gold: _check-sbt
 	  "runMain struxdriver.benchmark.EvalBenchmark --verify-gold --index $(CURDIR)/$(BENCHMARK_INDEX) --out-dir $(CURDIR)/$(BENCHMARK_REPORT_DIR) --project-root $(CURDIR)"
 	@echo ">> [eval-benchmark] report written to $(BENCHMARK_REPORT)"
 
-# Smoke slice for CI: a 3-obligation subset (one per tier), plus a determinism
-# check that the report is byte-identical across two runs once the wall-clock
-# fields are stripped.
+# Smoke slice for CI: a 6-obligation subset (one per difficulty tier per
+# library), plus a determinism check that the report is byte-identical across
+# two runs once the wall-clock fields are stripped.
 eval-benchmark-smoke: _check-sbt
 	@set -euo pipefail; \
 	sel="$$(printf '%s\n' $(BENCHMARK_SMOKE_IDS) | sed 's/.*/"id":"&"/' | paste -sd'|' -)"; \

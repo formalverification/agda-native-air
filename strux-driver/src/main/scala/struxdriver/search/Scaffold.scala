@@ -43,7 +43,7 @@ object Scaffold {
     * server with unless overridden.
     */
   val defaultAgdaFlags: String =
-    "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library"
+    "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras"
 
   /** Read the benchmark index, keeping the requested ids (None = all). */
   def readIndex(index: Path, ids: Option[Set[String]]): IO[Vector[IndexEntry]] =

@@ -242,11 +242,24 @@ object Splice {
       Left(s"splice: line $line out of range (file has ${lines.size} lines)")
     else {
       val l = lines(line - 1)
-      if (col < 1 || col - 1 + HoleToken.length > l.length || !l.startsWith(HoleToken, col - 1))
+      // `col` counts CODEPOINTS (Agda's column convention, which the server's
+      // hole list preserves); Scala strings index UTF-16 units, and the two
+      // diverge on any astral-plane glyph (𝑨, 𝒾𝒹, …) earlier in the line.
+      // Those are ubiquitous in agda-algebras fixtures and absent from the
+      // ASCII-only stdlib tier, which is how naive indexing survived P0/P1:
+      // it either refused a commit ("no {!!} at …") or, worse, cut the line
+      // at a shifted offset and spliced a corrupted working copy.
+      val cpCount = l.codePointCount(0, l.length)
+      if (col < 1 || col - 1 > cpCount)
         Left(s"splice: no $HoleToken at line $line, column $col")
       else {
-        val patched = l.substring(0, col - 1) + candidate + l.substring(col - 1 + HoleToken.length)
-        Right(lines.updated(line - 1, patched).mkString("\n"))
+        val idx = l.offsetByCodePoints(0, col - 1)
+        if (idx + HoleToken.length > l.length || !l.startsWith(HoleToken, idx))
+          Left(s"splice: no $HoleToken at line $line, column $col")
+        else {
+          val patched = l.substring(0, idx) + candidate + l.substring(idx + HoleToken.length)
+          Right(lines.updated(line - 1, patched).mkString("\n"))
+        }
       }
     }
   }

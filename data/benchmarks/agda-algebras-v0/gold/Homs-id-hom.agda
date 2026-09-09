@@ -1,0 +1,22 @@
+-- Homs-id-hom.agda (gold solution)
+--
+-- File: data/benchmarks/agda-algebras-v0/gold/Homs-id-hom.agda
+--
+-- Gold solution for benchmark obligation: algebras-homs-id-hom
+--
+module Homs-id-hom where
+
+open import AgdaDojang.Debug
+
+open import Agda.Primitive   using ( Level )
+open import Relation.Binary  using ( Setoid )
+open import Data.Product     using ( _,_ )
+open import Relation.Binary.PropositionalEquality using ( refl )
+
+open import Overture             using ( Signature )
+open import Setoid.Algebras      using ( Algebra ; 𝔻[_] )
+open import Setoid.Functions
+open import Setoid.Homomorphisms
+
+𝒾𝒹′ : {𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} → hom 𝑨 𝑨
+𝒾𝒹′ {𝑨 = 𝑨} = 𝑖𝑑 , mkIsHom (Setoid.reflexive 𝔻[ 𝑨 ] refl)

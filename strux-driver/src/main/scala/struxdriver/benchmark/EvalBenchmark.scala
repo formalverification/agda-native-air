@@ -187,8 +187,7 @@ final case class Config(
   mode:             Mode,
   indexPath:        Path,
   outDir:           Path,
-  projectRoot:      Path,
-  agdaAlgebrasSrc:  Option[Path]
+  projectRoot:      Path
 )
 
 
@@ -223,39 +222,6 @@ object IndexParser {
 
 
 // =============================================================================
-// Filtering (pure)
-// =============================================================================
-
-object Filter {
-
-  /** Partition obligations into available and skipped.
-    *
-    * agda-algebras obligations are skipped when agdaAlgebrasSrc is None.
-    * Obligations whose gold file is missing are also skipped — verify-gold only
-    * consumes the gold, so the obligation file's presence is not checked here.
-    */
-  def filterAvailable(
-    obligations:     Vector[Obligation],
-    agdaAlgebrasSrc: Option[Path],
-    projectRoot:     Path
-  ): (Vector[Obligation], Vector[String]) = {
-    val (available, skipped) =
-      obligations.partitionMap { ob =>
-        val skip: Option[String] =
-          if (ob.source == "agda-algebras" && agdaAlgebrasSrc.isEmpty)
-            Some(ob.id)
-          else if (!Files.isRegularFile(projectRoot.resolve(ob.goldPath)))
-            Some(ob.id)
-          else
-            None
-        skip.toRight(ob)
-      }
-    (available, skipped)
-  }
-}
-
-
-// =============================================================================
 // Gold Verification (effectful)
 // =============================================================================
 
@@ -286,12 +252,21 @@ object GoldVerifier {
       // the registered libraries must be named explicitly, and the gold file's own
       // directory must be added to the include path (-i) for its top-level module
       // name to resolve.
+      // agda-algebras obligations additionally need that library, which the
+      // flake shellHook always registers (a live checkout when
+      // AGDA_ALGEBRAS_ROOT is set, the flake-pinned store copy otherwise).
+      // The agda-stdlib rows keep their original invocation untouched, so the
+      // frozen P1 baseline is verified in an unchanged environment.
+      val extraLibs =
+        if (ob.source == "agda-algebras") Vector("--library", "agda-algebras")
+        else Vector.empty[String]
       val cmd = Vector(
         "agda",
         "--no-default-libraries",
         "--library-file", librariesFile,
         "--library", "standard-library",
-        "--library", "agda-dojang",
+        "--library", "agda-dojang"
+      ) ++ extraLibs ++ Vector(
         "-i", goldAbs.getParent.toString,
         goldAbs.toString
       )
@@ -437,13 +412,6 @@ object CliParser {
       val projectRoot =
         Paths.get(m.getOrElse("project-root", ".")).toAbsolutePath.normalize()
 
-      // Accept AGDA_ALGEBRAS_ROOT (the name the flake and Makefile use) as well as
-      // the legacy AGDA_ALGEBRAS_SRC; either signals that agda-algebras is available.
-      val agdaAlgebrasSrc =
-        sys.env.get("AGDA_ALGEBRAS_ROOT")
-          .orElse(sys.env.get("AGDA_ALGEBRAS_SRC"))
-          .map(s => Paths.get(s).toAbsolutePath.normalize())
-
       for {
         md <- mode
         ix <- m.get("index").toRight(s"Missing --index\n\n$usage")
@@ -452,8 +420,7 @@ object CliParser {
         indexPath        = Paths.get(ix).toAbsolutePath.normalize(),
         outDir           = Paths.get(m.getOrElse("out-dir", "data/benchmarks/reports"))
                             .toAbsolutePath.normalize(),
-        projectRoot      = projectRoot,
-        agdaAlgebrasSrc  = agdaAlgebrasSrc
+        projectRoot      = projectRoot
       )
     }
   }
@@ -478,21 +445,23 @@ object EvalBenchmark extends IOApp {
         indexResult <- IndexParser.parseIndex(config.indexPath)
         (allObligations, parseErrors) = indexResult
         _ <- parseErrors.traverse_(e => IO.println(s"  WARN: $e"))
+        // A benchmark index must parse in full: a malformed row that is
+        // merely warned about would shrink the suite silently, and a report
+        // could pass after dropping an indexed row (#132 review, round 2).
+        _ <- IO.raiseWhen(parseErrors.nonEmpty)(
+               new RuntimeException(
+                 s"${parseErrors.size} index row(s) failed to parse; fix the index rather than running a shrunken suite")
+             )
         _ <- IO.raiseWhen(allObligations.isEmpty)(
                new RuntimeException("No obligations parsed from index")
              )
 
-        // Filter for available obligations.
-        (available, skipped) = Filter.filterAvailable(
-          allObligations, config.agdaAlgebrasSrc, config.projectRoot
-        )
+        // No pre-filtering: every indexed row is verified.  A missing gold
+        // file surfaces as a failed GoldResult from verifyOne (which checks
+        // for it before spawning Agda), so the whole-index guarantee holds —
+        // a row can fail, but it can never be dropped silently (#132 review).
         _ <- IO.println(
-               s"Benchmark index: ${allObligations.size} obligations " +
-               s"(${available.size} available, ${skipped.size} skipped)"
-             )
-        _ <- IO.whenA(skipped.nonEmpty)(
-               IO.println(s"  Skipped: ${skipped.take(5).mkString(", ")}" +
-                          (if (skipped.size > 5) "..." else ""))
+               s"Benchmark index: ${allObligations.size} obligations"
              )
 
         // Dispatch.
@@ -500,7 +469,7 @@ object EvalBenchmark extends IOApp {
           case Mode.VerifyGold =>
             for {
               _       <- IO.println("\n--- Gold verification ---")
-              results <- GoldVerifier.verifyAll(available, config.projectRoot)
+              results <- GoldVerifier.verifyAll(allObligations, config.projectRoot)
               report   = Report.buildGoldReport(results)
               path    <- Report.writeReport(report, config.outDir)
               _       <- IO.println(

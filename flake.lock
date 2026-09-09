@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "agda-algebras-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788749391,
+        "narHash": "sha256-7PVcMm2QmHzkwBQnWEHA8W6wvkCFei5yaxwiRB38aMo=",
+        "owner": "ualib",
+        "repo": "agda-algebras",
+        "rev": "4662373d281daf0f20a6319f1a46755a45d33293",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ualib",
+        "repo": "agda-algebras",
+        "rev": "4662373d281daf0f20a6319f1a46755a45d33293",
+        "type": "github"
+      }
+    },
     "github-project": {
       "inputs": {
         "nixpkgs": "nixpkgs"
@@ -68,6 +85,7 @@
     },
     "root": {
       "inputs": {
+        "agda-algebras-src": "agda-algebras-src",
         "github-project": "github-project",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-agda": "nixpkgs-agda"

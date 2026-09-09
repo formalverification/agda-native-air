@@ -5,10 +5,10 @@
 This is the "copy/paste runnable" guide to running **agda-native-air** end-to-end.
 
 **Companion docs**.  
-+ [`MANIFESTO.md`](MANIFESTO.md) — vision
-+ [`PLAN.md`](PLAN.md) — roadmap + milestones
-+ [`representation.md`](representation.md) — data contracts / schemas
-+ [`architecture.md`](architecture.md) — system architecture overview
++ [`MANIFESTO.md`](MANIFESTO.md): vision
++ [`PLAN.md`](PLAN.md): roadmap + milestones
++ [`representation.md`](representation.md): data contracts / schemas
++ [`architecture.md`](architecture.md): system architecture overview
 
 ---
 
@@ -49,7 +49,7 @@ make eval-proof-completion-smoke
 - [10.  Smoke, audit, probe-all](#10--smoke-audit-probe-all)
 - [11.  Where outputs land](#11--where-outputs-land)
 - [12.  Debugging playbook](#12--debugging-playbook)
-- [13.  agda-mcp — AI-assisted proof development ](#13--agda-mcp--ai-assisted-proof-development)
+- [13.  agda-mcp: AI-assisted proof development ](#13--agda-mcp-ai-assisted-proof-development)
 - [14.  Known good sequences](#14--known-good-sequences)
 - [15.  Cleaning](#15--cleaning)
 
@@ -70,7 +70,7 @@ This repo has three "lanes" that connect:
     - `extract`, `transform`, `a2t`, dataset stats, premise eval.
 
 3.  **Proof completion (AgdaDojang + Python)**  
-    - `eval-proof-completion` / `eval-proof-completion-smoke` — the propose → check loop.
+    - `eval-proof-completion` / `eval-proof-completion-smoke`: the propose → check loop.
     - Deterministic fixture policy + retrieval policy.
 
 4.  **ML / ETL (Python + Spark)**  
@@ -102,13 +102,16 @@ nix develop .#backend
 +  `make extract-lib-nix`
 +  `make extract-lib-smoke-nix`
 
-### 1.3.  Registering external Agda libraries (optional)
+### 1.3.  Registering external Agda libraries
 
-Every Agda-equipped shell registers `standard-library` and the repo-local
-`agda-dojang` by default.  To type-check against an external library from a local
-checkout — `agda-algebras`, `agda-categories`, or `TypeTopology` — point the
-matching `*_ROOT` environment variable at the **library root** (the directory that
-contains the `.agda-lib` file) before entering the shell:
+Every Agda-equipped shell registers three libraries by default:
+`standard-library` (Nix-managed), the repo-local `agda-dojang`, and
+`agda-algebras`, the last from the `agda-algebras-src` flake input, a store
+copy pinned at the benchmark-suite commit with prebuilt `.agdai` interfaces
+(pulled from the project Cachix cache, which the flake's `nixConfig` registers as a substituter — Nix asks once to trust it — so no library build; see `data/benchmarks/README.md`).
+Setting `AGDA_ALGEBRAS_ROOT` before entering the shell overrides the pin with
+a live checkout; `agda-categories` and `TypeTopology` remain opt-in the same
+way:
 
 ```sh
 AGDA_ALGEBRAS_ROOT=~/git/ualib/agda-algebras/master  nix develop .#backend
@@ -117,24 +120,26 @@ AGDA_TYPETOPOLOGY_ROOT=~/git/TypeTopology            nix develop .#backend
 ```
 
 The shell hook searches each root for a `.agda-lib`, registers what it finds, and
-prints a summary.  Libraries that are not registered show how to enable them:
+prints a summary; unregistered libraries show how to enable them:
 
 ```
    Agda libraries:
      * standard-library (Nix-managed)
      * agda-dojang (repo-local)
-     - agda-algebras: set AGDA_ALGEBRAS_ROOT to enable
+     * agda-algebras (/nix/store/…-agda-algebras-unstable-…; flake pin)
      - agda-categories: set AGDA_CATEGORIES_ROOT to enable
      - TypeTopology: set AGDA_TYPETOPOLOGY_ROOT to enable
 ```
 
-Once a library is registered (its line changes to a `*` entry), a module that
-imports it type-checks directly — e.g. `agda MyModule.agda` or
-`nix develop .#backend --command agda MyModule.agda`.
+One boundary to know: the pin serves **type-checking**.  The corpus and
+metadata lanes (§10) record git provenance (commit and dirty state) that a
+store path cannot supply, so they keep requiring a live checkout, pointed at
+explicitly via `AGDA_ALGEBRAS_ROOT` (the hook's fallback is deliberately not
+exported to child processes such as `make`).
 
-Reproducible, no-clone registration (pinning the library in the flake so
-collaborators need no local checkout) is deferred future work, tracked in
-[#54](https://github.com/formalverification/agda-native-air/issues/54).
+Once a library is registered (its line changes to a `*` entry), a module that
+imports it type-checks directly; e.g. `agda MyModule.agda` or
+`nix develop .#backend --command agda MyModule.agda`.
 
 ---
 
@@ -328,14 +333,14 @@ make corpus-nix          # from outside a Nix shell (uses .#backend)
 make corpus              # when already inside one
 ```
 
-+  `corpus.jsonl` and `corpus.jsonl.gz` — every row of every module that
++  `corpus.jsonl` and `corpus.jsonl.gz`: every row of every module that
    succeeded, concatenated in module-sorted order.  The gzip is reproducible
    (no stored filename, `mtime=0`), so its digest is quotable.
-+  `coverage.json` — modules attempted, succeeded, failed, and why, plus any
++  `coverage.json`: modules attempted, succeeded, failed, and why, plus any
    module that was in the modules file and never attempted.
-+  `provenance.json` — the library commit, the flake-locked toolchain, the run
++  `provenance.json`: the library commit, the flake-locked toolchain, the run
    configuration, and the corpus digests.
-+  `stats.json` and `stats.md` — definitions by kind and namespace, size
++  `stats.json` and `stats.md`: definitions by kind and namespace, size
    distributions, and dependency-graph shape.
 
 The two halves can be run separately (`make corpus-assemble`, `make corpus-stats`).
@@ -397,9 +402,9 @@ For each fixture file, the evaluator:
 
 The following results are written to `agda-dojang/_build/eval-proof-completion/<run-id>/`:
 
-+  `fixtures.jsonl` — one row per fixture with summary (holes, solved, final status, elapsed ms);
-+  `results.jsonl` — one row per hole attempt with full details (goal, candidate, status, rc, log path);
-+  `logs/<fixture>/hole-<N>/` — per-hole Agda output for debugging.
++  `fixtures.jsonl`: one row per fixture with summary (holes, solved, final status, elapsed ms);
++  `results.jsonl`: one row per hole attempt with full details (goal, candidate, status, rc, log path);
++  `logs/<fixture>/hole-<N>/`: per-hole Agda output for debugging.
 
 Both JSONL files use schema version `eval-proof-completion.v0`.
 
@@ -655,9 +660,9 @@ Default library: `LIB_NAME=agda-algebras`
   * `data/agda-algebras/raw/logs/`
 * Manifests:
 
-  * `data/agda-algebras/manifests/<timestamp>.json` — the Make wrapper's record
+  * `data/agda-algebras/manifests/<timestamp>.json`: the Make wrapper's record
     (exit code, Agda version, repo revision)
-  * `data/agda-algebras/raw/run-manifest.json` — the driver's record: run
+  * `data/agda-algebras/raw/run-manifest.json`: the driver's record: run
     configuration, a coverage summary, and one entry per module attempted
     (`ok`, `rows`, `seconds`, `validateErrors`)
 * Assembled corpus (from `make corpus`; `$(CORPUS_VERSION)` defaults to `v0.1`):
@@ -738,29 +743,33 @@ because env tokens can shadow your stored auth.
 ---
 
 
-## 13.  agda-mcp — AI-assisted proof development
+## 13.  agda-mcp: AI-assisted proof development
 
 `agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
 Cursor, etc.) interact with Agda through standard tool calls.
 
-The server exposes **thirteen tools**: four core proof-state tools — `get_goal`,
-`fill_hole`, `check_file`, `get_diagnostics` — the whole-project gate,
-`check_project`, and five live-query tools answered by a persistent
-interaction lane — `type_of`, `normalize`, `resolve_name`, `definition_of`,
-`exports_of` (issue #75; see `docs/agda-mcp-interaction-lane.md`) — all always
-available, plus three corpus-backed search tools —
-`search_by_name`, `search_by_type`, `get_dependencies` — that are registered
-only when you start the server with `--corpus PATH` (an agda-strux JSONL
-corpus).  For the full command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`,
+The server exposes **thirteen tools**:
+
++  **core proof-state tools** (4): `get_goal`, `fill_hole`, `check_file`,
+   `get_diagnostics`,
++  **whole-project gate** (1): `check_project`,
++  **live-query tools** answered by a persistent interaction lane (5): `type_of`,
+   `normalize`, `resolve_name`, `definition_of`, `exports_of` (issue #75; see
+   `docs/agda-mcp-interaction-lane.md`), all always available,
++  **corpus-backed search tools** (3): `search_by_name`, `search_by_type`,
+   `get_dependencies`, that are registered only when you start the server with
+   `--corpus PATH` (an agda-strux JSONL corpus).
+
+For the full command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`,
 `--corpus`, `--timeout`, `--check-command`, `--check-timeout`, `--verbose`), see
 [`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
 
-`check_project` runs the project's own acceptance gate — the nearest Makefile's
+`check_project` runs the project's own acceptance gate (the nearest Makefile's
 `check` target, a command you name with `--check-command`, or `agda` on the
-project's `Everything` module — and reports its verdict without misreporting its
+project's `Everything` module) and reports its verdict without misreporting its
 exit code, including the case where a wrapper script ending in `echo` reports
-shell exit 0 for a build that failed.  See
-[`agda-mcp/README.md`](../agda-mcp/README.md#check_project).
+shell exit 0 for a build that failed.
+See [`agda-mcp/README.md`](../agda-mcp/README.md#check_project).
 
 This section walks you through building, testing, running, and connecting an agent.
 
@@ -785,7 +794,7 @@ integration tests that invoke a real `agda` binary.  For the integration tests, 
 must be in the Nix `backend` shell (`nix develop .#backend`) or have `agda` in
 your `PATH`; if Agda is not found, tier-2 tests are skipped.
 
-Or, from the repo root (no shell entry or `cd` needed — the Makefile enters the
+Or, from the repo root (no shell entry or `cd` needed; the Makefile enters the
 backend shell for you):
 
 ```sh
@@ -886,7 +895,7 @@ inspect goals, fill holes, and check Agda files through natural language.
     If that works, try something a bit harder, such as
 
     ```
-    Use ONLY the agda MCP tools (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`) to solve all holes in `agda-dojang/data/fixtures/Fixture01.agda`.  For each hole, inspect with `get_goal`, propose a candidate, and verify with `fill_hole`.  If a candidate fails, read the error message and adjust. Note: `fill_hole` validates candidates without modifying the file — once all candidates are verified, use your Edit tool to write them into the source, then confirm with `check_file`.
+    Use ONLY the agda MCP tools (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`) to solve all holes in `agda-dojang/data/fixtures/Fixture01.agda`.  For each hole, inspect with `get_goal`, propose a candidate, and verify with `fill_hole`.  If a candidate fails, read the error message and adjust. Note: `fill_hole` validates candidates without modifying the file; once all candidates are verified, use your Edit tool to write them into the source, then confirm with `check_file`.
     ```
 
     If you started the server with `--corpus` (the shipped `.mcp.json` does, using
@@ -910,19 +919,20 @@ for JSON configuration examples for Claude Desktop, Cursor, and Codex CLI.
 
 You can point Claude Code at another Agda project (for example `agda-algebras`) while
 still giving it agda-mcp from *this* repository.  The recommended setup: **launch
-Claude Code from the other project's worktree** — so that project is the working
-directory, with its own `CLAUDE.md`, git, and permissions — and **attach agda-mcp to
+Claude Code from the other project's worktree** (so that project is the working
+directory, with its own `CLAUDE.md`, git, and permissions) and **attach agda-mcp to
 that session**.  agda-mcp does not need to be the working directory;
-`scripts/run-server.sh` computes the agda-native-air repo root and `cd`s there before launching the server, so it works from any cwd.
+`scripts/run-server.sh` computes the agda-native-air repo root and `cd`s there
+before launching the server, so it works from any cwd.
 
 (Launching from agda-native-air and using `/add-dir` to reach the other project also
 works, but then agda-native-air stays the project root, so committing the other
 project's work through that session is awkward.  Prefer the setup below.)
 
-There are two ways to attach the server.  **Option A is recommended** — it is a plain
+There are two ways to attach the server.  **Option A is recommended**; it is a plain
 file, immune to shell aliasing, and self-documenting.
 
-#### Option A — a project `.mcp.json` (recommended)
+#### Option A: a project `.mcp.json` (recommended)
 
 Copy the committed template
 [`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
@@ -941,22 +951,28 @@ claude        # approve the "agda" server when prompted, then /mcp → agda · �
 ```
 
 Claude Code auto-loads `.mcp.json` from the working directory (asking once to approve
-it).  Two entries in it do the real work — `env.AGDA_ALGEBRAS_ROOT`, which registers
-your library so the proof-state tools resolve it, and (optionally) `--corpus`, which
-turns on the search tools.  Both are covered in *Library registration and the search
-corpus* below.  Keep `--timeout 600`: the bound is enforced — on expiry the `agda`
-process group is killed and the tool returns a timeout rather than blocking — and the
-first typecheck of a large module is cold, building `.agdai` interfaces for its whole
-import graph, which can take minutes and overruns even the 300 s default.  Sizing the
-bound too small is not a graceful degradation: it aborts exactly the call that would
-have built those interfaces, so the next call starts cold again.  Every proof-state
-response reports `elapsedMs` and `checkedFromSource`, so you can tell a slow cold call
-from a slow warm one (`checkedFromSource` is omitted when the run died before
-producing evidence either way, and when your `--agda-flags` carry
-`--trace-imports=0`, which silences the progress lines it is read from — absent
-means unknown, not warm).
+it).  Two entries in it do the real work:
 
-#### Option B — `claude mcp add`
++ `env.AGDA_ALGEBRAS_ROOT`, which registers your library so the proof-state tools
+  resolve it, and
++ (optionally) `--corpus`, which turns on the search tools.
+
+Both are covered in *Library registration and the search corpus* below.
+
+Keep `--timeout 600`: the bound is enforced; on expiry the `agda` process group is
+killed and the tool returns a timeout rather than blocking.  The first typecheck
+of a large module is cold, building `.agdai` interfaces for its whole import
+graph, which can take minutes and overruns even the 300 s default.  Sizing the
+bound too small is not a graceful degradation: it aborts exactly the call that
+would have built those interfaces, so the next call starts cold again.
+
+Every proof-state response reports `elapsedMs` and `checkedFromSource`, so you can
+tell a slow cold call from a slow warm one (`checkedFromSource` is omitted when
+the run died before producing evidence either way, and when your `--agda-flags`
+carry `--trace-imports=0`, which silences the progress lines it is read from;
+absent means unknown, not warm).
+
+#### Option B: `claude mcp add`
 
 Equivalently, register the server on the command line from the worktree:
 
@@ -968,7 +984,7 @@ claude mcp add agda --scope local \
      --timeout 600
 ```
 
-`--scope local` keeps the registration in your per-project config — not committed to the
+`--scope local` keeps the registration in your per-project config, not committed to the
 other repository.
 
 > **If this errors with `script: unrecognized option '--scope'`** (or similar), your
@@ -983,20 +999,20 @@ other repository.
 Two things in the config carry the machine-specific setup.  The templates above already
 include both; this is what they do and how to get them right.
 
-**Register your library — `env.AGDA_ALGEBRAS_ROOT` (needed for the proof-state tools).**
+**Register your library: `env.AGDA_ALGEBRAS_ROOT` (needed for the proof-state tools).**
 agda-mcp answers *every* tool call with **this repository's** Agda, inside its `.#backend`
 shell — not your project's shell.  (`run-server.sh` does `nix develop <agda-native-air>#backend
 --command …`; your own `nix develop` before launching `claude` only equips Claude's Bash,
 not the server.)  So `-l agda-algebras` has to resolve in *this* repo's `agda/libraries`,
 and setting `AGDA_ALGEBRAS_ROOT` is exactly what puts it there: `run-server.sh` passes the
 variable into the `.#backend` shell, whose hook appends your library's `.agda-lib` to
-`agda/libraries` (see [§1.3](#13--registering-external-agda-libraries-optional)).  This is
+`agda/libraries` (see [§1.3](#13--registering-external-agda-libraries)).  This is
 verified to propagate through `run-server.sh`; when registration seems not to happen it is
 almost always one of two things:
 
 +  **The path points at the wrong worktree.**  `AGDA_ALGEBRAS_ROOT` must be the *exact*
    worktree you are editing and must contain a `*.agda-lib` at its top level.  If it is
-   stale or wrong, the hook prints a warning to **stderr** — which the MCP client hides —
+   stale or wrong, the hook prints a warning to **stderr**, which the MCP client hides,
    and silently skips registration, so `-l agda-algebras` then fails with "library not
    found".
 +  **The server was not restarted after editing `.mcp.json`.**  The server reads the
@@ -1006,12 +1022,12 @@ almost always one of two things:
 Do **not** hand-edit `agda/libraries` to work around this: the hook regenerates that file
 on every shell entry, so a manual line is wiped the next time the server starts.
 `AGDA_ALGEBRAS_ROOT` is the durable fix.  For a different library, set the matching
-`*_ROOT` variable and `-l <name>` — see [§1.3](#13--registering-external-agda-libraries-optional)
+`*_ROOT` variable and `-l <name>`; see [§1.3](#13--registering-external-agda-libraries)
 for the supported set.
 
 **You cannot get a silent answer about the wrong worktree.**  A stale `AGDA_ALGEBRAS_ROOT`
 used to be a genuine hazard: the server would resolve your file's imports against the
-*other* branch's tree and report success.  It now refuses instead — a file whose nearest
+*other* branch's tree and report success.  It now refuses instead; a file whose nearest
 `*.agda-lib` names a library the server has registered at a different root fails with a
 `rootMismatch` object naming both roots and the libraries file that disagrees.  You do not
 have to wait for that to notice, either: every proof-state response carries a `project`
@@ -1020,7 +1036,7 @@ resolved binary and cwd included) and `verdict` (what green means, and Agda's ow
 code, which the verdict is read from).  See
 [`docs/agda-mcp-environment.md`](agda-mcp-environment.md).
 
-**Add a corpus — `--corpus <abs-path>.jsonl` (turns on the search tools).**  The
+**Add a corpus: `--corpus <abs-path>.jsonl` (turns on the search tools).**  The
 `search_by_name` / `search_by_type` / `get_dependencies` tools appear in `tools/list` only
 when a corpus is loaded; the proof-state tools do not need one.  Build a corpus of your
 library once, then point `--corpus` at it:
@@ -1038,7 +1054,7 @@ Then add `"--corpus", "/abs/path/to/agda-algebras-corpus.jsonl"` to the server's
 `make extract-lib` emits exactly the agda-strux JSONL schema that `--corpus` reads (one
 entry per line: name, type, kind, dependencies, …), and the server logs how many entries
 it loaded at startup, so you can confirm it took.  Retrieval is independent of the
-proof-state tools — it neither requires nor affects library registration.
+proof-state tools; it neither requires nor affects library registration.
 
 #### Three things to know
 
@@ -1047,7 +1063,7 @@ proof-state tools — it neither requires nor affects library registration.
    hierarchical path (e.g. `FLRP.Bridge` at `src/FLRP/Bridge.lagda.md`) that copy
    collides with the module's canonical file once the library is on the include path,
    and Agda reports `ModuleDefinedInOtherFile`.  Only flat, top-level modules work today.
-   `check_file` and `get_diagnostics` are unaffected — they typecheck **in place**, so a
+   `check_file` and `get_diagnostics` are unaffected; they typecheck **in place**, so a
    real library file loads and verifies correctly.  A fix that runs `get_goal` /
    `fill_hole` in place too is tracked in
    [#66](https://github.com/formalverification/agda-native-air/issues/66).  Until it
@@ -1064,7 +1080,7 @@ proof-state tools — it neither requires nor affects library registration.
    absolute remains the form that is correct under every registration.)
 +  **Match the toolchain.**  agda-mcp typechecks with this repo's pinned Agda 2.8.0 and
    standard-library 2.3.  That is only correct if the other project is compatible with
-   those versions — confirm `agda --version` and the std-lib version line up.  A project
+   those versions; confirm `agda --version` and the std-lib version line up.  A project
    that pins its own toolchain should instead be checked with it: give the registration
    `--agda-bin` naming that project's `agda` and `--cwd` naming its checkout root, the
    issue-#103 pattern that [`agda-mcp/examples/fls.mcp.json`](../agda-mcp/examples/fls.mcp.json)
@@ -1075,7 +1091,7 @@ proof-state tools — it neither requires nor affects library registration.
 
 Doing this in the "Claude Code on the web" UI is possible but heavier: the container
 needs *both* repositories as sources, agda-mcp built in-container (the Nix backend
-build — several minutes, and the container is ephemeral), and an MCP config wired to
+build takes several minutes, and the container is ephemeral), and an MCP config wired to
 absolute container paths.  That is worth setting up via an environment setup script
 once the workflow is proven, but for a first sanity test the terminal is far simpler.
 
@@ -1091,7 +1107,7 @@ flags match the example above.
 **"Library 'agda-algebras' not found" on another project**.  The library is not
 registered in this repo's `agda/libraries`.  Set `env.AGDA_ALGEBRAS_ROOT` in your
 `.mcp.json` to the exact worktree you are editing (it must contain a `*.agda-lib`) and
-**fully restart** Claude Code — see *Library registration and the search corpus* in
+**fully restart** Claude Code; see *Library registration and the search corpus* in
 §13.5 for the two common causes.
 
 **"ModuleDefinedInOtherFile" from `get_goal` / `fill_hole` on a library file**.  This is
@@ -1104,7 +1120,7 @@ module — see the first item under *Three things to know* in §13.5.
 **"filePath does not exist" naming a path in the agda-native-air checkout**.  You sent a
 relative path from your own project.  The server is a separate process, and
 `scripts/run-server.sh` starts it in *this* repository, so relative paths resolve here
-rather than in your tree — the error names both the path as resolved and the working
+rather than in your tree; the error names both the path as resolved and the working
 directory it was resolved against.  Send an absolute path: your project's directory
 followed by the relative path you tried.  See *Which file gets checked: the path rule*
 in [`agda-mcp/README.md`](../agda-mcp/README.md).
