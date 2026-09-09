@@ -133,7 +133,7 @@ obligations are conjunctive.
 ## 2.  The oracle and its economics
 
 `agda-mcp` runs two lanes, and the search respects the boundary absolutely
-(docs/agda-mcp-interaction-lane.md):
+(docs/agda-mcp/agda-mcp-interaction-lane.md):
 
 +  **Batch lane** (verdicts).  `check_file` and `fill_hole` derive success from a
    one-shot `agda` process's exit code.  This lane is the only judge: probe
@@ -413,5 +413,5 @@ The reading survives the re-measurement and sharpens: **the suite's term-mode ce
 ## References
 
 +  Issues: [#112](https://github.com/formalverification/agda-native-air/issues/112) (post-mortem), [#113](https://github.com/formalverification/agda-native-air/issues/113) (tracking, with the P0 and P1 measurement comments), [#119](https://github.com/formalverification/agda-native-air/issues/119)/[#122](https://github.com/formalverification/agda-native-air/issues/122)/[#123](https://github.com/formalverification/agda-native-air/issues/123)/[#124](https://github.com/formalverification/agda-native-air/issues/124) (phases); PRs [#121](https://github.com/formalverification/agda-native-air/pull/121) (P0), [#126](https://github.com/formalverification/agda-native-air/pull/126) (P1), [#130](https://github.com/formalverification/agda-native-air/pull/130) (P2).
-+  Docs: `docs/agda-mcp-interaction-lane.md` (the two-lane policy and the lane protocol), `agda-mcp/README.md` (tool contracts), `data/benchmarks/README.md` and `docs/benchmarks/taxonomy.md` (the suite), `agda-dojang/README.md` (the result schema).
++  Docs: `docs/agda-mcp/agda-mcp-interaction-lane.md` (the two-lane policy and the lane protocol), `agda-mcp/README.md` (tool contracts), `data/benchmarks/README.md` and `docs/benchmarks/taxonomy.md` (the suite), `agda-dojang/README.md` (the result schema).
 +  Code map (`strux-driver/src/main/scala/struxdriver/search/`): `Model.scala` (state, claims, keys), `Wire.scala` (strict decoders), `McpClient.scala` (transport), `Oracle.scala` (timed, memoised calls), `Actions.scala` (application arithmetic, pi splitter), `Propose.scala` (proposer seam, fixed space, peek), `Retrieve.scala` (the P2 retrieval proposer), `BeamLoop.scala` (the loop), `Scaffold.scala` (shared fixture scaffolding), `SingleStepHarness.scala` (P0 entry), `LoopHarness.scala` (P1 entry); tests beside them in `src/test/scala/struxdriver/search/`, wire captures in `src/test/resources/search/`.
