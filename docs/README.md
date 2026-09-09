@@ -7,10 +7,11 @@ An index of this directory and a reading order for a new collaborator.  The repo
 ## Subdirectories
 
 +  [`adr/`](adr/): architecture decision records, numbered in order of adoption.  Each states a design's context, its decisions with status and evidence, a decision-log table, and references; the deep notes a record distills stay where they are and are linked per decision.  [`0001`](adr/0001-proof-search-on-agda-mcp.md) is proof search on agda-mcp; [`0002`](adr/0002-agda-mcp.md) is the agda-mcp server itself.
-+  [`agda-mcp/`](agda-mcp/): the agda-mcp server's deep design notes: the interaction lane (the two-lane policy, the wire protocol as probed, lifecycle, and economics), the ask-Agda audit, the environment forensics (what the server and its shell hook write where, and which tree a call checks), and the executive summary of the #68 hardening wave.  The tool contracts themselves live beside the code in [`agda-mcp/README.md`](../agda-mcp/README.md).
++  [`agda-mcp/`](agda-mcp/): the agda-mcp server's deep design notes: the interaction lane (the two-lane policy, the wire protocol as probed, lifecycle, and economics), the ask-Agda audit, the environment forensics (what the server and its shell hook write where, and which tree a call checks), and the executive summary of the [#68] hardening wave.  The tool contracts themselves live beside the code in [`agda-mcp/README.md`](../agda-mcp/README.md).
++  [`proof-search/`](proof-search/): the proof-search component's explanatory note: what the search is, how it works on a real obligation, how to run it, and how to read a run.  Its decisions and its measured record are in [`adr/0001`](adr/0001-proof-search-on-agda-mcp.md).
 +  [`benchmarks/`](benchmarks/): the M1-5 baseline benchmark's difficulty taxonomy and its obligations document; the suite itself, its index, and its README are under [`data/benchmarks/`](../data/benchmarks/).
 +  [`corpora/`](corpora/): one dataset card per published corpus cut, and the procedure for publishing a corpus release.
-+  [`feedback/`](feedback/): documents imported from consumer projects (sessions in `ualib/agda-algebras`), kept verbatim apart from their header comments: the field report that motivated the #68 wave, and the consumer-side case for corpus proof search.
++  [`feedback/`](feedback/): documents imported from consumer projects (sessions in `ualib/agda-algebras`), kept verbatim apart from their header comments: the field report that motivated the [#68] wave, and the consumer-side case for corpus proof search.
 +  [`notes/`](notes/): working notes and background reading (currently a prior-art report on AI for theorem proving).
 
 ## Top-level documents
@@ -46,5 +47,8 @@ The evidence record is as follows:
 2.  [`HowToRun.md`](HowToRun.md) §§ 1–3 to get a shell, a build, and the tests running; the rest as needed.
 3.  [`GITHUB_PROJECT.md`](GITHUB_PROJECT.md) for where the work stands.
 4.  [`adr/0002-agda-mcp.md`](adr/0002-agda-mcp.md) for the server's design and the evidence behind it, with [`agda-mcp/README.md`](../agda-mcp/README.md) open beside it for the tool contracts; the notes under [`agda-mcp/`](agda-mcp/) when a decision's detail matters.
-5.  [`adr/0001-proof-search-on-agda-mcp.md`](adr/0001-proof-search-on-agda-mcp.md) for the search built on top of the server, and [`benchmarks/taxonomy.md`](benchmarks/taxonomy.md) for how it is scored.
+5.  [`proof-search/overview.md`](proof-search/overview.md) for how the search built on top of the server works, then [`adr/0001-proof-search-on-agda-mcp.md`](adr/0001-proof-search-on-agda-mcp.md) for its decisions and numbers, and [`benchmarks/taxonomy.md`](benchmarks/taxonomy.md) for how it is scored.
 6.  [`feedback/`](feedback/) and [`mcp-field-reports.md`](mcp-field-reports.md) for what agents actually do with the tools, which is what the next design decisions will be argued from.
+
+<!-- GitHub references -->
+[#68]: https://github.com/formalverification/agda-native-air/issues/68
