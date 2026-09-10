@@ -49,8 +49,8 @@ module (the haystack) rather than read it off the fixture:
 | Tier            | Count | Examples                                                                 |
 |-----------------|-------|--------------------------------------------------------------------------|
 | `routine`       | 3     | `+-suc m m`, `length-++ xs`, `∧-assoc a b a`                            |
-| `compositional` | 6     | `+-mono-≤ le le`, `*-mono-≤ le le`, `+-∸-assoc n le`, `map-++ f xs xs`  |
-| `non-obvious`   | 3     | `+-mono-< lt lt`, `m+n≤o⇒m≤o m le`, `∷-injectiveˡ eq`                   |
+| `compositional` | 5     | `+-mono-≤ le le`, `*-mono-≤ le le`, `+-∸-assoc n le`, `map-++ f xs xs`  |
+| `non-obvious`   | 4     | `+-mono-< lt lt`, `m+n≤o⇒m≤o m le`, `m+n≡0⇒m≡0 m eq`, `∷-injectiveˡ eq` |
 
 Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
 (7 obligations), `Data.List.Properties` (3), `Data.Bool.Properties` (2).
@@ -116,7 +116,10 @@ Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
    proposer's saturated form can emit and `fill_hole` refuses candidates that
    leave metas unsolved.  A gold outside those shapes would measure the shape
    vocabulary, not retrieval; `+-cancelˡ-≡` (four visible binders) and any
-   two-lemma composite under `trans` are excluded on this rule.
+   two-lemma composite under `trans` are excluded on this rule, and a fixture
+   binds every hypothesis in its clause rather than leaving it in the goal,
+   since the proposer saturates every visible binder and a Π-typed goal could
+   only be closed by a partial application.
 +  **Three mechanical gates**, all re-runnable: the name and statement rules
    checked against the whole corpus by
    `scripts/python/corpus/check_haystack_exclusion.py` (run as

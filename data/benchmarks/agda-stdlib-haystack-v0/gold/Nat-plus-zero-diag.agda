@@ -3,12 +3,16 @@
 -- File: data/benchmarks/agda-stdlib-haystack-v0/gold/Nat-plus-zero-diag.agda
 --
 -- Benchmark obligation: haystack-nat-plus-zero-diag
--- Difficulty: compositional (Tier 2)
+-- Difficulty: non-obvious (Tier 3)
 -- Haystack: Data.Nat.Properties
 -- Needle: Data.Nat.Properties.m+n≡0⇒m≡0
 -- Strategy: one saturated application of the needle over the goal's context
 --
--- Note: the goal is a Π-type; the needle's implicit n is solved by unification (m+n≡0⇒n≡0 closes it too).
+-- Note: a hypothesis-consuming instance; the goal m ≡ 0 carries no signal, the
+-- hypothesis does (m+n≡0⇒n≡0 closes it too).  The hypothesis is bound in the
+-- clause because the proposer saturates every visible binder of a lemma, so a
+-- Π-typed goal could only be closed by a partial application, which is not one
+-- of the three committed candidate shapes (found on the retrieve-k 32 ledger).
 --
 -- Haystack tier (issue #129): the Properties module is opened with a
 -- deliberately narrow `using` list of decoys that cannot close the goal, so
@@ -26,4 +30,4 @@ open import Relation.Binary.PropositionalEquality using ( _≡_ )
 open import Data.Nat.Properties using ( +-comm )
 
 +-zero-diag : ∀ (m : ℕ) → m + m ≡ 0 → m ≡ 0
-+-zero-diag m = Data.Nat.Properties.m+n≡0⇒m≡0 m
++-zero-diag m eq = Data.Nat.Properties.m+n≡0⇒m≡0 m eq
