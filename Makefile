@@ -446,7 +446,9 @@ help:
 	@echo "  make proof-search-split          - Proof-search P0: full M1-5 sweep + oracle-vs-proposal timing split (issue 113)"
 	@echo "  make proof-search-it             - Proof-search P0: live two-obligation regression vs the real agda-mcp"
 	@echo "  make proof-search-loop           - Proof-search P1/P2: M1-5 beam search, per-tier solve counts (issues 122/123)"
-	@echo "                                     P2 knobs: PROOF_SEARCH_PROPOSER=retrieval PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RETRIEVE_K=8 PROOF_SEARCH_EXCLUDE=on"
+	@echo "                                     P2 knobs: PROOF_SEARCH_PROPOSER=retrieval PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RETRIEVE_K=8 PROOF_SEARCH_EXCLUDE=on PROOF_SEARCH_SCORER=token-overlap"
+	@echo "  make proof-search-recall         - Proof-search: offline recall@k of each row's target lemmas per scorer, no server (issue 19)"
+	@echo "                                     PROOF_SEARCH_RECALL_REPORT=<run>/report.json PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RECALL_SCORERS=a,b"
 	@echo "  make proof-search-loop-it        - Proof-search P1: live full-search regression vs the real agda-mcp"
 	@echo "  make proof-search-retrieval-it   - Proof-search P2: live corpus-tool transport test (issue 123)"
 	@echo "  make tree                        - Pretty tree view"
@@ -1665,9 +1667,12 @@ PROOF_SEARCH_CORPUS   ?= data/corpora/agda-stdlib/v0/corpus.jsonl
 PROOF_SEARCH_RETRIEVE_K ?= 8
 PROOF_SEARCH_EXCLUDE  ?= on
 PROOF_SEARCH_EXPAND_DEPS ?= off
+# The ranking behind retrieval (issue #19): a CandidateScorer by name; the
+# default is the placeholder every published sweep ranked with.
+PROOF_SEARCH_SCORER   ?= token-overlap
 # --corpus is passed only when the retrieval proposer is selected, so the
 # fixed baseline drives the identical ten-tool server P1 measured against.
-PROOF_SEARCH_CORPUS_ARGS = $(if $(filter retrieval,$(PROOF_SEARCH_PROPOSER)),--corpus $(abspath $(PROOF_SEARCH_CORPUS)) --retrieve-k $(PROOF_SEARCH_RETRIEVE_K) --exclude-target $(PROOF_SEARCH_EXCLUDE) --expand-deps $(PROOF_SEARCH_EXPAND_DEPS),)
+PROOF_SEARCH_CORPUS_ARGS = $(if $(filter retrieval,$(PROOF_SEARCH_PROPOSER)),--corpus $(abspath $(PROOF_SEARCH_CORPUS)) --retrieve-k $(PROOF_SEARCH_RETRIEVE_K) --exclude-target $(PROOF_SEARCH_EXCLUDE) --expand-deps $(PROOF_SEARCH_EXPAND_DEPS) --scorer $(PROOF_SEARCH_SCORER),)
 PROOF_SEARCH_LOOP_IDS ?= --all
 
 .PHONY: proof-search-loop proof-search-loop-it proof-search-retrieval-it
@@ -1694,6 +1699,24 @@ proof-search-retrieval-it: _check-sbt
 	echo ">> [proof-search-retrieval-it] live corpus-tool transport test against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
 	  "testOnly struxdriver.search.RetrievalIntegrationSpec"
+
+# The offline rank-only instrument (issue #19): replay the retrieval pool
+# pipeline over a corpus loaded in-process, against the goal displays a loop
+# run recorded, and report the rank of every `target:` / `restates:` lemma
+# and recall@k per stratum — seconds per sweep, no server.  RECALL_REPORT
+# names the run whose goals are replayed; CORPUS is the same corpus that run
+# retrieved from; SCORERS is a comma list of CandidateScorer names.
+PROOF_SEARCH_RECALL_REPORT  ?=
+PROOF_SEARCH_RECALL_SCORERS ?= $(PROOF_SEARCH_SCORER)
+PROOF_SEARCH_RECALL_K       ?= 8,32
+PROOF_SEARCH_RECALL_OUT     ?= $(PROOF_SEARCH_OUT_DIR)/recall/$(PROOF_SEARCH_RUN_ID).json
+
+.PHONY: proof-search-recall
+proof-search-recall: _check-sbt
+	@test -n "$(PROOF_SEARCH_RECALL_REPORT)" || { echo "ERROR: set PROOF_SEARCH_RECALL_REPORT=<run>/report.json (the goal displays to replay)"; exit 1; }
+	@echo ">> [proof-search-recall] scorers=$(PROOF_SEARCH_RECALL_SCORERS) exclusion=$(PROOF_SEARCH_EXCLUDE) corpus=$(PROOF_SEARCH_CORPUS) goals=$(PROOF_SEARCH_RECALL_REPORT)"
+	@cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.search.RetrievalRecall --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --corpus $(abspath $(PROOF_SEARCH_CORPUS)) --report $(abspath $(PROOF_SEARCH_RECALL_REPORT)) --project-root $(CURDIR) --out $(CURDIR)/$(PROOF_SEARCH_RECALL_OUT) --scorers $(PROOF_SEARCH_RECALL_SCORERS) --exclude-target $(PROOF_SEARCH_EXCLUDE) --k $(PROOF_SEARCH_RECALL_K)"
 
 
 
