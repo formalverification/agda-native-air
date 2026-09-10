@@ -40,7 +40,7 @@ P3 replaces the deterministic ranker with a learned policy behind the existing p
 
 (See also [#112] and [#113].)
 
-The project's north star is AI agents that work effectively with Agda.  Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might help*; proof search is the part that *does mathematics*: propose a step, submit it to the checker, iterate.  Its one prior implementation, `agda-dojang/python/tools/search.py`, had been dead since 2026-03-10 and was archived under [#112].
+The project's north star is AI agents that work effectively with Agda.  Retrieval and representation (`docs/PLAN.md` Phase 2) tell an agent *what might help*; proof search is the part that *does mathematics*: propose a step, submit it to the checker, iterate.  Its one prior implementation, `agda-dojang/python/tools/search.py`, had been dead since 2026-03-10; [#112] is its post-mortem, and the file's move to `experiments/archive/` is still open there.
 
 Three things had changed by mid-2026 ([#113]).  The oracle became native: `agda-mcp` exposes `fill_hole`, `get_goal`, and `check_file` directly and, since the [#68] hardening wave, answers scope, type, and definition questions from a persistent interaction lane ([#75], [#107], [#108]), which is precisely the information a proposer needs.  The corpus exists: `agda-strux` extraction plus `search_by_name` and `search_by_type` can supply candidate lemmas at scale.  And the measurement exists: `data/benchmarks/` is the suite, 43 obligations across two libraries with difficulty tiers, and the proof-completion evaluator already emits versioned JSONL (`eval-proof-completion.v0`), so search results sit beside the policy-backend baseline with no new apparatus.
 
