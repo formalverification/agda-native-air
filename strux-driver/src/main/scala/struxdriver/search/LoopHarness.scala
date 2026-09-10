@@ -33,7 +33,9 @@
   *       eval_fixtures.py implements; fullySolved iff the final strict gate
   *       passed; solvedPath names the artifact under the run's solved/
   *       directory) plus a report outcome with the search status
-  *       (solved / exhausted / budget_exceeded) and the loop counters.
+  *       (solved / exhausted / budget_exceeded) and the loop counters.  The
+  *       outcome also carries the index row's `source` and `tags`, so a
+  *       report can be sliced without a join back to the index (#129).
   *
   *  Exit code: P0's discipline unchanged — anomalies never abort the sweep
   *  and never stop artifact writing, but any anomaly (or any fixture whose
@@ -48,8 +50,13 @@
   *    fixtures.jsonl — per-fixture summary rows (eval-proof-completion.v0).
   *    timing.jsonl   — the proof-search-timing.v0 ledger, with the new
   *                     type_of and peek phases beside P0's.
-  *    report.json    — config, per-tier solve counts, per-fixture outcomes,
-  *                     and the oracle split (batch vs knowledge vs proposal).
+  *    report.json    — config, per-tier solve counts, per-STRATUM solve
+  *                     counts (issue #129: `source`, plus the `stratum:` tag
+  *                     when the index row carries one — `agda-stdlib`,
+  *                     `agda-stdlib/haystack`, `agda-algebras/wholesale` —
+  *                     so a tier quoted on its own baseline stays reportable
+  *                     on its own in a full sweep), per-fixture outcomes, and
+  *                     the oracle split (batch vs knowledge vs proposal).
   *    work/, logs/, solved/ — working copies, raw replies, solved artifacts.
   *
   *  Invocation (see the proof-search-loop Make target)
@@ -143,11 +150,18 @@ final case class LoopOutcome(
   stats:        LoopStats,
   wallMs:       Long,
   anomaly:      Option[String],
-  retrieval:    Option[Json] = None // the P2 per-fixture retrieval stats (issue #123)
+  retrieval:    Option[Json] = None, // the P2 per-fixture retrieval stats (issue #123)
+  source:       String = "",          // the index row's library, for slicing (#129)
+  tags:         Vector[String] = Vector.empty // the index row's tags, likewise
 ) {
+  /** The stratum this outcome reports under: see `LoopOutcome.stratumOf`. */
+  def stratum: String = LoopOutcome.stratumOf(source, tags)
+
   def toJson: Json = Json.obj(
     "benchmarkId"  -> benchmarkId.asJson,
     "difficulty"   -> difficulty.asJson,
+    "source"       -> source.asJson,
+    "tags"         -> tags.asJson,
     "goal"         -> goal.asJson,
     "module"       -> module.asJson,
     "searchStatus" -> searchStatus.asJson,
@@ -166,6 +180,19 @@ final case class LoopOutcome(
     "anomaly"      -> anomaly.asJson,
     "retrieval"    -> retrieval.getOrElse(Json.Null)
   ).dropNullValues
+}
+
+object LoopOutcome {
+  /** The reporting stratum of an index row: its `source`, extended by the
+    * value of its `stratum:` tag when it carries one (`agda-algebras` with
+    * `stratum:wholesale` → `agda-algebras/wholesale`; the frozen stdlib rows
+    * carry no stratum tag and report as plain `agda-stdlib`).  This is the
+    * discriminator issue #129 settles on: the tiers quoted against their own
+    * baselines stay separable in a full-suite report without a join.
+    */
+  def stratumOf(source: String, tags: Vector[String]): String =
+    tags.collectFirst { case t if t.startsWith("stratum:") => s"$source/${t.stripPrefix("stratum:")}" }
+      .getOrElse(source)
 }
 
 object ProofSearchLoop extends IOApp {
@@ -379,7 +406,8 @@ object ProofSearchLoop extends IOApp {
                 wallMs = (t1 - t0).toMillis
               } yield (
                 LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
-                  solved = false, Vector.empty, LoopStats(), wallMs, Some(msg)),
+                  solved = false, Vector.empty, LoopStats(), wallMs, Some(msg),
+                  source = entry.source, tags = entry.tags),
                 fixtureRow("", None, None, wallMs, anomalous = true),
                 Vector.empty[AttemptRow]
               )
@@ -464,7 +492,9 @@ object ProofSearchLoop extends IOApp {
                               stats        = result.stats,
                               wallMs       = wallMs,
                               anomaly      = None,
-                              retrieval    = retrStats
+                              retrieval    = retrStats,
+                              source       = entry.source,
+                              tags         = entry.tags
                             )
               } yield (outcome, fixtureRow(module, Some(result), solvedPath, wallMs, anomalous = false), attempts)
           }
@@ -487,7 +517,7 @@ object ProofSearchLoop extends IOApp {
           } yield (
             LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
               solved = false, Vector.empty, partial, wallMs, Some(e.getMessage),
-              retrieval = retr),
+              retrieval = retr, source = entry.source, tags = entry.tags),
             fixtureRow("", None, None, wallMs, anomalous = true),
             attempts
           )
@@ -598,9 +628,11 @@ object ProofSearchLoop extends IOApp {
   ): IO[Unit] = {
     val outcomes = driven.map(_._1)
     val tiers    = Vector("routine", "compositional", "non-obvious")
+    // Strata in index order of first appearance, so a report reads in the
+    // suite's own order (stdlib, then agda-algebras, then the haystack tier).
+    val strata   = outcomes.map(_.stratum).distinct
 
-    def tierBlock(tier: String): Json = {
-      val sel = outcomes.filter(_.difficulty == tier)
+    def block(sel: Vector[LoopOutcome]): Json =
       Json.obj(
         "total"          -> sel.size.asJson,
         "solved"         -> sel.count(_.solved).asJson,
@@ -612,7 +644,6 @@ object ProofSearchLoop extends IOApp {
         "peekRejects"    -> sel.map(_.stats.peekRejects).sum.asJson,
         "wallMs"         -> sel.map(_.wallMs).sum.asJson
       )
-    }
 
     val report = Json.obj(
       "schemaVersion" -> "proof-search-loop-report.v0".asJson,
@@ -632,7 +663,8 @@ object ProofSearchLoop extends IOApp {
       "corpus" -> corpusInfo.getOrElse(Json.Null),
       "obligations" -> entries.size.asJson,
       "timestamp"   -> java.time.Instant.now().toString.asJson,
-      "perTier"     -> Json.obj(tiers.map(t => t -> tierBlock(t)): _*),
+      "perTier"     -> Json.obj(tiers.map(t => t -> block(outcomes.filter(_.difficulty == t))): _*),
+      "perStratum"  -> Json.obj(strata.map(s => s -> block(outcomes.filter(_.stratum == s))): _*),
       "split"       -> aggregate(ledger),
       "outcomes"    -> Json.arr(outcomes.map(_.toJson): _*)
     ).dropNullValues
@@ -654,6 +686,10 @@ object ProofSearchLoop extends IOApp {
       val sel = outcomes.filter(_.difficulty == t)
       f"$t%-14s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  (${sel.count(_.searchStatus == "exhausted")} exhausted, ${sel.count(_.searchStatus == "budget_exceeded")} budget, ${sel.count(_.searchStatus == "anomaly")} anomaly)"
     }.mkString("\n|")
+    val perStratum = outcomes.map(_.stratum).distinct.map { s =>
+      val sel = outcomes.filter(_.stratum == s)
+      f"$s%-24s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  (${sel.count(_.searchStatus == "exhausted")} exhausted, ${sel.count(_.searchStatus == "budget_exceeded")} budget, ${sel.count(_.searchStatus == "anomaly")} anomaly)"
+    }.mkString("\n|")
     val batch  = ledger.filter(r => batchPhases(r.phase) && !r.cached)
     val know   = ledger.filter(r => knowledgePhases(r.phase) && !r.cached)
     val retr   = ledger.filter(r => retrievalPhases(r.phase) && !r.cached)
@@ -662,6 +698,7 @@ object ProofSearchLoop extends IOApp {
     f"""
        |== proof-search loop (beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"}) ==
        |$perTier
+       |$perStratum
        |solved total: ${outcomes.count(_.solved)}/${outcomes.size}
        |oracle: batch ${batch.size} calls ${batch.map(_.clientMs).sum / 1000.0}%.1f s; knowledge ${know.size} calls ${know.map(_.clientMs).sum / 1000.0}%.1f s; retrieval ${retr.size} calls ${retr.map(_.clientMs).sum / 1000.0}%.1f s; memo hits ${ledger.count(_.cached)}
        |peek:   $peeks peeks, $prej rejected (probes skipped)
