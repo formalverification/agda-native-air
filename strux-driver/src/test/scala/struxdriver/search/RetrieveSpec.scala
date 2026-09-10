@@ -16,7 +16,11 @@
   *  qualified-token reduction, the import-scope rule, both target-exclusion
   *  rules and their off-switch, the rendering ladder, the three candidate
   *  shapes, ranking determinism, composition with the base proposer, the
-  *  per-goal memo, and the truncation stat.
+  *  per-goal memo, and the truncation stat.  Since issue #19 also: the
+  *  scorer registry, the pool-aware rank's total order, and every rule of
+  *  the `idf-unfold` scorer pinned on rows copied from the agda-algebras
+  *  corpus (test/resources/search/recall-rows.jsonl) against the fixture
+  *  that motivated it.
   *
   *  ============================================================================
   */
