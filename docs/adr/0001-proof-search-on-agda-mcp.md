@@ -226,6 +226,27 @@ Three findings.  The mechanism is proven on this corpus: the control's one new s
 
 Each rule of `idf-unfold` is kept because removing it alone costs top-eight recall: no fragments 8/31, no conclusion weight 7/31, no hypotheses 5/31, no norm 4/31, no unfolding 4/31, unfolding depth two 9/31 but originals 14/21.  The name-fragment rule was measured and dropped: neutral on fair targets at eight, and four originals lost.  The two rules that carry the tier are the ones the listed hypotheses did not name: unfolding, because the interaction lane prints goals normalized while lemma types are stated in the library's aliases, and the hypotheses, because the lemmas that conclude `hom 𝑨 𝑩` (`𝒾𝒹`, `mon→hom`, `epi→hom`, `_≅_.to`, `HomReduct`) differ only in what they assume.  What no deterministic rule reaches, by name: the targets outside the corpus (`Setoid.refl`, `Function.Base._∘_`, `id`, five rows), the constructors the `defKind` filter never proposes (`eq`, `mkIsHom`, `mkcon`, four rows), the pair and nested-application golds no candidate shape can commit whatever their rank (`⊙-hom … , ⊙-injective …`, `epi→hom 𝑨 (𝑨 ╱ θ) (πepi h θ)`, `IsMon.HomReduct (proj₂ m)`), and, within ranking itself, the generic projections that are themselves needles (`𝑖𝑑` on `homs-id-hom` falls from 1 to 152 under every IDF variant) and the hom-concluding neighborhood the scorer cannot order further.  That last residue is the demand curve for a learned ranker.
 
+**The two recorded knob experiments** ([#19]; wholesale stratum, the placeholder scorer, exclusion on, runs `k19-wholesale-{k8,k16,k32,b120}`, 2026-09-10; development work ran alongside, so probe counts are the comparable column).  The control reproduces `p2s2-a` on all ten fixtures (status, probes, peeks, and accepted lemmas identical), and neither knob moves a solve, as the instrument predicted: no fair target of the stratum sits within the placeholder's top 32.
+
+| run | retrieve-k | budget | solved | probes | peeks |
+|---|---|---|---|---|---|
+| `k19-wholesale-k8` (control) | 8 | 60 | 0/10 | 364 | 3,097 |
+| `k19-wholesale-k16` | 16 | 60 | 0/10 | 369 | 4,330 |
+| `k19-wholesale-k32` | 32 | 60 | 0/10 | 401 | 4,939 |
+| `k19-wholesale-b120` | 8 | 120 | 0/10 | 664 | 5,207 |
+
+The wider cuts admit the same generic projections deeper down the ranking at 40 % and 60 % more peeks; the doubled budget lets the six budget-bound fixtures run to 120 probes and depth 5 without one new commit.  The wholesale zero is a ranking zero, not an economics zero; the knobs stay at 8 and 60.
+
+**The `idf-unfold` sweeps** ([#19]; all 43 obligations, the standing knobs, exclusion on and then off, runs `k19-idf-unfold-{a,b}`, quiet machine, zero anomalies, 2026-09-10).  The stdlib rows, which retrieve from no corpus in these runs, reproduce the frozen baseline field for field (every status, probe count, and script as in `p2s2-a`; 6/22, 137 probes).
+
+| sweep | stdlib | agda-algebras `using` | agda-algebras `wholesale` | total | probes | peeks | wall |
+|---|---|---|---|---|---|---|---|
+| `p2s2-a`: `token-overlap`, exclusion on | 6/22 | 2/11 | 0/10 | 8/43 | 723 | 5,695 | 3,917 s |
+| A: `idf-unfold`, exclusion on | 6/22 | **3/11** | 0/10 | **9/43** | 498 | 3,759 | 2,514 s |
+| B: `idf-unfold`, exclusion off (control) | 6/22 | 3/11 | 1/10 | 10/43 | 502 | 3,746 | 2,518 s |
+
+The first fair retrieval solve on the agda-algebras tier under exclusion: `surjinv-inverse-r` by `(InvIsInverseʳ fE)` in five probes, the lemma the placeholder ranked 60th and `idf-unfold` ranks first, in retrieval's saturated shape (the fixed space's `(InvIsInverseʳ {!!})` is refused on a blocked sub-hole).  The lane-form exclusion fired for the first time on this tier's originals (three, all wholesale, none a fair target) because the new ranking put them in the resolved prefix; 498 probes against 723 because better-ranked pools exhaust sooner.  The control adds only the needle the placeholder's control added; the originals now ranked first or second and accepted (`lift∼lower`, `𝒾𝒹`, `mon→hom`) are stopped, verified on the wire, by the peek's textual match (an η-expanded record, retained implicit binders) or by the shapes (an implicit argument, the saturation cap), and `sup-trans` with `≤-trans` accepted fourth is stopped the same way.  The mechanism's ceiling has moved off the ranker; those are the levers handed on.
+
 ## 10.  Where it is going
 
 +  **Premise selection** ([#19], [M2-5]).  The instrument and the bar now exist: a learned ranker is measured on the same `target:` and `restates:` ground truth, in the same excluded and unexcluded pools, and has to beat `idf-unfold`'s 9 of 31 fair targets and 16 of 21 originals in the top eight (§ 9).  What it has to learn is stated: the library's definitional unfoldings (which the deterministic scorer reads off the corpus bodies) and the discrimination among lemmas that conclude the same thing, where the hypotheses carry the signal.  Two changes outside ranking would move more than any scorer: candidate shapes that project hypotheses (`proj₂ m`) and nest applications, and a ranking query taken from the un-normalized goal display, which would state goals in the aliases the lemmas use.
