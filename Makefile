@@ -441,7 +441,7 @@ help:
 	@echo "  make project-update-check        - Report whether docs/GITHUB_PROJECT.md is stale (no write)"
 	@echo "  make project-lint                - Validate docs/GITHUB_PROJECT.md structure (offline)"
 	@echo "  make eval-benchmark              - Typecheck all benchmark gold solutions -> JSON report"
-	@echo "  make eval-benchmark-smoke        - CI slice (one obligation per tier) + determinism check"
+	@echo "  make eval-benchmark-smoke        - CI slice (one obligation per difficulty tier per benchmark tier) + determinism check"
 	@echo "  make proof-search-single-step    - Proof-search P0: k stub candidates vs one M1-5 obligation (PROOF_SEARCH_ID)"
 	@echo "  make proof-search-split          - Proof-search P0: full M1-5 sweep + oracle-vs-proposal timing split (issue 113)"
 	@echo "  make proof-search-it             - Proof-search P0: live two-obligation regression vs the real agda-mcp"
@@ -1555,8 +1555,10 @@ eval-proof-completion eval-proof-completion-smoke demo-proof-completion:
 BENCHMARK_INDEX        ?= data/benchmarks/benchmark-index.jsonl
 BENCHMARK_REPORT_DIR   ?= data/benchmarks/reports
 BENCHMARK_REPORT       ?= $(BENCHMARK_REPORT_DIR)/gold-verification.json
-# CI smoke slice: one obligation per difficulty tier per library (six total).
-BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map algebras-overture-lift-lower algebras-homs-comp-hom algebras-kernels-ker-in-con
+# CI smoke slice: one obligation per difficulty tier per benchmark tier (nine
+# total): the frozen stdlib tier, the agda-algebras tier, and the stdlib
+# haystack tier (#129).
+BENCHMARK_SMOKE_IDS    ?= stdlib-nat-plus-identity-l stdlib-nat-plus-comm stdlib-dec-map algebras-overture-lift-lower algebras-homs-comp-hom algebras-kernels-ker-in-con haystack-nat-plus-suc-diag haystack-nat-plus-mono-diag haystack-list-cons-injective-head
 
 .PHONY: eval-benchmark eval-benchmark-gold eval-benchmark-smoke
 

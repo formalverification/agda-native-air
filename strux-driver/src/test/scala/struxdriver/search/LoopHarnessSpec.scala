@@ -15,6 +15,11 @@
   *  Pure: a scripted ToolCaller whose transport dies on the second probe; no
   *  server, no Agda.
   *
+  *  Also pins the report's stratum label (issue #129): an outcome carries its
+  *  index row's `source` and `tags` on every path, anomaly included, and the
+  *  label under which it reports is the source extended by the `stratum:`
+  *  tag when there is one.
+  *
   *  ============================================================================
   */
 package struxdriver.search
@@ -147,6 +152,9 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
 
     outcome.searchStatus shouldBe "anomaly"
     outcome.anomaly.getOrElse("") should include ("transport died")
+    outcome.source shouldBe "test"
+    outcome.tags shouldBe Vector.empty
+    outcome.stratum shouldBe "test"
     row.searchStatus shouldBe "anomaly"
     attempts shouldBe empty // the transport died on the FIRST probe
     val retr = outcome.retrieval.getOrElse(fail("retrieval ledger lost on the anomaly path"))
@@ -210,5 +218,15 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     row.finalStatus shouldBe "crash"
     // The raw reply log the hook wrote is also on disk, beside the row.
     Files.exists(cfg.runRoot.resolve("logs/test-anomaly/probe-001.json")) shouldBe true
+  }
+
+  test("the stratum label is the source, extended by the stratum tag when present (#129)") {
+    LoopOutcome.stratumOf("agda-stdlib", Vector.empty) shouldBe "agda-stdlib"
+    LoopOutcome.stratumOf("agda-stdlib", Vector("stratum:haystack")) shouldBe "agda-stdlib/haystack"
+    LoopOutcome.stratumOf("agda-algebras", Vector("universe-polymorphic", "stratum:wholesale")) shouldBe
+      "agda-algebras/wholesale"
+    // Other tags never make a stratum; the first stratum tag wins.
+    LoopOutcome.stratumOf("agda-algebras", Vector("universe-polymorphic")) shouldBe "agda-algebras"
+    LoopOutcome.stratumOf("x", Vector("stratum:a", "stratum:b")) shouldBe "x/a"
   }
 }
