@@ -225,6 +225,185 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     TokenOverlapScorer.approxVisibleArity(trans) shouldBe 2
   }
 
+  test("scorers: selected by name, the default is the P2 placeholder, an unknown name is refused") {
+    Scorers.default.instantiate(DefinitionTable.empty) shouldBe TokenOverlapScorer
+    Scorers.byName("token-overlap").map(_.instantiate(DefinitionTable.empty)) shouldBe Right(TokenOverlapScorer)
+    Scorers.byName("no-such-scorer").isLeft shouldBe true
+    Scorers.names.distinct.size shouldBe Scorers.names.size
+    Scorers.all.filter(_.needsDefinitions).map(_.name).forall(_.contains("unfold")) shouldBe true
+  }
+
+  test("rank: the pool-aware seam keeps the placeholder's total order — score, then arity, then name") {
+    val gts   = Set("+", "≡")
+    val rows  = corpusRows.filter(_.defKind == "function")
+    val ranked = RetrievalPool.rank(TokenOverlapScorer, RankQuery.goalOnly(gts), rows)
+    // Scores: +-comm 5 (alias form, arity 0) and +-suc 5 (arity 2); map-id 2
+    // (arity 1) and trans 2 (arity 2); *-comm 1 and the ring projection 1,
+    // both arity 0, split on the qname (`*` sorts below `I`); ≤-refl -1.
+    ranked.map(h => (h.bareName, TokenOverlapScorer.score(gts, h), TokenOverlapScorer.approxVisibleArity(h))) shouldBe Vector(
+      ("+-comm", 5, 0), ("+-suc", 5, 2), ("map-id", 2, 1), ("trans", 2, 2),
+      ("*-comm", 1, 0), ("+-comm", 1, 0), ("≤-refl", -1, 0))
+    ranked(4).prettyQname shouldBe "Data.Nat.Properties.*-comm"
+    ranked(5).prettyQname shouldBe "Data.Nat.Properties.IsCommutativeRing.+-comm"
+    // Rank is a pure function of its inputs: the same pool in another order ranks identically.
+    RetrievalPool.rank(TokenOverlapScorer, RankQuery.goalOnly(gts), rows.reverse) shouldBe ranked
+  }
+
+  // --------------------------------------------------------------------------
+  // The IDF family (issue #19), rule by rule, on rows copied from the
+  // agda-algebras v0.1 corpus (test/resources/search/recall-rows.jsonl): the
+  // fixture that motivated each rule is the one it is pinned on.
+  // --------------------------------------------------------------------------
+
+  /** The real rows: eight pool members and the definitions their types name. */
+  private lazy val realRows: Vector[io.circe.Json] = {
+    val src = scala.io.Source.fromInputStream(
+      getClass.getResourceAsStream("/search/recall-rows.jsonl"), "UTF-8")
+    try src.getLines().filter(_.trim.nonEmpty).map(l => io.circe.parser.parse(l).toOption.get).toVector
+    finally src.close()
+  }
+  private lazy val realHits: Map[String, SearchHit] =
+    realRows.flatMap(j => InMemoryCorpus.hitOf(j).toOption).map(h => h.prettyQname -> h).toMap
+  private lazy val realTable: DefinitionTable =
+    new DefinitionTable(realRows.flatMap(DefinitionTable.entryOf).toMap)
+  private def real(q: String): SearchHit = realHits(q)
+
+  /** The pool of the mon→hom motivating case: hom-concluding lemmas that
+    * differ only in their premises, two generic projections, a lemma about
+    * `≤`, and a long theorem that mentions everything.
+    */
+  private lazy val homPool: Vector[SearchHit] = Vector(
+    "Setoid.Homomorphisms.Basic.IsMon.HomReduct", "Setoid.Homomorphisms.Basic.epi→hom",
+    "Setoid.Homomorphisms.Basic.𝒾𝒹", "Setoid.Homomorphisms.Basic.mon→hom",
+    "Setoid.Homomorphisms.Isomorphisms._≅_.to", "Overture.Basic.ℓ₁", "Setoid.Functions.Basic.𝑖𝑑",
+    "Setoid.Subalgebras.Properties.≤-trans", "Setoid.Homomorphisms.Noether.FirstHomTheorem").map(real)
+
+  /** algebras-homs-mon-to-hom, as get_goal displayed it (run ctx-probe-1):
+    * the goal `hom 𝑨 𝑩` and the hypothesis `m : mon 𝑨 𝑩`, both NORMALISED
+    * into their Σ-unfoldings.
+    */
+  private val monToHomGoal = GoalView(
+    "Data.Product.Σ\n(Function.Bundles.Func (Algebra.Domain 𝑨) (Algebra.Domain 𝑩))\n(IsHom 𝑨 𝑩)",
+    Vector("𝓞", "𝓥", "α", "ρᵃ", "β", "ρᵇ").map(n => CtxEntry(n, "Level", None)) ++ Vector(
+      CtxEntry("𝑆", "Data.Product.Σ (Set 𝓞) (λ F → F → Set 𝓥)", None),
+      CtxEntry("𝑨", "Algebra α ρᵃ", None), CtxEntry("𝑩", "Algebra β ρᵇ", None),
+      CtxEntry("m", "Data.Product.Σ\n(Function.Bundles.Func (Algebra.Domain 𝑨) (Algebra.Domain 𝑩))\n(IsMon 𝑨 𝑩)", None)),
+    None)
+
+  private def scorerNamed(name: String): CandidateScorer =
+    Scorers.byName(name).toOption.get.instantiate(realTable)
+  private def ranking(name: String, goal: GoalView, pool: Vector[SearchHit] = homPool): Vector[String] =
+    RetrievalPool.rank(scorerNamed(name), Queries.rankQuery(goal), pool).map(_.bareName)
+  private def scoreOf(name: String, goal: GoalView, q: String): Double =
+    scorerNamed(name).scores(Queries.rankQuery(monToHomGoal), homPool)(real(q))
+
+  test("fragments: NFKC folds the mathematical alphabets, humps and separators split, symbols stand alone") {
+    Fragments.of("𝑖𝑑") shouldBe Vector("id")
+    Fragments.of("𝒾𝒹") shouldBe Vector("id")
+    Fragments.of("IsInRange→IsInImage") shouldBe Vector("is", "in", "range", "is", "in", "image")
+    Fragments.of("HomReduct") shouldBe Vector("hom", "reduct")
+    Fragments.of("⊙-injective") shouldBe Vector("⊙", "injective")
+    Fragments.of("≤-trans") shouldBe Vector("≤", "trans")
+    Fragments.of("InvIsInverseʳ") shouldBe Vector("inv", "is", "inverser")
+    Fragments.of("𝔻[") shouldBe Vector("d", "[")
+  }
+
+  test("unfolding: table keys tolerate anonymous-module segments and infix spellings") {
+    DefinitionTable.lookupKeys("Setoid.Subalgebras.Basic._.≤") shouldBe
+      Vector("Setoid.Subalgebras.Basic.≤", "Setoid.Subalgebras.Basic._≤_")
+    DefinitionTable.lookupKeys("Setoid.Homomorphisms.Basic.hom") shouldBe
+      Vector("Setoid.Homomorphisms.Basic.hom", "Setoid.Homomorphisms.Basic._hom_")
+    DefinitionTable.lookupKeys("@0") shouldBe Vector("@0")
+    // `_≤_` unfolds to `_IsSubalgebraOf_`, then to `hom` and `IsInjective`, then to
+    // the Σ-vocabulary the goal display uses; depth bounds the walk.
+    val one   = realTable.expand(Vector("Setoid.Subalgebras.Basic._.≤"), 1).map(TokenOverlapScorer.bareToken)
+    val three = realTable.expand(Vector("Setoid.Subalgebras.Basic._.≤"), 3).map(TokenOverlapScorer.bareToken)
+    one should contain ("IsSubalgebraOf")
+    (one should not).contain("IsHom")
+    three should contain allOf ("IsSubalgebraOf", "hom", "IsInjective", "Σ", "Func", "IsHom")
+    DefinitionTable.lookupKeys("Setoid.Algebras.Basic.𝔻[") should contain ("Setoid.Algebras.Basic.𝔻[_]")
+    realTable.expand(Vector("Setoid.Algebras.Basic.𝔻[", "]"), 1).map(TokenOverlapScorer.bareToken) should contain ("Domain")
+  }
+
+  test("mon→hom: the placeholder hands the top to the nullary generics (the stage-two failure)") {
+    // Qualified display tokens match no bare corpus token, every row ties at
+    // or below zero, and the arity tie-break puts the Level constant first.
+    ranking("token-overlap", monToHomGoal).head shouldBe "ℓ₁"
+  }
+
+  test("mon→hom: unfolding states the hom-concluding lemmas in the display's vocabulary") {
+    // On whole bare tokens, `𝒾𝒹 : hom 𝑨 𝑨` shares no unit with the display of
+    // its own conclusion (`hom` is not `IsHom`, `Σ`, `Func`, or `Domain`);
+    // unfolded, it says exactly what the display says.  Fragments alone
+    // would relate `hom` to `IsHom`, so they are off here to isolate the rule.
+    def plain(depth: Int) =
+      new IdfScorer("probe", fragments = false, conclusion = 1.0, nameWeight = 1.0, unfold = depth, normalize = true, table = realTable)
+        .scores(Queries.rankQuery(monToHomGoal), homPool)(real("Setoid.Homomorphisms.Basic.𝒾𝒹"))
+    plain(0) shouldBe 0.0
+    plain(3) should be > 0.0
+    val r = ranking("idf-unfold", monToHomGoal)
+    r.takeRight(3).toSet should contain allOf ("ℓ₁", "𝑖𝑑")
+  }
+
+  test("mon→hom: the hypotheses single out the lemma whose premise the context discharges") {
+    // Four rows conclude `hom 𝑨 𝑩`; `m : mon 𝑨 𝑩` is what says mon→hom (and
+    // the field HomReduct behind it) rather than epi→hom or 𝒾𝒹.
+    val r = ranking("idf-unfold", monToHomGoal)
+    r.head shouldBe "mon→hom"
+    def gap(name: String) =
+      scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Basic.IsMon.HomReduct") -
+        scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Basic.epi→hom")
+    gap("idf-unfold") should be > gap("idf-unfold-no-hypotheses")
+  }
+
+  test("mon→hom: the cosine norm shrinks a theorem that mentions everything relative to the lemma that says the right thing") {
+    // The norm divides by the row's own IDF mass, so FirstHomTheorem (whose
+    // type names hom, epi, kernels, quotients, and more) loses ground against
+    // mon→hom that the unnormalised sum had granted it.  Measured on the full
+    // pool: the norm lifted the originals' recall@32 from 14/21 to 19/21.
+    def ratio(name: String) =
+      scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Noether.FirstHomTheorem") /
+        scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Basic.mon→hom")
+    ratio("idf-unfold") should be < ratio("idf-unfold-no-norm")
+    val r = ranking("idf-unfold", monToHomGoal)
+    r.indexOf("FirstHomTheorem") should be > r.indexOf("mon→hom")
+  }
+
+  test("sup-trans: `≤-trans` reaches the display's vocabulary only through three unfolding steps") {
+    // The goal `𝑨 ≥ 𝑪` displays as a Σ over hom and injectivity; `≤` names
+    // none of it until `_≤_` → `_IsSubalgebraOf_` → `hom`/`IsInjective` → Σ ….
+    // The goal and the context exactly as get_goal displayed them (run
+    // ctx-probe-1): the hypotheses p q are the Σ-unfoldings of 𝑨 ≥ 𝑩, 𝑩 ≥ 𝑪.
+    val goal = GoalView("Agda.Builtin.Sigma.Σ (Agda.Builtin.Sigma.Σ (Function.Bundles.Func (Algebra.Domain 𝑪) (Algebra.Domain 𝑨)) (Setoid.Homomorphisms.Basic.IsHom 𝑪 𝑨)) (λ h → {x y : Relation.Binary.Bundles.Setoid.Carrier (Algebra.Domain 𝑪)} → (Algebra.Domain 𝑨 Relation.Binary.Bundles.Setoid.≈ Function.Bundles.Func.to (Overture.proj₁ h) x) (Function.Bundles.Func.to (Overture.proj₁ h) y) → (Algebra.Domain 𝑪 Relation.Binary.Bundles.Setoid.≈ x) y)", Vector(CtxEntry("𝓞", "Level", None), CtxEntry("𝓥", "Level", None), CtxEntry("α", "Level", None), CtxEntry("ρᵃ", "Level", None), CtxEntry("β", "Level", None), CtxEntry("ρᵇ", "Level", None), CtxEntry("γ", "Level", None), CtxEntry("ρᶜ", "Level", None), CtxEntry("𝑆", "Agda.Builtin.Sigma.Σ (Set 𝓞) (λ F → F → Set 𝓥)", None), CtxEntry("𝑨", "Algebra α ρᵃ", None), CtxEntry("𝑩", "Algebra β ρᵇ", None), CtxEntry("𝑪", "Algebra γ ρᶜ", None), CtxEntry("p", "Agda.Builtin.Sigma.Σ (Agda.Builtin.Sigma.Σ (Function.Bundles.Func (Algebra.Domain 𝑩) (Algebra.Domain 𝑨)) (Setoid.Homomorphisms.Basic.IsHom 𝑩 𝑨)) (λ h → {x y : Relation.Binary.Bundles.Setoid.Carrier (Algebra.Domain 𝑩)} → (Algebra.Domain 𝑨 Relation.Binary.Bundles.Setoid.≈ Function.Bundles.Func.to (Overture.proj₁ h) x) (Function.Bundles.Func.to (Overture.proj₁ h) y) → (Algebra.Domain 𝑩 Relation.Binary.Bundles.Setoid.≈ x) y)", None), CtxEntry("q", "Agda.Builtin.Sigma.Σ (Agda.Builtin.Sigma.Σ (Function.Bundles.Func (Algebra.Domain 𝑪) (Algebra.Domain 𝑩)) (Setoid.Homomorphisms.Basic.IsHom 𝑪 𝑩)) (λ h → {x y : Relation.Binary.Bundles.Setoid.Carrier (Algebra.Domain 𝑪)} → (Algebra.Domain 𝑩 Relation.Binary.Bundles.Setoid.≈ Function.Bundles.Func.to (Overture.proj₁ h) x) (Function.Bundles.Func.to (Overture.proj₁ h) y) → (Algebra.Domain 𝑪 Relation.Binary.Bundles.Setoid.≈ x) y)", None)), None)
+    val leTrans = real("Setoid.Subalgebras.Properties.≤-trans")
+    // Fragments off, so `Algebra.Domain` in the display cannot meet the
+    // `Algebra` of the lemma's binders and only unfolding can connect them.
+    def at(depth: Int) =
+      new IdfScorer("probe", fragments = false, conclusion = 1.0, nameWeight = 1.0, unfold = depth, normalize = true, table = realTable)
+        .scores(Queries.rankQuery(goal), homPool)(leTrans)
+    at(0) shouldBe 0.0
+    at(1) shouldBe 0.0
+    at(2) shouldBe 0.0
+    at(3) should be > 0.0
+    // With the hypotheses in the query the lemma whose premises ARE the
+    // hypotheses rises past everything that is not about hom (rank 5 of 476
+    // on the full pool, from 439 under the placeholder); the hom-concluding
+    // rows it still shares the top with is what a learned ranker is for.
+    val r = ranking("idf-unfold", goal)
+    r.indexOf("≤-trans") should be < 4
+    r.indexOf("≤-trans") should be < r.indexOf("𝑖𝑑")
+    r.indexOf("≤-trans") should be < r.indexOf("ℓ₁")
+    r.indexOf("≤-trans") should be < r.indexOf("to")
+    ranking("token-overlap", goal).indexOf("≤-trans") should be > r.indexOf("≤-trans")
+  }
+
+  test("idf-unfold is the kept combination, needs the corpus bodies, and is not the default") {
+    Scorers.idfUnfold.name shouldBe "idf-unfold"
+    Scorers.idfUnfold.needsDefinitions shouldBe true
+    Scorers.default.name shouldBe "token-overlap"
+    Scorers.byName("idf-unfold").map(_.name) shouldBe Right("idf-unfold")
+  }
+
   // --------------------------------------------------------------------------
   // ImportScope
   // --------------------------------------------------------------------------

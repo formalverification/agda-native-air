@@ -98,7 +98,8 @@ final case class LoopHarnessConfig(
   loop:          LoopConfig,
   proposerKind:  String,
   corpus:        Option[Path],
-  retrieval:     RetrievalConfig
+  retrieval:     RetrievalConfig,
+  scorer:        ScorerSpec = Scorers.default // the ranking behind retrieval, by name (issue #19)
 ) {
   def runRoot: Path = outDir.resolve(runId)
 }
@@ -152,7 +153,8 @@ final case class LoopOutcome(
   anomaly:      Option[String],
   retrieval:    Option[Json] = None, // the P2 per-fixture retrieval stats (issue #123)
   source:       String = "",          // the index row's library, for slicing (#129)
-  tags:         Vector[String] = Vector.empty // the index row's tags, likewise
+  tags:         Vector[String] = Vector.empty, // the index row's tags, likewise
+  goalContext:  Option[Vector[CtxEntry]] = None // the root goal's local context, as get_goal answered it (issue #19)
 ) {
   /** The stratum this outcome reports under: see `LoopOutcome.stratumOf`. */
   def stratum: String = LoopOutcome.stratumOf(source, tags)
@@ -178,7 +180,12 @@ final case class LoopOutcome(
     "depthCapped"  -> stats.depthCapped.asJson,
     "wallMs"       -> wallMs.asJson,
     "anomaly"      -> anomaly.asJson,
-    "retrieval"    -> retrieval.getOrElse(Json.Null)
+    "retrieval"    -> retrieval.getOrElse(Json.Null),
+    // The root goal's context beside its display, so the offline recall
+    // instrument (RetrievalRecall.scala) can rebuild the goal tokens the
+    // proposer saw: the context names are exactly what the tokeniser drops.
+    "goalContext"  -> goalContext.fold(Json.Null)(cs =>
+                        Json.arr(cs.map(c => Json.obj("name" -> c.name.asJson, "type" -> c.tpe.asJson)): _*))
   ).dropNullValues
 }
 
@@ -188,11 +195,11 @@ object LoopOutcome {
     * `stratum:wholesale` → `agda-algebras/wholesale`; the frozen stdlib rows
     * carry no stratum tag and report as plain `agda-stdlib`).  This is the
     * discriminator issue #129 settles on: the tiers quoted against their own
-    * baselines stay separable in a full-suite report without a join.
+    * baselines stay separable in a full-suite report without a join.  One
+    * definition, the index row's (`Obligation.stratumOf`); this is the
+    * report-side name for it.
     */
-  def stratumOf(source: String, tags: Vector[String]): String =
-    tags.collectFirst { case t if t.startsWith("stratum:") => s"$source/${t.stripPrefix("stratum:")}" }
-      .getOrElse(source)
+  def stratumOf(source: String, tags: Vector[String]): String = IndexEntry.stratumOf(source, tags)
 }
 
 object ProofSearchLoop extends IOApp {
@@ -221,6 +228,8 @@ object ProofSearchLoop extends IOApp {
       |    [--exclude-target on|off]  the anti-gaming target exclusion (default on;
       |                           off is the labeled mechanism-control sweep only)
       |    [--expand-deps on|off] one-hop get_dependencies expansion (default off)
+      |    [--scorer NAME]        the ranking behind retrieval (default token-overlap;
+      |                           one of the names Scorers.names lists; issue #19)
       |""".stripMargin
 
   def run(args: List[String]): IO[ExitCode] =
@@ -278,6 +287,7 @@ object ProofSearchLoop extends IOApp {
       topK   <- intOf(m, "retrieve-k", RetrievalConfig.default.topK, 1)
       excl   <- onOff(m, "exclude-target", RetrievalConfig.default.excludeTarget)
       deps   <- onOff(m, "expand-deps", RetrievalConfig.default.expandDeps)
+      scorer <- m.get("scorer").fold[Either[String, ScorerSpec]](Right(Scorers.default))(Scorers.byName)
     } yield LoopHarnessConfig(
       index         = Paths.get(ix),
       ids           = ids,
@@ -290,7 +300,8 @@ object ProofSearchLoop extends IOApp {
       loop          = LoopConfig(beam, depth, budget, dedup, peek),
       proposerKind  = prop,
       corpus        = corpus,
-      retrieval     = RetrievalConfig.default.copy(topK = topK, excludeTarget = excl, expandDeps = deps)
+      retrieval     = RetrievalConfig.default.copy(topK = topK, excludeTarget = excl, expandDeps = deps),
+      scorer        = scorer
     )
   }
 
@@ -318,20 +329,27 @@ object ProofSearchLoop extends IOApp {
       entries <- Scaffold.readIndex(cfg.index, cfg.ids)
       _       <- IO.raiseWhen(entries.isEmpty)(new RuntimeException("no obligations matched"))
       _       <- IO.blocking(Files.createDirectories(cfg.runRoot))
-      _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"} proposer=${cfg.proposerKind}${cfg.corpus.fold("")(c => s" corpus=$c retrieveK=${cfg.retrieval.topK} excludeTarget=${if (cfg.retrieval.excludeTarget) "on" else "off"}")}")
+      _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"} proposer=${cfg.proposerKind}${cfg.corpus.fold("")(c => s" corpus=$c retrieveK=${cfg.retrieval.topK} excludeTarget=${if (cfg.retrieval.excludeTarget) "on" else "off"} scorer=${cfg.scorer.name}")}")
       _       <- IO.println(s">> run root: ${cfg.runRoot}")
       // Hash the corpus and read its provenance sibling BEFORE the sweep: a
       // malformed sibling fails the run here, in seconds, rather than
       // silently dropping the provenance block from a finished report
       // (#130 review).  An absent sibling stays legitimate (digest-only).
       corpusInfo <- cfg.corpus.traverse(corpusProvenance)
+      // A scorer that unfolds definitions reads the corpus bodies once here
+      // (issue #19); the server never sends them on the wire.
+      defs    <- if (cfg.scorer.needsDefinitions)
+                   cfg.corpus.traverse(DefinitionTable.load).map(_.getOrElse(DefinitionTable.empty))
+                 else IO.pure(DefinitionTable.empty)
+      scorer   = cfg.scorer.instantiate(defs)
+      _       <- IO.whenA(cfg.scorer.needsDefinitions)(IO.println(s">> definition table: ${defs.size} bodies for scorer ${scorer.name}"))
       result  <- McpClient.resource(serverCfg).use { client =>
                    for {
                      // One ledger for the run; one oracle — and so one probe
                      // memo — per fixture (see Oracle.create's second door).
                      timings <- cats.effect.Ref.of[IO, Vector[TimingRow]](Vector.empty)
                      driven  <- entries.traverse(e =>
-                                  Oracle.create(client, timings).flatMap(o => runFixture(cfg, o, e)))
+                                  Oracle.create(client, timings).flatMap(o => runFixture(cfg, o, e, scorer)))
                      ledger  <- timings.get
                    } yield (driven, ledger)
                  }
@@ -355,7 +373,8 @@ object ProofSearchLoop extends IOApp {
   private[search] def runFixture(
     cfg:    LoopHarnessConfig,
     oracle: Oracle,
-    entry:  IndexEntry
+    entry:  IndexEntry,
+    scorer: CandidateScorer = Scorers.default.instantiate(DefinitionTable.empty)
   ): IO[(LoopOutcome, FixtureRow, Vector[AttemptRow])] = {
     val workDir  = cfg.runRoot.resolve(s"work/${entry.id}")
     val logsDir  = cfg.runRoot.resolve(s"logs/${entry.id}")
@@ -435,7 +454,8 @@ object ProofSearchLoop extends IOApp {
                                  lemmaType = name =>
                                    oracle.typeOf(mkCtx("type_of", None), st.workFile, name, None)
                                      .map(_.body.map(_.inferred)),
-                                 cfg       = cfg.retrieval
+                                 cfg       = cfg.retrieval,
+                                 scorer    = scorer
                                ).map(Option(_))
                              else IO.pure(Option.empty[RetrievalProposer])
                 _        <- retrRef.set(retriever)
@@ -494,7 +514,8 @@ object ProofSearchLoop extends IOApp {
                               anomaly      = None,
                               retrieval    = retrStats,
                               source       = entry.source,
-                              tags         = entry.tags
+                              tags         = entry.tags,
+                              goalContext  = result.rootGoal.map(_.context)
                             )
               } yield (outcome, fixtureRow(module, Some(result), solvedPath, wallMs, anomalous = false), attempts)
           }
@@ -658,7 +679,8 @@ object ProofSearchLoop extends IOApp {
         "retrieveK"     -> cfg.retrieval.topK.asJson,
         "queryLimit"    -> cfg.retrieval.queryLimit.asJson,
         "excludeTarget" -> cfg.retrieval.excludeTarget.asJson,
-        "expandDeps"    -> cfg.retrieval.expandDeps.asJson
+        "expandDeps"    -> cfg.retrieval.expandDeps.asJson,
+        "scorer"        -> cfg.scorer.name.asJson
       ),
       "corpus" -> corpusInfo.getOrElse(Json.Null),
       "obligations" -> entries.size.asJson,
