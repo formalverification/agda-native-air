@@ -49,7 +49,7 @@ Why it is shaped this way comes down to one field datum and one measurement.
 
 **The datum**.  In July 2026 a Claude Code session formalized about 1200 lines of literate Agda in `ualib/agda-algebras` with the server configured and its four tools listed, and never called it once, because nothing said whether green meant the build passed, and the two tools with no shell equivalent were unreliable on the literate files that repository is made of.
 
-**The measurement**.  A batch judgment costs about 2.6 s of interface loading on a standard-library fixture, while a question about a file the lane has loaded costs 1–3 ms.  So verdicts are made expensive and unimpeachable, knowledge is made cheap and explicitly non-authoritative, and every response and every tool description says which of the two it is.
+**The measurement**.  A batch judgment costs about 2.6 s of interface loading on a standard-library fixture, while a question about a file the lane has loaded costs 1–3 ms.  So verdicts are made expensive and unimpeachable, knowledge is made cheap and explicitly non-authoritative, and the proof-state and live-query tools say, in every response and in their descriptions, which of the two they are.  The three corpus lookups ride neither lane and run no Agda at all (§ 10).
 
 ### Where it stands
 
@@ -137,7 +137,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 (See also [#69], [#72], [#78], and [`agda-mcp/README.md`].)
 
-**Decision**.  `success` is a function of the exit code alone, and every verdict says what ran and what green means.
+**Decision**.  For the per-file tools, `success` is a function of the exit code alone; `check_project` adds two conjuncts, in the safe direction only (below); and every verdict says what ran and what green means.
 
 +  Every batch proof-state response carries `verdict` (`equivalentTo`, the exact `agda` command the call is equivalent to; `meaning`, one sentence; `exitCode`, Agda's own), `command` (`binary` resolved against `PATH`, `args`, `cwd`), and `project` (§ 5); the one response shape without a `verdict` is a lane-sourced `get_goal`, which carries `command`, `project`, and the lane echo instead (below).  A change in Agda's message format can empty the diagnostics list; it cannot turn a failing build green.  The suite pins this with a stand-in binary that exits non-zero while printing nothing a parser could latch onto.
 +  `fill_hole` tolerates exactly one class of error on an otherwise green file: the `[UnsolvedInteractionMetas]` of the file's other open holes and of sub-holes inside the candidate.  A candidate that leaves `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]` is a type error ([#69], PR [#81]); that is the FLRP "implicits under a defined function" pattern that cost the field session a build cycle.
@@ -238,11 +238,11 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 (See also [#77].)
 
-**Decision**.  Every call is bounded, the bound is enforced by killing the process, and every response says how long it took and whether Agda re-checked from source.
+**Decision**.  Every call that runs Agda or a gate, on either lane, is bounded, and the bound is enforced by killing the process; every such response says how long it took, and the per-file and lane responses say whether Agda re-checked from source.  The corpus lookups run no subprocess and have no bound.
 
 +  `agda` is spawned into its own process group, its stdout and stderr drained on dedicated threads so neither can fill a pipe and deadlock the other, and raced against a timer; on expiry the group gets SIGINT, then SIGTERM, then SIGKILL, and is reaped.  Wrapping `readProcessWithExitCode` in `System.Timeout.timeout` could not do this: it kills the waiting Haskell thread and leaks a running `agda` every time it fires.  A timeout is returned as a value, never thrown, which is what lets the in-place tools' `bracket_` restore run on the timeout path exactly as after a clean check.
 +  The default bound was raised from 30 s to 300 s so cold interface builds are not aborted, and the shipped registrations pass 600 s; sizing the bound too small is not a graceful degradation, since it aborts exactly the call that would have built the interfaces.  `check_project` has its own `--check-timeout` (default 1800 s), because a whole-project gate legitimately runs for tens of minutes.  The lane shares one deadline across a request's phases, pipe writes included, and kills its child by the same ladder.
-+  Every response carries `elapsedMs` and the tri-state `checkedFromSource` of § 8, so a client can tell a slow cold call from a slow warm one, which § 3.7 of the field report says is the only way an advantage influences a decision.
++  Every proof-state and live-query response carries `elapsedMs`; the per-file batch tools and the lane carry the tri-state `checkedFromSource` of § 8, `check_project` carries `modulesChecked` in its place (a count of the same progress lines, over the gate's output), and the corpus lookups carry neither.  So a client can tell a slow cold call from a slow warm one, which § 3.7 of the field report says is the only way an advantage influences a decision.
 
 **One correction to the record**.  The 2026-09-01 fls report praises a 173 s check that "moved itself to the background and notified on completion".  That is the client harness backgrounding a long tool call; the server's contribution is the bound that makes a long call safe to wait on.  The behavior is real and worth having, but it is not a server decision, and this record does not claim it as one.
 
@@ -319,7 +319,7 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 | 2 | `get_goal` answers from the lane first, with injection as the stated fallback and the only path reporting binder visibility | Adopted ([#108], PR [#110]) | Byte-identical goals on the fixture matrix; no file mutation on the happy path |
 | 3 | A batch tool may peek at a warm lane's stored load, never call it; a cold or stale lane leaves the response byte-identical | Adopted ([#108], [#115]) | Enrichment tests pin both shapes |
 | 4 | `scope_at` omitted rather than approximated with grep | Adopted ([#75]) | No protocol command enumerates a scope |
-| 5 | `success` is a function of the exit code alone; every verdict carries `verdict`, `command`, `project` | Adopted ([#72], [#76], PR [#95]) | Stand-in binary test; field report § 2 and § 6 |
+| 5 | For the per-file tools, `success` is a function of the exit code alone; every batch verdict carries `verdict`, `command`, `project` | Adopted ([#72], [#76], PR [#95]) | Stand-in binary test; field report § 2 and § 6 |
 | 6 | `fill_hole` tolerates only other open holes' `[UnsolvedInteractionMetas]` | Adopted ([#69], PR [#81]) | Verification fixture: `ok` on content `agda` rejects with exit 42 |
 | 7 | `check_project` may turn a green gate red on failure evidence, never a red gate green | Adopted ([#78], PR [#98]) | The wrapper-ending-in-`echo` trap of § 3.5 |
 | 8 | `answer = whatAgdaSaid <|> whatWeDerived`; the rule lives in the README's architecture notes | Adopted ([#100], [#106]; PRs [#105], [#116]) | Four module-name shapes; the audit's inventory |
