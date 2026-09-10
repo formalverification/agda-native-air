@@ -10,7 +10,7 @@
 --   This module is the process and protocol layer only.  The tool handlers live
 --   in AgdaMCP.Tools.LiveQueries; the wire protocol itself (framing, escaping,
 --   command shapes, response kinds, and every gotcha the design observes) is
---   documented in docs/agda-mcp-interaction-lane.md, which was probed against the
+--   documented in docs/agda-mcp/agda-mcp-interaction-lane.md, which was probed against the
 --   pinned Agda 2.8.0 before this module was written.  Where behavior here might
 --   seem arbitrary (the sentinel after every command, the startup flush, the
 --   reload policy), that document holds the measured reason.
@@ -221,7 +221,7 @@ data LaneGoal = LaneGoal
 -- and their types not at all, so this is the one payload of the feedback
 -- document's § 5 corpus that the interaction protocol carries as data and the
 -- prose cannot carry at all (issue #115, measured in
--- docs/agda-mcp-ask-agda-audit.md § 3).
+-- docs/agda-mcp/agda-mcp-ask-agda-audit.md § 3).
 --
 -- Note the wire asymmetry with 'LaneGoal': a visible goal's @constraintObj@
 -- carries an integer @id@ (its interaction point), an invisible one a string

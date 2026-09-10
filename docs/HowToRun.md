@@ -755,7 +755,7 @@ The server exposes **thirteen tools**:
 +  **whole-project gate** (1): `check_project`,
 +  **live-query tools** answered by a persistent interaction lane (5): `type_of`,
    `normalize`, `resolve_name`, `definition_of`, `exports_of` (issue #75; see
-   `docs/agda-mcp-interaction-lane.md`), all always available,
+   `docs/agda-mcp/agda-mcp-interaction-lane.md`), all always available,
 +  **corpus-backed search tools** (3): `search_by_name`, `search_by_type`,
    `get_dependencies`, that are registered only when you start the server with
    `--corpus PATH` (an agda-strux JSONL corpus).
@@ -1034,7 +1034,7 @@ have to wait for that to notice, either: every proof-state response carries a `p
 block naming the tree it checked, alongside `command` (the exact `agda` invocation,
 resolved binary and cwd included) and `verdict` (what green means, and Agda's own exit
 code, which the verdict is read from).  See
-[`docs/agda-mcp-environment.md`](agda-mcp-environment.md).
+[`docs/agda-mcp/agda-mcp-environment.md`](agda-mcp/agda-mcp-environment.md).
 
 **Add a corpus: `--corpus <abs-path>.jsonl` (turns on the search tools).**  The
 `search_by_name` / `search_by_type` / `get_dependencies` tools appear in `tools/list` only

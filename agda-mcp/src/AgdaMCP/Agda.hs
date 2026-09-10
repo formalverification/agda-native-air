@@ -694,7 +694,7 @@ timeoutMessage cfg =
 -- the progress lines the two answers below are read from.
 --
 -- The grammar is closed, and every clause was measured against the pinned Agda
--- 2.8.0 (issue #114; transcripts in @docs/agda-mcp-ask-agda-audit.md@ § 4):
+-- 2.8.0 (issue #114; transcripts in @docs/agda-mcp/agda-mcp-ask-agda-audit.md@ § 4):
 --
 --   * @--trace-imports=N@ is the only level-carrying spelling.
 --   * The bare @--trace-imports@ means level 2.
@@ -787,7 +787,7 @@ progressChannelMuted = (< 1) . traceImportsLevel
 --     argv carrying an effective @--trace-imports=0@ silences the progress
 --     lines outright, which gives a genuinely cold check the warm signature, so
 --     under one this answers 'Nothing' rather than @Just False@ (issue #114;
---     reproduced end to end in @docs/agda-mcp-ask-agda-audit.md@ § 4).  The
+--     reproduced end to end in @docs/agda-mcp/agda-mcp-ask-agda-audit.md@ § 4).  The
 --     field exists to explain latency, and a wrong @false@ defeats that purpose
 --     in a way an absent field does not.  The argv read is the run's own
 --     ('arCommand', built from the very list handed to @createProcess@), so the

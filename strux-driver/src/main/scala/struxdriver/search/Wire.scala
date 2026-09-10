@@ -125,7 +125,7 @@ object GetGoalBody {
 }
 
 /** type_of, the interaction-lane knowledge query the P1 proposer and peek
-  * read (docs/agda-mcp-interaction-lane.md § 5).  Verified on the wire
+  * read (docs/agda-mcp/agda-mcp-interaction-lane.md § 5).  Verified on the wire
   * (issue #122 probes, captures in test/resources/search/): a successful
   * inference carries `type` — with under-determined metas ANSWERED, printed
   * as named metas (`_x_9 ≡ _x_9`), never errored — while an expression Agda

@@ -39,7 +39,7 @@
   *  #113 sweep differ by ~2 % despite fresh per-pass directories).  The
   *  fixture itself keeps a hole throughout probing, so it writes no interface
   *  of its own, and the interaction lane reloads on every fixture switch
-  *  regardless of pathing (docs/agda-mcp-interaction-lane.md § 2.6) — so the
+  *  regardless of pathing (docs/agda-mcp/agda-mcp-interaction-lane.md § 2.6) — so the
   *  per-pass work directories cost no reusable warmth, and they buy pass
   *  isolation: each pass's committed artifacts survive for post-mortem
   *  instead of being overwritten by the next.  The probe memo is deliberately

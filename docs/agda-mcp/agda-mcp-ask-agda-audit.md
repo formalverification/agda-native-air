@@ -1,8 +1,8 @@
 # Ask Agda rather than re-derive: the audit
 
-File: `agda-native-air/docs/agda-mcp-ask-agda-audit.md`
+File: `agda-native-air/docs/agda-mcp/agda-mcp-ask-agda-audit.md`
 
-Purpose: the audit record for issue #106 — every answer `agda-mcp` computes from source text, with a verdict on each, and the two measurements the issue asked for: what `--interaction-json` actually carries for the § 5 error corpus (Measurement 1), and what `--trace-imports=0` does to the `checkedFromSource` signal (Measurement 2).  Every probe below was run on 2026-08-20 against the pinned Agda 2.8.0 inside `nix develop .#backend`, and every quoted transcript was captured live from a real process; scratch directory prefixes are abbreviated to `…` in the quotes.  This is a standalone document rather than a section of `docs/agda-mcp-interaction-lane.md` because that file is #75's design record while this audit is a cross-tool inventory with its own acceptance list; the two cite each other.
+Purpose: the audit record for issue #106 — every answer `agda-mcp` computes from source text, with a verdict on each, and the two measurements the issue asked for: what `--interaction-json` actually carries for the § 5 error corpus (Measurement 1), and what `--trace-imports=0` does to the `checkedFromSource` signal (Measurement 2).  Every probe below was run on 2026-08-20 against the pinned Agda 2.8.0 inside `nix develop .#backend`, and every quoted transcript was captured live from a real process; scratch directory prefixes are abbreviated to `…` in the quotes.  This is a standalone document rather than a section of `docs/agda-mcp/agda-mcp-interaction-lane.md` because that file is #75's design record while this audit is a cross-tool inventory with its own acceptance list; the two cite each other.
 
 ## 1.  The rule
 

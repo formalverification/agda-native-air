@@ -204,7 +204,7 @@
       # MCP client spawned the server from another project, that used to write
       # a stray — and broken, since it names an agda-dojang that is not there —
       # agda/ directory into that project's root.  Issue #76 records the
-      # sighting; docs/agda-mcp-environment.md records the reproduction.
+      # sighting; docs/agda-mcp/agda-mcp-environment.md records the reproduction.
       _anair_has_marker() {
         [ -n "$1" ] && [ -f "$1/agda-dojang/agda-dojang.agda-lib" ]
       }

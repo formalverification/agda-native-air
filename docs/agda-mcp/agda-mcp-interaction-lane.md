@@ -1,6 +1,6 @@
 # The agda-mcp interaction lane
 
-File: `agda-native-air/docs/agda-mcp-interaction-lane.md`
+File: `agda-native-air/docs/agda-mcp/agda-mcp-interaction-lane.md`
 
 Purpose: the design record for issue #75 — the second lane of the agda-mcp server, a persistent `agda --interaction-json` child per resolved project root, serving live scope, type, and definition queries as structured data.  This document states the two-lane policy, the wire protocol *as observed* under the pinned Agda 2.8.0 (probed 2026-08-19/20 inside `nix develop .#backend`; every exchange quoted below was captured from a live process, not transcribed from Agda's source), the process lifecycle, and what each existing module becomes.  It is written before the Haskell, and the implementation is expected to cite it rather than restate it.
 
@@ -64,7 +64,7 @@ This is once per process, not per load (verified against an empty stdin).  The l
 
     A parse error has the same shape.  The process survives and accepts further commands.
 +  **Nothing rewrites the file.**  `HoleVariants.agda` (holes in all four syntaxes, `?` included) and `LiterateMd.lagda.md` hash identically before and after a load; `?` holes are not expanded on disk.
-+  `RunningInfo` lines carry Agda's `Checking M (path).` progress, indented by import depth — the same lines `AgdaMCP.Agda.progressModules` already parses from batch output, and the lane's evidence for "this call re-checked the file from source".  That evidence is only as good as the channel: a per-load argv carrying an effective `--trace-imports=0` emits no `RunningInfo` at all (probed — the load went straight to `AllGoalsWarnings`), so `AgdaMCP.Interaction.loadCheckedFromSource` reads a line naming the file as a re-check and answers "unknown" whenever the evidence could not arrive: the argv it was handed muted the channel (issue #114; the grammar and its measurements are in `docs/agda-mcp-ask-agda-audit.md` § 4), or the load failed before Agda announced this file — a header that does not match its file name, a parse error — which establishes no interface reuse either.  Only a load that *succeeded* in silence over an open channel reads as reuse, which is the batch signal's own reading of silent success.
++  `RunningInfo` lines carry Agda's `Checking M (path).` progress, indented by import depth — the same lines `AgdaMCP.Agda.progressModules` already parses from batch output, and the lane's evidence for "this call re-checked the file from source".  That evidence is only as good as the channel: a per-load argv carrying an effective `--trace-imports=0` emits no `RunningInfo` at all (probed — the load went straight to `AllGoalsWarnings`), so `AgdaMCP.Interaction.loadCheckedFromSource` reads a line naming the file as a re-check and answers "unknown" whenever the evidence could not arrive: the argv it was handed muted the channel (issue #114; the grammar and its measurements are in `docs/agda-mcp/agda-mcp-ask-agda-audit.md` § 4), or the load failed before Agda announced this file — a header that does not match its file name, a parse error — which establishes no interface reuse either.  Only a load that *succeeded* in silence over an open channel reads as reuse, which is the batch signal's own reading of silent success.
 
 ### 2.5  The query commands
 

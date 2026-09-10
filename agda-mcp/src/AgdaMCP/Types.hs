@@ -1566,7 +1566,7 @@ instance FromJSON NormalizeParams where
 -- here, and why?  @line@ as in 'TypeOfParams'; for scope questions it matters
 -- more, because a goal-scoped query sees local variables and, on a hole-free
 -- file, more of the opened names than the completed toplevel scope does (see
--- docs/agda-mcp-interaction-lane.md § 2.6).
+-- docs/agda-mcp/agda-mcp-interaction-lane.md § 2.6).
 data ResolveNameParams = ResolveNameParams
   { rnpFilePath :: FilePath
   , rnpName     :: Text

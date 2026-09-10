@@ -9,7 +9,7 @@
 --   per resolved project root.  There's no edit to the file, no cold subprocess
 --   per question, and no build verdict anywhere in the response; interaction mode
 --   is tolerant by design, so verdicts stay with the batch tools (the two
---   interface lanes described in docs/agda-mcp-interaction-lane.md § 1).
+--   interface lanes described in docs/agda-mcp/agda-mcp-interaction-lane.md § 1).
 --
 --   Every handler shares one spine ('withLiveFile'): resolve and read the
 --   requested path, resolve its library context and refuse a wrong-checkout call,

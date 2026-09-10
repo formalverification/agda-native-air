@@ -622,7 +622,7 @@ pureTests = do
     -- .agda-lib flags: field carrying it is rejected outright), so the server
     -- always knows, and an inference from a silence it caused is withheld.
     -- Every level below was measured against the pinned Agda 2.8.0; the
-    -- transcripts are in docs/agda-mcp-ask-agda-audit.md § 4.
+    -- transcripts are in docs/agda-mcp/agda-mcp-ask-agda-audit.md § 4.
     , runTest "traceImportsLevel: no occurrence means Agda's default level" $
         assertEqual "level" 1
           (traceImportsLevel ["-i", "/x", "--library-file=/y", "/x/M.agda"])
@@ -4938,7 +4938,7 @@ reanchorTest cfg path =
 -- Tier 1h: the interaction lane's wire model and prose parsers (#75, no Agda)
 --
 -- Every string below is a captured transcript line from the probes recorded
--- in docs/agda-mcp-interaction-lane.md, not an invented example: these tests
+-- in docs/agda-mcp/agda-mcp-interaction-lane.md, not an invented example: these tests
 -- pin the parsers to what Agda 2.8.0 actually said.
 -- ---------------------------------------------------------------------------
 

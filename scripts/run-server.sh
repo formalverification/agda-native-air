@@ -23,7 +23,7 @@
 #   target/ from its sbt version probe — into that project's root.  The two
 #   lines below remove that entirely: cd to this repository first, and hand the
 #   hook an explicit anchor so its answer does not depend on cwd at all.
-#   docs/agda-mcp-environment.md has the reproduction and the full inventory of
+#   docs/agda-mcp/agda-mcp-environment.md has the reproduction and the full inventory of
 #   what gets written where.
 #
 # Usage (from anywhere):
