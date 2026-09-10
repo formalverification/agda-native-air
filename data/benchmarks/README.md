@@ -71,6 +71,21 @@ Domains: setoid, algebra, universe.
    retrieves and applies the library's original lemma has legitimately found the
    needle in the haystack; excluding the target from the candidate pool is the P2
    target-exclusion policy's job, not the fixture's.
++  **Ranking ground truth** (recorded per obligation in `tags`, issue #19): every
+   row carries one `restates:<prettyQname>` tag naming the library original it was
+   mined from, by its corpus `prettyQname`, and zero or more `target:<prettyQname>`
+   tags naming the library lemmas and constructors the gold term applies, product
+   plumbing (`_,_`, `proj₁`, `proj₂`) and the record projections that only
+   destructure a hypothesis or name a carrier (`Func.to`, `Setoid._≈_`, `𝔻[_]`)
+   excepted.  The two are kept apart because they measure different regimes: the
+   original's rank in the unexcluded pool is the haystack question (would the
+   exclusion-off control commit it), while the targets' ranks in the excluded pool
+   are the fair question (would ranking hand the searcher the lemmas the gold
+   needs).  A `target:` may name a standard-library definition (`Function.Base.id`,
+   `Relation.Binary.Bundles.Setoid.refl`), which the agda-algebras corpus cannot
+   retrieve, or a constructor, which the retrieval proposer's `defKind` filter
+   never proposes; the offline recall instrument (`make proof-search-recall`)
+   reports both cases by name rather than counting them as ranking failures.
 
 ## Directory Layout
 
