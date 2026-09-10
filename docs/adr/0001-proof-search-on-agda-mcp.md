@@ -5,7 +5,7 @@
 File: `agda-native-air/docs/adr/0001-proof-search-on-agda-mcp.md`
 
 +  **Status**: Accepted through P2.  P0, P1, and P2 are landed on `main` and measured; P3 is direction.  Rewritten 2026-09-09 as a decision record; the explanatory companion is [`proof-search/overview.md`], which defines the vocabulary both documents use.
-+  **Date**: 2026-08-22 (P0 and P1); 2026-08-27 (P2, first measurement); 2026-09-08 (P2 re-measured after review, and measured on the agda-algebras tier).
++  **Date**: 2026-08-22 (P0 and P1); 2026-08-27 (P2, first measurement); 2026-09-08 (P2 re-measured after review, and measured on the agda-algebras tier); 2026-09-10 (the haystack tier measured).
 +  **Tracking**: [#113] ([M2-9]); phases [#119] (P0, PR [#121]), [#122] (P1, PR [#126]), [#123] (P2, [M2-10], PR [#130] and the stage-two measurement in its comments), [#124] (P3, direction); the benchmark instruments [#127] (the agda-algebras tier, PR [#132]), [#129], and [#142]; the hand-off [#19] ([M2-5]).
 +  **Ancestry**: [#112], the post-mortem of the retired `search.py`, whose four lessons this design encodes as types and tests, and whose one defect it makes unrepresentable.
 
@@ -31,10 +31,11 @@ We are building a machine that proves Agda theorems by search, with Agda itself 
 +  **P0** landed the state model, the oracle client, and the single-step harness, and measured the economics above.
 +  **P1** landed the beam loop with a fixed, non-learned action space (the closers `refl` and `tt`, the goal context's assumptions, and applications of the lemmas the fixture imports) and measured the baseline on the standard-library tier: **6 of 22 obligations** (routine 6/7, compositional 0/10, non-obvious 0/5).  That is exactly the set whose gold proofs are single terms expressible from the fixture's imports, so the number is the term-mode ceiling of the suite, not a shortfall of the loop.  The `type_of` peek cut probes by 88 % and wall time by 4.5× with the same six solves.
 +  **P2** landed retrieval over real corpora (the standard library, 55,576 rows; agda-algebras, 13,123 rows) behind the same proposer interface, and measured the honest result twice.  On the standard-library tier retrieval adds **zero** solves under target exclusion, because the ceiling binds any term-mode proposer, while the labeled control with exclusion off retrieves and commits all five admissible standard-library lemmas.  On the agda-algebras tier, built so that every gold is a single term, the fixed space solves 2 of 21, retrieval again adds zero under exclusion, and the control commits one wholesale-stratum lemma end to end; the ledgers locate the binding constraint in ranking at scale, not in the move vocabulary.  The suite-wide baseline is **8 of 43**, byte-stable across four reproductions.
++  **The haystack tier** ([#129]) is the instrument those two nulls called for: twelve standard-library obligations whose needles are import-reachable but never `using`-listed and never the answer key.  On it retrieval has its first solves under exclusion, **6 of 12** against the fixed space's 0 of 12, each attributable to retrieval by construction, and each of the six nulls pins one limitation of the placeholder ranker or the peek (§ 9).
 
 ### Where it goes
 
-P3 replaces the deterministic ranker with a learned policy behind the existing policy-backend contract.  The stage-two ledgers are the quantitative demand for premise selection ([#19], [M2-5]), which slots into the scorer seam the retrieval proposer already exposes.  Two benchmark instruments sharpen attribution ([#129], [#142]).  Raising the ceiling itself needs case-split moves, which is deliberately outside P1–P3.
+P3 replaces the deterministic ranker with a learned policy behind the existing policy-backend contract.  The stage-two ledgers and the haystack tier's nulls are the quantitative demand for premise selection ([#19], [M2-5]), which slots into the scorer seam the retrieval proposer already exposes.  One benchmark instrument is measured ([#129]); the style-paired one ([#142]) remains.  Raising the ceiling itself needs case-split moves, which is deliberately outside P1–P3.
 
 ## 1.  Context: why proof search, and why now
 
@@ -212,11 +213,22 @@ The reading: **the suite's term-mode ceiling binds any term-mode proposer**.  Re
 
 Three findings.  The mechanism is proven on this corpus: the control's one new solve is a wholesale needle committed end to end, `algebras-inverses-range-to-image` closed by `(Setoid.Functions.IsInRange→IsInImage w)`, retrieved from a 79-row in-scope pool, ranked in the top three, rendered through the qualified rung of the ladder, saturated with the context assumption, and committed in five probes.  Zero uplift under exclusion, and this time the binding constraint is measured to be ranking at scale rather than the move vocabulary: wholesale opens flood the legal pools (up to 24,566 raw hits and 3,025 in-scope rows on one fixture, against `using`-stratum pools of 16–79), the token-overlap ranker drowns the targets under the library's generic projections (`Overture.ℓ₁`, `∣_∣`, `∥_∥`, `𝑖𝑑`), and eight fixtures burn the full budget on ranked-but-wrong candidates.  And the measurement existed at all because of the review round: every wholesale pool flows through the whole-module scope fix, without which this sweep would have reported a false zero.
 
+**The haystack tier** ([#129], [M2-11]; twelve standard-library obligations whose golds apply one lemma that the fixture imports but does not `using`-list, so the needle is never the answer key; runs `hay-fixed-final` and `hay-retrieval-final`, retrieve-k 8, exclusion on, 2026-09-10; other work ran on the machine, so probe counts are the comparable column, and every number reproduced across two sweeps).
+
+| tier | fixed space | retrieval, exclusion on | probes (retrieval) |
+|---|---|---|---|
+| routine | 0/3 | 2/3 | 13 |
+| compositional | 0/5 | 4/5 | 64 |
+| non-obvious | 0/4 | 0/4 | 240 |
+| total | 0/12 (30 probes, every row exhausted at depth 0) | 6/12 | 317 |
+
+The first solves under target exclusion: six needles committed as one saturated application each (`(Data.Nat.Properties.+-mono-≤ le le)`, `(Data.Bool.Properties.∧-distribˡ-∨ a a b)`, …) in 3 to 9 probes, with the exclusion ledger empty on every row, so each is attributable to retrieval by construction.  The six nulls each pin one limitation of the placeholder pipeline, with a fixture built so that nothing else can explain it: a renamed re-export splits the vocabulary (`∸` in the display, `Agda.Builtin.Nat.-` in the corpus); display normalization hides the needle's notation (`m < n` displays as `suc m ≤ n`, so `+-mono-<` carries a misfit token); the ranker reads the goal display and never the hypothesis (three rows); the peek rejects a candidate whose inferred type keeps a trailing implicit binder (`length-++`, ranked first, a one-probe proof by `fill_hole`, never probed); and the cheap-arity tie-break reads arity off the corpus string, where alias-stated rows look nullary.  Widening the cut to 32 (`hay-retrieval-k32`) reproduces the solve set and the 317 probes exactly for 2.3 times the peeks, and no missing needle enters the top 32, so on this tier the cut is not the bottleneck.  One rule the measurement forced onto the tier: a fixture binds every hypothesis in its clause, since the proposer saturates every visible binder and a Π-typed goal could only be closed by a partial application, outside the three shapes.
+
 ## 10.  Where it is going
 
 +  **Premise selection** ([#19], [M2-5]).  The `CandidateScorer` seam inside the retrieval proposer now has a measured reason to exist: token overlap fails at 3,000-row pools where the needles are in scope.  Two cheap knob experiments are recorded as options before any learned model: a retrieve-k above eight, and a larger probe budget on wholesale rows.
 +  **P3, policy proposals** ([#124]).  A learned policy behind the existing contract (`policy_contract.py`, mirrored by `AgdaMCP.Types`; `policy_fixture.py` as the deterministic stand-in), compared against policy-alone top-k and both earlier baselines: the closed propose, check, and learn loop the project has been building toward.
-+  **Benchmark instruments** ([#129], [#142]).  Obligations whose single-term golds require a non-`using`-listed, non-target lemma from an imported haystack, and style-paired obligations, so retrieval's ranking value becomes measurable without gaming.
++  **Benchmark instruments** ([#129], [#142]).  The haystack tier ([#129]) is landed and measured (§ 9): obligations whose single-term golds require a non-`using`-listed, non-target lemma from an imported haystack, on which retrieval now has its first solves under exclusion and its nulls each name a ranking or peek limitation.  Style-paired obligations ([#142]) remain, so retrieval's ranking value becomes measurable without gaming from a second direction.
 +  **Raising the ceiling** (unscheduled, the largest known win).  Term mode caps the standard-library tier at 6/22, and 13 of the 16 unreachable golds are structural inductions of a single shape (`f zero … = refl; f (suc n) … = cong g (f n …)`).  Reaching them needs case-split moves, plausibly via the interaction protocol's `Cmd_make_case`, which changes the state model's move vocabulary and is deliberately outside P1–P3.
 +  **Recorded options, taken only if measurement demands**: parallel oracle workers (N servers over disjoint work copies) if wall time becomes the bottleneck; richer selection policies than first-open-obligation if multi-hole fixtures ever make selection order matter under budget.
 
@@ -240,6 +252,7 @@ Three findings.  The mechanism is proven on this corpus: the control's one new s
 | 14 | Three candidate shapes: `_`-form, bounded saturation over the context, `{!!}`-refinement | Adopted (P2) | `fill_hole` refuses blocked-constraint sub-holes (captures `wire-fill-hole-blocked-*`); the control solves are saturated one-shots |
 | 15 | The scorer is a seam; token overlap is the placeholder, premise selection the replacement | Adopted (P2); the demand now measured | Stage two: needles in scope, drowned at 3,000-row pools ([#19]) |
 | 16 | Splice columns are codepoints, never UTF-16 units | Adopted ([#127]) | `ModelSpec` regression; astral glyphs throughout agda-algebras |
+| 17 | The retrieval instrument is a tier whose needles are import-reachable, not `using`-listed, never the answer key, with golds inside the three candidate shapes and the exclusion ledger required empty | Adopted ([#129]) | Fixed space 0/12 against retrieval 6/12 under exclusion, zero exclusions; each null pinned to one pipeline limitation (§ 9) |
 
 ## References
 
