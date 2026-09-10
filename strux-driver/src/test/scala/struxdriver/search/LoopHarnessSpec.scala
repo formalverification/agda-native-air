@@ -80,6 +80,18 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     }
   }
 
+  test("the report outcome carries the root goal's context when the loop recorded one (#19)") {
+    // The offline recall instrument rebuilds the proposer's goal tokens from
+    // this field; it is additive, and absent when no root goal was reached.
+    val base = LoopOutcome("id", "routine", "m + n ≡ n + m", "M", "exhausted",
+      solved = false, Vector.empty, LoopStats(), 1L, None)
+    base.toJson.hcursor.downField("goalContext").focus shouldBe None
+    val withCtx = base.copy(goalContext = Some(Vector(CtxEntry("m", "ℕ", None), CtxEntry("n", "ℕ", None))))
+    withCtx.toJson.hcursor.downField("goalContext").focus.flatMap(_.asArray).map(_.size) shouldBe Some(2)
+    withCtx.toJson.hcursor.downField("goalContext").downArray.get[String]("name") shouldBe Right("m")
+    withCtx.toJson.hcursor.downField("goalContext").downArray.get[String]("type") shouldBe Right("ℕ")
+  }
+
   test("an anomalous RETRIEVAL fixture keeps its accumulated ledger (#130 round 3)") {
     // The corpus queries answer and the ledger accumulates (hits, inScope,
     // proposedLemmas); then the transport dies on a probe.  The recovered
