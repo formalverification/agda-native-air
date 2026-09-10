@@ -12,8 +12,9 @@ ground truth for a benchmark entry.
 
 ## Contents (v0)
 
-The current suite has **43 obligations** from two libraries, spanning the three
-difficulty tiers of `docs/benchmarks/taxonomy.md`.
+The current suite has **55 obligations** from two libraries, spanning the three
+difficulty tiers of `docs/benchmarks/taxonomy.md`: two tiers cut from the Agda
+standard library and one from agda-algebras.
 
 The **`agda-stdlib` tier** (22 obligations) is the original [M1-5] cut and is
 **frozen**: the P1 baseline (issue #113) is quoted against it, so it only ever
@@ -38,6 +39,21 @@ corpus are cut from the same library at the same commit:
 | `non-obvious`   | 5     | `≤-reflexive`, `≤-trans`, `≤-trans-≅`, `kercon`, `ker-in-con`           |
 
 Domains: setoid, algebra, universe.
+
+The **`agda-stdlib-haystack` tier** (12 obligations, issue #129) is the
+retrieval instrument: each gold is one application of a standard-library lemma
+that the fixture imports but does not `using`-list, so the lemma is reachable
+only by its qualified name and a searcher has to *find* it in the imported
+module (the haystack) rather than read it off the fixture:
+
+| Tier            | Count | Examples                                                                 |
+|-----------------|-------|--------------------------------------------------------------------------|
+| `routine`       | 3     | `+-suc m m`, `length-++ xs`, `∧-assoc a b a`                            |
+| `compositional` | 6     | `+-mono-≤ le le`, `*-mono-≤ le le`, `+-∸-assoc n le`, `map-++ f xs xs`  |
+| `non-obvious`   | 3     | `+-mono-< lt lt`, `m+n≤o⇒m≤o m le`, `∷-injectiveˡ eq`                   |
+
+Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
+(7 obligations), `Data.List.Properties` (3), `Data.Bool.Properties` (2).
 
 ### agda-algebras tier: selection criteria and provenance
 
@@ -72,6 +88,57 @@ Domains: setoid, algebra, universe.
    needle in the haystack; excluding the target from the candidate pool is the P2
    target-exclusion policy's job, not the fixture's.
 
+### agda-stdlib-haystack tier: design constraints and gates
+
++  **Why it exists**: the P2 retrieval measurement (issue #123, numbers on
+   #113) found that every frozen stdlib obligation *is* a stdlib lemma, so once
+   the answer key is excluded from the candidate pool there is no needle left
+   to find, and the term-mode ceiling binds the rest.  This tier is built to
+   contain needles that are not the answer key.
++  **Reachable but not listed**: each fixture opens its haystack module with a
+   narrow `using` list of one or two *decoys*, lemmas of the same family that
+   cannot close the goal in term mode, so the fixed action space has a real
+   pool to fail with while the needle is reachable only qualified
+   (`open import M using (xs)` grants qualified access to all of `M`).  The
+   gold therefore names the needle qualified, `Data.Nat.Properties.+-suc m m`,
+   which is the same text the retrieval proposer's qualified rendering
+   produces.
++  **Statements are specializations the library does not state**: a diagonal
+   instance (`m + suc m ≡ suc (m + m)`), a hypothesis-consuming instance
+   (`m ≤ n → m + m ≤ n + n`), or an instance whose implicit argument
+   unification solves from the goal (`length (xs ++ xs) ≡ …`).  No statement
+   is a stdlib lemma up to renaming, and none becomes one after `_<_` or an
+   alias family unfolds, since the retrieval proposer's lane-form exclusion
+   compares normalized printings.
++  **Golds stay within the committed candidate shapes**: one lemma applied to
+   context names, with at most three visible binders in the lemma's
+   lane-printed telescope (hypotheses count), because that is what the
+   proposer's saturated form can emit and `fill_hole` refuses candidates that
+   leave metas unsolved.  A gold outside those shapes would measure the shape
+   vocabulary, not retrieval; `+-cancelˡ-≡` (four visible binders) and any
+   two-lemma composite under `trans` are excluded on this rule.
++  **Three mechanical gates**, all re-runnable: the name and statement rules
+   checked against the whole corpus by
+   `scripts/python/corpus/check_haystack_exclusion.py` (run as
+   `python3 scripts/python/corpus/check_haystack_exclusion.py --corpus
+   data/corpora/agda-stdlib/v0/corpus.jsonl --index
+   data/benchmarks/benchmark-index.jsonl`); the fixed-space sweep over the
+   tier's ids, every status `exhausted` or `budget_exceeded`
+   (`make proof-search-loop PROOF_SEARCH_PROPOSER=fixed
+   PROOF_SEARCH_LOOP_IDS="--ids …"`); and the retrieval sweep with exclusion
+   on, whose per-fixture ledger must report zero exclusions.  The measured
+   numbers are posted on #129 and #113, and the per-row outcome (whether the
+   token-overlap ranker surfaced the needle at all) is part of the record: a
+   row the ranker cannot find is a valid instrument, not a defective fixture.
++  **Stratum tag**: every row carries `stratum:haystack` in `tags`, beside
+   the agda-algebras strata; `source` stays `agda-stdlib`, so `EvalBenchmark`
+   verifies the golds in the unchanged stdlib environment, and the loop
+   harness reports the tier under `agda-stdlib/haystack` in `perStratum`,
+   separately from the frozen tier's plain `agda-stdlib`.
++  **Frozen tier untouched**: the 22 obligations of `agda-stdlib-v0` are
+   byte-identical to the P1 and P2 baselines' fixtures; this tier is a new
+   directory, which is the only way the stdlib content grows.
+
 ## Directory Layout
 
 ```
@@ -87,9 +154,12 @@ data/benchmarks/
 │       ├── Nat-plus-identityL.agda
 │       ├── Nat-plus-comm.agda
 │       └── ...
-└── agda-algebras-v0/
-    ├── obligations/                   # 21 modules, one {!!} hole each
-    └── gold/                          # solved twins
+├── agda-algebras-v0/
+│   ├── obligations/                   # 21 modules, one {!!} hole each
+│   └── gold/                          # solved twins
+└── agda-stdlib-haystack-v0/
+    ├── obligations/                   # 12 modules, one {!!} hole each
+    └── gold/                          # solved twins, needle named qualified
 ```
 
 Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
@@ -109,7 +179,9 @@ Each obligation is a self-contained Agda module:
    necessarily brings the restated lemma's own library name into scope (see the
    stratum semantics above); the gold still never *applies* it, and keeping the
    original reachable is the stratum's point, since retrieving it is a legitimate
-   find and excluding it is the P2 target-exclusion policy's job.
+   find and excluding it is the P2 target-exclusion policy's job.  Haystack-tier
+   fixtures qualify it the other way round: their `using` lists hold only
+   decoys, and the lemma the gold applies is deliberately *not* listed.
 
 The corresponding gold file is identical except the hole is replaced with the
 correct proof term.
@@ -131,7 +203,7 @@ Each line is a JSON object with the following fields:
 | `difficulty`    | string       | One of `"routine"`, `"compositional"`, `"non-obvious"`         |
 | `domain`        | string       | Domain tag (e.g., `"arithmetic"`, `"list"`, `"logic"`)         |
 | `proofStrategy` | string       | Primary proof technique (e.g., `"refl"`, `"induction"`)        |
-| `tags`          | list[string] | Additional tags for slicing (e.g., `["standalone"]`)           |
+| `tags`          | list[string] | Additional tags for slicing (e.g., `["standalone"]`, `["stratum:haystack"]`) |
 
 Example line:
 
