@@ -2,11 +2,45 @@
 
 # StruxDriver
 
-**StruxDriver** is the data-extraction and normalization component of the **agda-native-air** project.
+**StruxDriver** is the data-extraction and normalization component of the
+**agda-native-air** project.
 
-Its purpose is to convert Agda libraries and interactive proof sessions into **structured, semantically informed datasets** suitable for machine learning tasks such as premise selection, proof synthesis, goal prediction, and proof-state modeling.
+Its purpose is to convert Agda libraries and interactive proof sessions into
+**structured, semantically informed datasets** suitable for machine learning tasks
+such as premise selection, proof synthesis, goal prediction, and proof-state
+modeling.
 
-Unlike lightweight scrapers or text-based parsers, StruxDriver is designed to work *with* Agda, invoking its typechecker and interaction protocol, in order to extract information that is only available after elaboration and scope checking.
+Unlike lightweight scrapers or text-based parsers, StruxDriver is designed to work
+*with* Agda, invoking its typechecker and interaction protocol, in order to
+extract information that is only available after elaboration and scope checking.
+
+---
+
+## Three roles, one build
+
+The name describes the subproject's first role; two more have joined it since,
+because they needed the same stack (sbt, cats-effect, fs2, circe) and the same
+benchmark index.  Each has its own package, its own Make targets, and its own
+documentation under `docs/`.  This README covers the first in depth and only
+points to the other two.
+
++  **Extraction driver** (`struxdriver.extract`): runs the Haskell `agda-json`
+   backend over a library, validates and assembles its JSONL, and writes the
+   manifest.  The rest of this README is about this role; the data contract is
+   [`docs/representation.md`][representation], and the published corpora are
+   described by the dataset cards under [`docs/corpora/`][corpora].
++  **Benchmark runner** (`struxdriver.benchmark`, `EvalBenchmark`): reads
+   `data/benchmarks/benchmark-index.jsonl`, verifies every gold solution against
+   the pinned toolchain (`make eval-benchmark`, `make eval-benchmark-smoke`), and
+   writes the gold-verification report.  The suite, its index schema, and its
+   difficulty tiers are documented in [`data/benchmarks/README.md`][benchmarks]
+   and [`docs/benchmarks/taxonomy.md`][taxonomy].
++  **Proof search** (`struxdriver.search`): a beam search over proof obligations
+   that drives `agda-mcp` as a client, with Agda as the only judge of every step
+   (`make proof-search-loop` and the other `proof-search-*` targets).  How it
+   works, with a worked example, is [`docs/proof-search/overview.md`][overview];
+   its decisions and measured record are
+   [`docs/adr/0001-proof-search-on-agda-mcp.md`][adr-0001].
 
 ---
 
@@ -19,7 +53,8 @@ Within the broader agda-native-air architecture, StruxDriver is responsible for:
 +  normalizing heterogeneous inputs into stable **JSONL schemas**,
 +  providing small evaluation and sanity-checking utilities for datasets.
 
-All learning components downstream (ETL, training, inference) depend on the correctness and stability of the data produced here.
+All learning components downstream (ETL, training, inference) depend on the
+correctness and stability of the data produced here.
 
 ---
 
@@ -56,9 +91,10 @@ The main Scala/Spark package for doing this is the `struxdriver.extract`
 package---specifically, the three programs, `AgdaJsonlDriver.scala`,
 `JsonlValidate.scala` and `Proc.scala`.
 
-At the time of this writing, all other programs in the `strux-driver` subproject are
-considered "legacy" or "deprecated," though we keep them around for now and expect to
-revisit them in the future when we need an etl pipeline.
+Apart from the benchmark runner and the proof search described above, the other
+programs in the `strux-driver` subproject are considered "legacy" or "deprecated,"
+though we keep them around for now and expect to revisit them in the future when
+we need an etl pipeline.
 
 ### Running the Extraction Program
 
@@ -311,6 +347,8 @@ From the repository root:
 make extract        # Offline extraction (.agda → JSONL)
 make transform      # Transform existing Agda JSON → JSONL
 make smoke          # Compile + quick sanity checks
+make eval-benchmark # Verify every benchmark gold under the pinned toolchain
+make proof-search-loop  # Beam search over the benchmark suite (docs/proof-search/)
 ```
 
 For finer control, StruxDriver programs can also be invoked directly via `sbt runMain`.
@@ -357,10 +395,19 @@ In particular, we are continually exploring new ways to improve it.  Here are so
 + [`agda-strux/README.md`][agda-strux/README]
 + [`agda-dojang/README.md`][agda-dojang/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
++ [`docs/proof-search/overview.md`][overview]
++ [`docs/adr/0001-proof-search-on-agda-mcp.md`][adr-0001]
++ [`data/benchmarks/README.md`][benchmarks]
 
-[Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
-[agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
-[agda-dojang/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-dojang/README.md
-[ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md
+[Root project README]: ../README.md
+[agda-strux/README]: ../agda-strux/README.md
+[agda-dojang/README]: ../agda-dojang/README.md
+[ml-pipeline/README]: ../ml-pipeline/README.md
+[representation]: ../docs/representation.md
+[corpora]: ../docs/corpora/README.md
+[benchmarks]: ../data/benchmarks/README.md
+[taxonomy]: ../docs/benchmarks/taxonomy.md
+[overview]: ../docs/proof-search/overview.md
+[adr-0001]: ../docs/adr/0001-proof-search-on-agda-mcp.md
 
 

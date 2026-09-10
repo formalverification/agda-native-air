@@ -18,22 +18,26 @@ The system connects a frontier AI agent to the Agda type-checker through a small
 stack of purpose-built layers.  The agent supplies strategy and reasoning; Agda
 is the oracle that decides what is actually correct; the layers in between let the
 agent inspect proof state, propose terms, and retrieve relevant definitions.
+The proof search in `strux-driver` is a second client of the same layers: it
+proposes candidates by rule or by retrieval where the agent would reason, and
+Agda judges them the same way.
 
 ```
   ┌────────────────────────────────────────────────┐
   │  User / editor  (Emacs agda-mode, VS Code, …)  │
   └───────────────────────┬────────────────────────┘
                           ▼
-  ┌────────────────────────────────────────────────┐
-  │  Frontier LLM agent  (Claude Code, Codex, …)   │  strategy, planning,
-  │                                                │  error interpretation
-  └───────────────────────┬────────────────────────┘
-                          │  MCP  (JSON-RPC over stdio)
-                          ▼
-  ┌────────────────────────────────────────────────┐     ┌────────────────────────────┐
-  │  agda-mcp   — Bridge layer                     │◀────│  Retrieval corpus          │
-  │  Haskell MCP server                            │ srch│  agda-strux → strux-driver │
-  │  proof-state tools + corpus search tools       │     └────────────────────────────┘
+  ┌────────────────────────────────────────────────┐     ┌──────────────────────────────┐
+  │  Frontier LLM agent  (Claude Code, Codex, …)   │     │  Proof search (strux-driver) │
+  │  strategy, planning, error interpretation      │     │  beam search over obligations│
+  │                                                │     │  a client of the bridge      │
+  └───────────────────────┬────────────────────────┘     └────────┬─────────────────────┘
+                          │  MCP  (JSON-RPC over stdio)           │  MCP, as a client
+                          ▼                  ┌────────────────────┘
+  ┌──────────────────────────────────────────▼─────┐     ┌──────────────────────────────┐
+  │  agda-mcp   — Bridge layer                     │◀────│  Retrieval corpus            │
+  │  Haskell MCP server                            │ srch│  agda-strux → strux-driver   │
+  │  proof-state tools + corpus search tools       │     └──────────────────────────────┘
   └───────────────────────┬────────────────────────┘
                           │  injects AgdaDojang macros and runs the agda binary
                           │  (v0: one subprocess per call)
@@ -81,7 +85,8 @@ MCP tool interface.
 | [`agda-mcp`](../agda-mcp/README.md) | Bridge | Implemented (v0.2.0) | MCP server exposing Agda proof-state interaction and corpus search to any MCP-compatible agent. |
 | [`agda-dojang`](../agda-dojang/README.md) | Interaction | Implemented | Repo-local Agda library (`AgdaDojang.Debug` reflection macros) plus a Python proof-completion harness; realizes goal inspection, hole filling, and diagnostics. |
 | [`agda-strux`](../agda-strux/README.md) | Retrieval (extraction) | Implemented | Haskell backend linking Agda-as-a-library; its `agda-json` executable emits canonical JSONL from Agda source. |
-| [`strux-driver`](../strux-driver/README.md) | Retrieval (ETL) | Implemented | Scala driver that runs `agda-json`, validates and transforms its JSONL, and hosts the M1-5 benchmark runner. |
+| [`strux-driver`](../strux-driver/README.md) | Retrieval (ETL) | Implemented | Scala driver that runs `agda-json`, validates and transforms its JSONL, and hosts the benchmark runner (`struxdriver.benchmark`) and the proof search (`struxdriver.search`, its own row below). |
+| Proof search ([`struxdriver.search`](../strux-driver/src/main/scala/struxdriver/search/)) | Search | Implemented (P0–P2) | Beam search over proof obligations that drives `agda-mcp` as a client, with Agda as the only judge of every step; fixed and retrieval proposers landed, a policy proposer (P3) is planned.  See [`proof-search/overview.md`](proof-search/overview.md) and [ADR 0001](adr/0001-proof-search-on-agda-mcp.md). |
 | Local specialist models | Accelerators (optional) | Planned (M2 / M4) | Premise selection, type-aware embeddings, proof-term ranking, and routine completion, surfaced as extra `agda-mcp` tools. |
 
 ---
@@ -131,6 +136,25 @@ MCP tool interface.
 +  **Status**.  Implemented.  See [`representation.md`](representation.md) for the
    JSONL data contract.
 
+### Search — `struxdriver.search`
+
++  **Role**.  Prove benchmark obligations by search: propose candidate terms for
+   the open hole, ask the bridge whether each typechecks, commit the ones that
+   do, and claim a proof only when no obligation remains and a final whole-file
+   check is green.  It is a client of the bridge like the agent, not part of it,
+   and it holds the search strategy the bridge deliberately does not.
++  **Inputs**.  A benchmark obligation (one module, one hole) from
+   `data/benchmarks/`; the bridge's proof-state and live-query tools; a corpus,
+   through the bridge's search tools, when retrieval proposals are on.
++  **Outputs**.  Per-run reports on the shared `eval-proof-completion.v0` schema
+   (`results.jsonl`, `fixtures.jsonl`), a timing ledger, `report.json`, and the
+   solved modules.
++  **Status**.  P0 to P2 landed and measured: a fixed action space, then
+   retrieval over the standard-library and agda-algebras corpora; P3, proposals
+   from a learned policy, is direction.  How it works is
+   [`proof-search/overview.md`](proof-search/overview.md); its decisions and
+   numbers are [ADR 0001](adr/0001-proof-search-on-agda-mcp.md).
+
 ### Accelerators — local specialist models
 
 +  **Role**.  Cheap, domain-specific models for narrow subtasks: ranking premises,
@@ -156,6 +180,9 @@ MCP tool interface.
     `agda-strux` + `strux-driver` — no Agda invocation.
 5.  When present, local models add ranking/completion tools alongside the above;
     the agent calls them the same way it calls any other tool.
+6.  The proof search (`strux-driver`) drives steps 1 to 4 as a client in the
+    agent's place: a proposer (fixed rules, or retrieval over the corpus) supplies
+    the candidate terms the agent would supply, and Agda judges them the same way.
 
 ---
 
@@ -173,7 +200,8 @@ A typical agent session follows a **propose–check–refine** loop.
 7.  Repeat until all holes are filled or the agent gives up.
 
 This is the same loop that AgdaDojang's scripted policy backend demo implements,
-but driven by a frontier LLM instead of a fixed script.
+but driven by a frontier LLM instead of a fixed script; the proof search runs it
+with a machine proposer in the agent's place.
 
 ---
 
@@ -203,3 +231,6 @@ MCP library.
 +  [`GITHUB_PROJECT.md`](GITHUB_PROJECT.md) — living GitHub project roadmap with issue-level detail.
 +  [`agda-mcp/README.md`](../agda-mcp/README.md) — Bridge layer: tool surface, flags, transport, and module structure.
 +  [`representation.md`](representation.md) — data contract for `agda-strux` JSONL output and derived views.
++  [`proof-search/overview.md`](proof-search/overview.md) — how the proof search works, with a worked example.
++  [`adr/0001-proof-search-on-agda-mcp.md`](adr/0001-proof-search-on-agda-mcp.md) — the proof search's decisions and measured record.
++  [`adr/0002-agda-mcp.md`](adr/0002-agda-mcp.md) — the agda-mcp server's design record.
