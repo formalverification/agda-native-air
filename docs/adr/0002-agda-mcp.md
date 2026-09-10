@@ -1,3 +1,5 @@
+<!-- File: docs/adr/0002-agda-mcp.md -->
+
 # ADR 0002: agda-mcp
 
 File: `agda-native-air/docs/adr/0002-agda-mcp.md`

@@ -6,7 +6,7 @@
 
 Its purpose is to convert Agda libraries and interactive proof sessions into **structured, semantically informed datasets** suitable for machine learning tasks such as premise selection, proof synthesis, goal prediction, and proof-state modeling.
 
-Unlike lightweight scrapers or text-based parsers, StruxDriver is designed to work *with* Agda — invoking its typechecker and interaction protocol — in order to extract information that is only available after elaboration and scope checking.
+Unlike lightweight scrapers or text-based parsers, StruxDriver is designed to work *with* Agda, invoking its typechecker and interaction protocol, in order to extract information that is only available after elaboration and scope checking.
 
 ---
 

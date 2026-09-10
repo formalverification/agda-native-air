@@ -1,3 +1,5 @@
+<!-- File: docs/adr/0001-proof-search-on-agda-mcp.md -->
+
 # ADR 0001: Proof search on agda-mcp
 
 File: `agda-native-air/docs/adr/0001-proof-search-on-agda-mcp.md`
