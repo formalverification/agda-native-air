@@ -576,35 +576,32 @@ object ProofSearchLoop extends IOApp {
     */
   private def corpusProvenance(corpus: Path): IO[Json] =
     for {
-      digest <- IO.blocking {
-                  val md = java.security.MessageDigest.getInstance("SHA-256")
-                  val in = Files.newInputStream(corpus)
-                  try {
-                    val buf = new Array[Byte](1 << 16)
-                    Iterator.continually(in.read(buf)).takeWhile(_ >= 0)
-                      .foreach(n => md.update(buf, 0, n))
-                  } finally in.close()
-                  md.digest().map(b => f"$b%02x").mkString
-                }
-      prov   <- IO.blocking {
-                  val p = corpus.resolveSibling("provenance.json")
-                  if (!Files.exists(p)) None
-                  else io.circe.parser.parse(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)) match {
-                    case Right(j) => Some(j)
-                    case Left(e) =>
-                      // Malformed is not absent: this block exists to pin
-                      // WHAT was retrieved from, so a sibling that cannot be
-                      // parsed fails the run rather than vanishing (#130
-                      // review).  Remove or fix the sibling to proceed.
-                      throw new RuntimeException(
-                        s"corpus provenance sibling is malformed: $p — ${e.message}")
-                  }
-                }
+      digest <- fs2.io.file.Files[IO].readAll(fs2.io.file.Path.fromNioPath(corpus))
+                  .through(fs2.hash.sha256)
+                  .compile.toVector
+                  .map(_.map(b => f"$b%02x").mkString)
+      prov   <- provenanceSibling(corpus.resolveSibling("provenance.json"))
     } yield Json.obj(
       "path"       -> corpus.toString.asJson,
       "sha256"     -> digest.asJson,
       "provenance" -> prov.getOrElse(Json.Null)
     ).dropNullValues
+
+  /** The assembly's provenance.json, parsed, when it sits beside the corpus.
+    * Malformed is not absent: this block exists to pin WHAT was retrieved
+    * from, so a sibling that cannot be parsed fails the run rather than
+    * vanishing (#130 review).  Remove or fix the sibling to proceed.
+    */
+  private def provenanceSibling(sibling: Path): IO[Option[Json]] =
+    IO.blocking(Files.exists(sibling)).flatMap {
+      case false => IO.pure(None)
+      case true  =>
+        IO.blocking(new String(Files.readAllBytes(sibling), StandardCharsets.UTF_8)).flatMap { text =>
+          IO.fromEither(io.circe.parser.parse(text).bimap(
+            e => new RuntimeException(s"corpus provenance sibling is malformed: $sibling: ${e.message}"),
+            j => Some(j)))
+        }
+    }
 
   private val batchPhases     = Set("check_file", "fill_hole", "final_check")
   private val knowledgePhases = Set("get_goal", "type_of", "peek")

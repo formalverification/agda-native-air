@@ -603,6 +603,13 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     s.hits shouldBe 0                     // the build never completed, so nothing past the queries is claimed
   }
 
+  test("pieces: depth-0 groups keep their opener, nested brackets stay inside, and the bare text between is kept") {
+    import Statements.{Bare, Group}
+    Statements.pieces("∀ (x y : A) {B : Set (f (g z))} ⦃ _ : C ⦄ → D") shouldBe Vector(
+      Bare("∀"), Group('(', "x y : A"), Group('{', "B : Set (f (g z))"), Group('⦃', " _ : C "), Bare("→ D"))
+    Statements.pieces("   ") shouldBe Vector.empty
+  }
+
   test("arrows: one splitter, standalone arrows only, behind the telescope, the arity tie-break, and the conclusion (#152 review, round three)") {
     Statements.splitTopLevelArrows("(w : Setoid.Functions.Inverses.IsInRange→IsInImage F) → P w") shouldBe
       Vector("(w : Setoid.Functions.Inverses.IsInRange→IsInImage F)", "P w")

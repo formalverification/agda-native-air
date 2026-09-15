@@ -80,6 +80,7 @@ import io.circe.Json
 import io.circe.syntax._
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
+import scala.annotation.tailrec
 
 import struxdriver.benchmark.{Obligation => IndexEntry}
 
@@ -123,9 +124,8 @@ object InMemoryCorpus {
     * server answers with every `Σ` row would miss the projections here.
     */
   def foldCase(s: String): String = {
-    val sb = new java.lang.StringBuilder(s.length)
-    s.codePoints().forEach(cp => sb.appendCodePoint(Character.toLowerCase(cp)))
-    sb.toString
+    val folded = s.codePoints().map(cp => Character.toLowerCase(cp)).toArray
+    new String(folded, 0, folded.length)
   }
 
   /** Unicode code-point order: `Data.Text`'s `compare` on the UTF-8 text the
@@ -133,20 +133,9 @@ object InMemoryCorpus {
     * puts a surrogate pair (`𝑨`, U+1D468) below a BMP glyph such as `ﬂ`
     * (U+FB02) where code-point order puts it above.
     */
-  val codePointOrder: Ordering[String] = new Ordering[String] {
-    def compare(a: String, b: String): Int = {
-      var i = 0
-      var j = 0
-      var r = 0
-      while (r == 0 && i < a.length && j < b.length) {
-        val ca = a.codePointAt(i)
-        val cb = b.codePointAt(j)
-        r = Integer.compare(ca, cb)
-        i += Character.charCount(ca)
-        j += Character.charCount(cb)
-      }
-      if (r != 0) r else Integer.compare(a.length - i, b.length - j)
-    }
+  val codePointOrder: Ordering[String] = {
+    import scala.math.Ordering.Implicits.seqOrdering
+    Ordering.by[String, Seq[Int]](s => s.codePoints().toArray.toSeq)
   }
 
   /** Load a corpus JSONL.  Rows that do not parse are counted and dropped, as
@@ -159,28 +148,25 @@ object InMemoryCorpus {
     * hits the server never returns.
     */
   def load(path: Path): IO[(InMemoryCorpus, Int, DefinitionTable)] =
-    IO.blocking {
-      val src = scala.io.Source.fromFile(path.toFile, "UTF-8")
-      try {
-        val rows = Vector.newBuilder[SearchHit]
-        val defs = scala.collection.mutable.LinkedHashMap.empty[String, Vector[String]]
-        var bad  = 0
-        src.getLines().foreach { line =>
-          if (line.trim.nonEmpty)
-            io.circe.parser.parse(line).leftMap(_.message) match {
-              case Left(_) => bad += 1
-              case Right(json) =>
-                SearchHit.fromCorpusRow(json) match {
-                  // Only a row the server would index reaches the definition
-                  // table (PR #152 review, round two).
-                  case Right(h) => rows += h; DefinitionTable.record(defs, json)
-                  case Left(_)  => bad += 1
-                }
-            }
-        }
-        (new InMemoryCorpus(dedupLastWins(rows.result())), bad, new DefinitionTable(defs.toMap))
-      } finally src.close()
+    Jsonl.parsed(path).compile.fold(Loading.empty)(_ line _).map { l =>
+      (new InMemoryCorpus(dedupLastWins(l.rows)), l.bad, new DefinitionTable(l.defs))
     }
+
+  /** What loading accumulates, line by line: the rows the server would
+    * index, in file order; the definition table over them; and the count of
+    * lines the server drops, an unparsable line or a row its decoder
+    * refuses.
+    */
+  private final case class Loading(rows: Vector[SearchHit], defs: Map[String, Vector[String]], bad: Int) {
+    def line(parsed: Either[io.circe.ParsingFailure, Json]): Loading = parsed.fold(_ => copy(bad = bad + 1), row)
+    // Only a row the server would index reaches the definition table (PR
+    // #152 review, round two).
+    def row(json: Json): Loading = SearchHit.fromCorpusRow(json) match {
+      case Right(h) => copy(rows = rows :+ h, defs = DefinitionTable.record(defs, json))
+      case Left(_)  => copy(bad = bad + 1)
+    }
+  }
+  private object Loading { val empty: Loading = Loading(Vector.empty, Map.empty, 0) }
 
   /** One row per `prettyQname`, the last in input order winning (the server's
     * `Map.fromList` semantics); the survivors keep their input order.
@@ -203,8 +189,7 @@ object FixtureContext {
 
   final case class SigBinder(visibility: Visibility, name: Option[String])
 
-  private val Opens  = Set('(', '{', '⦃')
-  private val Closes = Set(')', '}', '⦄')
+  import Statements.{Bare, Group}
 
   private def visibilityOf(open: Char): Visibility = open match {
     case '{' => Visibility.Hidden
@@ -218,40 +203,14 @@ object FixtureContext {
     t.startsWith(name) && (t.length == name.length || " :{(=\t".contains(t.charAt(name.length)))
   }
 
-  /** Depth-0 pieces of one segment: bracket groups (with their opener) and
-    * the bare text between them.
+  /** The index of the first `:` at bracket depth zero, if any: the depth
+    * before each character by a scan, then the first colon at depth zero.
     */
-  private def pieces(seg: String): Vector[Either[String, (Char, String)]] = {
-    val out   = Vector.newBuilder[Either[String, (Char, String)]]
-    val cur   = new StringBuilder
-    var depth = 0
-    var open  = ' '
-    def flushBare(): Unit = { val t = cur.result().trim; if (t.nonEmpty) out += Left(t); cur.clear() }
-    seg.foreach {
-      case c if Opens(c) =>
-        if (depth == 0) { flushBare(); open = c } else cur += c
-        depth += 1
-      case c if Closes(c) =>
-        depth -= 1
-        if (depth == 0) { out += Right((open, cur.result())); cur.clear() } else cur += c
-      case c => cur += c
-    }
-    flushBare()
-    out.result()
-  }
-
   private def depth0Colon(content: String): Option[Int] = {
-    var depth = 0
-    var i     = 0
-    var found = -1
-    while (found < 0 && i < content.length) {
-      val c = content.charAt(i)
-      if (Opens(c)) depth += 1
-      else if (Closes(c)) depth -= 1
-      else if (c == ':' && depth == 0) found = i
-      i += 1
-    }
-    if (found < 0) None else Some(found)
+    val depths = content.iterator.scanLeft(0) { (d, c) =>
+      if (Statements.Opens(c)) d + 1 else if (Statements.Closes(c)) d - 1 else d
+    }.toVector
+    content.indices.find(i => content.charAt(i) == ':' && depths(i) == 0)
   }
 
   /** The binder telescope of a signature body (everything after `name :`):
@@ -267,15 +226,17 @@ object FixtureContext {
     val segs = Statements.splitTopLevelArrows(signatureBody)
     if (segs.size <= 1) Vector.empty
     else segs.init.flatMap { seg =>
-      val ps        = pieces(seg)
-      val forall    = ps.headOption.exists(_.left.exists(_.startsWith("∀")))
-      val groups    = ps.collect { case Right((open, content)) => (open, content) }
-      val binderGrp = groups.collect { case (open, content) if depth0Colon(content).isDefined =>
-        content.substring(0, depth0Colon(content).get).trim.split("\\s+").toVector.filter(_.nonEmpty)
-          .map(n => SigBinder(visibilityOf(open), Some(n)))
-      }.flatten
+      val ps     = Statements.pieces(seg)
+      val forall = ps.headOption.exists { case Bare(t) => t.startsWith("∀"); case _ => false }
+      val binderGrp = ps.flatMap {
+        case Group(open, content) =>
+          depth0Colon(content).toVector.flatMap(colon =>
+            content.take(colon).trim.split("\\s+").toVector.filter(_.nonEmpty)
+              .map(n => SigBinder(visibilityOf(open), Some(n))))
+        case Bare(_) => Vector.empty
+      }
       val forallBare =
-        if (forall) ps.collect { case Left(t) => t }.flatMap(_.split("\\s+")).filterNot(t => t == "∀" || t.isEmpty)
+        if (forall) ps.collect { case Bare(t) => t }.flatMap(_.split("\\s+")).filterNot(t => t == "∀" || t.isEmpty)
           .map(n => SigBinder(Visibility.Visible, Some(n)))
         else Vector.empty
       if (binderGrp.nonEmpty || forallBare.nonEmpty) binderGrp ++ forallBare
@@ -289,67 +250,103 @@ object FixtureContext {
     * parenthesised pattern binds every name token inside it).
     */
   def clausePatterns(lhs: String): (Map[String, String], Vector[Vector[String]]) = {
-    val rebinds  = Map.newBuilder[String, String]
-    val visibles = Vector.newBuilder[Vector[String]]
-    pieces(lhs).foreach {
-      case Left(bare) =>
-        bare.split("\\s+").filter(_.nonEmpty).foreach(t => visibles += (if (t == "_") Vector.empty else Vector(t)))
-      case Right(('{', content)) if content.contains('=') =>
-        val Array(l, r) = content.split("=", 2)
-        rebinds += (l.trim -> r.trim)
-      case Right(('{', _)) => () // a positional implicit pattern: not a shape the fixtures use
-      case Right((_, content)) =>
-        visibles += content.split("[\\s,]+").toVector.filter(t => t.nonEmpty && t != "_")
-    }
-    (rebinds.result(), visibles.result())
+    val (rebinds, visibles) = Statements.pieces(lhs).flatMap[Either[(String, String), Vector[String]]] {
+      case Bare(bare) =>
+        bare.split("\\s+").toVector.filter(_.nonEmpty).map(t => Right(if (t == "_") Vector.empty else Vector(t)))
+      case Group('{', content) if content.contains('=') =>
+        val (name, pattern) = content.span(_ != '=')
+        Vector(Left(name.trim -> pattern.drop(1).trim))
+      case Group('{', _) => Vector.empty // a positional implicit pattern: not a shape the fixtures use
+      case Group(_, content) =>
+        Vector(Right(content.split("[\\s,]+").toVector.filter(t => t.nonEmpty && t != "_")))
+    }.partitionMap(identity)
+    (rebinds.toMap, visibles)
   }
 
   /** Walk the telescope against the patterns (see the object header). */
   def walk(binders: Vector[SigBinder], rebinds: Map[String, String], patterns: Vector[Vector[String]]): Vector[String] = {
-    val out  = Vector.newBuilder[String]
-    var ps   = patterns
-    var stop = false
-    binders.foreach { b =>
-      if (!stop) b.visibility match {
-        case Visibility.Visible =>
-          if (ps.isEmpty) stop = true
-          else { out ++= ps.head; ps = ps.tail }
-        case _ =>
-          b.name.foreach(n => out += rebinds.getOrElse(n, n))
+    // A visible binder takes the next pattern, and the first visible binder
+    // the clause does not bind ends the walk (the rest of the telescope is
+    // the goal); an implicit or instance binder enters under its own name,
+    // or the name the clause rebinds it to.
+    @tailrec def go(bs: Vector[SigBinder], ps: Vector[Vector[String]], acc: Vector[String]): Vector[String] =
+      (bs, ps) match {
+        case (SigBinder(Visibility.Visible, _) +: rest, p +: more) => go(rest, more, acc ++ p)
+        case (SigBinder(Visibility.Visible, _) +: _, _)            => acc
+        case (SigBinder(_, name) +: rest, _) =>
+          go(rest, ps, acc ++ name.map(n => rebinds.getOrElse(n, n)))
+        case _ => acc
       }
-    }
-    out.result().distinct
+    go(binders, patterns, Vector.empty).distinct
   }
 
   /** The context names at the `{!!}` hole of `hole`, from the fixture source;
     * empty when the signature or the clause cannot be located.
     */
   def reconstruct(source: String, hole: String): Vector[String] = {
-    val lines    = source.linesIterator.toVector
-    val sigStart = lines.indexWhere(l => startsWithName(l, hole) && l.trim.drop(hole.length).trim.startsWith(":"))
-    val clauseIx = if (sigStart < 0) -1 else lines.indexWhere(l => startsWithName(l, hole), sigStart + 1)
-    if (sigStart < 0 || clauseIx < 0) Vector.empty
-    else {
-      val sig     = lines.slice(sigStart, clauseIx).mkString(" ")
-      val sigBody = sig.substring(sig.indexOf(':') + 1)
-      val holeIx  = lines.indexWhere(_.contains("{!!}"), clauseIx)
-      val clause  = lines.slice(clauseIx, (if (holeIx < 0) clauseIx else holeIx) + 1).mkString(" ")
-      val lhs     = clause.substring(clause.indexOf(hole) + hole.length, math.max(clause.indexOf(hole) + hole.length, clause.lastIndexOf('=')))
+    val lines = source.linesIterator.toVector
+    def lineFrom(from: Int)(p: String => Boolean): Option[Int] = lines.indices.drop(from).find(i => p(lines(i)))
+    val names = for {
+      sigStart <- lineFrom(0)(l => startsWithName(l, hole) && l.trim.drop(hole.length).trim.startsWith(":"))
+      clauseIx <- lineFrom(sigStart + 1)(l => startsWithName(l, hole))
+    } yield {
+      val sigBody   = lines.slice(sigStart, clauseIx).mkString(" ").split(":", 2).last
+      val holeIx    = lineFrom(clauseIx)(_.contains("{!!}")).getOrElse(clauseIx)
+      val clause    = lines.slice(clauseIx, holeIx + 1).mkString(" ")
+      val afterName = clause.indexOf(hole) + hole.length
+      val lhs       = clause.substring(afterName, math.max(afterName, clause.lastIndexOf('=')))
       val (rebinds, visibles) = clausePatterns(lhs)
       walk(telescope(sigBody), rebinds, visibles)
     }
+    names.getOrElse(Vector.empty)
   }
 }
 
-/** One ground-truth name's fate in one ranked pool. */
-final case class TargetStatus(
-  qname:  String,
-  role:   String,          // "target" | "restates"
-  status: String,          // "ranked" | "excluded" | "non-function" | "out-of-scope" | "not-in-corpus" | "not-in-pool"
-  rank:   Option[Int],     // 1-based, when ranked
-  score:  Option[Double],  // the scorer's value, when ranked
-  detail: Option[String]   // the exclusion reason, the defKind, the row's module
-) {
+/** One ground-truth name's fate in one ranked pool: its rank and score when
+  * the pool ranks it, or the named reason it has none.  `label` is the
+  * `status` the report writes; `detail` is the exclusion reason, the
+  * defKind, or the row's module.
+  */
+sealed trait Fate extends Product with Serializable {
+  def label:  String
+  def rank:   Option[Int]    = None
+  def score:  Option[Double] = None
+  def detail: Option[String] = None
+}
+object Fate {
+  final case class Ranked(at: Int, value: Double) extends Fate {
+    val label: String = "ranked"
+    override def rank:  Option[Int]    = Some(at)
+    override def score: Option[Double] = Some(value)
+  }
+  final case class Excluded(reason: String) extends Fate {
+    val label: String = "excluded"
+    override def detail: Option[String] = Some(reason)
+  }
+  final case class NonFunction(defKind: String) extends Fate {
+    val label: String = "non-function"
+    override def detail: Option[String] = Some(defKind)
+  }
+  final case class OutOfScope(module: String) extends Fate {
+    val label: String = "out-of-scope"
+    override def detail: Option[String] = Some(module)
+  }
+  case object NotInCorpus extends Fate { val label: String = "not-in-corpus" }
+  case object NotInPool extends Fate {
+    val label: String = "not-in-pool"
+    override def detail: Option[String] = Some("no query returned it (truncation?)")
+  }
+}
+
+/** One ground-truth name, its role (`target` or `restates`), and its fate;
+  * the report's vocabulary (`status`, `rank`, `score`, `detail`) reads off
+  * the fate.
+  */
+final case class TargetStatus(qname: String, role: String, fate: Fate) {
+  def status: String         = fate.label
+  def rank:   Option[Int]    = fate.rank
+  def score:  Option[Double] = fate.score
+  def detail: Option[String] = fate.detail
   def hitAt(k: Int): Boolean = rank.exists(_ <= k)
   def toJson: Json = Json.obj(
     "qname"  -> qname.asJson,
@@ -430,12 +427,12 @@ final case class RecallSummary(names: Int, reachable: Int, hitsAt: Map[Int, Int]
 object RecallSummary {
   def ratio(num: Int, den: Int): Double = if (den == 0) 0.0 else Scaffold.round3(num.toDouble / den).toDouble
   def of(statuses: Vector[TargetStatus], ks: Vector[Int]): RecallSummary = {
-    val reach = statuses.filter(_.status == "ranked")
+    val ranks = statuses.collect { case TargetStatus(_, _, Fate.Ranked(at, _)) => at }
     RecallSummary(
       names     = statuses.size,
-      reachable = reach.size,
+      reachable = ranks.size,
       hitsAt    = ks.map(k => k -> statuses.count(_.hitAt(k))).toMap,
-      mrr       = if (reach.isEmpty) 0.0 else reach.flatMap(_.rank).map(1.0 / _).sum / reach.size)
+      mrr       = if (ranks.isEmpty) 0.0 else ranks.map(1.0 / _).sum / ranks.size)
   }
 }
 
@@ -580,23 +577,24 @@ object RetrievalRecall extends IOApp {
   /** Statuses of the ground-truth names against one built pool. */
   def statuses(names: Vector[String], role: String, corpus: InMemoryCorpus, scope: ImportScope,
                built: RetrievalPool.Built, score: SearchHit => Double): Vector[TargetStatus] =
-    names.map { q =>
-      corpus.lookup(q) match {
-        case None => TargetStatus(q, role, "not-in-corpus", None, None, None)
-        case Some(row) =>
-          if (scope.importingModuleOf(row.module).isEmpty)
-            TargetStatus(q, role, "out-of-scope", None, None, Some(row.module))
-          else built.excluded.find(_._2.prettyQname == q) match {
-            case Some((reason, _)) => TargetStatus(q, role, "excluded", None, None, Some(reason))
-            case None =>
-              if (row.defKind != "function") TargetStatus(q, role, "non-function", None, None, Some(row.defKind))
-              else {
-                val i = built.ranked.indexWhere(_.prettyQname == q)
-                if (i < 0) TargetStatus(q, role, "not-in-pool", None, None, Some("no query returned it (truncation?)"))
-                else TargetStatus(q, role, "ranked", Some(i + 1), Some(score(row)), None)
-              }
-          }
-      }
+    names.map(q => TargetStatus(q, role, fateOf(q, corpus, scope, built, score)))
+
+  /** One name's fate: the first reason it is unreachable, in the order the
+    * pipeline applies them (the corpus, the scope, the exclusion, the
+    * `defKind` filter, the queries), else its rank and score.
+    */
+  def fateOf(q: String, corpus: InMemoryCorpus, scope: ImportScope, built: RetrievalPool.Built,
+             score: SearchHit => Double): Fate =
+    corpus.lookup(q) match {
+      case None                                                     => Fate.NotInCorpus
+      case Some(row) if scope.importingModuleOf(row.module).isEmpty => Fate.OutOfScope(row.module)
+      case Some(row) =>
+        built.excluded.collectFirst { case (reason, h) if h.prettyQname == q => Fate.Excluded(reason) }.getOrElse {
+          if (row.defKind != "function") Fate.NonFunction(row.defKind)
+          else built.ranked.zipWithIndex
+            .collectFirst { case (h, i) if h.prettyQname == q => Fate.Ranked(i + 1, score(row)) }
+            .getOrElse(Fate.NotInPool)
+        }
     }
 
   /** One fixture under one scorer. */
@@ -747,9 +745,9 @@ object RetrievalRecall extends IOApp {
     val tables = perScorer.map { case (sc, fs) =>
       val strata = strataOf(fs).map(s => row(s, fs.filter(_.stratum == s)))
       val details = fs.map { f =>
-        def one(t: TargetStatus) = t.status match {
-          case "ranked" => s"${t.qname} #${t.rank.getOrElse(0)}"
-          case other    => s"${t.qname} ${other}${t.detail.fold("")(d => s"($d)")}"
+        def one(t: TargetStatus) = t.fate match {
+          case Fate.Ranked(at, _) => s"${t.qname} #$at"
+          case other              => s"${t.qname} ${other.label}${other.detail.fold("")(d => s"($d)")}"
         }
         val mism = (if (f.reconstructionMatches.contains(false)) " CONTEXT-MISMATCH" else "") +
                    (if (f.degraded) " DEGRADED(no hypothesis types on record)" else "")

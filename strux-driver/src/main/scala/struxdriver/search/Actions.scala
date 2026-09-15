@@ -100,53 +100,33 @@ object Actions {
     else segs.init.flatMap(domainBinders)
   }
 
-  /** One depth-0 group of a domain segment, or a bare token run between groups. */
-  private sealed trait Piece
-  private final case class Group(open: Char, content: String) extends Piece
-  private final case class Bare(text: String)                 extends Piece
-
-  private def pieces(seg: String): Vector[Piece] = {
-    val out   = Vector.newBuilder[Piece]
-    val cur   = new StringBuilder
-    var depth = 0
-    var open  = ' '
-    def flushBare(): Unit = { val t = cur.result().trim; if (t.nonEmpty) out += Bare(t); cur.clear() }
-    seg.foreach {
-      case c @ ('(' | '{' | '⦃') =>
-        if (depth == 0) { flushBare(); open = c } else cur += c
-        depth += 1
-      case c @ (')' | '}' | '⦄') =>
-        depth -= 1
-        if (depth == 0) { out += Group(open, cur.result()); cur.clear() } else cur += c
-      case c => cur += c
+  private def domainBinders(seg: String): Vector[Binder] = {
+    // Depth-0 pieces (Statements.pieces): the bracket groups and the bare
+    // text between them; a leading `∀` is sugar and binds nothing itself.
+    val rest = Statements.pieces(seg) match {
+      case Statements.Bare("∀") +: tail => tail
+      case other                        => other
     }
-    flushBare()
-    out.result()
+    val groups     = rest.collect { case g: Statements.Group => g }
+    val onlyGroups = rest.nonEmpty && groups.size == rest.size
+    val parensBind = groups.forall(g => g.open != '(' || g.content.contains(':'))
+    if (onlyGroups && parensBind) groups.flatMap(groupBinders)
+    else Vector(Binder(Visible, seg))
   }
 
-  private def domainBinders(seg: String): Vector[Binder] = {
-    val ps = pieces(seg)
-    val rest = ps match {
-      case Bare("∀") +: tail => tail
-      case other             => other
+  /** The binders of one bracket group, with the group's visibility: one per
+    * name before the colon (`(x y : A)` binds two), or one anonymous binder
+    * over the whole content when there is no colon.
+    */
+  private def groupBinders(g: Statements.Group): Vector[Binder] = {
+    val vis = g.open match {
+      case '(' => Visible
+      case '{' => Hidden
+      case _   => Instance
     }
-    val groups     = rest.collect { case g: Group => g }
-    val onlyGroups = rest.nonEmpty && rest.forall(_.isInstanceOf[Group])
-    val parensBind = groups.forall(g => g.open != '(' || g.content.contains(':'))
-    if (onlyGroups && parensBind)
-      groups.flatMap { g =>
-        val vis = g.open match {
-          case '(' => Visible
-          case '{' => Hidden
-          case _   => Instance
-        }
-        g.content.indexOf(':') match {
-          case -1 => Vector(Binder(vis, g.content.trim))
-          case i  => g.content.take(i).trim.split("\\s+").toVector.filter(_.nonEmpty)
-                       .map(_ => Binder(vis, g.content.drop(i + 1).trim))
-        }
-      }
-    else Vector(Binder(Visible, seg))
+    val (names, colonType) = g.content.span(_ != ':')
+    if (colonType.isEmpty) Vector(Binder(vis, g.content.trim))
+    else names.trim.split("\\s+").toVector.filter(_.nonEmpty).map(_ => Binder(vis, colonType.drop(1).trim))
   }
 
   /** Binder tables for the stub space.  Textual stand-ins for the stdlib

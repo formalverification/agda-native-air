@@ -112,6 +112,7 @@ package struxdriver.search
 
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
+import scala.annotation.tailrec
 
 /** The three corpus tools, as the proposer consumes them.  Implemented over
   * the live server by `Oracle` (ledgered, phase "retrieval") and over a
@@ -197,49 +198,97 @@ final case class TargetExclusion(holeName: String, statement: String) {
   */
 object Statements {
 
-  private val Delims: Set[Char] = Set('(', ')', '{', '}', '⦃', '⦄')
-
-  /** Tokenise: delimiters are single tokens, everything else splits on
-    * whitespace.  Total and allocation-simple; these strings are short.
+  /** The bracket characters the tokenizer treats as single tokens: the
+    * openers, the closers, and both together.  The binder telescope
+    * (`Actions`), the piece splitter below, and the fixture-context
+    * reconstruction (`FixtureContext`) count depth with the same sets.
     */
-  def tokens(s: String): Vector[String] = {
-    val out = Vector.newBuilder[String]
-    val cur = new StringBuilder
-    def flush(): Unit = { if (cur.nonEmpty) { out += cur.result(); cur.clear() } }
-    s.foreach {
-      case c if c.isWhitespace => flush()
-      case c if Delims(c)      => flush(); out += c.toString
-      case c                   => cur += c
-    }
-    flush()
-    out.result()
-  }
+  val Opens:  Set[Char] = Set('(', '{', '⦃')
+  val Closes: Set[Char] = Set(')', '}', '⦄')
+  val Delims: Set[Char] = Opens ++ Closes
+
+  /** The delimiters as tokens, for the token-level filters. */
+  val DelimTokens: Set[String] = Delims.map(_.toString)
+
+  /** The tokens that carry structure rather than meaning: the delimiters,
+    * the arrow, the colon, `∀`, the dot, and the semicolon.  The placeholder
+    * scorer's misfit penalty and the query filter skip them; the IDF family
+    * adds `λ` and `=`, which the unfolded bodies contain (`IdfScorer`).
+    */
+  val Structural: Set[String] = DelimTokens ++ Set("→", ":", "∀", ".", ";")
+
+  /** A token: one delimiter, or a maximal run of characters that are
+    * neither whitespace nor delimiters (`\p{javaWhitespace}` is
+    * `Char.isWhitespace`).
+    */
+  private val Token = """[(){}⦃⦄]|[^\p{javaWhitespace}(){}⦃⦄]+""".r
+
+  /** Tokenize: delimiters are single tokens, everything else splits on
+    * whitespace.  Total, and linear in the text (the bodies of a whole
+    * corpus go through here at load).
+    */
+  def tokens(s: String): Vector[String] = Token.findAllIn(s).toVector
+
+  /** The opener tokens that begin a binder group. */
+  private val OpenTokens: Set[String] = Opens.map(_.toString)
 
   /** The binder names of a token stream: inside each delimiter group, the
     * tokens before a `:` at that group's own level.  A group without a `:`
-    * (a parenthesised type) binds nothing.
+    * (a parenthesized type) binds nothing, and so does one whose first
+    * tokens open a nested group.  Every suffix of the stream that begins at
+    * an opener is read once.
     */
-  private def binderNames(ts: Vector[String]): Vector[String] = {
-    val names = Vector.newBuilder[String]
-    var i = 0
-    while (i < ts.length) {
-      if (Delims(ts(i).head) && (ts(i) == "(" || ts(i) == "{" || ts(i) == "⦃")) {
-        // Collect simple name tokens until ':', a close, or a nested open.
-        var j       = i + 1
-        val pending = Vector.newBuilder[String]
-        var decided = false
-        while (j < ts.length && !decided) {
-          ts(j) match {
-            case ":"                            => names ++= pending.result(); decided = true
-            case t if Delims(t.head)            => decided = true // nested group or close: not a binder group
-            case t                              => pending += t; j += 1
-          }
-        }
-      }
-      i += 1
+  private def binderNames(ts: Vector[String]): Vector[String] =
+    ts.tails.flatMap {
+      case open +: rest if OpenTokens(open) =>
+        val (names, after) = rest.span(t => t != ":" && !Delims(t.head))
+        if (after.headOption.contains(":")) names else Vector.empty
+      case _ => Vector.empty
+    }.toVector
+
+  /** One depth-0 piece of a segment: a bracket group, with the character
+    * that opened it and its content, or the bare text between groups.
+    */
+  sealed trait Piece extends Product with Serializable
+  final case class Group(open: Char, content: String) extends Piece
+  final case class Bare(text: String)                 extends Piece
+
+  /** The state of the piece scan: the pieces so far, where the piece under
+    * construction begins, the bracket depth, and the opener of the group
+    * being read.
+    */
+  private final case class PieceScan(out: Vector[Piece], start: Int, depth: Int, open: Char)
+
+  /** Depth-0 pieces of one segment: the bracket groups (with their opener)
+    * and the bare text between them, in order; nested brackets stay inside
+    * their group's content.  A fold over the character positions, cutting
+    * at the depth-0 brackets.  Shared by the binder telescope
+    * (`Actions.domainBinders`) and the fixture-context reconstruction
+    * (`FixtureContext`), which had one copy each.
+    */
+  def pieces(seg: String): Vector[Piece] = {
+    // The pieces with the bare text from the piece's start to `end` appended, when there is any.
+    def withBare(s: PieceScan, end: Int): Vector[Piece] = {
+      val t = seg.substring(s.start, end).trim
+      if (t.isEmpty) s.out else s.out :+ Bare(t)
     }
-    names.result()
+    val end = seg.indices.foldLeft(PieceScan(Vector.empty, 0, 0, ' ')) { (s, i) =>
+      val c = seg.charAt(i)
+      if (Opens(c))
+        if (s.depth == 0) PieceScan(withBare(s, i), i + 1, 1, c) else s.copy(depth = s.depth + 1)
+      else if (Closes(c))
+        if (s.depth == 1) PieceScan(s.out :+ Group(s.open, seg.substring(s.start, i)), i + 1, 0, s.open)
+        else s.copy(depth = s.depth - 1)
+      else s
+    }
+    withBare(end, seg.length)
   }
+
+  /** The brackets the arrow splitter counts as depth: the delimiters and
+    * the square brackets of a bracket mixfix (see `splitTopLevelArrows`).
+    */
+  private val ArrowOpens:  Set[Char] = Opens + '['
+  private val ArrowCloses: Set[Char] = Closes + ']'
 
   /** Split a printed type on its depth-0 arrows, STANDALONE ones only: an
     * arrow separates two segments when whitespace (or the text's boundary)
@@ -256,24 +305,17 @@ object Statements {
     * rounds two to four.
     */
   def splitTopLevelArrows(printed: String): Vector[String] = {
-    val s     = printed.replaceAll("\\s+", " ").trim
-    val out   = Vector.newBuilder[String]
-    val cur   = new StringBuilder
-    var depth = 0
-    var i     = 0
-    while (i < s.length) {
-      val c = s.charAt(i)
-      if (c == '(' || c == '{' || c == '⦃' || c == '[') { depth += 1; cur += c }
-      else if (c == ')' || c == '}' || c == '⦄' || c == ']') { depth = math.max(0, depth - 1); cur += c }
-      else if (c == '→' && depth == 0 &&
-               (i == 0 || s.charAt(i - 1).isWhitespace) && (i == s.length - 1 || s.charAt(i + 1).isWhitespace)) {
-        out += cur.result().trim; cur.clear()
-      }
-      else cur += c
-      i += 1
-    }
-    out += cur.result().trim
-    out.result()
+    val s = printed.replaceAll("\\s+", " ").trim
+    def standalone(i: Int): Boolean =
+      (i == 0 || s.charAt(i - 1).isWhitespace) && (i == s.length - 1 || s.charAt(i + 1).isWhitespace)
+    // The depth before each character, then the cuts: the standalone arrows
+    // at depth zero.  The segments are the text between consecutive cuts.
+    val depths = s.iterator.scanLeft(0) { (d, c) =>
+      if (ArrowOpens(c)) d + 1 else if (ArrowCloses(c)) math.max(0, d - 1) else d
+    }.toVector
+    val cuts   = s.indices.filter(i => s.charAt(i) == '→' && depths(i) == 0 && standalone(i)).toVector
+    val bounds = (-1 +: cuts) :+ s.length
+    bounds.zip(bounds.tail).map { case (from, to) => s.substring(from + 1, to).trim }
   }
 
   def normalize(stmt: String): String = {
@@ -408,8 +450,6 @@ object TokenOverlapScorer extends CandidateScorer {
     seg.stripPrefix("_").stripSuffix("_")
   }
 
-  private val Structural = Set("(", ")", "{", "}", "⦃", "⦄", "→", ":", "∀", ".", ";")
-
   def score(goalTokens: Set[String], hit: SearchHit): Int = {
     val typeTokens = Statements.tokens(hit.tpe).map(bareToken).toSet
     val overlap    = goalTokens.count(typeTokens)
@@ -425,7 +465,7 @@ object TokenOverlapScorer extends CandidateScorer {
     // because record/alias heads and literals appear in perfectly relevant
     // statements.
     val misfits = typeTokens.count(t =>
-      !goalTokens(t) && !Structural(t) && t.nonEmpty && !t.exists(_.isLetterOrDigit))
+      !goalTokens(t) && !Statements.Structural(t) && t.nonEmpty && !t.exists(_.isLetterOrDigit))
     2 * overlap + nameHit - misfits
   }
 
@@ -463,41 +503,41 @@ object Fragments {
   def normalize(s: String): String =
     java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFKC).toLowerCase(java.util.Locale.ROOT)
 
+  private def lowerOrDigit(cp: Int): Boolean = Character.isLowerCase(cp) || Character.isDigit(cp)
+
+  /** The string spelled by a sequence of code points. */
+  private def spell(cps: Seq[Int]): String = { val a = cps.toArray; new String(a, 0, a.length) }
+
   /** Split one identifier run at camel-case humps, on the ORIGINAL casing
     * (the run is lower-cased afterwards): a hump is an upper-case letter
-    * following a lower-case letter or digit.
+    * following a lower-case letter or digit.  The humps are the cut points;
+    * the pieces are the code points between consecutive cuts.
     */
   private def camelSplit(run: String): Vector[String] = {
-    val out = Vector.newBuilder[String]
-    val cur = new StringBuilder
-    var prevLowerOrDigit = false
-    run.codePoints().forEach { cp =>
-      val upper = Character.isUpperCase(cp)
-      if (upper && prevLowerOrDigit && cur.nonEmpty) { out += cur.result(); cur.clear() }
-      cur.appendAll(Character.toChars(cp))
-      prevLowerOrDigit = Character.isLowerCase(cp) || Character.isDigit(cp)
-    }
-    if (cur.nonEmpty) out += cur.result()
-    out.result()
+    val cps    = run.codePoints().toArray.toVector
+    val humps  = cps.indices.drop(1).filter(i => Character.isUpperCase(cps(i)) && lowerOrDigit(cps(i - 1))).toVector
+    val bounds = (0 +: humps) :+ cps.length
+    bounds.zip(bounds.tail).map { case (from, to) => spell(cps.slice(from, to)) }.filter(_.nonEmpty)
   }
 
-  /** The fragments of one bare token (see the object header). */
+  /** The fragments of one bare token (see the object header): the code
+    * points after NFKC, consumed left to right; a maximal identifier run
+    * yields its camel-case pieces, a symbol yields itself, a separator or a
+    * space yields nothing.
+    */
   def of(bare: String): Vector[String] = {
-    val out = Vector.newBuilder[String]
-    val run = new StringBuilder
-    def flushRun(): Unit = {
-      if (run.nonEmpty) { out ++= camelSplit(run.result()).map(normalize).filter(_.nonEmpty); run.clear() }
-    }
-    java.text.Normalizer.normalize(bare, java.text.Normalizer.Form.NFKC).codePoints().forEach { cp =>
-      if (isIdentChar(cp)) run.appendAll(Character.toChars(cp))
-      else {
-        flushRun()
-        if (!Separators(cp) && !Character.isWhitespace(cp))
-          out += normalize(new String(Character.toChars(cp)))
+    @tailrec def go(cps: Vector[Int], acc: Vector[String]): Vector[String] =
+      cps.headOption match {
+        case None => acc
+        case Some(cp) if isIdentChar(cp) =>
+          val (run, rest) = cps.span(isIdentChar)
+          go(rest, acc ++ camelSplit(spell(run)).map(normalize).filter(_.nonEmpty))
+        case Some(cp) if Separators(cp) || Character.isWhitespace(cp) =>
+          go(cps.tail, acc)
+        case Some(cp) =>
+          go(cps.tail, acc :+ normalize(spell(Vector(cp))))
       }
-    }
-    flushRun()
-    out.result()
+    go(java.text.Normalizer.normalize(bare, java.text.Normalizer.Form.NFKC).codePoints().toArray.toVector, Vector.empty)
   }
 }
 
@@ -531,22 +571,21 @@ final class DefinitionTable(val bodies: Map[String, Vector[String]]) {
 
   /** The tokens reachable from `tokens` by at most `depth` unfolding steps,
     * each definition unfolded once.  Deterministic: a breadth-first walk in
-    * token order.
+    * token order, one level per step; each level is a fold over its
+    * frontier that unfolds the tokens not yet unfolded and carries the set
+    * of those it has, and the bodies it emits are the next frontier.
     */
   def expand(tokens: Vector[String], depth: Int): Vector[String] = {
-    val out      = Vector.newBuilder[String]
-    var frontier = tokens
-    var seen     = Set.empty[String]
-    var d        = 0
-    while (d < depth && frontier.nonEmpty) {
-      val next = Vector.newBuilder[String]
-      frontier.foreach { t =>
-        if (!seen(t)) bodyOf(t).foreach { body => seen += t; out ++= body; next ++= body }
+    @tailrec def go(frontier: Vector[String], seen: Set[String], steps: Int, acc: Vector[String]): Vector[String] =
+      if (steps >= depth || frontier.isEmpty) acc
+      else {
+        val (unfolded, seen1) = frontier.foldLeft((Vector.empty[String], seen)) {
+          case ((out, done), t) if done(t) => (out, done)
+          case ((out, done), t)            => bodyOf(t).fold((out, done))(body => (out ++ body, done + t))
+        }
+        go(unfolded, seen1, steps + 1, acc ++ unfolded)
       }
-      frontier = next.result()
-      d += 1
-    }
-    out.result()
+    go(tokens, Set.empty, 0, Vector.empty)
   }
 }
 
@@ -580,7 +619,7 @@ object DefinitionTable {
 
   /** The body tokens worth keeping: no de Bruijn indices, no delimiters. */
   def bodyTokens(body: String): Vector[String] =
-    Statements.tokens(body).filterNot(t => t.startsWith("@") || Set("(", ")", "{", "}", "⦃", "⦄").contains(t))
+    Statements.tokens(body).filterNot(t => t.startsWith("@") || Statements.DelimTokens(t))
 
   /** A parsed corpus row as the table sees it: its qualified name, and its
     * body tokens when the row qualifies (a `function` row with a body of one
@@ -603,36 +642,41 @@ object DefinitionTable {
       h.prettyQname -> body
     }
 
-  /** Fold one parsed row into a table under construction.  The LAST row per
-    * qualified name wins outright, as in the server's `Map.fromList` index:
-    * a later duplicate that does not qualify (a constructor, a bodyless row,
-    * a proof term over the bound) REMOVES an earlier body rather than leaving
-    * it standing (PR #152 review).  Measured on the v0.1 corpus: 5 of its 733
-    * duplicate names are of that shape, none in a module the tier's fixtures
-    * import, so no published rank moved; the semantics is now the stated one.
+  /** Fold one parsed row into a table under construction: the table with
+    * the row applied.  The LAST row per qualified name wins outright, as in
+    * the server's `Map.fromList` index: a later duplicate that does not
+    * qualify (a constructor, a bodyless row, a proof term over the bound)
+    * REMOVES an earlier body rather than leaving it standing (PR #152
+    * review).  Measured on the v0.1 corpus: 5 of its 733 duplicate names
+    * are of that shape, none in a module the tier's fixtures import, so no
+    * published rank moved; the semantics is now the stated one.
     */
-  def record(m: scala.collection.mutable.Map[String, Vector[String]], json: io.circe.Json): Unit =
-    rowOf(json).foreach { case (qn, body) =>
-      m.remove(qn)
-      body.foreach(b => m.update(qn, b))
-    }
+  def record(table: Map[String, Vector[String]], json: io.circe.Json): Map[String, Vector[String]] =
+    rowOf(json).fold(table) { case (qn, body) => body.fold(table - qn)(b => table.updated(qn, b)) }
 
   /** The table over a row stream, in file order (see `record`). */
-  def fromRows(rows: Iterator[io.circe.Json]): DefinitionTable = {
-    val m = scala.collection.mutable.LinkedHashMap.empty[String, Vector[String]]
-    rows.foreach(record(m, _))
-    new DefinitionTable(m.toMap)
-  }
+  def fromRows(rows: Iterator[io.circe.Json]): DefinitionTable =
+    new DefinitionTable(rows.foldLeft(Map.empty[String, Vector[String]])(record))
 
   /** Load the table from a corpus JSONL (the last row per name wins, as the
-    * server's index does; see `record`).
+    * server's index does; see `record`).  Lines that do not parse are
+    * skipped, as the server skips them; `InMemoryCorpus.load` counts them.
     */
   def load(path: java.nio.file.Path): IO[DefinitionTable] =
-    IO.blocking {
-      val src = scala.io.Source.fromFile(path.toFile, "UTF-8")
-      try fromRows(src.getLines().filter(_.trim.nonEmpty).flatMap(l => io.circe.parser.parse(l).toOption))
-      finally src.close()
-    }
+    Jsonl.parsed(path).collect { case Right(json) => json }
+      .compile.fold(Map.empty[String, Vector[String]])(record)
+      .map(new DefinitionTable(_))
+}
+
+/** A JSONL file as a stream, one parse attempt per non-blank line in file
+  * order: `Right` the row, `Left` the parsing failure, so a loader can count
+  * what the server would have dropped instead of stopping at it.
+  */
+object Jsonl {
+  def parsed(path: java.nio.file.Path): fs2.Stream[IO, Either[io.circe.ParsingFailure, io.circe.Json]] =
+    fs2.io.file.Files[IO].readUtf8Lines(fs2.io.file.Path.fromNioPath(path))
+      .filter(_.trim.nonEmpty)
+      .map(io.circe.parser.parse)
 }
 
 /** The IDF family (issue #19): inverse-document-frequency weighting of the
@@ -679,7 +723,8 @@ final class IdfScorer(
 
   override def readsHypotheses: Boolean = hypotheses > 0.0
 
-  private val Structural = Set("(", ")", "{", "}", "⦃", "⦄", "→", ":", "∀", ".", ";", "λ", "=")
+  /** The structural tokens, plus the two the unfolded bodies carry. */
+  private val Structural = Statements.Structural ++ Set("λ", "=")
 
   private def units(tokens: Iterable[String]): Set[String] = {
     val bare = tokens.iterator.map(TokenOverlapScorer.bareToken).filter(t => t.nonEmpty && !Structural(t))
@@ -764,7 +809,7 @@ object Queries {
       .filterNot(t => t.forall(_.isDigit))
       .filterNot(ctxNames)
       .filterNot(t => MetaLike.matches(t))
-      .filterNot(t => Set("(", ")", "{", "}", "⦃", "⦄", "→", "∀", ":", ".", ";").contains(t))
+      .filterNot(Statements.Structural)
       .distinct
 
   def goalTokens(goal: GoalView): Vector[String] =
@@ -854,7 +899,11 @@ object RetrievalPool {
       val v = s(h)
       (if (v == 0.0) 0.0 else -v, TokenOverlapScorer.approxVisibleArity(h), h.prettyQname)
     }
-    rows.sortBy(key)(Ordering.Tuple3(Ordering.Double.TotalOrdering, Ordering.Int, Ordering.String))
+    // Each key is computed once: `sortBy` would recompute it per comparison,
+    // and the arity re-parses the row's type each time.
+    rows.map(h => key(h) -> h)
+      .sortBy(_._1)(Ordering.Tuple3(Ordering.Double.TotalOrdering, Ordering.Int, Ordering.String))
+      .map(_._2)
   }
 }
 

@@ -328,8 +328,8 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     // A `target:` naming the excluded row would be reported as excluded, with the reason.
     val gamed = unprimed.copy(tags = unprimed.tags :+ "target:Setoid.Functions.Inverses.IsInRange→IsInImage")
     val fr2 = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, gamed, recorded, fixtureSource).unsafeRunSync()
-    fr2.targets.last shouldBe TargetStatus("Setoid.Functions.Inverses.IsInRange→IsInImage", "target", "excluded", None, None,
-      Some("name:Setoid.Functions.Inverses.IsInRange→IsInImage"))
+    fr2.targets.last shouldBe TargetStatus("Setoid.Functions.Inverses.IsInRange→IsInImage", "target",
+      Fate.Excluded("name:Setoid.Functions.Inverses.IsInRange→IsInImage"))
   }
 
   test("evaluate: a recorded context is used as is, and the reconstruction is checked against it") {
@@ -351,10 +351,15 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
   test("recall arithmetic: over all names and over reachable ones; MRR over reachable") {
     val ks = Vector(1, 8)
     val ss = Vector(
-      TargetStatus("a", "target", "ranked", Some(1), Some(1.0), None),
-      TargetStatus("b", "target", "ranked", Some(4), Some(1.0), None),
-      TargetStatus("c", "target", "non-function", None, None, Some("constructor")),
-      TargetStatus("d", "target", "not-in-corpus", None, None, None))
+      TargetStatus("a", "target", Fate.Ranked(1, 1.0)),
+      TargetStatus("b", "target", Fate.Ranked(4, 1.0)),
+      TargetStatus("c", "target", Fate.NonFunction("constructor")),
+      TargetStatus("d", "target", Fate.NotInCorpus))
+    // The report's vocabulary reads off the fate: the label, rank and score
+    // only when ranked, detail only when there is a reason to give.
+    ss.map(_.status) shouldBe Vector("ranked", "ranked", "non-function", "not-in-corpus")
+    ss.map(_.toJson.hcursor.downField("rank").focus.isDefined) shouldBe Vector(true, true, false, false)
+    ss.map(_.toJson.hcursor.downField("detail").focus.isDefined) shouldBe Vector(false, false, true, false)
     val s = RecallSummary.of(ss, ks)
     s.names shouldBe 4
     s.reachable shouldBe 2
