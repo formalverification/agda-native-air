@@ -46,7 +46,8 @@ publishable **Agda-native reasoning environment**.
 ```
 agda-native-air/
 ├── README.md
-├── LICENSE, LICENSE-docs, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+├── LICENSE, LICENSE-docs, CONTRIBUTING.md
+├── .github/                   # CI workflow, CODEOWNERS, issue and PR templates
 ├── flake.nix, flake.lock      # the pinned toolchain: Agda 2.8.0, stdlib 2.3, GHC, Scala, Spark, Python
 ├── Makefile                   # the single CLI for extract → transform → ETL → train → eval
 ├── agda-dojang/               # repo-local Agda library (reflection macros) + evaluation harness
@@ -54,6 +55,7 @@ agda-native-air/
 ├── agda-strux/                # structured extraction: Agda-as-a-library → JSONL (Haskell)
 ├── strux-driver/              # Scala driver: runs the extractor, hosts the benchmark runner and the proof search
 ├── ml-pipeline/               # Spark ETL (Scala) and training / retrieval / evaluation (Python)
+├── configs/                   # pipeline configuration: the agda-algebras extraction config, logging
 ├── data/
 │   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
 ├── docs/
@@ -64,6 +66,7 @@ agda-native-air/
 │   ├── benchmarks/            # the difficulty taxonomy
 │   ├── corpora/               # one dataset card per published corpus
 │   ├── feedback/              # documents imported from consumer projects
+│   ├── notes/                 # working notes and background reading
 │   └── mcp-field-reports.md   # the session-by-session record of the server in real use
 ├── experiments/               # archived exploratory work (read-only)
 ├── reports/                   # archived agent transcripts
@@ -103,16 +106,21 @@ As of September 2026 the following are built, measured, and in use.
    gate (`check_project`), five live queries answered by a persistent interaction
    lane (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`),
    and three corpus-backed search tools (`search_by_name`, `search_by_type`,
-   `get_dependencies`).  Every verdict is Agda's own exit code, every response
-   names the tree it checked, and a server pointed at the wrong checkout refuses
-   rather than guesses.  The tool contracts are in
+   `get_dependencies`), which the server registers only when it is started with
+   a corpus.  Every verdict on a file is the exit code of the `agda` run that
+   produced it, `check_project` reports the exit code of the project's own gate
+   without misreporting it, every response about a file names the tree it
+   checked, and a server pointed at the wrong checkout refuses rather than
+   guesses.  The tool contracts are in
    [`agda-mcp/README.md`](agda-mcp/README.md); the design decisions and the
    evidence behind them are [ADR 0002](docs/adr/0002-agda-mcp.md); connecting an
    agent, to this repository or to another Agda project, is
    [`docs/HowToRun.md` § 13](docs/HowToRun.md).  The server is in use from Claude
    Code sessions on two external Agda projects,
    [`ualib/agda-algebras`](https://github.com/ualib/agda-algebras) and the
-   Cardano formal ledger specification; what those sessions did with it, and
+   Cardano formal ledger specification,
+   [`IntersectMBO/formal-ledger-specifications`](https://github.com/IntersectMBO/formal-ledger-specifications);
+   what those sessions did with it, and
    where it fell short, is recorded session by session in
    [`docs/mcp-field-reports.md`](docs/mcp-field-reports.md).
 +  **Two corpora**, extracted by `agda-strux` from pinned library commits and
@@ -123,22 +131,31 @@ As of September 2026 the following are built, measured, and in use.
    [card](docs/corpora/agda-algebras-v0.1.md), published as the
    [`agda-algebras-corpus-v0.1`](https://github.com/formalverification/agda-native-air/releases/tag/agda-algebras-corpus-v0.1)
    release).
-+  **A benchmark of 43 proof obligations** with gold solutions, 22 from the
-   standard library and 21 mined from agda-algebras at the corpus commit, each
++  **A benchmark of 55 proof obligations** with gold solutions, in three
+   library tiers: 22 from the standard library, 21 mined from agda-algebras at
+   the corpus commit, and 12 standard-library obligations whose proofs need a
+   lemma the fixture imports but never names (the haystack tier).  Every row is
    classified into one of three difficulty tiers.  Every gold type-checks under
-   the pinned toolchain, and CI re-verifies a slice on every pull request.  See
+   the pinned toolchain, and CI re-verifies a slice whenever the benchmark, the
+   Scala driver, or the flake changes.  See
    [`data/benchmarks/README.md`](data/benchmarks/README.md) and
    [`docs/benchmarks/taxonomy.md`](docs/benchmarks/taxonomy.md).
 +  **Proof search on `agda-mcp`**.  A beam search in `strux-driver` proposes
    terms for the open hole, by rule or by retrieval over a corpus, and lets Agda
-   judge every step.  The measured record: the fixed action space solves 8 of the
-   43 obligations, and its 6 of 22 on the standard-library tier is exactly that
-   tier's term-mode ceiling (the other sixteen golds need an induction or a case
-   split, which a term cannot express); retrieval adds no solve under target
-   exclusion on either tier, while the labeled control with exclusion off finds
-   and commits every admitted library lemma, so the machinery works and the
-   binding constraint is ranking at scale.  Work in review adds a third benchmark
-   tier built so that retrieval has a needle to find, and a stronger scorer; the
+   judge every step.  The measured record: the fixed action space solves 8 of
+   the 43 obligations of the first two library tiers and none of the 12 haystack
+   rows, 8 of 55 in all; its 6 of 22 on the standard-library tier is exactly that tier's
+   term-mode ceiling (the other sixteen golds restructure the clause: thirteen
+   inductions, two case splits, and one reasoning chain whose imports the
+   obligation does not carry, none of which a term can express).  Retrieval adds
+   no solve under target exclusion on those two tiers, while the labeled
+   controls with exclusion off commit all five excluded standard-library lemmas
+   and one wholesale agda-algebras lemma end to end, so the machinery works; on
+   the agda-algebras tier the ledgers locate the binding constraint in ranking
+   at scale.  On the haystack tier, built so that retrieval has a needle to
+   find, retrieval solves 6 of 12 against the fixed space's 0 of 12, the first
+   solves under exclusion.  A stronger scorer is in review
+   ([#152](https://github.com/formalverification/agda-native-air/pull/152)); the
    tracking issue, [#113](https://github.com/formalverification/agda-native-air/issues/113),
    carries the current numbers.  How the search works is
    [`docs/proof-search/overview.md`](docs/proof-search/overview.md); its decisions
@@ -151,9 +168,9 @@ As of September 2026 the following are built, measured, and in use.
 What comes next, in the order the evidence argues for:
 
 +  **Ranking at scale** ([#19](https://github.com/formalverification/agda-native-air/issues/19)):
-   the retrieval ledgers locate the binding constraint in ranking thousands of
-   in-scope lemmas; a learned premise-selection scorer slots into the seam the
-   search already exposes.
+   the agda-algebras ledgers and the haystack nulls locate the binding
+   constraint in ranking thousands of in-scope lemmas; a learned
+   premise-selection scorer slots into the seam the search already exposes.
 +  **An agent-in-the-loop measurement** ([#154](https://github.com/formalverification/agda-native-air/issues/154)):
    a frontier model driving the server over the same 43 obligations under a
    fixed prompt and budget, reported per tier beside the search's numbers.
