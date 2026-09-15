@@ -45,6 +45,29 @@ object Scaffold {
   val defaultAgdaFlags: String =
     "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras"
 
+  /** The harness argument convention, `--key value` pairs and a bare `--all`,
+    * with the accepted keys DECLARED by each entry point: an unknown `--key`
+    * is an error, never a silently swallowed pair.  Before PR #152's review
+    * every harness accepted any `--anything value`, so `--scoreers idf-unfold`
+    * would have run the default scorer and written a report that looked like
+    * the requested experiment.  `--all` is recorded as `all -> "true"`.
+    */
+  def parseFlags(args: List[String], known: Set[String]): Either[String, Map[String, String]] = {
+    @annotation.tailrec
+    def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
+      rest match {
+        case Nil                                        => Right(m)
+        case "--all" :: xs                              => go(xs, m + ("all" -> "true"))
+        case flag :: v :: xs if flag.startsWith("--") =>
+          val key = flag.drop(2)
+          if (known(key)) go(xs, m + (key -> v))
+          else Left(s"unrecognized option: $flag (accepted: ${known.toVector.sorted.map("--" + _).mkString(" ")})")
+        case flag :: Nil if flag.startsWith("--")       => Left(s"option $flag needs a value")
+        case other :: _                                 => Left(s"unrecognized argument: $other")
+      }
+    go(args, Map.empty)
+  }
+
   /** Read the benchmark index, keeping the requested ids (None = all). */
   def readIndex(index: Path, ids: Option[Set[String]]): IO[Vector[IndexEntry]] =
     IO.blocking(Files.readAllLines(index, StandardCharsets.UTF_8).asScala.toVector)

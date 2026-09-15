@@ -237,7 +237,7 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     Scorers.all.filter(_.needsDefinitions).map(_.name).forall(_.contains("unfold")) shouldBe true
   }
 
-  test("rank: the pool-aware seam keeps the placeholder's total order — score, then arity, then name") {
+  test("rank: the pool-aware seam keeps the placeholder's total order: score, then arity, then name") {
     val gts   = Set("+", "≡")
     val rows  = corpusRows.filter(_.defKind == "function")
     val ranked = RetrievalPool.rank(TokenOverlapScorer, RankQuery.goalOnly(gts), rows)
@@ -268,8 +268,7 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
   }
   private lazy val realHits: Map[String, SearchHit] =
     realRows.flatMap(j => InMemoryCorpus.hitOf(j).toOption).map(h => h.prettyQname -> h).toMap
-  private lazy val realTable: DefinitionTable =
-    new DefinitionTable(realRows.flatMap(DefinitionTable.entryOf).toMap)
+  private lazy val realTable: DefinitionTable = DefinitionTable.fromRows(realRows.iterator)
   private def real(q: String): SearchHit = realHits(q)
 
   /** The pool of the mon→hom motivating case: hom-concluding lemmas that
@@ -299,7 +298,7 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
   private def ranking(name: String, goal: GoalView, pool: Vector[SearchHit] = homPool): Vector[String] =
     RetrievalPool.rank(scorerNamed(name), Queries.rankQuery(goal), pool).map(_.bareName)
   private def scoreOf(name: String, goal: GoalView, q: String): Double =
-    scorerNamed(name).scores(Queries.rankQuery(monToHomGoal), homPool)(real(q))
+    scorerNamed(name).scores(Queries.rankQuery(goal), homPool)(real(q))
 
   test("fragments: NFKC folds the mathematical alphabets, humps and separators split, symbols stand alone") {
     Fragments.of("𝑖𝑑") shouldBe Vector("id")
@@ -569,6 +568,55 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     val callsAfterFirst = corpus.calls.size
     proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
     corpus.calls.size shouldBe callsAfterFirst
+  }
+
+  test("propose: the memo is keyed by the context too, since ranking and the saturated shapes read it (#152 review)") {
+    val (proposer, corpus, _) = freshProposer()
+    val first = proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val callsAfterFirst = corpus.calls.size
+    // The same display, other assumption names: a different pool, and
+    // saturated candidates spelled over the new names, not the memoised ones.
+    val other  = goal.copy(context = Vector(CtxEntry("a", "ℕ", None), CtxEntry("b", "ℕ", None)))
+    val second = proposer.propose(state0, state0.obligations.head, other).unsafeRunSync()
+    corpus.calls.size should be > callsAfterFirst
+    second should contain ("(+-suc a b)")
+    (second should not).contain("(+-suc m n)")
+    first should contain ("(+-suc m n)")
+    RetrievalProposer.poolKey(goal) should not be RetrievalProposer.poolKey(other)
+  }
+
+  test("propose: query accounting survives a corpus failure mid-pipeline (#130 round 3, #152 review)") {
+    // Name queries answer; the first type query dies.  The ledger must show
+    // the name queries that ran, and the failure must still propagate.
+    val canned = new CannedCorpus(corpusRows)
+    val dying  = new CorpusSearch {
+      def byName(pattern: String, limit: Int) = canned.byName(pattern, limit)
+      def byType(pattern: String, limit: Int) = IO.raiseError[Vector[SearchHit]](new RuntimeException("corpus died"))
+      def dependenciesOf(qname: String)       = IO.pure(Vector.empty[SearchHit])
+    }
+    val lane = new FakeLane(laneTypes)
+    val p    = RetrievalProposer.create(baseFixed, dying, scope, exclusion, lane.lemmaType, cfg4).unsafeRunSync()
+    val err  = intercept[RuntimeException](p.propose(state0, state0.obligations.head, goal).unsafeRunSync())
+    err.getMessage shouldBe "corpus died"
+    val s = p.stats.unsafeRunSync()
+    s.queries shouldBe scope.modules.size // every by-module name query, counted as it answered
+    s.hits shouldBe 0                     // the build never completed, so nothing past the queries is claimed
+  }
+
+  test("idf: at nameWeight zero the name leaves the document entirely, frequencies and norm included (#152 review)") {
+    // Two rows with one type, one of them named after a goal unit.  With the
+    // name rule off they must score identically; the name may not leak in
+    // through the document frequencies or the norm.  With it on, it counts.
+    val named   = SearchHit("M.hom-lemma", "(x : A) → P x", "function", "M", hasBody = true)
+    val unnamed = SearchHit("M.zzz",       "(x : A) → P x", "function", "M", hasBody = true)
+    val other   = SearchHit("M.other",     "(y : B) → Q y", "function", "M", hasBody = true)
+    val q    = RankQuery(Set("P", "hom"), Set.empty)
+    val pool = Vector(named, unnamed, other)
+    val off  = new IdfScorer("t-off", fragments = true, conclusion = 1.0, nameWeight = 0.0, normalize = true).scores(q, pool)
+    off(named) shouldBe off(unnamed)
+    off(named) should be > 0.0
+    val on   = new IdfScorer("t-on",  fragments = true, conclusion = 1.0, nameWeight = 1.0, normalize = true).scores(q, pool)
+    on(named) should be > on(unnamed)
   }
 
   test("propose: a query returning exactly the limit is counted truncated, not passed off as complete") {

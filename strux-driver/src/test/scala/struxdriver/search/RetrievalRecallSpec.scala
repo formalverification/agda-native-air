@@ -88,7 +88,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     ks = Vector(1, 8), queryLimit = 5000, top = 3)
 
   // --------------------------------------------------------------------------
-  // InMemoryCorpus — the server's semantics
+  // InMemoryCorpus: the server's semantics
   // --------------------------------------------------------------------------
 
   test("corpus: substring, case-insensitive, code-point order, truncation, pretty module") {
@@ -128,6 +128,28 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     InMemoryCorpus.dedupLastWins(Vector(a1, b, a2)) shouldBe Vector(b, a2)
   }
 
+  test("definition table: the last row per name wins outright, so a bodyless duplicate removes an earlier body (#152 review)") {
+    def j(s: String) = io.circe.parser.parse(s).toOption.get
+    val t = DefinitionTable.fromRows(Iterator(
+      j("""{"prettyQname":"M.d","defKind":"function","body":"Σ A B"}"""),
+      j("""{"prettyQname":"M.d","defKind":"constructor","body":null}"""),
+      j("""{"prettyQname":"M.e","defKind":"function","body":"x"}"""),
+      j("""{"prettyQname":"M.e","defKind":"function","body":"y z"}"""),
+      j("""{"defKind":"function","body":"nameless"}""")))
+    t.bodyOf("M.d") shouldBe None                    // the constructor row won, and it has no body
+    t.bodyOf("M.e") shouldBe Some(Vector("y", "z")) // the later body won
+    t.size shouldBe 1
+  }
+
+  test("cli: an unknown option is refused rather than silently ignored (#152 review)") {
+    val base = List("--index", "i", "--corpus", "c", "--report", "r", "--project-root", ".", "--out", "o", "--all")
+    val typo = RetrievalRecall.parseArgs(base ++ List("--scoreers", "idf-unfold"))
+    typo.isLeft shouldBe true
+    typo.left.toOption.get should include ("--scoreers")
+    RetrievalRecall.parseArgs(base ++ List("--scorers", "idf-unfold")).map(_.scorers.map(_.name)) shouldBe Right(Vector("idf-unfold"))
+    RetrievalRecall.parseArgs(base ++ List("--scorers")).isLeft shouldBe true
+  }
+
   test("corpus: the wire row is the pretty subset of a full extraction row") {
     val json = io.circe.parser.parse(
       """{"prettyQname":"Overture.Basic.𝑖𝑑","type":"(A : Set a) → A → A","defKind":"function",
@@ -137,7 +159,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
   }
 
   // --------------------------------------------------------------------------
-  // FixtureContext — the goal context from the source
+  // FixtureContext: the goal context from the source
   // --------------------------------------------------------------------------
 
   test("context: implicits are inserted eagerly, a clause rebind keeps its name, the premise takes the pattern's") {
@@ -179,7 +201,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
   }
 
   // --------------------------------------------------------------------------
-  // The instrument — statuses, ranks, regimes, arithmetic
+  // The instrument: statuses, ranks, regimes, arithmetic
   // --------------------------------------------------------------------------
 
   test("evaluate: every status by name, the target rank, and the original in the unexcluded pool") {
@@ -187,7 +209,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     fr.contextSource shouldBe "reconstructed"
     fr.goalTokens shouldBe Vector("Image", "∋")          // F and b are context names
     // The syntactic statement rule fires on the original: its corpus type and
-    // the index prose differ in notation, so only the name rule could — and
+    // the index prose differ in notation, so only the name rule could, and
     // the hole carries a prime.  So the original stays IN the excluded pool;
     // that is exactly what the lane-form rule exists to catch, and exactly
     // what the instrument must report rather than hide.

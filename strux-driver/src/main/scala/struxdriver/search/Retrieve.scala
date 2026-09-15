@@ -266,7 +266,7 @@ trait CandidateScorer {
   * separately, the tokens of the local hypotheses' types (both through
   * `Queries`, so context names, numerals, and metas are already dropped).
   * The placeholder reads the goal alone; the hypotheses are there because
-  * the lemmas that conclude the same thing differ in what they ASSUME —
+  * the lemmas that conclude the same thing differ in what they ASSUME:
   * `mon→hom`, `epi→hom`, `𝒾𝒹`, and `_≅_.to` all conclude `hom 𝑨 𝑩`, and only
   * the hypothesis `m : mon 𝑨 𝑩` says which one the goal wants (the haystack
   * tier's finding on #129, measured here on #19).
@@ -300,19 +300,21 @@ object Scorers {
 
   val default: ScorerSpec = fixed(TokenOverlapScorer)
 
-  /** The scorer the #19 measurements kept: bare units on both sides,
-    * fragments, IDF over the pool, the conclusion counted twice, three
-    * unfolding steps through the corpus bodies, the cosine norm, and the
-    * hypotheses' overlap with the premises, every weight one.  The name rule
-    * was measured and dropped: at the loop's k = 8 it left fair-target
-    * recall unchanged and cost the originals four places in twenty-one.  On
-    * the agda-algebras tier (recall reports `recall-ctx1-*`, 2026-09-10) it
-    * lifts fair-target recall@8 from 1/31 to 9/31 and the originals'
-    * recall@8 from 5/21 to 16/21 against the placeholder; the minus-one
-    * ablations below are what pin each rule's contribution.
+  /** The scorer the #19 measurements kept: every rule of the IDF family at
+    * weight one: bare units on both sides, fragments, IDF over the pool, the
+    * conclusion counted twice, the row's name, three unfolding steps through
+    * the corpus bodies, the cosine norm, and the hypotheses' overlap with the
+    * premises.  The name rule was first dropped on a confounded measurement
+    * (name units stayed in the frequencies and the norm at weight zero) and
+    * came back when the PR #152 review made the knob mean what it says: on
+    * clean semantics it lifts fair-target recall@8 from 7/33 to 9/33 and
+    * costs two originals at eight (14/21 to 12/21).  Against the placeholder
+    * (1/33 and 5/21) the whole scorer is 9/33 and 12/21 at eight, 12/33 and
+    * 20/21 at thirty-two (recall report `recall-ctx1-r2`, 2026-09-15); the
+    * minus-one ablations below pin each rule's contribution.
     */
   val idfUnfold: ScorerSpec =
-    idf("idf-unfold", fragments = true, conclusion = 1.0, nameWeight = 0.0, unfold = 3, normalize = true, hypotheses = 1.0)
+    idf("idf-unfold", fragments = true, conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true, hypotheses = 1.0)
 
   val all: Vector[ScorerSpec] = Vector(
     // The placeholders: the published one, and the same with the goal side bare-reduced.
@@ -320,13 +322,13 @@ object Scorers {
     fixed(BareOverlapScorer),
     // The kept scorer and its minus-one-rule ablations.
     idfUnfold,
-    idf("idf-unfold-no-fragments",  fragments = false, conclusion = 1.0, nameWeight = 0.0, unfold = 3, normalize = true,  hypotheses = 1.0),
-    idf("idf-unfold-no-conclusion", fragments = true,  conclusion = 0.0, nameWeight = 0.0, unfold = 3, normalize = true,  hypotheses = 1.0),
-    idf("idf-unfold-no-unfolding",  fragments = true,  conclusion = 1.0, nameWeight = 0.0, unfold = 0, normalize = true,  hypotheses = 1.0),
-    idf("idf-unfold-no-norm",       fragments = true,  conclusion = 1.0, nameWeight = 0.0, unfold = 3, normalize = false, hypotheses = 1.0),
-    idf("idf-unfold-no-hypotheses", fragments = true,  conclusion = 1.0, nameWeight = 0.0, unfold = 3, normalize = true,  hypotheses = 0.0),
-    idf("idf-unfold-depth2",        fragments = true,  conclusion = 1.0, nameWeight = 0.0, unfold = 2, normalize = true,  hypotheses = 1.0),
-    idf("idf-unfold-with-name",     fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true,  hypotheses = 1.0),
+    idf("idf-unfold-no-fragments",  fragments = false, conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true,  hypotheses = 1.0),
+    idf("idf-unfold-no-conclusion", fragments = true,  conclusion = 0.0, nameWeight = 1.0, unfold = 3, normalize = true,  hypotheses = 1.0),
+    idf("idf-unfold-no-name",       fragments = true,  conclusion = 1.0, nameWeight = 0.0, unfold = 3, normalize = true,  hypotheses = 1.0),
+    idf("idf-unfold-no-unfolding",  fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 0, normalize = true,  hypotheses = 1.0),
+    idf("idf-unfold-no-norm",       fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = false, hypotheses = 1.0),
+    idf("idf-unfold-no-hypotheses", fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true,  hypotheses = 0.0),
+    idf("idf-unfold-depth2",        fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 2, normalize = true,  hypotheses = 1.0),
     // The build-up ladder the #19 comment quotes, first hypothesis to last.
     idf("idf",                      fragments = false, conclusion = 0.0, nameWeight = 0.0),
     idf("idf-conclusion",           fragments = false, conclusion = 1.0, nameWeight = 0.0),
@@ -335,8 +337,7 @@ object Scorers {
     idf("idf-full",                 fragments = true,  conclusion = 1.0, nameWeight = 1.0),
     idf("idf-norm",                 fragments = true,  conclusion = 1.0, nameWeight = 1.0, normalize = true),
     idf("idf-unfold3",              fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3),
-    idf("idf-unfold3-norm",         fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true),
-    idf("idf-unfold3-norm-hyp",     fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true, hypotheses = 1.0))
+    idf("idf-unfold3-norm",         fragments = true,  conclusion = 1.0, nameWeight = 1.0, unfold = 3, normalize = true))
 
   def names: Vector[String] = all.map(_.name)
   def byName(name: String): Either[String, ScorerSpec] =
@@ -400,7 +401,7 @@ object TokenOverlapScorer extends CandidateScorer {
   * fragment is a maximal run of identifier characters (letters, digits, and
   * the sub/superscript and modifier letters agda-algebras names use) or a
   * single symbol, after NFKC normalisation (which folds the mathematical
-  * alphabets onto ASCII — `𝑖𝑑`, `𝒾𝒹`, and `id` become one unit, `ᵃ` becomes
+  * alphabets onto ASCII, so `𝑖𝑑`, `𝒾𝒹`, and `id` become one unit and `ᵃ` becomes
   * `a`) and case folding; identifier runs are further split at camel-case
   * humps (`IsInRange` → `is`, `in`, `range`; `HomReduct` → `hom`, `reduct`),
   * and the separators names are built from (`-`, `_`, `→`, `∼`, `.`, `′`)
@@ -463,7 +464,7 @@ object Fragments {
   * displays reach the ranker NORMALISED (the interaction lane prints
   * `Cmd_goal_type_context Normalised`), so a goal about `hom 𝑨 𝑪` or `𝑨 ≤ 𝑪`
   * displays as its Σ-unfolding, while lemma types are stated in the alias
-  * the library defines — and no token of `hom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪`
+  * the library defines, and no token of `hom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪`
   * occurs in the display of its own conclusion.  Unfolding a row's type
   * tokens through the bodies of the definitions they name, a bounded number
   * of steps, states the row in the display's vocabulary (`hom` →
@@ -527,7 +528,7 @@ object DefinitionTable {
       val last  = segs.last
       val infix = if (last.startsWith("_") || last.endsWith("_")) plain else (segs.init :+ s"_${last}_").mkString(".")
       // A bracket mixfix prints as its opener (`𝔻[ 𝑨 ]` tokenises to `𝔻[`, `𝑨`,
-      // `]`); the definition is `𝔻[_]`.  Bracket pairs only — no name is known here.
+      // `]`); the definition is `𝔻[_]`.  Bracket pairs only; no name is known here.
       val bracket = Brackets.get(last.last).map(close => (segs.init :+ s"${last}_$close").mkString("."))
       (Vector(plain, infix) ++ bracket).distinct
     }
@@ -539,33 +540,53 @@ object DefinitionTable {
   def bodyTokens(body: String): Vector[String] =
     Statements.tokens(body).filterNot(t => t.startsWith("@") || Set("(", ")", "{", "}", "⦃", "⦄").contains(t))
 
-  /** One table entry from a full corpus row, when the row qualifies. */
-  def entryOf(json: io.circe.Json): Option[(String, Vector[String])] = {
+  /** A parsed corpus row as the table sees it: its qualified name, and its
+    * body tokens when the row qualifies (a `function` row with a body of one
+    * to `MaxBodyTokens` tokens).  `None` for a row without a name.
+    */
+  def rowOf(json: io.circe.Json): Option[(String, Option[Vector[String]])] = {
     val c = json.hcursor
-    for {
-      qn   <- c.get[String]("prettyQname").toOption
-      kind <- c.get[String]("defKind").toOption
-      if kind == "function"
-      body <- c.get[Option[String]]("body").toOption.flatten
-      toks  = bodyTokens(body)
-      if toks.nonEmpty && toks.size <= MaxBodyTokens
-    } yield qn -> toks
+    c.get[String]("prettyQname").toOption.map { qn =>
+      val body = for {
+        kind <- c.get[String]("defKind").toOption
+        if kind == "function"
+        b    <- c.get[Option[String]]("body").toOption.flatten
+        toks  = bodyTokens(b)
+        if toks.nonEmpty && toks.size <= MaxBodyTokens
+      } yield toks
+      qn -> body
+    }
+  }
+
+  /** Fold one parsed row into a table under construction.  The LAST row per
+    * qualified name wins outright, as in the server's `Map.fromList` index:
+    * a later duplicate that does not qualify (a constructor, a bodyless row,
+    * a proof term over the bound) REMOVES an earlier body rather than leaving
+    * it standing (PR #152 review).  Measured on the v0.1 corpus: 5 of its 733
+    * duplicate names are of that shape, none in a module the tier's fixtures
+    * import, so no published rank moved; the semantics is now the stated one.
+    */
+  def record(m: scala.collection.mutable.Map[String, Vector[String]], json: io.circe.Json): Unit =
+    rowOf(json).foreach { case (qn, body) =>
+      m.remove(qn)
+      body.foreach(b => m.update(qn, b))
+    }
+
+  /** The table over a row stream, in file order (see `record`). */
+  def fromRows(rows: Iterator[io.circe.Json]): DefinitionTable = {
+    val m = scala.collection.mutable.LinkedHashMap.empty[String, Vector[String]]
+    rows.foreach(record(m, _))
+    new DefinitionTable(m.toMap)
   }
 
   /** Load the table from a corpus JSONL (the last row per name wins, as the
-    * server's index does).
+    * server's index does; see `record`).
     */
   def load(path: java.nio.file.Path): IO[DefinitionTable] =
     IO.blocking {
       val src = scala.io.Source.fromFile(path.toFile, "UTF-8")
-      try {
-        val m = scala.collection.mutable.LinkedHashMap.empty[String, Vector[String]]
-        src.getLines().foreach { line =>
-          if (line.trim.nonEmpty)
-            io.circe.parser.parse(line).toOption.flatMap(entryOf).foreach { case (q, toks) => m.update(q, toks) }
-        }
-        new DefinitionTable(m.toMap)
-      } finally src.close()
+      try fromRows(src.getLines().filter(_.trim.nonEmpty).flatMap(l => io.circe.parser.parse(l).toOption))
+      finally src.close()
     }
 }
 
@@ -573,11 +594,11 @@ object DefinitionTable {
   * overlap between the goal's units and a row's, the frequencies counted
   * over the pool being ranked, so a unit every row in a `Setoid.*` haystack
   * carries (`level`, `setoid`, `algebra`, `func`) weighs almost nothing and
-  * a unit few rows carry (`ishom`, `∋`, `iscongruence`) weighs a lot — which
+  * a unit few rows carry (`ishom`, `∋`, `iscongruence`) weighs a lot, which
   * is what demotes the generic projections without any hand list.  Both
   * sides are reduced to bare tokens first (the placeholder reduced only the
   * corpus side, so a qualified display token such as
-  * `Setoid.Homomorphisms.Basic.IsHom` matched nothing — the whole pool tied
+  * `Setoid.Homomorphisms.Basic.IsHom` matched nothing; the whole pool tied
   * at zero and the arity tie-break handed the top to the nullary generics).
   *
   * Five optional rules, each a knob so the instrument can measure it alone:
@@ -592,9 +613,13 @@ object DefinitionTable {
   * norm (a cosine), so a long type that mentions everything cannot outrank
   * a short one that says the right thing; `hypotheses` adds, at that
   * weight, the overlap between the row's PREMISES (every arrow segment but
-  * the last) and the goal context's hypothesis types — the lemmas that
-  * conclude the same thing differ in what they assume.  Ties still break
-  * cheap-before-expensive, then on the qname (`RetrievalPool.rank`).
+  * the last) and the goal context's hypothesis types, because the lemmas
+  * that conclude the same thing differ in what they assume.  At `nameWeight`
+  * zero the name's units leave the row's document entirely, counting in
+  * neither the frequencies nor the norm, so the knob means what it says and
+  * the with-name ablation isolates the whole rule (PR #152 review).  Ties
+  * still break cheap-before-expensive, then on the qname
+  * (`RetrievalPool.rank`).
   */
 final class IdfScorer(
   val name:    String,
@@ -650,7 +675,7 @@ final class IdfScorer(
     val rowType   = pool.map(h => h.prettyQname -> typeUnits(h.tpe)).toMap
     val rowConcl  = pool.map(h => h.prettyQname -> typeUnits(split(h.prettyQname)._2)).toMap
     val rowPrem   = pool.map(h => h.prettyQname -> typeUnits(split(h.prettyQname)._1)).toMap
-    val rowName   = pool.map(h => h.prettyQname -> nameUnits(h)).toMap
+    val rowName   = pool.map(h => h.prettyQname -> (if (nameWeight > 0.0) nameUnits(h) else Set.empty[String])).toMap
     val n         = pool.size.toDouble
     val df        = pool.iterator.flatMap(h => rowType(h.prettyQname) ++ rowName(h.prettyQname)).toVector
                       .groupBy(identity).map { case (u, us) => u -> us.size }
@@ -775,7 +800,7 @@ object RetrievalPool {
   }
 
   /** The total rank: score first, then cheap before expensive (#112's lesson
-    * four, on the retrieval pool — approximate arity from the corpus type),
+    * four, on the retrieval pool: approximate arity from the corpus type),
     * then the qname so ranking is total and deterministic.  A zero score is
     * normalised so `-0.0` and `0.0` cannot split a tie.
     */
@@ -815,23 +840,39 @@ final class RetrievalProposer private (
       retrieved <- cachedPool(goal)
     } yield (baseCands ++ retrieved).distinct
 
-  private def cachedPool(goal: GoalView): IO[Vector[String]] =
-    poolCache.get.flatMap(_.get(goal.goal) match {
+  private def cachedPool(goal: GoalView): IO[Vector[String]] = {
+    val key = RetrievalProposer.poolKey(goal)
+    poolCache.get.flatMap(_.get(key) match {
       case Some(hit) => IO.pure(hit)
-      case None      => buildPool(goal).flatTap(p => poolCache.update(_ + (goal.goal -> p)))
+      case None      => buildPool(goal).flatTap(p => poolCache.update(_ + (key -> p)))
     })
+  }
+
+  /** The corpus as the pool pipeline sees it from inside the proposer: every
+    * reply is counted into the ledger AS IT ARRIVES (a query issued, a reply
+    * at the limit), so a corpus failure mid-pipeline leaves the work already
+    * done on the record for the anomaly report (#130 review round 3; PR #152
+    * review caught the shared pipeline moving the counts to after the build).
+    */
+  private val counting: CorpusSearch = new CorpusSearch {
+    private def count(q: IO[Vector[SearchHit]]): IO[Vector[SearchHit]] =
+      q.flatTap(hs => statsRef.update(s => s.copy(
+        queries   = s.queries + 1,
+        truncated = s.truncated + (if (hs.size >= cfg.queryLimit) 1 else 0))))
+    def byName(pattern: String, limit: Int): IO[Vector[SearchHit]] = count(corpus.byName(pattern, limit))
+    def byType(pattern: String, limit: Int): IO[Vector[SearchHit]] = count(corpus.byType(pattern, limit))
+    def dependenciesOf(prettyQname: String): IO[Vector[SearchHit]] = corpus.dependenciesOf(prettyQname)
+  }
 
   /** The pipeline: the shared pool (RetrievalPool: queries, scope,
     * exclusion, `defKind` filter, rank), its counts into the ledger, then the
-    * proposer-side steps — optional dependency expansion, rendering
+    * proposer-side steps: optional dependency expansion, rendering
     * resolution through the lane, and candidate shaping.
     */
   private def buildPool(goal: GoalView): IO[Vector[String]] =
     for {
-      built    <- RetrievalPool.build(corpus, scope, exclusion, cfg, scorer, goal)
+      built    <- RetrievalPool.build(counting, scope, exclusion, cfg, scorer, goal)
       _        <- statsRef.update(s => s.copy(
-                    queries     = s.queries + built.queries,
-                    truncated   = s.truncated + built.truncated,
                     hits        = s.hits + built.hits,
                     inScope     = s.inScope + built.inScope.size,
                     excluded    = (s.excluded ++ built.excluded.map(_._1)).distinct,
@@ -982,7 +1023,18 @@ object RetrievalProposer {
   val MaxSaturationArity:  Int = 3
   val MaxSaturationCombos: Int = 27
 
-  /** Every k-tuple over `names`, with repetition, in name order — `*-comm n n`
+  /** The pool memo's key: the goal display AND the local context, names and
+    * types.  The ranking reads the hypotheses (`RankQuery`) and the saturated
+    * shapes are spelled over the assumption names, so one display under two
+    * contexts is two pools (PR #152 review; the shape half predates the
+    * branch).  Within one fixture's search the context never changes, since
+    * a sub-hole inside an application binds nothing, so the memo still hits
+    * on every re-selection of a goal.
+    */
+  def poolKey(goal: GoalView): String =
+    goal.goal + "\u0000" + goal.context.map(c => c.name + ":" + c.tpe).mkString("\u0001")
+
+  /** Every k-tuple over `names`, with repetition, in name order; `*-comm n n`
     * is a legitimate candidate.
     */
   def tuples(names: Vector[String], k: Int): Vector[Vector[String]] =

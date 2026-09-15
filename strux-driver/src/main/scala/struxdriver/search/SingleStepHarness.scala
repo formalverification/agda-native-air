@@ -193,17 +193,13 @@ object SingleStepHarness extends IOApp {
   // Argument parsing (the EvalBenchmark list-recursion style)
   // --------------------------------------------------------------------------
 
-  private def parseArgs(args: List[String]): Either[String, HarnessConfig] = {
-    @annotation.tailrec
-    def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
-      rest match {
-        case Nil                              => Right(m)
-        case "--all" :: xs                    => go(xs, m + ("all" -> "true"))
-        case flag :: v :: xs if flag.startsWith("--") => go(xs, m + (flag.drop(2) -> v))
-        case other :: _                       => Left(s"unrecognized argument: $other")
-      }
+  /** The documented options; anything else is refused (Scaffold.parseFlags). */
+  private val Keys: Set[String] = Set(
+    "index", "ids", "out-dir", "run-id", "server-bin", "agda-flags", "server-timeout", "project-root", "passes")
+
+  private[search] def parseArgs(args: List[String]): Either[String, HarnessConfig] = {
     for {
-      m    <- go(args, Map.empty)
+      m    <- Scaffold.parseFlags(args, Keys)
       ix   <- m.get("index").toRight("missing --index")
       out  <- m.get("out-dir").toRight("missing --out-dir")
       bin  <- m.get("server-bin").toRight("missing --server-bin")

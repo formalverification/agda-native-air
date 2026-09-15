@@ -85,6 +85,16 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     }
   }
 
+  test("cli: a misspelled knob is refused, so a sweep cannot silently run the default scorer (#152 review)") {
+    val base = List("--index", "i", "--all", "--out-dir", "o", "--server-bin", "b", "--project-root", ".")
+    val typo = ProofSearchLoop.parseArgs(base ++ List("--proposer", "retrieval", "--corpus", "c", "--scoreer", "idf-unfold"))
+    typo.isLeft shouldBe true
+    typo.left.toOption.get should include ("--scoreer")
+    ProofSearchLoop.parseArgs(base ++ List("--proposer", "retrieval", "--corpus", "c", "--scorer", "idf-unfold"))
+      .map(_.scorer.name) shouldBe Right("idf-unfold")
+    ProofSearchLoop.parseArgs(base).map(_.scorer.name) shouldBe Right("token-overlap")
+  }
+
   test("the report outcome carries the root goal's context when the loop recorded one (#19)") {
     // The offline recall instrument rebuilds the proposer's goal tokens from
     // this field; it is additive, and absent when no root goal was reached.

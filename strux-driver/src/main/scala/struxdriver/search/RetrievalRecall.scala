@@ -19,7 +19,7 @@
   *  `report.json` (the display is Agda's, and only Agda can produce it), the
   *  fixture's imports (the legal scope), and a corpus loaded in-process, and
   *  runs exactly the pool pipeline the retrieval proposer runs before it asks
-  *  the lane anything — `RetrievalPool.build`: queries with the server's own
+  *  the lane anything, `RetrievalPool.build`: queries with the server's own
   *  substring semantics, scope, target exclusion, the `defKind` filter, and
   *  the scorer's rank.  Two things the proposer does afterwards are NOT
   *  replayed, and the numbers here are conservative for both: lane
@@ -36,10 +36,10 @@
   *  the pool WITH exclusion as configured (the fair regime); `restates:` names
   *  the library original the row was mined from, measured in the pool WITHOUT
   *  exclusion (the haystack regime the exclusion-off control depends on).  A
-  *  target may be unreachable for a stated reason — not in this corpus (a
+  *  target may be unreachable for a stated reason: not in this corpus (a
   *  standard-library name), a constructor (the `defKind` filter), out of
-  *  scope, or excluded — and each reason is reported by name rather than
-  *  folded into a recall miss without comment; recall is quoted both over all
+  *  scope, or excluded; each reason is reported by name rather than
+  *  folded into a recall miss without comment.  Recall is quoted both over all
   *  recorded targets and over the reachable ones.
   *
   *  The goal context
@@ -80,9 +80,9 @@ import struxdriver.benchmark.{Obligation => IndexEntry}
 /** A corpus loaded in-process, answering the three tools with the server's
   * own semantics (agda-mcp `Corpus.hs`): case-insensitive substring match on
   * `prettyQname` (name search) or on the printed type (type search), results
-  * in the corpus map's key order — `Data.Text`'s `Ord`, which is code-point
+  * in the corpus map's key order, `Data.Text`'s `Ord`, which is code-point
   * order, not Java's UTF-16 unit order (they differ on the astral glyphs
-  * agda-algebras names are full of) — truncated at the limit.  The wire
+  * agda-algebras names are full of), and truncated at the limit.  The wire
   * `module` field is the row's PRETTY module, as the server sends it.
   * Dependency expansion answers empty: the instrument measures the pool the
   * default configuration ranks, and `expandDeps` is off in every published
@@ -122,7 +122,7 @@ object InMemoryCorpus {
     sb.toString
   }
 
-  /** Unicode code-point order — `Data.Text`'s `compare` on the UTF-8 text the
+  /** Unicode code-point order: `Data.Text`'s `compare` on the UTF-8 text the
     * server indexes by.  `String.compareTo` orders by UTF-16 code unit, which
     * puts a surrogate pair (`𝑨`, U+1D468) below a BMP glyph such as `ﬂ`
     * (U+FB02) where code-point order puts it above.
@@ -182,7 +182,7 @@ object InMemoryCorpus {
                   case Right(h) => rows += h
                   case Left(_)  => bad += 1
                 }
-                DefinitionTable.entryOf(json).foreach { case (q, toks) => defs.update(q, toks) }
+                DefinitionTable.record(defs, json)
             }
         }
         (new InMemoryCorpus(dedupLastWins(rows.result())), bad, new DefinitionTable(defs.toMap))
@@ -203,7 +203,7 @@ object InMemoryCorpus {
   * at the hole: the signature's binders in order, where an implicit or
   * instance binder is inserted eagerly under its signature name (or the name
   * the clause rebinds it to with `{x = p}`), and a visible binder enters
-  * under the clause's pattern name — until the first visible binder the
+  * under the clause's pattern name, until the first visible binder the
   * clause does not bind, after which the rest of the telescope is the goal.
   */
 object FixtureContext {
@@ -490,20 +490,17 @@ object RetrievalRecall extends IOApp {
       case Right(cfg) => runInstrument(cfg).as(ExitCode.Success)
     }
 
-  private def parseArgs(args: List[String]): Either[String, RecallConfig] = {
-    @annotation.tailrec
-    def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
-      rest match {
-        case Nil                                      => Right(m)
-        case "--all" :: xs                            => go(xs, m + ("all" -> "true"))
-        case flag :: v :: xs if flag.startsWith("--") => go(xs, m + (flag.drop(2) -> v))
-        case other :: _                               => Left(s"unrecognized argument: $other")
-      }
+  /** The documented options; anything else is refused (Scaffold.parseFlags). */
+  private val Keys: Set[String] = Set(
+    "index", "corpus", "report", "project-root", "out", "ids",
+    "scorers", "exclude-target", "k", "query-limit", "top")
+
+  private[search] def parseArgs(args: List[String]): Either[String, RecallConfig] = {
     def intOf(m: Map[String, String], key: String, dflt: Int, min: Int): Either[String, Int] =
       m.get(key).fold[Either[String, Int]](Right(dflt))(s =>
         s.toIntOption.filter(_ >= min).toRight(s"bad --$key: $s"))
     for {
-      m       <- go(args, Map.empty)
+      m       <- Scaffold.parseFlags(args, Keys)
       ix      <- m.get("index").toRight("missing --index")
       corpus  <- m.get("corpus").toRight("missing --corpus")
       report  <- m.get("report").toRight("missing --report")

@@ -1706,7 +1706,7 @@ proof-search-retrieval-it: _check-sbt
 # The offline rank-only instrument (issue #19): replay the retrieval pool
 # pipeline over a corpus loaded in-process, against the goal displays a loop
 # run recorded, and report the rank of every `target:` / `restates:` lemma
-# and recall@k per stratum — seconds per sweep, no server.  RECALL_REPORT
+# and recall@k per stratum, in seconds per sweep and without a server.  RECALL_REPORT
 # names the run whose goals are replayed; CORPUS is the same corpus that run
 # retrieved from; SCORERS is a comma list of CandidateScorer names.
 PROOF_SEARCH_RECALL_REPORT  ?=
