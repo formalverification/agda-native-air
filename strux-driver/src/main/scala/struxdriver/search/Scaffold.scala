@@ -75,6 +75,23 @@ object Scaffold {
     go(args, Map.empty)
   }
 
+  /** The obligation selection of a harness: exactly one of `--all` and
+    * `--ids id1,id2`, the latter naming at least one id; `None` means every
+    * obligation.  Before PR #152's third review round `--ids ""` passed as
+    * an empty selection and `--ids` beside `--all` passed with `--all`
+    * silently ignored, so a run could measure nothing, or the wrong subset,
+    * under a valid-looking report.
+    */
+  def selection(m: Map[String, String]): Either[String, Option[Set[String]]] =
+    (m.get("ids"), m.contains("all")) match {
+      case (Some(_), true)     => Left("pass --ids or --all, not both")
+      case (None, false)       => Left("pass --ids or --all")
+      case (None, true)        => Right(None)
+      case (Some(raw), false)  =>
+        val ids = raw.split(",").toVector.map(_.trim).filter(_.nonEmpty).toSet
+        if (ids.isEmpty) Left("--ids names no obligation") else Right(Some(ids))
+    }
+
   /** Read the benchmark index, keeping the requested ids (None = all). */
   def readIndex(index: Path, ids: Option[Set[String]]): IO[Vector[IndexEntry]] =
     IO.blocking(Files.readAllLines(index, StandardCharsets.UTF_8).asScala.toVector)

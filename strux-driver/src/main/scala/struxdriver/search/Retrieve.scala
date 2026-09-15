@@ -241,6 +241,37 @@ object Statements {
     names.result()
   }
 
+  /** Split a printed type on its depth-0 arrows, STANDALONE ones only: an
+    * arrow separates two segments when whitespace (or the text's boundary)
+    * sits on both sides of it, so an arrow inside an identifier
+    * (`IsInRange→IsInImage`, `abelianGroup→group`, a name such as `→-cong`)
+    * never splits the type.  Whitespace is normalized first and segments
+    * are trimmed.  The one arrow splitter behind the binder telescope
+    * (`Actions.bindersOfPrinted`), the conclusion split (`IdfScorer`), and
+    * the fixture-context reconstruction (`FixtureContext`); PR #152 review,
+    * rounds two and three.
+    */
+  def splitTopLevelArrows(printed: String): Vector[String] = {
+    val s     = printed.replaceAll("\\s+", " ").trim
+    val out   = Vector.newBuilder[String]
+    val cur   = new StringBuilder
+    var depth = 0
+    var i     = 0
+    while (i < s.length) {
+      val c = s.charAt(i)
+      if (c == '(' || c == '{' || c == '⦃') { depth += 1; cur += c }
+      else if (c == ')' || c == '}' || c == '⦄') { depth -= 1; cur += c }
+      else if (c == '→' && depth == 0 &&
+               (i == 0 || s.charAt(i - 1).isWhitespace) && (i == s.length - 1 || s.charAt(i + 1).isWhitespace)) {
+        out += cur.result().trim; cur.clear()
+      }
+      else cur += c
+      i += 1
+    }
+    out += cur.result().trim
+    out.result()
+  }
+
   def normalize(stmt: String): String = {
     val ts      = tokens(stmt).filterNot(_ == "∀")
     val renames = binderNames(ts).distinct.zipWithIndex.map { case (n, i) => n -> s"x${i + 1}" }.toMap
@@ -647,27 +678,17 @@ final class IdfScorer(
     if (fragments) bare.flatMap(Fragments.of).toSet else bare.toSet
   }
 
-  /** A printed type split at its last depth-0 arrow TOKEN: (premises,
-    * conclusion).  Tokens, not characters: Agda identifiers may contain the
-    * arrow (`IsInRange→IsInImage`, `abelianGroup→group` in the v0.1 corpus,
-    * 290 rows), and a character scan would cut such a name in two (PR #152
-    * review, round two).  `Statements.tokens` keeps a glued arrow inside its
-    * token and yields a standalone arrow as its own.
+  /** A printed type split at its last standalone depth-0 arrow: (premises,
+    * conclusion).  Agda identifiers may contain the arrow
+    * (`IsInRange→IsInImage`; 290 rows of the v0.1 corpus carry one glued to
+    * a name), and a character scan cut such a name in two (PR #152 review,
+    * round two); the split is `Statements.splitTopLevelArrows`, shared with
+    * the binder telescope and the context reconstruction (round three).
     */
   private def splitConclusion(printed: String): (String, String) = {
-    val toks  = Statements.tokens(printed)
-    var depth = 0
-    var cut   = -1
-    toks.zipWithIndex.foreach { case (t, i) =>
-      t match {
-        case "(" | "{" | "⦃"  => depth += 1
-        case ")" | "}" | "⦄"  => depth -= 1
-        case "→" if depth == 0 => cut = i
-        case _                 => ()
-      }
-    }
-    if (cut < 0) ("", toks.mkString(" "))
-    else (toks.take(cut).mkString(" "), toks.drop(cut + 1).mkString(" "))
+    val segs = Statements.splitTopLevelArrows(printed)
+    if (segs.size <= 1) ("", segs.headOption.getOrElse(""))
+    else (segs.init.mkString(" → "), segs.last)
   }
 
   private def nameUnits(hit: SearchHit): Set[String] = {

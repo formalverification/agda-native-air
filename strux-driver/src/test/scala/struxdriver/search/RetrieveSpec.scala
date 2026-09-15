@@ -603,6 +603,21 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     s.hits shouldBe 0                     // the build never completed, so nothing past the queries is claimed
   }
 
+  test("arrows: one splitter, standalone arrows only, behind the telescope, the arity tie-break, and the conclusion (#152 review, round three)") {
+    Statements.splitTopLevelArrows("(w : Setoid.Functions.Inverses.IsInRange→IsInImage F) → P w") shouldBe
+      Vector("(w : Setoid.Functions.Inverses.IsInRange→IsInImage F)", "P w")
+    Statements.splitTopLevelArrows("A→B → C") shouldBe Vector("A→B", "C")
+    Statements.splitTopLevelArrows("→-cong x → y") shouldBe Vector("→-cong x", "y")
+    Statements.splitTopLevelArrows("(A → B) → A → B") shouldBe Vector("(A → B)", "A", "B")
+    Statements.splitTopLevelArrows("Agda.Primitive.Level") shouldBe Vector("Agda.Primitive.Level")
+    // The binder telescope counts one visible binder here, not two.
+    Actions.bindersOfPrinted("(w : IsInRange→IsInImage F) → P w").count(_.visibility == Visibility.Visible) shouldBe 1
+    Actions.bindersOfPrinted("abelianGroup→group G → P").count(_.visibility == Visibility.Visible) shouldBe 1
+    // And so does the cheap-before-expensive tie-break that reads it.
+    val glued = SearchHit("M.x", "Classical.Structures.Group.AbelianGroup.abelianGroup→group G → P G", "function", "M", hasBody = true)
+    TokenOverlapScorer.approxVisibleArity(glued) shouldBe 1
+  }
+
   test("idf: an arrow inside an identifier does not split a type; only a standalone arrow token does (#152 review, round two)") {
     // `IsInRange→IsInImage` is a name; a character scan cut it into a premise
     // and a conclusion.  With the name as the whole conclusion of one row and

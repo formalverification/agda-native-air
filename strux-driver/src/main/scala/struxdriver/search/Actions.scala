@@ -92,24 +92,12 @@ object Actions {
     * undercount leaves a partial application the goal must then accept.
     */
   def bindersOfPrinted(printed: String): Vector[Binder] = {
-    val segs = splitTopLevel(printed.replaceAll("\\s+", " ").trim)
+    // Standalone arrows only (Statements.splitTopLevelArrows): an arrow inside
+    // an identifier (`IsInRange→IsInImage`) is not a binder boundary, and the
+    // character scan this replaced counted one (PR #152 review, round three).
+    val segs = Statements.splitTopLevelArrows(printed)
     if (segs.size <= 1) Vector.empty
     else segs.init.flatMap(domainBinders)
-  }
-
-  /** Split a normalized type on depth-0 `→`. */
-  private def splitTopLevel(s: String): Vector[String] = {
-    val out   = Vector.newBuilder[String]
-    val cur   = new StringBuilder
-    var depth = 0
-    s.foreach {
-      case c @ ('(' | '{' | '⦃') => depth += 1; cur += c
-      case c @ (')' | '}' | '⦄') => depth -= 1; cur += c
-      case '→' if depth == 0     => out += cur.result().trim; cur.clear()
-      case c                     => cur += c
-    }
-    out += cur.result().trim
-    out.result()
   }
 
   /** One depth-0 group of a domain segment, or a bare token run between groups. */

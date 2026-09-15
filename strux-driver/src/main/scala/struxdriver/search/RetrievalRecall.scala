@@ -218,21 +218,6 @@ object FixtureContext {
     t.startsWith(name) && (t.length == name.length || " :{(=\t".contains(t.charAt(name.length)))
   }
 
-  /** Split on `→` at bracket depth 0. */
-  private def splitArrows(s: String): Vector[String] = {
-    val out   = Vector.newBuilder[String]
-    val cur   = new StringBuilder
-    var depth = 0
-    s.foreach {
-      case c if Opens(c)          => depth += 1; cur += c
-      case c if Closes(c)         => depth -= 1; cur += c
-      case '→' if depth == 0      => out += cur.result().trim; cur.clear()
-      case c                      => cur += c
-    }
-    out += cur.result().trim
-    out.result()
-  }
-
   /** Depth-0 pieces of one segment: bracket groups (with their opener) and
     * the bare text between them.
     */
@@ -277,7 +262,9 @@ object FixtureContext {
     * visible binder (a premise).
     */
   def telescope(signatureBody: String): Vector[SigBinder] = {
-    val segs = splitArrows(signatureBody.replaceAll("\\s+", " ").trim)
+    // Standalone arrows only: a name such as `A→B` in a signature is one
+    // token, not a binder boundary (PR #152 review, round three).
+    val segs = Statements.splitTopLevelArrows(signatureBody)
     if (segs.size <= 1) Vector.empty
     else segs.init.flatMap { seg =>
       val ps        = pieces(seg)
@@ -509,8 +496,7 @@ object RetrievalRecall extends IOApp {
       report  <- m.get("report").toRight("missing --report")
       root    <- m.get("project-root").toRight("missing --project-root")
       out     <- m.get("out").toRight("missing --out")
-      ids      = m.get("ids").map(_.split(",").map(_.trim).filter(_.nonEmpty).toSet)
-      _       <- if (ids.isEmpty && !m.contains("all")) Left("pass --ids or --all") else Right(())
+      ids     <- Scaffold.selection(m)
       scorers <- nonEmptyList(m, "scorers", Scorers.default.name).flatMap(_.traverse(Scorers.byName))
       excl    <- m.get("exclude-target").fold[Either[String, Boolean]](Right(true)) {
                    case "on"  => Right(true)
@@ -559,7 +545,7 @@ object RetrievalRecall extends IOApp {
   def untypedRefusal(scorers: Vector[CandidateScorer], untyped: Vector[String], allow: Boolean): Option[String] = {
     val readers = scorers.filter(_.readsHypotheses).map(_.name)
     if (allow || readers.isEmpty || untyped.isEmpty) None
-    else Some(s"scorer(s) ${readers.mkString(", ")} read the hypotheses' types, but ${untyped.size} fixture(s) have no context on record " +
+    else Some(s"scorer(s) ${readers.mkString(", ")} read the hypotheses' types, but ${untyped.size} fixture(s) have no typed context on record " +
       s"(${untyped.mkString(", ")}); pass --allow-untyped-context on to replay them anyway, marked degraded, or use a report that carries goalContext")
   }
 
@@ -582,6 +568,14 @@ object RetrievalRecall extends IOApp {
           .map(_.flatMap(e => e.hcursor.get[String]("name").toOption
             .map(n => CtxEntry(n, e.hcursor.get[String]("type").getOrElse(""), None)))))
     }.toMap
+
+  /** A recorded context counts as untyped when it is absent or when any of
+    * its entries lacks a type, since a hypothesis-reading scorer would then
+    * see no hypothesis tokens for that entry; an explicitly empty context
+    * (`Some(Vector.empty)`, a fixture with no hypotheses) is fully typed
+    * (PR #152 review, round three).
+    */
+  def untypedContext(ctx: Option[Vector[CtxEntry]]): Boolean = ctx.forall(_.exists(_.tpe.trim.isEmpty))
 
   /** Statuses of the ground-truth names against one built pool. */
   def statuses(names: Vector[String], role: String, corpus: InMemoryCorpus, scope: ImportScope,
@@ -634,7 +628,7 @@ object RetrievalRecall extends IOApp {
         contextSource  = ctxSource,
         context        = ctx,
         reconstruction = recorded.context.map(_ => reconstructed),
-        degraded       = recorded.context.isEmpty && scorer.readsHypotheses,
+        degraded       = untypedContext(recorded.context) && scorer.readsHypotheses,
         goalTokens     = Queries.goalTokens(goal),
         hypothesisTokens = Queries.hypothesisTokens(goal),
         pool           = built,
@@ -662,7 +656,7 @@ object RetrievalRecall extends IOApp {
       t1       <- IO.monotonic
       _        <- IO.println(s">> recall instrument: ${entries.size} obligation(s), corpus ${corpus.rows.size} rows (${badRows} unparsable, ${defs.size} definition bodies) in ${(t1 - t0).toMillis} ms; scorers ${cfg.scorers.map(_.name).mkString(",")}; exclusion ${if (cfg.excludeTarget) "on" else "off"}")
       instantiated = cfg.scorers.map(_.instantiate(defs))
-      untyped   = entries.filter(e => goals(e.id).context.isEmpty).map(_.id)
+      untyped   = entries.filter(e => untypedContext(goals(e.id).context)).map(_.id)
       _        <- untypedRefusal(instantiated, untyped, cfg.allowUntypedContext)
                     .traverse_(msg => IO.raiseError[Unit](new RuntimeException(msg)))
       _        <- IO.whenA(untyped.nonEmpty && instantiated.exists(_.readsHypotheses))(

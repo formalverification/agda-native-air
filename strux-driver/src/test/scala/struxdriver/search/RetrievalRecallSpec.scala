@@ -28,6 +28,13 @@ import struxdriver.benchmark.{Difficulty, Obligation => IndexEntry}
 
 final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
 
+  /** A corpus row with every field the server's decoder requires. */
+  private def fullRow(q: String, kind: String, bodyJson: String): String = {
+    val name = q.substring(q.lastIndexOf('.') + 1); val mod = q.substring(0, q.lastIndexOf('.'))
+    s"""{"file":"$mod.lagda.md","module":"$mod._","name":"$name","qname":"$mod._.$name","prettyModule":"$mod","prettyName":"$name",""" +
+      s""""prettyQname":"$q","type":"T","typeAstVersion":"0.3-v0","defKind":"$kind","dependencies":[],"astSize":1,"hasBody":true,"body":$bodyJson}"""
+  }
+
   // --------------------------------------------------------------------------
   // The canned corpus: the shape of the agda-algebras extraction, on the wire.
   // --------------------------------------------------------------------------
@@ -130,8 +137,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
 
   test("definition table: the last row per name wins outright, so a bodyless duplicate removes an earlier body (#152 review)") {
     def j(s: String) = io.circe.parser.parse(s).toOption.get
-    def full(q: String, kind: String, body: String) =
-      j(s"""{"prettyQname":"$q","type":"T","defKind":"$kind","prettyModule":"M","hasBody":true,"body":$body}""")
+    def full(q: String, kind: String, body: String) = j(fullRow(q, kind, body))
     val t = DefinitionTable.fromRows(Iterator(
       full("M.d", "function", "\"Σ A B\""),
       full("M.d", "constructor", "null"),
@@ -146,8 +152,8 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
   test("definition table: a row the server would drop is not a row here either, even as a later duplicate (#152 review, round two)") {
     def j(s: String) = io.circe.parser.parse(s).toOption.get
     val t = DefinitionTable.fromRows(Iterator(
-      j("""{"prettyQname":"M.d","type":"T","defKind":"function","prettyModule":"M","hasBody":true,"body":"Σ A B"}"""),
-      j("""{"prettyQname":"M.d","defKind":"constructor","body":null}"""),          // no type, no module: the server drops it
+      j(fullRow("M.d", "function", "\"Σ A B\"")),
+      j("""{"prettyQname":"M.d","type":"T","defKind":"constructor","prettyModule":"M","body":null}"""), // wire fields only: the server drops it
       j("""{"prettyQname":"M.f","defKind":"function","body":"would-be-a-body"}""")))
     t.bodyOf("M.d") shouldBe Some(Vector("Σ", "A", "B"))  // the partial duplicate removed nothing
     t.bodyOf("M.f") shouldBe None                          // and the partial row contributed nothing
@@ -161,6 +167,35 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     RetrievalRecall.parseArgs(base ++ List("--scoreers", "x")).left.toOption.get should include ("--all")
     RetrievalRecall.parseArgs(base ++ List("--allow-untyped-context", "on")).map(_.allowUntypedContext) shouldBe Right(true)
     RetrievalRecall.parseArgs(base).map(_.allowUntypedContext) shouldBe Right(false)
+  }
+
+  test("cli: exactly one of --ids and --all, and --ids must name something (#152 review, round three)") {
+    val base = List("--index", "i", "--corpus", "c", "--report", "r", "--project-root", ".", "--out", "o")
+    RetrievalRecall.parseArgs(base ++ List("--ids", "")).left.toOption.get should include ("--ids")
+    RetrievalRecall.parseArgs(base ++ List("--ids", " , ,")).left.toOption.get should include ("--ids")
+    RetrievalRecall.parseArgs(base ++ List("--ids", "a", "--all")).left.toOption.get should include ("not both")
+    RetrievalRecall.parseArgs(base).left.toOption.get should include ("--ids or --all")
+    RetrievalRecall.parseArgs(base ++ List("--all")).map(_.ids) shouldBe Right(None)
+    RetrievalRecall.parseArgs(base ++ List("--ids", "a, b")).map(_.ids) shouldBe Right(Some(Set("a", "b")))
+  }
+
+  test("context: a recorded context with a blank type is untyped; an explicitly empty one is typed (#152 review, round three)") {
+    RetrievalRecall.untypedContext(None) shouldBe true
+    RetrievalRecall.untypedContext(Some(Vector.empty)) shouldBe false
+    RetrievalRecall.untypedContext(Some(Vector(CtxEntry("m", "ℕ", None)))) shouldBe false
+    RetrievalRecall.untypedContext(Some(Vector(CtxEntry("m", "ℕ", None), CtxEntry("n", "  ", None)))) shouldBe true
+    val idf = Scorers.idfUnfold.instantiate(DefinitionTable.empty)
+    val blank = RetrievalRecall.RecordedGoal("Image F ∋ b", Some(Vector(CtxEntry("F", "Func 𝑨 𝑩", None), CtxEntry("b", "", None))))
+    val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, idf, entry, blank, fixtureSource).unsafeRunSync()
+    fr.contextSource shouldBe "report"
+    fr.degraded shouldBe true
+    RetrievalRecall.untypedRefusal(Vector(idf), Vector("x"), allow = false).get should include ("typed context")
+  }
+
+  test("context: an arrow inside an identifier is not a binder boundary in the reconstruction (#152 review, round three)") {
+    val src = "f : {A B : Set} → (p : A→B) → A → B\nf p a = {!!}\n"
+    FixtureContext.reconstruct(src, "f") shouldBe Vector("A", "B", "p", "a")
+    FixtureContext.telescope("(p : A→B) → A → B").map(_.name) shouldBe Vector(Some("p"), None)
   }
 
   test("a hypothesis-reading scorer over a report without context types is refused unless opted into, and then marked degraded (#152 review, round two)") {
@@ -186,12 +221,23 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     RetrievalRecall.parseArgs(base ++ List("--scorers")).isLeft shouldBe true
   }
 
-  test("corpus: the wire row is the pretty subset of a full extraction row") {
-    val json = io.circe.parser.parse(
-      """{"prettyQname":"Overture.Basic.𝑖𝑑","type":"(A : Set a) → A → A","defKind":"function",
-        |"module":"Overture.Basic._","prettyModule":"Overture.Basic","hasBody":true,"typeAst":{}}""".stripMargin).toOption.get
-    SearchHit.fromCorpusRow(json) shouldBe Right(SearchHit("Overture.Basic.𝑖𝑑", "(A : Set a) → A → A", "function", "Overture.Basic", hasBody = true))
+  test("corpus: a row is one the server's decoder keeps, projected to the wire subset (#152 review, rounds two and three)") {
+    val full = io.circe.parser.parse(
+      """{"file":"f.lagda.md","module":"Overture.Basic._","name":"𝑖𝑑","qname":"Overture.Basic._.𝑖𝑑",
+        |"prettyModule":"Overture.Basic","prettyName":"𝑖𝑑","prettyQname":"Overture.Basic.𝑖𝑑",
+        |"type":"(A : Set a) → A → A","typeAstVersion":"0.3-v0","typeAst":{},"kind":"definition","defKind":"function",
+        |"dependencies":["Agda.Primitive.Set"],"astSize":19,"hasBody":true,"body":"λ x → x"}""".stripMargin).toOption.get
+    SearchHit.fromCorpusRow(full) shouldBe Right(SearchHit("Overture.Basic.𝑖𝑑", "(A : Set a) → A → A", "function", "Overture.Basic", hasBody = true))
+    // The wire subset alone is NOT a corpus row: the server requires the
+    // extraction fields too, and drops a line without them.
+    val wireOnly = io.circe.parser.parse(
+      """{"prettyQname":"Overture.Basic.𝑖𝑑","type":"(A : Set a) → A → A","defKind":"function","prettyModule":"Overture.Basic","hasBody":true}""").toOption.get
+    SearchHit.fromCorpusRow(wireOnly).isLeft shouldBe true
     SearchHit.fromCorpusRow(io.circe.Json.obj()).isLeft shouldBe true
+    // `typeAst` is not required, and `hasBody` falls back to a nonempty body, as on the server.
+    val noAstNoHasBody = full.mapObject(_.remove("typeAst").remove("hasBody"))
+    SearchHit.fromCorpusRow(noAstNoHasBody).map(_.hasBody) shouldBe Right(true)
+    SearchHit.fromCorpusRow(noAstNoHasBody.mapObject(_.add("body", io.circe.Json.Null))).map(_.hasBody) shouldBe Right(false)
   }
 
   // --------------------------------------------------------------------------

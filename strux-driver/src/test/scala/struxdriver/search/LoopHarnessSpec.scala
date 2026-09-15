@@ -100,6 +100,10 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
       .left.toOption.get should include ("--out-dir")
     ProofSearchLoop.parseArgs(base ++ List("--agda-flags", "--library-file=x -l y")).map(_.agdaFlags) shouldBe
       Right("--library-file=x -l y")
+    // Exactly one of --ids and --all, and --ids must name something (round three).
+    ProofSearchLoop.parseArgs(List("--index", "i", "--out-dir", "o", "--server-bin", "b", "--project-root", ".", "--ids", ""))
+      .left.toOption.get should include ("--ids")
+    ProofSearchLoop.parseArgs(base ++ List("--ids", "x")).left.toOption.get should include ("not both")
   }
 
   test("the report outcome carries the root goal's context when the loop recorded one (#19)") {

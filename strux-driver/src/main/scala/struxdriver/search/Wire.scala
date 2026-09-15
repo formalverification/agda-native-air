@@ -234,21 +234,35 @@ object SearchHit {
       body <- c.get[Boolean]("hasBody")
     } yield SearchHit(qn, tpe, kind, mod, body)
 
-  /** A row of a corpus JSONL as the server indexes and serves it: the wire
-    * subset of the full row (docs/representation.md §3), with `module` the
-    * PRETTY module.  A row missing one of these fields is one the server's
-    * decoder drops, so nothing client-side treats it as a corpus row either,
+  /** A row of a corpus JSONL as the server indexes and serves it.  The
+    * server's `CorpusEntry` decoder requires `file`, `module`, `name`,
+    * `qname`, `prettyModule`, `prettyName`, `prettyQname`, `type`,
+    * `typeAstVersion`, `defKind`, `dependencies`, and `astSize`, and reads
+    * `hasBody` as "a nonempty `body` is present" when the field is absent;
+    * `typeAst` is not required.  A row missing a required field is one the
+    * server drops, so nothing client-side treats it as a corpus row either,
     * neither the in-memory corpus nor the definition table (PR #152 review,
-    * round two).  Every row of the published corpora carries them.
+    * rounds two and three).  The result is the wire subset
+    * (docs/representation.md §3), `module` the PRETTY module.  Every row of
+    * the published corpora carries every required field.
     */
   def fromCorpusRow(json: Json): Either[String, SearchHit] = {
     val c = json.hcursor
     (for {
+      _    <- c.get[String]("file")
+      _    <- c.get[String]("module")
+      _    <- c.get[String]("name")
+      _    <- c.get[String]("qname")
+      mod  <- c.get[String]("prettyModule")
+      _    <- c.get[String]("prettyName")
       qn   <- c.get[String]("prettyQname")
       tpe  <- c.get[String]("type")
+      _    <- c.get[String]("typeAstVersion")
       kind <- c.get[String]("defKind")
-      mod  <- c.get[String]("prettyModule")
-      body <- c.getOrElse[Boolean]("hasBody")(false)
+      _    <- c.get[Vector[String]]("dependencies")
+      _    <- c.get[Int]("astSize")
+      has  <- c.get[Option[Boolean]]("hasBody")
+      body  = has.getOrElse(c.get[Option[String]]("body").toOption.flatten.exists(_.nonEmpty))
     } yield SearchHit(qn, tpe, kind, mod, body)).left.map(_.getMessage)
   }
 }

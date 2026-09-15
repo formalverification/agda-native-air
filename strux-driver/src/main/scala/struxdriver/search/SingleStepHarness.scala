@@ -204,8 +204,7 @@ object SingleStepHarness extends IOApp {
       out  <- m.get("out-dir").toRight("missing --out-dir")
       bin  <- m.get("server-bin").toRight("missing --server-bin")
       root <- m.get("project-root").toRight("missing --project-root")
-      ids   = m.get("ids").map(_.split(",").map(_.trim).filter(_.nonEmpty).toSet)
-      _    <- if (ids.isEmpty && !m.contains("all")) Left("pass --ids or --all") else Right(())
+      ids  <- Scaffold.selection(m)
       passes <- m.get("passes").fold[Either[String, Int]](Right(1))(s =>
                   s.toIntOption.filter(_ >= 1).toRight(s"bad --passes: $s"))
       tmo    <- m.get("server-timeout").fold[Either[String, Int]](Right(600))(s =>
