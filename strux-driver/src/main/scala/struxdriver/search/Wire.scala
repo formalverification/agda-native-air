@@ -233,6 +233,42 @@ object SearchHit {
       mod  <- c.get[String]("module")
       body <- c.get[Boolean]("hasBody")
     } yield SearchHit(qn, tpe, kind, mod, body)
+
+  /** A row of a corpus JSONL as the server indexes and serves it.  The
+    * server's `CorpusEntry` decoder requires `file`, `module`, `name`,
+    * `qname`, `prettyModule`, `prettyName`, `prettyQname`, `type`,
+    * `typeAstVersion`, `defKind`, `dependencies`, and `astSize`, and reads
+    * `hasBody` as "a nonempty `body` is present" when the field is absent;
+    * `typeAst` is not required.  A row missing a required field is one the
+    * server drops, so nothing client-side treats it as a corpus row either,
+    * neither the in-memory corpus nor the definition table (PR #152 review,
+    * rounds two and three).  The result is the wire subset
+    * (docs/representation.md §3), `module` the PRETTY module.  Every row of
+    * the published corpora carries every required field.
+    */
+  def fromCorpusRow(json: Json): Either[String, SearchHit] = {
+    val c = json.hcursor
+    (for {
+      _    <- c.get[String]("file")
+      _    <- c.get[String]("module")
+      _    <- c.get[String]("name")
+      _    <- c.get[String]("qname")
+      mod  <- c.get[String]("prettyModule")
+      _    <- c.get[String]("prettyName")
+      qn   <- c.get[String]("prettyQname")
+      tpe  <- c.get[String]("type")
+      _    <- c.get[String]("typeAstVersion")
+      kind <- c.get[String]("defKind")
+      _    <- c.get[Vector[String]]("dependencies")
+      _    <- c.get[Int]("astSize")
+      // The server parses `body` as an optional text BEFORE `hasBody`, so a
+      // row whose `body` is a non-text value fails there whatever `hasBody`
+      // says; the same order here (PR #152 review, round four).
+      raw  <- c.get[Option[String]]("body")
+      has  <- c.get[Option[Boolean]]("hasBody")
+      body  = has.getOrElse(raw.exists(_.nonEmpty))
+    } yield SearchHit(qn, tpe, kind, mod, body)).left.map(_.getMessage)
+  }
 }
 
 /** get_dependencies, reduced to what the P2 retrieval expansion reads: the

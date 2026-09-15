@@ -97,9 +97,36 @@ final case class Obligation(
   domain:          String,         // e.g., "arithmetic", "algebra"
   proofStrategy:   String,         // e.g., "refl", "induction"
   tags:            Vector[String]  // additional metadata tags
-)
+) {
+  /** The reporting stratum of this row: its `source`, extended by the value of
+    * its `stratum:` tag when it carries one (`agda-algebras` with
+    * `stratum:wholesale` reports as `agda-algebras/wholesale`); the frozen
+    * stdlib rows carry no stratum tag and report as plain `agda-stdlib`.
+    * The discriminator the proof-search reports slice on (issues #129, #19).
+    */
+  def stratum: String = Obligation.stratumOf(source, tags)
+
+  /** The values of every tag carrying `prefix`, in tag order:
+    * `taggedValues("target:")` is the row's ranking ground truth (issue #19,
+    * data/benchmarks/README.md "Ranking ground truth").
+    */
+  def taggedValues(prefix: String): Vector[String] =
+    tags.collect { case t if t.startsWith(prefix) => t.stripPrefix(prefix) }
+}
 
 object Obligation {
+  /** The reporting stratum of a row: its `source`, extended by the value of
+    * its `stratum:` tag when it carries one (`agda-algebras` with
+    * `stratum:wholesale` gives `agda-algebras/wholesale`; the frozen stdlib
+    * rows carry no stratum tag and report as plain `agda-stdlib`); the first
+    * stratum tag wins and other tags never make a stratum.  The one
+    * definition behind `Obligation#stratum` and the loop report's
+    * `LoopOutcome.stratumOf` (issues #129, #19).
+    */
+  def stratumOf(source: String, tags: Vector[String]): String =
+    tags.collectFirst { case t if t.startsWith("stratum:") => s"$source/${t.stripPrefix("stratum:")}" }
+      .getOrElse(source)
+
   /** Decode from the JSONL schema. */
   implicit val decoder: Decoder[Obligation] = (c: HCursor) =>
     for {

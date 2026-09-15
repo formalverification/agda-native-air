@@ -186,7 +186,13 @@ final case class FixtureSearchResult(
 object BeamLoop {
 
   /** Harness callbacks: one per probe (row writing, raw-reply logging). */
-  final case class Hooks(onProbe: ProbeEvent => IO[Unit])
+  /** Observation seams for the harness: every judged probe, and every goal
+    * the loop fetched for a state it expands (the root goal first).  Neither
+    * decides anything; `onGoal` exists so a fixture whose search raises
+    * after the root `get_goal` still reports the root display and context
+    * (PR #152 review, round four).
+    */
+  final case class Hooks(onProbe: ProbeEvent => IO[Unit], onGoal: GoalView => IO[Unit] = _ => IO.unit)
   object Hooks { val none: Hooks = Hooks(_ => IO.unit) }
 
   private final case class St(
@@ -309,6 +315,7 @@ object BeamLoop {
         target = state.obligations.head // never empty: discharged states are claimed, not enqueued
         gAns  <- oracle.getGoal(mkCtx("get_goal", None), workFile, target)
         view   = GoalView(gAns.body.goal, gAns.body.context, gAns.body.module)
+        _     <- hooks.onGoal(view)
         rows0 <- oracle.timings.get.map(_.size)
         t0    <- IO.monotonic
         cands <- proposer.propose(state, target, view)

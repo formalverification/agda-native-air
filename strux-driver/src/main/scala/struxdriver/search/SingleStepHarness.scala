@@ -63,12 +63,13 @@
   *
   *  Invocation (see the proof-search-* Make targets)
   *  ------------------------------------------------
+  *    ROOT=/path/to/repo
   *    sbt "runMain struxdriver.search.SingleStepHarness
-  *          --index data/benchmarks/benchmark-index.jsonl
+  *          --index $ROOT/data/benchmarks/benchmark-index.jsonl
   *          --ids stdlib-nat-plus-identity-l | --all
-  *          --out-dir data/benchmarks/reports/proof-search
+  *          --out-dir $ROOT/data/benchmarks/reports/proof-search
   *          --run-id r1 --passes 1
-  *          --server-bin /path/to/agda-mcp --project-root /path/to/repo"
+  *          --server-bin /path/to/agda-mcp --project-root $ROOT"
   *
   *  ============================================================================
   */
@@ -176,7 +177,7 @@ object SingleStepHarness extends IOApp {
       |    (--ids id1,id2 | --all)
       |    --out-dir PATH         run roots land here
       |    --server-bin PATH      the agda-mcp binary
-      |    --project-root PATH    repo root: server cwd; index paths resolve here
+      |    --project-root PATH    repo root: server cwd; the index's obligation paths resolve here
       |    [--run-id STR]         default: epoch millis
       |    [--agda-flags STR]     default: the committed .mcp.json flag set
       |    [--server-timeout N]   per-Agda-call bound, seconds (default 600)
@@ -193,23 +194,18 @@ object SingleStepHarness extends IOApp {
   // Argument parsing (the EvalBenchmark list-recursion style)
   // --------------------------------------------------------------------------
 
-  private def parseArgs(args: List[String]): Either[String, HarnessConfig] = {
-    @annotation.tailrec
-    def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
-      rest match {
-        case Nil                              => Right(m)
-        case "--all" :: xs                    => go(xs, m + ("all" -> "true"))
-        case flag :: v :: xs if flag.startsWith("--") => go(xs, m + (flag.drop(2) -> v))
-        case other :: _                       => Left(s"unrecognized argument: $other")
-      }
+  /** The documented options; anything else is refused (Scaffold.parseFlags). */
+  private val Keys: Set[String] = Set(
+    "index", "ids", "out-dir", "run-id", "server-bin", "agda-flags", "server-timeout", "project-root", "passes")
+
+  private[search] def parseArgs(args: List[String]): Either[String, HarnessConfig] = {
     for {
-      m    <- go(args, Map.empty)
+      m    <- Scaffold.parseFlags(args, Keys)
       ix   <- m.get("index").toRight("missing --index")
       out  <- m.get("out-dir").toRight("missing --out-dir")
       bin  <- m.get("server-bin").toRight("missing --server-bin")
       root <- m.get("project-root").toRight("missing --project-root")
-      ids   = m.get("ids").map(_.split(",").map(_.trim).filter(_.nonEmpty).toSet)
-      _    <- if (ids.isEmpty && !m.contains("all")) Left("pass --ids or --all") else Right(())
+      ids  <- Scaffold.selection(m)
       passes <- m.get("passes").fold[Either[String, Int]](Right(1))(s =>
                   s.toIntOption.filter(_ >= 1).toRight(s"bad --passes: $s"))
       tmo    <- m.get("server-timeout").fold[Either[String, Int]](Right(600))(s =>

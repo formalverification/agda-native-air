@@ -45,6 +45,53 @@ object Scaffold {
   val defaultAgdaFlags: String =
     "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras"
 
+  /** The harness argument convention, `--key value` pairs and a bare `--all`,
+    * with the accepted keys DECLARED by each entry point: an unknown `--key`
+    * is an error, never a silently swallowed pair.  Before PR #152's review
+    * every harness accepted any `--anything value`, so `--scoreers idf-unfold`
+    * would have run the default scorer and written a report that looked like
+    * the requested experiment.  `--all` is recorded as `all -> "true"`.
+    */
+  def parseFlags(args: List[String], known: Set[String]): Either[String, Map[String, String]] = {
+    val accepted = (known.map("--" + _) + "--all").toVector.sorted.mkString(" ")
+    // A value that is itself one of the accepted options was a dropped value
+    // (`--out-dir --all` would otherwise run with `--all` as the path).  Only
+    // KNOWN options count: an `--agda-flags` value may legitimately begin
+    // with `--library-file=…`, which is not an option of ours.
+    def isOption(v: String): Boolean = v == "--all" || (v.startsWith("--") && known(v.drop(2)))
+    @annotation.tailrec
+    def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
+      rest match {
+        case Nil                                        => Right(m)
+        case "--all" :: xs                              => go(xs, m + ("all" -> "true"))
+        case flag :: v :: xs if flag.startsWith("--") =>
+          val key = flag.drop(2)
+          if (!known(key)) Left(s"unrecognized option: $flag (accepted: $accepted)")
+          else if (isOption(v)) Left(s"option $flag needs a value, but the next argument is the option $v")
+          else go(xs, m + (key -> v))
+        case flag :: Nil if flag.startsWith("--")       => Left(s"option $flag needs a value")
+        case other :: _                                 => Left(s"unrecognized argument: $other")
+      }
+    go(args, Map.empty)
+  }
+
+  /** The obligation selection of a harness: exactly one of `--all` and
+    * `--ids id1,id2`, the latter naming at least one id; `None` means every
+    * obligation.  Before PR #152's third review round `--ids ""` passed as
+    * an empty selection and `--ids` beside `--all` passed with `--all`
+    * silently ignored, so a run could measure nothing, or the wrong subset,
+    * under a valid-looking report.
+    */
+  def selection(m: Map[String, String]): Either[String, Option[Set[String]]] =
+    (m.get("ids"), m.contains("all")) match {
+      case (Some(_), true)     => Left("pass --ids or --all, not both")
+      case (None, false)       => Left("pass --ids or --all")
+      case (None, true)        => Right(None)
+      case (Some(raw), false)  =>
+        val ids = raw.split(",").toVector.map(_.trim).filter(_.nonEmpty).toSet
+        if (ids.isEmpty) Left("--ids names no obligation") else Right(Some(ids))
+    }
+
   /** Read the benchmark index, keeping the requested ids (None = all). */
   def readIndex(index: Path, ids: Option[Set[String]]): IO[Vector[IndexEntry]] =
     IO.blocking(Files.readAllLines(index, StandardCharsets.UTF_8).asScala.toVector)
@@ -92,4 +139,18 @@ object Scaffold {
 
   def pct(part: Double, whole: Double): BigDecimal =
     if (whole <= 0) BigDecimal(0) else BigDecimal(part / whole * 100).setScale(2, BigDecimal.RoundingMode.HALF_UP)
+}
+
+/** Content digests for the provenance blocks: the loop report pins the corpus
+  * it retrieved from (`ProofSearchLoop.corpusProvenance`) and the recall
+  * report pins the corpus it replayed against, so a measurement names its
+  * corpus by content, not by path.
+  */
+object Digest {
+  /** The SHA-256 of a file's bytes, as lowercase hex, streamed. */
+  def sha256Hex(path: Path): IO[String] =
+    fs2.io.file.Files[IO].readAll(fs2.io.file.Path.fromNioPath(path))
+      .through(fs2.hash.sha256)
+      .compile.toVector
+      .map(_.map(b => f"$b%02x").mkString)
 }

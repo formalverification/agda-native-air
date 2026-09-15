@@ -72,6 +72,7 @@ package struxdriver.search
 import cats.effect.{IO, Ref}
 import cats.syntax.all._
 import java.util.regex.Pattern
+import scala.util.matching.Regex
 
 /** What the loop shows a proposer about the obligation it selected: the goal
   * display and local context exactly as get_goal answered them, plus the
@@ -208,7 +209,7 @@ object Peek {
   /** A meta token as the lane prints one — `_6`, `_x_9`, `_A_10`, `_n_6` —
     * verified on the wire (issue #122 probes).
     */
-  private val Meta = Pattern.compile("""_[^\s(){}⦃⦄]*_[0-9]+|_[0-9]+""")
+  private val Meta: Regex = """_[^\s(){}⦃⦄]*_[0-9]+|_[0-9]+""".r
 
   /** Can the inferred type describe the goal?  Every meta is a wildcard, the
     * SAME meta is the SAME wildcard (a backreference — `_x_9 ≡ _x_9` cannot
@@ -219,24 +220,21 @@ object Peek {
   def compatible(goalDisplayed: String, inferred: String): Boolean = {
     val goal = normalize(goalDisplayed)
     val inf  = normalize(inferred)
-    val sb   = new StringBuilder("^")
-    val seen = scala.collection.mutable.Map.empty[String, String]
-    val m    = Meta.matcher(inf)
-    var last = 0
-    while (m.find()) {
-      sb.append(Pattern.quote(expandNumerals(inf.substring(last, m.start()))))
-      val meta = m.group()
-      seen.get(meta) match {
-        case Some(g) => sb.append("\\k<").append(g).append(">")
-        case None =>
-          val g = s"m${seen.size}"
-          seen(meta) = g
-          sb.append("(?<").append(g).append(">.*)")
-      }
-      last = m.end()
+    def literal(from: Int, to: Int): String = Pattern.quote(expandNumerals(inf.substring(from, to)))
+    // Left to right over the metas: the literal text before each is quoted,
+    // the first occurrence of a meta opens a named group, a repeat
+    // backreferences it.  The state is the pattern so far, the groups
+    // named so far, and where the last meta ended.
+    val (body, _, last) = Meta.findAllMatchIn(inf).foldLeft(("^", Map.empty[String, String], 0)) {
+      case ((acc, groups, last), m) =>
+        groups.get(m.matched) match {
+          case Some(g) => (acc + literal(last, m.start) + s"\\k<$g>", groups, m.end)
+          case None =>
+            val g = s"m${groups.size}"
+            (acc + literal(last, m.start) + s"(?<$g>.*)", groups.updated(m.matched, g), m.end)
+        }
     }
-    sb.append(Pattern.quote(expandNumerals(inf.substring(last)))).append("$")
-    Pattern.compile(sb.toString, Pattern.DOTALL).matcher(expandNumerals(goal)).matches()
+    Pattern.compile(body + literal(last, inf.length) + "$", Pattern.DOTALL).matcher(expandNumerals(goal)).matches()
   }
 
   private def normalize(s: String): String = s.replaceAll("\\s+", " ").trim
@@ -261,20 +259,11 @@ object Peek {
     */
   private val MaxNumeralDigits = 2
 
-  private def expandNumerals(s: String): String = {
-    val num = Pattern.compile("""\b([0-9]+)\b""").matcher(s)
-    val out = new StringBuilder
-    var last = 0
-    while (num.find()) {
-      out.append(s.substring(last, num.start()))
-      val tok = num.group(1)
-      if (tok.length <= MaxNumeralDigits) out.append(sucTower(tok.toLong))
-      else out.append(tok)
-      last = num.end()
-    }
-    out.append(s.substring(last))
-    out.result()
-  }
+  private val Numeral: Regex = """\b([0-9]+)\b""".r
+
+  private def expandNumerals(s: String): String =
+    Numeral.replaceAllIn(s, m => Regex.quoteReplacement(
+      if (m.group(1).length <= MaxNumeralDigits) sucTower(m.group(1).toLong) else m.group(1)))
 
   /** `n` as an explicit suc tower — `suc (suc (… 0 …))` — built with string
     * repetition, no recursion.

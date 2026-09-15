@@ -16,7 +16,11 @@
   *  qualified-token reduction, the import-scope rule, both target-exclusion
   *  rules and their off-switch, the rendering ladder, the three candidate
   *  shapes, ranking determinism, composition with the base proposer, the
-  *  per-goal memo, and the truncation stat.
+  *  per-goal memo, and the truncation stat.  Since issue #19 also: the
+  *  scorer registry, the pool-aware rank's total order, and every rule of
+  *  the `idf-unfold` scorer pinned on rows copied from the agda-algebras
+  *  corpus (test/resources/search/recall-rows.jsonl) against the fixture
+  *  that motivated it.
   *
   *  ============================================================================
   */
@@ -225,6 +229,184 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     TokenOverlapScorer.approxVisibleArity(trans) shouldBe 2
   }
 
+  test("scorers: selected by name, the default is the P2 placeholder, an unknown name is refused") {
+    Scorers.default.instantiate(DefinitionTable.empty) shouldBe TokenOverlapScorer
+    Scorers.byName("token-overlap").map(_.instantiate(DefinitionTable.empty)) shouldBe Right(TokenOverlapScorer)
+    Scorers.byName("no-such-scorer").isLeft shouldBe true
+    Scorers.names.distinct.size shouldBe Scorers.names.size
+    Scorers.all.filter(_.needsDefinitions).map(_.name).forall(_.contains("unfold")) shouldBe true
+  }
+
+  test("rank: the pool-aware seam keeps the placeholder's total order: score, then arity, then name") {
+    val gts   = Set("+", "≡")
+    val rows  = corpusRows.filter(_.defKind == "function")
+    val ranked = RetrievalPool.rank(TokenOverlapScorer, RankQuery.goalOnly(gts), rows)
+    // Scores: +-comm 5 (alias form, arity 0) and +-suc 5 (arity 2); map-id 2
+    // (arity 1) and trans 2 (arity 2); *-comm 1 and the ring projection 1,
+    // both arity 0, split on the qname (`*` sorts below `I`); ≤-refl -1.
+    ranked.map(h => (h.bareName, TokenOverlapScorer.score(gts, h), TokenOverlapScorer.approxVisibleArity(h))) shouldBe Vector(
+      ("+-comm", 5, 0), ("+-suc", 5, 2), ("map-id", 2, 1), ("trans", 2, 2),
+      ("*-comm", 1, 0), ("+-comm", 1, 0), ("≤-refl", -1, 0))
+    ranked(4).prettyQname shouldBe "Data.Nat.Properties.*-comm"
+    ranked(5).prettyQname shouldBe "Data.Nat.Properties.IsCommutativeRing.+-comm"
+    // Rank is a pure function of its inputs: the same pool in another order ranks identically.
+    RetrievalPool.rank(TokenOverlapScorer, RankQuery.goalOnly(gts), rows.reverse) shouldBe ranked
+  }
+
+  // --------------------------------------------------------------------------
+  // The IDF family (issue #19), rule by rule, on rows copied from the
+  // agda-algebras v0.1 corpus (test/resources/search/recall-rows.jsonl): the
+  // fixture that motivated each rule is the one it is pinned on.
+  // --------------------------------------------------------------------------
+
+  /** The real rows: eight pool members and the definitions their types name. */
+  private lazy val realRows: Vector[io.circe.Json] = {
+    val src = scala.io.Source.fromInputStream(
+      getClass.getResourceAsStream("/search/recall-rows.jsonl"), "UTF-8")
+    try src.getLines().filter(_.trim.nonEmpty).map(l => io.circe.parser.parse(l).toOption.get).toVector
+    finally src.close()
+  }
+  private lazy val realHits: Map[String, SearchHit] =
+    realRows.flatMap(j => SearchHit.fromCorpusRow(j).toOption).map(h => h.prettyQname -> h).toMap
+  private lazy val realTable: DefinitionTable = DefinitionTable.fromRows(realRows.iterator)
+  private def real(q: String): SearchHit = realHits(q)
+
+  /** The pool of the mon→hom motivating case: hom-concluding lemmas that
+    * differ only in their premises, two generic projections, a lemma about
+    * `≤`, and a long theorem that mentions everything.
+    */
+  private lazy val homPool: Vector[SearchHit] = Vector(
+    "Setoid.Homomorphisms.Basic.IsMon.HomReduct", "Setoid.Homomorphisms.Basic.epi→hom",
+    "Setoid.Homomorphisms.Basic.𝒾𝒹", "Setoid.Homomorphisms.Basic.mon→hom",
+    "Setoid.Homomorphisms.Isomorphisms._≅_.to", "Overture.Basic.ℓ₁", "Setoid.Functions.Basic.𝑖𝑑",
+    "Setoid.Subalgebras.Properties.≤-trans", "Setoid.Homomorphisms.Noether.FirstHomTheorem").map(real)
+
+  /** algebras-homs-mon-to-hom, as get_goal displayed it (run ctx-probe-1):
+    * the goal `hom 𝑨 𝑩` and the hypothesis `m : mon 𝑨 𝑩`, both NORMALISED
+    * into their Σ-unfoldings.
+    */
+  private val monToHomGoal = GoalView(
+    "Data.Product.Σ\n(Function.Bundles.Func (Algebra.Domain 𝑨) (Algebra.Domain 𝑩))\n(IsHom 𝑨 𝑩)",
+    Vector("𝓞", "𝓥", "α", "ρᵃ", "β", "ρᵇ").map(n => CtxEntry(n, "Level", None)) ++ Vector(
+      CtxEntry("𝑆", "Data.Product.Σ (Set 𝓞) (λ F → F → Set 𝓥)", None),
+      CtxEntry("𝑨", "Algebra α ρᵃ", None), CtxEntry("𝑩", "Algebra β ρᵇ", None),
+      CtxEntry("m", "Data.Product.Σ\n(Function.Bundles.Func (Algebra.Domain 𝑨) (Algebra.Domain 𝑩))\n(IsMon 𝑨 𝑩)", None)),
+    None)
+
+  private def scorerNamed(name: String): CandidateScorer =
+    Scorers.byName(name).toOption.get.instantiate(realTable)
+  private def ranking(name: String, goal: GoalView, pool: Vector[SearchHit] = homPool): Vector[String] =
+    RetrievalPool.rank(scorerNamed(name), Queries.rankQuery(goal), pool).map(_.bareName)
+  private def scoreOf(name: String, goal: GoalView, q: String): Double =
+    scorerNamed(name).scores(Queries.rankQuery(goal), homPool)(real(q))
+
+  test("fragments: NFKC folds the mathematical alphabets, humps and separators split, symbols stand alone") {
+    Fragments.of("𝑖𝑑") shouldBe Vector("id")
+    Fragments.of("𝒾𝒹") shouldBe Vector("id")
+    Fragments.of("IsInRange→IsInImage") shouldBe Vector("is", "in", "range", "is", "in", "image")
+    Fragments.of("HomReduct") shouldBe Vector("hom", "reduct")
+    Fragments.of("⊙-injective") shouldBe Vector("⊙", "injective")
+    Fragments.of("≤-trans") shouldBe Vector("≤", "trans")
+    Fragments.of("InvIsInverseʳ") shouldBe Vector("inv", "is", "inverser")
+    Fragments.of("𝔻[") shouldBe Vector("d", "[")
+  }
+
+  test("unfolding: table keys tolerate anonymous-module segments and infix spellings") {
+    DefinitionTable.lookupKeys("Setoid.Subalgebras.Basic._.≤") shouldBe
+      Vector("Setoid.Subalgebras.Basic.≤", "Setoid.Subalgebras.Basic._≤_")
+    DefinitionTable.lookupKeys("Setoid.Homomorphisms.Basic.hom") shouldBe
+      Vector("Setoid.Homomorphisms.Basic.hom", "Setoid.Homomorphisms.Basic._hom_")
+    DefinitionTable.lookupKeys("@0") shouldBe Vector("@0")
+    // `_≤_` unfolds to `_IsSubalgebraOf_`, then to `hom` and `IsInjective`, then to
+    // the Σ-vocabulary the goal display uses; depth bounds the walk.
+    val one   = realTable.expand(Vector("Setoid.Subalgebras.Basic._.≤"), 1).map(TokenOverlapScorer.bareToken)
+    val three = realTable.expand(Vector("Setoid.Subalgebras.Basic._.≤"), 3).map(TokenOverlapScorer.bareToken)
+    one should contain ("IsSubalgebraOf")
+    (one should not).contain("IsHom")
+    three should contain allOf ("IsSubalgebraOf", "hom", "IsInjective", "Σ", "Func", "IsHom")
+    DefinitionTable.lookupKeys("Setoid.Algebras.Basic.𝔻[") should contain ("Setoid.Algebras.Basic.𝔻[_]")
+    realTable.expand(Vector("Setoid.Algebras.Basic.𝔻[", "]"), 1).map(TokenOverlapScorer.bareToken) should contain ("Domain")
+  }
+
+  test("mon→hom: the placeholder hands the top to the nullary generics (the stage-two failure)") {
+    // Qualified display tokens match no bare corpus token, every row ties at
+    // or below zero, and the arity tie-break puts the Level constant first.
+    ranking("token-overlap", monToHomGoal).head shouldBe "ℓ₁"
+  }
+
+  test("mon→hom: unfolding states the hom-concluding lemmas in the display's vocabulary") {
+    // On whole bare tokens, `𝒾𝒹 : hom 𝑨 𝑨` shares no unit with the display of
+    // its own conclusion (`hom` is not `IsHom`, `Σ`, `Func`, or `Domain`);
+    // unfolded, it says exactly what the display says.  Fragments alone
+    // would relate `hom` to `IsHom`, so they are off here to isolate the rule.
+    def plain(depth: Int) =
+      new IdfScorer("probe", fragments = false, conclusion = 1.0, nameWeight = 1.0, unfold = depth, normalize = true, table = realTable)
+        .scores(Queries.rankQuery(monToHomGoal), homPool)(real("Setoid.Homomorphisms.Basic.𝒾𝒹"))
+    plain(0) shouldBe 0.0
+    plain(3) should be > 0.0
+    val r = ranking("idf-unfold", monToHomGoal)
+    r.takeRight(3).toSet should contain allOf ("ℓ₁", "𝑖𝑑")
+  }
+
+  test("mon→hom: the hypotheses single out the lemma whose premise the context discharges") {
+    // Four rows conclude `hom 𝑨 𝑩`; `m : mon 𝑨 𝑩` is what says mon→hom (and
+    // the field HomReduct behind it) rather than epi→hom or 𝒾𝒹.
+    val r = ranking("idf-unfold", monToHomGoal)
+    r.head shouldBe "mon→hom"
+    def gap(name: String) =
+      scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Basic.IsMon.HomReduct") -
+        scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Basic.epi→hom")
+    gap("idf-unfold") should be > gap("idf-unfold-no-hypotheses")
+  }
+
+  test("mon→hom: the cosine norm shrinks a theorem that mentions everything relative to the lemma that says the right thing") {
+    // The norm divides by the row's own IDF mass, so FirstHomTheorem (whose
+    // type names hom, epi, kernels, quotients, and more) loses ground against
+    // mon→hom that the unnormalised sum had granted it.  Measured on the full
+    // pool: the norm lifted the originals' recall@32 from 14/21 to 19/21.
+    def ratio(name: String) =
+      scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Noether.FirstHomTheorem") /
+        scoreOf(name, monToHomGoal, "Setoid.Homomorphisms.Basic.mon→hom")
+    ratio("idf-unfold") should be < ratio("idf-unfold-no-norm")
+    val r = ranking("idf-unfold", monToHomGoal)
+    r.indexOf("FirstHomTheorem") should be > r.indexOf("mon→hom")
+  }
+
+  test("sup-trans: `≤-trans` reaches the display's vocabulary only through three unfolding steps") {
+    // The goal `𝑨 ≥ 𝑪` displays as a Σ over hom and injectivity; `≤` names
+    // none of it until `_≤_` → `_IsSubalgebraOf_` → `hom`/`IsInjective` → Σ ….
+    // The goal and the context exactly as get_goal displayed them (run
+    // ctx-probe-1): the hypotheses p q are the Σ-unfoldings of 𝑨 ≥ 𝑩, 𝑩 ≥ 𝑪.
+    val goal = GoalView("Agda.Builtin.Sigma.Σ (Agda.Builtin.Sigma.Σ (Function.Bundles.Func (Algebra.Domain 𝑪) (Algebra.Domain 𝑨)) (Setoid.Homomorphisms.Basic.IsHom 𝑪 𝑨)) (λ h → {x y : Relation.Binary.Bundles.Setoid.Carrier (Algebra.Domain 𝑪)} → (Algebra.Domain 𝑨 Relation.Binary.Bundles.Setoid.≈ Function.Bundles.Func.to (Overture.proj₁ h) x) (Function.Bundles.Func.to (Overture.proj₁ h) y) → (Algebra.Domain 𝑪 Relation.Binary.Bundles.Setoid.≈ x) y)", Vector(CtxEntry("𝓞", "Level", None), CtxEntry("𝓥", "Level", None), CtxEntry("α", "Level", None), CtxEntry("ρᵃ", "Level", None), CtxEntry("β", "Level", None), CtxEntry("ρᵇ", "Level", None), CtxEntry("γ", "Level", None), CtxEntry("ρᶜ", "Level", None), CtxEntry("𝑆", "Agda.Builtin.Sigma.Σ (Set 𝓞) (λ F → F → Set 𝓥)", None), CtxEntry("𝑨", "Algebra α ρᵃ", None), CtxEntry("𝑩", "Algebra β ρᵇ", None), CtxEntry("𝑪", "Algebra γ ρᶜ", None), CtxEntry("p", "Agda.Builtin.Sigma.Σ (Agda.Builtin.Sigma.Σ (Function.Bundles.Func (Algebra.Domain 𝑩) (Algebra.Domain 𝑨)) (Setoid.Homomorphisms.Basic.IsHom 𝑩 𝑨)) (λ h → {x y : Relation.Binary.Bundles.Setoid.Carrier (Algebra.Domain 𝑩)} → (Algebra.Domain 𝑨 Relation.Binary.Bundles.Setoid.≈ Function.Bundles.Func.to (Overture.proj₁ h) x) (Function.Bundles.Func.to (Overture.proj₁ h) y) → (Algebra.Domain 𝑩 Relation.Binary.Bundles.Setoid.≈ x) y)", None), CtxEntry("q", "Agda.Builtin.Sigma.Σ (Agda.Builtin.Sigma.Σ (Function.Bundles.Func (Algebra.Domain 𝑪) (Algebra.Domain 𝑩)) (Setoid.Homomorphisms.Basic.IsHom 𝑪 𝑩)) (λ h → {x y : Relation.Binary.Bundles.Setoid.Carrier (Algebra.Domain 𝑪)} → (Algebra.Domain 𝑩 Relation.Binary.Bundles.Setoid.≈ Function.Bundles.Func.to (Overture.proj₁ h) x) (Function.Bundles.Func.to (Overture.proj₁ h) y) → (Algebra.Domain 𝑪 Relation.Binary.Bundles.Setoid.≈ x) y)", None)), None)
+    val leTrans = real("Setoid.Subalgebras.Properties.≤-trans")
+    // Fragments off, so `Algebra.Domain` in the display cannot meet the
+    // `Algebra` of the lemma's binders and only unfolding can connect them.
+    def at(depth: Int) =
+      new IdfScorer("probe", fragments = false, conclusion = 1.0, nameWeight = 1.0, unfold = depth, normalize = true, table = realTable)
+        .scores(Queries.rankQuery(goal), homPool)(leTrans)
+    at(0) shouldBe 0.0
+    at(1) shouldBe 0.0
+    at(2) shouldBe 0.0
+    at(3) should be > 0.0
+    // With the hypotheses in the query the lemma whose premises ARE the
+    // hypotheses rises past everything that is not about hom (rank 5 of 476
+    // on the full pool, from 439 under the placeholder); the hom-concluding
+    // rows it still shares the top with is what a learned ranker is for.
+    val r = ranking("idf-unfold", goal)
+    r.indexOf("≤-trans") should be < 4
+    r.indexOf("≤-trans") should be < r.indexOf("𝑖𝑑")
+    r.indexOf("≤-trans") should be < r.indexOf("ℓ₁")
+    r.indexOf("≤-trans") should be < r.indexOf("to")
+    ranking("token-overlap", goal).indexOf("≤-trans") should be > r.indexOf("≤-trans")
+  }
+
+  test("idf-unfold is the kept combination, needs the corpus bodies, and is not the default") {
+    Scorers.idfUnfold.name shouldBe "idf-unfold"
+    Scorers.idfUnfold.needsDefinitions shouldBe true
+    Scorers.default.name shouldBe "token-overlap"
+    Scorers.byName("idf-unfold").map(_.name) shouldBe Right("idf-unfold")
+  }
+
   // --------------------------------------------------------------------------
   // ImportScope
   // --------------------------------------------------------------------------
@@ -386,6 +568,134 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     val callsAfterFirst = corpus.calls.size
     proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
     corpus.calls.size shouldBe callsAfterFirst
+  }
+
+  test("propose: the memo is keyed by the context too, since ranking and the saturated shapes read it (#152 review)") {
+    val (proposer, corpus, _) = freshProposer()
+    val first = proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val callsAfterFirst = corpus.calls.size
+    // The same display, other assumption names: a different pool, and
+    // saturated candidates spelled over the new names, not the memoised ones.
+    val other  = goal.copy(context = Vector(CtxEntry("a", "ℕ", None), CtxEntry("b", "ℕ", None)))
+    val second = proposer.propose(state0, state0.obligations.head, other).unsafeRunSync()
+    corpus.calls.size should be > callsAfterFirst
+    second should contain ("(+-suc a b)")
+    (second should not).contain("(+-suc m n)")
+    first should contain ("(+-suc m n)")
+    RetrievalProposer.poolKey(goal) should not be RetrievalProposer.poolKey(other)
+  }
+
+  test("propose: query accounting survives a corpus failure mid-pipeline (#130 round 3, #152 review)") {
+    // Name queries answer; the first type query dies.  The ledger must show
+    // the name queries that ran, and the failure must still propagate.
+    val canned = new CannedCorpus(corpusRows)
+    val dying  = new CorpusSearch {
+      def byName(pattern: String, limit: Int) = canned.byName(pattern, limit)
+      def byType(pattern: String, limit: Int) = IO.raiseError[Vector[SearchHit]](new RuntimeException("corpus died"))
+      def dependenciesOf(qname: String)       = IO.pure(Vector.empty[SearchHit])
+    }
+    val lane = new FakeLane(laneTypes)
+    val p    = RetrievalProposer.create(baseFixed, dying, scope, exclusion, lane.lemmaType, cfg4).unsafeRunSync()
+    val err  = intercept[RuntimeException](p.propose(state0, state0.obligations.head, goal).unsafeRunSync())
+    err.getMessage shouldBe "corpus died"
+    val s = p.stats.unsafeRunSync()
+    s.queries shouldBe scope.modules.size // every by-module name query, counted as it answered
+    s.hits shouldBe 0                     // the build never completed, so nothing past the queries is claimed
+  }
+
+  test("pieces: depth-0 groups keep their opener, nested brackets stay inside, and the bare text between is kept") {
+    import Statements.{Bare, Group}
+    Statements.pieces("∀ (x y : A) {B : Set (f (g z))} ⦃ _ : C ⦄ → D") shouldBe Vector(
+      Bare("∀"), Group('(', "x y : A"), Group('{', "B : Set (f (g z))"), Group('⦃', " _ : C "), Bare("→ D"))
+    Statements.pieces("   ") shouldBe Vector.empty
+  }
+
+  test("arrows: one splitter, standalone arrows only, behind the telescope, the arity tie-break, and the conclusion (#152 review, round three)") {
+    Statements.splitTopLevelArrows("(w : Setoid.Functions.Inverses.IsInRange→IsInImage F) → P w") shouldBe
+      Vector("(w : Setoid.Functions.Inverses.IsInRange→IsInImage F)", "P w")
+    Statements.splitTopLevelArrows("A→B → C") shouldBe Vector("A→B", "C")
+    Statements.splitTopLevelArrows("→-cong x → y") shouldBe Vector("→-cong x", "y")
+    Statements.splitTopLevelArrows("(A → B) → A → B") shouldBe Vector("(A → B)", "A", "B")
+    Statements.splitTopLevelArrows("Agda.Primitive.Level") shouldBe Vector("Agda.Primitive.Level")
+    // Square brackets enclose too: an arrow inside a bracket mixfix is not a boundary (round four).
+    Statements.splitTopLevelArrows("𝔻[ A → B ] → C") shouldBe Vector("𝔻[ A → B ]", "C")
+    Statements.splitTopLevelArrows("(f : 𝕌[ A → B ]) → C f") shouldBe Vector("(f : 𝕌[ A → B ])", "C f")
+    Actions.bindersOfPrinted("(f : 𝕌[ A → B ]) → C f").count(_.visibility == Visibility.Visible) shouldBe 1
+    // The binder telescope counts one visible binder here, not two.
+    Actions.bindersOfPrinted("(w : IsInRange→IsInImage F) → P w").count(_.visibility == Visibility.Visible) shouldBe 1
+    Actions.bindersOfPrinted("abelianGroup→group G → P").count(_.visibility == Visibility.Visible) shouldBe 1
+    // And so does the cheap-before-expensive tie-break that reads it.
+    val glued = SearchHit("M.x", "Classical.Structures.Group.AbelianGroup.abelianGroup→group G → P G", "function", "M", hasBody = true)
+    TokenOverlapScorer.approxVisibleArity(glued) shouldBe 1
+  }
+
+  test("idf: an arrow inside an identifier does not split a type; only a standalone arrow token does (#152 review, round two)") {
+    // `IsInRange→IsInImage` is a name; a character scan cut it into a premise
+    // and a conclusion.  With the name as the whole conclusion of one row and
+    // the premise of another, the conclusion weight must land where it belongs.
+    val concl = SearchHit("M.a", "(w : W) → Setoid.Functions.Inverses.IsInRange→IsInImage F", "function", "M", hasBody = true)
+    val prem  = SearchHit("M.b", "Setoid.Functions.Inverses.IsInRange→IsInImage F → W", "function", "M", hasBody = true)
+    val noise = SearchHit("M.c", "(x : X) → Q x", "function", "M", hasBody = true)
+    val q  = RankQuery(Set("IsInRange→IsInImage"), Set.empty)
+    val sc = new IdfScorer("t", fragments = false, conclusion = 1.0, nameWeight = 0.0, normalize = false).scores(q, Vector(concl, prem, noise))
+    // Both rows share the unit once (weight 1); the conclusion weight adds it
+    // again for `concl` only, so `concl` scores exactly twice `prem`.
+    sc(concl) shouldBe (2.0 * sc(prem) +- 1e-9)
+    sc(prem) should be > 0.0
+  }
+
+  test("propose: a dependency neighbor the initial queries already returned is not a fresh hit (#152 review, round four)") {
+    // mapId was an initial out-of-scope hit and someCtor an initial non-function
+    // hit; plusSuc was ranked.  Returned again as neighbors, none of them may
+    // re-enter the ledger; only a never-seen row does.
+    val canned = new CannedCorpus(corpusRows)
+    val ghost  = SearchHit("Data.Nat.Properties.ghost", "m + n ≡ n + m", "function", "Data.Nat.Properties", hasBody = true)
+    val deps   = new CorpusSearch {
+      def byName(pattern: String, limit: Int) = canned.byName(pattern, limit)
+      def byType(pattern: String, limit: Int) = canned.byType(pattern, limit)
+      def dependenciesOf(qname: String)       = IO.pure(Vector(mapId, someCtor, plusSuc, ghost))
+    }
+    val lane = new FakeLane(laneTypes)
+    val p    = RetrievalProposer.create(baseFixed, deps, scope, exclusion, lane.lemmaType, cfg4.copy(expandDeps = true)).unsafeRunSync()
+    p.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val s = p.stats.unsafeRunSync()
+    val initialHits = corpusRows.count(h => canned.byName("", 1000).unsafeRunSync().contains(h)) // every canned row answers some query here
+    s.hits shouldBe initialHits + 1        // the ghost alone is new
+    s.nonFunction shouldBe 1               // the constructor was counted once, at the initial cut
+    s.inScope shouldBe (corpusRows.count(h => scope.importingModuleOf(h.module).isDefined) + 1)
+  }
+
+  test("definition table: a row the server reports bodyless contributes no unfolding, whatever its raw body says (#152 review, round four)") {
+    def j(s: String) = io.circe.parser.parse(s).toOption.get
+    def full(q: String, hasBody: Boolean, body: String) =
+      j(s"""{"file":"f","module":"M._","name":"x","qname":"M._.x","prettyModule":"M","prettyName":"x","prettyQname":"$q","type":"T","typeAstVersion":"0.3-v0","defKind":"function","dependencies":[],"astSize":1,"hasBody":$hasBody,"body":$body}""")
+    val t = DefinitionTable.fromRows(Iterator(full("M.a", false, "\"Σ A B\""), full("M.b", true, "\"Σ A B\"")))
+    t.bodyOf("M.a") shouldBe None
+    t.bodyOf("M.b") shouldBe Some(Vector("Σ", "A", "B"))
+  }
+
+  test("propose: dependency expansion counts its server requests in the ledger (#152 review, round two)") {
+    val (proposer, corpus, _) = freshProposer(cfg = cfg4.copy(expandDeps = true))
+    proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val s = proposer.stats.unsafeRunSync()
+    corpus.calls.count(_.startsWith("deps:")) shouldBe 3
+    s.queries shouldBe corpus.calls.size // every name, type, and dependency request, one each
+  }
+
+  test("idf: at nameWeight zero the name leaves the document entirely, frequencies and norm included (#152 review)") {
+    // Two rows with one type, one of them named after a goal unit.  With the
+    // name rule off they must score identically; the name may not leak in
+    // through the document frequencies or the norm.  With it on, it counts.
+    val named   = SearchHit("M.hom-lemma", "(x : A) → P x", "function", "M", hasBody = true)
+    val unnamed = SearchHit("M.zzz",       "(x : A) → P x", "function", "M", hasBody = true)
+    val other   = SearchHit("M.other",     "(y : B) → Q y", "function", "M", hasBody = true)
+    val q    = RankQuery(Set("P", "hom"), Set.empty)
+    val pool = Vector(named, unnamed, other)
+    val off  = new IdfScorer("t-off", fragments = true, conclusion = 1.0, nameWeight = 0.0, normalize = true).scores(q, pool)
+    off(named) shouldBe off(unnamed)
+    off(named) should be > 0.0
+    val on   = new IdfScorer("t-on",  fragments = true, conclusion = 1.0, nameWeight = 1.0, normalize = true).scores(q, pool)
+    on(named) should be > on(unnamed)
   }
 
   test("propose: a query returning exactly the limit is counted truncated, not passed off as complete") {

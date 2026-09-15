@@ -85,6 +85,39 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     }
   }
 
+  test("cli: a misspelled knob is refused, so a sweep cannot silently run the default scorer (#152 review)") {
+    val base = List("--index", "i", "--all", "--out-dir", "o", "--server-bin", "b", "--project-root", ".")
+    val typo = ProofSearchLoop.parseArgs(base ++ List("--proposer", "retrieval", "--corpus", "c", "--scoreer", "idf-unfold"))
+    typo.isLeft shouldBe true
+    typo.left.toOption.get should include ("--scoreer")
+    ProofSearchLoop.parseArgs(base ++ List("--proposer", "retrieval", "--corpus", "c", "--scorer", "idf-unfold"))
+      .map(_.scorer.name) shouldBe Right("idf-unfold")
+    ProofSearchLoop.parseArgs(base).map(_.scorer.name) shouldBe Right("token-overlap")
+    // An option where a value should be is a dropped value, not a path
+    // (#152 review, round two); a value that merely begins with `--` and is
+    // not one of our options is a value (an agda-flags string, say).
+    ProofSearchLoop.parseArgs(List("--index", "i", "--out-dir", "--all", "--server-bin", "b", "--project-root", "."))
+      .left.toOption.get should include ("--out-dir")
+    ProofSearchLoop.parseArgs(base ++ List("--agda-flags", "--library-file=x -l y")).map(_.agdaFlags) shouldBe
+      Right("--library-file=x -l y")
+    // Exactly one of --ids and --all, and --ids must name something (round three).
+    ProofSearchLoop.parseArgs(List("--index", "i", "--out-dir", "o", "--server-bin", "b", "--project-root", ".", "--ids", ""))
+      .left.toOption.get should include ("--ids")
+    ProofSearchLoop.parseArgs(base ++ List("--ids", "x")).left.toOption.get should include ("not both")
+  }
+
+  test("the report outcome carries the root goal's context when the loop recorded one (#19)") {
+    // The offline recall instrument rebuilds the proposer's goal tokens from
+    // this field; it is additive, and absent when no root goal was reached.
+    val base = LoopOutcome("id", "routine", "m + n ≡ n + m", "M", "exhausted",
+      solved = false, Vector.empty, LoopStats(), 1L, None)
+    base.toJson.hcursor.downField("goalContext").focus shouldBe None
+    val withCtx = base.copy(goalContext = Some(Vector(CtxEntry("m", "ℕ", None), CtxEntry("n", "ℕ", None))))
+    withCtx.toJson.hcursor.downField("goalContext").focus.flatMap(_.asArray).map(_.size) shouldBe Some(2)
+    withCtx.toJson.hcursor.downField("goalContext").downArray.get[String]("name") shouldBe Right("m")
+    withCtx.toJson.hcursor.downField("goalContext").downArray.get[String]("type") shouldBe Right("ℕ")
+  }
+
   test("an anomalous RETRIEVAL fixture keeps its accumulated ledger (#130 round 3)") {
     // The corpus queries answer and the ledger accumulates (hits, inScope,
     // proposedLemmas); then the transport dies on a probe.  The recovered
@@ -157,6 +190,10 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     outcome.stratum shouldBe "test"
     row.searchStatus shouldBe "anomaly"
     attempts shouldBe empty // the transport died on the FIRST probe
+    // The root get_goal had answered before the death: the anomaly outcome
+    // keeps its display and context (#152 review, round four).
+    outcome.goal shouldBe "T"
+    outcome.goalContext shouldBe Some(Vector.empty)
     val retr = outcome.retrieval.getOrElse(fail("retrieval ledger lost on the anomaly path"))
     retr.hcursor.get[Int]("hits").toOption.getOrElse(0) should be >= 1
     retr.hcursor.get[Vector[String]]("proposedLemmas").toOption.getOrElse(Vector.empty) should contain ("helper")
