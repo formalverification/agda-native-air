@@ -454,6 +454,7 @@ help:
 	@echo "  make agent-bench                 - Agent-in-the-loop: a frontier model driving agda-mcp over the benchmark (issue 154)"
 	@echo "  make agent-bench-rejudge         - Re-judge an existing agent-bench run from its archived final files and transcripts"
 	@echo "  make agent-bench-it              - Agent-bench: the judge's Agda typecheck gate against a committed gold and obligation"
+	@echo "  make agent-bench-archive         - Copy a quoted agent-bench run (report, rows, prompts, transcripts, final files) under reports/agent-bench/"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1759,7 +1760,9 @@ AGENT_BENCH_CORPUS_STDLIB   ?= data/corpora/agda-stdlib/v0/corpus.jsonl
 AGENT_BENCH_CORPUS_ALGEBRAS ?= data/corpora/agda-algebras/v0.1/corpus.jsonl
 AGENT_BENCH_RUN_ID          ?= agent-$(AGENT_BENCH_MODEL)-$(shell date -u +%Y%m%dT%H%M%SZ)
 
-.PHONY: agent-bench agent-bench-rejudge agent-bench-it
+AGENT_BENCH_ARCHIVE_DIR     ?= reports/agent-bench
+
+.PHONY: agent-bench agent-bench-rejudge agent-bench-it agent-bench-archive
 
 # One arm: the model named by AGENT_BENCH_MODEL over the whole suite (or
 # AGENT_BENCH_IDS="--ids id1,id2"), AGENT_BENCH_PARALLELISM subjects at once.
@@ -1784,6 +1787,23 @@ agent-bench-it: _check-sbt
 	@echo ">> [agent-bench-it] the judge's Agda gate on a committed gold and obligation"; \
 	cd "$(STRUX_DRIVER)" && AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
 	  "testOnly struxdriver.agentbench.AgentBenchIntegrationSpec"
+
+# Archive a run that a report quotes (AGENT_BENCH_RUN_ID=<run-id>): the report,
+# the JSONL rows, the prompts, and every subject's transcript, verdict, final
+# file, and configuration, under $(AGENT_BENCH_ARCHIVE_DIR)/<run-id>/, which is
+# committed.  The work copies, the staging server's log, and the .agdai files
+# stay behind.
+agent-bench-archive:
+	@set -e; src="$(AGENT_BENCH_OUT_DIR)/$(AGENT_BENCH_RUN_ID)"; dst="$(AGENT_BENCH_ARCHIVE_DIR)/$(AGENT_BENCH_RUN_ID)"; \
+	test -f "$$src/report.json" || { echo "ERROR: no report.json under $$src (set AGENT_BENCH_RUN_ID)"; exit 1; }; \
+	mkdir -p "$$dst/subjects" "$$dst/prompts"; \
+	cp "$$src"/report.json "$$src"/results.jsonl "$$src"/fixtures.jsonl "$$dst"/; \
+	cp "$$src"/prompts/*.md "$$dst"/prompts/; \
+	for d in "$$src"/subjects/*/; do id=$$(basename "$$d"); mkdir -p "$$dst/subjects/$$id/final"; \
+	  cp "$$d"transcript.jsonl "$$d"outcome.json "$$d"mcp.json "$$d"prompt.txt "$$d"run.json "$$dst/subjects/$$id/"; \
+	  cp "$$d"final/*.agda "$$dst/subjects/$$id/final/"; \
+	done; \
+	echo ">> [agent-bench-archive] $$dst: $$(ls "$$dst/subjects" | wc -l) subject(s), $$(du -sh "$$dst" | cut -f1)"
 
 
 

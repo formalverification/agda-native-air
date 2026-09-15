@@ -56,5 +56,13 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     v2.gate.map(_.gate) shouldBe Some("typecheck")
     v2.agdaExit.exists(_ != 0) shouldBe true
     v2.solved shouldBe false
+
+    // A rule broken but the file green: the gate is named AND Agda's verdict is recorded.
+    val edited = gold.replace("using ( _≡_ ; refl ; cong ; sym )", "using ( _≡_ ; refl ; cong ; sym ; trans )")
+    Files.write(file, edited.getBytes(StandardCharsets.UTF_8))
+    val v3 = Judge.judge(e, ob, edited, file, root, safe = true, 300.seconds).unsafeRunSync()
+    v3.gate.map(_.gate) shouldBe Some("preservation")
+    v3.agdaExit shouldBe Some(0)
+    v3.solved shouldBe false
   }
 }

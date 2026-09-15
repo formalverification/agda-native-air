@@ -170,9 +170,16 @@ object Transcript {
                 else blocks.flatMap(b => if (b.hcursor.get[String]("type").toOption.contains("text")) b.hcursor.get[String]("text").toOption else None)
               acc.copy(results = acc.results ++ results, userTexts = acc.userTexts ++ texts)
             case "rate_limit_event" =>
+              // Two shapes seen from one client version: a top-level
+              // `utilization` (with `surpassedThreshold`), and, once the
+              // window is quiet, only the per-window figures under
+              // `unifiedWindows`; the five-hour window is the one a sweep
+              // exhausts first.
               val info = c.downField("rate_limit_info")
-              acc.copy(rateLimits = acc.rateLimits :+ (
-                (info.get[String]("status").getOrElse("?"), info.get[Double]("utilization").getOrElse(0.0))))
+              val util = info.get[Double]("utilization").toOption
+                .orElse(info.downField("unifiedWindows").downField("five_hour").get[Double]("utilization").toOption)
+                .getOrElse(0.0)
+              acc.copy(rateLimits = acc.rateLimits :+ ((info.get[String]("status").getOrElse("?"), util)))
             case "result" =>
               acc.copy(result = Some(ResultRecord(
                 subtype           = c.get[String]("subtype").getOrElse("?"),

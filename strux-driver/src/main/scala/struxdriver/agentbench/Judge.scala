@@ -308,21 +308,22 @@ object Judge {
     } yield (res._1, (t1 - t0).toMillis, res._2)
   }
 
-  /** All four gates on a final file, first failure named. */
+  /** All four gates on a final file, first failure named.  Agda runs whatever
+    * the syntactic gates said, so a file that broke a rule of the protocol
+    * (an original import line edited, say) is reported with its verdict too:
+    * "failed preservation, and would have type-checked" is a finding a reader
+    * needs, and the run costs one batch check per row either way.
+    */
   def judge(entry: IndexEntry, obligationText: String, finalText: String, finalFile: Path, projectRoot: Path, safe: Boolean, timeout: FiniteDuration): IO[Verdict] =
     Statement.of(obligationText, entry.hole) match {
       case Left(msg) =>
         IO.pure(Verdict(Some(GateFailure("statement", msg)), Vector.empty, Vector.empty, None, None, None))
       case Right(st) =>
         val (syn, added, evidence) = syntactic(st, finalText)
-        syn match {
-          case Some(f) => IO.pure(Verdict(Some(f), added, evidence, None, None, None))
-          case None =>
-            typecheck(entry, finalFile, projectRoot, safe, timeout).map { case (rc, ms, out) =>
-              val tail = out.linesIterator.toVector.takeRight(12).mkString("\n")
-              val gate = if (rc == 0) None else Some(GateFailure("typecheck", s"agda exit $rc"))
-              Verdict(gate, added, evidence, Some(rc), Some(ms), Some(tail))
-            }
+        typecheck(entry, finalFile, projectRoot, safe, timeout).map { case (rc, ms, out) =>
+          val tail = out.linesIterator.toVector.takeRight(12).mkString("\n")
+          val gate = syn.orElse(if (rc == 0) None else Some(GateFailure("typecheck", s"agda exit $rc")))
+          Verdict(gate, added, evidence, Some(rc), Some(ms), Some(tail))
         }
     }
 }
