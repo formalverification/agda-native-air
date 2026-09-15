@@ -610,6 +610,10 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     Statements.splitTopLevelArrows("→-cong x → y") shouldBe Vector("→-cong x", "y")
     Statements.splitTopLevelArrows("(A → B) → A → B") shouldBe Vector("(A → B)", "A", "B")
     Statements.splitTopLevelArrows("Agda.Primitive.Level") shouldBe Vector("Agda.Primitive.Level")
+    // Square brackets enclose too: an arrow inside a bracket mixfix is not a boundary (round four).
+    Statements.splitTopLevelArrows("𝔻[ A → B ] → C") shouldBe Vector("𝔻[ A → B ]", "C")
+    Statements.splitTopLevelArrows("(f : 𝕌[ A → B ]) → C f") shouldBe Vector("(f : 𝕌[ A → B ])", "C f")
+    Actions.bindersOfPrinted("(f : 𝕌[ A → B ]) → C f").count(_.visibility == Visibility.Visible) shouldBe 1
     // The binder telescope counts one visible binder here, not two.
     Actions.bindersOfPrinted("(w : IsInRange→IsInImage F) → P w").count(_.visibility == Visibility.Visible) shouldBe 1
     Actions.bindersOfPrinted("abelianGroup→group G → P").count(_.visibility == Visibility.Visible) shouldBe 1
@@ -631,6 +635,36 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     // again for `concl` only, so `concl` scores exactly twice `prem`.
     sc(concl) shouldBe (2.0 * sc(prem) +- 1e-9)
     sc(prem) should be > 0.0
+  }
+
+  test("propose: a dependency neighbor the initial queries already returned is not a fresh hit (#152 review, round four)") {
+    // mapId was an initial out-of-scope hit and someCtor an initial non-function
+    // hit; plusSuc was ranked.  Returned again as neighbors, none of them may
+    // re-enter the ledger; only a never-seen row does.
+    val canned = new CannedCorpus(corpusRows)
+    val ghost  = SearchHit("Data.Nat.Properties.ghost", "m + n ≡ n + m", "function", "Data.Nat.Properties", hasBody = true)
+    val deps   = new CorpusSearch {
+      def byName(pattern: String, limit: Int) = canned.byName(pattern, limit)
+      def byType(pattern: String, limit: Int) = canned.byType(pattern, limit)
+      def dependenciesOf(qname: String)       = IO.pure(Vector(mapId, someCtor, plusSuc, ghost))
+    }
+    val lane = new FakeLane(laneTypes)
+    val p    = RetrievalProposer.create(baseFixed, deps, scope, exclusion, lane.lemmaType, cfg4.copy(expandDeps = true)).unsafeRunSync()
+    p.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val s = p.stats.unsafeRunSync()
+    val initialHits = corpusRows.count(h => canned.byName("", 1000).unsafeRunSync().contains(h)) // every canned row answers some query here
+    s.hits shouldBe initialHits + 1        // the ghost alone is new
+    s.nonFunction shouldBe 1               // the constructor was counted once, at the initial cut
+    s.inScope shouldBe (corpusRows.count(h => scope.importingModuleOf(h.module).isDefined) + 1)
+  }
+
+  test("definition table: a row the server reports bodyless contributes no unfolding, whatever its raw body says (#152 review, round four)") {
+    def j(s: String) = io.circe.parser.parse(s).toOption.get
+    def full(q: String, hasBody: Boolean, body: String) =
+      j(s"""{"file":"f","module":"M._","name":"x","qname":"M._.x","prettyModule":"M","prettyName":"x","prettyQname":"$q","type":"T","typeAstVersion":"0.3-v0","defKind":"function","dependencies":[],"astSize":1,"hasBody":$hasBody,"body":$body}""")
+    val t = DefinitionTable.fromRows(Iterator(full("M.a", false, "\"Σ A B\""), full("M.b", true, "\"Σ A B\"")))
+    t.bodyOf("M.a") shouldBe None
+    t.bodyOf("M.b") shouldBe Some(Vector("Σ", "A", "B"))
   }
 
   test("propose: dependency expansion counts its server requests in the ledger (#152 review, round two)") {

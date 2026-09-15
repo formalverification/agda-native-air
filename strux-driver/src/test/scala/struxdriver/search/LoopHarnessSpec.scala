@@ -190,6 +190,10 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     outcome.stratum shouldBe "test"
     row.searchStatus shouldBe "anomaly"
     attempts shouldBe empty // the transport died on the FIRST probe
+    // The root get_goal had answered before the death: the anomaly outcome
+    // keeps its display and context (#152 review, round four).
+    outcome.goal shouldBe "T"
+    outcome.goalContext shouldBe Some(Vector.empty)
     val retr = outcome.retrieval.getOrElse(fail("retrieval ledger lost on the anomaly path"))
     retr.hcursor.get[Int]("hits").toOption.getOrElse(0) should be >= 1
     retr.hcursor.get[Vector[String]]("proposedLemmas").toOption.getOrElse(Vector.empty) should contain ("helper")

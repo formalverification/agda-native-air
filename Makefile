@@ -1722,7 +1722,7 @@ proof-search-recall: _check-sbt
 	@test -n "$(PROOF_SEARCH_RECALL_REPORT)" || { echo "ERROR: set PROOF_SEARCH_RECALL_REPORT=<run>/report.json (the goal displays to replay)"; exit 1; }
 	@echo ">> [proof-search-recall] scorers=$(PROOF_SEARCH_RECALL_SCORERS) exclusion=$(PROOF_SEARCH_EXCLUDE) corpus=$(PROOF_SEARCH_CORPUS) goals=$(PROOF_SEARCH_RECALL_REPORT)"
 	@cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.search.RetrievalRecall --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --corpus $(abspath $(PROOF_SEARCH_CORPUS)) --report $(abspath $(PROOF_SEARCH_RECALL_REPORT)) --project-root $(CURDIR) --out $(CURDIR)/$(PROOF_SEARCH_RECALL_OUT) --scorers $(PROOF_SEARCH_RECALL_SCORERS) --exclude-target $(PROOF_SEARCH_EXCLUDE) --k $(PROOF_SEARCH_RECALL_K) --allow-untyped-context $(PROOF_SEARCH_RECALL_ALLOW_UNTYPED)"
+	  "runMain struxdriver.search.RetrievalRecall --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --corpus $(abspath $(PROOF_SEARCH_CORPUS)) --report $(abspath $(PROOF_SEARCH_RECALL_REPORT)) --project-root $(CURDIR) --out $(abspath $(PROOF_SEARCH_RECALL_OUT)) --scorers $(PROOF_SEARCH_RECALL_SCORERS) --exclude-target $(PROOF_SEARCH_EXCLUDE) --k $(PROOF_SEARCH_RECALL_K) --allow-untyped-context $(PROOF_SEARCH_RECALL_ALLOW_UNTYPED)"
 
 
 

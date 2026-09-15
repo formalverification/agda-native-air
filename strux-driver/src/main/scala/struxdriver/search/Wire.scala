@@ -261,8 +261,12 @@ object SearchHit {
       kind <- c.get[String]("defKind")
       _    <- c.get[Vector[String]]("dependencies")
       _    <- c.get[Int]("astSize")
+      // The server parses `body` as an optional text BEFORE `hasBody`, so a
+      // row whose `body` is a non-text value fails there whatever `hasBody`
+      // says; the same order here (PR #152 review, round four).
+      raw  <- c.get[Option[String]]("body")
       has  <- c.get[Option[Boolean]]("hasBody")
-      body  = has.getOrElse(c.get[Option[String]]("body").toOption.flatten.exists(_.nonEmpty))
+      body  = has.getOrElse(raw.exists(_.nonEmpty))
     } yield SearchHit(qn, tpe, kind, mod, body)).left.map(_.getMessage)
   }
 }

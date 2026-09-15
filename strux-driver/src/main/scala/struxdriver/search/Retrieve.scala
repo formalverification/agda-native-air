@@ -245,11 +245,15 @@ object Statements {
     * arrow separates two segments when whitespace (or the text's boundary)
     * sits on both sides of it, so an arrow inside an identifier
     * (`IsInRange→IsInImage`, `abelianGroup→group`, a name such as `→-cong`)
-    * never splits the type.  Whitespace is normalized first and segments
-    * are trimmed.  The one arrow splitter behind the binder telescope
+    * never splits the type.  Depth counts parentheses, braces, instance
+    * braces, AND square brackets: a bracket mixfix such as `𝔻[ A → B ]` or
+    * `𝕌[ … ]` encloses its argument, and an arrow inside it is not a binder
+    * boundary (95 rows of the two published corpora carry one; PR #152
+    * review, round four).  Whitespace is normalized first and segments are
+    * trimmed.  The one arrow splitter behind the binder telescope
     * (`Actions.bindersOfPrinted`), the conclusion split (`IdfScorer`), and
     * the fixture-context reconstruction (`FixtureContext`); PR #152 review,
-    * rounds two and three.
+    * rounds two to four.
     */
   def splitTopLevelArrows(printed: String): Vector[String] = {
     val s     = printed.replaceAll("\\s+", " ").trim
@@ -259,8 +263,8 @@ object Statements {
     var i     = 0
     while (i < s.length) {
       val c = s.charAt(i)
-      if (c == '(' || c == '{' || c == '⦃') { depth += 1; cur += c }
-      else if (c == ')' || c == '}' || c == '⦄') { depth -= 1; cur += c }
+      if (c == '(' || c == '{' || c == '⦃' || c == '[') { depth += 1; cur += c }
+      else if (c == ')' || c == '}' || c == '⦄' || c == ']') { depth = math.max(0, depth - 1); cur += c }
       else if (c == '→' && depth == 0 &&
                (i == 0 || s.charAt(i - 1).isWhitespace) && (i == s.length - 1 || s.charAt(i + 1).isWhitespace)) {
         out += cur.result().trim; cur.clear()
@@ -588,8 +592,12 @@ object DefinitionTable {
     // (SearchHit.fromCorpusRow); a partial row neither adds nor removes a
     // body, since the server never indexed it (PR #152 review, round two).
     SearchHit.fromCorpusRow(json).toOption.map { h =>
+      // The server's `hasBody` is authoritative: a row it reports bodyless
+      // contributes no unfolding, whatever its raw `body` field holds (PR
+      // #152 review, round four; no row of the published corpora disagrees
+      // with its own `body`).
       val body =
-        if (h.defKind != "function") None
+        if (h.defKind != "function" || !h.hasBody) None
         else json.hcursor.get[Option[String]]("body").toOption.flatten
           .map(bodyTokens).filter(toks => toks.nonEmpty && toks.size <= MaxBodyTokens)
       h.prettyQname -> body
@@ -794,7 +802,8 @@ object RetrievalPool {
     inScope:     Vector[SearchHit],
     excluded:    Vector[(String, SearchHit)], // reason ("name:…" | "statement:…") -> row
     nonFunction: Int,
-    ranked:      Vector[SearchHit]
+    ranked:      Vector[SearchHit],
+    seen:        Set[String]                  // every distinct qname the queries returned, whatever became of it
   )
 
   /** Enumerate the legal haystacks (module-prefix name queries are the recall
@@ -828,7 +837,8 @@ object RetrievalPool {
         inScope     = inScope,
         excluded    = excluded,
         nonFunction = kept.size - functions.size,
-        ranked      = rank(scorer, Queries.rankQuery(goal), functions)
+        ranked      = rank(scorer, Queries.rankQuery(goal), functions),
+        seen        = union.map(_.prettyQname).toSet
       )
     }
   }
@@ -916,7 +926,7 @@ final class RetrievalProposer private (
                     excluded    = (s.excluded ++ built.excluded.map(_._1)).distinct,
                     nonFunction = s.nonFunction + built.nonFunction))
       query     = Queries.rankQuery(goal)
-      expanded <- if (cfg.expandDeps) expandTop(built.ranked, query) else IO.pure(built.ranked)
+      expanded <- if (cfg.expandDeps) expandTop(built.ranked, built.seen, query) else IO.pure(built.ranked)
       resolved <- resolveTopK(expanded)
       _        <- statsRef.update(s => s.copy(proposedLemmas = (s.proposedLemmas ++ resolved.map(_._1)).distinct))
     } yield resolved.flatMap { case (rendered, binders) =>
@@ -977,12 +987,14 @@ final class RetrievalProposer private (
     * dropped (#130 review); survivors re-rank with everything else before
     * the topK cut.
     */
-  private def expandTop(ranked: Vector[SearchHit], query: RankQuery): IO[Vector[SearchHit]] =
+  private def expandTop(ranked: Vector[SearchHit], seen: Set[String], query: RankQuery): IO[Vector[SearchHit]] =
     for {
       nss      <- ranked.take(3).traverse(h => counting.dependenciesOf(h.prettyQname))
-      known     = ranked.map(_.prettyQname).toSet
+      // A neighbor the initial queries already returned is not a fresh hit,
+      // whether it was ranked, excluded, out of scope, or non-function; only
+      // rows never seen enter the ledger again (PR #152 review, round four).
       fresh     = nss.flatten.groupBy(_.prettyQname).toVector.map(_._2.head)
-                    .filterNot(h => known.contains(h.prettyQname))
+                    .filterNot(h => seen.contains(h.prettyQname))
       inScope   = fresh.filter(h => scope.importingModuleOf(h.module).isDefined)
       _        <- statsRef.update(s => s.copy(hits = s.hits + fresh.size, inScope = s.inScope + inScope.size))
       kept     <- if (cfg.excludeTarget) {

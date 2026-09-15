@@ -411,6 +411,10 @@ object ProofSearchLoop extends IOApp {
       // ledger accumulated BEFORE a mid-fixture raise (#130 review, round 3):
       // the honesty ledger matters most precisely on failed runs.
       retrRef <- Ref.of[IO, Option[RetrievalProposer]](None)
+      // The first goal the loop fetched (the root), kept outside the
+      // recovered effect so an anomaly after `get_goal` still reports the
+      // root display and its context (PR #152 review, round four).
+      rootRef <- Ref.of[IO, Option[GoalView]](None)
       t0      <- IO.monotonic
       out     <- {
         val step: IO[(LoopOutcome, FixtureRow, Vector[AttemptRow])] = for {
@@ -457,7 +461,7 @@ object ProofSearchLoop extends IOApp {
                              else IO.pure(Option.empty[RetrievalProposer])
                 _        <- retrRef.set(retriever)
                 proposer  = retriever.getOrElse(base)
-                hooks    = BeamLoop.Hooks { ev =>
+                hooks    = BeamLoop.Hooks(onGoal = v => rootRef.update(_.orElse(Some(v))), onProbe = { ev =>
                              for {
                                n      <- counter.updateAndGet(_ + 1)
                                logPath = logsDir.resolve(f"probe-$n%03d.json")
@@ -481,7 +485,7 @@ object ProofSearchLoop extends IOApp {
                                _      <- seen.update { case (m, h) =>
                                            if (ev.answer.cached) (m, h + 1) else (m + 1, h) }
                              } yield ()
-                           }
+                           })
                 state0   = SearchState.initial(st.content, Vector(st.obligation))
                 result  <- BeamLoop.run(oracle, proposer, cfg.loop, mkCtx, st.workFile, state0, hooks)
                 t1      <- IO.monotonic
@@ -532,10 +536,13 @@ object ProofSearchLoop extends IOApp {
             // The retrieval ledger accumulated before the raise: every cut
             // already counted stays counted (#130 review, round 3).
             retr     <- retrRef.get.flatMap(_.traverse(_.stats.map(retrievalJson)))
+            root     <- rootRef.get
           } yield (
-            LoopOutcome(entry.id, entry.difficulty.tag, entry.typeSig, "", "anomaly",
+            LoopOutcome(entry.id, entry.difficulty.tag, root.map(_.goal).getOrElse(entry.typeSig),
+              root.flatMap(_.module).getOrElse(""), "anomaly",
               solved = false, Vector.empty, partial, wallMs, Some(e.getMessage),
-              retrieval = retr, source = entry.source, tags = entry.tags),
+              retrieval = retr, source = entry.source, tags = entry.tags,
+              goalContext = root.map(_.context)),
             fixtureRow("", None, None, wallMs, anomalous = true),
             attempts
           )

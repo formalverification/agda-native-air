@@ -238,6 +238,10 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     val noAstNoHasBody = full.mapObject(_.remove("typeAst").remove("hasBody"))
     SearchHit.fromCorpusRow(noAstNoHasBody).map(_.hasBody) shouldBe Right(true)
     SearchHit.fromCorpusRow(noAstNoHasBody.mapObject(_.add("body", io.circe.Json.Null))).map(_.hasBody) shouldBe Right(false)
+    // The server parses `body` as optional text before `hasBody`: a non-text
+    // body fails the row even with `hasBody` present (round four).
+    SearchHit.fromCorpusRow(full.mapObject(_.add("body", io.circe.Json.fromInt(5)))).isLeft shouldBe true
+    SearchHit.fromCorpusRow(full.mapObject(_.add("body", io.circe.Json.Null))).map(_.hasBody) shouldBe Right(true)
   }
 
   // --------------------------------------------------------------------------
