@@ -57,7 +57,8 @@ cd ../worktrees/99-new-feature
 
 A fresh worktree has no built `agda-mcp` server (`dist-newstyle/` is
 gitignored), so a Claude Code session started there reports the `agda` MCP
-server as failed to connect until you build it, about two minutes warm:
+server as failed to connect until you build it, about two minutes warm, unless
+`AGDA_MCP_BIN` names a prebuilt binary (`docs/HowToRun.md` § 13.5):
 
 ```bash
 nix develop .#backend --command bash -c 'cd agda-mcp && cabal build -v0 exe:agda-mcp'
