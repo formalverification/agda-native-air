@@ -22,10 +22,12 @@
   *       because every committed gold passes under it, exit-code verdict.
   *
   *  A file that passes every gate but names the library's own lemma for the
-  *  statement it was asked to prove is *restated*, never solved: on stdlib
-  *  rows the original is the index `module` and `hole`; on agda-algebras rows
-  *  the fixture's definition carries a prime (`lift∼lower′`) and the original
-  *  is the unprimed name.  Evidence is any qualified token ending in the
+  *  statement it was asked to prove is *restated*, never solved: the original
+  *  is the index row's `restates:` tag (its qualified corpus name, PR #152)
+  *  where the row has one, else the fixture's own name with its prime
+  *  stripped (agda-algebras fixtures carry a prime, `lift∼lower′`, and the
+  *  original is the unprimed name; the two readings agree on every tagged
+  *  row).  Evidence is any qualified token ending in the
   *  original's bare name, any import or open line that names it in a `using`
   *  or `renaming` list, or (on primed rows only, where the bare name cannot
   *  be a recursive call) the bare name itself, all read over the parts of the
@@ -104,14 +106,20 @@ object Gates {
     else Left(GateFailure("holes", s"${braces + lone} hole(s) remain"))
   }
 
-  /** The original a row restates: its bare name (the hole with a trailing
-    * prime stripped) and whether the bare name is itself evidence (only when
-    * it differs from the hole, since the hole's own name in its body is a
-    * recursive call).
+  /** The library original a row restates, and whether its bare name is
+    * itself evidence (only when it differs from the hole, since the hole's
+    * own name in its body is a recursive call).  The index's `restates:` tag
+    * (PR #152) names the original by its qualified corpus name and is read
+    * first; a row without one (the standard-library tiers) falls back to the
+    * fixture's own name with a trailing prime stripped, which is what the
+    * tags record on every agda-algebras row.
     */
-  def originalOf(hole: String): (String, Boolean) = {
-    val bare = hole.stripSuffix("′")
-    (bare, bare != hole)
+  final case class Original(qualified: Option[String], bare: String, bareIsEvidence: Boolean)
+
+  def originalOf(hole: String, tags: Vector[String]): Original = {
+    val tagged = tags.collectFirst { case t if t.startsWith("restates:") => t.stripPrefix("restates:") }
+    val bare   = tagged.map(_.split('.').last).getOrElse(hole.stripSuffix("′"))
+    Original(tagged, bare, bare != hole)
   }
 
   private val ListClause = """(?:using|renaming)\s*\(([^)]*)\)""".r
@@ -121,8 +129,8 @@ object Gates {
     * the original in a `using` or `renaming` list, and, on primed rows, the
     * bare original.  Each hit is reported as text a reader can check.
     */
-  def restatement(st: Statement, finalText: String): Vector[String] = {
-    val (orig, bareCounts) = originalOf(st.hole)
+  def restatement(st: Statement, tags: Vector[String], finalText: String): Vector[String] = {
+    val Original(_, orig, bareCounts) = originalOf(st.hole, tags)
     val frozen = st.frozenBlocks.flatten.toSet
     val own    = Code.keptLines(finalText).filterNot(frozen)
     val code   = Code.stripComments(own.mkString("\n"))
@@ -162,8 +170,8 @@ object Judge {
   /** The syntactic gates only (no Agda): the statement, then preservation,
     * escape, holes; restatement evidence is collected whatever the gates say.
     */
-  def syntactic(st: Statement, finalText: String): (Option[GateFailure], Vector[String], Vector[String]) = {
-    val evidence = Gates.restatement(st, finalText)
+  def syntactic(st: Statement, tags: Vector[String], finalText: String): (Option[GateFailure], Vector[String], Vector[String]) = {
+    val evidence = Gates.restatement(st, tags, finalText)
     Gates.preservation(st, finalText) match {
       case Left(f) => (Some(f), Vector.empty, evidence)
       case Right(added) =>
@@ -197,7 +205,7 @@ object Judge {
       case Left(msg) =>
         IO.pure(Verdict(Some(GateFailure("statement", msg)), Vector.empty, Vector.empty, None, None, None))
       case Right(st) =>
-        val (syn, added, evidence) = syntactic(st, finalText)
+        val (syn, added, evidence) = syntactic(st, entry.tags, finalText)
         typecheck(entry, finalFile, projectRoot, safe, timeout).map { case (rc, ms, out) =>
           val tail = out.linesIterator.toVector.takeRight(12).mkString("\n")
           val gate = syn.orElse(if (rc == 0) None else Some(GateFailure("typecheck", s"agda exit $rc")))

@@ -73,7 +73,7 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
 
   private val st: Statement = Statement.of(obligation, "+-comm").toOption.get
 
-  private def firstGate(text: String): Option[String] = Judge.syntactic(st, text)._1.map(_.gate)
+  private def firstGate(text: String): Option[String] = Judge.syntactic(st, Vector.empty, text)._1.map(_.gate)
 
   test("statement: module line, four import lines, one signature, frozen blocks exclude the clause") {
     st.moduleLine shouldBe "module Nat-plus-comm where"
@@ -84,7 +84,7 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
   }
 
   test("gold passes every syntactic gate, logs its where-block import, and has no restatement evidence") {
-    val (gate, added, evidence) = Judge.syntactic(st, gold)
+    val (gate, added, evidence) = Judge.syntactic(st, Vector.empty, gold)
     gate shouldBe None
     added shouldBe Vector("open import Relation.Binary.PropositionalEquality.Properties")
     evidence shouldBe Vector.empty
@@ -115,30 +115,30 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
 
   test("a postulate, a trustMe, and any pragma fail the escape gate; a postulate in a comment does not") {
     val post = header + "postulate\n  ax : ∀ (m n : ℕ) → m + n ≡ n + m\n\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = ax m n\n"
-    Judge.syntactic(st, post)._1 shouldBe Some(GateFailure("escape", "keyword postulate"))
+    Judge.syntactic(st, Vector.empty, post)._1 shouldBe Some(GateFailure("escape", "keyword postulate"))
     val prag = header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n{-# TERMINATING #-}\n+-comm m n = +-comm m n\n"
-    Judge.syntactic(st, prag)._1 shouldBe Some(GateFailure("escape", "pragma TERMINATING"))
+    Judge.syntactic(st, Vector.empty, prag)._1 shouldBe Some(GateFailure("escape", "pragma TERMINATING"))
     val opts = "{-# OPTIONS --type-in-type #-}\n" + gold
-    Judge.syntactic(st, opts)._1 shouldBe Some(GateFailure("escape", "pragma OPTIONS"))
+    Judge.syntactic(st, Vector.empty, opts)._1 shouldBe Some(GateFailure("escape", "pragma OPTIONS"))
     val tm = header + "open import Relation.Binary.PropositionalEquality.TrustMe using ( trustMe )\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = trustMe\n"
-    Judge.syntactic(st, tm)._1 shouldBe Some(GateFailure("escape", "keyword trustMe"))
+    Judge.syntactic(st, Vector.empty, tm)._1 shouldBe Some(GateFailure("escape", "keyword trustMe"))
     val inComment = gold + "-- we could postulate this, but {- postulate -} we do not\n"
     firstGate(inComment) shouldBe None
   }
 
   test("naming the original qualified is restated: directly, through a module alias, or via an import list") {
     val direct = header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = Data.Nat.Properties.+-comm m n\n"
-    Judge.syntactic(st, direct) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector("qualified Data.Nat.Properties.+-comm") }
+    Judge.syntactic(st, Vector.empty, direct) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector("qualified Data.Nat.Properties.+-comm") }
     val alias = header + "import Data.Nat.Properties as P\n\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = P.+-comm m n\n"
-    Judge.syntactic(st, alias)._3 shouldBe Vector("qualified P.+-comm")
+    Judge.syntactic(st, Vector.empty, alias)._3 shouldBe Vector("qualified P.+-comm")
     val byImport = header + "open import Data.Nat.Properties using ( +-comm ) renaming ( +-suc to ps )\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = refl\n"
-    Judge.syntactic(st, byImport)._3 shouldBe Vector("import open import Data.Nat.Properties using ( +-comm ) renaming ( +-suc to ps )")
+    Judge.syntactic(st, Vector.empty, byImport)._3 shouldBe Vector("import open import Data.Nat.Properties using ( +-comm ) renaming ( +-suc to ps )")
     val renamed = header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = c m n\n  where open import Data.Nat.Properties renaming ( +-comm to c )\n"
-    Judge.syntactic(st, renamed)._3 shouldBe Vector("import open import Data.Nat.Properties renaming ( +-comm to c )")
+    Judge.syntactic(st, Vector.empty, renamed)._3 shouldBe Vector("import open import Data.Nat.Properties renaming ( +-comm to c )")
   }
 
   test("a recursive call by the hole's own bare name is not evidence on an unprimed row") {
-    Judge.syntactic(st, gold)._3 shouldBe Vector.empty
+    Judge.syntactic(st, Vector.empty, gold)._3 shouldBe Vector.empty
   }
 
   test("on a primed agda-algebras row the bare unprimed name is evidence; the primed name is not") {
@@ -154,13 +154,24 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
         |""".stripMargin
     val s2 = Statement.of(ob, "lift∼lower′").toOption.get
     s2.signature shouldBe Vector("lift∼lower′ : (a : A)", "  →  P a")
-    Gates.originalOf("lift∼lower′") shouldBe (("lift∼lower", true))
+    val tags = Vector("stratum:wholesale", "restates:Setoid.Functions.Basic.lift∼lower")
+    Gates.originalOf("lift∼lower′", tags) shouldBe Gates.Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
+    Gates.originalOf("lift∼lower′", Vector.empty) shouldBe Gates.Original(None, "lift∼lower", true)
     val bare = ob.replace("{!!}", "lift∼lower 𝑨 a")
-    Judge.syntactic(s2, bare) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector("bare lift∼lower") }
+    Judge.syntactic(s2, tags, bare) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector("bare lift∼lower") }
     val recursive = ob.replace("{!!}", "lift∼lower′ 𝑨 a")
-    Judge.syntactic(s2, recursive)._3 shouldBe Vector.empty
+    Judge.syntactic(s2, tags, recursive)._3 shouldBe Vector.empty
     val qualified = ob.replace("{!!}", "Setoid.Functions.Basic.lift∼lower 𝑨 a")
-    Judge.syntactic(s2, qualified)._3 shouldBe Vector("qualified Setoid.Functions.Basic.lift∼lower")
+    Judge.syntactic(s2, tags, qualified)._3 shouldBe Vector("qualified Setoid.Functions.Basic.lift∼lower")
+  }
+
+  test("a restates: tag names the original even when the fixture's name is not the original primed") {
+    val ob = "module M where\nopen import AgdaDojang.Debug\nfoo′ : A\nfoo′ = {!!}\n"
+    val s4 = Statement.of(ob, "foo′").toOption.get
+    val tags = Vector("restates:Some.Where.bar")
+    Gates.originalOf("foo′", tags) shouldBe Gates.Original(Some("Some.Where.bar"), "bar", true)
+    Judge.syntactic(s4, tags, ob.replace("{!!}", "bar"))._3 shouldBe Vector("bare bar")
+    Judge.syntactic(s4, tags, ob.replace("{!!}", "foo"))._3 shouldBe Vector.empty
   }
 
   test("a haystack row's frozen imports never count as restatement evidence") {
@@ -174,7 +185,7 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
         |""".stripMargin
     val s3 = Statement.of(ob, "+-suc-diag").toOption.get
     val solved = ob.replace("{!!}", "Data.Nat.Properties.+-suc m m")
-    Judge.syntactic(s3, solved) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector.empty }
+    Judge.syntactic(s3, Vector("stratum:haystack"), solved) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector.empty }
   }
 
   test("frozen lines hidden in a block comment do not satisfy preservation (Copilot on PR #158)") {
@@ -203,12 +214,12 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
       val gd   = new String(Files.readAllBytes(root.resolve(e.goldPath)), StandardCharsets.UTF_8)
       val stmt = Statement.of(ob, e.hole).fold(msg => fail(s"${e.id}: $msg"), identity)
       withClue(s"${e.id} gold: ") {
-        val (gate, _, evidence) = Judge.syntactic(stmt, gd)
+        val (gate, _, evidence) = Judge.syntactic(stmt, e.tags, gd)
         gate shouldBe None
         evidence shouldBe Vector.empty
       }
       withClue(s"${e.id} obligation: ") {
-        Judge.syntactic(stmt, ob)._1.map(_.gate) shouldBe Some("holes")
+        Judge.syntactic(stmt, e.tags, ob)._1.map(_.gate) shouldBe Some("holes")
       }
     }
   }
