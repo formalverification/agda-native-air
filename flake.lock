@@ -22,11 +22,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1786908852,
-        "narHash": "sha256-8bMamwpnJJ8eC+SL6EKcY2t+z2OB6fqNw8ZDQNklFyU=",
+        "lastModified": 1787123927,
+        "narHash": "sha256-CExdyybxOJN9gG3E7W0GCrR7qIRrlXXWRhMVNbT1tnM=",
         "owner": "williamdemeo",
         "repo": "github-project",
-        "rev": "446b51c9c2958684a8a2de522b7116ac55955ecf",
+        "rev": "20a191ac9e89f049eff4f9461737b679a622d269",
         "type": "github"
       },
       "original": {
