@@ -27,7 +27,12 @@
   *  can only move a target UP the effective ranking) and the lane-form
   *  statement exclusion (which can only remove a row the syntactic rule
   *  missed).  The instrument reports, never decides: a target's status is
-  *  its rank, or the named reason it has none.
+  *  its rank, or the named reason it has none.  The report records the
+  *  sha256 of the corpus it loaded and, when the replayed run recorded its
+  *  own (`corpus.sha256` in the loop report), whether the two agree; a
+  *  mismatch is stated on stdout and in the report rather than refused,
+  *  since replaying a run's goals against another corpus is a legitimate
+  *  question as long as the report says so (PR #152 review, round six).
   *
   *  Ground truth
   *  ------------
@@ -305,18 +310,25 @@ object FixtureContext {
   }
 
   /** The context names at the `{!!}` hole of `hole`, from the fixture source;
-    * empty when the signature or the clause cannot be located.
+    * empty when the signature or the clause cannot be located.  The clause
+    * read is the one that carries the hole: the last clause head at or
+    * before the `{!!}` line, since a definition may have several equations
+    * and the earlier ones bind nothing at the hole (PR #152 review, round
+    * six; every fixture of the suite has exactly one clause, so no report
+    * moves).  Without a hole line, the first clause head is read alone.
     */
   def reconstruct(source: String, hole: String): Vector[String] = {
     val lines = source.linesIterator.toVector
     def lineFrom(from: Int)(p: String => Boolean): Option[Int] = lines.indices.drop(from).find(i => p(lines(i)))
+    def isHead(i: Int): Boolean = startsWithName(lines(i), hole)
     val names = for {
-      sigStart <- lineFrom(0)(l => startsWithName(l, hole) && l.trim.drop(hole.length).trim.startsWith(":"))
-      clauseIx <- lineFrom(sigStart + 1)(l => startsWithName(l, hole))
+      sigStart  <- lineFrom(0)(l => startsWithName(l, hole) && l.trim.drop(hole.length).trim.startsWith(":"))
+      firstHead <- lines.indices.drop(sigStart + 1).find(isHead) // the signature ends at the first clause
     } yield {
-      val sigBody   = lines.slice(sigStart, clauseIx).mkString(" ").split(":", 2).last
-      val holeIx    = lineFrom(clauseIx)(_.contains("{!!}")).getOrElse(clauseIx)
-      val clause    = lines.slice(clauseIx, holeIx + 1).mkString(" ")
+      val holeLine  = lineFrom(firstHead)(_.contains("{!!}"))
+      val clauseIx  = holeLine.map(h => lines.indices.slice(firstHead, h + 1).findLast(isHead).getOrElse(firstHead)).getOrElse(firstHead)
+      val sigBody   = lines.slice(sigStart, firstHead).mkString(" ").split(":", 2).last
+      val clause    = lines.slice(clauseIx, holeLine.getOrElse(clauseIx) + 1).mkString(" ")
       val afterName = clause.indexOf(hole) + hole.length
       val lhs       = clause.substring(afterName, math.max(afterName, clause.lastIndexOf('=')))
       val (rebinds, visibles) = clausePatterns(lhs)
@@ -570,6 +582,12 @@ object RetrievalRecall extends IOApp {
       s"(${untyped.mkString(", ")}); pass --allow-untyped-context on to replay them anyway, marked degraded, or use a report that carries goalContext")
   }
 
+  /** The sha256 a loop report recorded for the corpus it retrieved from
+    * (`ProofSearchLoop.corpusProvenance`), when it ran with one.
+    */
+  def reportCorpusDigest(report: Json): Option[String] =
+    report.hcursor.downField("corpus").get[String]("sha256").toOption
+
   /** What a report recorded per fixture: the root goal display, and the
     * context when the report is recent enough to carry one.
     */
@@ -675,6 +693,10 @@ object RetrievalRecall extends IOApp {
       t0       <- IO.monotonic
       loaded   <- InMemoryCorpus.load(cfg.corpus)
       (corpus, badRows, defs) = loaded
+      digest   <- Digest.sha256Hex(cfg.corpus)
+      reportDigest = reportCorpusDigest(report)
+      _        <- reportDigest.filter(_ != digest).traverse_(rd => IO.println(
+                    s"!! the corpus differs from the one the replayed run retrieved from (sha256 ${digest.take(12)}… vs ${rd.take(12)}…): the ranks below are not a replay of that run"))
       t1       <- IO.monotonic
       _        <- IO.println(s">> recall instrument: ${entries.size} obligation(s), corpus ${corpus.rows.size} rows (${badRows} unparsable, ${defs.size} definition bodies) in ${(t1 - t0).toMillis} ms; scorers ${cfg.scorers.map(_.name).mkString(",")}; exclusion ${if (cfg.excludeTarget) "on" else "off"}")
       instantiated = cfg.scorers.map(_.instantiate(defs))
@@ -688,7 +710,7 @@ object RetrievalRecall extends IOApp {
                      entries.traverse(e => evaluate(cfg, corpus, sc, e, goals(e.id), sources(e.id))).map(sc -> _)
                    }
       t2       <- IO.monotonic
-      json      = reportJson(cfg, corpus.rows.size, badRows, perScorer, skippedNoGT, skippedNoGoal, (t2 - t1).toMillis)
+      json      = reportJson(cfg, corpus.rows.size, badRows, digest, reportDigest, perScorer, skippedNoGT, skippedNoGoal, (t2 - t1).toMillis)
       _        <- IO.blocking { Option(cfg.out.getParent).foreach(Files.createDirectories(_)); Files.write(cfg.out, json.spaces2.getBytes(StandardCharsets.UTF_8)) }
       _        <- IO.println(render(cfg, perScorer, skippedNoGT, skippedNoGoal))
       _        <- IO.println(s">> wrote ${cfg.out}")
@@ -714,7 +736,7 @@ object RetrievalRecall extends IOApp {
     )
   }
 
-  private def reportJson(cfg: RecallConfig, rows: Int, badRows: Int,
+  private def reportJson(cfg: RecallConfig, rows: Int, badRows: Int, corpusSha256: String, reportCorpusSha256: Option[String],
                          perScorer: Vector[(CandidateScorer, Vector[FixtureRecall])],
                          skippedNoGT: Vector[String], skippedNoGoal: Vector[String], wallMs: Long): Json =
     Json.obj(
@@ -723,15 +745,20 @@ object RetrievalRecall extends IOApp {
       "config" -> Json.obj(
         "index"         -> cfg.index.toString.asJson,
         "corpus"        -> cfg.corpus.toString.asJson,
+        "corpusSha256"  -> corpusSha256.asJson,
         "corpusRows"    -> rows.asJson,
         "corpusUnparsable" -> badRows.asJson,
         "report"        -> cfg.report.toString.asJson,
+        // The digest the replayed run recorded, and whether this corpus is
+        // that one; absent when the run recorded none.
+        "reportCorpusSha256"  -> reportCorpusSha256.asJson,
+        "corpusMatchesReport" -> reportCorpusSha256.map(_ == corpusSha256).asJson,
         "scorers"       -> cfg.scorers.map(_.name).asJson,
         "excludeTarget" -> cfg.excludeTarget.asJson,
         "k"             -> cfg.ks.asJson,
         "queryLimit"    -> cfg.queryLimit.asJson,
         "wallMs"        -> wallMs.asJson
-      ),
+      ).dropNullValues,
       "skipped" -> Json.obj(
         "noGroundTruth"  -> skippedNoGT.asJson,
         "noRecordedGoal" -> skippedNoGoal.asJson

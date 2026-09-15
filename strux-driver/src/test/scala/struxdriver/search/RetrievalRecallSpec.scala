@@ -248,6 +248,12 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
       bad shouldBe 0
       loaded.byName("other-name", 10).unsafeRunSync().map(_.prettyQname) shouldBe Vector("Setoid.X.lemma")
       loaded.prettyNameOf(loaded.rows.head) shouldBe "other-name"
+      // The server skips only the EMPTY line; a whitespace-only line reaches
+      // its parser and counts as a dropped line, so it does here (round six).
+      Files.write(tmp, (rowJson.noSpaces + "\n\n   \n" + rowJson.noSpaces + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8))
+      val (loaded2, bad2, _) = InMemoryCorpus.load(tmp).unsafeRunSync()
+      bad2 shouldBe 1
+      loaded2.rows.size shouldBe 1 // the duplicate row: last wins
     } finally Files.delete(tmp)
   }
 
@@ -308,6 +314,25 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     // A name that merely prefixes the hole's name is not the hole.
     val src4 = "πhom : Level → Set\nπhom = {!!}\nπ : {I : Set} → I → I\nπ i = {!!}\n"
     FixtureContext.reconstruct(src4, "π") shouldBe Vector("I", "i")
+  }
+
+  test("context: the clause read is the one that carries the hole, not the first equation (#152 review, round six)") {
+    val src =
+      """f : (n : ℕ) → P n
+        |f zero = base
+        |f n = {!!}
+        |""".stripMargin
+    FixtureContext.reconstruct(src, "f") shouldBe Vector("n")
+    // A clause spread over several lines is read whole, and a clause after
+    // the hole's is not read at all.
+    val src2 =
+      """g : (x y : ℕ) → Q x y
+        |g zero y = base
+        |g x
+        |  y = {!!}
+        |g _ _ = other
+        |""".stripMargin
+    FixtureContext.reconstruct(src2, "g") shouldBe Vector("x", "y")
   }
 
   test("context: a parenthesised type is one anonymous premise, and a wildcard pattern binds nothing") {
@@ -399,6 +424,17 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     j.hcursor.downField("recallAt").get[Double]("8") shouldBe Right(0.5)
     j.hcursor.downField("recallReachableAt").get[Double]("8") shouldBe Right(1.0)
     RecallSummary.of(Vector.empty, ks).mrr shouldBe 0.0
+  }
+
+  test("corpus digest: the report pins the corpus by content, and reads the replayed run's own digest (#152 review, round six)") {
+    val tmp = Files.createTempFile("digest", ".jsonl")
+    try {
+      Files.write(tmp, "abc".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+      Digest.sha256Hex(tmp).unsafeRunSync() shouldBe "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    } finally Files.delete(tmp)
+    val withDigest = io.circe.parser.parse("""{"corpus":{"path":"c.jsonl","sha256":"deadbeef"},"outcomes":[]}""").toOption.get
+    RetrievalRecall.reportCorpusDigest(withDigest) shouldBe Some("deadbeef")
+    RetrievalRecall.reportCorpusDigest(io.circe.Json.obj("outcomes" -> io.circe.Json.arr())) shouldBe None
   }
 
   test("recordedGoals: goals and contexts come from the outcomes; anomalies are skipped") {

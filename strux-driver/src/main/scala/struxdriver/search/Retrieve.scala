@@ -668,14 +668,18 @@ object DefinitionTable {
       .map(new DefinitionTable(_))
 }
 
-/** A JSONL file as a stream, one parse attempt per non-blank line in file
+/** A JSONL file as a stream, one parse attempt per non-empty line in file
   * order: `Right` the row, `Left` the parsing failure, so a loader can count
-  * what the server would have dropped instead of stopping at it.
+  * what the server would have dropped instead of stopping at it.  Only the
+  * empty line is skipped, as the server's `loadCorpus` skips only that
+  * (`filter (not . null) . lines`): a whitespace-only line reaches the
+  * parser and fails there, and is counted, on both sides (PR #152 review,
+  * round six).  Neither published corpus has an empty or a blank line.
   */
 object Jsonl {
   def parsed(path: java.nio.file.Path): fs2.Stream[IO, Either[io.circe.ParsingFailure, io.circe.Json]] =
     fs2.io.file.Files[IO].readUtf8Lines(fs2.io.file.Path.fromNioPath(path))
-      .filter(_.trim.nonEmpty)
+      .filter(_.nonEmpty)
       .map(io.circe.parser.parse)
 }
 

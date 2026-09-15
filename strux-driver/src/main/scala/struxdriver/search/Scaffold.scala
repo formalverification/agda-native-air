@@ -140,3 +140,17 @@ object Scaffold {
   def pct(part: Double, whole: Double): BigDecimal =
     if (whole <= 0) BigDecimal(0) else BigDecimal(part / whole * 100).setScale(2, BigDecimal.RoundingMode.HALF_UP)
 }
+
+/** Content digests for the provenance blocks: the loop report pins the corpus
+  * it retrieved from (`ProofSearchLoop.corpusProvenance`) and the recall
+  * report pins the corpus it replayed against, so a measurement names its
+  * corpus by content, not by path.
+  */
+object Digest {
+  /** The SHA-256 of a file's bytes, as lowercase hex, streamed. */
+  def sha256Hex(path: Path): IO[String] =
+    fs2.io.file.Files[IO].readAll(fs2.io.file.Path.fromNioPath(path))
+      .through(fs2.hash.sha256)
+      .compile.toVector
+      .map(_.map(b => f"$b%02x").mkString)
+}

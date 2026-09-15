@@ -577,10 +577,7 @@ object ProofSearchLoop extends IOApp {
     */
   private def corpusProvenance(corpus: Path): IO[Json] =
     for {
-      digest <- fs2.io.file.Files[IO].readAll(fs2.io.file.Path.fromNioPath(corpus))
-                  .through(fs2.hash.sha256)
-                  .compile.toVector
-                  .map(_.map(b => f"$b%02x").mkString)
+      digest <- Digest.sha256Hex(corpus)
       prov   <- provenanceSibling(corpus.resolveSibling("provenance.json"))
     } yield Json.obj(
       "path"       -> corpus.toString.asJson,
