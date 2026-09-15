@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-distrib-l",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-distribˡ-+",
+  "goal" : "∀ (m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 2,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 32717,
+  "costUsd" : 0.119309,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1246,
+    "cacheRead" : 78758,
+    "cacheCreation" : 4760
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3010,
+  "agdaTail" : "Checking Nat-mul-distribL (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-mul-distrib-l/final/Nat-mul-distribL.agda).",
+  "finalPath" : "subjects/stdlib-nat-mul-distrib-l/final/Nat-mul-distribL.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-distrib-l/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `trans (*-comm m (n + p)) (trans (*-distribʳ-+ m n p) (cong₂ _+_ (*-comm n m) (*-comm p m)))` plus an added `open import Relation.Binary.PropositionalEquality using ( trans )`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.77,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

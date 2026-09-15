@@ -1,0 +1,63 @@
+{
+  "benchmarkId" : "algebras-functions-lift-lower",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "universe-polymorphic"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "lift∼lower′",
+  "goal" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ) (a : Lift β (Setoid.Carrier 𝑨)) →  Setoid._≈_ (𝑙𝑖𝑓𝑡 {𝑨 = 𝑨} β) (lift (lower a)) a",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 29662,
+  "costUsd" : 0.16256400000000001,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1088,
+    "cacheRead" : 103742,
+    "cacheCreation" : 8229
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3669,
+  "agdaTail" : "Checking Functions-lift-lower (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-functions-lift-lower/final/Functions-lift-lower.agda).",
+  "finalPath" : "subjects/algebras-functions-lift-lower/final/Functions-lift-lower.agda",
+  "transcriptPath" : "subjects/algebras-functions-lift-lower/transcript.jsonl",
+  "lastWords" : "The hole is filled with `Setoid.refl 𝑨`, and check_file reports success (exit code 0, no diagnostics, no remaining holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.8,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

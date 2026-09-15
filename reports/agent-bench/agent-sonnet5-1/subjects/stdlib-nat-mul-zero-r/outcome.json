@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-zero-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-zeroʳ",
+  "goal" : "∀ (n : ℕ) → n * 0 ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 24245,
+  "costUsd" : 0.04557220000000001,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1262,
+    "cacheRead" : 64566,
+    "cacheCreation" : 4722
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3483,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-nat-mul-zero-r/final/Nat-mul-zeroR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-zero-r/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the module now type-checks with the hole filled by induction on n.",
+  "rateLimit" : {
+    "maxUtilization" : 0.33,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

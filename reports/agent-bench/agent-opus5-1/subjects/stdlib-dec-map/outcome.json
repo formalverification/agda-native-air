@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-dec-map",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "map′",
+  "goal" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 21686,
+  "costUsd" : 0.092194,
+  "tokens" : {
+    "input" : 8,
+    "output" : 839,
+    "cacheRead" : 61208,
+    "cacheCreation" : 3945
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3601,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
+  "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where `map′` is defined by case split: `yes a ↦ yes (A→B a)` and `no na ↦ no (λ b → na (B→A b))`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.55,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

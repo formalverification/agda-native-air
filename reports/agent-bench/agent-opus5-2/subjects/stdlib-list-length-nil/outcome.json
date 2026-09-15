@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-list-length-nil",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "length-[]",
+  "goal" : "{A : Set} → length {A = A} [] ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19768,
+  "costUsd" : 0.0824235,
+  "tokens" : {
+    "input" : 8,
+    "output" : 550,
+    "cacheRead" : 60967,
+    "cacheCreation" : 3704
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3796,
+  "agdaTail" : "Checking List-length-nil (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-list-length-nil/final/List-length-nil.agda).",
+  "finalPath" : "subjects/stdlib-list-length-nil/final/List-length-nil.agda",
+  "transcriptPath" : "subjects/stdlib-list-length-nil/transcript.jsonl",
+  "lastWords" : "I filled the hole with `refl`, and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.7,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

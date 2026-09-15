@@ -1,0 +1,64 @@
+{
+  "benchmarkId" : "algebras-homs-mon-to-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "mon→hom′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → hom 𝑨 𝑩",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__normalize" : 1,
+    "mcp__agda__exports_of" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 44129,
+  "costUsd" : 0.2424725,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1845,
+    "cacheRead" : 137073,
+    "cacheCreation" : 12658
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5240,
+  "agdaTail" : "Checking Homs-mon-to-hom (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/cost-opus-1/subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda).",
+  "finalPath" : "subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-mon-to-hom/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `IsMon.HomReduct (proj₂ m)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.3,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

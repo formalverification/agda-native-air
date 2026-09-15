@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-suc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-suc",
+  "goal" : "∀ (m n : ℕ) → m + suc n ≡ suc (m + n)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19038,
+  "costUsd" : 0.085213,
+  "tokens" : {
+    "input" : 8,
+    "output" : 627,
+    "cacheRead" : 61030,
+    "cacheCreation" : 3786
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3054,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with `+-suc` proved by induction on `m`: `+-suc zero n = refl` and `+-suc (suc m) n = cong suc (+-suc m n)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.52,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-suc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-suc",
+  "goal" : "∀ (m n : ℕ) → m + suc n ≡ suc (m + n)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 22850,
+  "costUsd" : 0.038195,
+  "tokens" : {
+    "input" : 8,
+    "output" : 756,
+    "cacheRead" : 63910,
+    "cacheCreation" : 4172
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2945,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file type-checks correctly.",
+  "rateLimit" : {
+    "maxUtilization" : 0.34,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

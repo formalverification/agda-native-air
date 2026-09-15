@@ -1,0 +1,64 @@
+{
+  "benchmarkId" : "algebras-kernels-ker-in-con",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "ker-in-con′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ} {x y : Setoid.Carrier 𝔻[ 𝑨 ]} →  proj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 2,
+    "mcp__agda__get_dependencies" : 2,
+    "mcp__agda__search_by_name" : 2,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 34975,
+  "costUsd" : 0.1003396,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1526,
+    "cacheRead" : 141873,
+    "cacheCreation" : 13880
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5965,
+  "agdaTail" : "",
+  "finalPath" : "subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda",
+  "transcriptPath" : "subjects/algebras-kernels-ker-in-con/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file with the hole filled by `id`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.47,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

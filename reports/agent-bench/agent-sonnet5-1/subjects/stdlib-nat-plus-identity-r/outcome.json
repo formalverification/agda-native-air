@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-identity-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-identityʳ",
+  "goal" : "∀ (n : ℕ) → n + 0 ≡ n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 21674,
+  "costUsd" : 0.0370646,
+  "tokens" : {
+    "input" : 8,
+    "output" : 668,
+    "cacheRead" : 63933,
+    "cacheCreation" : 4112
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2960,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.33,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

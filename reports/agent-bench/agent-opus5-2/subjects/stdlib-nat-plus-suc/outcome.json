@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-suc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-suc",
+  "goal" : "∀ (m n : ℕ) → m + suc n ≡ suc (m + n)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 18965,
+  "costUsd" : 0.08380649999999999,
+  "tokens" : {
+    "input" : 8,
+    "output" : 571,
+    "cacheRead" : 61037,
+    "cacheCreation" : 3785
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3174,
+  "agdaTail" : "Checking Nat-plus-suc (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda).",
+  "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.72,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-comm",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-comm",
+  "goal" : "∀ (m n : ℕ) → m + n ≡ n + m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 21862,
+  "costUsd" : 0.094139,
+  "tokens" : {
+    "input" : 8,
+    "output" : 819,
+    "cacheRead" : 61578,
+    "cacheCreation" : 4172
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3245,
+  "agdaTail" : "Checking Nat-plus-comm (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda).",
+  "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

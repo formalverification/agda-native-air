@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-list-map-id",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "map-id",
+  "goal" : "∀ {A : Set} (xs : List A) → map id xs ≡ xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 20727,
+  "costUsd" : 0.084064,
+  "tokens" : {
+    "input" : 8,
+    "output" : 606,
+    "cacheRead" : 60988,
+    "cacheCreation" : 3727
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3143,
+  "agdaTail" : "Checking List-map-id (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-list-map-id/final/List-map-id.agda).",
+  "finalPath" : "subjects/stdlib-list-map-id/final/List-map-id.agda",
+  "transcriptPath" : "subjects/stdlib-list-map-id/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (exit code 0, no diagnostics, no holes), with `map-id` proven by induction: `map-id [] = refl` and `map-id (x ∷ xs) = cong (x ∷_) (map-id xs)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

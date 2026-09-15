@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-identity-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-identityʳ",
+  "goal" : "∀ (n : ℕ) → n * 1 ≡ n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 25217,
+  "costUsd" : 0.09458000000000001,
+  "tokens" : {
+    "input" : 8,
+    "output" : 878,
+    "cacheRead" : 61332,
+    "cacheCreation" : 4079
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3203,
+  "agdaTail" : "Checking Nat-mul-identityR (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda).",
+  "finalPath" : "subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-identity-r/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `*-identityʳ` by induction: `zero = refl` and `suc n = cong suc (*-identityʳ n)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

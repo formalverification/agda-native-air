@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-list-append-assoc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "++-assoc",
+  "goal" : "∀ {A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ (ys ++ zs)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 21045,
+  "costUsd" : 0.086243,
+  "tokens" : {
+    "input" : 8,
+    "output" : 658,
+    "cacheRead" : 61090,
+    "cacheCreation" : 3809
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3828,
+  "agdaTail" : "Checking List-append-assoc (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-list-append-assoc/final/List-append-assoc.agda).",
+  "finalPath" : "subjects/stdlib-list-append-assoc/final/List-append-assoc.agda",
+  "transcriptPath" : "subjects/stdlib-list-append-assoc/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (0 errors, 0 holes), with the hole replaced by induction on `xs`: `++-assoc [] ys zs = refl` and `++-assoc (x ∷ xs) ys zs = cong (x ∷_) (++-assoc xs ys zs)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

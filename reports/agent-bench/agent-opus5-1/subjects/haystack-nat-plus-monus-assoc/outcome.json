@@ -1,0 +1,61 @@
+{
+  "benchmarkId" : "haystack-nat-plus-monus-assoc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-∸-assoc-diag",
+  "goal" : "∀ {m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 26436,
+  "costUsd" : 0.1278055,
+  "tokens" : {
+    "input" : 10,
+    "output" : 911,
+    "cacheRead" : 81979,
+    "cacheCreation" : 6284
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3086,
+  "agdaTail" : "",
+  "finalPath" : "subjects/haystack-nat-plus-monus-assoc/final/Nat-plus-monus-assoc.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-monus-assoc/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Nat.Properties.+-∸-assoc n le`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.67,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

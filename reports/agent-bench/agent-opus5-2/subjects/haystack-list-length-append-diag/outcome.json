@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "haystack-list-length-append-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "length-++-diag",
+  "goal" : "∀ {A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 21205,
+  "costUsd" : 0.08603250000000001,
+  "tokens" : {
+    "input" : 8,
+    "output" : 563,
+    "cacheRead" : 61505,
+    "cacheCreation" : 4003
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2658,
+  "agdaTail" : "Checking List-length-append-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda).",
+  "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
+  "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.List.Properties.length-++ xs`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.94,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

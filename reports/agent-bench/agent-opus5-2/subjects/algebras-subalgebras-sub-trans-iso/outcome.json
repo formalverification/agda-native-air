@@ -1,0 +1,68 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sub-trans-iso",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "≤-trans-≅′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 17,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__search_by_name" : 3,
+    "mcp__agda__get_dependencies" : 1,
+    "mcp__agda__resolve_name" : 1,
+    "mcp__agda__type_of" : 5,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 16,
+  "wallMs" : 84680,
+  "costUsd" : 0.6953035,
+  "tokens" : {
+    "input" : 22,
+    "output" : 4728,
+    "cacheRead" : 361363,
+    "cacheCreation" : 39510
+  },
+  "permissionDenials" : 1,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+      "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md"
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5330,
+  "agdaTail" : "Checking Subalgebras-sub-trans-iso (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda).",
+  "finalPath" : "subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sub-trans-iso/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `⊙-hom (proj₁ p) (_≅_.to B≅C) , ⊙-injective (proj₁ (proj₁ p)) (proj₁ (_≅_.to B≅C)) (proj₂ p) (≅toInjective B≅C)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.92,
+    "statuses" : [
+      "allowed",
+      "allowed_warning"
+    ]
+  }
+}

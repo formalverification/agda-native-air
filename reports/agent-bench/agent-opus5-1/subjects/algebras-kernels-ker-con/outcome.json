@@ -1,0 +1,63 @@
+{
+  "benchmarkId" : "algebras-kernels-ker-con",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "kercon′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) →  Con 𝑨 ρᵇ",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__type_of" : 4,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 67336,
+  "costUsd" : 0.35134150000000003,
+  "tokens" : {
+    "input" : 14,
+    "output" : 3867,
+    "cacheRead" : 151475,
+    "cacheCreation" : 17770
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5652,
+  "agdaTail" : "",
+  "finalPath" : "subjects/algebras-kernels-ker-con/final/Kernels-ker-con.agda",
+  "transcriptPath" : "subjects/algebras-kernels-ker-con/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `kerRel _≈_ ∣h∣ , mkcon (Func.cong (proj₁ h)) (kerRelOfEquiv isEquivalence ∣h∣) (HomKerComp h)` plus a `where` block opening `Setoid 𝔻[ 𝑩 ]`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.66,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

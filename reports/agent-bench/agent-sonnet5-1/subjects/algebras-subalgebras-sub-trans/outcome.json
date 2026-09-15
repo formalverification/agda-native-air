@@ -1,0 +1,67 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sub-trans",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "≤-trans′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 14,
+  "toolCalls" : {
+    "Read" : 4,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__definition_of" : 3,
+    "mcp__agda__type_of" : 2,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 13,
+  "wallMs" : 56335,
+  "costUsd" : 0.17224620000000002,
+  "tokens" : {
+    "input" : 16,
+    "output" : 4294,
+    "cacheRead" : 198491,
+    "cacheCreation" : 22100
+  },
+  "permissionDenials" : 3,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+      "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Basic.lagda.md",
+      "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Properties.lagda.md",
+      "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md"
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5880,
+  "agdaTail" : "",
+  "finalPath" : "subjects/algebras-subalgebras-sub-trans/final/Subalgebras-sub-trans.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sub-trans/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.45,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

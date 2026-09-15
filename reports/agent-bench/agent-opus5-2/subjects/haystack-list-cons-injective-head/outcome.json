@@ -1,0 +1,61 @@
+{
+  "benchmarkId" : "haystack-list-cons-injective-head",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "∷-injective-head",
+  "goal" : "∀ {A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 31375,
+  "costUsd" : 0.129736,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1000,
+    "cacheRead" : 81900,
+    "cacheCreation" : 6260
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2869,
+  "agdaTail" : "Checking List-cons-injective-head (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda).",
+  "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
+  "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.List.Properties.∷-injectiveˡ eq`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.94,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

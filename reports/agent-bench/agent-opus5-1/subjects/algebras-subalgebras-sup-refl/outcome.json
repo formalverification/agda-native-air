@@ -1,0 +1,62 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sup-refl",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "≥-refl′",
+  "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra {𝑆 = 𝑆} α ρᵃ} →  𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__type_of" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 39401,
+  "costUsd" : 0.1742585,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1257,
+    "cacheRead" : 105641,
+    "cacheCreation" : 8875
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5876,
+  "agdaTail" : "",
+  "finalPath" : "subjects/algebras-subalgebras-sup-refl/final/Subalgebras-sup-refl.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sup-refl/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled as `≥-refl′ = ≅→≤ ∘ ≅-sym`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.6,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

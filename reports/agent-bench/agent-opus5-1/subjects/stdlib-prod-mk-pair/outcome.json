@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-prod-mk-pair",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "mk-pair",
+  "goal" : "{A B : Set} → A → B → A × B",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19056,
+  "costUsd" : 0.084656,
+  "tokens" : {
+    "input" : 8,
+    "output" : 624,
+    "cacheRead" : 60920,
+    "cacheCreation" : 3744
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3421,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
+  "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
+  "lastWords" : "The hole is filled with `a , b`, and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.49,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

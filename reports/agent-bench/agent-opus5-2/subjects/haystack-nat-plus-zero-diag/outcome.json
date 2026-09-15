@@ -1,0 +1,61 @@
+{
+  "benchmarkId" : "haystack-nat-plus-zero-diag",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-zero-diag",
+  "goal" : "∀ (m : ℕ) → m + m ≡ 0 → m ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 3,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 38937,
+  "costUsd" : 0.196193,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1548,
+    "cacheRead" : 124026,
+    "cacheCreation" : 9427
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2904,
+  "agdaTail" : "Checking Nat-plus-zero-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda).",
+  "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `Data.Nat.Properties.m+n≡0⇒m≡0 m eq`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.93,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

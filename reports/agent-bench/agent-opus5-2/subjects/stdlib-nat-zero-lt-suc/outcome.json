@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-nat-zero-lt-suc",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "0<1+n",
+  "goal" : "∀ {n : ℕ} → 0 < suc n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 26392,
+  "costUsd" : 0.120243,
+  "tokens" : {
+    "input" : 10,
+    "output" : 802,
+    "cacheRead" : 80808,
+    "cacheCreation" : 5860
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3181,
+  "agdaTail" : "Checking Nat-zero-lt-suc (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda).",
+  "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `s≤s z≤n`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.72,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

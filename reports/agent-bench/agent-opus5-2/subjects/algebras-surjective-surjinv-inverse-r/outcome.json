@@ -1,0 +1,62 @@
+{
+  "benchmarkId" : "algebras-surjective-surjinv-inverse-r",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "SurjInvIsInverseʳ′",
+  "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} (f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →  Setoid._≈_ 𝑩 (Func.to f (SurjInv f fE b)) b",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__type_of" : 2,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 34717,
+  "costUsd" : 0.1943205,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1382,
+    "cacheRead" : 109919,
+    "cacheCreation" : 10356
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3590,
+  "agdaTail" : "Checking Surjective-surjinv-inverse-r (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-surjective-surjinv-inverse-r/final/Surjective-surjinv-inverse-r.agda).",
+  "finalPath" : "subjects/algebras-surjective-surjinv-inverse-r/final/Surjective-surjinv-inverse-r.agda",
+  "transcriptPath" : "subjects/algebras-surjective-surjinv-inverse-r/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `InvIsInverseʳ fE`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.81,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-identity-l",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-identityˡ",
+  "goal" : "∀ (n : ℕ) → 0 + n ≡ n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19929,
+  "costUsd" : 0.084047,
+  "tokens" : {
+    "input" : 8,
+    "output" : 570,
+    "cacheRead" : 61078,
+    "cacheCreation" : 3807
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3235,
+  "agdaTail" : "Checking Nat-plus-identityL (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-plus-identity-l/final/Nat-plus-identityL.agda).",
+  "finalPath" : "subjects/stdlib-nat-plus-identity-l/final/Nat-plus-identityL.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-identity-l/transcript.jsonl",
+  "lastWords" : "The hole is filled with `refl` and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.72,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

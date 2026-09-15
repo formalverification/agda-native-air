@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-maybe-map-nothing",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "map-nothing",
+  "goal" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 34032,
+  "costUsd" : 0.1383845,
+  "tokens" : {
+    "input" : 12,
+    "output" : 993,
+    "cacheRead" : 98019,
+    "cacheCreation" : 6338
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3713,
+  "agdaTail" : "Checking Maybe-map-nothing (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-maybe-map-nothing/final/Maybe-map-nothing.agda).",
+  "finalPath" : "subjects/stdlib-maybe-map-nothing/final/Maybe-map-nothing.agda",
+  "transcriptPath" : "subjects/stdlib-maybe-map-nothing/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `refl`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

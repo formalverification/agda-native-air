@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-unit-trivial",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "trivial",
+  "goal" : "⊤",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 17704,
+  "costUsd" : 0.080914,
+  "tokens" : {
+    "input" : 8,
+    "output" : 528,
+    "cacheRead" : 60774,
+    "cacheCreation" : 3616
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3202,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
+  "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (`trivial = tt`, no holes, exit code 0).",
+  "rateLimit" : {
+    "maxUtilization" : 0.49,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

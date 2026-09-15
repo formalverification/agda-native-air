@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "haystack-nat-mul-mono-sq",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "*-mono-sq",
+  "goal" : "∀ {m n : ℕ} → m ≤ n → m * m ≤ n * n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19760,
+  "costUsd" : 0.0874305,
+  "tokens" : {
+    "input" : 8,
+    "output" : 596,
+    "cacheRead" : 61555,
+    "cacheCreation" : 4058
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2997,
+  "agdaTail" : "",
+  "finalPath" : "subjects/haystack-nat-mul-mono-sq/final/Nat-mul-mono-sq.agda",
+  "transcriptPath" : "subjects/haystack-nat-mul-mono-sq/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Nat.Properties.*-mono-≤ le le`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.67,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

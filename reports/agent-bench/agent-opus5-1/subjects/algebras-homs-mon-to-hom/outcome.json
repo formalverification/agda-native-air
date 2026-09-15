@@ -1,0 +1,64 @@
+{
+  "benchmarkId" : "algebras-homs-mon-to-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "mon→hom′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → hom 𝑨 𝑩",
+  "solved" : false,
+  "restated" : true,
+  "restatementEvidence" : [
+    "bare mon→hom"
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__search_by_name" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 40915,
+  "costUsd" : 0.19988399999999998,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1505,
+    "cacheRead" : 110644,
+    "cacheCreation" : 10571
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5849,
+  "agdaTail" : "",
+  "finalPath" : "subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-mon-to-hom/transcript.jsonl",
+  "lastWords" : "The hole is filled with `mon→hom _ _ m` (applying the library's `Setoid.Homomorphisms.Basic.mon→hom` with inferred algebra arguments), and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.59,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

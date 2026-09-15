@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-bool-not-involutive",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "not-involutive",
+  "goal" : "∀ (b : Bool) → not (not b) ≡ b",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 20840,
+  "costUsd" : 0.0369958,
+  "tokens" : {
+    "input" : 8,
+    "output" : 680,
+    "cacheRead" : 63784,
+    "cacheCreation" : 4074
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2969,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-bool-not-involutive/final/Bool-not-involutive.agda",
+  "transcriptPath" : "subjects/stdlib-bool-not-involutive/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.36,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

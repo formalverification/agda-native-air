@@ -1,0 +1,62 @@
+{
+  "benchmarkId" : "algebras-overture-proj-op",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "π",
+  "goal" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__normalize" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 31631,
+  "costUsd" : 0.157418,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1030,
+    "cacheRead" : 102772,
+    "cacheCreation" : 7908
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3250,
+  "agdaTail" : "Checking Overture-proj-op (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-overture-proj-op/final/Overture-proj-op.agda).",
+  "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
+  "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
+  "lastWords" : "The hole is filled with `λ a → a i` (since `Op I A = (I → A) → A`, the projection applies the tuple to `i`), and check_file reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.79,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

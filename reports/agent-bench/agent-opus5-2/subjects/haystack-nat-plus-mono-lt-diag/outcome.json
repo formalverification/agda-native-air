@@ -1,0 +1,61 @@
+{
+  "benchmarkId" : "haystack-nat-plus-mono-lt-diag",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-mono-<-diag",
+  "goal" : "∀ {m n : ℕ} → m < n → m + m < n + n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 29959,
+  "costUsd" : 0.14878149999999998,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1158,
+    "cacheRead" : 99641,
+    "cacheCreation" : 6880
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2965,
+  "agdaTail" : "Checking Nat-plus-mono-lt-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-nat-plus-mono-lt-diag/final/Nat-plus-mono-lt-diag.agda).",
+  "finalPath" : "subjects/haystack-nat-plus-mono-lt-diag/final/Nat-plus-mono-lt-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-mono-lt-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `Data.Nat.Properties.+-mono-< lt lt`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.94,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

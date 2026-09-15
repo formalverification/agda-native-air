@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "haystack-list-cons-injective-head",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "∷-injective-head",
+  "goal" : "∀ {A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 20174,
+  "costUsd" : 0.0868495,
+  "tokens" : {
+    "input" : 8,
+    "output" : 583,
+    "cacheRead" : 61547,
+    "cacheCreation" : 4033
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3113,
+  "agdaTail" : "",
+  "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
+  "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.List.Properties.∷-injectiveˡ eq`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.68,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

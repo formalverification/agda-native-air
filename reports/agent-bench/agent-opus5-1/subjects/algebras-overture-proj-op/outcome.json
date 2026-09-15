@@ -1,0 +1,61 @@
+{
+  "benchmarkId" : "algebras-overture-proj-op",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "π",
+  "goal" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 23527,
+  "costUsd" : 0.118128,
+  "tokens" : {
+    "input" : 10,
+    "output" : 787,
+    "cacheRead" : 80522,
+    "cacheCreation" : 5700
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3204,
+  "agdaTail" : "",
+  "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
+  "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled as `π i = λ x → x i`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.56,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

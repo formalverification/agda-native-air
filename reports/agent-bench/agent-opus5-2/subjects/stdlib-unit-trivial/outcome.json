@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-unit-trivial",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "trivial",
+  "goal" : "⊤",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19296,
+  "costUsd" : 0.081039,
+  "tokens" : {
+    "input" : 8,
+    "output" : 533,
+    "cacheRead" : 60774,
+    "cacheCreation" : 3616
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3098,
+  "agdaTail" : "Checking Unit-trivial (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-unit-trivial/final/Unit-trivial.agda).",
+  "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
+  "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (`trivial = tt`), with no diagnostics and no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.7,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

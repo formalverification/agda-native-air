@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "haystack-list-length-append-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "length-++-diag",
+  "goal" : "∀ {A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 20094,
+  "costUsd" : 0.0859825,
+  "tokens" : {
+    "input" : 8,
+    "output" : 561,
+    "cacheRead" : 61505,
+    "cacheCreation" : 4003
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2617,
+  "agdaTail" : "",
+  "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
+  "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (hole filled with `Data.List.Properties.length-++ xs`).",
+  "rateLimit" : {
+    "maxUtilization" : 0.68,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

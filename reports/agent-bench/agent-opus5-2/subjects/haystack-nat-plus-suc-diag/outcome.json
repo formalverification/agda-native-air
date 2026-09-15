@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "haystack-nat-plus-suc-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-suc-diag",
+  "goal" : "∀ (m : ℕ) → m + suc m ≡ suc (m + m)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19013,
+  "costUsd" : 0.08802099999999999,
+  "tokens" : {
+    "input" : 8,
+    "output" : 617,
+    "cacheRead" : 61556,
+    "cacheCreation" : 4063
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3391,
+  "agdaTail" : "Checking Nat-plus-suc-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda).",
+  "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `Data.Nat.Properties.+-suc m m`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.92,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

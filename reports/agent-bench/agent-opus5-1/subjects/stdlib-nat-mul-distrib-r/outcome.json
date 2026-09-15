@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-distrib-r",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-distribʳ-+",
+  "goal" : "∀ (m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 26104,
+  "costUsd" : 0.109255,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1250,
+    "cacheRead" : 61970,
+    "cacheCreation" : 4585
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3139,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-nat-mul-distrib-r/final/Nat-mul-distribR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-distrib-r/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `*-distribʳ-+` by induction on `n` using `cong`, `sym`, `trans`, and `+-assoc`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.54,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

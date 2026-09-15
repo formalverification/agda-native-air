@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-list-length-append",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "length-++",
+  "goal" : "∀ {A : Set} (xs ys : List A) → length (xs ++ ys) ≡ length xs + length ys",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 17148,
+  "costUsd" : 0.0355486,
+  "tokens" : {
+    "input" : 8,
+    "output" : 573,
+    "cacheRead" : 63838,
+    "cacheCreation" : 3981
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3481,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-list-length-append/final/List-length-append.agda",
+  "transcriptPath" : "subjects/stdlib-list-length-append/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.34,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

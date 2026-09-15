@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "haystack-bool-and-distrib-diag",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "∧-distrib-diag",
+  "goal" : "∀ (a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19809,
+  "costUsd" : 0.0887095,
+  "tokens" : {
+    "input" : 8,
+    "output" : 612,
+    "cacheRead" : 61691,
+    "cacheCreation" : 4138
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2955,
+  "agdaTail" : "Checking Bool-and-distrib-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda).",
+  "finalPath" : "subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda",
+  "transcriptPath" : "subjects/haystack-bool-and-distrib-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Bool.Properties.∧-distribˡ-∨ a a b`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.95,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

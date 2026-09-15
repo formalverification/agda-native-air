@@ -1,0 +1,64 @@
+{
+  "benchmarkId" : "algebras-injective-comp-injective",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "⊙-injective′",
+  "goal" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →  IsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__definition_of" : 1,
+    "mcp__agda__type_of" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 35895,
+  "costUsd" : 0.216092,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1672,
+    "cacheRead" : 131144,
+    "cacheCreation" : 10750
+  },
+  "permissionDenials" : 1,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+      "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md"
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3706,
+  "agdaTail" : "Checking Injective-comp-injective (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda).",
+  "finalPath" : "subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda",
+  "transcriptPath" : "subjects/algebras-injective-comp-injective/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `λ x → finj (ginj x)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.82,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

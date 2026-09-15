@@ -1,0 +1,59 @@
+{
+  "benchmarkId" : "stdlib-list-map-compose",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "map-compose",
+  "goal" : "∀ {A B C : Set} (f : B → C) (g : A → B) (xs : List A) → map (f ∘ g) xs ≡ map f (map g xs)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 21028,
+  "costUsd" : 0.0852495,
+  "tokens" : {
+    "input" : 8,
+    "output" : 620,
+    "cacheRead" : 61119,
+    "cacheCreation" : 3804
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3305,
+  "agdaTail" : "",
+  "finalPath" : "subjects/stdlib-list-map-compose/final/List-map-compose.agda",
+  "transcriptPath" : "subjects/stdlib-list-map-compose/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `map-compose` by induction on `xs` with `refl` in the base case and `cong (f (g x) ∷_)` in the step.",
+  "rateLimit" : {
+    "maxUtilization" : 0.54,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-comm",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-comm",
+  "goal" : "∀ (m n : ℕ) → m + n ≡ n + m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 37555,
+  "costUsd" : 0.10176779999999999,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1245,
+    "cacheRead" : 49994,
+    "cacheCreation" : 19547
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 2621,
+  "agdaTail" : "Checking Nat-plus-comm (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/cost-sonnet-1/subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda).",
+  "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks correctly.",
+  "rateLimit" : {
+    "maxUtilization" : 0.0,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
