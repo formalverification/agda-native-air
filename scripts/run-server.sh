@@ -52,6 +52,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The same path, shell-escaped, for the commands the diagnostics ask the
+# operator to paste: a checkout path with a space must survive the paste.
+REPO_ROOT_Q="$(printf %q "${REPO_ROOT}")"
 
 # Anchor the shellHook to this repository, whatever the client's cwd was.
 export AGDA_NATIVE_AIR_ROOT="${REPO_ROOT}"
@@ -62,6 +65,25 @@ cd "${REPO_ROOT}"
 # wrapper (NIX_CLEAN_ENV) does: LD_LIBRARY_PATH on Linux, DYLD_LIBRARY_PATH on
 # Darwin, which the flake also declares as a system.
 unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
+
+# Say the most likely cause of a failed launch FIRST.  The MCP client keeps
+# only the stderr that arrives before the connection closes, and the
+# authoritative check below runs after the shell entry, which takes seconds;
+# in the field the client's log ended at the shellHook's first bytes and the
+# real message never showed.  This is a heuristic (a glob where the check
+# below asks cabal), so it warns and continues rather than deciding.
+if [ -z "${AGDA_MCP_BIN:-}" ]; then
+  prebuilt=""
+  for candidate in "${REPO_ROOT}"/agda-mcp/dist-newstyle/build/*/ghc-*/agda-mcp-*/x/agda-mcp/build/agda-mcp/agda-mcp; do
+    # The same test the authoritative check applies: a regular, executable file.
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then prebuilt="$candidate"; break; fi
+  done
+  if [ -z "$prebuilt" ]; then
+    echo "agda-mcp: no executable server binary under ${REPO_ROOT}/agda-mcp/dist-newstyle (a fresh worktree?)." >&2
+    echo "agda-mcp: if this launch fails, build it first:  cd ${REPO_ROOT_Q}/agda-mcp && cabal build exe:agda-mcp   (inside nix develop .#backend)" >&2
+    echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
+  fi
+fi
 
 # Save real stdout on fd 3, then redirect stdout → stderr.
 # This catches all shellHook banner output that leaks to stdout.
@@ -74,7 +96,7 @@ exec nix develop "${REPO_ROOT}#backend" --command \
     # what went wrong, how to build the binary, and the override.
     no_server() {
       echo "agda-mcp: $1" >&2
-      echo "agda-mcp: build the server with:  cd '"${REPO_ROOT}"'/agda-mcp && cabal build exe:agda-mcp" >&2
+      echo "agda-mcp: build the server with:  cd '"${REPO_ROOT_Q}"'/agda-mcp && cabal build exe:agda-mcp" >&2
       echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
       exit 1
     }
