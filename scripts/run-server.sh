@@ -52,6 +52,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# The same path, shell-escaped, for the commands the diagnostics ask the
+# operator to paste: a checkout path with a space must survive the paste.
+REPO_ROOT_Q="$(printf %q "${REPO_ROOT}")"
 
 # Anchor the shellHook to this repository, whatever the client's cwd was.
 export AGDA_NATIVE_AIR_ROOT="${REPO_ROOT}"
@@ -77,7 +80,7 @@ if [ -z "${AGDA_MCP_BIN:-}" ]; then
   done
   if [ -z "$prebuilt" ]; then
     echo "agda-mcp: no executable server binary under ${REPO_ROOT}/agda-mcp/dist-newstyle (a fresh worktree?)." >&2
-    echo "agda-mcp: if this launch fails, build it first:  cd ${REPO_ROOT}/agda-mcp && cabal build exe:agda-mcp   (inside nix develop .#backend)" >&2
+    echo "agda-mcp: if this launch fails, build it first:  cd ${REPO_ROOT_Q}/agda-mcp && cabal build exe:agda-mcp   (inside nix develop .#backend)" >&2
     echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
   fi
 fi
@@ -93,7 +96,7 @@ exec nix develop "${REPO_ROOT}#backend" --command \
     # what went wrong, how to build the binary, and the override.
     no_server() {
       echo "agda-mcp: $1" >&2
-      echo "agda-mcp: build the server with:  cd '"${REPO_ROOT}"'/agda-mcp && cabal build exe:agda-mcp" >&2
+      echo "agda-mcp: build the server with:  cd '"${REPO_ROOT_Q}"'/agda-mcp && cabal build exe:agda-mcp" >&2
       echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
       exit 1
     }
