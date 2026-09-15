@@ -923,7 +923,11 @@ Claude Code from the other project's worktree** (so that project is the working
 directory, with its own `CLAUDE.md`, git, and permissions) and **attach agda-mcp to
 that session**.  agda-mcp does not need to be the working directory;
 `scripts/run-server.sh` computes the agda-native-air repo root and `cd`s there
-before launching the server, so it works from any cwd.
+before launching the server, so it works from any cwd; it also clears the
+`LD_LIBRARY_PATH` this flake's devShells export, so a Claude Code session
+started from inside `nix develop` loads the server too (issue #153).  Set
+`AGDA_MCP_BIN` in the server's `env` block to run a prebuilt binary instead of
+the one `cabal list-bin` names in the launcher's own checkout.
 
 (Launching from agda-native-air and using `/add-dir` to reach the other project also
 works, but then agda-native-air stays the project root, so committing the other
