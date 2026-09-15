@@ -93,6 +93,13 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     ProofSearchLoop.parseArgs(base ++ List("--proposer", "retrieval", "--corpus", "c", "--scorer", "idf-unfold"))
       .map(_.scorer.name) shouldBe Right("idf-unfold")
     ProofSearchLoop.parseArgs(base).map(_.scorer.name) shouldBe Right("token-overlap")
+    // An option where a value should be is a dropped value, not a path
+    // (#152 review, round two); a value that merely begins with `--` and is
+    // not one of our options is a value (an agda-flags string, say).
+    ProofSearchLoop.parseArgs(List("--index", "i", "--out-dir", "--all", "--server-bin", "b", "--project-root", "."))
+      .left.toOption.get should include ("--out-dir")
+    ProofSearchLoop.parseArgs(base ++ List("--agda-flags", "--library-file=x -l y")).map(_.agdaFlags) shouldBe
+      Right("--library-file=x -l y")
   }
 
   test("the report outcome carries the root goal's context when the loop recorded one (#19)") {

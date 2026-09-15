@@ -85,7 +85,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
   private def cfg(exclude: Boolean) = RecallConfig(
     index = Paths.get("i"), corpus = Paths.get("c"), report = Paths.get("r"), projectRoot = Paths.get("."),
     out = Paths.get("o.json"), ids = None, scorers = Vector(Scorers.default), excludeTarget = exclude,
-    ks = Vector(1, 8), queryLimit = 5000, top = 3)
+    ks = Vector(1, 8), queryLimit = 5000, top = 3, allowUntypedContext = false)
 
   // --------------------------------------------------------------------------
   // InMemoryCorpus: the server's semantics
@@ -130,15 +130,51 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
 
   test("definition table: the last row per name wins outright, so a bodyless duplicate removes an earlier body (#152 review)") {
     def j(s: String) = io.circe.parser.parse(s).toOption.get
+    def full(q: String, kind: String, body: String) =
+      j(s"""{"prettyQname":"$q","type":"T","defKind":"$kind","prettyModule":"M","hasBody":true,"body":$body}""")
     val t = DefinitionTable.fromRows(Iterator(
-      j("""{"prettyQname":"M.d","defKind":"function","body":"Σ A B"}"""),
-      j("""{"prettyQname":"M.d","defKind":"constructor","body":null}"""),
-      j("""{"prettyQname":"M.e","defKind":"function","body":"x"}"""),
-      j("""{"prettyQname":"M.e","defKind":"function","body":"y z"}"""),
+      full("M.d", "function", "\"Σ A B\""),
+      full("M.d", "constructor", "null"),
+      full("M.e", "function", "\"x\""),
+      full("M.e", "function", "\"y z\""),
       j("""{"defKind":"function","body":"nameless"}""")))
     t.bodyOf("M.d") shouldBe None                    // the constructor row won, and it has no body
     t.bodyOf("M.e") shouldBe Some(Vector("y", "z")) // the later body won
     t.size shouldBe 1
+  }
+
+  test("definition table: a row the server would drop is not a row here either, even as a later duplicate (#152 review, round two)") {
+    def j(s: String) = io.circe.parser.parse(s).toOption.get
+    val t = DefinitionTable.fromRows(Iterator(
+      j("""{"prettyQname":"M.d","type":"T","defKind":"function","prettyModule":"M","hasBody":true,"body":"Σ A B"}"""),
+      j("""{"prettyQname":"M.d","defKind":"constructor","body":null}"""),          // no type, no module: the server drops it
+      j("""{"prettyQname":"M.f","defKind":"function","body":"would-be-a-body"}""")))
+    t.bodyOf("M.d") shouldBe Some(Vector("Σ", "A", "B"))  // the partial duplicate removed nothing
+    t.bodyOf("M.f") shouldBe None                          // and the partial row contributed nothing
+  }
+
+  test("cli: an empty scorer or cut-off list is refused; an option as a value is refused; the diagnostic names --all (#152 review, round two)") {
+    val base = List("--index", "i", "--corpus", "c", "--report", "r", "--project-root", ".", "--out", "o", "--all")
+    RetrievalRecall.parseArgs(base ++ List("--scorers", "")).left.toOption.get should include ("--scorers")
+    RetrievalRecall.parseArgs(base ++ List("--k", " , ")).left.toOption.get should include ("--k")
+    RetrievalRecall.parseArgs(List("--index", "--all", "--corpus", "c")).left.toOption.get should include ("--index")
+    RetrievalRecall.parseArgs(base ++ List("--scoreers", "x")).left.toOption.get should include ("--all")
+    RetrievalRecall.parseArgs(base ++ List("--allow-untyped-context", "on")).map(_.allowUntypedContext) shouldBe Right(true)
+    RetrievalRecall.parseArgs(base).map(_.allowUntypedContext) shouldBe Right(false)
+  }
+
+  test("a hypothesis-reading scorer over a report without context types is refused unless opted into, and then marked degraded (#152 review, round two)") {
+    val idf = Scorers.idfUnfold.instantiate(DefinitionTable.empty)
+    val tok = Scorers.default.instantiate(DefinitionTable.empty)
+    RetrievalRecall.untypedRefusal(Vector(idf), Vector("a", "b"), allow = false).get should include ("idf-unfold")
+    RetrievalRecall.untypedRefusal(Vector(tok), Vector("a"), allow = false) shouldBe None
+    RetrievalRecall.untypedRefusal(Vector(idf), Vector.empty, allow = false) shouldBe None
+    RetrievalRecall.untypedRefusal(Vector(idf), Vector("a"), allow = true) shouldBe None
+    val untypedGoal = RetrievalRecall.RecordedGoal("Image F ∋ b", None)
+    RetrievalRecall.evaluate(cfg(exclude = true), corpus, idf, entry, untypedGoal, fixtureSource).unsafeRunSync().degraded shouldBe true
+    RetrievalRecall.evaluate(cfg(exclude = true), corpus, tok, entry, untypedGoal, fixtureSource).unsafeRunSync().degraded shouldBe false
+    val typed = untypedGoal.copy(context = Some(Vector("F", "b").map(n => CtxEntry(n, "T", None))))
+    RetrievalRecall.evaluate(cfg(exclude = true), corpus, idf, entry, typed, fixtureSource).unsafeRunSync().degraded shouldBe false
   }
 
   test("cli: an unknown option is refused rather than silently ignored (#152 review)") {
@@ -154,8 +190,8 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     val json = io.circe.parser.parse(
       """{"prettyQname":"Overture.Basic.𝑖𝑑","type":"(A : Set a) → A → A","defKind":"function",
         |"module":"Overture.Basic._","prettyModule":"Overture.Basic","hasBody":true,"typeAst":{}}""".stripMargin).toOption.get
-    InMemoryCorpus.hitOf(json) shouldBe Right(SearchHit("Overture.Basic.𝑖𝑑", "(A : Set a) → A → A", "function", "Overture.Basic", hasBody = true))
-    InMemoryCorpus.hitOf(io.circe.Json.obj()).isLeft shouldBe true
+    SearchHit.fromCorpusRow(json) shouldBe Right(SearchHit("Overture.Basic.𝑖𝑑", "(A : Set a) → A → A", "function", "Overture.Basic", hasBody = true))
+    SearchHit.fromCorpusRow(io.circe.Json.obj()).isLeft shouldBe true
   }
 
   // --------------------------------------------------------------------------
@@ -254,6 +290,11 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     fr.reconstructionMatches shouldBe Some(true)
     val drifted = live.copy(context = Some(Vector(CtxEntry("F", "", None), CtxEntry("b", "", None))))
     RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, entry, drifted, fixtureSource).unsafeRunSync()
+      .reconstructionMatches shouldBe Some(false)
+    // The same names in another order are a drift too: saturated tuples are
+    // spelled over the context in order (#152 review, round two).
+    val permuted = live.copy(context = Some(live.context.get.reverse))
+    RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, entry, permuted, fixtureSource).unsafeRunSync()
       .reconstructionMatches shouldBe Some(false)
   }
 

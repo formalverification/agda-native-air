@@ -233,6 +233,24 @@ object SearchHit {
       mod  <- c.get[String]("module")
       body <- c.get[Boolean]("hasBody")
     } yield SearchHit(qn, tpe, kind, mod, body)
+
+  /** A row of a corpus JSONL as the server indexes and serves it: the wire
+    * subset of the full row (docs/representation.md §3), with `module` the
+    * PRETTY module.  A row missing one of these fields is one the server's
+    * decoder drops, so nothing client-side treats it as a corpus row either,
+    * neither the in-memory corpus nor the definition table (PR #152 review,
+    * round two).  Every row of the published corpora carries them.
+    */
+  def fromCorpusRow(json: Json): Either[String, SearchHit] = {
+    val c = json.hcursor
+    (for {
+      qn   <- c.get[String]("prettyQname")
+      tpe  <- c.get[String]("type")
+      kind <- c.get[String]("defKind")
+      mod  <- c.get[String]("prettyModule")
+      body <- c.getOrElse[Boolean]("hasBody")(false)
+    } yield SearchHit(qn, tpe, kind, mod, body)).left.map(_.getMessage)
+  }
 }
 
 /** get_dependencies, reduced to what the P2 retrieval expansion reads: the

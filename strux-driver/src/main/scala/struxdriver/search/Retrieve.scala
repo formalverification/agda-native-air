@@ -260,6 +260,13 @@ object Statements {
 trait CandidateScorer {
   def name: String
   def scores(query: RankQuery, pool: Vector[SearchHit]): SearchHit => Double
+  /** Whether the score depends on `RankQuery.hypothesisTokens`.  The offline
+    * instrument refuses to replay such a scorer over a fixture whose context
+    * types are not on record, since it would silently run as the
+    * no-hypotheses variant under the scorer's own name (PR #152 review,
+    * round two).
+    */
+  def readsHypotheses: Boolean = false
 }
 
 /** What a scorer is asked to rank against: the goal display's tokens and,
@@ -542,21 +549,20 @@ object DefinitionTable {
 
   /** A parsed corpus row as the table sees it: its qualified name, and its
     * body tokens when the row qualifies (a `function` row with a body of one
-    * to `MaxBodyTokens` tokens).  `None` for a row without a name.
+    * to `MaxBodyTokens` tokens).  `None` for a row the server would not
+    * index (see below).
     */
-  def rowOf(json: io.circe.Json): Option[(String, Option[Vector[String]])] = {
-    val c = json.hcursor
-    c.get[String]("prettyQname").toOption.map { qn =>
-      val body = for {
-        kind <- c.get[String]("defKind").toOption
-        if kind == "function"
-        b    <- c.get[Option[String]]("body").toOption.flatten
-        toks  = bodyTokens(b)
-        if toks.nonEmpty && toks.size <= MaxBodyTokens
-      } yield toks
-      qn -> body
+  def rowOf(json: io.circe.Json): Option[(String, Option[Vector[String]])] =
+    // A row is a corpus row only if the server's decoder would keep it
+    // (SearchHit.fromCorpusRow); a partial row neither adds nor removes a
+    // body, since the server never indexed it (PR #152 review, round two).
+    SearchHit.fromCorpusRow(json).toOption.map { h =>
+      val body =
+        if (h.defKind != "function") None
+        else json.hcursor.get[Option[String]]("body").toOption.flatten
+          .map(bodyTokens).filter(toks => toks.nonEmpty && toks.size <= MaxBodyTokens)
+      h.prettyQname -> body
     }
-  }
 
   /** Fold one parsed row into a table under construction.  The LAST row per
     * qualified name wins outright, as in the server's `Map.fromList` index:
@@ -632,6 +638,8 @@ final class IdfScorer(
   hypotheses:  Double          = 0.0
 ) extends CandidateScorer {
 
+  override def readsHypotheses: Boolean = hypotheses > 0.0
+
   private val Structural = Set("(", ")", "{", "}", "⦃", "⦄", "→", ":", "∀", ".", ";", "λ", "=")
 
   private def units(tokens: Iterable[String]): Set[String] = {
@@ -639,22 +647,27 @@ final class IdfScorer(
     if (fragments) bare.flatMap(Fragments.of).toSet else bare.toSet
   }
 
-  /** A printed type split at its last depth-0 arrow: (premises, conclusion). */
+  /** A printed type split at its last depth-0 arrow TOKEN: (premises,
+    * conclusion).  Tokens, not characters: Agda identifiers may contain the
+    * arrow (`IsInRange→IsInImage`, `abelianGroup→group` in the v0.1 corpus,
+    * 290 rows), and a character scan would cut such a name in two (PR #152
+    * review, round two).  `Statements.tokens` keeps a glued arrow inside its
+    * token and yields a standalone arrow as its own.
+    */
   private def splitConclusion(printed: String): (String, String) = {
-    val s     = printed.replaceAll("\\s+", " ")
+    val toks  = Statements.tokens(printed)
     var depth = 0
-    var cut   = 0
-    var i     = 0
-    while (i < s.length) {
-      s.charAt(i) match {
-        case '(' | '{' | '⦃' => depth += 1
-        case ')' | '}' | '⦄' => depth -= 1
-        case '→' if depth == 0 => cut = i + 1
-        case _ => ()
+    var cut   = -1
+    toks.zipWithIndex.foreach { case (t, i) =>
+      t match {
+        case "(" | "{" | "⦃"  => depth += 1
+        case ")" | "}" | "⦄"  => depth -= 1
+        case "→" if depth == 0 => cut = i
+        case _                 => ()
       }
-      i += 1
     }
-    (s.substring(0, math.max(0, cut - 1)), s.substring(cut))
+    if (cut < 0) ("", toks.mkString(" "))
+    else (toks.take(cut).mkString(" "), toks.drop(cut + 1).mkString(" "))
   }
 
   private def nameUnits(hit: SearchHit): Set[String] = {
@@ -861,7 +874,11 @@ final class RetrievalProposer private (
         truncated = s.truncated + (if (hs.size >= cfg.queryLimit) 1 else 0))))
     def byName(pattern: String, limit: Int): IO[Vector[SearchHit]] = count(corpus.byName(pattern, limit))
     def byType(pattern: String, limit: Int): IO[Vector[SearchHit]] = count(corpus.byType(pattern, limit))
-    def dependenciesOf(prettyQname: String): IO[Vector[SearchHit]] = corpus.dependenciesOf(prettyQname)
+    // A dependency expansion is a server request too; it counts as a query
+    // (no limit applies, so it can never be truncated).  PR #152 review,
+    // round two: these calls had bypassed the ledger.
+    def dependenciesOf(prettyQname: String): IO[Vector[SearchHit]] =
+      corpus.dependenciesOf(prettyQname).flatTap(_ => statsRef.update(s => s.copy(queries = s.queries + 1)))
   }
 
   /** The pipeline: the shared pool (RetrievalPool: queries, scope,
@@ -941,7 +958,7 @@ final class RetrievalProposer private (
     */
   private def expandTop(ranked: Vector[SearchHit], query: RankQuery): IO[Vector[SearchHit]] =
     for {
-      nss      <- ranked.take(3).traverse(h => corpus.dependenciesOf(h.prettyQname))
+      nss      <- ranked.take(3).traverse(h => counting.dependenciesOf(h.prettyQname))
       known     = ranked.map(_.prettyQname).toSet
       fresh     = nss.flatten.groupBy(_.prettyQname).toVector.map(_._2.head)
                     .filterNot(h => known.contains(h.prettyQname))

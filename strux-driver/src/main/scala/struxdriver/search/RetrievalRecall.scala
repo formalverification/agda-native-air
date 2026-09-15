@@ -143,20 +143,6 @@ object InMemoryCorpus {
     }
   }
 
-  /** One corpus row as the server would serve it: the wire subset of the
-    * full row (docs/representation.md §3), `module` = `prettyModule`.
-    */
-  def hitOf(json: Json): Either[String, SearchHit] = {
-    val c = json.hcursor
-    (for {
-      qn   <- c.get[String]("prettyQname")
-      tpe  <- c.get[String]("type")
-      kind <- c.get[String]("defKind")
-      mod  <- c.get[String]("prettyModule")
-      body <- c.getOrElse[Boolean]("hasBody")(false)
-    } yield SearchHit(qn, tpe, kind, mod, body)).leftMap(_.getMessage)
-  }
-
   /** Load a corpus JSONL.  Rows that do not parse are counted and dropped, as
     * the server drops them; the count is returned so a report can state it.
     * Rows are then deduplicated by `prettyQname`, keeping the LAST one in
@@ -178,11 +164,12 @@ object InMemoryCorpus {
             io.circe.parser.parse(line).leftMap(_.message) match {
               case Left(_) => bad += 1
               case Right(json) =>
-                hitOf(json) match {
-                  case Right(h) => rows += h
+                SearchHit.fromCorpusRow(json) match {
+                  // Only a row the server would index reaches the definition
+                  // table (PR #152 review, round two).
+                  case Right(h) => rows += h; DefinitionTable.record(defs, json)
                   case Left(_)  => bad += 1
                 }
-                DefinitionTable.record(defs, json)
             }
         }
         (new InMemoryCorpus(dedupLastWins(rows.result())), bad, new DefinitionTable(defs.toMap))
@@ -392,6 +379,7 @@ final case class FixtureRecall(
   contextSource:    String,               // "report" | "reconstructed"
   context:          Vector[String],
   reconstruction:   Option[Vector[String]], // when the report had a context: what the fallback would have said
+  degraded:         Boolean,                // a hypothesis-reading scorer replayed without the hypotheses' types
   goalTokens:       Vector[String],
   hypothesisTokens: Vector[String],        // empty when the report carried no context types
   pool:             RetrievalPool.Built,   // exclusion as configured
@@ -399,7 +387,11 @@ final case class FixtureRecall(
   restates:         Vector[TargetStatus],  // measured in the unexcluded pool
   top:              Vector[(String, Double)]
 ) {
-  def reconstructionMatches: Option[Boolean] = reconstruction.map(_.toSet == context.toSet)
+  /** Order and multiplicity included: the proposer spells saturated tuples
+    * over the context in order, so a permuted reconstruction is a drift
+    * (PR #152 review, round two).
+    */
+  def reconstructionMatches: Option[Boolean] = reconstruction.map(_ == context)
   def toJson: Json = Json.obj(
     "benchmarkId"           -> benchmarkId.asJson,
     "stratum"               -> stratum.asJson,
@@ -409,6 +401,7 @@ final case class FixtureRecall(
     "context"               -> context.asJson,
     "reconstructionMatches" -> reconstructionMatches.asJson,
     "reconstruction"        -> reconstruction.asJson,
+    "degraded"              -> degraded.asJson,
     "goalTokens"            -> goalTokens.asJson,
     "hypothesisTokens"      -> hypothesisTokens.asJson,
     "pool" -> Json.obj(
@@ -464,7 +457,8 @@ final case class RecallConfig(
   excludeTarget: Boolean,
   ks:            Vector[Int],
   queryLimit:    Int,
-  top:           Int
+  top:           Int,
+  allowUntypedContext: Boolean
 )
 
 object RetrievalRecall extends IOApp {
@@ -482,6 +476,9 @@ object RetrievalRecall extends IOApp {
       |    [--k 8,32]             the recall cut-offs (default 8,32)
       |    [--query-limit N]      per-query cap, as the proposer sends it (default 5000)
       |    [--top N]              ranked rows to list per fixture (default 8)
+      |    [--allow-untyped-context on|off]  replay a hypothesis-reading scorer over fixtures whose
+      |                           report carries no context types, marking each as degraded (default off:
+      |                           the run is refused, since the scorer would silently be its no-hypotheses variant)
       |""".stripMargin
 
   def run(args: List[String]): IO[ExitCode] =
@@ -493,7 +490,7 @@ object RetrievalRecall extends IOApp {
   /** The documented options; anything else is refused (Scaffold.parseFlags). */
   private val Keys: Set[String] = Set(
     "index", "corpus", "report", "project-root", "out", "ids",
-    "scorers", "exclude-target", "k", "query-limit", "top")
+    "scorers", "exclude-target", "k", "query-limit", "top", "allow-untyped-context")
 
   private[search] def parseArgs(args: List[String]): Either[String, RecallConfig] = {
     def intOf(m: Map[String, String], key: String, dflt: Int, min: Int): Either[String, Int] =
@@ -508,17 +505,20 @@ object RetrievalRecall extends IOApp {
       out     <- m.get("out").toRight("missing --out")
       ids      = m.get("ids").map(_.split(",").map(_.trim).filter(_.nonEmpty).toSet)
       _       <- if (ids.isEmpty && !m.contains("all")) Left("pass --ids or --all") else Right(())
-      scorers <- m.getOrElse("scorers", Scorers.default.name).split(",").toVector.map(_.trim).filter(_.nonEmpty)
-                   .traverse(Scorers.byName)
+      scorers <- nonEmptyList(m, "scorers", Scorers.default.name).flatMap(_.traverse(Scorers.byName))
       excl    <- m.get("exclude-target").fold[Either[String, Boolean]](Right(true)) {
                    case "on"  => Right(true)
                    case "off" => Right(false)
                    case other => Left(s"bad --exclude-target: $other (on|off)")
                  }
-      ks      <- m.getOrElse("k", "8,32").split(",").toVector.map(_.trim).filter(_.nonEmpty)
-                   .traverse(s => s.toIntOption.filter(_ >= 1).toRight(s"bad --k: $s"))
+      ks      <- nonEmptyList(m, "k", "8,32").flatMap(_.traverse(s => s.toIntOption.filter(_ >= 1).toRight(s"bad --k: $s")))
       limit   <- intOf(m, "query-limit", RetrievalConfig.default.queryLimit, 1)
       top     <- intOf(m, "top", 8, 0)
+      untyped <- m.get("allow-untyped-context").fold[Either[String, Boolean]](Right(false)) {
+                   case "on"  => Right(true)
+                   case "off" => Right(false)
+                   case other => Left(s"bad --allow-untyped-context: $other (on|off)")
+                 }
     } yield RecallConfig(
       index         = Paths.get(ix),
       corpus        = Paths.get(corpus),
@@ -530,8 +530,31 @@ object RetrievalRecall extends IOApp {
       excludeTarget = excl,
       ks            = ks.sorted,
       queryLimit    = limit,
-      top           = top
+      top           = top,
+      allowUntypedContext = untyped
     )
+  }
+
+  /** A comma-separated list option that must name at least one item: an
+    * explicit `--scorers ""` is a configuration error, not a run with no
+    * scorers that writes a report which looks complete (PR #152 review,
+    * round two).
+    */
+  private def nonEmptyList(m: Map[String, String], key: String, dflt: String): Either[String, Vector[String]] = {
+    val items = m.getOrElse(key, dflt).split(",").toVector.map(_.trim).filter(_.nonEmpty)
+    if (items.isEmpty) Left(s"--$key needs at least one item") else Right(items)
+  }
+
+  /** The refusal a hypothesis-reading scorer earns when a fixture's report
+    * carries no context types: the scorer would run as its no-hypotheses
+    * variant under its own name.  `None` when nothing is at risk or the
+    * caller opted into marked, degraded replay.
+    */
+  def untypedRefusal(scorers: Vector[CandidateScorer], untyped: Vector[String], allow: Boolean): Option[String] = {
+    val readers = scorers.filter(_.readsHypotheses).map(_.name)
+    if (allow || readers.isEmpty || untyped.isEmpty) None
+    else Some(s"scorer(s) ${readers.mkString(", ")} read the hypotheses' types, but ${untyped.size} fixture(s) have no context on record " +
+      s"(${untyped.mkString(", ")}); pass --allow-untyped-context on to replay them anyway, marked degraded, or use a report that carries goalContext")
   }
 
   /** What a report recorded per fixture: the root goal display, and the
@@ -605,6 +628,7 @@ object RetrievalRecall extends IOApp {
         contextSource  = ctxSource,
         context        = ctx,
         reconstruction = recorded.context.map(_ => reconstructed),
+        degraded       = recorded.context.isEmpty && scorer.readsHypotheses,
         goalTokens     = Queries.goalTokens(goal),
         hypothesisTokens = Queries.hypothesisTokens(goal),
         pool           = built,
@@ -631,9 +655,14 @@ object RetrievalRecall extends IOApp {
       (corpus, badRows, defs) = loaded
       t1       <- IO.monotonic
       _        <- IO.println(s">> recall instrument: ${entries.size} obligation(s), corpus ${corpus.rows.size} rows (${badRows} unparsable, ${defs.size} definition bodies) in ${(t1 - t0).toMillis} ms; scorers ${cfg.scorers.map(_.name).mkString(",")}; exclusion ${if (cfg.excludeTarget) "on" else "off"}")
+      instantiated = cfg.scorers.map(_.instantiate(defs))
+      untyped   = entries.filter(e => goals(e.id).context.isEmpty).map(_.id)
+      _        <- untypedRefusal(instantiated, untyped, cfg.allowUntypedContext)
+                    .traverse_(msg => IO.raiseError[Unit](new RuntimeException(msg)))
+      _        <- IO.whenA(untyped.nonEmpty && instantiated.exists(_.readsHypotheses))(
+                    IO.println(s"!! ${untyped.size} fixture(s) replayed without hypothesis types; hypothesis-reading scorers are marked degraded there: ${untyped.mkString(", ")}"))
       sources  <- entries.traverse(e => IO.blocking(new String(Files.readAllBytes(cfg.projectRoot.resolve(e.obligationPath)), StandardCharsets.UTF_8)).map(e.id -> _)).map(_.toMap)
-      perScorer <- cfg.scorers.traverse { spec =>
-                     val sc = spec.instantiate(defs)
+      perScorer <- instantiated.traverse { sc =>
                      entries.traverse(e => evaluate(cfg, corpus, sc, e, goals(e.id), sources(e.id))).map(sc -> _)
                    }
       t2       <- IO.monotonic
@@ -690,6 +719,7 @@ object RetrievalRecall extends IOApp {
           "name"      -> sc.name.asJson,
           "summary"   -> summaries(fs, cfg.ks),
           "contextReconstructionMismatches" -> fs.filter(_.reconstructionMatches.contains(false)).map(_.benchmarkId).asJson,
+          "degradedFixtures" -> fs.filter(_.degraded).map(_.benchmarkId).asJson,
           "fixtures"  -> Json.arr(fs.map(_.toJson): _*)
         )
       }: _*)
@@ -721,7 +751,8 @@ object RetrievalRecall extends IOApp {
           case "ranked" => s"${t.qname} #${t.rank.getOrElse(0)}"
           case other    => s"${t.qname} ${other}${t.detail.fold("")(d => s"($d)")}"
         }
-        val mism = if (f.reconstructionMatches.contains(false)) " CONTEXT-MISMATCH" else ""
+        val mism = (if (f.reconstructionMatches.contains(false)) " CONTEXT-MISMATCH" else "") +
+                   (if (f.degraded) " DEGRADED(no hypothesis types on record)" else "")
         s"  ${f.benchmarkId} [${f.stratum}] pool=${f.pool.ranked.size} ctx=${f.contextSource}$mism\n" +
           f.targets.map(t => s"      target   ${one(t)}").mkString("\n") + (if (f.targets.isEmpty) "      target   (none recorded)" else "") + "\n" +
           f.restates.map(t => s"      restates ${one(t)}").mkString("\n")

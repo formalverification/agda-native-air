@@ -1712,6 +1712,9 @@ proof-search-retrieval-it: _check-sbt
 PROOF_SEARCH_RECALL_REPORT  ?=
 PROOF_SEARCH_RECALL_SCORERS ?= $(PROOF_SEARCH_SCORER)
 PROOF_SEARCH_RECALL_K       ?= 8,32
+# A hypothesis-reading scorer over a report without goalContext is refused
+# unless this is on; then the affected fixtures are marked degraded.
+PROOF_SEARCH_RECALL_ALLOW_UNTYPED ?= off
 PROOF_SEARCH_RECALL_OUT     ?= $(PROOF_SEARCH_OUT_DIR)/recall/$(PROOF_SEARCH_RUN_ID).json
 
 .PHONY: proof-search-recall
@@ -1719,7 +1722,7 @@ proof-search-recall: _check-sbt
 	@test -n "$(PROOF_SEARCH_RECALL_REPORT)" || { echo "ERROR: set PROOF_SEARCH_RECALL_REPORT=<run>/report.json (the goal displays to replay)"; exit 1; }
 	@echo ">> [proof-search-recall] scorers=$(PROOF_SEARCH_RECALL_SCORERS) exclusion=$(PROOF_SEARCH_EXCLUDE) corpus=$(PROOF_SEARCH_CORPUS) goals=$(PROOF_SEARCH_RECALL_REPORT)"
 	@cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.search.RetrievalRecall --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --corpus $(abspath $(PROOF_SEARCH_CORPUS)) --report $(abspath $(PROOF_SEARCH_RECALL_REPORT)) --project-root $(CURDIR) --out $(CURDIR)/$(PROOF_SEARCH_RECALL_OUT) --scorers $(PROOF_SEARCH_RECALL_SCORERS) --exclude-target $(PROOF_SEARCH_EXCLUDE) --k $(PROOF_SEARCH_RECALL_K)"
+	  "runMain struxdriver.search.RetrievalRecall --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --corpus $(abspath $(PROOF_SEARCH_CORPUS)) --report $(abspath $(PROOF_SEARCH_RECALL_REPORT)) --project-root $(CURDIR) --out $(CURDIR)/$(PROOF_SEARCH_RECALL_OUT) --scorers $(PROOF_SEARCH_RECALL_SCORERS) --exclude-target $(PROOF_SEARCH_EXCLUDE) --k $(PROOF_SEARCH_RECALL_K) --allow-untyped-context $(PROOF_SEARCH_RECALL_ALLOW_UNTYPED)"
 
 
 

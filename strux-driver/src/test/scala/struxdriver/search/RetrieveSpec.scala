@@ -267,7 +267,7 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     finally src.close()
   }
   private lazy val realHits: Map[String, SearchHit] =
-    realRows.flatMap(j => InMemoryCorpus.hitOf(j).toOption).map(h => h.prettyQname -> h).toMap
+    realRows.flatMap(j => SearchHit.fromCorpusRow(j).toOption).map(h => h.prettyQname -> h).toMap
   private lazy val realTable: DefinitionTable = DefinitionTable.fromRows(realRows.iterator)
   private def real(q: String): SearchHit = realHits(q)
 
@@ -601,6 +601,29 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     val s = p.stats.unsafeRunSync()
     s.queries shouldBe scope.modules.size // every by-module name query, counted as it answered
     s.hits shouldBe 0                     // the build never completed, so nothing past the queries is claimed
+  }
+
+  test("idf: an arrow inside an identifier does not split a type; only a standalone arrow token does (#152 review, round two)") {
+    // `IsInRange→IsInImage` is a name; a character scan cut it into a premise
+    // and a conclusion.  With the name as the whole conclusion of one row and
+    // the premise of another, the conclusion weight must land where it belongs.
+    val concl = SearchHit("M.a", "(w : W) → Setoid.Functions.Inverses.IsInRange→IsInImage F", "function", "M", hasBody = true)
+    val prem  = SearchHit("M.b", "Setoid.Functions.Inverses.IsInRange→IsInImage F → W", "function", "M", hasBody = true)
+    val noise = SearchHit("M.c", "(x : X) → Q x", "function", "M", hasBody = true)
+    val q  = RankQuery(Set("IsInRange→IsInImage"), Set.empty)
+    val sc = new IdfScorer("t", fragments = false, conclusion = 1.0, nameWeight = 0.0, normalize = false).scores(q, Vector(concl, prem, noise))
+    // Both rows share the unit once (weight 1); the conclusion weight adds it
+    // again for `concl` only, so `concl` scores exactly twice `prem`.
+    sc(concl) shouldBe (2.0 * sc(prem) +- 1e-9)
+    sc(prem) should be > 0.0
+  }
+
+  test("propose: dependency expansion counts its server requests in the ledger (#152 review, round two)") {
+    val (proposer, corpus, _) = freshProposer(cfg = cfg4.copy(expandDeps = true))
+    proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val s = proposer.stats.unsafeRunSync()
+    corpus.calls.count(_.startsWith("deps:")) shouldBe 3
+    s.queries shouldBe corpus.calls.size // every name, type, and dependency request, one each
   }
 
   test("idf: at nameWeight zero the name leaves the document entirely, frequencies and norm included (#152 review)") {

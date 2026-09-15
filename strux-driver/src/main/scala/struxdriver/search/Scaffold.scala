@@ -53,6 +53,12 @@ object Scaffold {
     * the requested experiment.  `--all` is recorded as `all -> "true"`.
     */
   def parseFlags(args: List[String], known: Set[String]): Either[String, Map[String, String]] = {
+    val accepted = (known.map("--" + _) + "--all").toVector.sorted.mkString(" ")
+    // A value that is itself one of the accepted options was a dropped value
+    // (`--out-dir --all` would otherwise run with `--all` as the path).  Only
+    // KNOWN options count: an `--agda-flags` value may legitimately begin
+    // with `--library-file=…`, which is not an option of ours.
+    def isOption(v: String): Boolean = v == "--all" || (v.startsWith("--") && known(v.drop(2)))
     @annotation.tailrec
     def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
       rest match {
@@ -60,8 +66,9 @@ object Scaffold {
         case "--all" :: xs                              => go(xs, m + ("all" -> "true"))
         case flag :: v :: xs if flag.startsWith("--") =>
           val key = flag.drop(2)
-          if (known(key)) go(xs, m + (key -> v))
-          else Left(s"unrecognized option: $flag (accepted: ${known.toVector.sorted.map("--" + _).mkString(" ")})")
+          if (!known(key)) Left(s"unrecognized option: $flag (accepted: $accepted)")
+          else if (isOption(v)) Left(s"option $flag needs a value, but the next argument is the option $v")
+          else go(xs, m + (key -> v))
         case flag :: Nil if flag.startsWith("--")       => Left(s"option $flag needs a value")
         case other :: _                                 => Left(s"unrecognized argument: $other")
       }
