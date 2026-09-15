@@ -40,9 +40,11 @@
 #   AGDA_MCP_BIN, when set, names the server binary to run (the same variable
 #   the Make targets honor), so a worktree can point at a prebuilt server.
 #   Otherwise the binary is what `cabal list-bin exe:agda-mcp` names, and it
-#   must exist: `cabal list-bin` builds nothing, so a fresh worktree needs
-#   `cabal build exe:agda-mcp` first, and the message says so instead of the
-#   bare "No such file" the client would otherwise see.
+#   must be an executable regular file: `cabal list-bin` builds nothing, so a
+#   fresh worktree needs `cabal build exe:agda-mcp` first.  Whichever way the
+#   resolution fails (list-bin itself failing, a missing build, an override
+#   naming a directory), the message says how to build it and names the
+#   override, instead of the bare "No such file" the client would otherwise see.
 #
 # Usage (from anywhere):
 #   scripts/run-server.sh [extra agda-mcp args...]
@@ -56,8 +58,10 @@ export AGDA_NATIVE_AIR_ROOT="${REPO_ROOT}"
 cd "${REPO_ROOT}"
 
 # Do not carry the client's dynamic-linker search path into `nix develop`
-# (issue #153, see the header).
-unset LD_LIBRARY_PATH
+# (issue #153, see the header).  Both variables, as the Makefile's nested-Nix
+# wrapper (NIX_CLEAN_ENV) does: LD_LIBRARY_PATH on Linux, DYLD_LIBRARY_PATH on
+# Darwin, which the flake also declares as a system.
+unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
 
 # Save real stdout on fd 3, then redirect stdout → stderr.
 # This catches all shellHook banner output that leaks to stdout.
@@ -66,21 +70,22 @@ exec 3>&1 1>&2
 exec nix develop "${REPO_ROOT}#backend" --command \
   bash -c '
     exec 1>&3 3>&-
+    # Every way of ending up without a runnable server gets the same message:
+    # what went wrong, how to build the binary, and the override.
+    no_server() {
+      echo "agda-mcp: $1" >&2
+      echo "agda-mcp: build the server with:  cd '"${REPO_ROOT}"'/agda-mcp && cabal build exe:agda-mcp" >&2
+      echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
+      exit 1
+    }
     if [ -n "${AGDA_MCP_BIN:-}" ]; then
       BIN="$AGDA_MCP_BIN"
     else
       cd "'"${REPO_ROOT}/agda-mcp"'"
-      BIN=$(cabal list-bin exe:agda-mcp 2>&1) || {
-        echo "agda-mcp: failed to resolve binary: $BIN" >&2
-        exit 1
-      }
+      BIN=$(cabal list-bin exe:agda-mcp 2>&1) || no_server "failed to resolve the server binary: $BIN"
       cd "'"${REPO_ROOT}"'"
     fi
-    [ -x "$BIN" ] || {
-      echo "agda-mcp: server binary not found or not executable: $BIN" >&2
-      echo "agda-mcp: build it with:  cd '"${REPO_ROOT}"'/agda-mcp && cabal build exe:agda-mcp" >&2
-      echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
-      exit 1
-    }
+    # A regular, executable file: -x alone is true of a directory as well.
+    [ -f "$BIN" ] && [ -x "$BIN" ] || no_server "server binary is not an executable file: $BIN"
     exec "$BIN" "$@"
   ' -- "$@"
