@@ -177,6 +177,16 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Judge.syntactic(s3, solved) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector.empty }
   }
 
+  test("frozen lines hidden in a block comment do not satisfy preservation (Copilot on PR #158)") {
+    // The original import line and signature survive verbatim, but inside a
+    // `{- -}` block; the active versions are widened and weakened.
+    val hidden = header.replace(
+      "open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )\n",
+      "{-\nopen import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n-}\nopen import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym ; trans )\n") +
+      "+-comm : ∀ (m n : ℕ) → m + n ≡ m + n\n+-comm m n = refl\n"
+    firstGate(hidden) shouldBe Some("preservation")
+  }
+
   test("Statement.of refuses a text without the hole's signature") {
     Statement.of("module M where\nf : A\nf = {!!}\n", "g").isLeft shouldBe true
   }

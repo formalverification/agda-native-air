@@ -102,9 +102,15 @@ object Code {
   def tokens(code: String): Vector[String] =
     code.split("[\\s(){};@\"]+").toVector.filter(_.nonEmpty)
 
-  /** Lines that carry code: blank and comment-only lines removed. */
+  /** The lines that carry code, as the preservation gate compares them: every
+    * comment stripped first (a line inside a `{- -}` block is not code, so a
+    * frozen line hidden there does not count as present: Copilot on PR #158),
+    * trailing whitespace dropped, blank lines removed.  Both sides of every
+    * comparison go through this, so a trailing comment on an original line is
+    * tolerated and a commented-out one is not.
+    */
   def keptLines(source: String): Vector[String] =
-    source.split("\n", -1).toVector.filterNot(l => l.trim.isEmpty || l.trim.startsWith("--"))
+    stripComments(source).split("\n", -1).toVector.map(_.replaceAll("\\s+$", "")).filterNot(_.isEmpty)
 }
 
 /** The frozen statement of an obligation: what the subject may not change. */
@@ -118,7 +124,7 @@ final case class Statement(
 
 object Statement {
   /** Top-level declaration blocks: a column-0 line plus the indented lines
-    * after it, over the kept lines (blank and comment-only lines dropped).
+    * after it, over the kept lines (comments and blank lines dropped).
     */
   def blocks(source: String): Vector[Vector[String]] =
     Code.keptLines(source).foldLeft(Vector.empty[Vector[String]]) { (acc, l) =>
@@ -184,9 +190,10 @@ object Gates {
     run.nonEmpty && haystack.indices.exists(i => haystack.slice(i, i + run.size) == run)
 
   /** Gate 1.  Every frozen block of the obligation appears in the final file
-    * as a consecutive run of kept lines, byte-identical.  Right carries the
-    * import lines the final file has that the obligation did not (indented
-    * `where`-block imports included), for the ledger.
+    * as a consecutive run of kept lines (comments stripped on both sides),
+    * byte-identical.  Right carries the import lines the final file has that
+    * the obligation did not (indented `where`-block imports included), for
+    * the ledger.
     */
   def preservation(st: Statement, finalText: String): Either[GateFailure, Vector[String]] = {
     val kept = Code.keptLines(finalText)

@@ -224,7 +224,7 @@ object AgentBench extends IOApp {
   // Arguments
   // --------------------------------------------------------------------------
 
-  private def parseArgs(args: List[String]): Either[String, AgentBenchConfig] = {
+  private[agentbench] def parseArgs(args: List[String]): Either[String, AgentBenchConfig] = {
     val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
       "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
       "claude-bin", "agda-flags", "server-timeout", "resume")
@@ -253,7 +253,15 @@ object AgentBench extends IOApp {
       runId   <- m.get("run-id").toRight("missing --run-id")
       root    <- m.get("project-root").toRight("missing --project-root")
       ids      = m.get("ids").map(_.split(",").map(_.trim).filter(_.nonEmpty).toSet)
-      _       <- if (ids.isEmpty && !m.contains("all")) Left("pass --ids or --all") else Right(())
+      // Exactly one selection, and a non-empty one: `--ids` beside `--all`
+      // would silently run the subset, and `--ids ""` would fail an hour
+      // later as "no obligations matched" (Copilot on PR #158).
+      _       <- (ids, m.contains("all")) match {
+                   case (Some(s), false) if s.nonEmpty => Right(())
+                   case (Some(_), false)               => Left("--ids names no obligation")
+                   case (None, true)                   => Right(())
+                   case _                              => Left("pass exactly one of --ids and --all")
+                 }
       rootAbs  = Paths.get(root).toAbsolutePath.normalize
       abs      = (p: String) => { val q = Paths.get(p); if (q.isAbsolute) q else rootAbs.resolve(q).normalize }
       bin     <- if (rejudge) Right(m.get("server-bin").map(abs)) else m.get("server-bin").map(abs).map(Option(_)).toRight("missing --server-bin")
