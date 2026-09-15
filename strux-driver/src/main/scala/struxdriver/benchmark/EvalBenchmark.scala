@@ -254,15 +254,72 @@ object IndexParser {
 
 object GoldVerifier {
 
+  /** The libraries registry the verifier consults: `$AGDA_DIR/libraries`,
+    * with the flake shell's `AGDA_DIR` when set and the repo-local default
+    * otherwise.  Shared with the agent-bench judge (issue #154), whose
+    * verdict must be this verifier's invocation on the subject's file.
+    */
+  def agdaDirOf(projectRoot: Path): String =
+    sys.env.getOrElse("AGDA_DIR", projectRoot.resolve("agda-dojang/agda").toString)
+
+  /** The exact `agda` argument vector that judges a file of the given
+    * library `source`: the flake's `agda` wrapper mirrored explicitly (the
+    * raw binary does not see the shell function), the file's own directory on
+    * the include path so its top-level module resolves, and `--library
+    * agda-algebras` for that tier's rows only, so the frozen stdlib rows are
+    * verified in an unchanged environment.  `extraFlags` sit before the file
+    * (the judge adds `--safe`; gold verification adds nothing).
+    */
+  def agdaCommand(source: String, file: Path, librariesFile: String, extraFlags: Vector[String]): Vector[String] = {
+    val extraLibs =
+      if (source == "agda-algebras") Vector("--library", "agda-algebras")
+      else Vector.empty[String]
+    Vector(
+      "agda",
+      "--no-default-libraries",
+      "--library-file", librariesFile,
+      "--library", "standard-library",
+      "--library", "agda-dojang"
+    ) ++ extraLibs ++ extraFlags ++ Vector(
+      "-i", file.getParent.toString,
+      file.toString
+    )
+  }
+
+  /** Run one `agda` command to completion under a bound and return its exit
+    * code with its combined output.  The process must not outlive the fiber:
+    * IO cancellation (e.g. on timeout) cannot interrupt the blocking read, so
+    * the process is destroyed explicitly on every exit path, which closes its
+    * output and unblocks the reader.  A failure to run at all is reported as
+    * exit -1 with the exception text, never raised.
+    */
+  def runAgda(cmd: Vector[String], agdaDir: String, timeout: FiniteDuration): IO[(Int, String)] =
+    IO.blocking {
+      val pb = new ProcessBuilder(cmd.asJava)
+      pb.environment().put("AGDA_DIR", agdaDir)
+      pb.redirectErrorStream(true)
+      pb.start()
+    }.bracket { proc =>
+      IO.blocking {
+        val output = new String(
+          proc.getInputStream.readAllBytes(),
+          StandardCharsets.UTF_8
+        )
+        (proc.waitFor(), output)
+      }.timeout(timeout)
+    } { proc =>
+      IO.blocking {
+        if (proc.isAlive) { proc.destroyForcibly().waitFor(); () }
+      }
+    }.handleError(e => (-1, s"Exception: ${e.getMessage}"))
+
   /** Typecheck a single gold solution file with Agda.
     *
     * This is the IO boundary: it spawns a subprocess and measures wall-clock time.
     */
   def verifyOne(ob: Obligation, projectRoot: Path): IO[GoldResult] = {
     val goldAbs = projectRoot.resolve(ob.goldPath)
-    val agdaDir =
-      sys.env.getOrElse("AGDA_DIR",
-        projectRoot.resolve("agda-dojang/agda").toString)
+    val agdaDir = agdaDirOf(projectRoot)
 
     val librariesFile = Paths.get(agdaDir).resolve("libraries").toString
 
@@ -274,54 +331,11 @@ object GoldVerifier {
         errorMsg     = Some(s"Gold file missing: $goldAbs")
       ))
     } else {
-      // Mirror the flake's `agda` wrapper (flake.nix mkAgdaShellSetup): the raw
-      // `agda` binary this subprocess invokes does not see the shell function, so
-      // the registered libraries must be named explicitly, and the gold file's own
-      // directory must be added to the include path (-i) for its top-level module
-      // name to resolve.
-      // agda-algebras obligations additionally need that library, which the
-      // flake shellHook always registers (a live checkout when
-      // AGDA_ALGEBRAS_ROOT is set, the flake-pinned store copy otherwise).
-      // The agda-stdlib rows keep their original invocation untouched, so the
-      // frozen P1 baseline is verified in an unchanged environment.
-      val extraLibs =
-        if (ob.source == "agda-algebras") Vector("--library", "agda-algebras")
-        else Vector.empty[String]
-      val cmd = Vector(
-        "agda",
-        "--no-default-libraries",
-        "--library-file", librariesFile,
-        "--library", "standard-library",
-        "--library", "agda-dojang"
-      ) ++ extraLibs ++ Vector(
-        "-i", goldAbs.getParent.toString,
-        goldAbs.toString
-      )
+      val cmd = agdaCommand(ob.source, goldAbs, librariesFile, Vector.empty)
 
       for {
         t0     <- IO.monotonic
-        result <- IO.blocking {
-                    val pb = new ProcessBuilder(cmd.asJava)
-                    pb.environment().put("AGDA_DIR", agdaDir)
-                    pb.redirectErrorStream(true)
-                    pb.start()
-                  }.bracket { proc =>
-                    IO.blocking {
-                      val output = new String(
-                        proc.getInputStream.readAllBytes(),
-                        StandardCharsets.UTF_8
-                      )
-                      (proc.waitFor(), output)
-                    }.timeout(120.seconds)
-                  } { proc =>
-                    // The Agda process must not outlive this fiber.  IO cancellation
-                    // (e.g. on timeout) cannot interrupt the blocking read, so destroy
-                    // the process explicitly — that closes its output and unblocks the
-                    // reader.  Runs on success, error, and cancellation.
-                    IO.blocking {
-                      if (proc.isAlive) { proc.destroyForcibly().waitFor(); () }
-                    }
-                  }.handleError(e => (-1, s"Exception: ${e.getMessage}"))
+        result <- runAgda(cmd, agdaDir, 120.seconds)
         t1     <- IO.monotonic
         elapsedMs = (t1 - t0).toMillis
         (exitCode, output) = result
