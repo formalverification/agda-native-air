@@ -339,11 +339,19 @@ object AgentBench extends IOApp {
       userT    <- resource("user-prompt.md")
       _        <- writeText(cfg.runRoot.resolve("prompts/system-prompt.md"), sysP)
       _        <- writeText(cfg.runRoot.resolve("prompts/user-prompt.md"), userT)
+      // A re-judge keeps the run's own record of how its subjects were run:
+      // the previous report's config and corpora blocks are carried over
+      // verbatim (the judge's own knob and the re-judge time are added), since
+      // the harness is not told the model or the corpora a second time.
+      previous <- if (cfg.rejudge)
+                    readText(cfg.runRoot.resolve("report.json")).map(io.circe.parser.parse(_).toOption).handleError(_ => None)
+                  else IO.pure(Option.empty[Json])
       driven   <- if (cfg.rejudge) rejudgeAll(cfg, entries) else driveAll(cfg, entries, sysP, userT)
-      corpora  <- Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
-                    .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }
+      corpora  <- previous.flatMap(_.hcursor.downField("corpora").focus).map(IO.pure).getOrElse(
+                    Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
+                      .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*)))
       version  <- if (cfg.rejudge) IO.pure("n/a (rejudge)") else claudeVersion(cfg.claudeBin)
-      _        <- writeOutputs(cfg, entries, driven, corpora, version, sysP, userT)
+      _        <- writeOutputs(cfg, entries, driven, corpora, version, sysP, userT, previous.flatMap(_.hcursor.downField("config").focus))
       anomalies = driven.map(_._1).filter(_.anomaly.isDefined)
       _        <- anomalies.traverse_(o => IO.println(s"!! ${o.entry.id} anomaly: ${o.anomaly.getOrElse("")}"))
     } yield if (anomalies.isEmpty) ExitCode.Success else ExitCode.Error
@@ -620,18 +628,13 @@ object AgentBench extends IOApp {
     Json.obj(all.map(_._1).distinct.sortBy(n => (-all.filter(_._1 == n).map(_._2).sum, n)).map(n => n -> all.filter(_._1 == n).map(_._2).sum.asJson): _*)
   }
 
-  private def writeOutputs(cfg: AgentBenchConfig, entries: Vector[IndexEntry], driven: Vector[(Outcome, Json, Vector[AttemptRow])], corpora: Vector[(String, Json)], version: String, sysP: String, userT: String): IO[Unit] = {
+  private def writeOutputs(cfg: AgentBenchConfig, entries: Vector[IndexEntry], driven: Vector[(Outcome, Json, Vector[AttemptRow])], corpora: Json, version: String, sysP: String, userT: String, previousConfig: Option[Json]): IO[Unit] = {
     val outcomes = driven.map(_._1)
     val tiers    = Vector("routine", "compositional", "non-obvious")
     val strata   = outcomes.map(_.stratum).distinct
     val subject  = SubjectConfig(cfg.claudeBin, cfg.model.getOrElse(""), cfg.maxTurns, cfg.wallCapSec.seconds, cfg.maxBudgetUsd,
                      cfg.projectRoot, cfg.serverBin.getOrElse(Paths.get("")), cfg.agdaFlags, cfg.serverTimeout, cfg.persistSessions, sysP, userT)
-    val report = Json.obj(
-      "schemaVersion" -> "agent-bench-report.v0".asJson,
-      "runId"         -> cfg.runId.asJson,
-      "timestamp"     -> java.time.Instant.now().toString.asJson,
-      "rejudged"      -> cfg.rejudge.asJson,
-      "config" -> Json.obj(
+    val builtConfig = Json.obj(
         "model"           -> cfg.model.asJson,
         "maxTurns"        -> cfg.maxTurns.asJson,
         "wallCapSec"      -> cfg.wallCapSec.asJson,
@@ -652,8 +655,19 @@ object AgentBench extends IOApp {
           "system" -> Json.obj("path" -> "prompts/system-prompt.md".asJson, "sha256" -> sha256(sysP).asJson),
           "user"   -> Json.obj("path" -> "prompts/user-prompt.md".asJson,   "sha256" -> sha256(userT).asJson)),
         "gates"           -> Vector("preservation", "escape", "holes", "typecheck", "isolation").asJson
-      ),
-      "corpora"     -> Json.obj(corpora: _*),
+      )
+    val config = previousConfig match {
+      case Some(prev) if cfg.rejudge =>
+        prev.deepMerge(Json.obj("safe" -> cfg.safe.asJson, "rejudgedAt" -> java.time.Instant.now().toString.asJson))
+      case _ => builtConfig
+    }
+    val report = Json.obj(
+      "schemaVersion" -> "agent-bench-report.v0".asJson,
+      "runId"         -> cfg.runId.asJson,
+      "timestamp"     -> java.time.Instant.now().toString.asJson,
+      "rejudged"      -> cfg.rejudge.asJson,
+      "config"        -> config,
+      "corpora"       -> corpora,
       "obligations" -> entries.size.asJson,
       "totals"      -> block(outcomes),
       "perTier"     -> Json.obj(tiers.map(t => t -> block(outcomes.filter(_.entry.difficulty.tag == t))): _*),
