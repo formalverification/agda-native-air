@@ -46,85 +46,150 @@ publishable **Agda-native reasoning environment**.
 ```
 agda-native-air/
 ├── README.md
-├── LICENSE
-├── CONTRIBUTING.md
-├── CODE_OF_CONDUCT.md
-├── docs/
-│   ├── MANIFESTO.md
-│   ├── PLAN.md
-│   ├── GITHUB_PROJECT.md
-│   ├── roadmap.md
-│   ├── representation.md
-│   ├── architecture.md
-│   ├── HowToRun.md
-│   └── public-history.md
-├── agda-dojang/
-├── agda-strux/
-├── agda-mcp/
+├── LICENSE, LICENSE-docs, CONTRIBUTING.md
+├── .github/                   # CI workflow, CODEOWNERS, issue and PR templates
+├── flake.nix, flake.lock      # the pinned toolchain: Agda 2.8.0, stdlib 2.3, GHC, Scala, Spark, Python
+├── Makefile                   # the single CLI for extract → transform → ETL → train → eval
+├── agda-dojang/               # repo-local Agda library (reflection macros) + evaluation harness
+├── agda-mcp/                  # the MCP server (Haskell)
+├── agda-strux/                # structured extraction: Agda-as-a-library → JSONL (Haskell)
+├── strux-driver/              # Scala driver: runs the extractor, hosts the benchmark runner and the proof search
+├── ml-pipeline/               # Spark ETL (Scala) and training / retrieval / evaluation (Python)
+├── configs/                   # pipeline configuration: the agda-algebras extraction config, logging
 ├── data/
-├── experiments/
-└── scripts/
+│   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
+│   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
+├── docs/
+│   ├── README.md              # index of the documentation, with a reading order
+│   ├── adr/                   # architecture decision records (0001 proof search, 0002 agda-mcp)
+│   ├── agda-mcp/              # the server's design notes
+│   ├── proof-search/          # how the search works and how to read a run
+│   ├── benchmarks/            # the difficulty taxonomy
+│   ├── corpora/               # one dataset card per published corpus
+│   ├── feedback/              # documents imported from consumer projects
+│   ├── notes/                 # working notes and background reading
+│   └── mcp-field-reports.md   # the session-by-session record of the server in real use
+├── experiments/               # archived exploratory work (read-only)
+├── reports/                   # archived agent transcripts
+└── scripts/                   # launchers and Python utilities
 ```
 
 ### Main components
 
-+  `agda-dojang/`
-
-   + Agda interaction and evaluation tooling
-   + goal/context reporting
-   + hole filling and candidate checking
-   + fixture-based proof-completion demo
-
-+  `agda-strux/`
-
-   + structured corpus extraction
-   + ETL and derived views
-   + schema and validation tooling
-
-+  `agda-mcp/`
-
-   + bridge layer
-   + agent-facing tool definitions and implementations
-
-+  `data/`
-
-   + committed fixtures and benchmark slices
-
-+  `experiments/`
-
-   + local models
-   + retrieval experiments
-   + archived exploratory work
++  `agda-mcp/`: the bridge.  A Haskell MCP server that exposes Agda's proof state,
+   type-checking verdicts, live scope and type queries, and corpus search to any
+   MCP client.  Its design record is [`docs/adr/0002-agda-mcp.md`](docs/adr/0002-agda-mcp.md).
++  `agda-dojang/`: the interaction layer.  A repo-local Agda library whose
+   reflection macros report goals and contexts, plus the proof-completion
+   evaluation harness.
++  `agda-strux/`: the extractor.  A Haskell backend linking Agda as a library;
+   its `agda-json` executable turns a checked module into canonical JSONL, one row
+   per definition.
++  `strux-driver/`: the Scala driver.  It runs the extractor over a library,
+   validates and transforms the JSONL, hosts the benchmark runner, and hosts the
+   proof search (`struxdriver.search`), a client of `agda-mcp` like any agent.
++  `ml-pipeline/`: the ETL and modelling layer.  A Spark job turns JSONL into
+   Parquet features; the Python side holds training, retrieval, and evaluation
+   code.
++  `data/benchmarks/`: the benchmark suite.  Paired obligation and gold modules,
+   a machine-readable index, and the difficulty classification of every row.
++  `docs/`: design records, notes, dataset cards, and the evidence record;
+   [`docs/README.md`](docs/README.md) is the map.
 
 ---
 
 ## Current status
 
-This repository is the public continuation of a private proof-of-concept development effort.
+As of September 2026 the following are built, measured, and in use.
 
-The following already exist in working form:
++  **`agda-mcp` v0.2.0**.  Thirteen tools over stdio: four proof-state tools
+   (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`), a whole-project
+   gate (`check_project`), five live queries answered by a persistent interaction
+   lane (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`),
+   and three corpus-backed search tools (`search_by_name`, `search_by_type`,
+   `get_dependencies`), which the server registers only when it is started with
+   a corpus.  Every verdict on a file is the exit code of the `agda` run that
+   produced it, `check_project` reports the exit code of the project's own gate
+   without misreporting it, every response about a file names the tree it
+   checked, and a server pointed at the wrong checkout refuses rather than
+   guesses.  The tool contracts are in
+   [`agda-mcp/README.md`](agda-mcp/README.md); the design decisions and the
+   evidence behind them are [ADR 0002](docs/adr/0002-agda-mcp.md); connecting an
+   agent, to this repository or to another Agda project, is
+   [`docs/HowToRun.md` § 13](docs/HowToRun.md).  The server is in use from Claude
+   Code sessions on two external Agda projects,
+   [`ualib/agda-algebras`](https://github.com/ualib/agda-algebras) and the
+   Cardano formal ledger specification,
+   [`IntersectMBO/formal-ledger-specifications`](https://github.com/IntersectMBO/formal-ledger-specifications);
+   what those sessions did with it, and
+   where it fell short, is recorded session by session in
+   [`docs/mcp-field-reports.md`](docs/mcp-field-reports.md).
++  **Two corpora**, extracted by `agda-strux` from pinned library commits and
+   described by dataset cards under [`docs/corpora/`](docs/corpora/): the Agda
+   standard library 2.3 (55,576 definitions from 1,153 modules;
+   [card](docs/corpora/agda-stdlib-v0.md), reproducible from the flake in
+   minutes) and agda-algebras (13,123 definitions from 409 modules;
+   [card](docs/corpora/agda-algebras-v0.1.md), published as the
+   [`agda-algebras-corpus-v0.1`](https://github.com/formalverification/agda-native-air/releases/tag/agda-algebras-corpus-v0.1)
+   release).
++  **A benchmark of 55 proof obligations** with gold solutions, in three
+   library tiers: 22 from the standard library, 21 mined from agda-algebras at
+   the corpus commit, and 12 standard-library obligations whose proofs need a
+   lemma the fixture imports but never names (the haystack tier).  Every row is
+   classified into one of three difficulty tiers.  Every gold type-checks under
+   the pinned toolchain, and CI re-verifies a slice whenever the benchmark, the
+   Scala driver, or the flake changes.  See
+   [`data/benchmarks/README.md`](data/benchmarks/README.md) and
+   [`docs/benchmarks/taxonomy.md`](docs/benchmarks/taxonomy.md).
++  **Proof search on `agda-mcp`**.  A beam search in `strux-driver` proposes
+   terms for the open hole, by rule or by retrieval over a corpus, and lets Agda
+   judge every step.  The measured record: the fixed action space solves 8 of
+   the 43 obligations of the first two library tiers and none of the 12 haystack
+   rows, 8 of 55 in all; its 6 of 22 on the standard-library tier is exactly that tier's
+   term-mode ceiling (the other sixteen golds restructure the clause: thirteen
+   inductions, two case splits, and one reasoning chain whose imports the
+   obligation does not carry, none of which a term can express).  Retrieval adds
+   no solve under target exclusion on those two tiers, while the labeled
+   controls with exclusion off commit all five excluded standard-library lemmas
+   and one wholesale agda-algebras lemma end to end, so the machinery works; on
+   the agda-algebras tier the ledgers locate the binding constraint in ranking
+   at scale.  On the haystack tier, built so that retrieval has a needle to
+   find, retrieval solves 6 of 12 against the fixed space's 0 of 12, the first
+   solves under exclusion.  A stronger scorer is in review
+   ([#152](https://github.com/formalverification/agda-native-air/pull/152)); the
+   tracking issue, [#113](https://github.com/formalverification/agda-native-air/issues/113),
+   carries the current numbers.  How the search works is
+   [`docs/proof-search/overview.md`](docs/proof-search/overview.md); its decisions
+   and numbers are [ADR 0001](docs/adr/0001-proof-search-on-agda-mcp.md).
++  **The extraction and evaluation pipeline**, end to end: `agda-strux` →
+   `strux-driver` → the Spark ETL and Python layers, with a proof-completion
+   evaluator whose reports share one schema with the search's, so a model's
+   result and a search's result sit in the same table.
 
-+  deterministic fixture-based proof completion;
-+  Agda-in-the-loop propose → check workflows;
-+  structured extraction and ETL foundations;
-+  schema documentation and evaluation reports.
+What comes next, in the order the evidence argues for:
 
-The following is currently under development:
++  **Ranking at scale** ([#19](https://github.com/formalverification/agda-native-air/issues/19)):
+   the agda-algebras ledgers and the haystack nulls locate the binding
+   constraint in ranking thousands of in-scope lemmas; a learned
+   premise-selection scorer slots into the seam the search already exposes.
++  **An agent-in-the-loop measurement** ([#154](https://github.com/formalverification/agda-native-air/issues/154)):
+   a frontier model driving the server over the same 43 obligations under a
+   fixed prompt and budget, reported per tier beside the search's numbers.
++  **The field stream** (Milestone 5): the ergonomics the field reports keep
+   asking for, such as batch verdicts, a returned patch from `fill_hole`, a
+   library registry that survives worktree churn, and a profiling tool.
++  **Local specialist models** (Milestones 2 and 4): not started.  When they
+   arrive they attach to `agda-mcp` as extra tools, so the interface an agent
+   sees does not change.
 
-+  `agda-mcp`;
-+  retrieval over structured Agda corpora;
-+  local specialist models for narrow tasks such as premise selection and candidate ranking.
+For the plan and the record behind this section, see
 
-For details, see
-
-+  [`docs/README.md`](docs/README.md): the index of `docs/`, what lives where and a reading order
-+  [`docs/MANIFESTO.md`](docs/MANIFESTO.md): motivation and vision for the project
-+  [`docs/PLAN.md`](docs/PLAN.md): project plan
-+  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md): living project roadmap (milestones and issues, synced with GitHub)
-+  [`docs/roadmap.md`](docs/roadmap.md): the frozen bootstrap plan the repository's issues were populated from
-+  [`docs/representation.md`](docs/representation.md): data contracts / schemas
-+  [`docs/architecture.md`](docs/architecture.md): system architecture overview
-+  [`docs/public-history.md`](docs/public-history.md): notes on the early history of this repository
++  [`docs/README.md`](docs/README.md): the index of `docs/`, what lives where, and a reading order;
++  [`docs/GITHUB_PROJECT.md`](docs/GITHUB_PROJECT.md): the living roadmap, milestones and issues synced with GitHub;
++  [`docs/architecture.md`](docs/architecture.md): the system architecture, layer by layer, with per-layer status;
++  [`docs/MANIFESTO.md`](docs/MANIFESTO.md) and [`docs/PLAN.md`](docs/PLAN.md): motivation, vision, and the plan by phase;
++  [`docs/representation.md`](docs/representation.md): the data contract for what the extractor emits;
++  [`docs/public-history.md`](docs/public-history.md): notes on the early history of this repository.
 
 ---
 
