@@ -451,6 +451,9 @@ help:
 	@echo "                                     PROOF_SEARCH_RECALL_REPORT=<run>/report.json PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RECALL_SCORERS=a,b"
 	@echo "  make proof-search-loop-it        - Proof-search P1: live full-search regression vs the real agda-mcp"
 	@echo "  make proof-search-retrieval-it   - Proof-search P2: live corpus-tool transport test (issue 123)"
+	@echo "  make agent-bench                 - Agent-in-the-loop: a frontier model driving agda-mcp over the benchmark (issue 154)"
+	@echo "  make agent-bench-rejudge         - Re-judge an existing agent-bench run from its archived final files and transcripts"
+	@echo "  make agent-bench-it              - Agent-bench: the judge's Agda typecheck gate against a committed gold and obligation"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1723,6 +1726,64 @@ proof-search-recall: _check-sbt
 	@echo ">> [proof-search-recall] scorers=$(PROOF_SEARCH_RECALL_SCORERS) exclusion=$(PROOF_SEARCH_EXCLUDE) corpus=$(PROOF_SEARCH_CORPUS) goals=$(PROOF_SEARCH_RECALL_REPORT)"
 	@cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
 	  "runMain struxdriver.search.RetrievalRecall --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --corpus $(abspath $(PROOF_SEARCH_CORPUS)) --report $(abspath $(PROOF_SEARCH_RECALL_REPORT)) --project-root $(CURDIR) --out $(abspath $(PROOF_SEARCH_RECALL_OUT)) --scorers $(PROOF_SEARCH_RECALL_SCORERS) --exclude-target $(PROOF_SEARCH_EXCLUDE) --k $(PROOF_SEARCH_RECALL_K) --allow-untyped-context $(PROOF_SEARCH_RECALL_ALLOW_UNTYPED)"
+
+# Agent-in-the-loop evaluation (issue #154, [M1-10]): one fresh, non-interactive
+# `claude -p` session per obligation, with the thirteen agda-mcp tools and Read
+# and Edit on a staged copy of the one file, under a turn cap, a wall cap, and a
+# cost cap; the final file is judged by the gold verifier's own `agda`
+# invocation (with --safe) plus the statement-preservation, escape-hatch, and
+# hole gates, and a file that names the library's own lemma for the statement
+# is reported `restated`, never `solved`.  Needs the Agda-capable dev shell and
+# a logged-in `claude` CLI on PATH:
+#
+#     nix develop .#backend --command make agent-bench AGENT_BENCH_MODEL=claude-sonnet-5
+#
+# Outputs land under $(AGENT_BENCH_OUT_DIR)/<run-id>/ (gitignored): report.json
+# (the loop's shape: perTier, perStratum, outcomes with turns, per-tool call
+# counts, wall, cost, tokens), results.jsonl and fixtures.jsonl
+# (eval-proof-completion.v0), and per-subject transcripts (stream-json), final
+# files, and judge verdicts under subjects/.  A full arm runs for hours: launch
+# it detached (see the running-proof-search-sweeps skill), never as a
+# foreground shell.
+AGENT_BENCH_OUT_DIR         ?= data/benchmarks/reports/agent-bench
+AGENT_BENCH_MODEL           ?= claude-sonnet-5
+AGENT_BENCH_IDS             ?= --all
+AGENT_BENCH_MAX_TURNS       ?= 30
+AGENT_BENCH_WALL_CAP        ?= 900
+AGENT_BENCH_MAX_BUDGET_USD  ?= 3.00
+AGENT_BENCH_PARALLELISM     ?= 1
+AGENT_BENCH_SAFE            ?= on
+AGENT_BENCH_PERSIST         ?= off
+AGENT_BENCH_CLAUDE_BIN      ?= claude
+AGENT_BENCH_CORPUS_STDLIB   ?= data/corpora/agda-stdlib/v0/corpus.jsonl
+AGENT_BENCH_CORPUS_ALGEBRAS ?= data/corpora/agda-algebras/v0.1/corpus.jsonl
+AGENT_BENCH_RUN_ID          ?= agent-$(AGENT_BENCH_MODEL)-$(shell date -u +%Y%m%dT%H%M%SZ)
+
+.PHONY: agent-bench agent-bench-rejudge agent-bench-it
+
+# One arm: the model named by AGENT_BENCH_MODEL over the whole suite (or
+# AGENT_BENCH_IDS="--ids id1,id2"), AGENT_BENCH_PARALLELISM subjects at once.
+agent-bench: _check-sbt
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	echo ">> [agent-bench] model=$(AGENT_BENCH_MODEL) turns=$(AGENT_BENCH_MAX_TURNS) wall=$(AGENT_BENCH_WALL_CAP)s budget=$(AGENT_BENCH_MAX_BUDGET_USD) parallelism=$(AGENT_BENCH_PARALLELISM) run-id=$(AGENT_BENCH_RUN_ID) against $$AGDA_MCP_BIN"; \
+	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))"
+
+# Re-judge a finished run (AGENT_BENCH_RUN_ID=<run-id>): no model is called;
+# the archived final files are judged again and the report rebuilt, so a
+# judge fix never costs a sweep.
+agent-bench-rejudge: _check-sbt
+	@set -e; \
+	echo ">> [agent-bench-rejudge] run-id=$(AGENT_BENCH_RUN_ID)"; \
+	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
+	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) --all --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --project-root $(CURDIR) --safe $(AGENT_BENCH_SAFE)"
+
+# The judge's typecheck gate against the real `agda` (AgentBenchIntegrationSpec):
+# a committed gold passes under --safe, the obligation is refused.
+agent-bench-it: _check-sbt
+	@echo ">> [agent-bench-it] the judge's Agda gate on a committed gold and obligation"; \
+	cd "$(STRUX_DRIVER)" && AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
+	  "testOnly struxdriver.agentbench.AgentBenchIntegrationSpec"
 
 
 
