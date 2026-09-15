@@ -62,13 +62,19 @@
   *
   *  Invocation (see the proof-search-recall Make target)
   *  -----------------------------------------------------
+  *    ROOT=/path/to/repo
   *    sbt "runMain struxdriver.search.RetrievalRecall
-  *          --index data/benchmarks/benchmark-index.jsonl
-  *          --corpus data/corpora/agda-algebras/v0.1/corpus.jsonl
-  *          --report data/benchmarks/reports/proof-search/<run>/report.json
-  *          --project-root /path/to/repo --out recall.json
+  *          --index $ROOT/data/benchmarks/benchmark-index.jsonl
+  *          --corpus $ROOT/data/corpora/agda-algebras/v0.1/corpus.jsonl
+  *          --report $ROOT/data/benchmarks/reports/proof-search/<run>/report.json
+  *          --project-root $ROOT --out /path/to/recall.json
   *          [--scorers token-overlap,…] [--exclude-target on|off] [--k 8,32]
   *          [--ids id1,id2 | --all] [--top 8]"
+  *
+  *  Path flags are ordinary paths, resolved by the process that reads them
+  *  (sbt forks with its cwd in strux-driver/, so the Make target passes them
+  *  absolute); `--project-root` is where the index's own `obligation` paths,
+  *  repo-relative by the index schema, resolve.
   *
   *  ============================================================================
   */
@@ -86,7 +92,8 @@ import struxdriver.benchmark.{Obligation => IndexEntry}
 
 /** A corpus loaded in-process, answering the three tools with the server's
   * own semantics (agda-mcp `Corpus.hs`): case-insensitive substring match on
-  * `prettyQname` (name search) or on the printed type (type search), results
+  * `prettyQname` OR `prettyName` (name search) or on the printed type (type
+  * search), results
   * in the corpus map's key order, `Data.Text`'s `Ord`, which is code-point
   * order, not Java's UTF-16 unit order (they differ on the astral glyphs
   * agda-algebras names are full of), and truncated at the limit.  The wire
@@ -94,19 +101,31 @@ import struxdriver.benchmark.{Obligation => IndexEntry}
   * Dependency expansion answers empty: the instrument measures the pool the
   * default configuration ranks, and `expandDeps` is off in every published
   * sweep.
+  *
+  * `prettyNames` is each row's `prettyName` by `prettyQname`, kept beside
+  * the hit because the server's name search matches EITHER field and the
+  * wire result carries only the qualified one (PR #152 review, round five).
+  * A row without an entry is matched on its bare name, the last segment of
+  * its qualified name, which is what `prettyName` is on every row of both
+  * published corpora (68,699 rows, measured); the loader records the field
+  * itself so the replay does not rest on that measurement.
   */
-final class InMemoryCorpus(val rows: Vector[SearchHit]) extends CorpusSearch {
+final class InMemoryCorpus(val rows: Vector[SearchHit], prettyNames: Map[String, String] = Map.empty) extends CorpusSearch {
   private val byQname: Map[String, SearchHit] = rows.map(h => h.prettyQname -> h).toMap
   private val ordered: Vector[SearchHit]      = rows.sortBy(_.prettyQname)(InMemoryCorpus.codePointOrder)
 
   def lookup(prettyQname: String): Option[SearchHit] = byQname.get(prettyQname)
 
-  private val loweredQname: Vector[(SearchHit, String)] = ordered.map(h => h -> InMemoryCorpus.foldCase(h.prettyQname))
+  /** The row's `prettyName` as the server indexes it (see the class header). */
+  def prettyNameOf(h: SearchHit): String = prettyNames.getOrElse(h.prettyQname, h.bareName)
+
+  private val loweredNames: Vector[(SearchHit, String, String)] =
+    ordered.map(h => (h, InMemoryCorpus.foldCase(h.prettyQname), InMemoryCorpus.foldCase(prettyNameOf(h))))
   private val loweredType:  Vector[(SearchHit, String)] = ordered.map(h => h -> InMemoryCorpus.foldCase(h.tpe))
 
   def byName(pattern: String, limit: Int): IO[Vector[SearchHit]] = IO.pure {
     val p = InMemoryCorpus.foldCase(pattern)
-    loweredQname.collect { case (h, q) if q.contains(p) => h }.take(math.max(1, limit))
+    loweredNames.collect { case (h, q, n) if q.contains(p) || n.contains(p) => h }.take(math.max(1, limit))
   }
   def byType(pattern: String, limit: Int): IO[Vector[SearchHit]] = IO.pure {
     val p = InMemoryCorpus.foldCase(pattern)
@@ -149,24 +168,29 @@ object InMemoryCorpus {
     */
   def load(path: Path): IO[(InMemoryCorpus, Int, DefinitionTable)] =
     Jsonl.parsed(path).compile.fold(Loading.empty)(_ line _).map { l =>
-      (new InMemoryCorpus(dedupLastWins(l.rows)), l.bad, new DefinitionTable(l.defs))
+      (new InMemoryCorpus(dedupLastWins(l.rows), l.names), l.bad, new DefinitionTable(l.defs))
     }
 
   /** What loading accumulates, line by line: the rows the server would
-    * index, in file order; the definition table over them; and the count of
-    * lines the server drops, an unparsable line or a row its decoder
-    * refuses.
+    * index, in file order; their `prettyName`s by qualified name (the last
+    * row per name wins, as in the server's index); the definition table
+    * over them; and the count of lines the server drops, an unparsable line
+    * or a row its decoder refuses.
     */
-  private final case class Loading(rows: Vector[SearchHit], defs: Map[String, Vector[String]], bad: Int) {
+  private final case class Loading(rows: Vector[SearchHit], names: Map[String, String],
+                                   defs: Map[String, Vector[String]], bad: Int) {
     def line(parsed: Either[io.circe.ParsingFailure, Json]): Loading = parsed.fold(_ => copy(bad = bad + 1), row)
     // Only a row the server would index reaches the definition table (PR
     // #152 review, round two).
     def row(json: Json): Loading = SearchHit.fromCorpusRow(json) match {
-      case Right(h) => copy(rows = rows :+ h, defs = DefinitionTable.record(defs, json))
+      case Right(h) =>
+        copy(rows  = rows :+ h,
+             names = names ++ json.hcursor.get[String]("prettyName").toOption.map(h.prettyQname -> _),
+             defs  = DefinitionTable.record(defs, json))
       case Left(_)  => copy(bad = bad + 1)
     }
   }
-  private object Loading { val empty: Loading = Loading(Vector.empty, Map.empty, 0) }
+  private object Loading { val empty: Loading = Loading(Vector.empty, Map.empty, Map.empty, 0) }
 
   /** One row per `prettyQname`, the last in input order winning (the server's
     * `Map.fromList` semantics); the survivors keep their input order.
@@ -458,7 +482,7 @@ object RetrievalRecall extends IOApp {
       |    --index PATH           benchmark-index.jsonl (the `target:` / `restates:` tags are the ground truth)
       |    --corpus PATH          agda-strux corpus JSONL, loaded in-process (no server)
       |    --report PATH          a loop run's report.json: the goal displays (and contexts, when recorded)
-      |    --project-root PATH    repo root: index paths resolve here
+      |    --project-root PATH    repo root: the index's obligation paths resolve here
       |    --out PATH             the JSON report to write
       |    (--ids id1,id2 | --all)
       |    [--scorers a,b]        scorers to rank with, by name (default: token-overlap)

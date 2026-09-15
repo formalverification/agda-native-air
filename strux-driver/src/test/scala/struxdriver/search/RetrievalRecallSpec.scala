@@ -221,6 +221,36 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     RetrievalRecall.parseArgs(base ++ List("--scorers")).isLeft shouldBe true
   }
 
+  test("corpus: a name query matches prettyName as well as prettyQname, as the server's search_by_name does (#152 review, round five)") {
+    // A row whose prettyName is not a substring of its prettyQname: no row of
+    // either published corpus is shaped so (prettyName is the last segment on
+    // all 68,699), but the server's predicate has the second disjunct and the
+    // replay mirrors it rather than resting on the measurement.
+    val hit = row("Setoid.X.lemma", "A → B")
+    val c   = new InMemoryCorpus(Vector(hit), Map("Setoid.X.lemma" -> "other-name"))
+    c.byName("other", 10).unsafeRunSync() shouldBe Vector(hit)
+    c.byName("X.lem", 10).unsafeRunSync() shouldBe Vector(hit)
+    c.byName("missing", 10).unsafeRunSync() shouldBe Vector.empty
+    // Without a recorded name the bare name stands in, which is the same
+    // predicate whenever prettyName is the last segment.
+    new InMemoryCorpus(Vector(hit)).byName("lemma", 10).unsafeRunSync() shouldBe Vector(hit)
+    new InMemoryCorpus(Vector(hit)).byName("other", 10).unsafeRunSync() shouldBe Vector.empty
+    // The loader records the field from the row itself.
+    val rowJson = io.circe.parser.parse(
+      """{"file":"f.lagda.md","module":"Setoid.X","name":"lemma","qname":"Setoid.X.lemma",
+        |"prettyModule":"Setoid.X","prettyName":"other-name","prettyQname":"Setoid.X.lemma",
+        |"type":"A → B","typeAstVersion":"0.3-v0","defKind":"function",
+        |"dependencies":[],"astSize":3,"hasBody":true,"body":"x"}""".stripMargin).toOption.get
+    val tmp = Files.createTempFile("recall-rows", ".jsonl")
+    try {
+      Files.write(tmp, rowJson.noSpaces.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+      val (loaded, bad, _) = InMemoryCorpus.load(tmp).unsafeRunSync()
+      bad shouldBe 0
+      loaded.byName("other-name", 10).unsafeRunSync().map(_.prettyQname) shouldBe Vector("Setoid.X.lemma")
+      loaded.prettyNameOf(loaded.rows.head) shouldBe "other-name"
+    } finally Files.delete(tmp)
+  }
+
   test("corpus: a row is one the server's decoder keeps, projected to the wire subset (#152 review, rounds two and three)") {
     val full = io.circe.parser.parse(
       """{"file":"f.lagda.md","module":"Overture.Basic._","name":"𝑖𝑑","qname":"Overture.Basic._.𝑖𝑑",

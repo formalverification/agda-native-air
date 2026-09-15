@@ -61,10 +61,11 @@
   *
   *  Invocation (see the proof-search-loop Make target)
   *  ---------------------------------------------------
+  *    ROOT=/path/to/repo
   *    sbt "runMain struxdriver.search.ProofSearchLoop
-  *          --index data/benchmarks/benchmark-index.jsonl --all
-  *          --out-dir data/benchmarks/reports/proof-search --run-id beam1
-  *          --server-bin /path/to/agda-mcp --project-root /path/to/repo
+  *          --index $ROOT/data/benchmarks/benchmark-index.jsonl --all
+  *          --out-dir $ROOT/data/benchmarks/reports/proof-search --run-id beam1
+  *          --server-bin /path/to/agda-mcp --project-root $ROOT
   *          [--beam 4] [--max-depth 6] [--probe-budget 60]
   *          [--dedup script|content] [--peek on|off]"
   *
@@ -210,7 +211,7 @@ object ProofSearchLoop extends IOApp {
       |    (--ids id1,id2 | --all)
       |    --out-dir PATH         run roots land here
       |    --server-bin PATH      the agda-mcp binary
-      |    --project-root PATH    repo root: server cwd; index paths resolve here
+      |    --project-root PATH    repo root: server cwd; the index's obligation paths resolve here
       |    [--run-id STR]         default: epoch millis
       |    [--agda-flags STR]     default: the committed .mcp.json flag set
       |    [--server-timeout N]   per-Agda-call bound, seconds (default 600)
