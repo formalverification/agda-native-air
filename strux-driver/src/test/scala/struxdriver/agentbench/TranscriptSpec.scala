@@ -69,6 +69,16 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     Audit.terminalOf(killed = false, t.result) shouldBe "completed"
   }
 
+  private val cleanVerdict = Verdict(None, Vector.empty, Vector.empty, "bodyRefs", None, Vector.empty, Some(0), Some(0), Some(1L), None)
+
+  test("a tool presented beyond the protocol is an anomaly, used or not") {
+    val t   = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
+    val iso = Audit.isolation(t, workDir)
+    Outcomes.anomalyOf(t, iso, cleanVerdict) shouldBe None
+    Outcomes.anomalyOf(t, iso.copy(extraTools = Vector("Bash")), cleanVerdict) shouldBe Some("tools presented beyond the protocol: Bash")
+    Outcomes.anomalyOf(t, iso, cleanVerdict.copy(checkExit = Some(1))).exists(_.contains("disagree")) shouldBe true
+  }
+
   private val entry = IndexEntry("x-id", "agda-stdlib", "M", Paths.get("data/x/X.agda"), Paths.get("data/g/X.agda"),
     "refl", "x", "T", Difficulty.Routine, "d", "s", Vector.empty)
 

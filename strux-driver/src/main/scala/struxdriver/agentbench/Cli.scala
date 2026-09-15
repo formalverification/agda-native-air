@@ -47,6 +47,14 @@ final case class AgentBenchConfig(
   resume:          Boolean
 ) {
   def layout: RunLayout = RunLayout(outDir.resolve(runId))
+
+  /** The flags every Agda of the protocol runs with: the subjects' servers,
+    * the harness's own server that stages the work copies and answers the
+    * judge, and the verifier's `agda` (Judge.typecheck adds the same flag
+    * itself).  `--safe` joins them whenever the judge is safe, so the
+    * `check_file` verdict a subject sees is the judge's.
+    */
+  def serverAgdaFlags: String = if (safe) agdaFlags + " --safe" else agdaFlags
 }
 
 object Cli {
@@ -67,13 +75,13 @@ object Cli {
       |    [--wall-cap N]            per-subject wall cap, seconds (default 900)
       |    [--max-budget-usd D]      per-subject cost cap (default 3.00)
       |    [--parallelism N]         subjects at once (default 1; wall clocks are indicative only above 1)
-      |    [--safe on|off]           judge with --safe (default on: every committed gold passes under it)
+      |    [--safe on|off]           the subjects' servers and the judge run with --safe (default on: every committed gold passes under it)
       |    [--persist-sessions on|off]  let the client write its session to disk (default off)
       |    [--claude-bin PATH]       the claude CLI (default: claude on PATH)
       |    [--agda-flags STR]        default: the committed .mcp.json flag set
       |    [--server-timeout N]      per-Agda-call bound, seconds (default 600)
-      |    [--rejudge]               re-judge an existing run root from subjects/; no model call (the server and the extractor are still needed)
-      |    [--resume on|off]         keep the archived, non-anomalous subjects of this run id and run only the rest (default off)
+      |    [--rejudge]               re-judge an existing run root from subjects/ with its own prompts; no model call (the server and the extractor are still needed)
+      |    [--resume on|off]         keep the archived, non-anomalous subjects of this run id and run only the rest (default off); refused when the run id's recorded protocol differs
       |""".stripMargin
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",

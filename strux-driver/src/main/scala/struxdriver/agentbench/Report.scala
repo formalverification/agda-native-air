@@ -12,9 +12,10 @@
   *  corpora, obligations, totals, perTier, perStratum, perTool, outcomes),
   *  `results.jsonl` (one eval-proof-completion.v0 row per fill_hole probe),
   *  `fixtures.jsonl` (one per obligation), and the console summary.  The
-  *  config block records every cap and client flag, the prompts' digests,
-  *  and the client version; a re-judge carries the run's own config and
-  *  corpora blocks forward, since it is not told them again.
+  *  config block records the protocol (every cap and client flag, the
+  *  prompts' digests, the client version; Protocol.scala) and the run's own
+  *  knobs; a re-judge carries the run's own config and corpora blocks
+  *  forward, since it is not told them again.
   *
   *  ============================================================================
   */
@@ -23,8 +24,6 @@ package struxdriver.agentbench
 import cats.effect.IO
 import io.circe.Json
 import io.circe.syntax._
-import java.nio.file.Paths
-import scala.concurrent.duration._
 
 import struxdriver.benchmark.{Obligation => IndexEntry}
 import struxdriver.io.TextIO
@@ -56,33 +55,17 @@ object Report {
     all.map(_._1).distinct.map(n => n -> all.filter(_._1 == n).map(_._2).sum).sortBy { case (n, k) => (-k, n) }
   }
 
-  /** The config block of a fresh run: every knob, flag, and digest a reader needs to reproduce it. */
-  private def builtConfig(cfg: AgentBenchConfig, version: String, sysP: String, userT: String): Json = {
-    val subject = SubjectConfig(cfg.claudeBin, cfg.model.getOrElse(""), cfg.maxTurns, cfg.wallCapSec.seconds, cfg.maxBudgetUsd,
-      cfg.projectRoot, cfg.serverBin.getOrElse(Paths.get("")), cfg.agdaFlags, cfg.serverTimeout, cfg.persistSessions, sysP, userT)
-    Json.obj(
-      "model"            -> cfg.model.asJson,
-      "maxTurns"         -> cfg.maxTurns.asJson,
-      "wallCapSec"       -> cfg.wallCapSec.asJson,
-      "maxBudgetUsd"     -> cfg.maxBudgetUsd.asJson,
-      "parallelism"      -> cfg.parallelism.asJson,
-      "safe"             -> cfg.safe.asJson,
-      "serverTimeout"    -> cfg.serverTimeout.asJson,
-      "agdaFlags"        -> cfg.agdaFlags.asJson,
-      "claudeBin"        -> cfg.claudeBin.asJson,
-      "claudeVersion"    -> version.asJson,
-      "claudeFlags"      -> Subject.fixedFlags(subject).asJson,
-      "envAdded"         -> Subject.envAdded.asJson,
-      "envRemovedPrefix" -> Subject.envRemovedPrefix.asJson,
-      "tools"            -> (Subject.fileTools.toVector.sorted ++ Subject.agdaTools).asJson,
-      "persistSessions"  -> cfg.persistSessions.asJson,
-      "resume"           -> cfg.resume.asJson,
-      "prompts" -> Json.obj(
-        "system" -> Json.obj("path" -> "prompts/system-prompt.md".asJson, "sha256" -> TextIO.sha256(sysP).asJson),
-        "user"   -> Json.obj("path" -> "prompts/user-prompt.md".asJson,   "sha256" -> TextIO.sha256(userT).asJson)),
-      "gates"            -> Vector("preservation", "escape", "holes", "typecheck", "isolation").asJson
-    ).dropNullValues
-  }
+  /** The config block of a fresh run: the protocol (Protocol.of, every knob
+    * a subject sees and the judge applies) plus what only this run of it
+    * chose (parallelism, the client binary, resume) and the gate names.
+    */
+  private def builtConfig(cfg: AgentBenchConfig, version: String, sysP: String, userT: String): Json =
+    Protocol.of(cfg, version, sysP, userT).deepMerge(Json.obj(
+      "parallelism" -> cfg.parallelism.asJson,
+      "claudeBin"   -> cfg.claudeBin.asJson,
+      "resume"      -> cfg.resume.asJson,
+      "gates"       -> Vector("preservation", "escape", "holes", "typecheck", "isolation").asJson
+    ))
 
   /** Write the three files and print the summary. */
   def write(

@@ -47,10 +47,17 @@ object AgentBench extends IOApp {
       entries  <- Scaffold.readIndex(cfg.index, cfg.ids)
       _        <- IO.raiseWhen(entries.isEmpty)(new RuntimeException("no obligations matched"))
       _        <- IO.blocking(Files.createDirectories(layout.runRoot))
-      sysP     <- TextIO.resource("agentbench/system-prompt.md")
-      userT    <- TextIO.resource("agentbench/user-prompt.md")
-      _        <- TextIO.write(layout.prompts.resolve("system-prompt.md"), sysP)
-      _        <- TextIO.write(layout.prompts.resolve("user-prompt.md"), userT)
+      // The prompts: a fresh run packages them into the archive; a re-judge
+      // reads the archive's own, so the record of what the subjects saw is
+      // never rewritten by a later resource.
+      sysP     <- if (cfg.rejudge) archived(layout.prompts.resolve("system-prompt.md")) else TextIO.resource("agentbench/system-prompt.md")
+      userT    <- if (cfg.rejudge) archived(layout.prompts.resolve("user-prompt.md")) else TextIO.resource("agentbench/user-prompt.md")
+      version  <- if (cfg.rejudge) IO.pure("n/a (rejudge)") else Subject.version(cfg.claudeBin)
+      // A run id is one protocol: a fresh run records its own before anything
+      // spawns, and a resumed one must be the protocol on record.
+      _        <- if (cfg.rejudge) IO.unit else Protocol.admit(layout, Protocol.of(cfg, version, sysP, userT), cfg.resume)
+      _        <- if (cfg.rejudge) IO.unit
+                  else TextIO.write(layout.prompts.resolve("system-prompt.md"), sysP) *> TextIO.write(layout.prompts.resolve("user-prompt.md"), userT)
       // A re-judge keeps the run's own record of how its subjects were run:
       // the previous report's config and corpora blocks are carried over,
       // since the harness is not told the model or the corpora a second time.
@@ -76,10 +83,13 @@ object AgentBench extends IOApp {
       corpora  <- previous.flatMap(_.hcursor.downField("corpora").focus).map(IO.pure).getOrElse(
                     Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
                       .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*)))
-      version  <- if (cfg.rejudge) IO.pure("n/a (rejudge)") else Subject.version(cfg.claudeBin)
       _        <- Report.write(cfg, entries, driven, corpora, version, sysP, userT, previous.flatMap(_.hcursor.downField("config").focus))
       anomalies = driven.map(_.outcome).filter(_.anomaly.isDefined)
       _        <- anomalies.traverse_(o => IO.println(s"!! ${o.entry.id} anomaly: ${o.anomaly.getOrElse("")}"))
     } yield if (anomalies.isEmpty) ExitCode.Success else ExitCode.Error
   }
+
+  /** An archived prompt, named when missing: a re-judge never substitutes the packaged one. */
+  private def archived(p: java.nio.file.Path): IO[String] =
+    TextIO.read(p).adaptError { case e => new RuntimeException(s"no archived prompt at $p (a re-judge reads the run's own prompts): ${e.getMessage}") }
 }

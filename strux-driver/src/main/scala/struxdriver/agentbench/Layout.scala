@@ -25,6 +25,7 @@ import java.nio.file.Path
 /** The run directory. */
 final case class RunLayout(runRoot: Path) {
   def report:     Path = runRoot.resolve("report.json")
+  def protocol:   Path = runRoot.resolve("protocol.json")
   def results:    Path = runRoot.resolve("results.jsonl")
   def fixtures:   Path = runRoot.resolve("fixtures.jsonl")
   def prompts:    Path = runRoot.resolve("prompts")

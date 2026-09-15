@@ -48,7 +48,7 @@ import io.circe.Json
 import io.circe.syntax._
 import java.io.File
 import java.lang.ProcessBuilder.Redirect
-import java.nio.file.Path
+import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -69,6 +69,27 @@ final case class SubjectConfig(
   userTemplate:    String
 ) {
   def runServer: Path = projectRoot.resolve("scripts/run-server.sh")
+}
+
+object SubjectConfig {
+  /** The one reading of the harness config into a subject's: the server flags
+    * are the protocol's (`--safe` included when the judge is safe).
+    */
+  def of(cfg: AgentBenchConfig, systemPrompt: String, userTemplate: String): SubjectConfig =
+    SubjectConfig(
+      claudeBin       = cfg.claudeBin,
+      model           = cfg.model.getOrElse(""),
+      maxTurns        = cfg.maxTurns,
+      wallCap         = cfg.wallCapSec.seconds,
+      maxBudgetUsd    = cfg.maxBudgetUsd,
+      projectRoot     = cfg.projectRoot,
+      serverBin       = cfg.serverBin.getOrElse(Paths.get("")),
+      agdaFlags       = cfg.serverAgdaFlags,
+      serverTimeout   = cfg.serverTimeout,
+      persistSessions = cfg.persistSessions,
+      systemPrompt    = systemPrompt.trim,
+      userTemplate    = userTemplate
+    )
 }
 
 /** How a subject process ended: its exit code (None when the wall cap killed it) and its wall clock. */

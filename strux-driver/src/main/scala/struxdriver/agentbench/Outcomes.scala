@@ -8,8 +8,9 @@
   *  Purpose
   *  -------
   *  What one obligation earned (issue #154), and how that is derived from a
-  *  subject's archive alone: read the final file, the transcript, and the
-  *  process record; audit the transcript (Audit.scala); run the gates
+  *  subject's archive alone: read the final file, the transcript, the
+  *  process record, and the server config (for the work directory the
+  *  subject had); audit the transcript (Audit.scala); run the gates
   *  (Judge.scala); assemble the outcome, the eval-proof-completion.v0
   *  fixture row, and the attempt rows; write the verdict beside the archive.
   *  Because this step reads only what the runner archived, `--rejudge` can
@@ -18,14 +19,16 @@
   *  Anomaly rules
   *  -------------
   *  A row is an anomaly, not a result, when the subject never had the
-  *  instrument: no init record (the client never started), the agda server
-  *  not connected, the tools presented as deferred names, a tool missing, the
+  *  instrument as the protocol fixes it: no init record (the client never
+  *  started), the agda server not connected, the tools presented as deferred
+  *  names, one of the thirteen missing, a tool presented beyond Read, Edit,
+  *  and the thirteen (used or not: the arm is exactly those fifteen), the
   *  account's rate limit refusing service, or a client error that is not one
   *  of the stated caps; and when the two batch verdicts on the final file
   *  (the gold verifier's agda and the server's check_file) disagree, which is
-  *  a configuration fact, not a fact about the proof.  The gates still run on
-  *  the file, so the anomaly keeps its diagnostics, and the run exits
-  *  non-zero.
+  *  a configuration fact, not a fact about the proof.  The rules are
+  *  `anomalyOf`, first that applies.  The gates still run on the file, so the
+  *  anomaly keeps its diagnostics, and the run exits non-zero.
   *
   *  ============================================================================
   */
@@ -152,13 +155,26 @@ object Outcomes {
   def anomaly(layout: RunLayout, entry: IndexEntry, msg: String): Judged =
     judged(layout, Outcome.anomaly(entry, msg, 0L), Vector.empty)
 
+  /** The anomaly rules of the header, first that applies. */
+  def anomalyOf(t: Transcript, iso: Isolation, verdict: Verdict): Option[String] = {
+    val capped = t.result.exists(r => r.subtype.contains("max_turns") || r.subtype.contains("budget"))
+    if (t.init.isEmpty) Some("no init record: the subject never started (see stderr.log)")
+    else if (!iso.mcpConnected) Some("agda server not connected in the subject's session")
+    else if (iso.toolsDeferred) Some("agda tools were presented as deferred names")
+    else if (iso.missingAgdaTools.nonEmpty) Some(s"agda tools missing from the session: ${iso.missingAgdaTools.mkString(",")}")
+    else if (iso.extraTools.nonEmpty) Some(s"tools presented beyond the protocol: ${iso.extraTools.mkString(",")}")
+    else if (t.rateLimitRejected) Some(s"rate limited: ${t.rateLimits.map(_._1).distinct.mkString(",")}")
+    else if (t.result.exists(_.isError) && !capped) Some(s"client error (${t.result.map(_.subtype).getOrElse("?")}): ${t.result.map(_.text.take(200)).getOrElse("")}")
+    else if (verdict.verdictsDisagree) Some(s"the gold verifier's agda (exit ${verdict.agdaExit.getOrElse(-1)}) and check_file (exit ${verdict.checkExit.getOrElse(-1)}) disagree on the final file")
+    else None
+  }
+
   /** Judge one archived subject: transcript, isolation, gates, outcome. */
   def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry, agda: Agda): IO[Judged] = {
     val layout    = cfg.layout
     val subj      = layout.subject(entry.id)
     val stem      = Scaffold.fixtureStem(entry)
     val finalFile = subj.finalFile(stem)
-    val workDir   = layout.workDir(entry.id)
     val obFile    = cfg.projectRoot.resolve(entry.obligationPath)
     val goldFile  = cfg.projectRoot.resolve(entry.goldPath)
     for {
@@ -166,6 +182,10 @@ object Outcomes {
       finalText  <- TextIO.read(finalFile)
       stream     <- TextIO.read(subj.transcript).handleError(_ => "")
       record     <- TextIO.readJson(subj.runRecord).map(_.flatMap(SubjectRun.fromJson))
+      // The work directory is the one the subject's server config names, so
+      // a copy of the archive re-judges as the original; the run root's is
+      // the fallback for an archive without one.
+      workDir    <- TextIO.readJson(subj.mcpConfig).map(_.flatMap(Audit.workDirOf).getOrElse(layout.workDir(entry.id)))
       t           = Transcript.parse(stream)
       killed      = record.exists(_.killed)
       wallMs      = record.map(_.wallMs).getOrElse(t.result.map(_.durationMs).getOrElse(0L))
@@ -173,15 +193,7 @@ object Outcomes {
       verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
                     else verdict.gate
-      capped      = t.result.exists(r => r.subtype.contains("max_turns") || r.subtype.contains("budget"))
-      anomaly     = if (t.init.isEmpty) Some("no init record: the subject never started (see stderr.log)")
-                    else if (!iso.mcpConnected) Some("agda server not connected in the subject's session")
-                    else if (iso.toolsDeferred) Some("agda tools were presented as deferred names")
-                    else if (iso.missingAgdaTools.nonEmpty) Some(s"agda tools missing from the session: ${iso.missingAgdaTools.mkString(",")}")
-                    else if (t.rateLimitRejected) Some(s"rate limited: ${t.rateLimits.map(_._1).distinct.mkString(",")}")
-                    else if (t.result.exists(_.isError) && !capped) Some(s"client error (${t.result.map(_.subtype).getOrElse("?")}): ${t.result.map(_.text.take(200)).getOrElse("")}")
-                    else if (verdict.verdictsDisagree) Some(s"the gold verifier's agda (exit ${verdict.agdaExit.getOrElse(-1)}) and check_file (exit ${verdict.checkExit.getOrElse(-1)}) disagree on the final file")
-                    else None
+      anomaly     = anomalyOf(t, iso, verdict)
       solved      = gate.isEmpty && verdict.solved
       restated    = gate.isEmpty && verdict.restated
       outcome     = Outcome(

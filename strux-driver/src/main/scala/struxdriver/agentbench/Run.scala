@@ -15,9 +15,10 @@
   *  it left and how its process ended, and hand the archive to the judge
   *  (Outcomes.judgeOne).  Subjects run `parallelism` at a time; the staging
   *  server serializes its own calls.  Under `--resume` a subject already
-  *  archived with no anomaly is kept and re-judged; `--rejudge` re-judges
-  *  every archived subject and spawns nothing.  A failure inside one drive is
-  *  that row's anomaly, never the sweep's.
+  *  archived with no anomaly is kept and re-judged, once the run id's
+  *  recorded protocol (Protocol.scala) has been found to be this run's;
+  *  `--rejudge` re-judges every archived subject and spawns nothing.  A
+  *  failure inside one drive is that row's anomaly, never the sweep's.
   *
   *  ============================================================================
   */
@@ -27,7 +28,6 @@ import cats.effect.{IO, Ref}
 import cats.effect.syntax.all._
 import cats.syntax.all._
 import java.nio.file.{Files, StandardCopyOption}
-import scala.concurrent.duration._
 
 import struxdriver.benchmark.{Obligation => IndexEntry}
 import struxdriver.io.TextIO
@@ -41,21 +41,7 @@ object Run {
     */
   def driveAll(cfg: AgentBenchConfig, entries: Vector[IndexEntry], client: McpClient, extractor: Extractor, sysP: String, userT: String): IO[Vector[Judged]] = {
     val layout  = cfg.layout
-    val bin     = cfg.serverBin.getOrElse(throw new IllegalStateException("server-bin required"))
-    val subject = SubjectConfig(
-      claudeBin       = cfg.claudeBin,
-      model           = cfg.model.getOrElse(""),
-      maxTurns        = cfg.maxTurns,
-      wallCap         = cfg.wallCapSec.seconds,
-      maxBudgetUsd    = cfg.maxBudgetUsd,
-      projectRoot     = cfg.projectRoot,
-      serverBin       = bin,
-      agdaFlags       = cfg.agdaFlags,
-      serverTimeout   = cfg.serverTimeout,
-      persistSessions = cfg.persistSessions,
-      systemPrompt    = sysP.trim,
-      userTemplate    = userT
-    )
+    val subject = SubjectConfig.of(cfg, sysP, userT)
     for {
       _       <- IO.println(s">> agent-bench: ${entries.size} obligation(s), model=${subject.model} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} parallelism=${cfg.parallelism} safe=${cfg.safe}")
       _       <- IO.println(s">> run root: ${layout.runRoot}")

@@ -38,6 +38,11 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     Cli.parse(rejudge ++ List("--server-bin", "bin")) shouldBe Left("missing --agda-json-bin")
   }
 
+  test("the subjects' servers and the judge share one flag set: --safe on adds --safe, off does not") {
+    Cli.parse(base ++ List("--all", "--agda-flags", "-l x")).map(_.serverAgdaFlags) shouldBe Right("-l x --safe")
+    Cli.parse(base ++ List("--all", "--agda-flags", "-l x", "--safe", "off")).map(_.serverAgdaFlags) shouldBe Right("-l x")
+  }
+
   test("an unknown flag and a bad on|off value are refused by name") {
     Cli.parse(base ++ List("--all", "--bogus", "1")) shouldBe Left("unrecognized argument: --bogus")
     Cli.parse(base ++ List("--all", "--safe", "maybe")) shouldBe Left("bad --safe: maybe (on|off)")

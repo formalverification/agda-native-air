@@ -1810,6 +1810,7 @@ agent-bench-archive:
 	test -f "$$src/report.json" || { echo "ERROR: no report.json under $$src (set AGENT_BENCH_RUN_ID)"; exit 1; }; \
 	mkdir -p "$$dst/subjects" "$$dst/prompts"; \
 	cp "$$src"/report.json "$$src"/results.jsonl "$$src"/fixtures.jsonl "$$dst"/; \
+	if [ -f "$$src"/protocol.json ]; then cp "$$src"/protocol.json "$$dst"/; fi; \
 	cp "$$src"/prompts/*.md "$$dst"/prompts/; \
 	for d in "$$src"/subjects/*/; do id=$$(basename "$$d"); mkdir -p "$$dst/subjects/$$id/final"; \
 	  cp "$$d"transcript.jsonl "$$d"outcome.json "$$d"mcp.json "$$d"prompt.txt "$$d"run.json "$$dst/subjects/$$id/"; \

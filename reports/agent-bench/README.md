@@ -22,9 +22,15 @@ from the harness's own output and never edited by hand.
    agda-algebras v0.1 corpus, digest `af864432`, for the others) plus Read and
    Edit on that file; no shell, no settings, no CLAUDE.md, no skills, no
    memory; the tools presented eagerly with their descriptions; the client
-   confined to the work directory.  The flag set, the environment additions,
-   and the prompts are recorded verbatim in each run's `report.json` and
-   `prompts/`.
+   confined to the work directory.  The subject's server runs with the
+   judge's `--safe`, so the `check_file` verdict it sees is the judge's (the
+   three archived arms ran their subjects' servers without it: no final file
+   carries a safe-flag refusal, and every subject's last `check_file`
+   verdict agrees with the judge's, so no verdict depends on the
+   difference).  The flag set, the environment additions, and the prompts
+   are recorded verbatim in each run's `report.json` and `prompts/`, and the
+   protocol (every knob a subject sees and the judge applies) in
+   `protocol.json`, written before the first subject spawns.
 +  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own list-price
    accounting, per subject; three subjects at a time, so wall clocks are
    indicative only.
@@ -51,10 +57,13 @@ from the harness's own output and never edited by hand.
    `JudgeSpec` and `AgentBenchIntegrationSpec` pin the rules and the live
    gates.
 +  **Isolation, verified per subject**.  From each transcript: the server
-   connected, the thirteen tools presented and not deferred, no tool used
-   beyond Read, Edit, and the thirteen, and no Read or Edit outside the work
-   directory that succeeded (refused attempts are counted separately).  A
-   subject that fails the first three is an anomaly, not a row.
+   connected; the tools presented exactly Read, Edit, and the thirteen, and
+   not deferred; no tool used beyond them; and no Read or Edit outside the
+   work directory that succeeded (refused attempts are counted separately).
+   A subject that never had that instrument (the first two, a tool presented
+   beyond the fifteen included, used or not) is an anomaly, not a row; one
+   that used a tool beyond them or left the directory fails the isolation
+   gate.
 
 ## What a run directory holds
 
@@ -129,9 +138,14 @@ make agent-bench-archive AGENT_BENCH_RUN_ID=agent-sonnet5-1
 ```
 
 `make agent-bench-rejudge AGENT_BENCH_RUN_ID=<run-id>` judges an archived run
-again from its final files without a model call (the server and the extractor
-are still consulted), so a judge change never costs a sweep.  A model's answers are not deterministic: a second seed of the
-frontier arm is recorded above for that reason, and any new run gets a new
-run id.
+again from its final files and its own archived prompts without a model call
+(the server and the extractor are still consulted), so a judge change never
+costs a sweep; a copy of an archive re-judges as the original, the isolation
+audit taking the work directory from the subject's own server config.  A run id is one protocol: `--resume on` keeps an archived
+subject only when the run's `protocol.json` is the current protocol, field
+for field, and refuses the run id otherwise (the archived arms predate the
+record and cannot be resumed).  A model's answers are not deterministic: a
+second seed of the frontier arm is recorded above for that reason, and any
+new run gets a new run id.
 
 [#154]: https://github.com/formalverification/agda-native-air/issues/154

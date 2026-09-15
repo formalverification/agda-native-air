@@ -80,6 +80,18 @@ object Audit {
       }
     }
 
+  /** The work directory the subject's own server config names: the parent
+    * of the staged file its check command ends with.  A re-judge of an
+    * archive copied elsewhere audits the transcript's paths against the
+    * directory the subject had, not the copy's.
+    */
+  def workDirOf(mcpConfig: Json): Option[Path] = {
+    val args = mcpConfig.hcursor.downField("mcpServers").downField("agda").get[Vector[String]]("args").toOption.getOrElse(Vector.empty)
+    args.sliding(2).collectFirst { case Vector("--check-command", cmd) => cmd }
+      .flatMap(cmd => cmd.trim.split("\\s+").lastOption)
+      .map(Paths.get(_)).filter(_.isAbsolute).flatMap(f => Option(f.getParent))
+  }
+
   def isolation(t: Transcript, workDir: Path): Isolation = {
     val init    = t.init
     val tools   = init.map(_.tools).getOrElse(Vector.empty)
