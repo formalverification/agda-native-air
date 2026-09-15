@@ -260,7 +260,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Evidence**.  At library scale (the published agda-algebras v0 corpus, `docs/corpora/`), 11,666 rows and 185 MB of JSONL load in about 1.4 s to a 308 MB resident footprint, because the index keeps only the fields the tools serve and drops `typeAst` and proof bodies; `hasBody` tells an agent a term exists to go and read.  Two consequences are documented for query writers: dependency tokens are fully qualified, and 655 `prettyQname` keys are shared by more than one row.  `make corpus-mcp-smoke` drives all three tools over the transport.
 
-**Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.  Its phase 1 landed on 2026-09-15 (PR [#PR-17-PHASE-1]): `search_in_scope`, the fourteenth tool, reads the file's import surface off the code-only view, ranks the in-scope rows of the index with the driver's token-overlap scorer, and returns only renderings the interaction lane has typed in the file's scope, with an honesty ledger on every response; the contract is the issue's comment of that date, and phase 2 (`search_term`) stays open on [#17].
+**Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.  Its phase 1 landed on 2026-09-15 (PR [#161]): `search_in_scope`, the fourteenth tool, reads the file's import surface off the code-only view, ranks the in-scope rows of the index with the driver's token-overlap scorer, and returns only renderings the interaction lane has typed in the file's scope, with an honesty ledger on every response; the contract is the issue's comment of that date, and phase 2 (`search_term`) stays open on [#17].
 
 ---
 
@@ -435,6 +435,7 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 [#146]: https://github.com/formalverification/agda-native-air/issues/146
 [#147]: https://github.com/formalverification/agda-native-air/issues/147
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
 
 [#459]: https://github.com/ualib/agda-algebras/issues/459
 [#507]: https://github.com/ualib/agda-algebras/pull/507
