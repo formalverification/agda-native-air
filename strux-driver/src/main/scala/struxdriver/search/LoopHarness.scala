@@ -50,13 +50,13 @@
   *    fixtures.jsonl — per-fixture summary rows (eval-proof-completion.v0).
   *    timing.jsonl   — the proof-search-timing.v0 ledger, with the new
   *                     type_of and peek phases beside P0's.
-  *    report.json    — config, per-tier solve counts, per-STRATUM solve
+  *    report.json    - config, per-tier solve counts, per-STRATUM solve
   *                     counts (issue #129: `source`, plus the `stratum:` tag
-  *                     when the index row carries one — `agda-stdlib`,
-  *                     `agda-stdlib/haystack`, `agda-algebras/wholesale` —
-  *                     so a tier quoted on its own baseline stays reportable
-  *                     on its own in a full sweep), per-fixture outcomes, and
-  *                     the oracle split (batch vs knowledge vs proposal).
+  *                     when the index row carries one, giving `agda-stdlib`,
+  *                     `agda-stdlib/haystack`, `agda-algebras/wholesale`, so a
+  *                     tier quoted on its own baseline stays reportable on its
+  *                     own in a full sweep), per-fixture outcomes, and the
+  *                     oracle split (batch vs knowledge vs proposal).
   *    work/, logs/, solved/ — working copies, raw replies, solved artifacts.
   *
   *  Invocation (see the proof-search-loop Make target)

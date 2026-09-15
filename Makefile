@@ -1570,9 +1570,10 @@ eval-benchmark eval-benchmark-gold: _check-sbt
 	  "runMain struxdriver.benchmark.EvalBenchmark --verify-gold --index $(CURDIR)/$(BENCHMARK_INDEX) --out-dir $(CURDIR)/$(BENCHMARK_REPORT_DIR) --project-root $(CURDIR)"
 	@echo ">> [eval-benchmark] report written to $(BENCHMARK_REPORT)"
 
-# Smoke slice for CI: a 6-obligation subset (one per difficulty tier per
-# library), plus a determinism check that the report is byte-identical across
-# two runs once the wall-clock fields are stripped.
+# Smoke slice for CI: the BENCHMARK_SMOKE_IDS subset (one obligation per
+# difficulty tier per benchmark tier, nine in all), plus a determinism check that
+# the report is byte-identical across two runs once the wall-clock fields are
+# stripped.
 eval-benchmark-smoke: _check-sbt
 	@set -euo pipefail; \
 	sel="$$(printf '%s\n' $(BENCHMARK_SMOKE_IDS) | sed 's/.*/"id":"&"/' | paste -sd'|' -)"; \
