@@ -55,6 +55,18 @@ git worktree add -b 99-new-feature ../worktrees/99-new-feature main
 cd ../worktrees/99-new-feature
 ```
 
+A fresh worktree has no built `agda-mcp` server (`dist-newstyle/` is
+gitignored), so a Claude Code session started there reports the `agda` MCP
+server as failed to connect until you build it, about two minutes warm:
+
+```bash
+nix develop .#backend --command bash -c 'cd agda-mcp && cabal build -v0 exe:agda-mcp'
+```
+
+The launcher says so on stderr (`no built server under …/agda-mcp/dist-newstyle`),
+but Claude Code shows only `CONNECTION_CLOSED`; the full stderr is in
+`~/.cache/claude-cli-nodejs/<project>/mcp-logs-agda/`.
+
 ### List and remove worktrees
 
 ```bash

@@ -63,6 +63,24 @@ cd "${REPO_ROOT}"
 # Darwin, which the flake also declares as a system.
 unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
 
+# Say the most likely cause of a failed launch FIRST.  The MCP client keeps
+# only the stderr that arrives before the connection closes, and the
+# authoritative check below runs after the shell entry, which takes seconds;
+# in the field the client's log ended at the shellHook's first bytes and the
+# real message never showed.  This is a heuristic (a glob where the check
+# below asks cabal), so it warns and continues rather than deciding.
+if [ -z "${AGDA_MCP_BIN:-}" ]; then
+  prebuilt=""
+  for candidate in "${REPO_ROOT}"/agda-mcp/dist-newstyle/build/*/ghc-*/agda-mcp-*/x/agda-mcp/build/agda-mcp/agda-mcp; do
+    if [ -f "$candidate" ]; then prebuilt="$candidate"; break; fi
+  done
+  if [ -z "$prebuilt" ]; then
+    echo "agda-mcp: no built server under ${REPO_ROOT}/agda-mcp/dist-newstyle (a fresh worktree?)." >&2
+    echo "agda-mcp: if this launch fails, build it first:  cd ${REPO_ROOT}/agda-mcp && cabal build exe:agda-mcp   (inside nix develop .#backend)" >&2
+    echo "agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary." >&2
+  fi
+fi
+
 # Save real stdout on fd 3, then redirect stdout → stderr.
 # This catches all shellHook banner output that leaks to stdout.
 exec 3>&1 1>&2

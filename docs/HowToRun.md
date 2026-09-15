@@ -789,6 +789,12 @@ cabal build
 cabal test
 ```
 
+Every git worktree needs its own build: `dist-newstyle/` is gitignored, so a
+fresh worktree has no server binary, and `scripts/run-server.sh` (which the
+`.mcp.json` registration runs) cannot connect a Claude Code session there until
+`cabal build exe:agda-mcp` has run in that worktree.  The launcher names the
+missing build on stderr; the client shows only `CONNECTION_CLOSED`.
+
 The test suite includes both pure tests (marker parsing, hole finding) and tier-2
 integration tests that invoke a real `agda` binary.  For the integration tests, you
 must be in the Nix `backend` shell (`nix develop .#backend`) or have `agda` in
