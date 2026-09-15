@@ -58,6 +58,7 @@ agda-native-air/
 ├── configs/                   # pipeline configuration: the agda-algebras extraction config, logging
 ├── data/
 │   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
+│   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
 ├── docs/
 │   ├── README.md              # index of the documentation, with a reading order
 │   ├── adr/                   # architecture decision records (0001 proof search, 0002 agda-mcp)
