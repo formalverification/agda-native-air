@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3143,
-  "agdaTail" : "Checking List-map-id (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-list-map-id/final/List-map-id.agda).",
+  "agdaMs" : 3048,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Agda.Primitive.Set} (xs : Agda.Builtin.List.List A) →\nData.List.Base.map Function.Base.id xs Agda.Builtin.Equality.≡ xs",
+    "final" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-map-id/final/List-map-id.agda",
   "transcriptPath" : "subjects/stdlib-list-map-id/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file (exit code 0, no diagnostics, no holes), with `map-id` proven by induction: `map-id [] = refl` and `map-id (x ∷ xs) = cong (x ∷_) (map-id xs)`.",

@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3397,
+  "agdaMs" : 2994,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+    "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda",
   "transcriptPath" : "subjects/haystack-bool-and-assoc-diag/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",

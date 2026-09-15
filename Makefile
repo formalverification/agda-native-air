@@ -1630,6 +1630,14 @@ define RESOLVE_AGDA_MCP_BIN
   test -n "$$AGDA_MCP_BIN" || { echo "ERROR: could not resolve the agda-mcp binary"; exit 1; }
 endef
 
+# Resolve the agda-strux extractor the agent bench's judge drives, building
+# it first (like RESOLVE_AGDA_MCP_BIN; the extraction lanes' resolver does not
+# build, since a fresh worktree has no dist-newstyle).
+define RESOLVE_AGDA_JSON_BIN_BUILT
+  $(call run_backend,cd "$(AGDA_STRUX_DIR)" && cabal build -v0 exe:agda-json); \
+  $(RESOLVE_AGDA_JSON_BIN)
+endef
+
 .PHONY: proof-search-single-step proof-search-split proof-search-it
 
 # One obligation (PROOF_SEARCH_ID), k stub candidates, one pass: which close it?
@@ -1767,25 +1775,29 @@ AGENT_BENCH_ARCHIVE_DIR     ?= reports/agent-bench
 # One arm: the model named by AGENT_BENCH_MODEL over the whole suite (or
 # AGENT_BENCH_IDS="--ids id1,id2"), AGENT_BENCH_PARALLELISM subjects at once.
 agent-bench: _check-sbt
-	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
 	echo ">> [agent-bench] model=$(AGENT_BENCH_MODEL) turns=$(AGENT_BENCH_MAX_TURNS) wall=$(AGENT_BENCH_WALL_CAP)s budget=$(AGENT_BENCH_MAX_BUDGET_USD) parallelism=$(AGENT_BENCH_PARALLELISM) run-id=$(AGENT_BENCH_RUN_ID) against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))"
+	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))"
 
 # Re-judge a finished run (AGENT_BENCH_RUN_ID=<run-id>): no model is called;
-# the archived final files are judged again and the report rebuilt, so a
-# judge fix never costs a sweep.
+# the archived final files are judged again (the harness's server and the
+# extractor answer the judge) and the report rebuilt, so a judge fix never
+# costs a sweep.  AGENT_BENCH_PARALLELISM rows at a time.
 agent-bench-rejudge: _check-sbt
-	@set -e; \
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
 	echo ">> [agent-bench-rejudge] run-id=$(AGENT_BENCH_RUN_ID)"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) --all --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --project-root $(CURDIR) --safe $(AGENT_BENCH_SAFE)"
+	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) --all --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE)"
 
-# The judge's typecheck gate against the real `agda` (AgentBenchIntegrationSpec):
-# a committed gold passes under --safe, the obligation is refused.
+# The judge against the real server, agda, and extractor (AgentBenchIntegrationSpec):
+# a committed gold is solved; the obligation fails on holes; a weakened
+# statement, an edited import, a postulate, a wrong proof, and a restatement
+# each fail by name, all named by Agda.
 agent-bench-it: _check-sbt
-	@echo ">> [agent-bench-it] the judge's Agda gate on a committed gold and obligation"; \
-	cd "$(STRUX_DRIVER)" && AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
+	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
+	echo ">> [agent-bench-it] the judge against $$AGDA_MCP_BIN and $$AGDA_JSON_BIN"; \
+	cd "$(STRUX_DRIVER)" && AGDA_MCP_BIN="$$AGDA_MCP_BIN" AGDA_JSON_BIN="$$AGDA_JSON_BIN" AGDA_NATIVE_AIR_ROOT="$(CURDIR)" $(SBT) $(SBT_FLAGS) \
 	  "testOnly struxdriver.agentbench.AgentBenchIntegrationSpec"
 
 # Archive a run that a report quotes (AGENT_BENCH_RUN_ID=<run-id>): the report,

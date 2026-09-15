@@ -47,8 +47,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2935,
+  "agdaMs" : 2904,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(a b : Agda.Builtin.Bool.Bool) →\n(a Data.Bool.Base.∧ (a Data.Bool.Base.∨ b)) Agda.Builtin.Equality.≡\n((a Data.Bool.Base.∧ a) Data.Bool.Base.∨ (a Data.Bool.Base.∧ b))",
+    "final" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda",
   "transcriptPath" : "subjects/haystack-bool-and-distrib-diag/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Bool.Properties.∧-distribˡ-∨ a a b`.",

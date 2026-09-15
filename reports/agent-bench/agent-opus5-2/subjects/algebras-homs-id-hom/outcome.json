@@ -3,7 +3,10 @@
   "difficulty" : "compositional",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.𝒾𝒹",
+    "target:Setoid.Functions.Basic.𝑖𝑑",
+    "target:Setoid.Homomorphisms.Basic.mkIsHom"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "𝒾𝒹′",
@@ -50,8 +53,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5797,
-  "agdaTail" : "Checking Homs-id-hom (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-homs-id-hom/final/Homs-id-hom.agda).",
+  "agdaMs" : 5374,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑨",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-homs-id-hom/final/Homs-id-hom.agda",
   "transcriptPath" : "subjects/algebras-homs-id-hom/transcript.jsonl",
   "lastWords" : "Yes — check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `𝑖𝑑 , record { compatible = Setoid.refl 𝔻[ 𝑨 ] }`.",

@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3420,
+  "agdaMs" : 3087,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ m)",
+    "final" : "(m n : ℕ) → m + n ≡ n + m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `+-comm` by induction on `m` using `+-identityʳ` in the base case and `cong suc` with `+-suc` in the step.",

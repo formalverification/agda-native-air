@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3601,
+  "agdaMs" : 3052,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Agda.Primitive.Set} →\n(A → B) →\n(B → A) →\nRelation.Nullary.Decidable.Core.Dec A →\nRelation.Nullary.Decidable.Core.Dec B",
+    "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
   "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where `map′` is defined by case split: `yes a ↦ yes (A→B a)` and `no na ↦ no (λ b → na (B→A b))`.",

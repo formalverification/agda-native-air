@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3113,
+  "agdaMs" : 3145,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Agda.Primitive.Set} {x y : A}\n{xs : Agda.Builtin.List.List A} →\n(x Agda.Builtin.List.List.∷ xs) Agda.Builtin.Equality.≡\n(y Agda.Builtin.List.List.∷ xs) →\nx Agda.Builtin.Equality.≡ y",
+    "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
   "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.List.Properties.∷-injectiveˡ eq`.",

@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2864,
-  "agdaTail" : "Checking Bool-and-assoc-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda).",
+  "agdaMs" : 2916,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(a b : Agda.Builtin.Bool.Bool) →\n((a Data.Bool.Base.∧ b) Data.Bool.Base.∧ a) Agda.Builtin.Equality.≡\n(a Data.Bool.Base.∧ (b Data.Bool.Base.∧ a))",
+    "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda",
   "transcriptPath" : "subjects/haystack-bool-and-assoc-diag/transcript.jsonl",
   "lastWords" : "The hole is filled with `Data.Bool.Properties.∧-assoc a b a` (the needle named qualified), and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

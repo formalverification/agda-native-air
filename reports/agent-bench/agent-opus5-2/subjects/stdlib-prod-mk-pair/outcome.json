@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3483,
-  "agdaTail" : "Checking Prod-mk-pair (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda).",
+  "agdaMs" : 3053,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Agda.Primitive.Set} → A → B → A Data.Product.Base.× B",
+    "final" : "{A B : Set} → A → B → A × B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
   "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled as `mk-pair a b = a , b`.",

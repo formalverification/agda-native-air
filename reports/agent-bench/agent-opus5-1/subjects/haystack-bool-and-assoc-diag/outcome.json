@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2701,
+  "agdaMs" : 3038,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(a b : Agda.Builtin.Bool.Bool) →\n((a Data.Bool.Base.∧ b) Data.Bool.Base.∧ a) Agda.Builtin.Equality.≡\n(a Data.Bool.Base.∧ (b Data.Bool.Base.∧ a))",
+    "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda",
   "transcriptPath" : "subjects/haystack-bool-and-assoc-diag/transcript.jsonl",
   "lastWords" : "The hole is filled with `Data.Bool.Properties.∧-assoc a b a`, and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

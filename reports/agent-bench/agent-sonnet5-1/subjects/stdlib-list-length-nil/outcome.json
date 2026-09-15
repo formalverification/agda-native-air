@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3784,
+  "agdaMs" : 3028,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} → length [] ≡ 0",
+    "final" : "{A : Set} → length [] ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-length-nil/final/List-length-nil.agda",
   "transcriptPath" : "subjects/stdlib-list-length-nil/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes), so the file type-checks correctly.",

@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3098,
-  "agdaTail" : "Checking Unit-trivial (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-unit-trivial/final/Unit-trivial.agda).",
+  "agdaMs" : 2908,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "Agda.Builtin.Unit.⊤",
+    "final" : "⊤",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
   "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file (`trivial = tt`), with no diagnostics and no remaining holes.",

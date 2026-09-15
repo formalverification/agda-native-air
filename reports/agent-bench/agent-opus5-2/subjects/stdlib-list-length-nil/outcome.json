@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3796,
-  "agdaTail" : "Checking List-length-nil (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-list-length-nil/final/List-length-nil.agda).",
+  "agdaMs" : 3042,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Agda.Primitive.Set} →\nData.List.Base.length Agda.Builtin.List.List.[]\nAgda.Builtin.Equality.≡ 0",
+    "final" : "{A : Set} → length [] ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-length-nil/final/List-length-nil.agda",
   "transcriptPath" : "subjects/stdlib-list-length-nil/transcript.jsonl",
   "lastWords" : "I filled the hole with `refl`, and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

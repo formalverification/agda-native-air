@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3629,
+  "agdaMs" : 3053,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+    "final" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-map-id/final/List-map-id.agda",
   "transcriptPath" : "subjects/stdlib-list-map-id/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

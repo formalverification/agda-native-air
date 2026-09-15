@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3394,
-  "agdaTail" : "Checking Dec-map (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-dec-map/final/Dec-map.agda).",
+  "agdaMs" : 3077,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Agda.Primitive.Set} →\n(A → B) →\n(B → A) →\nRelation.Nullary.Decidable.Core.Dec A →\nRelation.Nullary.Decidable.Core.Dec B",
+    "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
   "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where `map′` is defined by case split into `map′ A→B B→A (yes a) = yes (A→B a)` and `map′ A→B B→A (no ¬a) = no (λ b → ¬a (B→A b))`.",

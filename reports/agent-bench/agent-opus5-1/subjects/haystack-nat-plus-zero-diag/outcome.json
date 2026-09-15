@@ -47,8 +47,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2845,
+  "agdaMs" : 3045,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ m) Agda.Builtin.Equality.≡ 0 →\nm Agda.Builtin.Equality.≡ 0",
+    "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `Data.Nat.Properties.m+n≡0⇒m≡0 m eq`.",

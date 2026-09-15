@@ -1,11 +1,11 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "agent-sonnet5-1",
-  "timestamp" : "2026-09-15T17:05:16.013636014Z",
+  "timestamp" : "2026-09-15T21:54:22.370562320Z",
   "rejudged" : true,
   "config" : {
     "safe" : true,
-    "rejudgedAt" : "2026-09-15T17:05:16.011578107Z",
+    "rejudgedAt" : "2026-09-15T21:54:22.368412158Z",
     "model" : "claude-sonnet-5",
     "maxTurns" : 30,
     "wallCapSec" : 900,
@@ -443,8 +443,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2861,
+      "agdaMs" : 3546,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → 0 + n ≡ n",
+        "final" : "(n : ℕ) → 0 + n ≡ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-plus-identity-l/final/Nat-plus-identityL.agda",
       "transcriptPath" : "subjects/stdlib-nat-plus-identity-l/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -502,8 +511,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2969,
+      "agdaMs" : 3417,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(b : Bool) → not (not b) ≡ b",
+        "final" : "(b : Bool) → not (not b) ≡ b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-bool-not-involutive/final/Bool-not-involutive.agda",
       "transcriptPath" : "subjects/stdlib-bool-not-involutive/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -562,8 +580,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3115,
+      "agdaMs" : 3002,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "⊤",
+        "final" : "⊤",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
       "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
       "lastWords" : "check_file reports success:true (exit code 0, no diagnostics) on the final file with `trivial = tt`.",
@@ -622,8 +649,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3193,
+      "agdaMs" : 2990,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B : Set} → A → B → A × B",
+        "final" : "{A B : Set} → A → B → A × B",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
       "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file.",
@@ -681,8 +717,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3598,
+      "agdaMs" : 2994,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
+        "final" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-maybe-map-nothing/final/Maybe-map-nothing.agda",
       "transcriptPath" : "subjects/stdlib-maybe-map-nothing/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -741,8 +786,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3784,
+      "agdaMs" : 3028,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} → length [] ≡ 0",
+        "final" : "{A : Set} → length [] ≡ 0",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-list-length-nil/final/List-length-nil.agda",
       "transcriptPath" : "subjects/stdlib-list-length-nil/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes), so the file type-checks correctly.",
@@ -800,8 +854,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3725,
+      "agdaMs" : 2972,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{n : ℕ} → 0 < suc n",
+        "final" : "{n : ℕ} → 0 < suc n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
       "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks.",
@@ -860,8 +923,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3211,
+      "agdaMs" : 2986,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ m)",
+        "final" : "(m n : ℕ) → m + n ≡ n + m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
       "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks with the hole filled.",
@@ -919,8 +991,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2960,
+      "agdaMs" : 2994,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → n + 0 ≡ n",
+        "final" : "(n : ℕ) → n + 0 ≡ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
       "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
@@ -978,8 +1059,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2945,
+      "agdaMs" : 3007,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+        "final" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
       "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file type-checks correctly.",
@@ -1037,8 +1127,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3128,
+      "agdaMs" : 2988,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+        "final" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-plus-assoc/final/Nat-plus-assoc.agda",
       "transcriptPath" : "subjects/stdlib-nat-plus-assoc/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -1096,8 +1195,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3483,
+      "agdaMs" : 3012,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → n * 0 ≡ 0",
+        "final" : "(n : ℕ) → n * 0 ≡ 0",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-mul-zero-r/final/Nat-mul-zeroR.agda",
       "transcriptPath" : "subjects/stdlib-nat-mul-zero-r/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the module now type-checks with the hole filled by induction on n.",
@@ -1155,8 +1263,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3442,
+      "agdaMs" : 3009,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → n * 1 ≡ n",
+        "final" : "(n : ℕ) → n * 1 ≡ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda",
       "transcriptPath" : "subjects/stdlib-nat-mul-identity-r/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -1214,8 +1331,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3481,
+      "agdaMs" : 3047,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+        "final" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-list-length-append/final/List-length-append.agda",
       "transcriptPath" : "subjects/stdlib-list-length-append/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",
@@ -1273,8 +1399,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3629,
+      "agdaMs" : 3053,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+        "final" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-list-map-id/final/List-map-id.agda",
       "transcriptPath" : "subjects/stdlib-list-map-id/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -1332,8 +1467,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3617,
+      "agdaMs" : 3020,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
+        "final" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-list-append-assoc/final/List-append-assoc.agda",
       "transcriptPath" : "subjects/stdlib-list-append-assoc/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
@@ -1391,8 +1535,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2896,
+      "agdaMs" : 3044,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B C : Set} (f : B → C) (g : A → B) (xs : List A) →\nmap (f ∘ g) xs ≡ map f (map g xs)",
+        "final" : "{A B C : Set} (f : B → C) (g : A → B) (xs : List A) →\nmap (f ∘ g) xs ≡ map f (map g xs)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-list-map-compose/final/List-map-compose.agda",
       "transcriptPath" : "subjects/stdlib-list-map-compose/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file.",
@@ -1452,8 +1605,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2743,
+      "agdaMs" : 3056,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m * n ≡ n * m",
+        "final" : "(m n : ℕ) → m * n ≡ n * m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-mul-comm/final/Nat-mul-comm.agda",
       "transcriptPath" : "subjects/stdlib-nat-mul-comm/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
@@ -1512,8 +1674,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3043,
+      "agdaMs" : 3010,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+        "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-mul-distrib-r/final/Nat-mul-distribR.agda",
       "transcriptPath" : "subjects/stdlib-nat-mul-distrib-r/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",
@@ -1573,8 +1744,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3099,
+      "agdaMs" : 3003,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+        "final" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-mul-distrib-l/final/Nat-mul-distribL.agda",
       "transcriptPath" : "subjects/stdlib-nat-mul-distrib-l/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes), so the module now type-checks.",
@@ -1633,8 +1813,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3206,
+      "agdaMs" : 3056,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+        "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
       "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
       "lastWords" : "check_file reports success: true (exit code 0, no diagnostics, no holes), so the file now type-checks correctly.",
@@ -1692,8 +1881,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3346,
+      "agdaMs" : 3090,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+        "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
       "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly with the hole filled.",
@@ -1710,7 +1908,8 @@
       "source" : "agda-algebras",
       "tags" : [
         "stratum:using",
-        "universe-polymorphic"
+        "universe-polymorphic",
+        "restates:Overture.Basic.lift∼lower"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "lift∼lower",
@@ -1753,8 +1952,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3758,
+      "agdaMs" : 3086,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+        "final" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-overture-lift-lower/final/Overture-lift-lower.agda",
       "transcriptPath" : "subjects/algebras-overture-lift-lower/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file with `lift∼lower = refl`.",
@@ -1771,7 +1979,8 @@
       "source" : "agda-algebras",
       "tags" : [
         "stratum:using",
-        "universe-polymorphic"
+        "universe-polymorphic",
+        "restates:Overture.Basic.lower∼lift"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "lower∼lift",
@@ -1814,8 +2023,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3901,
+      "agdaMs" : 3130,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+        "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda",
       "transcriptPath" : "subjects/algebras-overture-lower-lift/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file with `lower∼lift = refl`.",
@@ -1831,7 +2049,8 @@
       "difficulty" : "routine",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Overture.Operations.π"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "π",
@@ -1875,8 +2094,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3408,
+      "agdaMs" : 3090,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+        "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
       "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -1893,7 +2121,9 @@
       "source" : "agda-algebras",
       "tags" : [
         "stratum:wholesale",
-        "universe-polymorphic"
+        "universe-polymorphic",
+        "restates:Setoid.Functions.Basic.lift∼lower",
+        "target:Relation.Binary.Bundles.Setoid.refl"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "lift∼lower′",
@@ -1939,8 +2169,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3306,
+      "agdaMs" : 3394,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+        "final" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-functions-lift-lower/final/Functions-lift-lower.agda",
       "transcriptPath" : "subjects/algebras-functions-lift-lower/transcript.jsonl",
       "lastWords" : "check_file reports success:true (exit code 0) with no diagnostics or open holes, so the file now type-checks successfully.",
@@ -1956,7 +2195,10 @@
       "difficulty" : "routine",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Functions.Inverses.Imagef∋f",
+        "target:Setoid.Functions.Inverses.Image_∋_.eq",
+        "target:Relation.Binary.Bundles.Setoid.refl"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "Imagef∋f′",
@@ -2000,8 +2242,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3619,
+      "agdaMs" : 3464,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-inverses-image-f-f/final/Inverses-image-f-f.agda",
       "transcriptPath" : "subjects/algebras-inverses-image-f-f/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",
@@ -2017,7 +2268,9 @@
       "difficulty" : "routine",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Functions.Inverses.InvIsInverseˡ",
+        "target:Relation.Binary.Bundles.Setoid.refl"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "InvIsInverseˡ′",
@@ -2025,7 +2278,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "bare InvIsInverseˡ"
+        "ref Setoid.Functions.Inverses.InvIsInverseˡ"
       ],
       "addedImports" : [
       ],
@@ -2063,8 +2316,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3625,
+      "agdaMs" : 3392,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda",
       "transcriptPath" : "subjects/algebras-inverses-inv-inverse-l/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks correctly with the hole filled.",
@@ -2080,7 +2342,9 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Functions.Surjective.SurjInvIsInverseʳ",
+        "target:Setoid.Functions.Inverses.InvIsInverseʳ"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "SurjInvIsInverseʳ′",
@@ -2125,8 +2389,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3863,
+      "agdaMs" : 3454,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-surjective-surjinv-inverse-r/final/Surjective-surjinv-inverse-r.agda",
       "transcriptPath" : "subjects/algebras-surjective-surjinv-inverse-r/transcript.jsonl",
       "lastWords" : "check_file reports success:true (exit code 0) on the final file, so the module type-checks with the hole filled by `InvIsInverseʳ {F = f} fE`.",
@@ -2142,7 +2415,9 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Functions.Injective.⊙-injective",
+        "target:Function.Base._∘_"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "⊙-injective′",
@@ -2150,8 +2425,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "import open import Setoid.Functions using ( ⊙-injective )",
-        "bare ⊙-injective"
+        "ref Setoid.Functions.Injective.⊙-injective"
       ],
       "addedImports" : [
         "open import Setoid.Functions using ( ⊙-injective )"
@@ -2191,8 +2465,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 4088,
+      "agdaMs" : 3441,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+        "final" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda",
       "transcriptPath" : "subjects/algebras-injective-comp-injective/transcript.jsonl",
       "lastWords" : "check_file reports success:true (exit code 0) on the final file, so the module type-checks.",
@@ -2208,7 +2491,10 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.𝒾𝒹",
+        "target:Setoid.Functions.Basic.𝑖𝑑",
+        "target:Setoid.Homomorphisms.Basic.mkIsHom"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "𝒾𝒹′",
@@ -2216,7 +2502,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "bare 𝒾𝒹"
+        "ref Setoid.Homomorphisms.Basic.𝒾𝒹"
       ],
       "addedImports" : [
       ],
@@ -2254,8 +2540,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 7231,
+      "agdaMs" : 5413,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+        "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-homs-id-hom/final/Homs-id-hom.agda",
       "transcriptPath" : "subjects/algebras-homs-id-hom/transcript.jsonl",
       "lastWords" : "check_file reports success on the final file (exit code 0, no diagnostics, no holes).",
@@ -2271,7 +2566,10 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Homomorphisms.Properties.⊙-hom",
+        "target:Setoid.Functions.Basic._⊙_",
+        "target:Setoid.Homomorphisms.Properties.⊙-is-hom"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "⊙-hom′",
@@ -2318,8 +2616,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6527,
+      "agdaMs" : 5579,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-homs-comp-hom/final/Homs-comp-hom.agda",
       "transcriptPath" : "subjects/algebras-homs-comp-hom/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -2335,7 +2642,9 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.mon→hom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.HomReduct"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "mon→hom′",
@@ -2343,7 +2652,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "bare mon→hom"
+        "ref Setoid.Homomorphisms.Basic.mon→hom"
       ],
       "addedImports" : [
       ],
@@ -2381,8 +2690,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5097,
+      "agdaMs" : 5724,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda",
       "transcriptPath" : "subjects/algebras-homs-mon-to-hom/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
@@ -2398,7 +2716,10 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Functions.Inverses.IsInRange→IsInImage",
+        "target:Setoid.Functions.Inverses.Image_∋_.eq",
+        "target:Relation.Binary.Bundles.Setoid.sym"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "IsInRange→IsInImage′",
@@ -2406,7 +2727,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "bare IsInRange→IsInImage"
+        "ref Setoid.Functions.Inverses.IsInRange→IsInImage"
       ],
       "addedImports" : [
       ],
@@ -2445,8 +2766,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3502,
+      "agdaMs" : 3477,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-inverses-range-to-image/final/Inverses-range-to-image.agda",
       "transcriptPath" : "subjects/algebras-inverses-range-to-image/transcript.jsonl",
       "lastWords" : "check_file reports success:true (exit code 0) on the final file, confirming the module type-checks with the hole filled by `IsInRange→IsInImage w`.",
@@ -2462,7 +2792,11 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Subalgebras.Properties.≥-refl",
+        "target:Function.Base._∘_",
+        "target:Setoid.Subalgebras.Properties.≅→≤",
+        "target:Setoid.Homomorphisms.Isomorphisms.≅-sym"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "≥-refl′",
@@ -2506,8 +2840,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6206,
+      "agdaMs" : 6061,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+        "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-subalgebras-sup-refl/final/Subalgebras-sup-refl.agda",
       "transcriptPath" : "subjects/algebras-subalgebras-sup-refl/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0) for the final file.",
@@ -2523,7 +2866,9 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Subalgebras.Properties.≥-trans",
+        "target:Setoid.Subalgebras.Properties.≤-trans"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "≥-trans′",
@@ -2570,8 +2915,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6188,
+      "agdaMs" : 6271,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-subalgebras-sup-trans/final/Subalgebras-sup-trans.agda",
       "transcriptPath" : "subjects/algebras-subalgebras-sup-trans/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file with the hole filled by `≤-trans q p`.",
@@ -2587,7 +2941,10 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.mon→intohom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.isHom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.isInjective"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "mon→intohom′",
@@ -2595,7 +2952,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "bare mon→intohom"
+        "ref Setoid.Homomorphisms.Basic.mon→intohom"
       ],
       "addedImports" : [
       ],
@@ -2636,8 +2993,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6670,
+      "agdaMs" : 5786,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda",
       "transcriptPath" : "subjects/algebras-homs-mon-to-intohom/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file.",
@@ -2653,7 +3019,10 @@
       "difficulty" : "compositional",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Homomorphisms.Kernels.πhom",
+        "target:Setoid.Homomorphisms.Basic.epi→hom",
+        "target:Setoid.Homomorphisms.Kernels.πepi"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "πhom′",
@@ -2700,8 +3069,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6369,
+      "agdaMs" : 5775,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-kernels-quotient-proj-hom/final/Kernels-quotient-proj-hom.agda",
       "transcriptPath" : "subjects/algebras-kernels-quotient-proj-hom/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes), so the file now type-checks correctly.",
@@ -2717,7 +3095,10 @@
       "difficulty" : "non-obvious",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Subalgebras.Properties.≤-reflexive",
+        "target:Setoid.Homomorphisms.Basic.𝒾𝒹",
+        "target:Setoid.Functions.Injective.id-is-injective"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "≤-reflexive′",
@@ -2763,8 +3144,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5550,
+      "agdaMs" : 6283,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
+        "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-subalgebras-sub-reflexive/final/Subalgebras-sub-reflexive.agda",
       "transcriptPath" : "subjects/algebras-subalgebras-sub-reflexive/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes), so the file now type-checks correctly.",
@@ -2780,7 +3170,10 @@
       "difficulty" : "non-obvious",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Subalgebras.Properties.≤-trans",
+        "target:Setoid.Homomorphisms.Properties.⊙-hom",
+        "target:Setoid.Functions.Injective.⊙-injective"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "≤-trans′",
@@ -2830,8 +3223,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5880,
+      "agdaMs" : 6328,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-subalgebras-sub-trans/final/Subalgebras-sub-trans.agda",
       "transcriptPath" : "subjects/algebras-subalgebras-sub-trans/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
@@ -2847,7 +3249,11 @@
       "difficulty" : "non-obvious",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Subalgebras.Properties.≤-trans-≅",
+        "target:Setoid.Homomorphisms.Properties.⊙-hom",
+        "target:Setoid.Functions.Injective.⊙-injective",
+        "target:Setoid.Homomorphisms.Isomorphisms.≅toInjective"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "≤-trans-≅′",
@@ -2855,7 +3261,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "bare ≤-trans-≅"
+        "ref Setoid.Subalgebras.Properties.≤-trans-≅"
       ],
       "addedImports" : [
       ],
@@ -2898,8 +3304,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6526,
+      "agdaMs" : 6241,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda",
       "transcriptPath" : "subjects/algebras-subalgebras-sub-trans-iso/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes), confirming the file now type-checks correctly.",
@@ -2915,7 +3330,12 @@
       "difficulty" : "non-obvious",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:using"
+        "stratum:using",
+        "restates:Setoid.Homomorphisms.Kernels.kercon",
+        "target:Overture.Relations.kerRel",
+        "target:Overture.Relations.kerRelOfEquiv",
+        "target:Setoid.Homomorphisms.Kernels.HomKerComp",
+        "target:Setoid.Congruences.Basic.mkcon"
       ],
       "stratum" : "agda-algebras/using",
       "hole" : "kercon′",
@@ -2923,8 +3343,7 @@
       "solved" : false,
       "restated" : true,
       "restatementEvidence" : [
-        "import open import Setoid.Homomorphisms  using ( kercon )",
-        "bare kercon"
+        "ref Setoid.Homomorphisms.Kernels.kercon"
       ],
       "addedImports" : [
         "open import Setoid.Homomorphisms  using ( kercon )"
@@ -2966,8 +3385,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6213,
+      "agdaMs" : 5723,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-kernels-ker-con/final/Kernels-ker-con.agda",
       "transcriptPath" : "subjects/algebras-kernels-ker-con/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
@@ -2983,7 +3411,9 @@
       "difficulty" : "non-obvious",
       "source" : "agda-algebras",
       "tags" : [
-        "stratum:wholesale"
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Kernels.ker-in-con",
+        "target:Function.Base.id"
       ],
       "stratum" : "agda-algebras/wholesale",
       "hole" : "ker-in-con′",
@@ -3030,8 +3460,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5965,
+      "agdaMs" : 5691,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda",
       "transcriptPath" : "subjects/algebras-kernels-ker-in-con/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file with the hole filled by `id`.",
@@ -3090,8 +3529,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3652,
+      "agdaMs" : 3142,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+        "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
       "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
       "lastWords" : "check_file reports success: true (exit code 0, no diagnostics, no holes) — the file type-checks with the hole filled by `Data.Nat.Properties.+-suc m m`.",
@@ -3150,8 +3598,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3329,
+      "agdaMs" : 3180,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+        "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
       "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file type-checks correctly with the hole filled.",
@@ -3210,8 +3667,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3049,
+      "agdaMs" : 3103,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
+        "final" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-plus-mono-diag/final/Nat-plus-mono-diag.agda",
       "transcriptPath" : "subjects/haystack-nat-plus-mono-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the module now type-checks with the hole filled by `Data.Nat.Properties.+-mono-≤ le le`.",
@@ -3270,8 +3736,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2840,
+      "agdaMs" : 3089,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+        "final" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-mul-mono-sq/final/Nat-mul-mono-sq.agda",
       "transcriptPath" : "subjects/haystack-nat-mul-mono-sq/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks correctly with the hole filled by `Data.Nat.Properties.*-mono-≤ le le`.",
@@ -3331,8 +3806,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3013,
+      "agdaMs" : 3107,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+        "final" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-plus-monus-assoc/final/Nat-plus-monus-assoc.agda",
       "transcriptPath" : "subjects/haystack-nat-plus-monus-assoc/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0) on the final file, so the module type-checks with no holes.",
@@ -3391,8 +3875,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3066,
+      "agdaMs" : 3114,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m < n → m + m < n + n",
+        "final" : "{m n : ℕ} → m < n → m + m < n + n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-plus-mono-lt-diag/final/Nat-plus-mono-lt-diag.agda",
       "transcriptPath" : "subjects/haystack-nat-plus-mono-lt-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly.",
@@ -3451,8 +3944,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3658,
+      "agdaMs" : 3095,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+        "final" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-nat-plus-le-hyp/final/Nat-plus-le-hyp.agda",
       "transcriptPath" : "subjects/haystack-nat-plus-le-hyp/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks with the hole filled.",
@@ -3511,8 +4013,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3299,
+      "agdaMs" : 3101,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+        "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
       "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly.",
@@ -3571,8 +4082,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3055,
+      "agdaMs" : 3111,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+        "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
       "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
       "lastWords" : "check_file reports success: true (exit code 0), so the module type-checks with no holes remaining.",
@@ -3631,8 +4151,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3038,
+      "agdaMs" : 3108,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+        "final" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-list-map-append-diag/final/List-map-append-diag.agda",
       "transcriptPath" : "subjects/haystack-list-map-append-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly with the hole filled by `Data.List.Properties.map-++ f xs xs`.",
@@ -3691,8 +4220,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3397,
+      "agdaMs" : 2994,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+        "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda",
       "transcriptPath" : "subjects/haystack-bool-and-assoc-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",
@@ -3751,8 +4289,17 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3026,
+      "agdaMs" : 3147,
       "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+        "final" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
       "finalPath" : "subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda",
       "transcriptPath" : "subjects/haystack-bool-and-distrib-diag/transcript.jsonl",
       "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file.",

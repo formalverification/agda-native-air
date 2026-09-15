@@ -4,7 +4,8 @@
   "source" : "agda-algebras",
   "tags" : [
     "stratum:using",
-    "universe-polymorphic"
+    "universe-polymorphic",
+    "restates:Overture.Basic.lower∼lift"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "lower∼lift",
@@ -47,8 +48,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3901,
+  "agdaMs" : 3130,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda",
   "transcriptPath" : "subjects/algebras-overture-lower-lift/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file with `lower∼lift = refl`.",

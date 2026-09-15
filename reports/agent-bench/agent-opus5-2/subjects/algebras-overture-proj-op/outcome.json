@@ -3,7 +3,8 @@
   "difficulty" : "routine",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:using"
+    "stratum:using",
+    "restates:Overture.Operations.π"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "π",
@@ -48,8 +49,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3250,
-  "agdaTail" : "Checking Overture-proj-op (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-overture-proj-op/final/Overture-proj-op.agda).",
+  "agdaMs" : 3126,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓥 a : Agda.Primitive.Level} {I : Agda.Primitive.Set 𝓥}\n{A : Agda.Primitive.Set a} →\nI → Overture.Operations.Op I A",
+    "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
   "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
   "lastWords" : "The hole is filled with `λ a → a i` (since `Op I A = (I → A) → A`, the projection applies the tuple to `i`), and check_file reports success on the final file.",

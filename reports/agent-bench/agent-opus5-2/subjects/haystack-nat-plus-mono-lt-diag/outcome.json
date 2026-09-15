@@ -47,8 +47,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2965,
-  "agdaTail" : "Checking Nat-plus-mono-lt-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-nat-plus-mono-lt-diag/final/Nat-plus-mono-lt-diag.agda).",
+  "agdaMs" : 3119,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.< n →\n(m Agda.Builtin.Nat.+ m) Data.Nat.Base.< (n Agda.Builtin.Nat.+ n)",
+    "final" : "{m n : ℕ} → m < n → m + m < n + n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-mono-lt-diag/final/Nat-plus-mono-lt-diag.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-mono-lt-diag/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `Data.Nat.Properties.+-mono-< lt lt`.",

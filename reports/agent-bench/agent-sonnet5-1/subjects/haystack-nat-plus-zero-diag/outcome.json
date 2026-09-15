@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3329,
+  "agdaMs" : 3180,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file type-checks correctly with the hole filled.",

@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2974,
+  "agdaMs" : 3127,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n((m Agda.Builtin.Nat.* n) Agda.Builtin.Nat.* p)\nAgda.Builtin.Equality.≡\n(m Agda.Builtin.Nat.* (n Agda.Builtin.Nat.* p))",
+    "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
   "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `*-assoc` by induction on `m` using `trans (*-distribʳ-+ p n (m * n)) (cong (n * p +_) (*-assoc m n p))`.",

@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3658,
+  "agdaMs" : 3095,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+    "final" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-le-hyp/final/Nat-plus-le-hyp.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-le-hyp/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks with the hole filled.",

@@ -3,7 +3,9 @@
   "difficulty" : "routine",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.InvIsInverseˡ",
+    "target:Relation.Binary.Bundles.Setoid.refl"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "InvIsInverseˡ′",
@@ -11,7 +13,7 @@
   "solved" : false,
   "restated" : true,
   "restatementEvidence" : [
-    "bare InvIsInverseˡ"
+    "ref Setoid.Functions.Inverses.InvIsInverseˡ"
   ],
   "addedImports" : [
   ],
@@ -49,8 +51,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3625,
+  "agdaMs" : 3392,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda",
   "transcriptPath" : "subjects/algebras-inverses-inv-inverse-l/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks correctly with the hole filled.",

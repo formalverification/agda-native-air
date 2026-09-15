@@ -3,7 +3,9 @@
   "difficulty" : "routine",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.InvIsInverseˡ",
+    "target:Relation.Binary.Bundles.Setoid.refl"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "InvIsInverseˡ′",
@@ -49,8 +51,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3376,
-  "agdaTail" : "Checking Inverses-inv-inverse-l (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda).",
+  "agdaMs" : 3436,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n{F : Function.Bundles.Func 𝑨 𝑩}\n{a : Relation.Binary.Bundles.Setoid.Carrier 𝑨} →\n(𝑨 Relation.Binary.Bundles.Setoid.≈\n Setoid.Functions.Inverses.Inv F Setoid.Functions.Inverses.Imagef∋f)\na",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda",
   "transcriptPath" : "subjects/algebras-inverses-inv-inverse-l/transcript.jsonl",
   "lastWords" : "The hole is filled with `Setoid.refl 𝑨` (since `Inv F {b = Func.to F a} Imagef∋f` reduces to `a`), and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

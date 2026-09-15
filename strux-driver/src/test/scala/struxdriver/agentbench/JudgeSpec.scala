@@ -6,14 +6,15 @@
   *
   *  Purpose
   *  -------
-  *  Pins the agent-bench judge's syntactic gates (issue #154) before any
-  *  model call: a gold passes every gate with no restatement evidence; the
-  *  obligation itself fails the hole gate; a weakened signature fails
-  *  preservation; a postulate and a pragma fail the escape gate; a file that
-  *  names the library original (qualified, through a module alias, by import,
-  *  or bare on a primed agda-algebras row) is flagged restated.  Then the same
-  *  gates over every committed obligation/gold pair of the benchmark index,
-  *  so the suite's own golds are the regression fixture.  Pure: no Agda.
+  *  Pins the judge's pure parts (issue #154): the frozen-text diff (module
+  *  line and import lines, comments stripped, the commented-out attack of PR
+  *  #158's review refused), and the gates as functions of Agda's answers: the
+  *  statement rule over the extractor's elaborated type ASTs (binder names
+  *  aside), the escape rule over Agda's safe-flag codes, the hole rule over `check_file`'s
+  *  count, the original's derivation from the `restates:` tag, and the
+  *  restatement rule over extractor rows captured verbatim from `agda-json`
+  *  on archived final files.  Then the diff over every committed obligation
+  *  and gold.  Agda itself is asked in AgentBenchIntegrationSpec.
   *
   *  ============================================================================
   */
@@ -73,153 +74,136 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
 
   private val st: Statement = Statement.of(obligation, "+-comm").toOption.get
 
-  private def firstGate(text: String): Option[String] = Judge.syntactic(st, Vector.empty, text)._1.map(_.gate)
-
-  test("statement: module line, four import lines, one signature, frozen blocks exclude the clause") {
+  test("statement: the module line and the four original import lines; a text without them is refused") {
     st.moduleLine shouldBe "module Nat-plus-comm where"
     st.importLines.size shouldBe 4
-    st.signature shouldBe Vector("+-comm : ∀ (m n : ℕ) → m + n ≡ n + m")
-    st.frozenBlocks.size shouldBe 6
-    st.frozenBlocks.exists(_.head.startsWith("+-comm m n")) shouldBe false
+    Statement.of("module M where\nf : A\nf = {!!}\n", "g").isLeft shouldBe true
+    Statement.of("open import X\nf : A\nf = {!!}\n", "f").isLeft shouldBe true
   }
 
-  test("gold passes every syntactic gate, logs its where-block import, and has no restatement evidence") {
-    val (gate, added, evidence) = Judge.syntactic(st, Vector.empty, gold)
-    gate shouldBe None
-    added shouldBe Vector("open import Relation.Binary.PropositionalEquality.Properties")
-    evidence shouldBe Vector.empty
+  test("imports: the gold keeps every frozen line and logs its where-block import") {
+    Gates.imports(st, gold) shouldBe Right(Vector("open import Relation.Binary.PropositionalEquality.Properties"))
   }
 
-  test("the obligation itself fails on the hole gate") {
-    firstGate(obligation) shouldBe Some("holes")
+  test("imports: a dropped import line, an edited one, and a changed module line fail preservation") {
+    Gates.imports(st, gold.replace("open import Data.Nat.Properties using ( +-identityʳ ; +-suc )\n", "")).left.map(_.gate) shouldBe Left("preservation")
+    Gates.imports(st, gold.replace("using ( _≡_ ; refl ; cong ; sym )", "using ( _≡_ ; refl ; cong ; sym ; trans )")).left.map(_.gate) shouldBe Left("preservation")
+    Gates.imports(st, gold.replace("module Nat-plus-comm where", "module Nat-plus-comm2 where")).left.map(_.gate) shouldBe Left("preservation")
   }
 
-  test("a `{! ... !}` hole and a lone `?` are holes; `?` inside a name is not") {
-    firstGate(header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = {! refl !}\n") shouldBe Some("holes")
-    firstGate(header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = ?\n") shouldBe Some("holes")
-    Gates.holes("f = g _≟_ x\n") shouldBe Right(())
-    Gates.holes("f = dec? x\n") shouldBe Right(())
-  }
-
-  test("a weakened signature fails preservation, and so does a dropped import or module line") {
-    firstGate(header + "+-comm : ∀ (m n : ℕ) → m + n ≡ m + n\n+-comm m n = refl\n") shouldBe Some("preservation")
-    val noImport = gold.replace("open import Data.Nat.Properties using ( +-identityʳ ; +-suc )\n", "")
-    firstGate(noImport) shouldBe Some("preservation")
-    firstGate(gold.replace("module Nat-plus-comm where", "module Nat-plus-comm2 where")) shouldBe Some("preservation")
-  }
-
-  test("preservation tolerates comments and blank lines between frozen lines") {
+  test("imports: comments and blank lines between frozen lines are tolerated; a commented-out copy is not code (Copilot on PR #158)") {
     val commented = gold.replace("open import AgdaDojang.Debug\n", "-- a note\nopen import AgdaDojang.Debug\n\n-- another\n")
-    firstGate(commented) shouldBe None
-  }
-
-  test("a postulate, a trustMe, and any pragma fail the escape gate; a postulate in a comment does not") {
-    val post = header + "postulate\n  ax : ∀ (m n : ℕ) → m + n ≡ n + m\n\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = ax m n\n"
-    Judge.syntactic(st, Vector.empty, post)._1 shouldBe Some(GateFailure("escape", "keyword postulate"))
-    val prag = header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n{-# TERMINATING #-}\n+-comm m n = +-comm m n\n"
-    Judge.syntactic(st, Vector.empty, prag)._1 shouldBe Some(GateFailure("escape", "pragma TERMINATING"))
-    val opts = "{-# OPTIONS --type-in-type #-}\n" + gold
-    Judge.syntactic(st, Vector.empty, opts)._1 shouldBe Some(GateFailure("escape", "pragma OPTIONS"))
-    val tm = header + "open import Relation.Binary.PropositionalEquality.TrustMe using ( trustMe )\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = trustMe\n"
-    Judge.syntactic(st, Vector.empty, tm)._1 shouldBe Some(GateFailure("escape", "keyword trustMe"))
-    val inComment = gold + "-- we could postulate this, but {- postulate -} we do not\n"
-    firstGate(inComment) shouldBe None
-  }
-
-  test("naming the original qualified is restated: directly, through a module alias, or via an import list") {
-    val direct = header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = Data.Nat.Properties.+-comm m n\n"
-    Judge.syntactic(st, Vector.empty, direct) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector("qualified Data.Nat.Properties.+-comm") }
-    val alias = header + "import Data.Nat.Properties as P\n\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = P.+-comm m n\n"
-    Judge.syntactic(st, Vector.empty, alias)._3 shouldBe Vector("qualified P.+-comm")
-    val byImport = header + "open import Data.Nat.Properties using ( +-comm ) renaming ( +-suc to ps )\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = refl\n"
-    Judge.syntactic(st, Vector.empty, byImport)._3 shouldBe Vector("import open import Data.Nat.Properties using ( +-comm ) renaming ( +-suc to ps )")
-    val renamed = header + "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = c m n\n  where open import Data.Nat.Properties renaming ( +-comm to c )\n"
-    Judge.syntactic(st, Vector.empty, renamed)._3 shouldBe Vector("import open import Data.Nat.Properties renaming ( +-comm to c )")
-  }
-
-  test("a recursive call by the hole's own bare name is not evidence on an unprimed row") {
-    Judge.syntactic(st, Vector.empty, gold)._3 shouldBe Vector.empty
-  }
-
-  test("on a primed agda-algebras row the bare unprimed name is evidence; the primed name is not") {
-    val ob =
-      """module Functions-lift-lower where
-        |
-        |open import AgdaDojang.Debug
-        |open import Setoid.Functions
-        |
-        |lift∼lower′ : (a : A)
-        |  →  P a
-        |lift∼lower′ 𝑨 a = {!!}
-        |""".stripMargin
-    val s2 = Statement.of(ob, "lift∼lower′").toOption.get
-    s2.signature shouldBe Vector("lift∼lower′ : (a : A)", "  →  P a")
-    val tags = Vector("stratum:wholesale", "restates:Setoid.Functions.Basic.lift∼lower")
-    Gates.originalOf("lift∼lower′", tags) shouldBe Gates.Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
-    Gates.originalOf("lift∼lower′", Vector.empty) shouldBe Gates.Original(None, "lift∼lower", true)
-    val bare = ob.replace("{!!}", "lift∼lower 𝑨 a")
-    Judge.syntactic(s2, tags, bare) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector("bare lift∼lower") }
-    val recursive = ob.replace("{!!}", "lift∼lower′ 𝑨 a")
-    Judge.syntactic(s2, tags, recursive)._3 shouldBe Vector.empty
-    val qualified = ob.replace("{!!}", "Setoid.Functions.Basic.lift∼lower 𝑨 a")
-    Judge.syntactic(s2, tags, qualified)._3 shouldBe Vector("qualified Setoid.Functions.Basic.lift∼lower")
-  }
-
-  test("a restates: tag names the original even when the fixture's name is not the original primed") {
-    val ob = "module M where\nopen import AgdaDojang.Debug\nfoo′ : A\nfoo′ = {!!}\n"
-    val s4 = Statement.of(ob, "foo′").toOption.get
-    val tags = Vector("restates:Some.Where.bar")
-    Gates.originalOf("foo′", tags) shouldBe Gates.Original(Some("Some.Where.bar"), "bar", true)
-    Judge.syntactic(s4, tags, ob.replace("{!!}", "bar"))._3 shouldBe Vector("bare bar")
-    Judge.syntactic(s4, tags, ob.replace("{!!}", "foo"))._3 shouldBe Vector.empty
-  }
-
-  test("a haystack row's frozen imports never count as restatement evidence") {
-    val ob =
-      """module Nat-plus-suc-diag where
-        |open import AgdaDojang.Debug
-        |open import Data.Nat.Base using ( ℕ ; suc ; _+_ )
-        |open import Data.Nat.Properties using ( +-comm )
-        |+-suc-diag : ∀ (m : ℕ) → m + suc m ≡ suc (m + m)
-        |+-suc-diag m = {!!}
-        |""".stripMargin
-    val s3 = Statement.of(ob, "+-suc-diag").toOption.get
-    val solved = ob.replace("{!!}", "Data.Nat.Properties.+-suc m m")
-    Judge.syntactic(s3, Vector("stratum:haystack"), solved) match { case (g, _, ev) => g shouldBe None; ev shouldBe Vector.empty }
-  }
-
-  test("frozen lines hidden in a block comment do not satisfy preservation (Copilot on PR #158)") {
-    // The original import line and signature survive verbatim, but inside a
-    // `{- -}` block; the active versions are widened and weakened.
+    Gates.imports(st, commented).isRight shouldBe true
     val hidden = header.replace(
       "open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )\n",
-      "{-\nopen import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )\n+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n-}\nopen import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym ; trans )\n") +
-      "+-comm : ∀ (m n : ℕ) → m + n ≡ m + n\n+-comm m n = refl\n"
-    firstGate(hidden) shouldBe Some("preservation")
+      "{-\nopen import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )\n-}\nopen import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym ; trans )\n") +
+      "+-comm : ∀ (m n : ℕ) → m + n ≡ n + m\n+-comm m n = refl\n"
+    Gates.imports(st, hidden).left.map(_.gate) shouldBe Left("preservation")
   }
 
-  test("Statement.of refuses a text without the hole's signature") {
-    Statement.of("module M where\nf : A\nf = {!!}\n", "g").isLeft shouldBe true
+  // Two elaborated types as the extractor encodes them: the same statement
+  // under different binder names, and a weakened one.
+  private def pi(name: String, cod: io.circe.Json): io.circe.Json = io.circe.Json.obj(
+    "tag" -> io.circe.Json.fromString("Type"), "sort" -> io.circe.Json.obj("tag" -> io.circe.Json.fromString("Inf")),
+    "term" -> io.circe.Json.obj("tag" -> io.circe.Json.fromString("Pi"),
+      "binder" -> io.circe.Json.obj("hiding" -> io.circe.Json.fromString("explicit"), "nameHint" -> io.circe.Json.fromString(name)),
+      "dom" -> io.circe.Json.obj("tag" -> io.circe.Json.fromString("Def"), "qname" -> io.circe.Json.fromString("Agda.Builtin.Nat.Nat")),
+      "cod" -> cod))
+  private def eq(l: Int, r: Int): io.circe.Json = io.circe.Json.obj(
+    "tag" -> io.circe.Json.fromString("Def"), "qname" -> io.circe.Json.fromString("Agda.Builtin.Equality._≡_"),
+    "elims" -> io.circe.Json.arr(io.circe.Json.obj("ix" -> io.circe.Json.fromInt(l)), io.circe.Json.obj("ix" -> io.circe.Json.fromInt(r))))
+  private val commAst   = pi("m", pi("n", eq(1, 0)))
+  private val commAstXY = pi("x", pi("y", eq(1, 0)))
+  private val weakAst   = pi("m", pi("n", eq(1, 1)))
+
+  test("statement: the elaborated types agree structurally, binder names aside; a changed or missing definition fails") {
+    val gold  = Vector(DefRow("Nat-plus-comm.+-comm", commAst, "(m n : ℕ) → m + n ≡ n + m", Vector.empty))
+    val same  = Vector(DefRow("Nat-plus-comm.+-comm", commAstXY, "(x y : ℕ) → x + y ≡ y + x", Vector.empty))
+    val weak  = Vector(DefRow("Nat-plus-comm.+-comm", weakAst, "(m n : ℕ) → m + n ≡ m + n", Vector.empty))
+    Gates.statement("Nat-plus-comm", "+-comm", gold, same) shouldBe Right(StatementCheck("(m n : ℕ) → m + n ≡ n + m", "(x y : ℕ) → x + y ≡ y + x", equal = true))
+    Gates.statement("Nat-plus-comm", "+-comm", gold, weak).left.map(_.gate) shouldBe Left("preservation")
+    Gates.statement("Nat-plus-comm", "+-comm", gold, Vector.empty).left.map(_.gate) shouldBe Left("preservation")
+    Gates.statement("Nat-plus-comm", "+-comm", Vector.empty, same).left.map(_.gate) shouldBe Left("statement")
+    Gates.withoutNameHints(commAst) shouldBe Gates.withoutNameHints(commAstXY)
+    Gates.withoutNameHints(commAst) should not be Gates.withoutNameHints(weakAst)
   }
 
-  test("every committed gold passes the syntactic gates with no restatement evidence; every obligation fails on holes") {
+  test("escape: Agda's safe-flag codes and the unsafe-import code, nothing else") {
+    Vector("SafeFlagPostulate", "SafeFlagTerminating", "SafeFlagNonTerminating", "SafeFlagPragma",
+      "SafeFlagNoPositivityCheck", "SafeFlagNoCoverageCheck", "CoInfectiveImport").forall(Gates.isEscapeCode) shouldBe true
+    Vector("NotInScope", "UnsolvedInteractionMetas", "UnequalTerms", "UnsolvedMetaVariables").exists(Gates.isEscapeCode) shouldBe false
+    val postulated = Checked(success = false, Some(42), 0, Vector("SafeFlagPostulate"), Map("SafeFlagPostulate" -> "Cannot postulate ax with safe flag"), 1)
+    Gates.escape(postulated) shouldBe Left(GateFailure("escape", "SafeFlagPostulate: Cannot postulate ax with safe flag"))
+    Gates.escape(Checked(success = true, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
+  }
+
+  test("holes: the server's count, or Agda's unsolved-interaction-metas code") {
+    Gates.holes(Checked(success = false, Some(42), 1, Vector("UnsolvedInteractionMetas"), Map.empty, 1)).left.map(_.gate) shouldBe Left("holes")
+    Gates.holes(Checked(success = false, Some(42), 0, Vector("UnsolvedInteractionMetas"), Map.empty, 1)).left.map(_.gate) shouldBe Left("holes")
+    Gates.holes(Checked(success = true, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
+  }
+
+  test("original: the restates: tag first, else the index module and the prime-stripped name") {
+    Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector("stratum:wholesale", "restates:Setoid.Functions.Basic.lift∼lower")) shouldBe
+      Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
+    Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector.empty) shouldBe Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
+    Gates.originalOf("Data.Nat.Properties", "+-comm", Vector.empty) shouldBe Original(Some("Data.Nat.Properties.+-comm"), "+-comm", false)
+    Gates.originalOf("M", "foo′", Vector("restates:Some.Where.bar")) shouldBe Original(Some("Some.Where.bar"), "bar", true)
+  }
+
+  // Extractor rows captured from `agda-json` on archived final files (2026-09-15).
+  private val noAst = io.circe.Json.Null
+  private val monToHom = Vector(DefRow("Homs-mon-to-hom.mon→hom′", noAst, "", Vector("Setoid.Homomorphisms.Basic.mon→hom")))
+  private val kerCon = Vector(
+    DefRow("Kernels-ker-con.∣h∣", noAst, "", Vector.empty),
+    DefRow("Kernels-ker-con.kercon′", noAst, "", Vector("Agda.Builtin.Sigma._,_", "Function.Bundles.Carrier", "Kernels-ker-con.∣h∣",
+      "Overture.Relations.kerRel", "Overture.Relations.kerRelOfEquiv", "Setoid.Algebras.Basic.𝔻[_]",
+      "Setoid.Congruences.Basic.mkcon", "Setoid.Homomorphisms.Kernels.HomKerComp")))
+  private val plusComm = Vector(DefRow("Nat-plus-comm.+-comm", noAst, "", Vector("Agda.Builtin.Nat.Nat", "Agda.Builtin.Nat.Nat.suc",
+    "Agda.Builtin.Nat.Nat.zero", "Agda.Builtin.Nat._+_", "Data.Nat.Properties.+-identityʳ", "Data.Nat.Properties.+-suc",
+    "Nat-plus-comm.+-comm", "Relation.Binary.PropositionalEquality.Core.cong", "Relation.Binary.PropositionalEquality.Core.sym",
+    "Relation.Binary.PropositionalEquality.Core.trans")))
+
+  test("restatement: a body that refers to the original by its qualified name is restated") {
+    val orig = Gates.originalOf("Setoid.Homomorphisms.Basic", "mon→hom′", Vector("restates:Setoid.Homomorphisms.Basic.mon→hom"))
+    Gates.restatement("Homs-mon-to-hom", "mon→hom′", orig, monToHom) shouldBe Vector("ref Setoid.Homomorphisms.Basic.mon→hom")
+  }
+
+  test("restatement: a proof from other lemmas, through a where-bound helper, is not; a recursive call is not") {
+    val orig = Gates.originalOf("Setoid.Homomorphisms.Kernels", "kercon′", Vector("restates:Setoid.Homomorphisms.Kernels.kercon"))
+    Gates.restatement("Kernels-ker-con", "kercon′", orig, kerCon) shouldBe Vector.empty
+    val origComm = Gates.originalOf("Data.Nat.Properties", "+-comm", Vector.empty)
+    Gates.restatement("Nat-plus-comm", "+-comm", origComm, plusComm) shouldBe Vector.empty
+  }
+
+  test("restatement: the closure follows the file's own helpers; a library name equal to the original's bare name counts") {
+    val orig = Gates.originalOf("Setoid.Homomorphisms.Kernels", "kercon′", Vector("restates:Setoid.Homomorphisms.Kernels.kercon"))
+    val viaHelper = Vector(
+      DefRow("Kernels-ker-con.kercon′", noAst, "", Vector("Kernels-ker-con.helper")),
+      DefRow("Kernels-ker-con.helper", noAst, "", Vector("Setoid.Homomorphisms.Kernels.kercon")))
+    Gates.restatement("Kernels-ker-con", "kercon′", orig, viaHelper) shouldBe Vector("ref Setoid.Homomorphisms.Kernels.kercon")
+    // The index names Data.Nat.Base for 0<1+n; the lemma lives in Data.Nat.Properties.
+    val origLt = Gates.originalOf("Data.Nat.Base", "0<1+n", Vector.empty)
+    Gates.restatement("Nat-zero-lt-suc", "0<1+n", origLt, Vector(DefRow("Nat-zero-lt-suc.0<1+n", noAst, "", Vector("Data.Nat.Properties.0<1+n")))) shouldBe Vector("ref Data.Nat.Properties.0<1+n")
+    // A missing row (the definition renamed away) yields no evidence rather than an error.
+    Gates.restatement("X", "x", origLt, Vector.empty) shouldBe Vector.empty
+  }
+
+  test("every committed obligation reads as a statement and every gold keeps its frozen lines") {
     val root  = Paths.get("..").toAbsolutePath.normalize
     val index = root.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.isRegularFile(index), s"benchmark index not found at $index")
     val rows = Files.readAllLines(index, StandardCharsets.UTF_8).asScala.toVector.filter(_.trim.nonEmpty)
       .map(l => io.circe.parser.decode[struxdriver.benchmark.Obligation](l).toOption.get)
-    rows.size should be >= 43
+    rows.size should be >= 55
     rows.foreach { e =>
       val ob   = new String(Files.readAllBytes(root.resolve(e.obligationPath)), StandardCharsets.UTF_8)
       val gd   = new String(Files.readAllBytes(root.resolve(e.goldPath)), StandardCharsets.UTF_8)
       val stmt = Statement.of(ob, e.hole).fold(msg => fail(s"${e.id}: $msg"), identity)
-      withClue(s"${e.id} gold: ") {
-        val (gate, _, evidence) = Judge.syntactic(stmt, e.tags, gd)
-        gate shouldBe None
-        evidence shouldBe Vector.empty
-      }
-      withClue(s"${e.id} obligation: ") {
-        Judge.syntactic(stmt, e.tags, ob)._1.map(_.gate) shouldBe Some("holes")
+      withClue(s"${e.id}: ") {
+        Gates.imports(stmt, gd).isRight shouldBe true
+        Gates.imports(stmt, ob).isRight shouldBe true
+        if (e.source == "agda-algebras") Gates.originalOf(e.module, e.hole, e.tags).qualified.exists(_.contains(".")) shouldBe true
       }
     }
   }

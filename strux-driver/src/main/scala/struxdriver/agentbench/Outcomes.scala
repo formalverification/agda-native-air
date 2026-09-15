@@ -21,8 +21,11 @@
   *  instrument: no init record (the client never started), the agda server
   *  not connected, the tools presented as deferred names, a tool missing, the
   *  account's rate limit refusing service, or a client error that is not one
-  *  of the stated caps.  The gates still run on the file, so the anomaly
-  *  keeps its diagnostics, and the run exits non-zero.
+  *  of the stated caps; and when the two batch verdicts on the final file
+  *  (the gold verifier's agda and the server's check_file) disagree, which is
+  *  a configuration fact, not a fact about the proof.  The gates still run on
+  *  the file, so the anomaly keeps its diagnostics, and the run exits
+  *  non-zero.
   *
   *  ============================================================================
   */
@@ -57,6 +60,10 @@ final case class Outcome(
   agdaExit:          Option[Int],
   agdaMs:            Option[Long],
   agdaTail:          Option[String],
+  checkExit:         Option[Int],
+  checkCodes:        Vector[String],
+  statement:         Option[StatementCheck],
+  evidenceSource:    String,
   anomaly:           Option[String],
   finalPath:         Option[String],
   transcriptPath:    Option[String],
@@ -91,6 +98,11 @@ final case class Outcome(
     "agdaExit"            -> agdaExit.asJson,
     "agdaMs"              -> agdaMs.asJson,
     "agdaTail"            -> agdaTail.asJson,
+    "checkExit"           -> checkExit.asJson,
+    "checkCodes"          -> checkCodes.asJson,
+    "statement"           -> statement.map(sc => Json.obj(
+                               "gold" -> sc.gold.asJson, "final" -> sc.finalFile.asJson, "equal" -> sc.equal.asJson)).asJson,
+    "evidenceSource"      -> evidenceSource.asJson,
     "anomaly"             -> anomaly.asJson,
     "finalPath"           -> finalPath.asJson,
     "transcriptPath"      -> transcriptPath.asJson,
@@ -102,7 +114,7 @@ final case class Outcome(
 object Outcome {
   def anomaly(entry: IndexEntry, msg: String, wallMs: Long): Outcome =
     Outcome(entry, solved = false, restated = false, None, Vector.empty, Vector.empty, "anomaly", 0, Vector.empty,
-      wallMs, 0.0, Json.obj(), 0, None, None, None, None, Some(msg), None, None, "")
+      wallMs, 0.0, Json.obj(), 0, None, None, None, None, None, Vector.empty, None, "unavailable: anomaly", Some(msg), None, None, "")
 }
 
 /** One obligation's three outputs: the report outcome, the fixtures.jsonl row, the results.jsonl rows. */
@@ -141,14 +153,16 @@ object Outcomes {
     judged(layout, Outcome.anomaly(entry, msg, 0L), Vector.empty)
 
   /** Judge one archived subject: transcript, isolation, gates, outcome. */
-  def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry): IO[Judged] = {
+  def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry, agda: Agda): IO[Judged] = {
     val layout    = cfg.layout
     val subj      = layout.subject(entry.id)
     val stem      = Scaffold.fixtureStem(entry)
     val finalFile = subj.finalFile(stem)
     val workDir   = layout.workDir(entry.id)
+    val obFile    = cfg.projectRoot.resolve(entry.obligationPath)
+    val goldFile  = cfg.projectRoot.resolve(entry.goldPath)
     for {
-      obligation <- TextIO.read(cfg.projectRoot.resolve(entry.obligationPath))
+      obligation <- TextIO.read(obFile)
       finalText  <- TextIO.read(finalFile)
       stream     <- TextIO.read(subj.transcript).handleError(_ => "")
       record     <- TextIO.readJson(subj.runRecord).map(_.flatMap(SubjectRun.fromJson))
@@ -156,7 +170,7 @@ object Outcomes {
       killed      = record.exists(_.killed)
       wallMs      = record.map(_.wallMs).getOrElse(t.result.map(_.durationMs).getOrElse(0L))
       iso         = Audit.isolation(t, workDir)
-      verdict    <- Judge.judge(entry, obligation, finalText, finalFile, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
+      verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
                     else verdict.gate
       capped      = t.result.exists(r => r.subtype.contains("max_turns") || r.subtype.contains("budget"))
@@ -166,6 +180,7 @@ object Outcomes {
                     else if (iso.missingAgdaTools.nonEmpty) Some(s"agda tools missing from the session: ${iso.missingAgdaTools.mkString(",")}")
                     else if (t.rateLimitRejected) Some(s"rate limited: ${t.rateLimits.map(_._1).distinct.mkString(",")}")
                     else if (t.result.exists(_.isError) && !capped) Some(s"client error (${t.result.map(_.subtype).getOrElse("?")}): ${t.result.map(_.text.take(200)).getOrElse("")}")
+                    else if (verdict.verdictsDisagree) Some(s"the gold verifier's agda (exit ${verdict.agdaExit.getOrElse(-1)}) and check_file (exit ${verdict.checkExit.getOrElse(-1)}) disagree on the final file")
                     else None
       solved      = gate.isEmpty && verdict.solved
       restated    = gate.isEmpty && verdict.restated
@@ -187,6 +202,10 @@ object Outcomes {
         agdaExit          = verdict.agdaExit,
         agdaMs            = verdict.agdaMs,
         agdaTail          = verdict.agdaTail,
+        checkExit         = verdict.checkExit,
+        checkCodes        = verdict.checkCodes,
+        statement         = verdict.statement,
+        evidenceSource    = verdict.evidenceSource,
         anomaly           = anomaly,
         finalPath         = Some(layout.relative(finalFile)),
         transcriptPath    = Some(subj.transcriptRel),

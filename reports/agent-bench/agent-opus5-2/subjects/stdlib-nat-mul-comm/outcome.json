@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3503,
-  "agdaTail" : "Checking Nat-mul-comm (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-mul-comm/final/Nat-mul-comm.agda).",
+  "agdaMs" : 3116,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.* n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.* m)",
+    "final" : "(m n : ℕ) → m * n ≡ n * m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-mul-comm/final/Nat-mul-comm.agda",
   "transcriptPath" : "subjects/stdlib-nat-mul-comm/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `*-comm` by induction on `m` using `sym (*-zeroʳ n)` and `trans (cong (n +_) (*-comm m n)) (sym (*-suc n m))`.",

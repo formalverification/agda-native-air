@@ -3,7 +3,9 @@
   "difficulty" : "compositional",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:using"
+    "stratum:using",
+    "restates:Setoid.Functions.Surjective.SurjInvIsInverseʳ",
+    "target:Setoid.Functions.Inverses.InvIsInverseʳ"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "SurjInvIsInverseʳ′",
@@ -48,8 +50,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3863,
+  "agdaMs" : 3454,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-surjective-surjinv-inverse-r/final/Surjective-surjinv-inverse-r.agda",
   "transcriptPath" : "subjects/algebras-surjective-surjinv-inverse-r/transcript.jsonl",
   "lastWords" : "check_file reports success:true (exit code 0) on the final file, so the module type-checks with the hole filled by `InvIsInverseʳ {F = f} fE`.",

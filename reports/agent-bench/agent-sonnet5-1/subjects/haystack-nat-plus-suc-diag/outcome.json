@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3652,
+  "agdaMs" : 3142,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
   "lastWords" : "check_file reports success: true (exit code 0, no diagnostics, no holes) — the file type-checks with the hole filled by `Data.Nat.Properties.+-suc m m`.",

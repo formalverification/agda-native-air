@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3481,
+  "agdaMs" : 3047,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+    "final" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-length-append/final/List-length-append.agda",
   "transcriptPath" : "subjects/stdlib-list-length-append/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file.",

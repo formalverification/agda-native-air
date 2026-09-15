@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3403,
-  "agdaTail" : "Checking Nat-plus-assoc (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-plus-assoc/final/Nat-plus-assoc.agda).",
+  "agdaMs" : 3090,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n((m Agda.Builtin.Nat.+ n) Agda.Builtin.Nat.+ p)\nAgda.Builtin.Equality.≡\n(m Agda.Builtin.Nat.+ (n Agda.Builtin.Nat.+ p))",
+    "final" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-assoc/final/Nat-plus-assoc.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-assoc/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file (no diagnostics, no holes, exit code 0), with `+-assoc` proved by induction on `m`: `+-assoc zero n p = refl` and `+-assoc (suc m) n p = cong suc (+-assoc m n p)`.",

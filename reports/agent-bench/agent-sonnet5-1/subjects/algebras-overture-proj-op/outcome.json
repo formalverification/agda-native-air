@@ -3,7 +3,8 @@
   "difficulty" : "routine",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:using"
+    "stratum:using",
+    "restates:Overture.Operations.π"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "π",
@@ -47,8 +48,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3408,
+  "agdaMs" : 3090,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+    "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
   "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

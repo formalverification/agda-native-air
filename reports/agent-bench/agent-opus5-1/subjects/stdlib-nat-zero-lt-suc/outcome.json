@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3437,
+  "agdaMs" : 3084,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{n : Agda.Builtin.Nat.Nat} →\n0 Data.Nat.Base.< Agda.Builtin.Nat.Nat.suc n",
+    "final" : "{n : ℕ} → 0 < suc n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
   "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `s≤s z≤n`.",

@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3346,
+  "agdaMs" : 3090,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+    "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
   "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly with the hole filled.",

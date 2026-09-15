@@ -4,7 +4,9 @@
   "source" : "agda-algebras",
   "tags" : [
     "stratum:wholesale",
-    "universe-polymorphic"
+    "universe-polymorphic",
+    "restates:Setoid.Functions.Basic.lift∼lower",
+    "target:Relation.Binary.Bundles.Setoid.refl"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "lift∼lower′",
@@ -49,8 +51,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3132,
+  "agdaMs" : 3387,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β : Agda.Primitive.Level}\n(𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ)\n(a : Level.Lift β (Relation.Binary.Bundles.Setoid.Carrier 𝑨)) →\n(Setoid.Functions.Basic.𝑙𝑖𝑓𝑡 β Relation.Binary.Bundles.Setoid.≈ a)\na",
+    "final" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-functions-lift-lower/final/Functions-lift-lower.agda",
   "transcriptPath" : "subjects/algebras-functions-lift-lower/transcript.jsonl",
   "lastWords" : "The hole is filled with `Setoid.refl 𝑨`, and check_file reports success (exit code 0, no diagnostics, no remaining holes) on the final file.",

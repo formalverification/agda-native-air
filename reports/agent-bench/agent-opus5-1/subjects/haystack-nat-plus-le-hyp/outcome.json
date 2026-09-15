@@ -47,8 +47,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2732,
+  "agdaMs" : 3071,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : Agda.Builtin.Nat.Nat} →\n(m Agda.Builtin.Nat.+ m) Data.Nat.Base.≤ n → m Data.Nat.Base.≤ n",
+    "final" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-le-hyp/final/Nat-plus-le-hyp.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-le-hyp/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `≤-trans (m≤m+n m m) le` (no holes, no errors or warnings).",

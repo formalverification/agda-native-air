@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3055,
+  "agdaMs" : 3111,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
   "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
   "lastWords" : "check_file reports success: true (exit code 0), so the module type-checks with no holes remaining.",

@@ -7,35 +7,26 @@
   *
   *  Purpose
   *  -------
-  *  What an obligation *states*, read off its source for the preservation
-  *  gate (issue #154): the module line, the original import lines, the type
-  *  signature of the definition with the hole, and the frozen blocks (every
-  *  top-level declaration except that definition's clauses).  Beneath it,
-  *  the two lexical helpers the gates share: a comment stripper that keeps
-  *  pragmas and line structure, and a tokenizer on Agda's own delimiters.
+  *  The two lines of an obligation that the protocol freezes as TEXT (issue
+  *  #154): the module line and every original import line.  These are the
+  *  scope the statement was posed in, and whether they are still there is a
+  *  diff, not a parse: the final file is compared line for line, with comments
+  *  stripped on both sides so a commented-out copy cannot stand in for the
+  *  real one (Copilot on PR #158).  Everything else the judge wants to know
+  *  about the statement it asks Agda (Judge.scala): what the definition's
+  *  type is, whether the file is safe, whether a hole remains, what the body
+  *  refers to.  Nothing here classifies a signature or a clause.
   *
-  *  Design notes
-  *  ------------
-  *  - This is a textual reading, not a parse of Agda: a column-0 line and its
-  *    indented continuation lines form a block, and a block is the signature
-  *    or a clause by how it begins.  It is enough for the committed fixtures
-  *    (JudgeSpec sweeps all 55 obligation/gold pairs) and it names what the
-  *    subject may not change; the question "is the statement the same" is
-  *    one Agda can also answer (`type_of` on the definition name), which is
-  *    the direction the judge should grow in.
-  *  - `Propose.Imports` (search package) also reads import lines, for the
-  *    fixed proposer's lemma pool: module and `using` names.  The reader here
-  *    classifies lines for a diff and tolerates a leading `where`; the two
-  *    serve different questions and are kept apart deliberately.
+  *  `Propose.Imports` (search package) also reads import lines, for the fixed
+  *  proposer's lemma pool (module and `using` names); this reader only asks
+  *  which lines are imports, for the diff.  Two questions, two readers.
   *
   *  ============================================================================
   */
 package struxdriver.agentbench
 
-/** Lexical helpers shared by the gates: comment stripping and tokenizing on
-  * Agda's own delimiters (whitespace, parentheses, braces, semicolons, `@`,
-  * and string quotes; a dot stays inside a token so a qualified name is one
-  * token).
+/** Lexical helpers for the diff: a comment stripper that keeps pragmas and
+  * line structure, and the code lines it leaves.
   */
 object Code {
   private def isDelim(c: Char): Boolean =
@@ -72,84 +63,43 @@ object Code {
     sb.toString
   }
 
-  def tokens(code: String): Vector[String] =
-    code.split("[\\s(){};@\"]+").toVector.filter(_.nonEmpty)
-
-  /** The lines that carry code, as the preservation gate compares them: every
-    * comment stripped first (a line inside a `{- -}` block is not code, so a
-    * frozen line hidden there does not count as present: Copilot on PR #158),
-    * trailing whitespace dropped, blank lines removed.  Both sides of every
-    * comparison go through this, so a trailing comment on an original line is
-    * tolerated and a commented-out one is not.
+  /** The lines that carry code, as the diff compares them: comments stripped
+    * first (so a line inside a `{- -}` block is not code), trailing
+    * whitespace dropped, blank lines removed.  Both sides of every comparison
+    * go through this, so a trailing comment on an original line is tolerated
+    * and a commented-out one is not.
     */
   def keptLines(source: String): Vector[String] =
     stripComments(source).split("\n", -1).toVector.map(_.replaceAll("\\s+$", "")).filterNot(_.isEmpty)
 }
 
-/** The frozen statement of an obligation: what the subject may not change. */
-final case class Statement(
-  hole:         String,
-  moduleLine:   String,
-  importLines:  Vector[String],
-  signature:    Vector[String],
-  frozenBlocks: Vector[Vector[String]]
-)
+/** The frozen text of an obligation: its module line and its import lines. */
+final case class Statement(hole: String, moduleLine: String, importLines: Vector[String])
 
 object Statement {
-  /** Top-level declaration blocks: a column-0 line plus the indented lines
-    * after it, over the kept lines (comments and blank lines dropped).
-    */
-  def blocks(source: String): Vector[Vector[String]] =
-    Code.keptLines(source).foldLeft(Vector.empty[Vector[String]]) { (acc, l) =>
-      if (acc.isEmpty || !l.head.isWhitespace) acc :+ Vector(l)
-      else acc.init :+ (acc.last :+ l)
-    }
-
-  private def afterHole(line: String, hole: String): Option[String] =
-    if (line.startsWith(hole) && line.length > hole.length && line.charAt(hole.length).isWhitespace)
-      Some(line.drop(hole.length).trim)
-    else None
-
-  /** `hole : ...` at column 0. */
-  def isSignature(block: Vector[String], hole: String): Boolean =
-    afterHole(block.head, hole).exists(rest => rest.startsWith(":") && (rest.length == 1 || rest.charAt(1).isWhitespace))
-
-  /** `hole pats = ...` (or `hole = ...`) at column 0: a clause of the definition. */
-  def isClause(block: Vector[String], hole: String): Boolean =
-    afterHole(block.head, hole).exists(rest => !rest.startsWith(":")) || block.head == hole
-
   private val WherePrefix = """^where\s+""".r
 
-  /** The `open` or `import` statement a line carries, with a leading `where`
-    * removed (`  where open import M using (x)`), or None.
+  /** The import statement a line carries (`open import M ...` or `import M
+    * ...`), with a leading `where` removed (`  where open import M using (x)`),
+    * or None.
     */
-  def openText(line: String): Option[String] = {
+  def importText(line: String): Option[String] = {
     val t = WherePrefix.replaceFirstIn(line.trim, "")
-    if (t.startsWith("open ") || t.startsWith("import ")) Some(t) else None
+    if (t.startsWith("open import ") || t.startsWith("import ")) Some(t) else None
   }
-
-  /** The import statement a line carries (`open import M ...` or `import M ...`), or None. */
-  def importText(line: String): Option[String] =
-    openText(line).filter(t => t.startsWith("open import ") || t.startsWith("import "))
 
   def isImport(line: String): Boolean = importText(line).isDefined
 
-  /** Read the statement of an obligation; Left when it has no module line, no
-    * signature for the hole, or no clause for it.
+  /** Read the frozen text of an obligation; Left when it has no module line or
+    * never mentions the definition it is said to declare.
     */
   def of(obligation: String, hole: String): Either[String, Statement] = {
-    val bs = blocks(obligation)
+    val lines = Code.keptLines(obligation)
     for {
-      moduleLine <- bs.map(_.head).find(l => l.startsWith("module ") && l.trim.endsWith(" where"))
+      moduleLine <- lines.find(l => l.startsWith("module ") && l.endsWith(" where"))
                       .toRight("obligation has no top-level module line")
-      signature  <- bs.find(isSignature(_, hole)).toRight(s"obligation has no type signature for `$hole`")
-      _          <- if (bs.exists(isClause(_, hole))) Right(()) else Left(s"obligation has no clause for `$hole`")
-    } yield Statement(
-      hole         = hole,
-      moduleLine   = moduleLine,
-      importLines  = bs.map(_.head).filter(isImport),
-      signature    = signature,
-      frozenBlocks = bs.filterNot(isClause(_, hole))
-    )
+      _          <- if (lines.exists(l => l.startsWith(hole) && l.length > hole.length && l.charAt(hole.length).isWhitespace)) Right(())
+                    else Left(s"obligation never declares `$hole` at column 0")
+    } yield Statement(hole, moduleLine, lines.filter(l => !l.head.isWhitespace && isImport(l)))
   }
 }

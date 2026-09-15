@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3038,
+  "agdaMs" : 3108,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+    "final" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-list-map-append-diag/final/List-map-append-diag.agda",
   "transcriptPath" : "subjects/haystack-list-map-append-diag/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly with the hole filled by `Data.List.Properties.map-++ f xs xs`.",

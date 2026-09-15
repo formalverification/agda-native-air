@@ -3,7 +3,10 @@
   "difficulty" : "compositional",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:using"
+    "stratum:using",
+    "restates:Setoid.Homomorphisms.Properties.⊙-hom",
+    "target:Setoid.Functions.Basic._⊙_",
+    "target:Setoid.Homomorphisms.Properties.⊙-is-hom"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "⊙-hom′",
@@ -48,8 +51,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5690,
+  "agdaMs" : 5599,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑩 →\nSetoid.Homomorphisms.Basic.hom 𝑩 𝑪 →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑪",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-homs-comp-hom/final/Homs-comp-hom.agda",
   "transcriptPath" : "subjects/algebras-homs-comp-hom/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled as `⊙-hom′ f g = (proj₁ g ⊙ proj₁ f) , ⊙-is-hom (proj₂ f) (proj₂ g)`.",

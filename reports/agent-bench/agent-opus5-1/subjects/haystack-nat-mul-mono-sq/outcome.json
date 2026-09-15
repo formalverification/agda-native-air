@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2997,
+  "agdaMs" : 3128,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.≤ n →\n(m Agda.Builtin.Nat.* m) Data.Nat.Base.≤ (n Agda.Builtin.Nat.* n)",
+    "final" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-mul-mono-sq/final/Nat-mul-mono-sq.agda",
   "transcriptPath" : "subjects/haystack-nat-mul-mono-sq/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Nat.Properties.*-mono-≤ le le`.",

@@ -3,7 +3,9 @@
   "difficulty" : "non-obvious",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Kernels.ker-in-con",
+    "target:Function.Base.id"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "ker-in-con′",
@@ -50,8 +52,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5965,
+  "agdaMs" : 5691,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda",
   "transcriptPath" : "subjects/algebras-kernels-ker-in-con/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics) on the final file with the hole filled by `id`.",

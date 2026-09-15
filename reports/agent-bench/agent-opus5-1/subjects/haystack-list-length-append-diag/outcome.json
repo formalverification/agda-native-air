@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2617,
+  "agdaMs" : 3095,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Agda.Primitive.Set} (xs : Agda.Builtin.List.List A) →\nData.List.Base.length (xs Data.List.Base.++ xs)\nAgda.Builtin.Equality.≡\n(Data.List.Base.length xs Agda.Builtin.Nat.+\n Data.List.Base.length xs)",
+    "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
   "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file (hole filled with `Data.List.Properties.length-++ xs`).",

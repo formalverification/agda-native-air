@@ -42,6 +42,7 @@ final case class AgentBenchConfig(
   claudeBin:       String,
   corpusStdlib:    Option[Path],
   corpusAlgebras:  Option[Path],
+  agdaJsonBin:     Option[Path],
   rejudge:         Boolean,
   resume:          Boolean
 ) {
@@ -57,7 +58,8 @@ object Cli {
       |    --out-dir PATH            run roots land here
       |    --run-id STR              the run directory name (a new protocol is a new run id)
       |    --project-root PATH       repo root: the server's cwd; index paths resolve here
-      |    --server-bin PATH         the agda-mcp binary (the subjects' servers and the staging server)
+      |    --server-bin PATH         the agda-mcp binary (the subjects' servers, and the harness's own that stages and judges)
+      |    --agda-json-bin PATH      the agda-strux extractor, for the judge's body references
       |    --model STR               the subject model, e.g. claude-sonnet-5
       |    --corpus-stdlib PATH      the agda-stdlib corpus, served to agda-stdlib rows
       |    --corpus-algebras PATH    the agda-algebras corpus, served to agda-algebras rows
@@ -70,13 +72,13 @@ object Cli {
       |    [--claude-bin PATH]       the claude CLI (default: claude on PATH)
       |    [--agda-flags STR]        default: the committed .mcp.json flag set
       |    [--server-timeout N]      per-Agda-call bound, seconds (default 600)
-      |    [--rejudge]               re-judge an existing run root from subjects/; no model call
+      |    [--rejudge]               re-judge an existing run root from subjects/; no model call (the server and the extractor are still needed)
       |    [--resume on|off]         keep the archived, non-anomalous subjects of this run id and run only the rest (default off)
       |""".stripMargin
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
     "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
-    "claude-bin", "agda-flags", "server-timeout", "resume")
+    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin")
 
   def parse(args: List[String]): Either[String, AgentBenchConfig] = {
     @annotation.tailrec
@@ -116,9 +118,11 @@ object Cli {
       rootAbs  = Paths.get(root).toAbsolutePath.normalize
       abs      = (p: String) => { val q = Paths.get(p); if (q.isAbsolute) q else rootAbs.resolve(q).normalize }
       // A re-judge reads the archive and calls no model, so it needs neither
-      // the server, the model, nor the corpora; a run needs all three.
+      // the model nor the corpora; the server and the extractor answer the
+      // judge in both modes.
       required = (key: String) => if (rejudge) Right(m.get(key)) else m.get(key).map(Option(_)).toRight(s"missing --$key")
-      bin     <- required("server-bin").map(_.map(abs))
+      bin     <- m.get("server-bin").map(abs).map(Option(_)).toRight("missing --server-bin")
+      json    <- m.get("agda-json-bin").map(abs).map(Option(_)).toRight("missing --agda-json-bin")
       model   <- required("model")
       cs      <- required("corpus-stdlib").map(_.map(abs))
       ca      <- required("corpus-algebras").map(_.map(abs))
@@ -150,6 +154,7 @@ object Cli {
       claudeBin       = m.getOrElse("claude-bin", "claude"),
       corpusStdlib    = cs,
       corpusAlgebras  = ca,
+      agdaJsonBin     = json,
       rejudge         = rejudge,
       resume          = resume
     )

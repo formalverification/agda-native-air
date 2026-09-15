@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2955,
-  "agdaTail" : "Checking Bool-and-distrib-diag (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda).",
+  "agdaMs" : 3088,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(a b : Agda.Builtin.Bool.Bool) →\n(a Data.Bool.Base.∧ (a Data.Bool.Base.∨ b)) Agda.Builtin.Equality.≡\n((a Data.Bool.Base.∧ a) Data.Bool.Base.∨ (a Data.Bool.Base.∧ b))",
+    "final" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda",
   "transcriptPath" : "subjects/haystack-bool-and-distrib-diag/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Bool.Properties.∧-distribˡ-∨ a a b`.",

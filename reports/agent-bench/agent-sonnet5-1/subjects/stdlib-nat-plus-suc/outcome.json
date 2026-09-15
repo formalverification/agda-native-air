@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2945,
+  "agdaMs" : 3007,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+    "final" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file type-checks correctly.",

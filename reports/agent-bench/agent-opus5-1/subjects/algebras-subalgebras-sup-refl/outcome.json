@@ -3,7 +3,11 @@
   "difficulty" : "compositional",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:using"
+    "stratum:using",
+    "restates:Setoid.Subalgebras.Properties.≥-refl",
+    "target:Function.Base._∘_",
+    "target:Setoid.Subalgebras.Properties.≅→≤",
+    "target:Setoid.Homomorphisms.Isomorphisms.≅-sym"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "≥-refl′",
@@ -48,8 +52,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5876,
+  "agdaMs" : 5824,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 𝑩 : Setoid.Algebras.Basic.Algebra α ρᵃ} →\n𝑨 Setoid.Homomorphisms.Isomorphisms._.≅ 𝑩 →\n𝑨 Setoid.Subalgebras.Basic._.≥ 𝑩",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-subalgebras-sup-refl/final/Subalgebras-sup-refl.agda",
   "transcriptPath" : "subjects/algebras-subalgebras-sup-refl/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled as `≥-refl′ = ≅→≤ ∘ ≅-sym`.",

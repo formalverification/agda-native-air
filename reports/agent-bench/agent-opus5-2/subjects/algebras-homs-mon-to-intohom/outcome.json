@@ -3,7 +3,10 @@
   "difficulty" : "compositional",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.mon→intohom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.isHom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.isInjective"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "mon→intohom′",
@@ -50,8 +53,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5068,
-  "agdaTail" : "Checking Homs-mon-to-intohom (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda).",
+  "agdaMs" : 5536,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ} →\nSetoid.Homomorphisms.Basic.mon 𝑨 𝑩 →\nData.Product.Base.Σ-syntax (Setoid.Homomorphisms.Basic.hom 𝑨 𝑩)\n(λ h →\n   Setoid.Functions.Injective.IsInjective\n   (Agda.Builtin.Sigma.Σ.fst h))",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda",
   "transcriptPath" : "subjects/algebras-homs-mon-to-intohom/transcript.jsonl",
   "lastWords" : "The hole is filled with `mon→hom _ _ m , IsMon.isInjective (proj₂ m)`, and check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

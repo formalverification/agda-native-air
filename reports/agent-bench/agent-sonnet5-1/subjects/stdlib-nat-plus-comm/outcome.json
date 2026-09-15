@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3211,
+  "agdaMs" : 2986,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ m)",
+    "final" : "(m n : ℕ) → m + n ≡ n + m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks with the hole filled.",

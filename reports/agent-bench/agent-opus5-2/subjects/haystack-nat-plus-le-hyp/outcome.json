@@ -47,8 +47,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2916,
-  "agdaTail" : "Checking Nat-plus-le-hyp (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/haystack-nat-plus-le-hyp/final/Nat-plus-le-hyp.agda).",
+  "agdaMs" : 3087,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : Agda.Builtin.Nat.Nat} →\n(m Agda.Builtin.Nat.+ m) Data.Nat.Base.≤ n → m Data.Nat.Base.≤ n",
+    "final" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-le-hyp/final/Nat-plus-le-hyp.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-le-hyp/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with the hole filled by `Data.Nat.Properties.m+n≤o⇒m≤o m le`.",

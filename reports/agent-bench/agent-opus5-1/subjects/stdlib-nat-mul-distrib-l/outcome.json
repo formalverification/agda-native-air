@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3101,
+  "agdaMs" : 3104,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.* (n Agda.Builtin.Nat.+ p))\nAgda.Builtin.Equality.≡\n((m Agda.Builtin.Nat.* n) Agda.Builtin.Nat.+\n (m Agda.Builtin.Nat.* p))",
+    "final" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-mul-distrib-l/final/Nat-mul-distribL.agda",
   "transcriptPath" : "subjects/stdlib-nat-mul-distrib-l/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `*-distribˡ-+` via `trans (*-comm m (n + p)) (trans (*-distribʳ-+ m n p) (cong₂ _+_ (*-comm n m) (*-comm p m)))`.",

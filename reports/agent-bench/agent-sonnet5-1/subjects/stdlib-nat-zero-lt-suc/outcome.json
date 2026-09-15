@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3725,
+  "agdaMs" : 2972,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{n : ℕ} → 0 < suc n",
+    "final" : "{n : ℕ} → 0 < suc n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
   "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks.",

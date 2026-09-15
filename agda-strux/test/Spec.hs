@@ -381,6 +381,21 @@ test_addcommexample_extracts_comm_and_where_lemma = do
         other ->
           assertFailure ("expected hasBody=true and body=String, got: " <> show other)
 
+      -- 1b) bodyRefs: the EXACT references of the body, from Agda's internal
+      --     terms: +-comm calls itself, the where-lemma (by its normalized
+      --     qualified name), cong, and trans; a reference is a fully qualified
+      --     name, never a bare token.
+      case KM.lookup "bodyRefs" oComm of
+        Just (Array refs) -> do
+          let names = [ T.unpack r | String r <- toList refs ]
+          assertBool ("expected +-comm among bodyRefs, got: " <> show names) ("AddCommExample.properties.+-comm" `elem` names)
+          assertBool ("expected the where-lemma among bodyRefs, got: " <> show names) ("AddCommExample.properties.+-suc" `elem` names)
+          assertBool ("expected cong among bodyRefs, got: " <> show names) ("AddCommExample.cong" `elem` names)
+          assertBool ("expected trans among bodyRefs, got: " <> show names) ("AddCommExample.trans" `elem` names)
+          assertBool ("expected every ref qualified, got: " <> show names) (all ('.' `elem`) names)
+        other ->
+          assertFailure ("expected bodyRefs to be an array, got: " <> show other)
+
       -- 2) Tight regression for the where-lemma name normalization:
       --    qname contains section marker "._." but prettyQname does not.
       let sucRows = findByPrettyQname "AddCommExample.properties.+-suc"

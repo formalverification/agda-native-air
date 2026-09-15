@@ -3,7 +3,9 @@
   "difficulty" : "non-obvious",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Kernels.ker-in-con",
+    "target:Function.Base.id"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "ker-in-con′",
@@ -48,8 +50,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5887,
-  "agdaTail" : "Checking Kernels-ker-in-con (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda).",
+  "agdaMs" : 5545,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n(h : Setoid.Homomorphisms.Basic.hom 𝑨 𝑩)\n{θ : Setoid.Congruences.Basic.Con 𝑨 ℓ}\n{x y\n : Relation.Binary.Bundles.Setoid.Carrier\n   Setoid.Algebras.Basic.𝔻[ 𝑨 ]} →\nAgda.Builtin.Sigma.Σ.fst\n(Setoid.Homomorphisms.Kernels.kercon\n (Setoid.Homomorphisms.Kernels.πhom h θ))\nx y →\nAgda.Builtin.Sigma.Σ.fst θ x y",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda",
   "transcriptPath" : "subjects/algebras-kernels-ker-in-con/transcript.jsonl",
   "lastWords" : "The goal reduced to `θ .proj₁ x y → proj₁ θ x y` (definitionally the identity, since `kercon (πhom h θ)`'s relation unfolds to `θ`'s), so I filled the hole with `id`; check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

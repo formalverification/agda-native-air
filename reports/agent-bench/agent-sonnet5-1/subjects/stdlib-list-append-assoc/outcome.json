@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3617,
+  "agdaMs" : 3020,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
+    "final" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-append-assoc/final/List-append-assoc.agda",
   "transcriptPath" : "subjects/stdlib-list-append-assoc/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",

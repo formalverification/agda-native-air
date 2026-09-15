@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3011,
+  "agdaMs" : 3131,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(n Agda.Builtin.Nat.+ 0) Agda.Builtin.Equality.≡ n",
+    "final" : "(n : ℕ) → n + 0 ≡ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `+-identityʳ` by induction: `+-identityʳ zero = refl` and `+-identityʳ (suc n) = cong suc (+-identityʳ n)`.",

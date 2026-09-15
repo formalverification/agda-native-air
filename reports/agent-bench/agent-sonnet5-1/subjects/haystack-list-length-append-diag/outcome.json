@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3299,
+  "agdaMs" : 3101,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
   "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the file now type-checks correctly.",

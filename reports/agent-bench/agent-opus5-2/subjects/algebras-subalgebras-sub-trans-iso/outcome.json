@@ -3,7 +3,11 @@
   "difficulty" : "non-obvious",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Subalgebras.Properties.≤-trans-≅",
+    "target:Setoid.Homomorphisms.Properties.⊙-hom",
+    "target:Setoid.Functions.Injective.⊙-injective",
+    "target:Setoid.Homomorphisms.Isomorphisms.≅toInjective"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "≤-trans-≅′",
@@ -53,8 +57,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5330,
-  "agdaTail" : "Checking Subalgebras-sub-trans-iso (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda).",
+  "agdaMs" : 6059,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\n𝑨 Setoid.Subalgebras.Basic._.≤ 𝑩 →\n𝑩 Setoid.Homomorphisms.Isomorphisms._.≅ 𝑪 →\n𝑨 Setoid.Subalgebras.Basic._.≤ 𝑪",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda",
   "transcriptPath" : "subjects/algebras-subalgebras-sub-trans-iso/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `⊙-hom (proj₁ p) (_≅_.to B≅C) , ⊙-injective (proj₁ (proj₁ p)) (proj₁ (_≅_.to B≅C)) (proj₂ p) (≅toInjective B≅C)`.",

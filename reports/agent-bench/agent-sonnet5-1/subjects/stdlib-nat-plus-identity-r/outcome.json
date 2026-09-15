@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2960,
+  "agdaMs" : 2994,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : ℕ) → n + 0 ≡ n",
+    "final" : "(n : ℕ) → n + 0 ≡ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",

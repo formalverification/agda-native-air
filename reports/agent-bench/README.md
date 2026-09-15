@@ -28,15 +28,28 @@ from the harness's own output and never edited by hand.
 +  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own list-price
    accounting, per subject; three subjects at a time, so wall clocks are
    indicative only.
-+  **Judge**.  The gold verifier's `agda` command (`GoldVerifier.agdaCommand`)
-   with `--safe` added (every committed gold passes under it) on the file the
-   subject left, behind three syntactic gates named in order: *preservation*
-   (the module line, every original import line, and the type signature
-   byte-identical; added import lines allowed and logged), *escape* (no
-   `postulate`, no `trustMe` or `primTrustMe`, no pragma), and *holes*.  A
-   file that passes every gate but names the library's own lemma for the
-   statement is *restated*, in its own column, never solved.  The judge's
-   gates are pinned by `JudgeSpec` on every committed obligation and gold.
++  **Judge**.  Every fact about the final file is Agda's own answer, asked
+   through the server (started with `--safe` in its flags) and the agda-strux
+   extractor.  The gates, named in order: *preservation* (the module line and
+   every original import line still present, a line diff with comments
+   stripped on both sides, added import lines allowed and logged; and the
+   definition still of the statement it was given: its elaborated type as
+   Agda holds it internally, extracted by `agda-strux` as a structural AST,
+   equal to the committed gold's, binder names aside), *escape* (`check_file` reports none of
+   Agda's safe-flag refusals), *holes* (`check_file`'s hole list is empty),
+   and *typecheck* (the gold verifier's `agda` command,
+   `GoldVerifier.agdaCommand`, with `--safe` added, exit-code verdict;
+   `check_file`'s exit code is recorded beside it).  A file that passes every
+   gate but whose definition refers to the library's own lemma for the
+   statement is *restated*, in its own column, never solved; the reference is
+   the extractor's `bodyRefs` (Agda's internal terms, closed over the file's
+   own helpers) and the original is the index row's `restates:` tag.  The
+   server's interaction lane plays no part in the judge: a printed type is
+   not a statement.  The arms were first judged by a textual reading and
+   re-judged under these gates to the same verdict on every row; the
+   archived reports and per-subject outcomes are the re-judge's.
+   `JudgeSpec` and `AgentBenchIntegrationSpec` pin the rules and the live
+   gates.
 +  **Isolation, verified per subject**.  From each transcript: the server
    connected, the thirteen tools presented and not deferred, no tool used
    beyond Read, Edit, and the thirteen, and no Read or Edit outside the work
@@ -116,8 +129,8 @@ make agent-bench-archive AGENT_BENCH_RUN_ID=agent-sonnet5-1
 ```
 
 `make agent-bench-rejudge AGENT_BENCH_RUN_ID=<run-id>` judges an archived run
-again from its final files without a model call, so a judge change never
-costs a sweep.  A model's answers are not deterministic: a second seed of the
+again from its final files without a model call (the server and the extractor
+are still consulted), so a judge change never costs a sweep.  A model's answers are not deterministic: a second seed of the
 frontier arm is recorded above for that reason, and any new run gets a new
 run id.
 

@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3429,
-  "agdaTail" : "Checking List-length-append (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-list-length-append/final/List-length-append.agda).",
+  "agdaMs" : 3068,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Agda.Primitive.Set} (xs ys : Agda.Builtin.List.List A) →\nData.List.Base.length (xs Data.List.Base.++ ys)\nAgda.Builtin.Equality.≡\n(Data.List.Base.length xs Agda.Builtin.Nat.+\n Data.List.Base.length ys)",
+    "final" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-list-length-append/final/List-length-append.agda",
   "transcriptPath" : "subjects/stdlib-list-length-append/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",

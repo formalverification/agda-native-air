@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3203,
-  "agdaTail" : "Checking Nat-mul-identityR (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda).",
+  "agdaMs" : 3051,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(n Agda.Builtin.Nat.* 1) Agda.Builtin.Equality.≡ n",
+    "final" : "(n : ℕ) → n * 1 ≡ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda",
   "transcriptPath" : "subjects/stdlib-nat-mul-identity-r/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, which proves `*-identityʳ` by induction: `zero = refl` and `suc n = cong suc (*-identityʳ n)`.",

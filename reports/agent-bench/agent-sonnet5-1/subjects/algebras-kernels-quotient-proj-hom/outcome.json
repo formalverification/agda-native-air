@@ -3,7 +3,10 @@
   "difficulty" : "compositional",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:using"
+    "stratum:using",
+    "restates:Setoid.Homomorphisms.Kernels.πhom",
+    "target:Setoid.Homomorphisms.Basic.epi→hom",
+    "target:Setoid.Homomorphisms.Kernels.πepi"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "πhom′",
@@ -50,8 +53,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 6369,
+  "agdaMs" : 5775,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-kernels-quotient-proj-hom/final/Kernels-quotient-proj-hom.agda",
   "transcriptPath" : "subjects/algebras-kernels-quotient-proj-hom/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes), so the file now type-checks correctly.",

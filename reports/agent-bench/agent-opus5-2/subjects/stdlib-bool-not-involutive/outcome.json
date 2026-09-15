@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3383,
-  "agdaTail" : "Checking Bool-not-involutive (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/stdlib-bool-not-involutive/final/Bool-not-involutive.agda).",
+  "agdaMs" : 3053,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(b : Agda.Builtin.Bool.Bool) →\nData.Bool.Base.not (Data.Bool.Base.not b) Agda.Builtin.Equality.≡ b",
+    "final" : "(b : Bool) → not (not b) ≡ b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-bool-not-involutive/final/Bool-not-involutive.agda",
   "transcriptPath" : "subjects/stdlib-bool-not-involutive/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file (the hole was replaced by a case split with `refl` in each branch).",

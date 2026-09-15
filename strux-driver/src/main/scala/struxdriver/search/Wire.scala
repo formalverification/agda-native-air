@@ -59,6 +59,22 @@ object WireHole {
   * hole list would read as "no obligations").  The count is cross-checked
   * against the list for the same reason.
   */
+/** One structured diagnostic as check_file reports it (agda-mcp/README.md,
+  * issue #74): Agda's own name for it (`SafeFlagPostulate`, `NotInScope`,
+  * `UnsolvedInteractionMetas`, ...), absent only when Agda printed no name,
+  * and the message body.  The agent bench's escape and hole gates read the
+  * codes (issue #154); the search never did, so the field is additive.
+  */
+final case class WireDiagnostic(severity: String, code: Option[String], message: String)
+object WireDiagnostic {
+  implicit val decoder: Decoder[WireDiagnostic] = (c: HCursor) =>
+    for {
+      severity <- c.getOrElse[String]("severity")("error")
+      code     <- c.get[Option[String]]("code")
+      message  <- c.getOrElse[String]("message")("")
+    } yield WireDiagnostic(severity, code, message)
+}
+
 final case class CheckFileBody(
   success:           Boolean,
   holes:             Vector[WireHole],
@@ -66,7 +82,8 @@ final case class CheckFileBody(
   timedOut:          Boolean,
   elapsedMs:         Long,
   checkedFromSource: Option[Boolean],
-  exitCode:          Option[Int]
+  exitCode:          Option[Int],
+  diagnostics:       Vector[WireDiagnostic] = Vector.empty
 )
 object CheckFileBody {
   implicit val decoder: Decoder[CheckFileBody] = (c: HCursor) =>
@@ -80,7 +97,8 @@ object CheckFileBody {
       elapsed  <- c.get[Long]("elapsedMs")
       cfs      <- c.get[Option[Boolean]]("checkedFromSource")
       exit     <- c.downField("verdict").downField("exitCode").as[Option[Int]]
-    } yield CheckFileBody(success, holes, count, timedOut, elapsed, cfs, exit)
+      diags    <- c.getOrElse[Vector[WireDiagnostic]]("diagnostics")(Vector.empty)
+    } yield CheckFileBody(success, holes, count, timedOut, elapsed, cfs, exit, diags)
 }
 
 /** One local-context entry as get_goal reports it.  The lane path carries

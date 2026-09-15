@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3193,
+  "agdaMs" : 2990,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Set} → A → B → A × B",
+    "final" : "{A B : Set} → A → B → A × B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
   "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file.",

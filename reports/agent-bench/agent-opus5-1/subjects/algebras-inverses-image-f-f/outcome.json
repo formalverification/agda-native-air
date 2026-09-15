@@ -3,7 +3,10 @@
   "difficulty" : "routine",
   "source" : "agda-algebras",
   "tags" : [
-    "stratum:wholesale"
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.Imagef∋f",
+    "target:Setoid.Functions.Inverses.Image_∋_.eq",
+    "target:Relation.Binary.Bundles.Setoid.refl"
   ],
   "stratum" : "agda-algebras/wholesale",
   "hole" : "Imagef∋f′",
@@ -53,8 +56,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3352,
+  "agdaMs" : 3388,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n(F : Function.Bundles.Func 𝑨 𝑩)\n(a : Relation.Binary.Bundles.Setoid.Carrier 𝑨) →\nSetoid.Functions.Inverses._.Image F ∋ Function.Bundles.Func.to F a",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-inverses-image-f-f/final/Inverses-image-f-f.agda",
   "transcriptPath" : "subjects/algebras-inverses-image-f-f/transcript.jsonl",
   "lastWords" : "The hole is filled with `eq a (Setoid.refl 𝑩)`, and `check_file` reports success (exit code 0, no diagnostics, no holes) on the final file.",

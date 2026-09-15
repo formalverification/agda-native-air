@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3202,
+  "agdaMs" : 3119,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "Agda.Builtin.Unit.⊤",
+    "final" : "⊤",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
   "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file (`trivial = tt`, no holes, exit code 0).",

@@ -32,9 +32,18 @@
 --
 -- Output fields
 -- =============
--- Existing required fields are preserved. We add two OPTIONAL fields:
---   - body    : null | string
---   - hasBody : bool
+-- Existing required fields are preserved. We add three OPTIONAL fields:
+--   - body     : null | string
+--   - hasBody  : bool
+--   - bodyRefs : [string]   the definitions the body refers to, EXACTLY: every
+--                           `Def` and `Con` head in every clause body of a
+--                           function, as the fully qualified name Agda holds
+--                           internally (normalized like prettyQname).  Unlike
+--                           `dependencies`, which tokenizes the printed type,
+--                           this is read off Agda's own terms, so it is what a
+--                           judge can trust when it asks "does this proof use
+--                           that lemma" (the agent bench's restatement gate,
+--                           issue #154).  Empty for anything without clauses.
 --
 -- These are optional so older validators/tests that enforce a fixed required-key
 -- set won't fail until we intentionally make them required.
@@ -73,6 +82,7 @@ import Agda.TypeChecking.Monad.Base
   )
 import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import qualified Agda.Syntax.Internal as I
+import qualified Agda.Syntax.Internal.Generic as IG
 import Agda.TypeChecking.Pretty (PrettyTCM, prettyTCM)
 import qualified AgdaJsonl.Cli as Cli
 import AgdaJsonl.StructAst (typeToAst)
@@ -220,6 +230,35 @@ ppClauseBody cl =
     Just t  -> Just <$> pp t
 
 --------------------------------------------------------------------------------
+-- Exact body references (what a proof uses)
+--------------------------------------------------------------------------------
+
+-- | The definitions a body refers to, read off Agda's internal terms: the
+-- head of every `Def` (a defined name) and every `Con` (a constructor) that
+-- occurs anywhere in any clause body, with duplicates removed and names
+-- normalized like `prettyQname`.  A where-bound helper is a separate
+-- definition in the signature, so it appears here by its own qualified name
+-- and carries its own references; a consumer that wants the closure follows
+-- the rows.  Nothing is inferred from text.
+bodyRefsOf :: Defn -> [T.Text]
+bodyRefsOf = \case
+  AbstractDefn d   -> bodyRefsOf d
+  d@FunctionDefn{} ->
+    Set.toList . Set.fromList . concatMap clauseRefs $ funClauses d
+  _                -> []
+  where
+    clauseRefs :: I.Clause -> [T.Text]
+    clauseRefs cl = maybe [] termRefs (I.clauseBody cl)
+
+    termRefs :: I.Term -> [T.Text]
+    termRefs = IG.foldTerm $ \case
+      I.Def q _   -> [qnameText q]
+      I.Con c _ _ -> [qnameText (I.conName c)]
+      _           -> []
+
+    qnameText q = normalizeQNameText (T.pack (prettyShow (pretty q)))
+
+--------------------------------------------------------------------------------
 -- Main entry: dump one JSONL row per definition in the checked interface
 --------------------------------------------------------------------------------
 
@@ -261,7 +300,8 @@ dumpCheckResultAsJsonl h file cr fmt = do
     tyTxt   <- pp (defType defn)
     tyAst   <- typeToAst (defType defn)
     bodyTxt <- ppDefnBody (theDef defn)
-    let hasBody = isJust bodyTxt
+    let hasBody  = isJust bodyTxt
+        bodyRefs = bodyRefsOf (theDef defn)
 
     let astSize = T.length tyTxt
         kind    = "definition"
@@ -293,6 +333,7 @@ dumpCheckResultAsJsonl h file cr fmt = do
               , ("astSize",        jsonNum astSize)
               , ("body",           maybe jsonNull jsonStr bodyTxt)
               , ("hasBody",        jsonBool hasBody)
+              , ("bodyRefs",       jsonArr (map jsonStr bodyRefs))
               ]
 
     liftIO $ hPutStrLn h (T.unpack line)

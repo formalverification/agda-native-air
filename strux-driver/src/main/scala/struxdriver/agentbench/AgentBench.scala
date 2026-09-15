@@ -28,8 +28,10 @@ import io.circe.Json
 import io.circe.syntax._
 import java.nio.file.Files
 
+import struxdriver.benchmark.GoldVerifier
 import struxdriver.io.TextIO
-import struxdriver.search.{ProofSearchLoop, Scaffold}
+import struxdriver.search.{McpClient, ProofSearchLoop, Scaffold, ServerConfig}
+import scala.concurrent.duration._
 
 object AgentBench extends IOApp {
 
@@ -53,7 +55,24 @@ object AgentBench extends IOApp {
       // the previous report's config and corpora blocks are carried over,
       // since the harness is not told the model or the corpora a second time.
       previous <- if (cfg.rejudge) TextIO.readJson(layout.report) else IO.pure(Option.empty[Json])
-      driven   <- if (cfg.rejudge) Run.rejudgeAll(cfg, entries) else Run.driveAll(cfg, entries, sysP, userT)
+      // The harness's own server: corpus-less, and `--safe` in its flags when
+      // the judge is, so its check_file names Agda's refusals; it stages the
+      // work copies and answers the judge for both modes.
+      bin       = cfg.serverBin.getOrElse(throw new IllegalStateException("server-bin required"))
+      server    = ServerConfig(
+                    bin        = bin,
+                    agdaFlags  = if (cfg.safe) cfg.agdaFlags + " --safe" else cfg.agdaFlags,
+                    timeoutSec = cfg.serverTimeout,
+                    cwd        = cfg.projectRoot,
+                    stderrLog  = layout.stagingLog,
+                    corpus     = None)
+      agdaDir   = GoldVerifier.agdaDirOf(cfg.projectRoot)
+      includes <- Extractor.includesFromRegistry(java.nio.file.Paths.get(agdaDir).resolve("libraries"))
+      extractor = Extractor(cfg.agdaJsonBin.getOrElse(throw new IllegalStateException("agda-json-bin required")), includes, agdaDir, cfg.serverTimeout.seconds)
+      driven   <- McpClient.resource(server).use { client =>
+                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor)
+                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT)
+                  }
       corpora  <- previous.flatMap(_.hcursor.downField("corpora").focus).map(IO.pure).getOrElse(
                     Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
                       .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*)))

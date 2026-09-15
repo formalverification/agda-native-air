@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3206,
+  "agdaMs" : 3056,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
   "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
   "lastWords" : "check_file reports success: true (exit code 0, no diagnostics, no holes), so the file now type-checks correctly.",

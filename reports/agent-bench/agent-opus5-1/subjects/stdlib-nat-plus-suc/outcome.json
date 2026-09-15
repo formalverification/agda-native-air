@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3054,
+  "agdaMs" : 3086,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ Agda.Builtin.Nat.Nat.suc n)\nAgda.Builtin.Equality.≡\nAgda.Builtin.Nat.Nat.suc (m Agda.Builtin.Nat.+ n)",
+    "final" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
   "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
   "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, with `+-suc` proved by induction on `m`: `+-suc zero n = refl` and `+-suc (suc m) n = cong suc (+-suc m n)`.",

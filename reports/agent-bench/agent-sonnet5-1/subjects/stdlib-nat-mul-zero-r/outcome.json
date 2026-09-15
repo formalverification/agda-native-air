@@ -45,8 +45,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3483,
+  "agdaMs" : 3012,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : ℕ) → n * 0 ≡ 0",
+    "final" : "(n : ℕ) → n * 0 ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/stdlib-nat-mul-zero-r/final/Nat-mul-zeroR.agda",
   "transcriptPath" : "subjects/stdlib-nat-mul-zero-r/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the module now type-checks with the hole filled by induction on n.",

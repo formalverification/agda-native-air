@@ -46,8 +46,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2840,
+  "agdaMs" : 3089,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+    "final" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-mul-mono-sq/final/Nat-mul-mono-sq.agda",
   "transcriptPath" : "subjects/haystack-nat-mul-mono-sq/transcript.jsonl",
   "lastWords" : "check_file reports success (exitCode 0, no diagnostics), so the file now type-checks correctly with the hole filled by `Data.Nat.Properties.*-mono-≤ le le`.",

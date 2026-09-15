@@ -4,7 +4,8 @@
   "source" : "agda-algebras",
   "tags" : [
     "stratum:using",
-    "universe-polymorphic"
+    "universe-polymorphic",
+    "restates:Overture.Basic.lower∼lift"
   ],
   "stratum" : "agda-algebras/using",
   "hole" : "lower∼lift",
@@ -48,8 +49,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3507,
-  "agdaTail" : "Checking Overture-lower-lift (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/154-m1-10-agent-in-the-loop/data/benchmarks/reports/agent-bench/agent-opus5-2/subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda).",
+  "agdaMs" : 3172,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{a b : Agda.Primitive.Level} {A : Agda.Primitive.Set a} →\n((λ r → Level.Lift.lower r) Function.Base.∘ Level.lift)\nAgda.Builtin.Equality.≡ Overture.Basic.𝑖𝑑 A",
+    "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda",
   "transcriptPath" : "subjects/algebras-overture-lower-lift/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `refl`.",

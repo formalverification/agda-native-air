@@ -47,8 +47,17 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3086,
+  "agdaMs" : 3102,
   "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.≤ n →\n((n Agda.Builtin.Nat.+ n) Agda.Builtin.Nat.- m)\nAgda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ (n Agda.Builtin.Nat.- m))",
+    "final" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
   "finalPath" : "subjects/haystack-nat-plus-monus-assoc/final/Nat-plus-monus-assoc.agda",
   "transcriptPath" : "subjects/haystack-nat-plus-monus-assoc/transcript.jsonl",
   "lastWords" : "check_file reports success on the final file, with the hole filled by `Data.Nat.Properties.+-∸-assoc n le`.",
