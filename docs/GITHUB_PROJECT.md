@@ -444,7 +444,7 @@ The `agda-dojang-eval` job in `ci.yml` is a good template — it already has the
 
 ---
 
-### Issue M0-10: Infra: Extensible Agda library configuration in Nix dev shells (#51, closed)
+### Issue M0-10: Infra: Extensible Agda library configuration in Nix dev shells (#51)
 
 **Labels:** `agda-dojang`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
 
@@ -512,7 +512,7 @@ We should implement Phases 1 and 2 immediately (they're tiny and have immediate 
 
 ### Issue M0-10a: Agda-Nix Phase 1: Shell function override (quick, low-risk) (#52, closed)
 
-**Labels:** `agda-dojang`, `infrastructure`, `reproducibility`
+**Labels:** `agda-dojang`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
 
 **Assignees:** @williamdemeo
 
@@ -533,7 +533,7 @@ This is transparent (just adds flags), doesn't affect the Nix wrapper itself, an
 
 ### Issue M0-10b: Agda-Nix Phase 2: Optional external library registration (#53, closed)
 
-**Labels:** `agda-dojang`, `infrastructure`, `reproducibility`
+**Labels:** `agda-dojang`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
 
 **Assignees:** @williamdemeo
 
@@ -572,6 +572,42 @@ The shell hook already prints a summary of available tools; extend it to list re
      ✅ agda-algebras (~/git/ualib/agda-algebras/master)
      ⚠️  agda-categories: set AGDA_CATEGORIES_SRC to enable
 ```
+
+---
+
+### Issue M0-10c: Agda-Nix Phase 3: Nix-managed external libraries (#54)
+
+**Labels:** `agda-dojang`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
+
+**Assignees:** @williamdemeo
+
+For libraries that have stable Nix derivations (e.g., `agda-categories` is in nixpkgs), add them to `mkAgdaEnv`:
+
+```nix
+mkAgdaEnv = pkgs: pkgs.agda.withPackages (p: [
+  p.standard-library
+  # p.agda-categories  # uncomment when needed
+]);
+```
+
+For libraries NOT in nixpkgs (agda-algebras, TypeTopology), use `fetchFromGitHub` in the flake to pin them:
+
+```nix
+inputs.agda-algebras = {
+  url = "github:ualib/agda-algebras";
+  flake = false;
+};
+```
+
+Then construct the libraries file from the fetched sources.  This gives full reproducibility (pinned git rev in `flake.lock`) without requiring a local clone.
+
+---
+
+### Issue M0-10d: Agda-Nix Phase 4: Interactive library selection (stretch) (#55)
+
+**Labels:** `enhancement`, `agda-dojang`, `infrastructure`, `M0: migration + infrastructure`
+
+Add a `nix develop .#with-algebras` shell variant, or a `scripts/select-libraries.sh` that prompts the user to choose which libraries to register.  This is nice-to-have and probably not worth the complexity unless more than ~3 external libraries are in play.
 
 ---
 
@@ -751,6 +787,146 @@ After deletions, update the README:
 - Rearchitecting the extraction or ETL pipeline
 - Removing `experiments/archive/` (intentionally preserved)
 - Touching any active Scala, Python, or Haskell source code
+
+---
+
+### Issue M0-12: Admin: configure repo protection rules and PR template (#40, closed)
+
+**Labels:** `infrastructure`, `M0: migration + infrastructure`
+
+**Assignees:** @williamdemeo, @hyeyoungshin, @Copilot
+
+## Description
+
+A note pops up on the main GitHub page for this repository reminding us that we should set up some rules protecting the repo against accidental or nefarious behavior; it says,
+
+"Your main branch isn't protected  
+Protect this branch from force pushing or deletion, or require status checks before merging.
+[View documentation](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)"
+
+### Rules for Merging PRs
+
+We should set up the following rules before opening the repo up to outside contributors:
+
+1.  At least 1 review and approval needed before merging a PR branch into `main`.
+2.  Only allow "Rebase and merge" (no direct "Merge commit" button).
+3.  Only allow "Rebase and merge" if CI passes (all green).
+4.  Allow "Automatic rebase and merge" once CI passes (assuming 1 review/approval of the PR).
+
+This is a good task for either Claude or GitHub Copilot to do or at least provide detailed guidance on how to do it.
+
+### PR Description Template
+
+We should probably have a PR template that guides/encourages contributors to provide a nice description of the PR.  It should automatically populate the PR description dialog box with a `# Description` section as well as an `# Acceptance Criteria` section that includes a checklist of standard criteria.
+
+---
+
+### Issue M0-13: flake shellHook: unguarded variable reads put cwd on `LD_LIBRARY_PATH` (#96)
+
+**Labels:** `bug`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
+
+## Context
+
+Found while landing #72 / #76 (PR #95); a Copilot review of that PR raised the `set -u` half of it, and testing the claim turned up a larger, unconditional defect underneath.  PR #95 guarded the one variable it introduced (`AGDA_NATIVE_AIR_ROOT`) and deliberately went no further, since auditing every shell is separate work.  This issue is that work.
+
+The flake's shell snippets read several environment variables without a default expansion.  That has two distinct consequences, and the first one bites in ordinary use, not only under unusual shell options.
+
+## 1.  Every shell puts the current directory on the dynamic-linker search path
+
+`exportLibPath` (flake.nix:390) is used by *every* devShell — `default`, `backend`, `proofParser`, `mlPipeline`, `all`, and both `gpu` variants:
+
+```nix
+# Prepend Nix-provided runtime libs; keep existing LD_LIBRARY_PATH only if it exists.
+exportLibPath = ''
+    export LD_LIBRARY_PATH="${wheelRuntimeLibPath}:$LD_LIBRARY_PATH"
+'';
+```
+
+The comment states the intent exactly; the code does not implement it.  `$LD_LIBRARY_PATH` is read unconditionally, so when it is unset — the common case on a clean login shell — the result ends in a trailing colon:
+
+```
+$ env -u LD_LIBRARY_PATH nix develop .#backend --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'
+…/p8hw2h465g0byxwpamnk6gv6mp5gnqn2-openssl-3.0.14/lib:
+```
+
+An empty entry in `LD_LIBRARY_PATH` is the current directory as far as glibc's loader is concerned, so every such shell silently searches the directory it was launched from for shared objects.  That is a reproducibility hazard on its own — a shell's linking behaviour should not depend on where it was entered — and it is worth fixing independently of anything below.
+
+## 2.  An inherited `set -u` aborts the shell before it starts
+
+This one is narrower than § 1 and worth calibrating before spending time on it.  A parent script's own `set -u` does *not* reach the shell `nix develop` runs — bash does not export `SHELLOPTS` by default, so `scripts/run-server.sh`'s `set -euo pipefail` is harmless here (checked: a child bash under such a parent reports options `hBc`, no `u`).  It bites only when a caller *exports* `SHELLOPTS` with `nounset` in it, which some CI harnesses do.  When that happens it kills the hook on the same line as § 1:
+
+```
+$ env SHELLOPTS=nounset nix develop .#backend --command bash -c 'echo "$AGDA_DIR"'
+/tmp/nix-shell.XXXXXX/nix-shell.H5XHIB: line 2119: LD_LIBRARY_PATH: unbound variable
+```
+
+Nothing after that point runs, so no amount of guarding further down helps until this line is fixed.
+
+## 3.  `backend` reports a variable it never sets
+
+Its banner echoes `WHEEL_LD_LIBRARY_PATH` (flake.nix:528), but `exportWheelRuntimeLibs` — the only thing that sets it — is used by `default`, `mlPipeline`, and `all`, never by `backend`.  The line therefore always prints empty there, and is a third unguarded read under `set -u`.
+
+## Inventory
+
++  `exportLibPath` (flake.nix:390-392) reads `$LD_LIBRARY_PATH`; used by every shell, and the cause of both § 1 and § 2.
++  Banner lines read `$LD_LIBRARY_PATH`, `$WHEEL_LD_LIBRARY_PATH`, and `$JAVA_HOME` at flake.nix:436-438 (`default`), 527-528 (`backend`), 556 (`proofParser`), and 629-630 (`all`).
++  `mkAgdaShellSetup` reads the optional external-library roots unguarded — `$AGDA_ALGEBRAS_ROOT`, `$AGDA_CATEGORIES_ROOT`, `$AGDA_TYPETOPOLOGY_ROOT` at flake.nix:279-281 and again in the summary at flake.nix:306-321.  These are optional by design, so they are the most likely of all to be unset.
++  `$AGDA_NATIVE_AIR_ROOT` in `mkAgdaShellSetup` is already guarded (PR #95); it is listed here only so the audit is complete.
+
+## Proposal
+
++  Give every optional read a default expansion (`"${VAR:-}"`), which for `exportLibPath` also makes the code do what its comment already promises.
++  Build `LD_LIBRARY_PATH` so that no empty entry is ever produced — append the inherited value only when it is non-empty, rather than always interpolating it.
++  Either set `WHEEL_LD_LIBRARY_PATH` in `backend` or drop it from that shell's banner, so the report matches the shell.
++  Consider adding a smoke check that enters each shell with `SHELLOPTS=nounset` and with the relevant variables unset, so a future unguarded read is caught rather than rediscovered.
+
+## Acceptance
+
++  `env -u LD_LIBRARY_PATH nix develop .#<shell> --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'` prints no trailing colon and no empty entry, for every shell.
++  `env SHELLOPTS=nounset nix develop .#<shell> --command true` succeeds for every shell, with the external-library roots unset.
++  The `backend` banner does not report a variable that shell does not set.
+
+## Relations
+
++  #76 (closed by PR #95) is where this surfaced; that PR fixed the stray-`agda/` half of the environment problem and guarded only its own new variable.
++  #54 and #55 (Agda-Nix Phases 3 and 4) concern *which* libraries the shells provision and how they are pinned; this is about the shell snippets' own hygiene, so it is deliberately filed separately rather than folded into either.
+
+---
+
+### Issue M0-13: Add Claude Code config (CLAUDE.md, SessionStart Nix hook, skills) (#57, closed)
+
+**Labels:** `infrastructure`, `M0: migration + infrastructure`
+
+**Assignees:** @williamdemeo
+
+## Description
+
+Port the Claude Code working-configuration pattern from `agda-algebras` to this repository, adapted for the polyglot (Agda + Scala + Haskell + Python + Nix) layout here.  The goal is that a Claude Code session — local or "on the web" — comes up with the pinned toolchain available and the house conventions encoded, so the agent can type-check Agda and run the CI lanes exactly as CI does, with no manual setup.
+
+This is separate from #13 (baseline benchmark curation); that work continues on its own branch and PR.
+
+## Background
+
+In a "Claude Code on the web" container, Nix is not preinstalled and the usual installer redirectors (`nixos.org/nix/install`, `install.determinate.systems`) are blocked by the container's host allowlist.  However, `releases.nixos.org` and `cache.nixos.org` are reachable, so a `SessionStart` hook can install Nix directly from `releases.nixos.org` and realize the pinned toolchain from the binary caches.  This was validated live: Nix 2.31.2 installs cleanly, and `nix develop .#backend --command agda --version` reports Agda 2.8.0 with standard-library 2.3 substituted from `cache.nixos.org` and `formalverification.cachix.org`.
+
+## Tasks
+
++ Add `CLAUDE.md` at the repo root covering: build/test entry points (`nix develop` and the targeted shells `.#backend` / `.#all`; `make ci-smoke`, `make test`, `make check`, `make backend-test`; type-checking Agda via the flake's `agda` wrapper); repository architecture (`strux-driver`, `ml-pipeline`, `agda-strux`, `agda-dojang`, `data/benchmarks`); functional-Scala and doc-header conventions; the benchmark fixture convention; the markdown house style; and environment gotchas.
++ Add `.claude/settings.json` registering a `SessionStart` hook.
++ Add `.claude/hooks/session-start.sh`: single-user Nix install from `releases.nixos.org`; `/etc/nix/nix.conf` configured for rootless builds against `cache.nixos.org` + `formalverification.cachix.org`; CA handling that prefers the container's combined proxy bundle; a web-only guard via `CLAUDE_CODE_REMOTE`; and a pre-warm of `.#backend`.
++ Add `.claude/skills/typechecking-agda/SKILL.md` (verify benchmark fixtures and `agda-dojang` modules under the flake).
++ Add `.claude/skills/authoring-a-benchmark-obligation/SKILL.md` (obligation + gold fixture layout, header/hole/`AgdaDojang.Debug` convention, `benchmark-index.jsonl` schema, tier selection, then type-check the gold).
+
+## Acceptance criteria
+
++ A fresh web session has `nix` on `PATH` and can run `nix develop .#backend --command agda --version` (→ Agda 2.8.0) with no manual setup.
++ `CLAUDE.md` and the skills reflect this repository's actual commands and layout, not agda-algebras'.
++ The change is purely additive: no existing build, test, or CI behavior is modified.
+
+## Notes
+
++ Provisioning approach validated live in this environment (Nix 2.31.2 from `releases.nixos.org`; `.#backend` realizes Agda 2.8.0 + standard-library 2.3).
++ The hook is web-only (`CLAUDE_CODE_REMOTE`); local developers continue to use `nix develop` directly.
 
 <!-- END GENERATED: milestone-0 -->
 
@@ -1119,6 +1295,909 @@ Related: [#83] is the field measurement this complements; [#113] carries the loo
 [#150]: https://github.com/formalverification/agda-native-air/pull/150
 [#152]: https://github.com/formalverification/agda-native-air/pull/152
 
+---
+
+### Issue M1-11: agda-mcp: `get_goal` / `fill_hole` fail on library-embedded modules (#66, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Summary
+
+`get_goal` and `fill_hole` work on flat, top-level scratch modules (the shape of every `data/benchmarks/` fixture) but fail on a module that lives *inside a library* at a hierarchical path — for example `FLRP.Bridge` at `src/FLRP/Bridge.lagda.md` in `agda-algebras`.  `check_file` and `get_diagnostics` are unaffected, because they typecheck the file **in place**.  This blocks using the two temp-copy tools on real libraries, which is exactly the "agda-mcp on `agda-algebras` / `formal-ledger-specifications`" use case.
+
+## How it fails
+
+Both tools write a patched copy of the file to a scratch directory and run Agda there (`AgdaMCP.Tools.ProofState.handleGetGoal` / `handleFillHole` → `makeTmpDir` + `makeOverlay`).  For a hierarchical module this produces one of two errors:
+
++  Without the library on the include path, the copy lands flat at `<tmp>/Bridge.lagda.md` with `-i <tmp>`, so Agda computes the top-level module name `Bridge` and rejects the declared `FLRP.Bridge` — `ModuleNameDoesntMatchFileName`.  The overlay only mirrors the file's *immediate* sibling directory (`src/FLRP/`), so cross-directory imports (`Setoid.*`, `Classical.*`, …) do not resolve either.
++  With the library on the include path (the `-l agda-algebras` the client passes so those imports *do* resolve), `<lib>/src` is added to the search path, so `FLRP.Bridge` now resolves to its canonical file **and** to the temp copy — `ModuleDefinedInOtherFile`.
+
+So the temp-copy design cannot satisfy both constraints at once for a library-embedded module: it needs the whole library `src` on the path to resolve imports, but that same path re-introduces the canonical file that the copy collides with.
+
+## Reproduction
+
+Real case (from a live session): every `get_goal` / `fill_hole` call on `agda-algebras`'s `src/FLRP/Bridge.lagda.md` failed with `ModuleDefinedInOtherFile`, while `check_file` and `get_diagnostics` loaded and verified the same file correctly.
+
+Minimal synthetic case: a two-directory library (`src/A/M.agda` importing `src/B/N.agda`, module names `A.M` / `B.N`) with a `{!!}` hole in `A.M` reproduces the same two errors under `get_goal` / `fill_hole` and succeeds under `check_file`.  A fixture of this shape belongs in the `agda-mcp` test suite as a regression guard.
+
+## Root cause
+
+The temp-copy + `makeOverlay` strategy (a port of `agent_bridge.py`'s scratch-file approach) assumes the target is a self-contained top-level module.  That holds for the benchmark fixtures but not for modules embedded in a library tree.
+
+## Proposed fix
+
+Typecheck **in place**, the way `check_file` / `get_diagnostics` already do — Agda then auto-detects the worktree's `.agda-lib` and the hierarchical name and all imports resolve exactly as they do for the human developer.  Concretely:
+
++  Patch the *real* file (hole → `reportGoalCtx ?` for `get_goal`, hole → candidate for `fill_hole`), run Agda in place, parse, and restore the original content under `Control.Exception.bracket` so the file is always restored — even on exception or timeout.
++  For `get_goal`, additionally ensure `open import AgdaDojang.Debug` is in scope before injecting `reportGoalCtx` (inject it transiently if absent; `agda-dojang` is already registered, so it resolves).  This works uniformly for `.agda` and `.lagda.md`, since a module declaration is in code context in both.
++  Drop the `makeTmpDir` / `makeOverlay` / `stripIncludeDir` machinery from these two handlers.
+
+Tradeoff: in-place patching transiently mutates the source for the duration of one Agda run.  `bracket` bounds that window and guarantees restoration; the MCP use case is agent-driven (no concurrent hand-editing), so this is acceptable for v0.  An alternative that never touches the source — mirroring the entire library `src` tree with symlinks and overriding the one file — is heavier and needs per-file library/dependency detection; it can come later if the in-place window proves problematic.
+
+This also makes #43 (optimize `makeOverlay` for large trees) moot for these two tools, since the overlay disappears from their path entirely.
+
+## Acceptance criteria
+
++  `get_goal` and `fill_hole` succeed on a hierarchically-named module that imports across sibling directories (synthetic fixture + a manual check against a real `agda-algebras` module).
++  The target file is byte-for-byte unchanged after every call, including when Agda errors or the call times out.
++  `check_file` / `get_diagnostics` behavior is unchanged.
++  A regression fixture of the two-directory shape is added to the `agda-mcp` test suite.
+
+---
+
+### Issue M1-12: agda-mcp: `fill_hole` reports ok for candidates that leave unsolved metas (#69, closed)
+
+**Labels:** `bug`, `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P0 — trust).  Feedback document § 3.1 and § 7.2.2 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Observed on `911ae18`
+
+Fixture (imports only `Agda.Builtin.Nat`):
+
+```agda
+module TwoHoles where
+
+open import Agda.Builtin.Nat
+
+implicitOnly : {n : Nat} → Nat
+implicitOnly {n} = n
+
+g : Nat
+g = {!!}
+
+h : Nat
+h = {!!}
+```
+
+`fill_hole {holeIndex: 0, candidate: "implicitOnly"}` returns:
+
+```json
+{"status": "ok", "candidate": "implicitOnly", "remainingHoles": 1}
+```
+
+Running `agda` directly on the identical patched content (hole 0 replaced by `implicitOnly`, hole `h` untouched) exits 42 with `[UnsolvedMetaVariables]` at `g` plus `[UnsolvedInteractionMetas]` at `h`.  The candidate did not typecheck in the sense any agent cares about.  This is exactly the FLRP "implicits under a defined function" pattern (`IE→cfIE (ies i)`) that cost the field session a full build cycle (document § 4), now demonstrated live on HEAD — the sharpest instance of the § 3.1 trust failure ("a verdict I cannot trust costs more than no verdict").
+
+### Cause
+
+`handleFillHole` excuses a non-zero exit when the combined output mentions `[UnsolvedInteractionMetas]` and none of four blacklisted tags (the `onlyMetas` predicate in `agda-mcp/src/AgdaMCP/Tools/ProofState.hs`).  The intent — tolerate the file's *other, still-open holes* — is right, but the blacklist does not fail on `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]`, so metas introduced by the candidate itself ride along with the excused interaction metas.
+
+### Proposal
+
++  Replace the tag blacklist with positive attribution: tolerate only `[UnsolvedInteractionMetas]` whose reported locations fall on the file's *other* hole spans; any `[UnsolvedMetaVariables]`, any `[UnsolvedConstraints]`, or an interaction meta inside the filled span fails the call.
++  On failure, name the unsolved metas with their types and locations (dovetails with the structured-diagnostics sub-issue of #68).
++  Adopt the fixture above as a cabal regression test: `fill_hole(0, "implicitOnly")` must return `type_error` naming an unsolved meta, and `fill_hole(0, "zero")` must remain `ok`.
+
+### Acceptance
+
++  The `TwoHoles` fixture behaves as above under `make agda-mcp-test`.
++  `status: "ok"` provably means the patched file passes batch `agda` up to other holes' interaction metas, and the `fill_hole` tool description states that contract.
+
+---
+
+### Issue M1-13: agda-mcp: `get_goal` reports macro's unsolved type instead of hole's goal (#70, closed)
+
+**Labels:** `bug`, `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P0 — trust).  Feedback document § 7.2.1 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)); found during verification, not reported by the field session (which never called the tool).
+
+### Observed on `911ae18`
+
+On the shipped fixture `agda-dojang/data/fixtures/Fixture01.agda`, hole 0 (`id x = {!!}`, whose goal the agda-mcp README documents as `"A"`):
+
+```json
+{"goal": "(x₁ : _3 x) → _5 x x₁",
+ "context": [{"index": 0, "name": "x", "type": "A", "visibility": "visible"},
+             {"index": 1, "name": "A", "type": "Set₀", "visibility": "hidden"}],
+ "module": "Fixture01"}
+```
+
+The context is right; the goal is not `A` but an unsolved function type.  Fresh fixtures with the concrete goal `Nat` return the same shape, in both `.agda` and `.lagda.md`.  The server's stderr shows the raw marker block already carrying the bad goal (`AGDADOJANG_GOAL: (x₁ : _4 x y) → _6 x y x₁`), so the defect sits in the `reportGoalCtx` reflection layer (`agda-dojang/agda/AgdaDojang/Debug.agda`) as driven by batch `agda` 2.8.0, not in agda-mcp's parsing.
+
+Two aggravating observations:
+
++  It is long-standing, not a fresh regression: the 2026-04-03 M1-4 transcript (`reports/m1-4/2026-04-03-213713-ClaudeCode-Fixture01.txt`) shows the same shape at hole 1, where the driving agent rationalized it as "mutual dependency between holes" — a live demonstration of how a wrong answer misleads rather than merely failing.
++  CI cannot see it: the unit tests assert `parseGoalContext` on hand-written marker text (`AGDADOJANG_GOAL: A`), and no test asserts an end-to-end goal value against real Agda output.
+
+### Why it matters
+
+`get_goal` is the primary "what am I trying to prove?" query and one of the two tools with no shell equivalent.  A goal polluted with `_N` metas is at best useless and at worst actively misleading.
+
+### Proposal
+
++  Diagnose whether `reportGoalCtx` quotes the goal before the expected type has been unified into the macro application — the `(x₁ : _A) → _B x₁` shape of a fresh function meta suggests exactly that — and fix the macro, or its injected invocation shape, so the reported goal is the hole's elaborated expected type.
++  Add an end-to-end integration test asserting goal values against real Agda output: `get_goal(Fixture01, 0) = "A"`, `get_goal(Fixture01, 1) = "⊤"`, `get_goal(Fixture01, 2) = "x ≡ x"`, plus one concrete-`Nat` fixture, under `make agda-mcp-test`.
+
+### Acceptance
+
++  `get_goal` on `Fixture01` holes 0–2 returns `A`, `⊤`, and `x ≡ x` respectively, pinned by an integration test that drives the real toolchain.
+
+---
+
+### Issue M1-14: agda-mcp: hole detection matches only `{!!}` (#71, closed)
+
+**Labels:** `bug`, `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P0 — trust).  Feedback document § 3.2 and § 7.2.5 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Observed on `911ae18`
+
+`findHoles` (`agda-mcp/src/AgdaMCP/Agda.hs`) scans raw source text for the exact four-character token `{!!}`.  All of the following reproduced during verification:
+
++  A fixture with four Agda-visible interaction points, `{!!}`, `{! !}`, `{!zero!}`, `?`, reports `holesCount: 2`: the real `{!!}` plus a `{!!}` mentioned in the header *comment*.  Worse, the comment token is hole 0 and the real hole is hole 1, so index-addressed calls target a comment.
++  A `.lagda.md` whose only hole is `{! zero !}` reports `holes: []` while the same `get_diagnostics` response carries the `[UnsolvedInteractionMetas]` error, and `get_goal(0)` answers "Hole index 0 not found".  This reproduces and explains the field document's § 0 memory note ("`holes: []` with open holes; `{!...!}` not recognized in `.lagda.md`"): it is not literate handling per se, it is the token model.
++  `?`-holes are invisible everywhere.
+
+### Why it matters
+
+Agents and agda-mode both write content-bearing `{! attempt !}` holes and `?` holes constantly, and a literate repository additionally mentions `{!!}` in prose and comments.  Under the current model the two tools with no shell equivalent (`get_goal`, `fill_hole`) are unavailable or mis-addressed exactly where the work happens; the document's § 2.3 is why the field session never called them.
+
+### Proposal
+
++  Recognize the hole surface syntax Agda recognizes: `{! … !}` with arbitrary, nesting-aware content and standalone `?`, ignoring occurrences inside comments and string literals.
++  The robust route is to stop re-lexing: Agda already enumerates interaction points with positions (they are exactly what `[UnsolvedInteractionMetas]` reports, and what the interaction protocol lists); use Agda's positions as the source of truth for holehood, and let a lexical pass merely locate the token text for substitution.
++  In literate files, restrict scanning to code regions (tracked separately in the literate-Agda sub-issue of #68) so prose tokens can never be holes.
++  Adopt the verification fixtures as regression tests: the four-variant file must report four holes with correct spans; comment and prose tokens must contribute zero.
+
+### Acceptance
+
++  Hole enumeration agrees with Agda's interaction-point count on the fixture matrix, for `.agda` and `.lagda.md` alike, and `get_goal`/`fill_hole` successfully address a `{! !}`-style hole.
+
+---
+
+### Issue M1-15: agda-mcp: make batch verdict explicit in responses/contract (#72, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P0 — trust).  Feedback document § 3.1, § 6 meta-suggestion, and § 7.3 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Context
+
+Verification refuted the secondhand "green on unsolved metas" claim for `check_file` / `get_diagnostics`: the server already runs batch `agda <file>` per call and was correctly red on every failing fixture.  But nothing *says* so, and the field session § 2.5 records the cost ("with no answers, the conservative move is the tool whose semantics I know exactly"):
+
++  The verdict semantics live only in the implementation; no response states what green means.
++  `get_diagnostics` has no success or exit-code field at all — only counts derived from parsing Agda's prose, which would silently zero if the message format drifts, exactly as position parsing already has (see the structured-diagnostics sub-issue of #68).
++  The four tool descriptions are one-liners stating none of flags, verdict meaning, supported file flavours, hole model, or caching — and "an agent chooses tools by reading those two lines and nothing else" (§ 6).
+
+### Proposal
+
++  Add to every proof-state response: a `verdict` field with an explicit meaning (e.g. `"equivalent-to: agda <resolved flags> <file>"`), the Agda exit code, and the resolved command line (binary, flags, cwd).
++  Derive `success` and the error verdict from the exit code, never solely from message parsing; give `get_diagnostics` the same `success`/exit fields as `check_file`.
++  Consider a `strict` option honoring `--safe` and friends per the document's § 3.1 proposal, but note the default is already batch-strict — the work is to make that contractual, not to change semantics.
++  Rewrite the four tool descriptions to carry the client-visible contract: verdict semantics, supported file flavours, hole model, cold-subprocess latency, and precisely what `fill_hole`'s `ok` tolerates.
+
+### Acceptance
+
++  Every response says what was run and what green means, and a client can confirm "this equals my `agda <file>` gate" without reading Haskell.
++  A tools/list dump alone is enough for an agent to know whether a green result means the build passes — the one thing § 6 says the descriptions failed to say.
+
+---
+
+### Issue M1-16: agda-mcp: first-class literate Agda code-region awareness (#73, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P0 — trust); companion to #71.  Feedback document § 3.2 and § 7.2.6 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Observed on `911ae18`
+
+The good news from verification first: on `.lagda.md`, `check_file` type-checks correctly, `get_goal` finds `{!!}`-token holes inside fenced blocks, and the transient `AgdaDojang.Debug` import injection lands correctly after the module header inside the fence.  What is missing is any awareness of *which bytes are code*:
+
++  A closing-prose mention of `{!!}` was counted as a hole, and `fill_hole` on that prose token returned `status: "ok"` — the substituted prose is invisible to Agda, and the file's real open hole was excused by the tolerance heuristic (#69).  An agent trusting that verdict would edit documentation believing it made proof progress.  In a repository like `ualib/agda-algebras`, which is 100 % `.lagda.md` and whose prose frequently discusses holes, this is a standing hazard, not an edge case.
++  The server's hand-rolled hole spans are character offsets over the raw literate text and are never surfaced, so nothing guarantees that hole positions and diagnostic positions agree with the literate file as an editor or agent sees it.
+
+### Proposal
+
++  Implement code-region extraction for the literate flavours Agda supports — ```` ```agda ```` fences for `.lagda.md`, `\begin{code}` blocks for `.lagda.tex`, `#+begin_src agda2` for `.lagda.org`, and `.lagda.rst` blocks — and restrict hole scanning and candidate substitution to code regions.
++  Report hole positions as (line, column) in literate-file coordinates wherever holes are listed, and keep diagnostic positions consistent with them.
++  Add one regression test per flavour: prose above and below a hole plus a decoy token in the prose, asserting the hole count and the reported line.
++  State the supported flavours in the tool descriptions, so a client can tell before trying (document § 3.2).
+
+If #71 moves holehood to Agda's own interaction points, prose immunity falls out for free and this issue reduces to substitution safety, position mapping, per-flavour tests, and description text — sequence the two accordingly.
+
+### Acceptance
+
++  `get_goal` and `fill_hole` behave identically on `M.agda` and the same code embedded in each literate flavour; decoy prose tokens are never holes; reported positions match the literate file.
+
+---
+
+### Issue M1-17: agda-mcp: structured diagnostics (#74, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P1 — reach beyond the shell).  Feedback document § 3.4, § 5, and § 7.2.3 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Observed on `911ae18`
+
++  A bug first: **no diagnostic carries a source position**.  `parseDiagnostics` (`agda-mcp/src/AgdaMCP/Tools/ProofState.hs`) extracts line numbers by splitting on `,` in the `file:10,5-15` style, but Agda 2.8.0 emits `file:9.12-13`; every diagnostic in the verification session shipped with `severity` and `message` only.
++  Only the bracketed header line survives (`…: error: [UnsolvedMetaVariables]`); the detail block — meta locations and types, expected versus actual, candidate lists — is dropped.  That detail is precisely what an agent needs: the field session's `UnsolvedConstraints` dump ran ~20 lines of internal meta names (`_𝑳.fst.Interp.to_127`) before the useful part, at token cost on every iteration.
+
+### Proposal
+
+Adopt the document's § 3.4 schema alongside the existing text:
+
+```
+{ severity, code: "UnsolvedMetaVariables" | "AmbiguousName" | …,
+  file, range: {startLine, startCol, endLine, endCol},
+  message, involved: { expected?, actual?, candidates?[], metaTypes?[] } }
+```
+
++  Parse Agda 2.8's `line.col-…` position format, with a regression test covering both old and new formats.
++  Keep the bracketed name as the machine-readable `code`, and attach the (bounded) full message body, not just the header line.
++  Add a `maxDiagnostics` cap (default around 10) with the total reported, so a broken import list does not return a hundred cascading errors.
++  Order by likely root cause — scope errors before type errors, warnings that precede hard errors (e.g. `ModuleDoesntExport` before the consequent `NotInScope`) first.
++  Build the fixture suite directly from the document's § 5 error corpus — `ModuleDoesntExport` (warning), `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedConstraints` + `UnsolvedMetaVariables` — one fixture each, asserting `code`, `range`, and the `involved` payload named in § 5's third column.
+
+### Acceptance
+
++  A client can branch on `code` and read `range` without regexing prose, for all six § 5 fixture classes, under `make agda-mcp-test`.
+
+---
+
+### Issue M1-18: agda-mcp: live scope, type + definition queries (#75, closed)
+
+**Labels:** `agda-mcp`, `retrieval`, `M1: agda-dojang/mcp`
+
+## Description
+
+
+Part of #68 (P1 — reach beyond the shell).  Feedback document § 3.3 and § 4 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).  Complementary to #17 (corpus-backed retrieval): these queries answer against the *current* tree and scope with no extraction step, which a five-day-old corpus cannot.
+
+### Context
+
+The field session's dozen scope questions all went to `grep`, and three cost a full iteration each: an `AmbiguousName` for `≈sym` (a `Setoid` record field versus a canopy lemma reached through a four-level chain of module applications), a `ClashingDefinition` against a `public` re-export, and a `NotInScope` from a missing barrel entry whose `ModuleDoesntExport` warning would have flagged it first.  `grep` cannot resolve re-exports or module applications; the type-checker can.  This family is where an MCP is strictly better than the shell rather than equal to it — § 2.2's bar for earning a call.
+
+### Proposal
+
+Read-only queries, none requiring the client to edit the file first (the "check a term without committing to it" property is what makes them worth a call):
+
++  `scope_at(filePath, line)` → names in scope with their fully qualified origins.
++  `resolve_name(filePath, line, name)` → candidates with provenance chains (the `AmbiguousName` case).
++  `type_of(filePath, line, expr)` and `normalize(filePath, line, expr)` → Agda's `C-c C-d` / `C-c C-n` on an expression that need not be in the file yet.
++  `exports_of(module)` → the public surface, so barrel omissions are caught before compiling.
++  `definition_of(name)` → defining file and line — the single most common grep an agent runs.
+
+Implementation note: this likely means driving `agda --interaction-json` (`Cmd_infer`, `Cmd_compute`, `Cmd_why_in_scope`, `Cmd_show_module_contents` cover most of the list) rather than the batch binary; that groundwork also serves #71's interaction-point-based hole model, so consider sequencing them together.
+
+### Acceptance
+
++  The three § 4 "moments" run as scripted tests: `resolve_name` on an `≈sym`-style fixture returns two candidates with provenance; `type_of` answers for an expression not present in the file; `definition_of` returns file and line for a re-exported name.
+
+---
+
+### Issue M1-19: agda-mcp: project-root resolution and environment transparency (#76, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P1 — reach beyond the shell); overlaps #72's response-echo work — land the echo once, use it for both.  Feedback document § 3.6 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Observed on `911ae18`
+
++  No response echoes flags, cwd, or resolved library context; the caller cannot tell which tree was checked.
++  The worktree binding is doubly indirect and mutates shared state: the client's `.mcp.json` sets `AGDA_ALGEBRAS_ROOT`, `scripts/run-server.sh` enters `nix develop .#backend`, and the shellHook then rewrites the checkout-wide `agda/libraries` from whatever env vars are in effect at that moment — observed live during verification (`[agda] wrote …/agda/libraries` on server start).  A stale env var means the server silently typechecks a *different branch's* tree while reporting success, and the one-worktree-per-branch workflow in `ualib/agda-algebras` (see `agda-mcp/examples/agda-algebras.mcp.json`) makes staleness easy to reach.
++  Open question carried from the field report, not reproduced during verification: an untracked `agda/` directory (`defaults`, `libraries`) appeared in the *agda-algebras* worktree root; the reporter could not tell whether the MCP setup, the Nix `agda` wrapper, or a direct invocation created it (`AGDA_DIR` handling is the natural suspect).
+
+### Proposal
+
++  Resolve the effective library context from the requested `filePath` by walking up to the nearest `*.agda-lib`, falling back to server-start configuration, and report which was used.
++  Echo the resolved root, library file, and full flags in every response.
++  Fail loudly when the requested file lies outside every configured root, rather than succeeding against the wrong tree — a wrong answer, not an error, is the worst outcome for an agent (§ 3.6).
++  Reproduce or rule out the stray `agda/` directory; document exactly what the server (including the shellHook it triggers) writes where, and keep generated state out of project trees or make it explicitly gitignorable.
+
+### Acceptance
+
++  Pointing the client at a file in a different worktree either works against that worktree or errors naming the mismatch; every response names the tree it checked; no silent success against the wrong tree is possible.
+
+---
+
+### Issue M1-20: agda-mcp: `--timeout` is parsed but never enforced; no timing or cache reporting (#77, closed)
+
+**Labels:** `bug`, `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P1).  Feedback document § 3.7 and § 7.2.4 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Observed on `911ae18`
+
++  `--timeout N` parses into `agdaTimeout`, which nothing reads — `runAgda` in `agda-mcp/src/AgdaMCP/Agda.hs` carries the `TODO: enforce agdaTimeout` comment from PR #38 review.  The field session's `.mcp.json` passes `--timeout 600` expecting an effect; a hung or interface-rebuilding Agda call simply blocks the tool call indefinitely.  The `FillTimeout` status defined in `AgdaMCP.Types` is unreachable code.
++  Every call is a cold `agda` subprocess (as the README's architecture notes state), and no response reports elapsed time or interface-cache state, so a client cannot learn whether the MCP call is ever cheaper than its own `agda <file>` — and § 3.7 is right that "an unadvertised advantage does not influence a decision".
+
+### Proposal
+
++  Enforce `agdaTimeout` around the subprocess (`System.Timeout.timeout` plus killing the process group), surface it as `FillTimeout` for `fill_hole` and a timeout diagnostic for the check tools, and test it with a deliberately slow fixture and a tiny timeout.
++  Report `elapsedMs` on every response, plus a coarse cache signal (e.g. whether Agda's output shows `Checking …` re-elaboration versus interface loading).
++  Document expected latency — cold subprocess per call, `.agdai` reuse courtesy of Agda itself — in the tool descriptions, alongside #72's contract text.  The warm Agda-as-a-library server stays the long-term answer (README "Future" section) and is out of scope here.
+
+### Acceptance
+
++  A hanging check returns a timeout result at the configured bound instead of blocking forever, and every response carries `elapsedMs`.
+
+---
+
+### Issue M1-21: agda-mcp: whole-project check tool `check_project` (#78, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P2 — economics and ergonomics).  Feedback document § 3.5 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Context
+
+The field session's acceptance gate was `make check` over a generated `Everything.agda` (~300 modules, 10–20 minutes); the agent ran it four times as backgrounded Bash jobs and had to defend against a real trap — a wrapper ending in `echo` reports shell exit 0 even when `make` failed, so the log had to be grepped for `error:`.  Per § 3.5, this is the call that would replace that agent's Bash usage *entirely*.
+
+### Proposal
+
++  `check_project(target?, since?)`: run the project's own gate — a configured command, defaulting to something honest like the nearest Makefile check target or `agda` on the project's `Everything` module — stream progress, and return a machine-readable exit status plus the first error with context (structured per #74).
++  The honest v1 contract is "run the real gate and never misreport its exit code"; `since`-based narrowing to changed files is optional follow-on scope.
++  Respect and report the timeout story from #77, since project checks are exactly where long runs live.
+
+### Acceptance
+
++  On a project whose gate fails mid-run, the response carries the failing module, the structured first error, and a non-success verdict; on success, the verdict names the command it ran and its elapsed time.
+
+---
+
+### Issue M1-22: agda-mcp: stable hole handles (#79, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P2 — economics and ergonomics); depends on #71, which must land first for the hole list to be correct at all.  Feedback document § 3.8 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
+
+### Context
+
+`get_goal` / `fill_hole` take a 0-based index into the source-order hole list.  Indices shift whenever an earlier hole is filled or a new one is added, turning a multi-hole edit into index bookkeeping — precisely the state an agent loses track of between calls (§ 3.8).  Verification showed it is worse than stated today: phantom token matches also occupy indices, so in one fixture the header comment's `{!!}` is hole 0 and the real hole is hole 1 (#71), meaning "the first hole" addresses a comment.
+
+### Proposal
+
++  Accept `(line, column)` — in literate-file coordinates per #73 — or a stable hole id as an alternative to `holeIndex` in `get_goal` and `fill_hole`.
++  Return the full updated hole list (id, position, and a one-line goal where cheap) from every `fill_hole` and `check_file` response, so the client re-anchors without a second call.
++  Keep `holeIndex` accepted for backward compatibility, documented as source-order and shift-prone.
+
+### Acceptance
+
++  A two-hole file remains addressable by position after the first hole is filled, with no index bookkeeping in the client, and every `fill_hole` response carries the re-anchored hole list.
+
+---
+
+### Issue M1-23: agda-strux: extract, document + publish agda-algebras corpus (#84, closed)
+
+**Labels:** `retrieval`, `M1: agda-dojang/mcp`
+
+## Context
+
+The corpus-backed search tools (M1-3) currently run against a small test fixture; the retrieval milestone needs a real corpus, and `ualib/agda-algebras` is the natural first library — large, coherent, and already the source of the M1-5 benchmark fixtures.
+
+### Work
+
++  Run the full extract → transform pipeline (agda-strux → strux-driver) over all of `ualib/agda-algebras` under the pinned toolchain; record extraction coverage and any per-module failures.
++  Compute and publish summary statistics: definitions by kind, module count, type/term sizes, and dependency-graph shape.
++  Package the JSONL corpus with a dataset card — schema version, provenance (library commit and toolchain pins), license, statistics, and intended uses — attached to a GitHub release; optionally mirror to Hugging Face for discoverability.
++  Wire the corpus into `agda-mcp --corpus` and add a smoke test asserting the three search tools answer real queries against it (e.g. `search_by_type "Algebra"`, `get_dependencies` on a known homomorphism lemma).
+
+### Relations
+
++  Feeds #16 (M2-2 corpus index and graph) and #17 (M2-3 retrieval tools); complements #75 — live queries answer against the current tree, while the corpus answers at library scale without a checkout.
++  A companion docs issue in `ualib/agda-algebras` will link the release from the library's side.
+
+---
+
+### Issue M1-24: Adopt the github-project plan-file model; retire the vendored roadmap tooling (#92, closed)
+
+**Labels:** `docs`, `infrastructure`, `cleanup`, `M1: agda-dojang/mcp`
+
+## Context
+
+This repository was the first to pair a roadmap file with Python scripts that populate GitHub issues: `docs/roadmap.md` plus `scripts/python/gh_project_populate.py`.  That tooling has since been refined into the [williamdemeo/github-project](https://github.com/williamdemeo/github-project) template — a two-direction engine (`populate` pushes file → GitHub once at bootstrap; `update` pulls GitHub → file for the life of the project; `lint` validates offline) over a standard plan file, `docs/GITHUB_PROJECT.md`, whose issue listings live between `BEGIN/END GENERATED` markers.  The copy here is the unrefined ancestor: one direction only, a parser tied to the old roadmap format, and referenced by nothing in the Makefile or CI — its bootstrap job was done long ago.  Meanwhile `docs/roadmap.md` has drifted well behind GitHub: it predates every issue filed since bootstrap (including the entire #68 agda-mcp hardening wave) and its issue listings no longer reflect state.
+
+### Plan
+
++  Add `docs/GITHUB_PROJECT.md` in the github-project format: hand-written summary, milestones M0–M4 with descriptions and exit criteria, and one generated region per milestone, filled by running the upstream engine's `update` against live GitHub state.  The `[MN-k]` prefixes on the original issues make this work with no changes on GitHub — the engine falls back to the title prefix, and this repository's milestone titles already follow the `N. Title` convention it parses.
++  Issues filed organically since bootstrap (no `[MN-k]` prefix: the #68 wave, #43, #54/#55, #66/#67, and successors) cannot be rendered into generated regions by the current engine, so the plan file carries a hand-authored section pointing at them; an upstream feature request in williamdemeo/github-project will propose an adoption path for such issues.
++  Wire thin Makefile targets (`project-lint`, `project-update`, `project-update-check`) that call the engine from a `GHPROJECT_DIR` checkout of github-project; migrating to a Nix flake input once github-project exposes the engine as a flake package is follow-up work upstream.
++  Delete `scripts/python/gh_project_populate.py` and update `scripts/README.md`; the engine lives upstream now, and keeping a stale copy here is exactly the drift this issue exists to end.
++  Freeze `docs/roadmap.md` as the historical bootstrap plan with a banner pointing at the new file, and repoint the live-status cross-references (README, CONTRIBUTING, the issue template, `docs/architecture.md`, `agda-mcp/README.md`).
+
+### Acceptance
+
++  `make project-lint` passes offline, and `make project-update-check` (with a github-project checkout) reports the plan file current against live GitHub state.
++  No roadmap-engine code remains in this repository, and `docs/GITHUB_PROJECT.md` reflects live issue state for M0–M4 while linking the field-driven work that lives outside the milestone plan.
+
+---
+
+### Issue M1-25: agda-mcp: `get_goal` reports a module name read from literate prose (#100, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68.  Found while working #79 (PR #99) and deliberately left out of that PR, which is scoped to hole addressing.
+
+### The defect
+
+`get_goal` reports the wrong module for a literate file whose prose mentions a module header.  `AgdaMCP.Tools.ProofState.moduleNameOf` scans the **raw** source, while its neighbours `ensureDebugImport` / `moduleHeaderSpan` scan the source with its non-code regions masked (`AgdaMCP.Holes.maskNonCode`).  So prose that looks like Agda is invisible to the injection logic — which is what #73 fixed — but still visible to the name parser.
+
+Reproduced against the current server, driving the real JSON-RPC transport:
+
+```
+$ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_goal",
+  "arguments":{"filePath":"agda-mcp/test/resources/LiterateMd.lagda.md","line":22,"column":5}}}' \
+  | agda-mcp --agda-flags "…" | …
+goal = Nat | module = 'Example'
+```
+
+The fixture declares `module LiterateMd where` inside its one code fence; `Example` comes from a prose line above it:
+
+```markdown
+module Example where — this prose line must not be mistaken for the
+module header when get_goal injects its debug import.
+```
+
+That line exists precisely because #73 pinned that `ensureDebugImport` must not be fooled by it.  It is: the import lands correctly and the goal is right.  Only `giModule` is wrong.
+
+### Scope
+
++  Any literate flavour whose prose contains a line beginning with `module` — `agda-algebras` is entirely literate and its prose discusses module structure constantly, so this is a live case, not a fixture curiosity.
++  Plain `.agda` too, in one narrower way: `moduleNameOf` strips `--` line comments but not `{- … -}` block comments, so a commented-out `module M where` inside a block comment is picked up.
++  Only `get_goal`'s `module` field is affected.  The goal, the context, hole addressing, and the diagnostics are all correct — `moduleNameOf` feeds nothing else.
+
+### Fix
+
+Give `moduleNameOf` the flavour and scan the masked source, exactly as `ensureDebugImport` already does:
+
+```haskell
+moduleNameOf :: LiterateFlavour -> Text -> Maybe Text
+moduleNameOf flav src = ... (T.lines (maskNonCode flav src)) ...
+```
+
+Masking preserves every character position and the line structure, so the header is found in the same place; only the prose disappears.  The block-comment case wants the scan to skip `{- … -}` as well, which the masked text does not do on its own.
+
+### Acceptance
+
++  `get_goal` on `agda-mcp/test/resources/LiterateMd.lagda.md` reports `module: "LiterateMd"`.
++  A regression test asserts the declared module name for each literate fixture and for a plain `.agda` whose block comment contains a `module … where` line.
+
+---
+
+### Issue M1-26: agda-mcp: relative filePath resolves against server's cwd; missing file crashes (#101, closed)
+
+**Labels:** `bug`, `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+### Observed on `7c07340`, while setting up the #83 field test
+
+With the server configured exactly as `agda-mcp/examples/agda-algebras.mcp.json` prescribes (client project: a `ualib/agda-algebras` worktree; server spawned via `scripts/run-server.sh`, which by design cds to the agda-native-air root before exec), a `check_file` call with the path form an agent in that project would naturally use fails ungracefully:
+
+```
+tools/call check_file {"filePath": "src/Overture/Basic.lagda.md"}
+→ {"error":{"code":-32603,"message":"Internal error"},"id":2,...}
+stderr: agda-mcp: uncaught exception handling tools/call:
+        /home/…/agda-native-air/main/src/Overture/Basic.lagda.md: openFile: does not exist
+```
+
+Two distinct defects:
+
++  **Relative `filePath` resolves against the server's cwd, not the client's project.**  `makeAbsolute` in the handlers uses the process cwd, which `run-server.sh` deliberately pins to the agda-native-air checkout (issue #76's stray-directory fix), so every relative path from a client in another project silently points into the wrong tree.  The tool descriptions say "absolute or relative to cwd" without saying whose cwd, and for any external client the honest answer ("the server repo's root") is never what the caller wants.  The same call with an absolute path succeeds, with the full #72 verdict echo.
++  **A nonexistent file is an uncaught `IOException`, not a structured error.**  `BS.readFile` / `TIO.readFile` throw before any handler logic runs, so the client gets the generic `-32603 Internal error` with no mention of the path, while the actual explanation lands only in server stderr the client cannot see.  #76 made wrong-root checks fail loudly with a named mismatch; a missing file deserves the same treatment, not a crash path.
+
+### Why it matters
+
+The #83 field test runs a fresh agent against exactly this configuration.  An agent whose first relative-path call returns an opaque "Internal error" has every reason to fall back to the shell — the § 2.5 conservative move — and the failure teaches it nothing, since the message names neither the resolved path nor the rule.  (The #83 run proceeds against `7c07340` as is; if the subject trips on this, that is a measured datum, and this issue is the fix that follows.)
+
+### Proposal
+
++  Resolve a relative `filePath` against the resolved project root (the #76 machinery: nearest `*.agda-lib` walk from the client-supplied root, `AGDA_*_ROOT` env, fall back to server cwd last), or alternatively reject relative paths with a structured error that names the server cwd and tells the caller to pass an absolute path.  Either is honest; silent wrong-tree resolution is not.
++  Catch `IOException` at the top of every file-taking handler and return a structured failure naming the path as resolved, the same way the wrong-root refusal does.
++  Fix the tool descriptions' "absolute or relative to cwd" to state the actual rule.
++  Regression tests: a relative path from a mismatched cwd, and a nonexistent absolute path, each asserting a structured, path-naming error rather than `-32603`.
+
+### Acceptance
+
++  From a client in a foreign project, `check_file` with a relative path either checks the intended file or returns a structured error naming the resolved path and the rule; a missing file never surfaces as `Internal error`.
+
+---
+
+### Issue M1-27: agda-mcp: support fls as a client project (#103, closed)
+
+**Labels:** `M1: agda-dojang/mcp`
+
+## Motivation
+
+Project-root `.mcp.json` files are now managed per project (claude-tooling), and agda-algebras sessions drive agda-mcp daily. fls (IntersectMBO/formal-ledger-specifications) sessions have nothing — verified 2026-08-16: no `.mcp.json` anywhere in the fls tree, its git history, or archived config; fls never had a registration. William wants fls sessions to have agda-mcp.
+
+## Why the agda-algebras registration does not transfer
+
+The aa registration anchors *checking* to this repo's toolchain: `scripts/run-server.sh` cd's here and enters the backend shell (deliberately, #76), so the agda doing the checking is this repo's agda, with agda-algebras registered through the `AGDA_ALGEBRAS_ROOT` anchor. fls pins its own toolchain — agda and libraries (agda-sets, agda-stdlib-classes, agda-stdlib-meta, standard-library) via its flake (`input-output-hk/agda.nix`, `agdaWithPackages`). Checking IOG-pinned fls under this repo's agda risks version skew, which for fls is a correctness hazard.
+
+## The enabling fact: most machinery already exists
+
+`agda-mcp` already accepts `--agda-bin PATH` (app/Main.hs), so the server can check fls with **fls's own agda** while this repo's shell hosts only the server runtime. `--check-command` (the #78 project gate) can carry fls's own gate, and `--timeout` handles fls's slow modules.
+
+## Open questions (the actual work)
+
+1. **A stable path to fls's agda.** Candidates: realise a local `nix develop --profile <gc-root> path:<fls>` (the PR-1255 mechanics used for web provisioning — verify agda actually lands in the profile's `bin/`); or resolve the store path once via `nix develop --command which agda` (breaks silently on flake update); or a tiny exec wrapper that runs agda through `nix develop --command` (cost depends on whether agda-mcp holds one persistent agda process or spawns per request — determine which).
+2. **Interaction-protocol compatibility.** Does fls's pinned agda version speak the interaction protocol agda-mcp drives? Field-test over the real JSON-RPC stdio transport (the `driving-agda-mcp` skill): `check_file` / `get_diagnostics` / `get_goal` against a real fls module.
+3. **Flags.** `agdaWithPackages` may bake the library set into the wrapped agda, so `--agda-flags` could be minimal or empty — measure, don't assume.
+4. **Checkout hygiene.** No writes into the fls checkout beyond normal agda artifacts — the #76 pollution class is already guarded in `run-server.sh`; re-verify from an fls cwd, since fls is an IOG repo where a dirty checkout is not acceptable.
+
+## Deliverable
+
+A **tested** registration JSON (server command + args) proven against a real fls module. The deployment half then lives in claude-tooling and is deliberately trivial: one file (`projects/fls/mcp.json`) plus `make install PROJECT=fls`, gated on William.
+
+🤖 AI-assisted development: Claude Fable 5 (Anthropic)
+
+---
+
+### Issue M1-28: agda-mcp: ask Agda rather than re-derive (#106, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68.  Raised while reviewing the fix for #100, whose defect was of a kind that should not be able to arise in this repository.
+
+### The principle
+
+`agda-mcp` exists so that an agent leans on Agda instead of guessing.  The server should hold itself to the same rule: when Agda can answer a question, ask Agda; a local derivation from source text is a pre-flight approximation and a fallback, never the authority.
+
+#100 is the worked example.  `get_goal` reported the module name by scanning the file, so a literate file whose *prose* opened a line with `module` was reported under the prose's name.  The scan was then fixed — and the deeper point survived the fix: Agda had already answered the question, in output the same call had already captured.
+
+```
+get_goal stdout: Checking LiterateMd (/…/test/resources/LiterateMd.lagda.md).
+```
+
+Measured on four shapes, Agda's answer is not merely equal to the scan's — it is better, and it is differently *meaningful*:
+
+| file | Agda says | the scan says |
+| --- | --- | --- |
+| `LiterateMd.lagda.md` | `LiterateMd` | `LiterateMd` |
+| `Proofs/Use.agda` | `Proofs.Use` | `Proofs.Use` |
+| header `module _ where` | `AnonModule` | `_` — the source does not carry the name |
+| header ≠ file name | *silent* (it errors first) | `NotMismatch` — the claim is all there is |
+
+Two lessons that generalize past this field.  First, Agda's answer is "what this module *is*"; a scan's answer is "what the header *claims*", and where they differ the difference is the diagnosis.  Second, Agda declines to answer exactly when the file is broken, which is when an agent most needs to be told something.  (With one correction, from Copilot's review of PR #105: in `get_goal` those broken cases end the call as a *failure*, which carries no `module` field, so the fallback keeps a successful answer complete rather than serving as a diagnosis channel.  The diagnosis for a mismatched header is already in the failure's text, which is Agda's own message.  A timeout, meanwhile, does not lose Agda's answer at all — measured, a run killed at 1055 ms had already printed its `Checking` line.)
+
+The rule this suggests, which PR #105 now follows for `get_goal`'s `module` field: `answer = whatAgdaSaid <|> whatWeDerived`, where a change in Agda's output degrades the field to the derived value and never to a wrong value.  That is #72's rule for Agda's prose ("the diagnostics text never gets a vote") applied to an informational field rather than to a verdict.
+
+### The audit this issue asks for
+
+Every answer `agda-mcp` computes from source text, with a verdict on each: delegated today, delegable via #75, or no interface exists (and why).
+
++  **The hole model** (`AgdaMCP.Holes`) — the largest instance by far.  We port Agda 2.8.0's literate preprocessor and a model of its lexer to answer "where are the holes?", kept honest only by parity tests against batch Agda.  Agda's interaction protocol returns interaction points as data; that is #75, and it should be stated there that the parity tests are a stopgap for exactly this reason.
++  **The reporting-macro injection** (`ensureDebugImport` + `reportGoalCtx`) — we edit the user's file to make Agda print a goal, because batch mode has no way to ask.  `Cmd_goal_type_context` over `--interaction-json` asks directly, so the whole inject-patch-restore dance is an artifact of the transport, not a requirement.  Also #75.
++  **The module name** (`moduleNameOf`) — delegated in PR #105; the scan remains for the pre-Agda injection (there is no Agda to ask yet) and as the fallback.
++  **Structured diagnostics** (`AgdaMCP.Diagnostics`, #74) — we parse Agda's human-readable error prose into codes, ranges, and `involved` payloads.  `--interaction-json` emits structured information for the same errors.  Worth measuring how much of #74's parser the JSON protocol would retire.
++  **Project resolution** (`AgdaMCP.Project`) — we find the nearest `*.agda-lib`, parse the libraries file, and compute include paths ourselves.  `agda --help` offers no query for "what libraries and include paths apply to this file", so this one likely stays; the audit should say so explicitly rather than leave it looking like an oversight.
++  **The `checkedFromSource` signal** (#77) — derived from the same progress lines, and it has a hole this investigation turned up: `--trace-imports=0` silences `Checking …` altogether (measured: level 1 and up print it, 0 prints nothing).  Measured on both branches of the signal: a *clean* cold `check_file` under that flag reports `checkedFromSource: true` without it and `false` with it, so a cold run does read as warm; a *failing* run under it reports the field as absent (unknown) rather than as a false warm, because the exit code is non-zero.  `agdaModuleNameOf` degrades correctly in both cases (it falls back to the declared name).  Worth deciding whether the clean-run misreading is acceptable or worth detecting.
++  **The project gate** (`AgdaMCP.Gate`) — Makefile parsing, not Agda's business.  Out of scope; listed so the audit is complete.
+
+### Acceptance
+
++  A short document (or README section) listing each derived answer with its verdict and the issue that would delegate it.
++  The rule written down where a new tool's author will read it, so "can Agda answer this?" is a question asked before a scanner is written, not after one misfires.
++  #75's description updated to say that it retires the hole scanner and the macro injection, not just that it adds live queries.
+
+### Non-goals
+
++  Rewriting anything here.  The delegations that matter depend on #75's transport work; this issue is the inventory and the rule.
+
+---
+
+### Issue M1-29: agda-mcp: re-source `get_goal` and hole goal types through interaction lane (#108, closed)
+
+**Labels:** `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68 (P0/P1 follow-on) and squarely a #106 case: two places where the server still derives what Agda already announces, now that #75's interaction lane (PR #107) gives it a structured way to ask.
+
+### Context
+
+PR #107 shipped the interaction lane for the five read-only query tools and deliberately left the batch tools untouched.  Its Phase-3 stretch — re-sourcing `get_goal` and enriching `get_diagnostics` — was cut because it changes contracts the #68 wave litigated carefully, not because the groundwork is missing.  The groundwork findings, so they are not re-derived:
+
++  `Cmd_goal_type_context Normalised <goalId> noRange ""` answers `GoalSpecific.goalInfo` with the goal's `type` and its context as data — `entries: [{originalName, reifiedName, binding, inScope}]` — with **no source mutation at all** (probed; transcript in `docs/agda-mcp-interaction-lane.md` § 2.5).  That is `get_goal`'s payload without the `reportGoalCtx` injection, the in-place patch, or the restore machinery.
++  `Cmd_load`'s `AllGoalsWarnings` carries every visible goal's printed type alongside its interaction point (`AgdaMCP.Interaction.goalsOf` already parses it) — which is `get_diagnostics`' hole listing with real goal types, for free on the load the lane already makes.
++  The lane's interaction points and `Holes.findHoles` agree on count and order across the fixture matrix (the tier-3 parity test pins this), so `holeIndex ↔ interaction-point id` and `(line, col) ↔ point range` are both sound translations.
+
+### Proposal
+
++  `get_goal`: answer from the lane when the file loads there — `ensureLoaded`, map the `HoleRef` to a point (`ByIndex` is the id by parity; `ByPosition` via `pointContaining`), one `Cmd_goal_type_context` — and keep the injection path as the fallback for files the lane cannot serve.  No patch, no restore, no `AgdaDojang.Debug` import requirement on the happy path.
++  `get_diagnostics` (and `check_file`'s hole list): fill each hole's `goal` from `AllGoalsWarnings` when a lane load is available.
+
+### What makes this its own review, not part of #107
+
++  **The verdict contract.**  `get_goal`'s response carries `verdict`/`command`/`project` from the batch run it makes, and its description explains the deliberately non-zero exit code.  A lane-sourced answer has no batch run and no exit code, so the echo and the description both change shape — the field #72 defined most carefully, so the change should be reviewed as a contract change, not smuggled in.
++  **The context-entry shape.**  The macro's `CtxEntry` carries `visibility` and a de Bruijn `index`; `goalInfo.entries` carries `binding`, `inScope`, `originalName`/`reifiedName`.  Neither subsumes the other, and clients may key on the current fields.
++  **Cost coupling.**  A batch tool that consults the lane pays a lane load on cold calls; whether `get_diagnostics` should ever spawn a process it otherwise would not is a policy question (the two-lane boundary is about verdicts, but the *cost model* in the tool descriptions is part of the contract too).
+
+### Acceptance
+
++  `get_goal` on the existing fixture matrix answers the same goals and contexts through the lane as through the injection path (a parity test in the same spirit as tier 3's), with the injection path still exercised as the fallback.
++  `get_diagnostics` hole entries carry the goal types `AllGoalsWarnings` printed, on files that load.
++  The tool descriptions and `docs/agda-mcp-improvements-summary.md` say what changed, per the #72 standard.
+
+---
+
+### Issue M1-30: agda-dojang: retire legacy Python bridge tooling (#109, closed)
+
+**Labels:** `M1: agda-dojang/mcp`
+
+## Description
+
+Follow-up from the #75 / PR #107 architecture discussion.  agda-dojang's Python *bridge* tooling (the deterministic "report → policy → patch → check" loop built for #23 v0) has been fully superseded on the agent-facing side: `agda-mcp` is its Haskell port (`AgdaMCP.Agda`'s header says so file by file), carries the same marker protocol with the #68 wave's hardening on top (truthful verdicts, the real hole model, literate awareness, structured diagnostics, timeouts, path/root refusals), and since PR #107 also answers the scope/type/definition questions the Python loop never could.  No agent workflow should route through the Python bridge again, and keeping two implementations of the loop invites exactly the drift the wave existed to remove.
+
+### What retires
+
++  `python/tools/agent_bridge.py`: the loop itself (ported as `agda-mcp`'s `get_goal`/`fill_hole` machinery).
++  `python/tools/report_parser.py`: the `AGDADOJANG_REQ_BEGIN/END` marker parser (ported as `AgdaMCP.Agda.parseGoalContext`).
++  `python/tools/dojang_try.py`: the CLI front for the same loop.
++  Their tests (`test_agent_bridge.py`, `test_report_parser.py`) and the `demo-agent-bridge` Makefile target.
+
+### What stays, explicitly out of scope
+
++  `python/tools/eval_fixtures.py`: the proof-completion evaluation harness (`make eval-proof-completion-smoke` and the M1-5 loop).  Not bridge tooling; it is the measurement apparatus.
++  `python/tools/policy_contract.py`: the policy-request contract spec, which `AgdaMCP.Types` documents 1-to-1 correspondence with and the harness builds requests from.
++  `python/tools/search.py`, `prompt_baseline.py`, `policy_fixture.py`, `dojang_extract.py`, and `python/utils/`: not bridge tooling; audit separately if ever.
++  Everything Agda-side (`AgdaDojang.Debug`, the macros, the fixtures) — unrelated to this retirement; see the #75 discussion for why the dojang library itself is not shrinking.
+
+### The one entanglement to resolve
+
+The eval harness imports the bridge: `eval_fixtures.py` takes `extract_policy_request_from_output` from `report_parser` and several run/patch primitives from `agent_bridge`, and `dojang_try.py` uses the parser too.  So this is a disentangling, not a delete.  Two shapes, in increasing ambition:
+
++  **A (recommended here): relocate the primitives.**  Move the handful of functions the harness actually uses into the harness module or `python/utils/`, with their tests following the code (the parser's tests are the pure lane's; keep the coverage, re-homed).  The bridge files then delete cleanly, and the harness's behavior is unchanged.
++  **B (bigger, its own issue if wanted): re-point the harness at `agda-mcp`.**  The evaluator would drive the same JSON-RPC surface agents use — one loop implementation, dogfooded by the benchmark.  Attractive, but it changes what M1-5 measures and couples the eval lane to a server build, so it should not ride a cleanup.
+
+### Touchpoints (nothing fails if one is missed, so listed here)
+
++  Root `Makefile`: `test-agda-dojang` lists `test_report_parser.py`; `test-agda-dojang-integration` lists `test_agent_bridge.py`; the `demo-agent-bridge` target and its `.PHONY`/help lines.
++  CI (`.github/workflows/ci.yml`): the `python-agda-dojang` lane's file list includes `test_report_parser.py`.
++  `agda-dojang/README.md`: the `dojang_try.py` and `agent_bridge.py` sections, the module-tree listing, and the table of contents.
++  `agda-mcp/src/AgdaMCP/Agda.hs`: the header's "Haskell port of the essential logic in legacy Python tools" citation should say the originals are retired (the marker-protocol reference to `AgdaDojang/Debug.agda` stays; that is the live contract).
++  `agda-mcp/README.md` § Architecture Notes: "mirrors how agda-dojang's Python tooling (`agent_bridge.py`) works"; same treatment.
++  `docs/agda-mcp-improvements-summary.md` and `docs/architecture.md`, wherever the Python bridge is described as current.
+
+### Acceptance
+
++  The three bridge files and their two test files are gone; `git grep agent_bridge report_parser dojang_try` finds only historical references (commit messages excepted) that are worded as history.
++  `make eval-proof-completion-smoke`, `make test-agda-dojang`, `make test-agda-dojang-integration`, and the CI `python-agda-dojang` lane all pass after the relocation, with the parser's test coverage preserved wherever its code lands.
++  `make ci-smoke` is green.
+
+---
+
+### Issue M1-31: agda-mcp: `checkedFromSource` misreads a muted evidence channel (#114, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68.  Raised by the #106 audit (its Measurement 2); every claim below was probed on 2026-08-20 against the pinned Agda 2.8.0 inside `nix develop .#backend`, and the transcripts land with #106's PR in `docs/agda-mcp-ask-agda-audit.md` § 4.
+
+### The defect
+
+`checkedFromSourceOf` reads a run that completed successfully without a `Checking` line as interface reuse, because a warm `agda` exits 0 printing nothing; silent success is the warm signature.  `--trace-imports=0` silences the `Checking` line outright, so under that flag a genuinely cold check has the warm signature too.  Reproduced through the real server on a clean scratch module, caches scrubbed before each run, as follows:
+
++  `check_file`, default flags: `{success: true, checkedFromSource: true}`.
++  `check_file`, flags plus `--trace-imports=0`: `{success: true, checkedFromSource: false}`, though this run re-typechecked the module from source.
++  `check_file` on a failing module, flags plus `--trace-imports=0`: `success: false` with the field absent, which is the honest degradation (exit non-zero, no evidence either way).
+
+The module name survives the same muting by construction (`giModule = liModule <|> declared-name scan`, issues #100/#108), but nothing covers the boolean.  The interaction lane has the same hole in both of its `RunningInfo`-keyed reads: probed, a cold `Cmd_load` whose per-load argv carries `--trace-imports=0` emits no `RunningInfo` at all, so `lrCheckedFromSource` reports a genuine re-check as `false` (it feeds `get_goal`'s lane-path `checkedFromSource`) and the lane's stored `liModule` stays empty.
+
+### Why detection is complete, measured
+
++  The flag has exactly one arrival path: the command line the server itself assembles.  `{-# OPTIONS --trace-imports=0 #-}` is rejected with `[OptionError] Unrecognized option`, and an `.agda-lib` whose `flags:` field carries it is rejected identically, so neither the checked file nor its project can smuggle the flag past the server.  Both lanes build their argv from the same `agdaFlags cfg` (plus `projectExtraFlags` and `fileDirIncludeFlags`), so one scan covers both.
++  The level grammar is closed: the only level-carrying spelling is `--trace-imports=N`; bare `--trace-imports` means level 2; a space-separated `--trace-imports 0` does not parse as a level at all (the `0` becomes a second input file, exit 71).
++  The effective level is the last occurrence: `--trace-imports=0 --trace-imports=1` prints `Checking`, and the reverse prints nothing.
++  Level semantics under 2.8.0, for the record: cold, level 1 (the default) and up print `Checking`, level 2 and the bare flag add `Finished`, level 3 adds `Loading` for every interface read; warm, everything below 3 is silent, and level 3 prints `Loading` lines, the only positive warm evidence.
+
+### The options
+
++  Degrade.  When the assembled argv's effective trace level is 0, `checkedFromSourceOf` answers `Nothing` on its silent-success branch, so the field goes absent exactly as it does when a run dies before producing evidence; the lane's `lrCheckedFromSource` needs the same account (today it is a `Bool`; a reused load is honestly `false`, a load under a muted channel is unknown).  This is the #106 rule with no residue: a channel the server knows it muted cannot support a definite answer.
++  Restore.  When, and only when, the effective level is 0, append `--trace-imports=1`; last-wins is probed above, and a deliberate level 2 or 3 is never touched.  This keeps the field truthful rather than absent, but `--agda-bin` may name a foreign toolchain (issue #103), and appending a flag an older `agda` does not recognize would break every call, so restoring needs a version gate that degrading does not.
+
+Degrading is the safe minimum and satisfies the rule; restoring is an optional refinement on top for toolchains known to accept the flag.
+
+### Acceptance
+
++  A clean cold `check_file` whose flags carry an effective `--trace-imports=0` no longer reports `checkedFromSource: false`; the field is absent (or `true` under the restore option).
++  `get_goal`'s lane path under the same flags does not report `checkedFromSource: false` for a load that re-checked the file.
++  Tests pin the muted-channel case in both lanes, and the detection follows the measured grammar (last `--trace-imports*` token decides; `=N` carries the level; bare means 2).
+
+---
+
+### Issue M1-32: agda-mcp: `get_diagnostics` fill unsolved-meta names and types from warm lane's stored load (#115, closed)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+## Description
+
+Part of #68.  Raised by the #106 audit (its Measurement 1): the feedback document's § 5 error corpus asks, for the unsolved-meta row, for "each meta with its type and the constraint blocking it", and that is the one row of the corpus where batch prose cannot answer while the interaction protocol carries the answer as data.  Probed on 2026-08-20 against the pinned Agda 2.8.0 inside `nix develop .#backend`; the full transcripts land with #106's PR in `docs/agda-mcp-ask-agda-audit.md` § 3.
+
+### What batch prose carries, and #74 already extracts
+
+A batch run of the `UnsolvedMetas.agda` fixture prints two diagnostics: `[UnsolvedConstraints]` with the constraint list and no position, and `[UnsolvedMetaVariables]` with a list of locations.  `involved.metaTypes` carries exactly those lines.  No meta's type appears anywhere in the prose, so the § 5 ask is only half-delivered today.
+
+### What the protocol carries, measured
+
+`Cmd_load` of the same fixture ends in `AllGoalsWarnings` plus `InteractionPoints` (interaction tolerance; `Status.checked` stays `false`, and the batch verdict is untouched by design), and the `AllGoalsWarnings` carries the missing half as data:
+
+```json
+"invisibleGoals":[
+  {"constraintObj":{"name":"_n_4","range":[{"start":{"col":9,"line":28,"pos":1146},"end":{"col":16,"line":28,"pos":1153}}]},"kind":"OfType","type":"Nat"},
+  {"constraintObj":{"name":"_m_5","range":[{"start":{"col":9,"line":28,"pos":1146},"end":{"col":16,"line":28,"pos":1153}}]},"kind":"OfType","type":"Nat"}],
+"errors":[{"message":"error: [UnsolvedConstraints]\nFailed to solve the following constraints:\n  _n_4 + _m_5 = 3 : Nat (blocked on _n_4)"}]
+```
+
+Each unsolved meta arrives with its name, its type, and a structured range; the blocking constraint arrives beside them.
+
+### The shape
+
+Mirror issue #108's free enrichment exactly: `check_file` and `get_diagnostics` may fill the unsolved-meta diagnostics from a warm lane's stored load — a peek, never a lane call, and never a verdict input; the batch exit code alone stays the verdict, since the lane's tolerance of unsolved metas is precisely why it must never decide one (two-lane policy, `docs/agda-mcp-interaction-lane.md` § 1).  Today the lane's stored load state keeps visible goals only (`goalsOf` reads `visibleGoals`), so the stored state grows the load's `invisibleGoals`; when the lane is cold or stale the response stays byte-identical to today's.  This is `answer = whatAgdaSaid <|> whatWeDerived` applied to the one § 5 payload still derived short.
+
+### Acceptance
+
++  After live queries have warmed the lane on a file with unsolved metas, `get_diagnostics` on the unchanged file carries each meta's name and type (structured) in or beside the `[UnsolvedMetaVariables]` diagnostic's payload, keeping today's fields otherwise.
++  A cold or stale lane changes nothing: no batch tool ever spawns, loads, or waits on a lane for this, and the enrichment never alters `success`.
++  A test pins both the enriched and the unenriched shapes.
+
+---
+
+### Issue M1-33: agda-mcp: mcp not loaded in fls claude sessions (#133, closed)
+
+**Labels:** `M1: agda-dojang/mcp`
+
+An .mpc.json file, from the williamdemeo/claude-tooling repository, is now linked into all fls worktrees, yet agda-mcp is not loaded.
+
+---
+
+### Issue M1-35: Tech report: field-testing an MCP server for Agda with a frontier agent (#86)
+
+**Labels:** `agda-mcp`, `research`, `M1: agda-dojang/mcp`
+
+## Context
+
+The field-test arc is fully documented in primary sources — the imported feedback document with its verification addendum, the #68 issue tree, and the fix PRs — but there is no single narrative a reader can follow end to end.
+
+## Work
+
++  Write a tech report under `docs/reports/` covering the arc: the zero-adoption field test, the verify-before-filing addendum (what reproduced, what was refuted, and the new defects verification itself uncovered), the P0 fixes, and the measured re-run (#83) with its numbers.
++  Be honest about scope: state what remains open (the P1/P2 sub-issues of #68) and what the adoption numbers do and do not show.
++  Keep the report self-contained with permalinks to the primary sources, so it is citable independently of repository history; a cross-post to an external blog is expected but out of scope for this issue.
+
+## Relations
+
++  Sources: [`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/main/docs/feedback/flrp-agda-mcp-improvements.md) (§ 0 and § 7), #68–#79, PR #81, and the #83 results.
++  Blocked on #83 for the measurement section only; the rest can be drafted now.
+
+---
+
+### Issue M1-36: agda-mcp: field-test hardening (tracking) (#68)
+
+**Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
+
+# Context
+
+A July 2026 Claude Code session formalized FLRP RP-2 in `ualib/agda-algebras` (its issue 459 / PR 507): ~1200 lines of literate Agda across roughly fifteen type-check iterations, with `agda-mcp` configured via `.mcp.json` and its four tools listed.  The headline datum: **the agent never called the server once**, running `agda <file>` from Bash every time — its reconstruction of why is § 2 of the feedback document, now imported at [`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md).  That document's § 0 asked that every claim be re-verified against the current server before filing issues; its § 7 addendum records that verification — scripted MCP stdio sessions against `911ae18`, cross-checked with direct `agda` runs under the pinned toolchain (Agda 2.8.0).
+
+# What verification found
+
++  **Confirmed, P0.**  `fill_hole` reports `ok` for candidates that leave unsolved metas, while `agda` exits 42 with `[UnsolvedMetaVariables]` on identical content; `get_goal` reports the reporting macro's unsolved type instead of the hole's goal, returning `(x₁ : _3 x) → _5 x x₁` where `Fixture01` documents `A`; hole detection matches only the literal token `{!!}`, misses `{! !}` / `{! e !}` / `?`, and counts (and even fills) tokens sitting in comments and markdown prose.
++  **Not reproduced.**  The secondhand "`check_file` green on unsolved metas" claim: `check_file` and `get_diagnostics` were correctly red on every failing fixture, and the inferred interaction-mode cause is wrong — the server runs batch `agda` per call.  The surviving ask is to make the already-strict verdict explicit and contractual.
++  **New defects found while re-testing.**  Diagnostics carry no source positions under Agda 2.8.0 (the parser expects `file:10,5-15` but Agda emits `file:9.12-13`), and `--timeout` is parsed but never enforced (`FillTimeout` is unreachable code).
+
+# Plan
+
+The document's § 6 framing survives contact with verification: P0 is trust, P1 is reach beyond the shell, P2 is economics and ergonomics.  Each fix should land with regression fixtures wired into `make agda-mcp-test` (the verification fixtures in the addendum are ready to be adopted as tests).
+
++  **P0 — trust**: #69 (truthful `fill_hole` verdict), #70 (`get_goal` returns the actual goal), #71 (a real hole model), #73 (literate code-region awareness), #72 (explicit batch verdict and tool-description contract).
++  **P1 — reach beyond the shell**: #74 (structured diagnostics), #75 (live scope/type/definition queries), #76 (root resolution and environment transparency), #77 (enforced timeouts with timing visibility).
++  **P2 — economics and ergonomics**: #78 (whole-project check tool), #79 (stable hole handles).
+
+Suggested sequencing: #69 and #70 are independent, high-value bug fixes; #71 then #73 share the hole-model rework (consider Agda's interaction points as the source of truth, which also lays groundwork for #75); #72 and #76 share the response-echo plumbing; #74 and #77 are self-contained; #78 and #79 build on the P0 layer.
+
+# Acceptance for the wave
+
++  The three § 4 "moments" from the field session run as scripted acceptance tests; they are encoded in #69, #74, and #75.
++  The next real literate-repo session (the #23 case-study frame) reaches for the MCP instead of the shell — the only metric that counts, per § 2 of the document.
++  Tool descriptions state the client-visible contract — verdict semantics, supported file flavours, hole model, and latency — per the § 6 meta-suggestion (#72).
+
+# Relations
+
++  #12 (M1-4) demonstrated the loop on fixtures; this wave is the field-test follow-up on a research-scale literate library.
++  #23 (M3-1) is the case study these agda-algebras sessions instantiate; its future runs are this wave's evaluation.
++  #17 (M2-3) covers corpus-backed retrieval; the live scope/type queries proposed here are complementary (they answer against the current tree with no extraction step).
++  #66 / #67 are prior art for field-driven hardening (in-place checking of library-embedded modules).
+
+---
+
+### Issue M1-37: agda-dojang: retire or repoint remianing `dojang_try` callers (#112)
+
+**Labels:** `agda-dojang`, `cleanup`, `M1: agda-dojang/mcp`
+
+Follow-up from #109 / PR #111.
+
+Retiring the Python bridge deleted `dojang_try.py`, which was the oracle for the last two Python tools that still shelled out to it.  #109 scoped both out deliberately, so PR #111 left them untouched and said so.  This issue is where they get decided.
+
+Unlike the bridge, neither has a Haskell analog waiting for it.  `AgdaMCP.Agda` is a literal port of `agent_bridge.py` and `report_parser.py`, and its header says so.  Nothing ports these two, so "retire" here has to mean *preserve and carry the lessons forward*, not *delete and forget*.
+
+## Measured state
+
++  `search.py` does not run, and has not since 2026-03-10.  Commit b49b536 ("rename components of imports for consistency") renamed the oracle field `jang_try` → `dojang_try` on the read side and in `OracleCfg`, but left the flag declared as `--jang-try`.  `main()` therefore raises `AttributeError: 'Namespace' object has no attribute 'dojang_try'` at the `OracleCfg(…)` line on any invocation, with or without the flag, and did so five months before `dojang_try.py` was deleted.  Verified against `main`, with `dojang_try.py` present.
++  `prompt_baseline.py` did run until PR #111.  Same one-task input, before: `{"ok": true, "rc": 0}`; after: `{"ok": false, "kind": "error", "rc": 2}`.  It exits 0 and writes rows marked `ok: false` rather than failing loudly, so the breakage is silent.
+
+## What actually supersedes them
+
++  `search.py` implements BFS/beam proof search over the AgdaDojang action space, and **nothing anywhere implements that today**.  `agda-mcp`'s `search_by_name` and `search_by_type` are corpus retrieval over the `agda-strux` corpus, a different job.  What `agda-mcp` does supply is the *oracle* such a search would call: `fill_hole` subsumes `dojang_try --candidate`, and `get_goal` subsumes its report step.  Reviving search is therefore a rewrite against a new substrate, tracked by #113, not a port of this file.
++  `prompt_baseline.py` turns a tasks JSONL into `(context, goal, completion)` attempt rows.  That job now belongs to `eval_fixtures.py` → `ml-pipeline/etl/src/main/scala/etl/BuildProofCompletionDataset.scala`, which emits `proof_completion.jsonl` on the versioned `proof-completion.v0` schema and runs in `make ci-smoke`.  Its successor is Scala, it already exists, and it needs no port.
+
+## Preserving the search work
+
+`experiments/archive/` already has the right contract for this: *"preserves code that was part of the original development but is not part of the current architecture.  It is kept for research continuity and may be revived in later phases.  Nothing here is maintained or tested in CI."*  So `search.py` moves there rather than being deleted, alongside the FastAPI server and the legacy MLP trainer.
+
+Archiving the file is the cheap half.  The valuable half is writing down what it worked out, because a rewrite should start from the lessons rather than from the code:
+
++  **Report actions are peeks, not moves.**  `peek_binders` runs `applySolveReport:<lemma>` for post-unification metas and falls back to `applyReport:<lemma>`, so the search can see what applying a lemma *would* leave behind without committing.  The recorded script keeps only real actions (candidates, `apply`, `applyWith`); report actions never enter it.  That separation is the file's best idea and survives any substrate.
++  **Partial application arithmetic.**  `drop_first_k_visible` says that `applyWith:_+_:[zero]`, having supplied `k` visible arguments, leaves the binders minus the first `k` visible ones.  Small, Agda-specific, and easy to get wrong.
++  **Two caches, not one, because the oracle is the cost centre.**  `hash_key(imports, goal, action)` memoises *oracle calls* (each one an Agda run); a separate `visited` set on `(imports, goal, script)` dedups *enqueued states*.  Conflating them either re-runs Agda or wrongly prunes.
++  **Ordering by remaining obligations.**  `score_for_child` sorts on `(terminal?, remaining_visible_binders, total_binders)`, lowest first, so terminal candidates come before lemma applications and cheaper applications before expensive ones.  Crude, but the right shape.
+
+And one defect the rewrite must **not** inherit, recorded here so it is not rediscovered:
+
++  **The state model is disjunctive where proof obligations are conjunctive.**  `State` carries a single `goal`, and `expand` emits one child *per binder* of an applied lemma; `bfs` then returns success as soon as any single state reaches the `⊤` sentinel.  So applying a lemma with two obligations and discharging either one is reported as a solved proof.  A correct search carries an obligation *set* (or a proof tree with an AND/OR distinction) rather than one goal.  The neighbouring code already flags the same spot as "naïve but simple".
+
+Worth being blunt about what is *not* worth carrying: `propose_terms` and `propose_tactics` are hardcoded to `goal == "Nat"` and offer two candidates and two tactics.  The action space is a stub, and it is exactly the part that retrieval and a learned policy are meant to replace.
+
+## Options
+
++  **A (recommended).  Archive `search.py`, retire `prompt_baseline.py`, port nothing yet.**  Move `search.py` to `experiments/archive/agda-dojang/` with an entry in that directory's README; delete `prompt_baseline.py` as redundant with the eval → ETL path.  Takes with it the `solve` target, `SEARCH_SCRIPT`, `DOJANG_TRY`, the `### search.py` README section and its TOC entry, and the commented-out `rows` target in `agda-dojang/Makefile`.  The lessons above are already recorded in #113, so the rewrite inherits them.
++  **B.  As A, plus repoint `prompt_baseline.py`.**  Keep a standalone task-file baseline by driving `agda-mcp`'s `fill_hole`, or the relocated `utils/agda_probe.py`, instead of a deleted CLI.  Worth it only if a baseline decoupled from the fixture corpus is still wanted; otherwise the ETL path already covers it.
++  **C.  Port `search.py` as-is to Haskell or Scala.**  Not recommended.  A faithful port carries a stub action space and the disjunctive-subgoal defect into a language where both are more expensive to fix.  The rewrite belongs in #113, informed by the lessons above.
+
+## Acceptance
+
++  `git grep dojang_try` finds nothing outside `experiments/archive/`, or only references worded as history, closing out the part of #109's acceptance criterion 1 that PR #111 deliberately left open.
++  `experiments/archive/README.md` lists what moved and why, so the search work is findable by someone who does not know it existed.
++  The transferable lessons above are recorded in #113 before `search.py` leaves the live tree.
++  `make ci-smoke`, `make test-agda-dojang`, `make test-agda-dojang-integration`, and `make eval-proof-completion-smoke` stay green.
++  Whatever survives in the live tree has a working entry point, exercised by a test or a Make target, so a second five-month silence is not possible.
+
 <!-- END GENERATED: milestone-1 -->
 
 ---
@@ -1178,30 +2257,6 @@ signature, and graph neighborhood.  This index is loaded by `agda-mcp` at startu
 - [ ] `make build-corpus-index` produces an index from `agda-algebras` JSONL
 - [ ] Index supports name search, type search, and k-hop neighborhood queries
 - [ ] Graph statistics are reported (number of nodes, edges, SCCs)
-
----
-
-### Issue M2-3: Add retrieval tools to agda-mcp: corpus-backed search (#17)
-
-**Labels:** `agda-mcp`, `retrieval`, `M2: retrieval + local models`
-
-## Description
-
-Upgrade the M1-3 search tools to use the offline corpus index.  Add `dependency-neighbors` and improve `search-by-type` with structural matching.
-
-### Tasks
-
-- [ ] Load corpus index at `agda-mcp` startup
-- [ ] Upgrade `search-by-name` to use inverted index (faster than substring scan)
-- [ ] Upgrade `search-by-type` to support structural matching via `typeAst`
-- [ ] Add `dependency-neighbors`: given a definition, return k-hop neighborhood from the graph
-- [ ] Benchmark query latency on `agda-algebras` corpus
-
-### Acceptance criteria
-
-- [ ] Search tools return results in < 100ms on `agda-algebras` corpus
-- [ ] `dependency-neighbors` returns structurally relevant results
-- [ ] Agent integration demo (M1-4 style) shows improved success with better retrieval
 
 ---
 
@@ -1391,7 +2446,100 @@ A cheap way to settle it, rather than arguing: build the P0 spike below in one o
 
 ---
 
-### Issue M2-10: proof-search stage P2: proposals over agda-strux corpora (#123, closed)
+### Issue M2-9a: proof search P0: state model and single-step harness (#119, closed)
+
+**Labels:** `eval`, `retrieval`, `M2: retrieval + local models`
+
+## Description
+
+P0 of the #113 plan, designed here before code.  Scope: choose the host language, define the conjunctive search state and the committed-action proof script, land a single-step harness that proposes k candidates against one M1-5 benchmark obligation with agda-mcp as the oracle, and produce the oracle-time vs proposal-time split that settles the host-language fork.  The search loop itself (BFS/beam, frontier management) is P1 and out of scope.
+
+### Host language: Scala, in strux-driver, driving agda-mcp as a JSON-RPC client
+
+The choice, and the measurement that can overturn it, as follows:
+
++  **The fork's latency argument is a measurable claim, so P0 measures it rather than arguing.**  In-process Haskell can eliminate only the client-side slice of an oracle call — JSON-RPC framing, serialization, the server's handling around the check — never the batch `agda` subprocess that produces the verdict, which the two-lane policy (`docs/agda-mcp-interaction-lane.md` § 1) requires no matter who calls.  That subprocess costs seconds per call warm (§ 2.7 measured ~2.6 s for a stdlib-importing file; a first probe of `fill_hole` on a benchmark obligation copy answered `elapsedMs: 4291`), against which a stdio round trip should be milliseconds.  The harness therefore reports, per oracle call, `serverElapsedMs` (the subprocess wall time the response itself carries) beside the client-observed round trip; the difference is the only part a Haskell rewrite could remove, and it is the number that settles the fork.  If that overhead is a material fraction of oracle time on real M1-5 obligations, P1 moves to Haskell and this spike is the evidence; if it is noise, the remaining considerations all point at Scala.
++  **The proposal side lives in Scala.**  `struxdriver.benchmark.EvalBenchmark` owns the M1-5 index and its decoder; the eval JSONL discipline and the ETL that consumes it are Scala; P2's proposers (retrieval over the agda-strux corpus) and the concurrency machinery for P1 (cats-effect, fs2) are established in this subproject.
++  **A client, not a lib consumer.**  Driving the server over its public tool contract keeps the search decoupled from `AgdaMCP.*` internals, exercises exactly the surface every other agent sees — so search stress doubles as server field-testing — and leaves the server untouched at P0.
+
+### State model: an obligation set, conjunctive by construction
+
++  **State**.  `SearchState(fileContent, obligations, script)`, where an obligation is one open hole — `(line, col, goal)` as the oracle reports it.  `solved` is defined as emptiness of the whole obligation set; there is no per-goal success anywhere in the model, so the #112 disjunctive defect is unrepresentable rather than merely avoided.
++  **The set is the oracle's, not ours.**  Every `fill_hole` and `check_file` response carries the re-anchored `holes` list (issue #79); the state's obligation set is always taken from that list.  A candidate that spawns two sub-holes therefore yields a state carrying both, by construction, and client-side hole arithmetic can never drift from Agda's.
++  **Solved is a batch verdict, not an empty list.**  An empty obligation set makes a state a candidate solution; the claim "solved" is issued only after a final `check_file` on the committed content returns `success: true` — the exit-code-derived verdict — mirroring `eval_fixtures.py`'s `_final_strict_check`.
++  **The regression test the tracking issue names**.  Pure: a state with two obligations, one discharged, asserts not solved.  Integration: a two-obligation fixture (a pair-shaped goal) filled with a constructor candidate carrying two sub-holes, then one sub-hole discharged; every intermediate `fill_hole` answers `status: "ok"` — which is exactly the trap, since ok means "successful refinement", not "proved" — and the harness must still report the state unsolved until both are discharged and the final gate passes.
+
+### The four #112 lessons, as types and tests
+
++  **Peeks are not moves.**  `Probe` and `Move` are distinct types, and the proof script has type `Vector[Move]`, so a probe cannot enter the script by type.  The substrate agrees: `fill_hole` restores the file after judging, so every call is a peek, and a move is the client committing the candidate to its working copy and re-anchoring from the response's holes.  Test: probing k candidates leaves the script unchanged; committing appends exactly the one committed action.
++  **Partial application arithmetic.**  `remainingAfterApply(binders, k)` drops the first k visible binders and keeps hidden ones (search.py's `drop_first_k_visible`), and the candidate constructor emits one `{!!}` per remaining visible binder.  Pure functions with tests, including that hidden binders are neither consumed by visible arguments nor granted holes.
++  **Two caches with two key types.**  `OracleKey` (file fingerprint, hole address, candidate) memoises oracle probes; `StateKey` (committed content and script) is the P1 frontier dedup.  Both key types are defined now as distinct newtypes so P1 cannot conflate them; the oracle memo is implemented and tested at P0 — the same candidate probed twice costs one oracle call.
++  **Order by remaining obligations.**  Probe outcomes rank by `(closes?, remaining obligations, ...)` ascending, and the harness reports candidates in that order.  Test: a closing candidate ranks before a one-subgoal application, before a two-subgoal one, before a type error.
+
+### The single-step harness
+
+`struxdriver.search` (new package): given one obligation from `data/benchmarks/benchmark-index.jsonl`, propose k candidates from a fixed stub action space, probe each against agda-mcp, and report which close it.
+
++  **Oracle**.  The harness spawns the agda-mcp binary over stdio with the committed `.mcp.json` flags, initializes, and calls `check_file` (baseline: exactly one obligation), `get_goal` (what the proposer sees), and `fill_hole` per candidate — the same newline-delimited JSON-RPC, double-encoded `content[0].text`, and `isError` handling every MCP client gets.
++  **Working copies.**  Each fixture is copied to `data/benchmarks/reports/proof-search/<runId>/work/<fixtureId>/` (the reports directory is already gitignored), so a crash can never leave a committed fixture dirtied; the module keeps its stem name, and the server's file-dir include flag makes it resolve (verified by the probe above).
++  **Stub action space.**  A fixed list: closers (`refl`, `tt`), application candidates built by the partial-application constructor from a small fixed binder table (`sym {!!}`, `cong suc {!!}`), and deliberate misfits — chosen to exercise every `fill_hole` status and the multi-obligation path, not to maximize solves.  The split is the deliverable, not the solve rate; P2 replaces this space with retrieval.
++  **Output.**  Per-candidate rows in the existing `eval-proof-completion.v0` attempt shape (`fixtureId`, `module`, `fixturePath`, `holeIndex`, `holeLine`, `holeCol`, `candidateRank`, `candidate`, `status`, `elapsedMs`, `rc`, `logPath`) written to `results.jsonl`, so results sit beside the policy-backend baseline; `status` uses `fill_hole`'s own vocabulary (`ok`/`type_error`/`timeout`/`crash`), and `rc` comes from the response's `verdict.exitCode`.  The timing split rides a sibling `timing.jsonl` (`proof-search-timing.v0`: per-call `phase`, `proposalMs`, `clientMs`, `serverElapsedMs`, `overheadMs`, `checkedFromSource`) rather than new fields smuggled into the shared schema, and `report.json` aggregates the split per difficulty tier and overall.
+
+### Make targets and tests
+
++  `make proof-search-single-step` — the harness on one obligation (`PROOF_SEARCH_ID`, defaulting to a routine one), k candidates, human-readable report; help line per house rules.
++  `make proof-search-split` — the sweep over all 22 obligations, run twice so the second pass is warm (the split is read from the warm pass, with cold-pass numbers reported beside it), writing `report.json` and printing the oracle-vs-proposal numbers destined for #113.
++  Unit tests, pure, running in `make test`: conjunctive state semantics (the pinned regression test), probe/move separation, partial-application arithmetic, oracle-key memoisation, ranking, and wire-shape decoders against canned real responses captured from the live server.
++  Integration, needing the backend shell: the two-obligation scenario end-to-end against the real server, gated on an `AGDA_MCP_BIN` environment variable exactly like the existing backend-gated Scala tests, plus the Make targets above.
+
+### Acceptance
+
++  The state model is conjunctive with the pinned regression test — a lemma with two obligations is not reported solved when only one is discharged — and the four lessons are encoded as the types and tests above, not prose.
++  The single-step harness runs one M1-5 obligation end-to-end against agda-mcp and reports which of k candidates close it.
++  `make proof-search-single-step` and `make proof-search-split` exist with help lines; `make test` stays green and includes the new unit tests; `make agda-mcp-test` is untouched and green.
++  The oracle-time vs proposal-time split on real M1-5 obligations is posted as numbers on #113, with the host-language conclusion those numbers support.
++  `docs/GITHUB_PROJECT.md` gains the #113 tracking-issue line in "Field-driven work outside the milestone plan", per that file's convention.
+
+Part of #113; lessons inherited from #112.
+
+---
+
+### Issue M2-9b: proof search P1 (the search loop): beam over obligation states with a fixed action space (#122, closed)
+
+**Labels:** `eval`, `retrieval`, `M2: retrieval + local models`
+
+## Description
+
+P1 of the #113 plan: the search loop over the P0 state model (#119, PR #121), with a fixed, non-learned action space.  The deliverable is the baseline number — how many M1-5 obligations the search closes per difficulty tier — which every later phase has to beat.  Better proposals are out of scope (P2 is retrieval, P3 is a learned policy); this issue is the loop, its budgets, and its measurement.
+
+### What P0 settled, and what it means here
+
++  **The oracle is the entire cost.**  Measured on #113: oracle calls are effectively 100 % of wall time at ~2.6–2.9 s per probe on stdlib fixtures, the cost is per-spawn import-graph loading (a builtins-only fixture answers in ~0.2 s), and transport is 0.21 % — so P1's economics are governed by oracle-call COUNT, and the natural budget unit is oracle calls, not seconds.
++  **The substrate is landed; build on it, do not re-derive it.**  `struxdriver.search` has the conjunctive `SearchState` (unforgeable via the sealed-abstract idiom), `SolvedClaim`'s two gates, the memoised `Oracle` with the timing ledger, strict wire decoders (drift fails visibly), the partial-application arithmetic, and the anomaly-red-exit discipline.  The PR #121 review threads record these as contract decisions; preserve them.
+
+### Design commitments
+
++  **The loop.**  Beam search over `SearchState`s: expanding a state probes k candidates at ONE obligation chosen by a fixed selection policy (first open obligation, stated and tested as a deliberate simplification — selection order affects which proofs are found under budget, never soundness, since the set is conjunctive and every commit re-anchors from the oracle's holes).  Children are the Ok probes committed, ranked by the landed `Rank`; beam width, depth bound, and a per-fixture oracle-call budget are tunables with stated defaults.  Termination per fixture: solved (via `SolvedClaim`'s final batch gate), exhausted, or budget-exceeded — each a distinct reported status.
++  **Two-cache discipline, completed.**  The `OracleKey` memo spans the whole fixture run (within one search, same content + candidate is one Agda call, by construction).  The frontier dedups on `StateKey` — landed as content + script, the #112 lesson's own key — and this issue decides the policy by measurement: run M1-5 with script-inclusive and with content-only dedup, compare solve counts and oracle calls, adopt the winner with a test.  The PR #121 `StateKey` thread anticipated exactly this decision.
++  **The peek experiment (measured, not assumed).**  The interaction lane answers `type_of` in milliseconds once a file is loaded — the modern form of #112's report-actions-are-peeks.  Measure whether a `type_of` pre-filter (candidate with `_` metas in place of holes, inferred at the goal) can reject candidates before they cost a ~2.7 s batch probe, and what it does to end-to-end oracle calls and wall time on M1-5.  Open protocol question to answer on the wire first (driving-agda-mcp skill): what `type_of` does with under-determined metas.  Outcome — uplift or refutation — is posted on #113 with the same method as the P0 split.  Peeks never enter the script and never decide anything; only `fill_hole` judges.
++  **The fixed action space.**  Non-learned but real: the goal context's assumptions (from `get_goal`), the P0 closers, and applications of the fixture's imported lemmas — one `{!!}` per remaining visible binder via the landed arithmetic, binder counts read from lane `type_of` answers plus a deliberately small top-level pi-type splitter (arrows at paren depth 0; the oracle polices what the parser gets wrong).  Term mode only: no case splits, no `with` — which caps what is reachable (most `induction`/`case-split` golds are not), and the baseline is reported with that ceiling stated so the number is read correctly.
++  **Reporting on the shared schema.**  Per-probe rows continue in `eval-proof-completion.v0` `results.jsonl`; the loop adds `fixtures.jsonl` (`FixtureSummary` semantics: `holesTotal` = 1 per benchmark obligation, `fullySolved` iff the final strict gate passed, `solvedPath` into the run's `solved/` directory), so the baseline sits beside the policy-backend evaluator's output.  The timing ledger keeps the oracle/proposal split per phase, now including a `peek` phase.
++  **Scaffolding.**  Factor the fixture-run scaffolding (work copies, baseline check, logging, red-exit) shared with the single-step harness rather than duplicating it.  Serial execution first; parallel oracle workers (N servers over disjoint work copies) are a recorded option, taken only if the measured wall time demands it.
+
+### Acceptance
+
++  The loop lands with a Make target and help line (`proof-search-loop`), pure tests against the `ToolCaller` seam (beam behavior, budget exhaustion, dedup policy, multi-obligation solve), and a live gated test extending the two-obligation regression to a full search.
++  Per-tier M1-5 solve counts (with beam/depth/budget stated) are posted on #113 — the baseline number.
++  The `type_of` peek experiment is measured and its numbers posted on #113, whichever way it comes out.
++  The `StateKey` dedup policy is decided by measurement and pinned in a test.
++  `make test`, `make proof-search-it`, `make proof-search-single-step`, and `make agda-mcp-test` stay green; the server is driven as a client only.
++  `docs/GITHUB_PROJECT.md`'s field-driven line for #113 is extended to name this sub-issue beside #119.
+
+Part of #113; builds on #119 / PR #121; siblings: the P2 (retrieval proposals) and P3 (policy proposals) sub-issues filed alongside.
+
+---
+
+### Issue M2-9c: proof-search stage P2: proposals over agda-strux corpora (#123)
 
 **Labels:** `eval`, `retrieval`, `M2: retrieval + local models`
 
@@ -1425,7 +2573,56 @@ Part of #113; builds on #122; sibling of the P3 policy sub-issue.
 
 ---
 
-### Issue M2-11: benchmarks: obligations whose single-term golds require retrieval from imported haystacks (#129, closed)
+### Issue M2-9d: proof search P3 (the closed loop): proposals from a learned policy (#124, closed)
+
+**Labels:** `eval`, `retrieval`, `local-models`, `M2: retrieval + local models`
+
+## Description
+
+P3 of the #113 plan: proposals from a learned policy — the closed loop this project has been building toward.  A search that asks a policy for candidates, checks them with Agda, and reports on the M1-5 JSONL schema.  Like #123, this is direction to be re-cut when its prerequisites land; the durable parts are the interface obligations and the headline comparison.
+
+### Scope
+
++  **The contract already exists; speak it, do not reinvent it.**  The policy-backend wire contract lives in `agda-dojang/python/tools/policy_contract.py`, mirrored one-to-one by `AgdaMCP.Types`, and `eval_fixtures.py`'s `call_policy` is the reference client.  P3 adds a Scala client for the same contract (request: goal + context + meta; response: ranked candidates on the versioned schema) as a third proposer behind the #122 interface.
++  **Deterministic first.**  `policy_fixture.py` is the working deterministic backend; the loop-with-policy is landed and tested against it before any trained model enters the picture, so the plumbing and the model are never debugged at the same time.
++  **The headline comparison.**  On M1-5, per tier, side by side on `eval-proof-completion.v0`: search + policy proposals, versus policy-alone top-k (the existing `eval_fixtures.py` baseline), versus the #122 fixed-space and #123 retrieval baselines.  Whether SEARCH adds value over the policy it wraps is the question this phase exists to answer.
++  **Budget accounting.**  Policy latency joins the proposal side of the timing ledger; the P0 method (oracle vs proposal split) is re-reported so the economics of a slow proposer are visible rather than assumed.
+
+### Acceptance
+
++  The policy-backed proposer lands behind the #122 interface, tested end to end against `policy_fixture.py`.
++  The three-way (or four-way, with #123) comparison is posted on #113 on the shared schema.
++  The proposer interface has survived P1 → P2 → P3 unchanged, or the changes are recorded on #122 with reasons.
+
+Part of #113; builds on #122 (loop, interface) and #123 (retrieval baseline); consumes the policy contract owned by agda-dojang.
+
+---
+
+### Issue M2-9e: Add retrieval tools to agda-mcp: corpus-backed search (#17)
+
+**Labels:** `agda-mcp`, `retrieval`, `M2: retrieval + local models`
+
+## Description
+
+Upgrade the M1-3 search tools to use the offline corpus index.  Add `dependency-neighbors` and improve `search-by-type` with structural matching.
+
+### Tasks
+
+- [ ] Load corpus index at `agda-mcp` startup
+- [ ] Upgrade `search-by-name` to use inverted index (faster than substring scan)
+- [ ] Upgrade `search-by-type` to support structural matching via `typeAst`
+- [ ] Add `dependency-neighbors`: given a definition, return k-hop neighborhood from the graph
+- [ ] Benchmark query latency on `agda-algebras` corpus
+
+### Acceptance criteria
+
+- [ ] Search tools return results in < 100ms on `agda-algebras` corpus
+- [ ] `dependency-neighbors` returns structurally relevant results
+- [ ] Agent integration demo (M1-4 style) shows improved success with better retrieval
+
+---
+
+### Issue M2-9f: benchmarks: obligations whose single-term golds require retrieval from imported haystacks (#129, closed)
 
 **Labels:** `M2: retrieval + local models`
 
@@ -1689,6 +2886,51 @@ Part of [#113]; found by the [#129] tier, PR [#150].
 [#126]: https://github.com/formalverification/agda-native-air/pull/126
 [#129]: https://github.com/formalverification/agda-native-air/issues/129
 [#150]: https://github.com/formalverification/agda-native-air/pull/150
+
+---
+
+### Issue M2-18: benchmarks: a composition tier, golds that string several corpus lemmas together (#160)
+
+**Labels:** `M2: retrieval + local models`
+
+## Context
+
+Every retrieval measurement so far asks the searcher to find **one** lemma.  The haystack tier ([#129], [M2-11]) was built so that a single saturated application of one import-reachable, non-`using`-listed lemma closes the goal, and its own design rules exclude anything else: `fill_hole` refuses `(trans {!!} {!!})` because the middle point is an unsolved meta, so two-lemma composites were ruled out of the golds by construction (see the tier's design constraints in `data/benchmarks/README.md`).  The agent-in-the-loop measurement ([#154]) then showed what a single needle is worth against a model: both arms solved the haystack tier 12 of 12 from memory, most rows in four turns with no query at all, so that tier measures the loop's ranker and nothing about a model.  The rows where the tools entered the loop were the agda-algebras ones where a proof had to be *assembled*: Opus composed `⊙-hom`, `⊙-injective`, and `≅toInjective` for `≤-trans-≅′`, and built the kernel congruence from `kerRel`, `mkcon`, `kerRelOfEquiv`, and `HomKerComp` for `kercon′`, after `type_of` queries on each piece.
+
+That is how mathematicians prove new theorems: not by finding the one result that is the theorem, but by finding several known results and stringing them together.  It is what `agda-mcp` plus corpus search and retrieval should be good at, and nothing in the suite measures it.
+
+## Proposal
+
+A **composition tier**: obligations whose gold proofs string together several corpus lemmas, none of which closes the goal on its own.
+
++  **Shape**.  Each gold is a composition of k lemmas, k = 2 and k = 3 to start, joined by the ordinary connectives (`trans`, `sym`, `cong`, function composition, `subst`, a `where`-bound intermediate), and no single lemma in the corpus is the statement or closes the goal by itself.
++  **Needles are reachable, not listed, and not the statement**.  The haystack discipline holds for every piece: each lemma is import-reachable (the module is opened, possibly with a `using` list of decoys) but not `using`-listed by name, and the statement is a specialization or combination the library does not state, so the target-exclusion policy of the loop has nothing to exclude and the restatement gate of the agent bench has nothing to flag.
++  **Not memorized**.  Draw the rows from agda-algebras at the corpus commit (`4662373d`), where [#154] measured the model arms actually reaching for the tools, rather than from the standard library, whose lemmas every model reproduces from memory; where a fresh definition can be introduced in the fixture so that the composition is genuinely new, prefer it.
++  **Ground truth in the index**.  Every row carries `stratum:composition` and one `needle:` tag per lemma the gold applies (qualified), the same way [#152] records `target:` and `restates:`, so per-needle recall is measurable by the offline instrument and a solve can be checked against the intended pieces.
++  **Three mechanical gates**, as the haystack tier has: no single needle closes the goal (the fixed-space and single-application retrieval sweeps over the tier must be 0 of n by construction); every gold type-checks under the pinned toolchain (`make eval-benchmark`); the recall instrument reports recall@k for each needle.
+
+## What it measures
+
++  **For the loop**: a move vocabulary beyond one saturated application.  The current shapes cannot express a `trans` chain whose middle point is a meta, so the tier is the quantitative case for the composition moves (a `trans` with the intermediate supplied from a retrieved lemma's conclusion, `sym`/`cong` wrappers, `where`-bound steps), which is the direction [#124] and the ceiling paragraph of ADR 0001 § 10 name.
++  **For retrieval**: recall of several needles per goal, and of needles for *intermediate* goals that are not the root goal's display, which the ranker never sees today; the per-needle tags make this an offline measurement first ([#19]).
++  **For the agent bench** ([#154]): whether the pieces come from the tools (`search_by_type` on an intermediate goal, `type_of` on candidates, `fill_hole` probes) or from memory, read off the per-tool counts and the transcripts, with the restated column as the honesty check.
+
+## Acceptance
+
++  10 to 15 obligations with type-checking golds under `data/benchmarks/agda-algebras-composition-v0/` (or a name the taxonomy prefers), indexed with `stratum:composition` and `needle:` tags, classified by the taxonomy.
++  The three gates run and their numbers posted here: the k = 1 sweeps at 0 of n, `eval-benchmark` green, per-needle recall from `make proof-search-recall`.
++  The loop and the agent bench run over the tier and reported beside the other strata (`perStratum` gains `agda-algebras/composition`); the ADR gains the decision and its evidence.
+
+Related: [#129] (the single-needle instrument this extends), [#142] (style-paired obligations, the other benchmark instrument still open), [#19] (premise selection, which the per-needle recall feeds), [#113] (the loop record), [#123] and [#124] (retrieval and the policy direction), [#154] (the agent bench that motivated this).
+
+[#19]: https://github.com/formalverification/agda-native-air/issues/19
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#123]: https://github.com/formalverification/agda-native-air/issues/123
+[#124]: https://github.com/formalverification/agda-native-air/issues/124
+[#129]: https://github.com/formalverification/agda-native-air/issues/129
+[#142]: https://github.com/formalverification/agda-native-air/issues/142
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#152]: https://github.com/formalverification/agda-native-air/pull/152
 
 <!-- END GENERATED: milestone-2 -->
 
@@ -2054,1158 +3296,5 @@ Issues filed organically on GitHub, with no `[MN-k]` prefix in the title, are in
 
 <!-- BEGIN GENERATED: unplanned -->
 
-#### (no milestone)
-
-### [Admin] configure repo protection rules and PR template (#40, closed)
-
-**Labels:** `infrastructure`
-
-**Assignees:** @williamdemeo, @hyeyoungshin, @Copilot
-
-# Description
-
-A note pops up on the main GitHub page for this repository reminding us that we should set up some rules protecting the repo against accidental or nefarious behavior; it says,
-
-"Your main branch isn't protected  
-Protect this branch from force pushing or deletion, or require status checks before merging.
-[View documentation](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)"
-
-## Rules for Merging PRs
-
-We should set up the following rules before opening the repo up to outside contributors:
-
-1.  At least 1 review and approval needed before merging a PR branch into `main`.
-2.  Only allow "Rebase and merge" (no direct "Merge commit" button).
-3.  Only allow "Rebase and merge" if CI passes (all green).
-4.  Allow "Automatic rebase and merge" once CI passes (assuming 1 review/approval of the PR).
-
-This is a good task for either Claude or GitHub Copilot to do or at least provide detailed guidance on how to do it.
-
-## PR Description Template
-
-We should probably have a PR template that guides/encourages contributors to provide a nice description of the PR.  It should automatically populate the PR description dialog box with a `# Description` section as well as an `# Acceptance Criteria` section that includes a checklist of standard criteria.
-
----
-
-### Agda-Nix Phase 3: Nix-managed external libraries (#54)
-
-**Labels:** `agda-dojang`, `infrastructure`, `reproducibility`
-
-**Assignees:** @williamdemeo
-
-For libraries that have stable Nix derivations (e.g., `agda-categories` is in nixpkgs), add them to `mkAgdaEnv`:
-
-```nix
-mkAgdaEnv = pkgs: pkgs.agda.withPackages (p: [
-  p.standard-library
-  # p.agda-categories  # uncomment when needed
-]);
-```
-
-For libraries NOT in nixpkgs (agda-algebras, TypeTopology), use `fetchFromGitHub` in the flake to pin them:
-
-```nix
-inputs.agda-algebras = {
-  url = "github:ualib/agda-algebras";
-  flake = false;
-};
-```
-
-Then construct the libraries file from the fetched sources.  This gives full reproducibility (pinned git rev in `flake.lock`) without requiring a local clone.
-
----
-
-### Agda-Nix Phase 4: Interactive library selection (stretch) (#55)
-
-**Labels:** `enhancement`, `agda-dojang`, `infrastructure`
-
-Add a `nix develop .#with-algebras` shell variant, or a `scripts/select-libraries.sh` that prompts the user to choose which libraries to register.  This is nice-to-have and probably not worth the complexity unless more than ~3 external libraries are in play.
-
----
-
-### [infra] Add Claude Code config (CLAUDE.md, SessionStart Nix hook, skills) (#57, closed)
-
-**Labels:** 
-
-**Assignees:** @williamdemeo
-
-## Description
-
-Port the Claude Code working-configuration pattern from `agda-algebras` to this repository, adapted for the polyglot (Agda + Scala + Haskell + Python + Nix) layout here.  The goal is that a Claude Code session — local or "on the web" — comes up with the pinned toolchain available and the house conventions encoded, so the agent can type-check Agda and run the CI lanes exactly as CI does, with no manual setup.
-
-This is separate from #13 (baseline benchmark curation); that work continues on its own branch and PR.
-
-## Background
-
-In a "Claude Code on the web" container, Nix is not preinstalled and the usual installer redirectors (`nixos.org/nix/install`, `install.determinate.systems`) are blocked by the container's host allowlist.  However, `releases.nixos.org` and `cache.nixos.org` are reachable, so a `SessionStart` hook can install Nix directly from `releases.nixos.org` and realize the pinned toolchain from the binary caches.  This was validated live: Nix 2.31.2 installs cleanly, and `nix develop .#backend --command agda --version` reports Agda 2.8.0 with standard-library 2.3 substituted from `cache.nixos.org` and `formalverification.cachix.org`.
-
-## Tasks
-
-+ Add `CLAUDE.md` at the repo root covering: build/test entry points (`nix develop` and the targeted shells `.#backend` / `.#all`; `make ci-smoke`, `make test`, `make check`, `make backend-test`; type-checking Agda via the flake's `agda` wrapper); repository architecture (`strux-driver`, `ml-pipeline`, `agda-strux`, `agda-dojang`, `data/benchmarks`); functional-Scala and doc-header conventions; the benchmark fixture convention; the markdown house style; and environment gotchas.
-+ Add `.claude/settings.json` registering a `SessionStart` hook.
-+ Add `.claude/hooks/session-start.sh`: single-user Nix install from `releases.nixos.org`; `/etc/nix/nix.conf` configured for rootless builds against `cache.nixos.org` + `formalverification.cachix.org`; CA handling that prefers the container's combined proxy bundle; a web-only guard via `CLAUDE_CODE_REMOTE`; and a pre-warm of `.#backend`.
-+ Add `.claude/skills/typechecking-agda/SKILL.md` (verify benchmark fixtures and `agda-dojang` modules under the flake).
-+ Add `.claude/skills/authoring-a-benchmark-obligation/SKILL.md` (obligation + gold fixture layout, header/hole/`AgdaDojang.Debug` convention, `benchmark-index.jsonl` schema, tier selection, then type-check the gold).
-
-## Acceptance criteria
-
-+ A fresh web session has `nix` on `PATH` and can run `nix develop .#backend --command agda --version` (→ Agda 2.8.0) with no manual setup.
-+ `CLAUDE.md` and the skills reflect this repository's actual commands and layout, not agda-algebras'.
-+ The change is purely additive: no existing build, test, or CI behavior is modified.
-
-## Notes
-
-+ Provisioning approach validated live in this environment (Nix 2.31.2 from `releases.nixos.org`; `.#backend` realizes Agda 2.8.0 + standard-library 2.3).
-+ The hook is web-only (`CLAUDE_CODE_REMOTE`); local developers continue to use `nix develop` directly.
-
----
-
-### agda-mcp: get_goal / fill_hole fail on library-embedded (hierarchically-named) modules (#66, closed)
-
-**Labels:** `agda-mcp`
-
-## Summary
-
-`get_goal` and `fill_hole` work on flat, top-level scratch modules (the shape of every `data/benchmarks/` fixture) but fail on a module that lives *inside a library* at a hierarchical path — for example `FLRP.Bridge` at `src/FLRP/Bridge.lagda.md` in `agda-algebras`.  `check_file` and `get_diagnostics` are unaffected, because they typecheck the file **in place**.  This blocks using the two temp-copy tools on real libraries, which is exactly the "agda-mcp on `agda-algebras` / `formal-ledger-specifications`" use case.
-
-## How it fails
-
-Both tools write a patched copy of the file to a scratch directory and run Agda there (`AgdaMCP.Tools.ProofState.handleGetGoal` / `handleFillHole` → `makeTmpDir` + `makeOverlay`).  For a hierarchical module this produces one of two errors:
-
-+  Without the library on the include path, the copy lands flat at `<tmp>/Bridge.lagda.md` with `-i <tmp>`, so Agda computes the top-level module name `Bridge` and rejects the declared `FLRP.Bridge` — `ModuleNameDoesntMatchFileName`.  The overlay only mirrors the file's *immediate* sibling directory (`src/FLRP/`), so cross-directory imports (`Setoid.*`, `Classical.*`, …) do not resolve either.
-+  With the library on the include path (the `-l agda-algebras` the client passes so those imports *do* resolve), `<lib>/src` is added to the search path, so `FLRP.Bridge` now resolves to its canonical file **and** to the temp copy — `ModuleDefinedInOtherFile`.
-
-So the temp-copy design cannot satisfy both constraints at once for a library-embedded module: it needs the whole library `src` on the path to resolve imports, but that same path re-introduces the canonical file that the copy collides with.
-
-## Reproduction
-
-Real case (from a live session): every `get_goal` / `fill_hole` call on `agda-algebras`'s `src/FLRP/Bridge.lagda.md` failed with `ModuleDefinedInOtherFile`, while `check_file` and `get_diagnostics` loaded and verified the same file correctly.
-
-Minimal synthetic case: a two-directory library (`src/A/M.agda` importing `src/B/N.agda`, module names `A.M` / `B.N`) with a `{!!}` hole in `A.M` reproduces the same two errors under `get_goal` / `fill_hole` and succeeds under `check_file`.  A fixture of this shape belongs in the `agda-mcp` test suite as a regression guard.
-
-## Root cause
-
-The temp-copy + `makeOverlay` strategy (a port of `agent_bridge.py`'s scratch-file approach) assumes the target is a self-contained top-level module.  That holds for the benchmark fixtures but not for modules embedded in a library tree.
-
-## Proposed fix
-
-Typecheck **in place**, the way `check_file` / `get_diagnostics` already do — Agda then auto-detects the worktree's `.agda-lib` and the hierarchical name and all imports resolve exactly as they do for the human developer.  Concretely:
-
-+  Patch the *real* file (hole → `reportGoalCtx ?` for `get_goal`, hole → candidate for `fill_hole`), run Agda in place, parse, and restore the original content under `Control.Exception.bracket` so the file is always restored — even on exception or timeout.
-+  For `get_goal`, additionally ensure `open import AgdaDojang.Debug` is in scope before injecting `reportGoalCtx` (inject it transiently if absent; `agda-dojang` is already registered, so it resolves).  This works uniformly for `.agda` and `.lagda.md`, since a module declaration is in code context in both.
-+  Drop the `makeTmpDir` / `makeOverlay` / `stripIncludeDir` machinery from these two handlers.
-
-Tradeoff: in-place patching transiently mutates the source for the duration of one Agda run.  `bracket` bounds that window and guarantees restoration; the MCP use case is agent-driven (no concurrent hand-editing), so this is acceptable for v0.  An alternative that never touches the source — mirroring the entire library `src` tree with symlinks and overriding the one file — is heavier and needs per-file library/dependency detection; it can come later if the in-place window proves problematic.
-
-This also makes #43 (optimize `makeOverlay` for large trees) moot for these two tools, since the overlay disappears from their path entirely.
-
-## Acceptance criteria
-
-+  `get_goal` and `fill_hole` succeed on a hierarchically-named module that imports across sibling directories (synthetic fixture + a manual check against a real `agda-algebras` module).
-+  The target file is byte-for-byte unchanged after every call, including when Agda errors or the call times out.
-+  `check_file` / `get_diagnostics` behavior is unchanged.
-+  A regression fixture of the two-directory shape is added to the `agda-mcp` test suite.
-
----
-
-### [agda-mcp] field-test hardening: trust, literate Agda, and reach (tracking) (#68, closed)
-
-**Labels:** `agda-mcp`
-
-# Context
-
-A July 2026 Claude Code session formalized FLRP RP-2 in `ualib/agda-algebras` (its issue 459 / PR 507): ~1200 lines of literate Agda across roughly fifteen type-check iterations, with `agda-mcp` configured via `.mcp.json` and its four tools listed.  The headline datum: **the agent never called the server once**, running `agda <file>` from Bash every time — its reconstruction of why is § 2 of the feedback document, now imported at [`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md).  That document's § 0 asked that every claim be re-verified against the current server before filing issues; its § 7 addendum records that verification — scripted MCP stdio sessions against `911ae18`, cross-checked with direct `agda` runs under the pinned toolchain (Agda 2.8.0).
-
-# What verification found
-
-+  **Confirmed, P0.**  `fill_hole` reports `ok` for candidates that leave unsolved metas, while `agda` exits 42 with `[UnsolvedMetaVariables]` on identical content; `get_goal` reports the reporting macro's unsolved type instead of the hole's goal, returning `(x₁ : _3 x) → _5 x x₁` where `Fixture01` documents `A`; hole detection matches only the literal token `{!!}`, misses `{! !}` / `{! e !}` / `?`, and counts (and even fills) tokens sitting in comments and markdown prose.
-+  **Not reproduced.**  The secondhand "`check_file` green on unsolved metas" claim: `check_file` and `get_diagnostics` were correctly red on every failing fixture, and the inferred interaction-mode cause is wrong — the server runs batch `agda` per call.  The surviving ask is to make the already-strict verdict explicit and contractual.
-+  **New defects found while re-testing.**  Diagnostics carry no source positions under Agda 2.8.0 (the parser expects `file:10,5-15` but Agda emits `file:9.12-13`), and `--timeout` is parsed but never enforced (`FillTimeout` is unreachable code).
-
-# Plan
-
-The document's § 6 framing survives contact with verification: P0 is trust, P1 is reach beyond the shell, P2 is economics and ergonomics.  Each fix should land with regression fixtures wired into `make agda-mcp-test` (the verification fixtures in the addendum are ready to be adopted as tests).
-
-+  **P0 — trust**: #69 (truthful `fill_hole` verdict), #70 (`get_goal` returns the actual goal), #71 (a real hole model), #73 (literate code-region awareness), #72 (explicit batch verdict and tool-description contract).
-+  **P1 — reach beyond the shell**: #74 (structured diagnostics), #75 (live scope/type/definition queries), #76 (root resolution and environment transparency), #77 (enforced timeouts with timing visibility).
-+  **P2 — economics and ergonomics**: #78 (whole-project check tool), #79 (stable hole handles).
-
-Suggested sequencing: #69 and #70 are independent, high-value bug fixes; #71 then #73 share the hole-model rework (consider Agda's interaction points as the source of truth, which also lays groundwork for #75); #72 and #76 share the response-echo plumbing; #74 and #77 are self-contained; #78 and #79 build on the P0 layer.
-
-# Acceptance for the wave
-
-+  The three § 4 "moments" from the field session run as scripted acceptance tests; they are encoded in #69, #74, and #75.
-+  The next real literate-repo session (the #23 case-study frame) reaches for the MCP instead of the shell — the only metric that counts, per § 2 of the document.
-+  Tool descriptions state the client-visible contract — verdict semantics, supported file flavours, hole model, and latency — per the § 6 meta-suggestion (#72).
-
-# Relations
-
-+  #12 (M1-4) demonstrated the loop on fixtures; this wave is the field-test follow-up on a research-scale literate library.
-+  #23 (M3-1) is the case study these agda-algebras sessions instantiate; its future runs are this wave's evaluation.
-+  #17 (M2-3) covers corpus-backed retrieval; the live scope/type queries proposed here are complementary (they answer against the current tree with no extraction step).
-+  #66 / #67 are prior art for field-driven hardening (in-place checking of library-embedded modules).
-
----
-
-### agda-mcp: fill_hole reports ok for candidates that leave unsolved metas (#69, closed)
-
-**Labels:** `bug`, `agda-mcp`
-
-Part of #68 (P0 — trust).  Feedback document § 3.1 and § 7.2.2 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Observed on `911ae18`
-
-Fixture (imports only `Agda.Builtin.Nat`):
-
-```agda
-module TwoHoles where
-
-open import Agda.Builtin.Nat
-
-implicitOnly : {n : Nat} → Nat
-implicitOnly {n} = n
-
-g : Nat
-g = {!!}
-
-h : Nat
-h = {!!}
-```
-
-`fill_hole {holeIndex: 0, candidate: "implicitOnly"}` returns:
-
-```json
-{"status": "ok", "candidate": "implicitOnly", "remainingHoles": 1}
-```
-
-Running `agda` directly on the identical patched content (hole 0 replaced by `implicitOnly`, hole `h` untouched) exits 42 with `[UnsolvedMetaVariables]` at `g` plus `[UnsolvedInteractionMetas]` at `h`.  The candidate did not typecheck in the sense any agent cares about.  This is exactly the FLRP "implicits under a defined function" pattern (`IE→cfIE (ies i)`) that cost the field session a full build cycle (document § 4), now demonstrated live on HEAD — the sharpest instance of the § 3.1 trust failure ("a verdict I cannot trust costs more than no verdict").
-
-# Cause
-
-`handleFillHole` excuses a non-zero exit when the combined output mentions `[UnsolvedInteractionMetas]` and none of four blacklisted tags (the `onlyMetas` predicate in `agda-mcp/src/AgdaMCP/Tools/ProofState.hs`).  The intent — tolerate the file's *other, still-open holes* — is right, but the blacklist does not fail on `[UnsolvedMetaVariables]` or `[UnsolvedConstraints]`, so metas introduced by the candidate itself ride along with the excused interaction metas.
-
-# Proposal
-
-+  Replace the tag blacklist with positive attribution: tolerate only `[UnsolvedInteractionMetas]` whose reported locations fall on the file's *other* hole spans; any `[UnsolvedMetaVariables]`, any `[UnsolvedConstraints]`, or an interaction meta inside the filled span fails the call.
-+  On failure, name the unsolved metas with their types and locations (dovetails with the structured-diagnostics sub-issue of #68).
-+  Adopt the fixture above as a cabal regression test: `fill_hole(0, "implicitOnly")` must return `type_error` naming an unsolved meta, and `fill_hole(0, "zero")` must remain `ok`.
-
-# Acceptance
-
-+  The `TwoHoles` fixture behaves as above under `make agda-mcp-test`.
-+  `status: "ok"` provably means the patched file passes batch `agda` up to other holes' interaction metas, and the `fill_hole` tool description states that contract.
-
----
-
-### agda-mcp: get_goal reports the reporting macro's unsolved type instead of the hole's goal (#70, closed)
-
-**Labels:** `bug`, `agda-mcp`
-
-Part of #68 (P0 — trust).  Feedback document § 7.2.1 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)); found during verification, not reported by the field session (which never called the tool).
-
-# Observed on `911ae18`
-
-On the shipped fixture `agda-dojang/data/fixtures/Fixture01.agda`, hole 0 (`id x = {!!}`, whose goal the agda-mcp README documents as `"A"`):
-
-```json
-{"goal": "(x₁ : _3 x) → _5 x x₁",
- "context": [{"index": 0, "name": "x", "type": "A", "visibility": "visible"},
-             {"index": 1, "name": "A", "type": "Set₀", "visibility": "hidden"}],
- "module": "Fixture01"}
-```
-
-The context is right; the goal is not `A` but an unsolved function type.  Fresh fixtures with the concrete goal `Nat` return the same shape, in both `.agda` and `.lagda.md`.  The server's stderr shows the raw marker block already carrying the bad goal (`AGDADOJANG_GOAL: (x₁ : _4 x y) → _6 x y x₁`), so the defect sits in the `reportGoalCtx` reflection layer (`agda-dojang/agda/AgdaDojang/Debug.agda`) as driven by batch `agda` 2.8.0, not in agda-mcp's parsing.
-
-Two aggravating observations:
-
-+  It is long-standing, not a fresh regression: the 2026-04-03 M1-4 transcript (`reports/m1-4/2026-04-03-213713-ClaudeCode-Fixture01.txt`) shows the same shape at hole 1, where the driving agent rationalized it as "mutual dependency between holes" — a live demonstration of how a wrong answer misleads rather than merely failing.
-+  CI cannot see it: the unit tests assert `parseGoalContext` on hand-written marker text (`AGDADOJANG_GOAL: A`), and no test asserts an end-to-end goal value against real Agda output.
-
-# Why it matters
-
-`get_goal` is the primary "what am I trying to prove?" query and one of the two tools with no shell equivalent.  A goal polluted with `_N` metas is at best useless and at worst actively misleading.
-
-# Proposal
-
-+  Diagnose whether `reportGoalCtx` quotes the goal before the expected type has been unified into the macro application — the `(x₁ : _A) → _B x₁` shape of a fresh function meta suggests exactly that — and fix the macro, or its injected invocation shape, so the reported goal is the hole's elaborated expected type.
-+  Add an end-to-end integration test asserting goal values against real Agda output: `get_goal(Fixture01, 0) = "A"`, `get_goal(Fixture01, 1) = "⊤"`, `get_goal(Fixture01, 2) = "x ≡ x"`, plus one concrete-`Nat` fixture, under `make agda-mcp-test`.
-
-# Acceptance
-
-+  `get_goal` on `Fixture01` holes 0–2 returns `A`, `⊤`, and `x ≡ x` respectively, pinned by an integration test that drives the real toolchain.
-
----
-
-### agda-mcp: hole detection matches only the literal token {!!} — misses real holes, counts comments and prose (#71, closed)
-
-**Labels:** `bug`, `agda-mcp`
-
-Part of #68 (P0 — trust).  Feedback document § 3.2 and § 7.2.5 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Observed on `911ae18`
-
-`findHoles` (`agda-mcp/src/AgdaMCP/Agda.hs`) scans raw source text for the exact four-character token `{!!}`.  All of the following reproduced during verification:
-
-+  A fixture with four Agda-visible interaction points — `{!!}`, `{! !}`, `{!zero!}`, `?` — reports `holesCount: 2`: the real `{!!}` plus a `{!!}` mentioned in the header *comment*.  Worse, the comment token is hole 0 and the real hole is hole 1, so index-addressed calls target a comment.
-+  A `.lagda.md` whose only hole is `{! zero !}` reports `holes: []` while the same `get_diagnostics` response carries the `[UnsolvedInteractionMetas]` error, and `get_goal(0)` answers "Hole index 0 not found".  This reproduces and explains the field document's § 0 memory note ("`holes: []` with open holes; `{!...!}` not recognized in `.lagda.md`"): it is not literate handling per se, it is the token model.
-+  `?`-holes are invisible everywhere.
-
-# Why it matters
-
-Agents and agda-mode both write content-bearing `{! attempt !}` holes and `?` holes constantly, and a literate repository additionally mentions `{!!}` in prose and comments.  Under the current model the two tools with no shell equivalent (`get_goal`, `fill_hole`) are unavailable or mis-addressed exactly where the work happens — the document's § 2.3 is why the field session never called them.
-
-# Proposal
-
-+  Recognize the hole surface syntax Agda recognizes: `{! … !}` with arbitrary, nesting-aware content and standalone `?`, ignoring occurrences inside comments and string literals.
-+  The robust route is to stop re-lexing: Agda already enumerates interaction points with positions (they are exactly what `[UnsolvedInteractionMetas]` reports, and what the interaction protocol lists); use Agda's positions as the source of truth for holehood, and let a lexical pass merely locate the token text for substitution.
-+  In literate files, restrict scanning to code regions (tracked separately in the literate-Agda sub-issue of #68) so prose tokens can never be holes.
-+  Adopt the verification fixtures as regression tests: the four-variant file must report four holes with correct spans; comment and prose tokens must contribute zero.
-
-# Acceptance
-
-+  Hole enumeration agrees with Agda's interaction-point count on the fixture matrix, for `.agda` and `.lagda.md` alike, and `get_goal`/`fill_hole` successfully address a `{! !}`-style hole.
-
----
-
-### [agda-mcp] make the batch verdict explicit: verdict + command echo in responses, contract in tool descriptions (#72, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68 (P0 — trust).  Feedback document § 3.1, § 6 meta-suggestion, and § 7.3 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Context
-
-Verification refuted the secondhand "green on unsolved metas" claim for `check_file` / `get_diagnostics`: the server already runs batch `agda <file>` per call and was correctly red on every failing fixture.  But nothing *says* so, and the field session § 2.5 records the cost ("with no answers, the conservative move is the tool whose semantics I know exactly"):
-
-+  The verdict semantics live only in the implementation; no response states what green means.
-+  `get_diagnostics` has no success or exit-code field at all — only counts derived from parsing Agda's prose, which would silently zero if the message format drifts, exactly as position parsing already has (see the structured-diagnostics sub-issue of #68).
-+  The four tool descriptions are one-liners stating none of flags, verdict meaning, supported file flavours, hole model, or caching — and "an agent chooses tools by reading those two lines and nothing else" (§ 6).
-
-# Proposal
-
-+  Add to every proof-state response: a `verdict` field with an explicit meaning (e.g. `"equivalent-to: agda <resolved flags> <file>"`), the Agda exit code, and the resolved command line (binary, flags, cwd).
-+  Derive `success` and the error verdict from the exit code, never solely from message parsing; give `get_diagnostics` the same `success`/exit fields as `check_file`.
-+  Consider a `strict` option honoring `--safe` and friends per the document's § 3.1 proposal, but note the default is already batch-strict — the work is to make that contractual, not to change semantics.
-+  Rewrite the four tool descriptions to carry the client-visible contract: verdict semantics, supported file flavours, hole model, cold-subprocess latency, and precisely what `fill_hole`'s `ok` tolerates.
-
-# Acceptance
-
-+  Every response says what was run and what green means, and a client can confirm "this equals my `agda <file>` gate" without reading Haskell.
-+  A tools/list dump alone is enough for an agent to know whether a green result means the build passes — the one thing § 6 says the descriptions failed to say.
-
----
-
-### agda-mcp: first-class literate Agda — code-region awareness and literate-coordinate positions (#73, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68 (P0 — trust); companion to #71.  Feedback document § 3.2 and § 7.2.6 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Observed on `911ae18`
-
-The good news from verification first: on `.lagda.md`, `check_file` type-checks correctly, `get_goal` finds `{!!}`-token holes inside fenced blocks, and the transient `AgdaDojang.Debug` import injection lands correctly after the module header inside the fence.  What is missing is any awareness of *which bytes are code*:
-
-+  A closing-prose mention of `{!!}` was counted as a hole, and `fill_hole` on that prose token returned `status: "ok"` — the substituted prose is invisible to Agda, and the file's real open hole was excused by the tolerance heuristic (#69).  An agent trusting that verdict would edit documentation believing it made proof progress.  In a repository like `ualib/agda-algebras`, which is 100 % `.lagda.md` and whose prose frequently discusses holes, this is a standing hazard, not an edge case.
-+  The server's hand-rolled hole spans are character offsets over the raw literate text and are never surfaced, so nothing guarantees that hole positions and diagnostic positions agree with the literate file as an editor or agent sees it.
-
-# Proposal
-
-+  Implement code-region extraction for the literate flavours Agda supports — ```` ```agda ```` fences for `.lagda.md`, `\begin{code}` blocks for `.lagda.tex`, `#+begin_src agda2` for `.lagda.org`, and `.lagda.rst` blocks — and restrict hole scanning and candidate substitution to code regions.
-+  Report hole positions as (line, column) in literate-file coordinates wherever holes are listed, and keep diagnostic positions consistent with them.
-+  Add one regression test per flavour: prose above and below a hole plus a decoy token in the prose, asserting the hole count and the reported line.
-+  State the supported flavours in the tool descriptions, so a client can tell before trying (document § 3.2).
-
-If #71 moves holehood to Agda's own interaction points, prose immunity falls out for free and this issue reduces to substitution safety, position mapping, per-flavour tests, and description text — sequence the two accordingly.
-
-# Acceptance
-
-+  `get_goal` and `fill_hole` behave identically on `M.agda` and the same code embedded in each literate flavour; decoy prose tokens are never holes; reported positions match the literate file.
-
----
-
-### [agda-mcp] structured diagnostics: codes, ranges, full messages, root-cause ordering (#74, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68 (P1 — reach beyond the shell).  Feedback document § 3.4, § 5, and § 7.2.3 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Observed on `911ae18`
-
-+  A bug first: **no diagnostic carries a source position**.  `parseDiagnostics` (`agda-mcp/src/AgdaMCP/Tools/ProofState.hs`) extracts line numbers by splitting on `,` in the `file:10,5-15` style, but Agda 2.8.0 emits `file:9.12-13`; every diagnostic in the verification session shipped with `severity` and `message` only.
-+  Only the bracketed header line survives (`…: error: [UnsolvedMetaVariables]`); the detail block — meta locations and types, expected versus actual, candidate lists — is dropped.  That detail is precisely what an agent needs: the field session's `UnsolvedConstraints` dump ran ~20 lines of internal meta names (`_𝑳.fst.Interp.to_127`) before the useful part, at token cost on every iteration.
-
-# Proposal
-
-Adopt the document's § 3.4 schema alongside the existing text:
-
-```
-{ severity, code: "UnsolvedMetaVariables" | "AmbiguousName" | …,
-  file, range: {startLine, startCol, endLine, endCol},
-  message, involved: { expected?, actual?, candidates?[], metaTypes?[] } }
-```
-
-+  Parse Agda 2.8's `line.col-…` position format, with a regression test covering both old and new formats.
-+  Keep the bracketed name as the machine-readable `code`, and attach the (bounded) full message body, not just the header line.
-+  Add a `maxDiagnostics` cap (default around 10) with the total reported, so a broken import list does not return a hundred cascading errors.
-+  Order by likely root cause — scope errors before type errors, warnings that precede hard errors (e.g. `ModuleDoesntExport` before the consequent `NotInScope`) first.
-+  Build the fixture suite directly from the document's § 5 error corpus — `ModuleDoesntExport` (warning), `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedConstraints` + `UnsolvedMetaVariables` — one fixture each, asserting `code`, `range`, and the `involved` payload named in § 5's third column.
-
-# Acceptance
-
-+  A client can branch on `code` and read `range` without regexing prose, for all six § 5 fixture classes, under `make agda-mcp-test`.
-
----
-
-### [agda-mcp] live scope, type + definition queries (#75, closed)
-
-**Labels:** `agda-mcp`, `retrieval`
-
-Part of #68 (P1 — reach beyond the shell).  Feedback document § 3.3 and § 4 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).  Complementary to #17 (corpus-backed retrieval): these queries answer against the *current* tree and scope with no extraction step, which a five-day-old corpus cannot.
-
-# Context
-
-The field session's dozen scope questions all went to `grep`, and three cost a full iteration each: an `AmbiguousName` for `≈sym` (a `Setoid` record field versus a canopy lemma reached through a four-level chain of module applications), a `ClashingDefinition` against a `public` re-export, and a `NotInScope` from a missing barrel entry whose `ModuleDoesntExport` warning would have flagged it first.  `grep` cannot resolve re-exports or module applications; the type-checker can.  This family is where an MCP is strictly better than the shell rather than equal to it — § 2.2's bar for earning a call.
-
-# Proposal
-
-Read-only queries, none requiring the client to edit the file first (the "check a term without committing to it" property is what makes them worth a call):
-
-+  `scope_at(filePath, line)` → names in scope with their fully qualified origins.
-+  `resolve_name(filePath, line, name)` → candidates with provenance chains (the `AmbiguousName` case).
-+  `type_of(filePath, line, expr)` and `normalize(filePath, line, expr)` → Agda's `C-c C-d` / `C-c C-n` on an expression that need not be in the file yet.
-+  `exports_of(module)` → the public surface, so barrel omissions are caught before compiling.
-+  `definition_of(name)` → defining file and line — the single most common grep an agent runs.
-
-Implementation note: this likely means driving `agda --interaction-json` (`Cmd_infer`, `Cmd_compute`, `Cmd_why_in_scope`, `Cmd_show_module_contents` cover most of the list) rather than the batch binary; that groundwork also serves #71's interaction-point-based hole model, so consider sequencing them together.
-
-# Acceptance
-
-+  The three § 4 "moments" run as scripted tests: `resolve_name` on an `≈sym`-style fixture returns two candidates with provenance; `type_of` answers for an expression not present in the file; `definition_of` returns file and line for a re-exported name.
-
----
-
-### [agda-mcp] project-root resolution and environment transparency (#76, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68 (P1 — reach beyond the shell); overlaps #72's response-echo work — land the echo once, use it for both.  Feedback document § 3.6 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Observed on `911ae18`
-
-+  No response echoes flags, cwd, or resolved library context; the caller cannot tell which tree was checked.
-+  The worktree binding is doubly indirect and mutates shared state: the client's `.mcp.json` sets `AGDA_ALGEBRAS_ROOT`, `scripts/run-server.sh` enters `nix develop .#backend`, and the shellHook then rewrites the checkout-wide `agda/libraries` from whatever env vars are in effect at that moment — observed live during verification (`[agda] wrote …/agda/libraries` on server start).  A stale env var means the server silently typechecks a *different branch's* tree while reporting success, and the one-worktree-per-branch workflow in `ualib/agda-algebras` (see `agda-mcp/examples/agda-algebras.mcp.json`) makes staleness easy to reach.
-+  Open question carried from the field report, not reproduced during verification: an untracked `agda/` directory (`defaults`, `libraries`) appeared in the *agda-algebras* worktree root; the reporter could not tell whether the MCP setup, the Nix `agda` wrapper, or a direct invocation created it (`AGDA_DIR` handling is the natural suspect).
-
-# Proposal
-
-+  Resolve the effective library context from the requested `filePath` by walking up to the nearest `*.agda-lib`, falling back to server-start configuration, and report which was used.
-+  Echo the resolved root, library file, and full flags in every response.
-+  Fail loudly when the requested file lies outside every configured root, rather than succeeding against the wrong tree — a wrong answer, not an error, is the worst outcome for an agent (§ 3.6).
-+  Reproduce or rule out the stray `agda/` directory; document exactly what the server (including the shellHook it triggers) writes where, and keep generated state out of project trees or make it explicitly gitignorable.
-
-# Acceptance
-
-+  Pointing the client at a file in a different worktree either works against that worktree or errors naming the mismatch; every response names the tree it checked; no silent success against the wrong tree is possible.
-
----
-
-### [agda-mcp] `--timeout` is parsed but never enforced; no timing or cache reporting (#77, closed)
-
-**Labels:** `bug`, `agda-mcp`
-
-Part of #68 (P1).  Feedback document § 3.7 and § 7.2.4 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Observed on `911ae18`
-
-+  `--timeout N` parses into `agdaTimeout`, which nothing reads — `runAgda` in `agda-mcp/src/AgdaMCP/Agda.hs` carries the `TODO: enforce agdaTimeout` comment from PR #38 review.  The field session's `.mcp.json` passes `--timeout 600` expecting an effect; a hung or interface-rebuilding Agda call simply blocks the tool call indefinitely.  The `FillTimeout` status defined in `AgdaMCP.Types` is unreachable code.
-+  Every call is a cold `agda` subprocess (as the README's architecture notes state), and no response reports elapsed time or interface-cache state, so a client cannot learn whether the MCP call is ever cheaper than its own `agda <file>` — and § 3.7 is right that "an unadvertised advantage does not influence a decision".
-
-# Proposal
-
-+  Enforce `agdaTimeout` around the subprocess (`System.Timeout.timeout` plus killing the process group), surface it as `FillTimeout` for `fill_hole` and a timeout diagnostic for the check tools, and test it with a deliberately slow fixture and a tiny timeout.
-+  Report `elapsedMs` on every response, plus a coarse cache signal (e.g. whether Agda's output shows `Checking …` re-elaboration versus interface loading).
-+  Document expected latency — cold subprocess per call, `.agdai` reuse courtesy of Agda itself — in the tool descriptions, alongside #72's contract text.  The warm Agda-as-a-library server stays the long-term answer (README "Future" section) and is out of scope here.
-
-# Acceptance
-
-+  A hanging check returns a timeout result at the configured bound instead of blocking forever, and every response carries `elapsedMs`.
-
----
-
-### [agda-mcp] whole-project check tool: check_project (#78, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68 (P2 — economics and ergonomics).  Feedback document § 3.5 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Context
-
-The field session's acceptance gate was `make check` over a generated `Everything.agda` (~300 modules, 10–20 minutes); the agent ran it four times as backgrounded Bash jobs and had to defend against a real trap — a wrapper ending in `echo` reports shell exit 0 even when `make` failed, so the log had to be grepped for `error:`.  Per § 3.5, this is the call that would replace that agent's Bash usage *entirely*.
-
-# Proposal
-
-+  `check_project(target?, since?)`: run the project's own gate — a configured command, defaulting to something honest like the nearest Makefile check target or `agda` on the project's `Everything` module — stream progress, and return a machine-readable exit status plus the first error with context (structured per #74).
-+  The honest v1 contract is "run the real gate and never misreport its exit code"; `since`-based narrowing to changed files is optional follow-on scope.
-+  Respect and report the timeout story from #77, since project checks are exactly where long runs live.
-
-# Acceptance
-
-+  On a project whose gate fails mid-run, the response carries the failing module, the structured first error, and a non-success verdict; on success, the verdict names the command it ran and its elapsed time.
-
----
-
-### [agda-mcp] stable hole handles: address holes by position or id + return updated hole list (#79, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68 (P2 — economics and ergonomics); depends on #71, which must land first for the hole list to be correct at all.  Feedback document § 3.8 ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md)).
-
-# Context
-
-`get_goal` / `fill_hole` take a 0-based index into the source-order hole list.  Indices shift whenever an earlier hole is filled or a new one is added, turning a multi-hole edit into index bookkeeping — precisely the state an agent loses track of between calls (§ 3.8).  Verification showed it is worse than stated today: phantom token matches also occupy indices, so in one fixture the header comment's `{!!}` is hole 0 and the real hole is hole 1 (#71), meaning "the first hole" addresses a comment.
-
-# Proposal
-
-+  Accept `(line, column)` — in literate-file coordinates per #73 — or a stable hole id as an alternative to `holeIndex` in `get_goal` and `fill_hole`.
-+  Return the full updated hole list (id, position, and a one-line goal where cheap) from every `fill_hole` and `check_file` response, so the client re-anchors without a second call.
-+  Keep `holeIndex` accepted for backward compatibility, documented as source-order and shift-prone.
-
-# Acceptance
-
-+  A two-hole file remains addressable by position after the first hole is filled, with no index bookkeeping in the client, and every `fill_hole` response carries the re-anchored hole list.
-
----
-
-### [agda-strux] extract, document + publish agda-algebras corpus (#84, closed)
-
-**Labels:** `retrieval`
-
-# Context
-
-The corpus-backed search tools (M1-3) currently run against a small test fixture; the retrieval milestone needs a real corpus, and `ualib/agda-algebras` is the natural first library — large, coherent, and already the source of the M1-5 benchmark fixtures.
-
-# Work
-
-+  Run the full extract → transform pipeline (agda-strux → strux-driver) over all of `ualib/agda-algebras` under the pinned toolchain; record extraction coverage and any per-module failures.
-+  Compute and publish summary statistics: definitions by kind, module count, type/term sizes, and dependency-graph shape.
-+  Package the JSONL corpus with a dataset card — schema version, provenance (library commit and toolchain pins), license, statistics, and intended uses — attached to a GitHub release; optionally mirror to Hugging Face for discoverability.
-+  Wire the corpus into `agda-mcp --corpus` and add a smoke test asserting the three search tools answer real queries against it (e.g. `search_by_type "Algebra"`, `get_dependencies` on a known homomorphism lemma).
-
-# Relations
-
-+  Feeds #16 (M2-2 corpus index and graph) and #17 (M2-3 retrieval tools); complements #75 — live queries answer against the current tree, while the corpus answers at library scale without a checkout.
-+  A companion docs issue in `ualib/agda-algebras` will link the release from the library's side.
-
----
-
-### Tech report: field-testing an MCP server for Agda with a frontier agent (#86, closed)
-
-**Labels:** `agda-mcp`, `research`
-
-# Context
-
-The field-test arc is fully documented in primary sources — the imported feedback document with its verification addendum, the #68 issue tree, and the fix PRs — but there is no single narrative a reader can follow end to end.
-
-# Work
-
-+  Write a tech report under `docs/reports/` covering the arc: the zero-adoption field test, the verify-before-filing addendum (what reproduced, what was refuted, and the new defects verification itself uncovered), the P0 fixes, and the measured re-run (#83) with its numbers.
-+  Be honest about scope: state what remains open (the P1/P2 sub-issues of #68) and what the adoption numbers do and do not show.
-+  Keep the report self-contained with permalinks to the primary sources, so it is citable independently of repository history; a cross-post to an external blog is expected but out of scope for this issue.
-
-# Relations
-
-+  Sources: [`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/main/docs/feedback/flrp-agda-mcp-improvements.md) (§ 0 and § 7), #68–#79, PR #81, and the #83 results.
-+  Blocked on #83 for the measurement section only; the rest can be drafted now.
-
----
-
-### Adopt the github-project plan-file model; retire the vendored roadmap tooling (#92, closed)
-
-**Labels:** `docs`, `infrastructure`, `cleanup`
-
-# Context
-
-This repository was the first to pair a roadmap file with Python scripts that populate GitHub issues: `docs/roadmap.md` plus `scripts/python/gh_project_populate.py`.  That tooling has since been refined into the [williamdemeo/github-project](https://github.com/williamdemeo/github-project) template — a two-direction engine (`populate` pushes file → GitHub once at bootstrap; `update` pulls GitHub → file for the life of the project; `lint` validates offline) over a standard plan file, `docs/GITHUB_PROJECT.md`, whose issue listings live between `BEGIN/END GENERATED` markers.  The copy here is the unrefined ancestor: one direction only, a parser tied to the old roadmap format, and referenced by nothing in the Makefile or CI — its bootstrap job was done long ago.  Meanwhile `docs/roadmap.md` has drifted well behind GitHub: it predates every issue filed since bootstrap (including the entire #68 agda-mcp hardening wave) and its issue listings no longer reflect state.
-
-# Plan
-
-+  Add `docs/GITHUB_PROJECT.md` in the github-project format: hand-written summary, milestones M0–M4 with descriptions and exit criteria, and one generated region per milestone, filled by running the upstream engine's `update` against live GitHub state.  The `[MN-k]` prefixes on the original issues make this work with no changes on GitHub — the engine falls back to the title prefix, and this repository's milestone titles already follow the `N. Title` convention it parses.
-+  Issues filed organically since bootstrap (no `[MN-k]` prefix: the #68 wave, #43, #54/#55, #66/#67, and successors) cannot be rendered into generated regions by the current engine, so the plan file carries a hand-authored section pointing at them; an upstream feature request in williamdemeo/github-project will propose an adoption path for such issues.
-+  Wire thin Makefile targets (`project-lint`, `project-update`, `project-update-check`) that call the engine from a `GHPROJECT_DIR` checkout of github-project; migrating to a Nix flake input once github-project exposes the engine as a flake package is follow-up work upstream.
-+  Delete `scripts/python/gh_project_populate.py` and update `scripts/README.md`; the engine lives upstream now, and keeping a stale copy here is exactly the drift this issue exists to end.
-+  Freeze `docs/roadmap.md` as the historical bootstrap plan with a banner pointing at the new file, and repoint the live-status cross-references (README, CONTRIBUTING, the issue template, `docs/architecture.md`, `agda-mcp/README.md`).
-
-# Acceptance
-
-+  `make project-lint` passes offline, and `make project-update-check` (with a github-project checkout) reports the plan file current against live GitHub state.
-+  No roadmap-engine code remains in this repository, and `docs/GITHUB_PROJECT.md` reflects live issue state for M0–M4 while linking the field-driven work that lives outside the milestone plan.
-
----
-
-### [infra] flake shellHook: unguarded variable reads put cwd on LD_LIBRARY_PATH, and an exported SHELLOPTS=nounset aborts every shell (#96)
-
-**Labels:** `bug`, `infrastructure`, `reproducibility`
-
-# Context
-
-Found while landing #72 / #76 (PR #95); a Copilot review of that PR raised the `set -u` half of it, and testing the claim turned up a larger, unconditional defect underneath.  PR #95 guarded the one variable it introduced (`AGDA_NATIVE_AIR_ROOT`) and deliberately went no further, since auditing every shell is separate work.  This issue is that work.
-
-The flake's shell snippets read several environment variables without a default expansion.  That has two distinct consequences, and the first one bites in ordinary use, not only under unusual shell options.
-
-# 1.  Every shell puts the current directory on the dynamic-linker search path
-
-`exportLibPath` (flake.nix:390) is used by *every* devShell — `default`, `backend`, `proofParser`, `mlPipeline`, `all`, and both `gpu` variants:
-
-```nix
-# Prepend Nix-provided runtime libs; keep existing LD_LIBRARY_PATH only if it exists.
-exportLibPath = ''
-    export LD_LIBRARY_PATH="${wheelRuntimeLibPath}:$LD_LIBRARY_PATH"
-'';
-```
-
-The comment states the intent exactly; the code does not implement it.  `$LD_LIBRARY_PATH` is read unconditionally, so when it is unset — the common case on a clean login shell — the result ends in a trailing colon:
-
-```
-$ env -u LD_LIBRARY_PATH nix develop .#backend --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'
-…/p8hw2h465g0byxwpamnk6gv6mp5gnqn2-openssl-3.0.14/lib:
-```
-
-An empty entry in `LD_LIBRARY_PATH` is the current directory as far as glibc's loader is concerned, so every such shell silently searches the directory it was launched from for shared objects.  That is a reproducibility hazard on its own — a shell's linking behaviour should not depend on where it was entered — and it is worth fixing independently of anything below.
-
-# 2.  An inherited `set -u` aborts the shell before it starts
-
-This one is narrower than § 1 and worth calibrating before spending time on it.  A parent script's own `set -u` does *not* reach the shell `nix develop` runs — bash does not export `SHELLOPTS` by default, so `scripts/run-server.sh`'s `set -euo pipefail` is harmless here (checked: a child bash under such a parent reports options `hBc`, no `u`).  It bites only when a caller *exports* `SHELLOPTS` with `nounset` in it, which some CI harnesses do.  When that happens it kills the hook on the same line as § 1:
-
-```
-$ env SHELLOPTS=nounset nix develop .#backend --command bash -c 'echo "$AGDA_DIR"'
-/tmp/nix-shell.XXXXXX/nix-shell.H5XHIB: line 2119: LD_LIBRARY_PATH: unbound variable
-```
-
-Nothing after that point runs, so no amount of guarding further down helps until this line is fixed.
-
-# 3.  `backend` reports a variable it never sets
-
-Its banner echoes `WHEEL_LD_LIBRARY_PATH` (flake.nix:528), but `exportWheelRuntimeLibs` — the only thing that sets it — is used by `default`, `mlPipeline`, and `all`, never by `backend`.  The line therefore always prints empty there, and is a third unguarded read under `set -u`.
-
-# Inventory
-
-+  `exportLibPath` (flake.nix:390-392) reads `$LD_LIBRARY_PATH`; used by every shell, and the cause of both § 1 and § 2.
-+  Banner lines read `$LD_LIBRARY_PATH`, `$WHEEL_LD_LIBRARY_PATH`, and `$JAVA_HOME` at flake.nix:436-438 (`default`), 527-528 (`backend`), 556 (`proofParser`), and 629-630 (`all`).
-+  `mkAgdaShellSetup` reads the optional external-library roots unguarded — `$AGDA_ALGEBRAS_ROOT`, `$AGDA_CATEGORIES_ROOT`, `$AGDA_TYPETOPOLOGY_ROOT` at flake.nix:279-281 and again in the summary at flake.nix:306-321.  These are optional by design, so they are the most likely of all to be unset.
-+  `$AGDA_NATIVE_AIR_ROOT` in `mkAgdaShellSetup` is already guarded (PR #95); it is listed here only so the audit is complete.
-
-# Proposal
-
-+  Give every optional read a default expansion (`"${VAR:-}"`), which for `exportLibPath` also makes the code do what its comment already promises.
-+  Build `LD_LIBRARY_PATH` so that no empty entry is ever produced — append the inherited value only when it is non-empty, rather than always interpolating it.
-+  Either set `WHEEL_LD_LIBRARY_PATH` in `backend` or drop it from that shell's banner, so the report matches the shell.
-+  Consider adding a smoke check that enters each shell with `SHELLOPTS=nounset` and with the relevant variables unset, so a future unguarded read is caught rather than rediscovered.
-
-# Acceptance
-
-+  `env -u LD_LIBRARY_PATH nix develop .#<shell> --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'` prints no trailing colon and no empty entry, for every shell.
-+  `env SHELLOPTS=nounset nix develop .#<shell> --command true` succeeds for every shell, with the external-library roots unset.
-+  The `backend` banner does not report a variable that shell does not set.
-
-# Relations
-
-+  #76 (closed by PR #95) is where this surfaced; that PR fixed the stray-`agda/` half of the environment problem and guarded only its own new variable.
-+  #54 and #55 (Agda-Nix Phases 3 and 4) concern *which* libraries the shells provision and how they are pinned; this is about the shell snippets' own hygiene, so it is deliberately filed separately rather than folded into either.
-
----
-
-### [agda-mcp] get_goal reports a module name read from literate prose (moduleNameOf does not mask non-code) (#100, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68.  Found while working #79 (PR #99) and deliberately left out of that PR, which is scoped to hole addressing.
-
-# The defect
-
-`get_goal` reports the wrong module for a literate file whose prose mentions a module header.  `AgdaMCP.Tools.ProofState.moduleNameOf` scans the **raw** source, while its neighbours `ensureDebugImport` / `moduleHeaderSpan` scan the source with its non-code regions masked (`AgdaMCP.Holes.maskNonCode`).  So prose that looks like Agda is invisible to the injection logic — which is what #73 fixed — but still visible to the name parser.
-
-Reproduced against the current server, driving the real JSON-RPC transport:
-
-```
-$ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_goal",
-  "arguments":{"filePath":"agda-mcp/test/resources/LiterateMd.lagda.md","line":22,"column":5}}}' \
-  | agda-mcp --agda-flags "…" | …
-goal = Nat | module = 'Example'
-```
-
-The fixture declares `module LiterateMd where` inside its one code fence; `Example` comes from a prose line above it:
-
-```markdown
-module Example where — this prose line must not be mistaken for the
-module header when get_goal injects its debug import.
-```
-
-That line exists precisely because #73 pinned that `ensureDebugImport` must not be fooled by it.  It is: the import lands correctly and the goal is right.  Only `giModule` is wrong.
-
-# Scope
-
-+  Any literate flavour whose prose contains a line beginning with `module` — `agda-algebras` is entirely literate and its prose discusses module structure constantly, so this is a live case, not a fixture curiosity.
-+  Plain `.agda` too, in one narrower way: `moduleNameOf` strips `--` line comments but not `{- … -}` block comments, so a commented-out `module M where` inside a block comment is picked up.
-+  Only `get_goal`'s `module` field is affected.  The goal, the context, hole addressing, and the diagnostics are all correct — `moduleNameOf` feeds nothing else.
-
-# Fix
-
-Give `moduleNameOf` the flavour and scan the masked source, exactly as `ensureDebugImport` already does:
-
-```haskell
-moduleNameOf :: LiterateFlavour -> Text -> Maybe Text
-moduleNameOf flav src = ... (T.lines (maskNonCode flav src)) ...
-```
-
-Masking preserves every character position and the line structure, so the header is found in the same place; only the prose disappears.  The block-comment case wants the scan to skip `{- … -}` as well, which the masked text does not do on its own.
-
-# Acceptance
-
-+  `get_goal` on `agda-mcp/test/resources/LiterateMd.lagda.md` reports `module: "LiterateMd"`.
-+  A regression test asserts the declared module name for each literate fixture and for a plain `.agda` whose block comment contains a `module … where` line.
-
----
-
-### [agda-mcp] relative filePath resolves against server's cwd; missing file crashes to Internal error (#101, closed)
-
-**Labels:** `bug`, `agda-mcp`
-
-# Observed on `7c07340`, while setting up the #83 field test
-
-With the server configured exactly as `agda-mcp/examples/agda-algebras.mcp.json` prescribes (client project: a `ualib/agda-algebras` worktree; server spawned via `scripts/run-server.sh`, which by design cds to the agda-native-air root before exec), a `check_file` call with the path form an agent in that project would naturally use fails ungracefully:
-
-```
-tools/call check_file {"filePath": "src/Overture/Basic.lagda.md"}
-→ {"error":{"code":-32603,"message":"Internal error"},"id":2,...}
-stderr: agda-mcp: uncaught exception handling tools/call:
-        /home/…/agda-native-air/main/src/Overture/Basic.lagda.md: openFile: does not exist
-```
-
-Two distinct defects:
-
-+  **Relative `filePath` resolves against the server's cwd, not the client's project.**  `makeAbsolute` in the handlers uses the process cwd, which `run-server.sh` deliberately pins to the agda-native-air checkout (issue #76's stray-directory fix), so every relative path from a client in another project silently points into the wrong tree.  The tool descriptions say "absolute or relative to cwd" without saying whose cwd, and for any external client the honest answer ("the server repo's root") is never what the caller wants.  The same call with an absolute path succeeds, with the full #72 verdict echo.
-+  **A nonexistent file is an uncaught `IOException`, not a structured error.**  `BS.readFile` / `TIO.readFile` throw before any handler logic runs, so the client gets the generic `-32603 Internal error` with no mention of the path, while the actual explanation lands only in server stderr the client cannot see.  #76 made wrong-root checks fail loudly with a named mismatch; a missing file deserves the same treatment, not a crash path.
-
-# Why it matters
-
-The #83 field test runs a fresh agent against exactly this configuration.  An agent whose first relative-path call returns an opaque "Internal error" has every reason to fall back to the shell — the § 2.5 conservative move — and the failure teaches it nothing, since the message names neither the resolved path nor the rule.  (The #83 run proceeds against `7c07340` as is; if the subject trips on this, that is a measured datum, and this issue is the fix that follows.)
-
-# Proposal
-
-+  Resolve a relative `filePath` against the resolved project root (the #76 machinery: nearest `*.agda-lib` walk from the client-supplied root, `AGDA_*_ROOT` env, fall back to server cwd last), or alternatively reject relative paths with a structured error that names the server cwd and tells the caller to pass an absolute path.  Either is honest; silent wrong-tree resolution is not.
-+  Catch `IOException` at the top of every file-taking handler and return a structured failure naming the path as resolved, the same way the wrong-root refusal does.
-+  Fix the tool descriptions' "absolute or relative to cwd" to state the actual rule.
-+  Regression tests: a relative path from a mismatched cwd, and a nonexistent absolute path, each asserting a structured, path-naming error rather than `-32603`.
-
-# Acceptance
-
-+  From a client in a foreign project, `check_file` with a relative path either checks the intended file or returns a structured error naming the resolved path and the rule; a missing file never surfaces as `Internal error`.
-
----
-
-### [agda-mcp] support fls as a client project (#103, closed)
-
-**Labels:** 
-
-## Motivation
-
-Project-root `.mcp.json` files are now managed per project (claude-tooling), and agda-algebras sessions drive agda-mcp daily. fls (IntersectMBO/formal-ledger-specifications) sessions have nothing — verified 2026-08-16: no `.mcp.json` anywhere in the fls tree, its git history, or archived config; fls never had a registration. William wants fls sessions to have agda-mcp.
-
-## Why the agda-algebras registration does not transfer
-
-The aa registration anchors *checking* to this repo's toolchain: `scripts/run-server.sh` cd's here and enters the backend shell (deliberately, #76), so the agda doing the checking is this repo's agda, with agda-algebras registered through the `AGDA_ALGEBRAS_ROOT` anchor. fls pins its own toolchain — agda and libraries (agda-sets, agda-stdlib-classes, agda-stdlib-meta, standard-library) via its flake (`input-output-hk/agda.nix`, `agdaWithPackages`). Checking IOG-pinned fls under this repo's agda risks version skew, which for fls is a correctness hazard.
-
-## The enabling fact: most machinery already exists
-
-`agda-mcp` already accepts `--agda-bin PATH` (app/Main.hs), so the server can check fls with **fls's own agda** while this repo's shell hosts only the server runtime. `--check-command` (the #78 project gate) can carry fls's own gate, and `--timeout` handles fls's slow modules.
-
-## Open questions (the actual work)
-
-1. **A stable path to fls's agda.** Candidates: realise a local `nix develop --profile <gc-root> path:<fls>` (the PR-1255 mechanics used for web provisioning — verify agda actually lands in the profile's `bin/`); or resolve the store path once via `nix develop --command which agda` (breaks silently on flake update); or a tiny exec wrapper that runs agda through `nix develop --command` (cost depends on whether agda-mcp holds one persistent agda process or spawns per request — determine which).
-2. **Interaction-protocol compatibility.** Does fls's pinned agda version speak the interaction protocol agda-mcp drives? Field-test over the real JSON-RPC stdio transport (the `driving-agda-mcp` skill): `check_file` / `get_diagnostics` / `get_goal` against a real fls module.
-3. **Flags.** `agdaWithPackages` may bake the library set into the wrapped agda, so `--agda-flags` could be minimal or empty — measure, don't assume.
-4. **Checkout hygiene.** No writes into the fls checkout beyond normal agda artifacts — the #76 pollution class is already guarded in `run-server.sh`; re-verify from an fls cwd, since fls is an IOG repo where a dirty checkout is not acceptable.
-
-## Deliverable
-
-A **tested** registration JSON (server command + args) proven against a real fls module. The deployment half then lives in claude-tooling and is deliberately trivial: one file (`projects/fls/mcp.json`) plus `make install PROJECT=fls`, gated on William.
-
-🤖 AI-assisted development: Claude Fable 5 (Anthropic)
-
----
-
-### [agda-mcp] Ask Agda rather than re-derive: audit every answer the server computes from source text (#106, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68.  Raised while reviewing the fix for #100, whose defect was of a kind that should not be able to arise in this repository.
-
-# The principle
-
-`agda-mcp` exists so that an agent leans on Agda instead of guessing.  The server should hold itself to the same rule: when Agda can answer a question, ask Agda; a local derivation from source text is a pre-flight approximation and a fallback, never the authority.
-
-#100 is the worked example.  `get_goal` reported the module name by scanning the file, so a literate file whose *prose* opened a line with `module` was reported under the prose's name.  The scan was then fixed — and the deeper point survived the fix: Agda had already answered the question, in output the same call had already captured.
-
-```
-get_goal stdout: Checking LiterateMd (/…/test/resources/LiterateMd.lagda.md).
-```
-
-Measured on four shapes, Agda's answer is not merely equal to the scan's — it is better, and it is differently *meaningful*:
-
-| file | Agda says | the scan says |
-| --- | --- | --- |
-| `LiterateMd.lagda.md` | `LiterateMd` | `LiterateMd` |
-| `Proofs/Use.agda` | `Proofs.Use` | `Proofs.Use` |
-| header `module _ where` | `AnonModule` | `_` — the source does not carry the name |
-| header ≠ file name | *silent* (it errors first) | `NotMismatch` — the claim is all there is |
-
-Two lessons that generalize past this field.  First, Agda's answer is "what this module *is*"; a scan's answer is "what the header *claims*", and where they differ the difference is the diagnosis.  Second, Agda declines to answer exactly when the file is broken, which is when an agent most needs to be told something.  (With one correction, from Copilot's review of PR #105: in `get_goal` those broken cases end the call as a *failure*, which carries no `module` field, so the fallback keeps a successful answer complete rather than serving as a diagnosis channel.  The diagnosis for a mismatched header is already in the failure's text, which is Agda's own message.  A timeout, meanwhile, does not lose Agda's answer at all — measured, a run killed at 1055 ms had already printed its `Checking` line.)
-
-The rule this suggests, which PR #105 now follows for `get_goal`'s `module` field: `answer = whatAgdaSaid <|> whatWeDerived`, where a change in Agda's output degrades the field to the derived value and never to a wrong value.  That is #72's rule for Agda's prose ("the diagnostics text never gets a vote") applied to an informational field rather than to a verdict.
-
-# The audit this issue asks for
-
-Every answer `agda-mcp` computes from source text, with a verdict on each: delegated today, delegable via #75, or no interface exists (and why).
-
-+  **The hole model** (`AgdaMCP.Holes`) — the largest instance by far.  We port Agda 2.8.0's literate preprocessor and a model of its lexer to answer "where are the holes?", kept honest only by parity tests against batch Agda.  Agda's interaction protocol returns interaction points as data; that is #75, and it should be stated there that the parity tests are a stopgap for exactly this reason.
-+  **The reporting-macro injection** (`ensureDebugImport` + `reportGoalCtx`) — we edit the user's file to make Agda print a goal, because batch mode has no way to ask.  `Cmd_goal_type_context` over `--interaction-json` asks directly, so the whole inject-patch-restore dance is an artifact of the transport, not a requirement.  Also #75.
-+  **The module name** (`moduleNameOf`) — delegated in PR #105; the scan remains for the pre-Agda injection (there is no Agda to ask yet) and as the fallback.
-+  **Structured diagnostics** (`AgdaMCP.Diagnostics`, #74) — we parse Agda's human-readable error prose into codes, ranges, and `involved` payloads.  `--interaction-json` emits structured information for the same errors.  Worth measuring how much of #74's parser the JSON protocol would retire.
-+  **Project resolution** (`AgdaMCP.Project`) — we find the nearest `*.agda-lib`, parse the libraries file, and compute include paths ourselves.  `agda --help` offers no query for "what libraries and include paths apply to this file", so this one likely stays; the audit should say so explicitly rather than leave it looking like an oversight.
-+  **The `checkedFromSource` signal** (#77) — derived from the same progress lines, and it has a hole this investigation turned up: `--trace-imports=0` silences `Checking …` altogether (measured: level 1 and up print it, 0 prints nothing).  Measured on both branches of the signal: a *clean* cold `check_file` under that flag reports `checkedFromSource: true` without it and `false` with it, so a cold run does read as warm; a *failing* run under it reports the field as absent (unknown) rather than as a false warm, because the exit code is non-zero.  `agdaModuleNameOf` degrades correctly in both cases (it falls back to the declared name).  Worth deciding whether the clean-run misreading is acceptable or worth detecting.
-+  **The project gate** (`AgdaMCP.Gate`) — Makefile parsing, not Agda's business.  Out of scope; listed so the audit is complete.
-
-# Acceptance
-
-+  A short document (or README section) listing each derived answer with its verdict and the issue that would delegate it.
-+  The rule written down where a new tool's author will read it, so "can Agda answer this?" is a question asked before a scanner is written, not after one misfires.
-+  #75's description updated to say that it retires the hole scanner and the macro injection, not just that it adds live queries.
-
-# Non-goals
-
-+  Rewriting anything here.  The delegations that matter depend on #75's transport work; this issue is the inventory and the rule.
-
----
-
-### [agda-mcp] re-source get_goal and hole goal types through the interaction lane (#108, closed)
-
-**Labels:** 
-
-Part of #68 (P0/P1 follow-on) and squarely a #106 case: two places where the server still derives what Agda already announces, now that #75's interaction lane (PR #107) gives it a structured way to ask.
-
-# Context
-
-PR #107 shipped the interaction lane for the five read-only query tools and deliberately left the batch tools untouched.  Its Phase-3 stretch — re-sourcing `get_goal` and enriching `get_diagnostics` — was cut because it changes contracts the #68 wave litigated carefully, not because the groundwork is missing.  The groundwork findings, so they are not re-derived:
-
-+  `Cmd_goal_type_context Normalised <goalId> noRange ""` answers `GoalSpecific.goalInfo` with the goal's `type` and its context as data — `entries: [{originalName, reifiedName, binding, inScope}]` — with **no source mutation at all** (probed; transcript in `docs/agda-mcp-interaction-lane.md` § 2.5).  That is `get_goal`'s payload without the `reportGoalCtx` injection, the in-place patch, or the restore machinery.
-+  `Cmd_load`'s `AllGoalsWarnings` carries every visible goal's printed type alongside its interaction point (`AgdaMCP.Interaction.goalsOf` already parses it) — which is `get_diagnostics`' hole listing with real goal types, for free on the load the lane already makes.
-+  The lane's interaction points and `Holes.findHoles` agree on count and order across the fixture matrix (the tier-3 parity test pins this), so `holeIndex ↔ interaction-point id` and `(line, col) ↔ point range` are both sound translations.
-
-# Proposal
-
-+  `get_goal`: answer from the lane when the file loads there — `ensureLoaded`, map the `HoleRef` to a point (`ByIndex` is the id by parity; `ByPosition` via `pointContaining`), one `Cmd_goal_type_context` — and keep the injection path as the fallback for files the lane cannot serve.  No patch, no restore, no `AgdaDojang.Debug` import requirement on the happy path.
-+  `get_diagnostics` (and `check_file`'s hole list): fill each hole's `goal` from `AllGoalsWarnings` when a lane load is available.
-
-# What makes this its own review, not part of #107
-
-+  **The verdict contract.**  `get_goal`'s response carries `verdict`/`command`/`project` from the batch run it makes, and its description explains the deliberately non-zero exit code.  A lane-sourced answer has no batch run and no exit code, so the echo and the description both change shape — the field #72 defined most carefully, so the change should be reviewed as a contract change, not smuggled in.
-+  **The context-entry shape.**  The macro's `CtxEntry` carries `visibility` and a de Bruijn `index`; `goalInfo.entries` carries `binding`, `inScope`, `originalName`/`reifiedName`.  Neither subsumes the other, and clients may key on the current fields.
-+  **Cost coupling.**  A batch tool that consults the lane pays a lane load on cold calls; whether `get_diagnostics` should ever spawn a process it otherwise would not is a policy question (the two-lane boundary is about verdicts, but the *cost model* in the tool descriptions is part of the contract too).
-
-# Acceptance
-
-+  `get_goal` on the existing fixture matrix answers the same goals and contexts through the lane as through the injection path (a parity test in the same spirit as tier 3's), with the injection path still exercised as the fallback.
-+  `get_diagnostics` hole entries carry the goal types `AllGoalsWarnings` printed, on files that load.
-+  The tool descriptions and `docs/agda-mcp-improvements-summary.md` say what changed, per the #72 standard.
-
----
-
-### [agda-dojang] retire the legacy Python bridge tooling (agent_bridge, report_parser, dojang_try) (#109, closed)
-
-**Labels:** 
-
-Follow-up from the #75 / PR #107 architecture discussion.  agda-dojang's Python *bridge* tooling — the deterministic "report → policy → patch → check" loop built for #23 v0 — has been fully superseded on the agent-facing side: `agda-mcp` is its Haskell port (`AgdaMCP.Agda`'s header says so file by file), carries the same marker protocol with the #68 wave's hardening on top (truthful verdicts, the real hole model, literate awareness, structured diagnostics, timeouts, path/root refusals), and since PR #107 also answers the scope/type/definition questions the Python loop never could.  No agent workflow should route through the Python bridge again, and keeping two implementations of the loop invites exactly the drift the wave existed to remove.
-
-# What retires
-
-+  `python/tools/agent_bridge.py` — the loop itself (ported as `agda-mcp`'s `get_goal`/`fill_hole` machinery).
-+  `python/tools/report_parser.py` — the `AGDADOJANG_REQ_BEGIN/END` marker parser (ported as `AgdaMCP.Agda.parseGoalContext`).
-+  `python/tools/dojang_try.py` — the CLI front for the same loop.
-+  Their tests (`test_agent_bridge.py`, `test_report_parser.py`) and the `demo-agent-bridge` Makefile target.
-
-# What stays, explicitly out of scope
-
-+  `python/tools/eval_fixtures.py` — the proof-completion evaluation harness (`make eval-proof-completion-smoke` and the M1-5 loop).  Not bridge tooling; it is the measurement apparatus.
-+  `python/tools/policy_contract.py` — the policy-request contract spec, which `AgdaMCP.Types` documents 1-to-1 correspondence with and the harness builds requests from.
-+  `python/tools/search.py`, `prompt_baseline.py`, `policy_fixture.py`, `dojang_extract.py`, and `python/utils/` — not bridge tooling; audit separately if ever.
-+  Everything Agda-side (`AgdaDojang.Debug`, the macros, the fixtures) — unrelated to this retirement; see the #75 discussion for why the dojang library itself is not shrinking.
-
-# The one entanglement to resolve
-
-The eval harness imports the bridge: `eval_fixtures.py` takes `extract_policy_request_from_output` from `report_parser` and several run/patch primitives from `agent_bridge`, and `dojang_try.py` uses the parser too.  So this is a disentangling, not a delete.  Two shapes, in increasing ambition:
-
-+  **A (recommended here): relocate the primitives.**  Move the handful of functions the harness actually uses into the harness module or `python/utils/`, with their tests following the code (the parser's tests are the pure lane's; keep the coverage, re-homed).  The bridge files then delete cleanly, and the harness's behavior is unchanged.
-+  **B (bigger, its own issue if wanted): re-point the harness at `agda-mcp`.**  The evaluator would drive the same JSON-RPC surface agents use — one loop implementation, dogfooded by the benchmark.  Attractive, but it changes what M1-5 measures and couples the eval lane to a server build, so it should not ride a cleanup.
-
-# Touchpoints (nothing fails if one is missed, so listed here)
-
-+  Root `Makefile`: `test-agda-dojang` lists `test_report_parser.py`; `test-agda-dojang-integration` lists `test_agent_bridge.py`; the `demo-agent-bridge` target and its `.PHONY`/help lines.
-+  CI (`.github/workflows/ci.yml`): the `python-agda-dojang` lane's file list includes `test_report_parser.py`.
-+  `agda-dojang/README.md`: the `dojang_try.py` and `agent_bridge.py` sections, the module-tree listing, and the table of contents.
-+  `agda-mcp/src/AgdaMCP/Agda.hs`: the header's "Haskell port of the essential logic in legacy Python tools" citation should say the originals are retired (the marker-protocol reference to `AgdaDojang/Debug.agda` stays — that is the live contract).
-+  `agda-mcp/README.md` § Architecture Notes: "mirrors how agda-dojang's Python tooling (`agent_bridge.py`) works" — same treatment.
-+  `docs/agda-mcp-improvements-summary.md` and `docs/architecture.md`, wherever the Python bridge is described as current.
-
-# Acceptance
-
-+  The three bridge files and their two test files are gone; `git grep agent_bridge report_parser dojang_try` finds only historical references (commit messages excepted) that are worded as history.
-+  `make eval-proof-completion-smoke`, `make test-agda-dojang`, `make test-agda-dojang-integration`, and the CI `python-agda-dojang` lane all pass after the relocation, with the parser's test coverage preserved wherever its code lands.
-+  `make ci-smoke` is green.
-
----
-
-### [agda-dojang] retire or repoint the last dojang_try callers (search.py, prompt_baseline.py) (#112)
-
-**Labels:** `agda-dojang`, `cleanup`
-
-Follow-up from #109 / PR #111.
-
-Retiring the Python bridge deleted `dojang_try.py`, which was the oracle for the last two Python tools that still shelled out to it.  #109 scoped both out deliberately, so PR #111 left them untouched and said so.  This issue is where they get decided.
-
-Unlike the bridge, neither has a Haskell analog waiting for it.  `AgdaMCP.Agda` is a literal port of `agent_bridge.py` and `report_parser.py`, and its header says so.  Nothing ports these two, so "retire" here has to mean *preserve and carry the lessons forward*, not *delete and forget*.
-
-## Measured state
-
-+  `search.py` does not run, and has not since 2026-03-10.  Commit b49b536 ("rename components of imports for consistency") renamed the oracle field `jang_try` → `dojang_try` on the read side and in `OracleCfg`, but left the flag declared as `--jang-try`.  `main()` therefore raises `AttributeError: 'Namespace' object has no attribute 'dojang_try'` at the `OracleCfg(…)` line on any invocation, with or without the flag, and did so five months before `dojang_try.py` was deleted.  Verified against `main`, with `dojang_try.py` present.
-+  `prompt_baseline.py` did run until PR #111.  Same one-task input, before: `{"ok": true, "rc": 0}`; after: `{"ok": false, "kind": "error", "rc": 2}`.  It exits 0 and writes rows marked `ok: false` rather than failing loudly, so the breakage is silent.
-
-## What actually supersedes them
-
-+  `search.py` implements BFS/beam proof search over the AgdaDojang action space, and **nothing anywhere implements that today**.  `agda-mcp`'s `search_by_name` and `search_by_type` are corpus retrieval over the `agda-strux` corpus, a different job.  What `agda-mcp` does supply is the *oracle* such a search would call: `fill_hole` subsumes `dojang_try --candidate`, and `get_goal` subsumes its report step.  Reviving search is therefore a rewrite against a new substrate, tracked by #113, not a port of this file.
-+  `prompt_baseline.py` turns a tasks JSONL into `(context, goal, completion)` attempt rows.  That job now belongs to `eval_fixtures.py` → `ml-pipeline/etl/src/main/scala/etl/BuildProofCompletionDataset.scala`, which emits `proof_completion.jsonl` on the versioned `proof-completion.v0` schema and runs in `make ci-smoke`.  Its successor is Scala, it already exists, and it needs no port.
-
-## Preserving the search work
-
-`experiments/archive/` already has the right contract for this: *"preserves code that was part of the original development but is not part of the current architecture.  It is kept for research continuity and may be revived in later phases.  Nothing here is maintained or tested in CI."*  So `search.py` moves there rather than being deleted, alongside the FastAPI server and the legacy MLP trainer.
-
-Archiving the file is the cheap half.  The valuable half is writing down what it worked out, because a rewrite should start from the lessons rather than from the code:
-
-+  **Report actions are peeks, not moves.**  `peek_binders` runs `applySolveReport:<lemma>` for post-unification metas and falls back to `applyReport:<lemma>`, so the search can see what applying a lemma *would* leave behind without committing.  The recorded script keeps only real actions (candidates, `apply`, `applyWith`); report actions never enter it.  That separation is the file's best idea and survives any substrate.
-+  **Partial application arithmetic.**  `drop_first_k_visible` says that `applyWith:_+_:[zero]`, having supplied `k` visible arguments, leaves the binders minus the first `k` visible ones.  Small, Agda-specific, and easy to get wrong.
-+  **Two caches, not one, because the oracle is the cost centre.**  `hash_key(imports, goal, action)` memoises *oracle calls* (each one an Agda run); a separate `visited` set on `(imports, goal, script)` dedups *enqueued states*.  Conflating them either re-runs Agda or wrongly prunes.
-+  **Ordering by remaining obligations.**  `score_for_child` sorts on `(terminal?, remaining_visible_binders, total_binders)`, lowest first, so terminal candidates come before lemma applications and cheaper applications before expensive ones.  Crude, but the right shape.
-
-And one defect the rewrite must **not** inherit, recorded here so it is not rediscovered:
-
-+  **The state model is disjunctive where proof obligations are conjunctive.**  `State` carries a single `goal`, and `expand` emits one child *per binder* of an applied lemma; `bfs` then returns success as soon as any single state reaches the `⊤` sentinel.  So applying a lemma with two obligations and discharging either one is reported as a solved proof.  A correct search carries an obligation *set* (or a proof tree with an AND/OR distinction) rather than one goal.  The neighbouring code already flags the same spot as "naïve but simple".
-
-Worth being blunt about what is *not* worth carrying: `propose_terms` and `propose_tactics` are hardcoded to `goal == "Nat"` and offer two candidates and two tactics.  The action space is a stub, and it is exactly the part that retrieval and a learned policy are meant to replace.
-
-## Options
-
-+  **A (recommended).  Archive `search.py`, retire `prompt_baseline.py`, port nothing yet.**  Move `search.py` to `experiments/archive/agda-dojang/` with an entry in that directory's README; delete `prompt_baseline.py` as redundant with the eval → ETL path.  Takes with it the `solve` target, `SEARCH_SCRIPT`, `DOJANG_TRY`, the `### search.py` README section and its TOC entry, and the commented-out `rows` target in `agda-dojang/Makefile`.  The lessons above are already recorded in #113, so the rewrite inherits them.
-+  **B.  As A, plus repoint `prompt_baseline.py`.**  Keep a standalone task-file baseline by driving `agda-mcp`'s `fill_hole`, or the relocated `utils/agda_probe.py`, instead of a deleted CLI.  Worth it only if a baseline decoupled from the fixture corpus is still wanted; otherwise the ETL path already covers it.
-+  **C.  Port `search.py` as-is to Haskell or Scala.**  Not recommended.  A faithful port carries a stub action space and the disjunctive-subgoal defect into a language where both are more expensive to fix.  The rewrite belongs in #113, informed by the lessons above.
-
-## Acceptance
-
-+  `git grep dojang_try` finds nothing outside `experiments/archive/`, or only references worded as history, closing out the part of #109's acceptance criterion 1 that PR #111 deliberately left open.
-+  `experiments/archive/README.md` lists what moved and why, so the search work is findable by someone who does not know it existed.
-+  The transferable lessons above are recorded in #113 before `search.py` leaves the live tree.
-+  `make ci-smoke`, `make test-agda-dojang`, `make test-agda-dojang-integration`, and `make eval-proof-completion-smoke` stay green.
-+  Whatever survives in the live tree has a working entry point, exercised by a test or a Make target, so a second five-month silence is not possible.
-
----
-
-### [agda-mcp] checkedFromSource misreads a muted evidence channel: detect --trace-imports=0 in the argv the server assembles (#114, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68.  Raised by the #106 audit (its Measurement 2); every claim below was probed on 2026-08-20 against the pinned Agda 2.8.0 inside `nix develop .#backend`, and the transcripts land with #106's PR in `docs/agda-mcp-ask-agda-audit.md` § 4.
-
-# The defect
-
-`checkedFromSourceOf` reads a run that completed successfully without a `Checking` line as interface reuse, because a warm `agda` exits 0 printing nothing; silent success is the warm signature.  `--trace-imports=0` silences the `Checking` line outright, so under that flag a genuinely cold check has the warm signature too.  Reproduced through the real server on a clean scratch module, caches scrubbed before each run, as follows:
-
-+  `check_file`, default flags: `{success: true, checkedFromSource: true}`.
-+  `check_file`, flags plus `--trace-imports=0`: `{success: true, checkedFromSource: false}`, though this run re-typechecked the module from source.
-+  `check_file` on a failing module, flags plus `--trace-imports=0`: `success: false` with the field absent, which is the honest degradation (exit non-zero, no evidence either way).
-
-The module name survives the same muting by construction (`giModule = liModule <|> declared-name scan`, issues #100/#108), but nothing covers the boolean.  The interaction lane has the same hole in both of its `RunningInfo`-keyed reads: probed, a cold `Cmd_load` whose per-load argv carries `--trace-imports=0` emits no `RunningInfo` at all, so `lrCheckedFromSource` reports a genuine re-check as `false` (it feeds `get_goal`'s lane-path `checkedFromSource`) and the lane's stored `liModule` stays empty.
-
-# Why detection is complete, measured
-
-+  The flag has exactly one arrival path: the command line the server itself assembles.  `{-# OPTIONS --trace-imports=0 #-}` is rejected with `[OptionError] Unrecognized option`, and an `.agda-lib` whose `flags:` field carries it is rejected identically, so neither the checked file nor its project can smuggle the flag past the server.  Both lanes build their argv from the same `agdaFlags cfg` (plus `projectExtraFlags` and `fileDirIncludeFlags`), so one scan covers both.
-+  The level grammar is closed: the only level-carrying spelling is `--trace-imports=N`; bare `--trace-imports` means level 2; a space-separated `--trace-imports 0` does not parse as a level at all (the `0` becomes a second input file, exit 71).
-+  The effective level is the last occurrence: `--trace-imports=0 --trace-imports=1` prints `Checking`, and the reverse prints nothing.
-+  Level semantics under 2.8.0, for the record: cold, level 1 (the default) and up print `Checking`, level 2 and the bare flag add `Finished`, level 3 adds `Loading` for every interface read; warm, everything below 3 is silent, and level 3 prints `Loading` lines, the only positive warm evidence.
-
-# The options
-
-+  Degrade.  When the assembled argv's effective trace level is 0, `checkedFromSourceOf` answers `Nothing` on its silent-success branch, so the field goes absent exactly as it does when a run dies before producing evidence; the lane's `lrCheckedFromSource` needs the same account (today it is a `Bool`; a reused load is honestly `false`, a load under a muted channel is unknown).  This is the #106 rule with no residue: a channel the server knows it muted cannot support a definite answer.
-+  Restore.  When, and only when, the effective level is 0, append `--trace-imports=1`; last-wins is probed above, and a deliberate level 2 or 3 is never touched.  This keeps the field truthful rather than absent, but `--agda-bin` may name a foreign toolchain (issue #103), and appending a flag an older `agda` does not recognize would break every call, so restoring needs a version gate that degrading does not.
-
-Degrading is the safe minimum and satisfies the rule; restoring is an optional refinement on top for toolchains known to accept the flag.
-
-# Acceptance
-
-+  A clean cold `check_file` whose flags carry an effective `--trace-imports=0` no longer reports `checkedFromSource: false`; the field is absent (or `true` under the restore option).
-+  `get_goal`'s lane path under the same flags does not report `checkedFromSource: false` for a load that re-checked the file.
-+  Tests pin the muted-channel case in both lanes, and the detection follows the measured grammar (last `--trace-imports*` token decides; `=N` carries the level; bare means 2).
-
----
-
-### [agda-mcp] get_diagnostics: fill unsolved-meta names and types from a warm lane's stored load (the § 5 payload prose cannot carry) (#115, closed)
-
-**Labels:** `agda-mcp`
-
-Part of #68.  Raised by the #106 audit (its Measurement 1): the feedback document's § 5 error corpus asks, for the unsolved-meta row, for "each meta with its type and the constraint blocking it", and that is the one row of the corpus where batch prose cannot answer while the interaction protocol carries the answer as data.  Probed on 2026-08-20 against the pinned Agda 2.8.0 inside `nix develop .#backend`; the full transcripts land with #106's PR in `docs/agda-mcp-ask-agda-audit.md` § 3.
-
-# What batch prose carries, and #74 already extracts
-
-A batch run of the `UnsolvedMetas.agda` fixture prints two diagnostics: `[UnsolvedConstraints]` with the constraint list and no position, and `[UnsolvedMetaVariables]` with a list of locations.  `involved.metaTypes` carries exactly those lines.  No meta's type appears anywhere in the prose, so the § 5 ask is only half-delivered today.
-
-# What the protocol carries, measured
-
-`Cmd_load` of the same fixture ends in `AllGoalsWarnings` plus `InteractionPoints` (interaction tolerance; `Status.checked` stays `false`, and the batch verdict is untouched by design), and the `AllGoalsWarnings` carries the missing half as data:
-
-```json
-"invisibleGoals":[
-  {"constraintObj":{"name":"_n_4","range":[{"start":{"col":9,"line":28,"pos":1146},"end":{"col":16,"line":28,"pos":1153}}]},"kind":"OfType","type":"Nat"},
-  {"constraintObj":{"name":"_m_5","range":[{"start":{"col":9,"line":28,"pos":1146},"end":{"col":16,"line":28,"pos":1153}}]},"kind":"OfType","type":"Nat"}],
-"errors":[{"message":"error: [UnsolvedConstraints]\nFailed to solve the following constraints:\n  _n_4 + _m_5 = 3 : Nat (blocked on _n_4)"}]
-```
-
-Each unsolved meta arrives with its name, its type, and a structured range; the blocking constraint arrives beside them.
-
-# The shape
-
-Mirror issue #108's free enrichment exactly: `check_file` and `get_diagnostics` may fill the unsolved-meta diagnostics from a warm lane's stored load — a peek, never a lane call, and never a verdict input; the batch exit code alone stays the verdict, since the lane's tolerance of unsolved metas is precisely why it must never decide one (two-lane policy, `docs/agda-mcp-interaction-lane.md` § 1).  Today the lane's stored load state keeps visible goals only (`goalsOf` reads `visibleGoals`), so the stored state grows the load's `invisibleGoals`; when the lane is cold or stale the response stays byte-identical to today's.  This is `answer = whatAgdaSaid <|> whatWeDerived` applied to the one § 5 payload still derived short.
-
-# Acceptance
-
-+  After live queries have warmed the lane on a file with unsolved metas, `get_diagnostics` on the unchanged file carries each meta's name and type (structured) in or beside the `[UnsolvedMetaVariables]` diagnostic's payload, keeping today's fields otherwise.
-+  A cold or stale lane changes nothing: no batch tool ever spawns, loads, or waits on a lane for this, and the enrichment never alters `success`.
-+  A test pins both the enriched and the unenriched shapes.
-
----
-
-### [proof search] P0: state model and single-step harness (#119, closed)
-
-**Labels:** `eval`, `retrieval`
-
-P0 of the #113 plan, designed here before code.  Scope: choose the host language, define the conjunctive search state and the committed-action proof script, land a single-step harness that proposes k candidates against one M1-5 benchmark obligation with agda-mcp as the oracle, and produce the oracle-time vs proposal-time split that settles the host-language fork.  The search loop itself (BFS/beam, frontier management) is P1 and out of scope.
-
-# Host language: Scala, in strux-driver, driving agda-mcp as a JSON-RPC client
-
-The choice, and the measurement that can overturn it, as follows:
-
-+  **The fork's latency argument is a measurable claim, so P0 measures it rather than arguing.**  In-process Haskell can eliminate only the client-side slice of an oracle call — JSON-RPC framing, serialization, the server's handling around the check — never the batch `agda` subprocess that produces the verdict, which the two-lane policy (`docs/agda-mcp-interaction-lane.md` § 1) requires no matter who calls.  That subprocess costs seconds per call warm (§ 2.7 measured ~2.6 s for a stdlib-importing file; a first probe of `fill_hole` on a benchmark obligation copy answered `elapsedMs: 4291`), against which a stdio round trip should be milliseconds.  The harness therefore reports, per oracle call, `serverElapsedMs` (the subprocess wall time the response itself carries) beside the client-observed round trip; the difference is the only part a Haskell rewrite could remove, and it is the number that settles the fork.  If that overhead is a material fraction of oracle time on real M1-5 obligations, P1 moves to Haskell and this spike is the evidence; if it is noise, the remaining considerations all point at Scala.
-+  **The proposal side lives in Scala.**  `struxdriver.benchmark.EvalBenchmark` owns the M1-5 index and its decoder; the eval JSONL discipline and the ETL that consumes it are Scala; P2's proposers (retrieval over the agda-strux corpus) and the concurrency machinery for P1 (cats-effect, fs2) are established in this subproject.
-+  **A client, not a lib consumer.**  Driving the server over its public tool contract keeps the search decoupled from `AgdaMCP.*` internals, exercises exactly the surface every other agent sees — so search stress doubles as server field-testing — and leaves the server untouched at P0.
-
-# State model: an obligation set, conjunctive by construction
-
-+  **State**.  `SearchState(fileContent, obligations, script)`, where an obligation is one open hole — `(line, col, goal)` as the oracle reports it.  `solved` is defined as emptiness of the whole obligation set; there is no per-goal success anywhere in the model, so the #112 disjunctive defect is unrepresentable rather than merely avoided.
-+  **The set is the oracle's, not ours.**  Every `fill_hole` and `check_file` response carries the re-anchored `holes` list (issue #79); the state's obligation set is always taken from that list.  A candidate that spawns two sub-holes therefore yields a state carrying both, by construction, and client-side hole arithmetic can never drift from Agda's.
-+  **Solved is a batch verdict, not an empty list.**  An empty obligation set makes a state a candidate solution; the claim "solved" is issued only after a final `check_file` on the committed content returns `success: true` — the exit-code-derived verdict — mirroring `eval_fixtures.py`'s `_final_strict_check`.
-+  **The regression test the tracking issue names**.  Pure: a state with two obligations, one discharged, asserts not solved.  Integration: a two-obligation fixture (a pair-shaped goal) filled with a constructor candidate carrying two sub-holes, then one sub-hole discharged; every intermediate `fill_hole` answers `status: "ok"` — which is exactly the trap, since ok means "successful refinement", not "proved" — and the harness must still report the state unsolved until both are discharged and the final gate passes.
-
-# The four #112 lessons, as types and tests
-
-+  **Peeks are not moves.**  `Probe` and `Move` are distinct types, and the proof script has type `Vector[Move]`, so a probe cannot enter the script by type.  The substrate agrees: `fill_hole` restores the file after judging, so every call is a peek, and a move is the client committing the candidate to its working copy and re-anchoring from the response's holes.  Test: probing k candidates leaves the script unchanged; committing appends exactly the one committed action.
-+  **Partial application arithmetic.**  `remainingAfterApply(binders, k)` drops the first k visible binders and keeps hidden ones (search.py's `drop_first_k_visible`), and the candidate constructor emits one `{!!}` per remaining visible binder.  Pure functions with tests, including that hidden binders are neither consumed by visible arguments nor granted holes.
-+  **Two caches with two key types.**  `OracleKey` (file fingerprint, hole address, candidate) memoises oracle probes; `StateKey` (committed content and script) is the P1 frontier dedup.  Both key types are defined now as distinct newtypes so P1 cannot conflate them; the oracle memo is implemented and tested at P0 — the same candidate probed twice costs one oracle call.
-+  **Order by remaining obligations.**  Probe outcomes rank by `(closes?, remaining obligations, ...)` ascending, and the harness reports candidates in that order.  Test: a closing candidate ranks before a one-subgoal application, before a two-subgoal one, before a type error.
-
-# The single-step harness
-
-`struxdriver.search` (new package): given one obligation from `data/benchmarks/benchmark-index.jsonl`, propose k candidates from a fixed stub action space, probe each against agda-mcp, and report which close it.
-
-+  **Oracle**.  The harness spawns the agda-mcp binary over stdio with the committed `.mcp.json` flags, initializes, and calls `check_file` (baseline: exactly one obligation), `get_goal` (what the proposer sees), and `fill_hole` per candidate — the same newline-delimited JSON-RPC, double-encoded `content[0].text`, and `isError` handling every MCP client gets.
-+  **Working copies.**  Each fixture is copied to `data/benchmarks/reports/proof-search/<runId>/work/<fixtureId>/` (the reports directory is already gitignored), so a crash can never leave a committed fixture dirtied; the module keeps its stem name, and the server's file-dir include flag makes it resolve (verified by the probe above).
-+  **Stub action space.**  A fixed list: closers (`refl`, `tt`), application candidates built by the partial-application constructor from a small fixed binder table (`sym {!!}`, `cong suc {!!}`), and deliberate misfits — chosen to exercise every `fill_hole` status and the multi-obligation path, not to maximize solves.  The split is the deliverable, not the solve rate; P2 replaces this space with retrieval.
-+  **Output.**  Per-candidate rows in the existing `eval-proof-completion.v0` attempt shape (`fixtureId`, `module`, `fixturePath`, `holeIndex`, `holeLine`, `holeCol`, `candidateRank`, `candidate`, `status`, `elapsedMs`, `rc`, `logPath`) written to `results.jsonl`, so results sit beside the policy-backend baseline; `status` uses `fill_hole`'s own vocabulary (`ok`/`type_error`/`timeout`/`crash`), and `rc` comes from the response's `verdict.exitCode`.  The timing split rides a sibling `timing.jsonl` (`proof-search-timing.v0`: per-call `phase`, `proposalMs`, `clientMs`, `serverElapsedMs`, `overheadMs`, `checkedFromSource`) rather than new fields smuggled into the shared schema, and `report.json` aggregates the split per difficulty tier and overall.
-
-# Make targets and tests
-
-+  `make proof-search-single-step` — the harness on one obligation (`PROOF_SEARCH_ID`, defaulting to a routine one), k candidates, human-readable report; help line per house rules.
-+  `make proof-search-split` — the sweep over all 22 obligations, run twice so the second pass is warm (the split is read from the warm pass, with cold-pass numbers reported beside it), writing `report.json` and printing the oracle-vs-proposal numbers destined for #113.
-+  Unit tests, pure, running in `make test`: conjunctive state semantics (the pinned regression test), probe/move separation, partial-application arithmetic, oracle-key memoisation, ranking, and wire-shape decoders against canned real responses captured from the live server.
-+  Integration, needing the backend shell: the two-obligation scenario end-to-end against the real server, gated on an `AGDA_MCP_BIN` environment variable exactly like the existing backend-gated Scala tests, plus the Make targets above.
-
-# Acceptance
-
-+  The state model is conjunctive with the pinned regression test — a lemma with two obligations is not reported solved when only one is discharged — and the four lessons are encoded as the types and tests above, not prose.
-+  The single-step harness runs one M1-5 obligation end-to-end against agda-mcp and reports which of k candidates close it.
-+  `make proof-search-single-step` and `make proof-search-split` exist with help lines; `make test` stays green and includes the new unit tests; `make agda-mcp-test` is untouched and green.
-+  The oracle-time vs proposal-time split on real M1-5 obligations is posted as numbers on #113, with the host-language conclusion those numbers support.
-+  `docs/GITHUB_PROJECT.md` gains the #113 tracking-issue line in "Field-driven work outside the milestone plan", per that file's convention.
-
-Part of #113; lessons inherited from #112.
-
----
-
-### [proof search] P1 (the search loop): beam over obligation states with a fixed action space (#122, closed)
-
-**Labels:** `eval`, `retrieval`
-
-P1 of the #113 plan: the search loop over the P0 state model (#119, PR #121), with a fixed, non-learned action space.  The deliverable is the baseline number — how many M1-5 obligations the search closes per difficulty tier — which every later phase has to beat.  Better proposals are out of scope (P2 is retrieval, P3 is a learned policy); this issue is the loop, its budgets, and its measurement.
-
-# What P0 settled, and what it means here
-
-+  **The oracle is the entire cost.**  Measured on #113: oracle calls are effectively 100 % of wall time at ~2.6–2.9 s per probe on stdlib fixtures, the cost is per-spawn import-graph loading (a builtins-only fixture answers in ~0.2 s), and transport is 0.21 % — so P1's economics are governed by oracle-call COUNT, and the natural budget unit is oracle calls, not seconds.
-+  **The substrate is landed; build on it, do not re-derive it.**  `struxdriver.search` has the conjunctive `SearchState` (unforgeable via the sealed-abstract idiom), `SolvedClaim`'s two gates, the memoised `Oracle` with the timing ledger, strict wire decoders (drift fails visibly), the partial-application arithmetic, and the anomaly-red-exit discipline.  The PR #121 review threads record these as contract decisions; preserve them.
-
-# Design commitments
-
-+  **The loop.**  Beam search over `SearchState`s: expanding a state probes k candidates at ONE obligation chosen by a fixed selection policy (first open obligation, stated and tested as a deliberate simplification — selection order affects which proofs are found under budget, never soundness, since the set is conjunctive and every commit re-anchors from the oracle's holes).  Children are the Ok probes committed, ranked by the landed `Rank`; beam width, depth bound, and a per-fixture oracle-call budget are tunables with stated defaults.  Termination per fixture: solved (via `SolvedClaim`'s final batch gate), exhausted, or budget-exceeded — each a distinct reported status.
-+  **Two-cache discipline, completed.**  The `OracleKey` memo spans the whole fixture run (within one search, same content + candidate is one Agda call, by construction).  The frontier dedups on `StateKey` — landed as content + script, the #112 lesson's own key — and this issue decides the policy by measurement: run M1-5 with script-inclusive and with content-only dedup, compare solve counts and oracle calls, adopt the winner with a test.  The PR #121 `StateKey` thread anticipated exactly this decision.
-+  **The peek experiment (measured, not assumed).**  The interaction lane answers `type_of` in milliseconds once a file is loaded — the modern form of #112's report-actions-are-peeks.  Measure whether a `type_of` pre-filter (candidate with `_` metas in place of holes, inferred at the goal) can reject candidates before they cost a ~2.7 s batch probe, and what it does to end-to-end oracle calls and wall time on M1-5.  Open protocol question to answer on the wire first (driving-agda-mcp skill): what `type_of` does with under-determined metas.  Outcome — uplift or refutation — is posted on #113 with the same method as the P0 split.  Peeks never enter the script and never decide anything; only `fill_hole` judges.
-+  **The fixed action space.**  Non-learned but real: the goal context's assumptions (from `get_goal`), the P0 closers, and applications of the fixture's imported lemmas — one `{!!}` per remaining visible binder via the landed arithmetic, binder counts read from lane `type_of` answers plus a deliberately small top-level pi-type splitter (arrows at paren depth 0; the oracle polices what the parser gets wrong).  Term mode only: no case splits, no `with` — which caps what is reachable (most `induction`/`case-split` golds are not), and the baseline is reported with that ceiling stated so the number is read correctly.
-+  **Reporting on the shared schema.**  Per-probe rows continue in `eval-proof-completion.v0` `results.jsonl`; the loop adds `fixtures.jsonl` (`FixtureSummary` semantics: `holesTotal` = 1 per benchmark obligation, `fullySolved` iff the final strict gate passed, `solvedPath` into the run's `solved/` directory), so the baseline sits beside the policy-backend evaluator's output.  The timing ledger keeps the oracle/proposal split per phase, now including a `peek` phase.
-+  **Scaffolding.**  Factor the fixture-run scaffolding (work copies, baseline check, logging, red-exit) shared with the single-step harness rather than duplicating it.  Serial execution first; parallel oracle workers (N servers over disjoint work copies) are a recorded option, taken only if the measured wall time demands it.
-
-# Acceptance
-
-+  The loop lands with a Make target and help line (`proof-search-loop`), pure tests against the `ToolCaller` seam (beam behavior, budget exhaustion, dedup policy, multi-obligation solve), and a live gated test extending the two-obligation regression to a full search.
-+  Per-tier M1-5 solve counts (with beam/depth/budget stated) are posted on #113 — the baseline number.
-+  The `type_of` peek experiment is measured and its numbers posted on #113, whichever way it comes out.
-+  The `StateKey` dedup policy is decided by measurement and pinned in a test.
-+  `make test`, `make proof-search-it`, `make proof-search-single-step`, and `make agda-mcp-test` stay green; the server is driven as a client only.
-+  `docs/GITHUB_PROJECT.md`'s field-driven line for #113 is extended to name this sub-issue beside #119.
-
-Part of #113; builds on #119 / PR #121; siblings: the P2 (retrieval proposals) and P3 (policy proposals) sub-issues filed alongside.
-
----
-
-### [proof search] P3 (the closed loop): proposals from a learned policy (#124, closed)
-
-**Labels:** `eval`, `retrieval`, `local-models`
-
-P3 of the #113 plan: proposals from a learned policy — the closed loop this project has been building toward.  A search that asks a policy for candidates, checks them with Agda, and reports on the M1-5 JSONL schema.  Like #123, this is direction to be re-cut when its prerequisites land; the durable parts are the interface obligations and the headline comparison.
-
-# Scope
-
-+  **The contract already exists; speak it, do not reinvent it.**  The policy-backend wire contract lives in `agda-dojang/python/tools/policy_contract.py`, mirrored one-to-one by `AgdaMCP.Types`, and `eval_fixtures.py`'s `call_policy` is the reference client.  P3 adds a Scala client for the same contract (request: goal + context + meta; response: ranked candidates on the versioned schema) as a third proposer behind the #122 interface.
-+  **Deterministic first.**  `policy_fixture.py` is the working deterministic backend; the loop-with-policy is landed and tested against it before any trained model enters the picture, so the plumbing and the model are never debugged at the same time.
-+  **The headline comparison.**  On M1-5, per tier, side by side on `eval-proof-completion.v0`: search + policy proposals, versus policy-alone top-k (the existing `eval_fixtures.py` baseline), versus the #122 fixed-space and #123 retrieval baselines.  Whether SEARCH adds value over the policy it wraps is the question this phase exists to answer.
-+  **Budget accounting.**  Policy latency joins the proposal side of the timing ledger; the P0 method (oracle vs proposal split) is re-reported so the economics of a slow proposer are visible rather than assumed.
-
-# Acceptance
-
-+  The policy-backed proposer lands behind the #122 interface, tested end to end against `policy_fixture.py`.
-+  The three-way (or four-way, with #123) comparison is posted on #113 on the shared schema.
-+  The proposer interface has survived P1 → P2 → P3 unchanged, or the changes are recorded on #122 with reasons.
-
-Part of #113; builds on #122 (loop, interface) and #123 (retrieval baseline); consumes the policy contract owned by agda-dojang.
-
----
-
-### [agda-mcp] mcp not loaded in fls claude sessions (#133, closed)
-
-**Labels:** 
-
-An .mpc.json file, from the williamdemeo/claude-tooling repository, is now linked into all fls worktrees, yet agda-mcp is not loaded.
-
+_(no organically-filed issues — every issue on GitHub carries a `[MN-k]` planning prefix)_
 <!-- END GENERATED: unplanned -->

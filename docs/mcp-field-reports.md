@@ -314,3 +314,68 @@ Worktree: `agda-algebras/worktrees/572-flrp-parachute-modules-improvements`.  To
 +  **What the MCP could not do, and the CLI did**: the profiling.  The kick-off's cost constraint is answered by `agda --profile=internal`, for which there is no MCP surface, so the measurement loop (delete the `.agdai`, profile twice, compare phases) ran in Bash, and the comparison of two record shapes (a scratch copy of the module with a different header, profiled alongside) was pure CLI as well.  A `profile_file` tool returning the phase table as JSON would have made that comparison a two-call affair and kept the numbers out of log-scraping.
 +  **Harness friction, not MCP friction**: the auto-mode classifier blocked `git reset --hard` on the sibling worktree, the `--force-with-lease` push, and a Python heredoc that rewrote the edited module; the Edit tool did the file edits instead, and the branch surgery is left for William.
 +  **Net**: for a header-level refactor under a measured cost constraint, the MCP was a wash against the CLI on the type-checking side and absent on the profiling side.  Its one real save was the root confirmation.
+
+## 2026-09-08 — fls PR #1308 review (starting account balance intervals), Claude Fable 5.1
+
+Worktree: `fls/worktrees/review-1308` (detached at the PR head).  Tools used: `get_diagnostics`, one call.  Nothing was written; this was a review, so the batch gate was the only Agda run needed.
+
++  **The server cannot check fls at all right now**.  The one probe failed in 75 ms with `AmbiguousTopLevelModuleName`: the server's cwd is `fls/master`, its `project` echo bound the review worktree's `.agda-lib` correctly (`rootSource: nearest-agda-lib`), but Agda still saw both `master/src` and `review-1308/src` for the same module name.  Underneath that, the registered-libraries list is agda-native-air's (`agda-dojang`, `standard-library-2.3`); fls needs agda-sets, agda-stdlib-classes and agda-stdlib-meta, none registered, so a resolved root would have failed on the first import anyway.  The structured failure was clear and cheap; it just answered "not this project".
++  **The CLI loop did the verification**: `_build/` seeded from master, then `nix develop --command agda src/Ledger.lagda.md` in the background while the diff, the cardano-ledger patches and the CIP text were read.  For a review, where the question is one green-or-red verdict on the whole closure rather than a goal-by-goal loop, the CLI is the right instrument regardless of the server's state.
++  **Net**: no time lost beyond one probe; no gain either.  A per-project libraries file, or the server picking up the flake's registry for fls, is the missing piece.
+
+## 2026-09-08 — fls PR #1313 review (SNAP moved to the end of EPOCH), Claude Fable 5.1
+
+Worktree: `fls/worktrees/carlos/epoch-dijkstra` (the PR branch, inside the flake shell; `.mcp.json` now points the server at `${PWD}` with `agda src/Ledger.lagda.md` as the check command).  Tools used: none of the agda-mcp tools; the server was connected but never called.
+
++  **Why not**: a review needs one green-or-red verdict on the whole closure plus a handful of "does this alternative compile" experiments.  The verdict ran as `agda src/Ledger.lagda.md` in the background (229 modules, 19m51s, exit 0, no warnings) while the diff, the cardano-ledger patch and the sibling modules were read; the experiments ran in a scratch copy of `src/ + src-lib-exts/ + formal-ledger.agda-lib + _build/` so the PR worktree stayed byte-identical.  The server holds one root per project and binds it from cwd, so pointing it at the scratch copy would have meant a second registration; the CLI needed only `cd`.
++  **Two places the MCP would have shortened a round**.  (1) A `rewrite`-based proof of `Γ≡Γ'` failed with "rewrite did not apply" because the where-bound abbreviation `ls'₁` reduces away once the goal normalises; a `get_goal` on that clause would have shown the normalised goal in seconds instead of a 90 s batch round and a read of the error dump.  (2) "Does stdlib 2.3 have `cong₃`?" was answered by grepping the nix store; `type_of "cong₃"` in the module's scope is the right instrument and would have been one call.
++  **Not verified this session**: whether the server can actually load fls under the new `.mcp.json`.  The 2026-09-08 #1308 entry above found it could not; the configuration has since changed and nobody probed it here.  Next fls session that writes Agda should run one `check_file` first and record the answer.
++  **Net**: for this review the CLI loop was strictly more efficient; the MCP's absence cost nothing, and its presence would have saved perhaps three minutes on the two diagnostic questions.
+
+## 2026-09-08 — fls #1274 (batch-threading UTxO invariants for LEDGER-pov), Claude Fable 5.1
+
+Worktree: `fls/worktrees/1274-dijkstra-batch-threading-utxo-invariants` (branch cut from the top of the Dijkstra PoV stack, inside the flake shell).  Tools used: `check_file` only, nine calls; `get_goal`, `fill_hole`, `type_of` and `normalize` were not called.
+
++  **The server can check fls again**.  Contrary to the #1308 entry, `check_file` bound the worktree's own `.agda-lib` (`rootSource: nearest-agda-lib`, includes `src` and `src-lib-exts`) and loaded the whole Dijkstra spine off the `_build/` seeded from a same-commit sibling.  Its registered-libraries list is still agda-native-air's, and its `agda` binary is `~/.cache/fls/agda-root/bin/agda`, not the flake's; it works because fls vendors agda-sets, stdlib-classes and stdlib-meta under `src-lib-exts`, which the `.agda-lib` puts on the include path.  Interface files written by the two 2.8.0 binaries were mutually readable: the nix gate afterwards re-checked only the edited modules.
++  **Why no holes**.  The proof plan was fixed before any Agda was written (a running-UTxO invariant with the *pending* ids, so that `Unique`/`All` decompose by pattern matching), and each lemma was a few lines of set-membership plumbing whose shape was known.  Writing the complete term and reading the checker's first complaint was faster than a goal-by-goal loop; nine `check_file` rounds (10 s to 80 s each, the long ones re-checking three dependent modules) took the four modules from draft to green.  Every round localized exactly one real defect: a `⇔` used in the wrong direction, `∀ {i o}` binders whose element types the `IsSet`-overloaded `∈` could not resolve, and, three times, a UTxO implicit that cannot be inferred because it only occurs under `ˢ`/`dom` (fixed by explicit map arguments and by turning two predicates into records).
++  **What was useful in the response**: `involved.metaTypes` with exact source ranges for unsolved metas (one `sed -n` per range and the culprit was visible), and the `success` verdict tied to the exit code.  What was noise: the 300-line constraint dump listing every `DecEq` instance candidate; a summary of the *blocking* meta alone would have sufficed.
++  **What was awkward**: (1) two agda processes on one `_build/` is a race, so the background nix gate and the MCP checks had to be serialized by hand; a server-side lock, or a note in the tool description, would remove the worry.  (2) A `check_file` on the top consumer re-checks every changed dependency (75 s); expected, but with three edited modules the per-round cost was dominated by that, and there is no way to ask "check only this file against stale interfaces".  (3) The intermediate commit split (rebuilding a no-mint-only state of three files) needed its own full round; unavoidable, but it is where a `check_project` on a *set* of files would have helped.
++  **Was the CLI loop more efficient?**  Roughly a wash on latency, since the flake's `agda` on the same cache takes the same 10 s to 80 s per module.  The MCP won on ergonomics: structured ranges instead of scraping `agda`'s error text, and no `nix develop --command` prefix.  The final gates (full closure, property scan, drop-in wiring module) ran on the CLI as the kick-off requires; the MCP's verdict was treated as a fast pre-check, never as the gate.
++  **Net**: for a plan-first session of small map lemmas, `check_file` was a convenient typed `agda` and the field's main contribution is the negative result about implicit map arguments, now a memory.  The hole-driven tools would have earned their keep only if a goal's *normal form* had been in doubt; it never was.
+
+## 2026-09-15 — fls Leios stack repair (#1304, #1305, #1307): three worktrees
+
+Task shape: move the Leios BLS primitives from the core crypto record into a
+Dijkstra-local extension record and rewire two stacked PRs on top of it, each
+PR in its own git worktree of the same library.  No proofs, no holes; the work
+was record fields, module threading, Foreign mirrors, and prose.
+
+Tools used: `check_file` ×1 on a sibling worktree (failed for a structural
+reason, below); after that the whole session ran on the server's pinned agda
+wrapper (`~/.cache/fls/agda-root/bin/agda`) from the CLI, and at the end the
+server reported a dropped connection.
+
+What was awkward:
+
++  **One cwd per server, so one worktree per server.**  `check_file` on a
+   file under a sibling worktree ran agda with the session worktree as cwd;
+   agda read that worktree's `.agda-lib`, added its `src/` to the search path
+   beside the `-i` for the sibling, and reported `AmbiguousTopLevelModuleName`
+   (the module in both trees).  The `command.cwd` echo made the cause legible
+   in one read, which is the tool doing its job, but the tool itself cannot
+   serve the multi-worktree workflow this repo uses for stacked PRs.  A
+   `cwd` (or "root from the file's nearest .agda-lib") option would fix it.
++  **Connection drop mid-session.**  After a re-login the server was reported
+   as failed to connect; the CLI wrapper it had been exec'ing still worked, so
+   the session lost the structured verdicts but not the checker.
++  **The pinned wrapper is a hidden asset.**  With the session shell outside
+   `nix develop` (`agda` not on PATH), the server's wrapper was the fastest
+   path to the project's exact Agda and libraries.  Worth documenting in the
+   server's README: "the wrapper at `<agda-root>/bin/agda` is usable directly."
+
+What worked: nothing MCP-specific this session beyond the diagnostic echo.
+The CLI loop was genuinely the right instrument here, because every check
+was a batch verdict on a whole module in a worktree the server did not own;
+the MCP's advantage (warm interaction lane, structured diagnostics) never had
+a chance to apply.  Net: for multi-worktree stacked-PR work the server needs
+per-call roots before it can replace the CLI.
