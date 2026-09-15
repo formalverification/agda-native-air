@@ -10,8 +10,13 @@ Description: Check the haystack benchmark tier's exclusion constraints against
   must differ from the hole's name, and the obligation's stated type must not
   normalize to any corpus row's type.  This script is the mechanical half of
   that promise.  For every selected index row it reports, against every row
-  of the corpus, the following three checks:
+  of the corpus, the following four checks, all of which a row must pass:
 
+    needle     the gold term's head (the qualified lemma the gold applies) is
+               a corpus row's `prettyQname`; a misspelled or absent needle is
+               a fixture that cannot measure retrieval at all, so it fails the
+               gate rather than merely being reported (Copilot review of PR
+               #150);
     name       the hole name is not the `prettyName` of ANY corpus row (the
                proposer's rule is scoped to the fixture's imports; the check
                here is deliberately wider, so a fixture cannot drift into a
@@ -39,7 +44,7 @@ Description: Check the haystack benchmark tier's exclusion constraints against
       --index data/benchmarks/benchmark-index.jsonl --tag stratum:haystack
 
   One JSON verdict per selected row streams to stdout; a summary goes to
-  stderr; the exit code is 0 only when every row passes all three checks.
+  stderr; the exit code is 0 only when every row passes all four checks.
 
 Design notes:
 
@@ -101,7 +106,8 @@ class Verdict:
 
     @property
     def passed(self) -> bool:
-        return not (self.name_hits or self.statement_hits or self.near_alias_hits)
+        return self.needle_in_corpus and not (
+            self.name_hits or self.statement_hits or self.near_alias_hits)
 
     def to_json(self) -> Dict:
         return {
@@ -188,11 +194,14 @@ def dequalify_token(t: str) -> str:
 
 
 def dequalify(stmt: str) -> str:
-    """The near-alias form: tokens dequalified, `∀` and parentheses dropped (the
-    corpus parenthesizes infix applications the index prose leaves bare), then
-    binders renamed positionally."""
-    ts = tuple(dequalify_token(t) for t in tokens(stmt) if t != "∀")
-    return " ".join(rename_positionally(tuple(t for t in ts if t not in ("(", ")"))))
+    """The near-alias form: tokens dequalified and `∀` dropped, binders renamed
+    positionally while their delimiter groups are still intact (a binder is only
+    recognizable inside its group), and only then the parentheses dropped, since
+    the corpus parenthesizes infix applications the index prose leaves bare.
+    Renaming after the drop left `(m : ℕ) → m ≡ m` and `(x : ℕ) → x ≡ x` distinct
+    (Copilot review of PR #150)."""
+    ts = rename_positionally(tuple(dequalify_token(t) for t in tokens(stmt) if t != "∀"))
+    return " ".join(t for t in ts if t not in ("(", ")"))
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +216,7 @@ def needle_of(gold_term: str) -> str:
 
 
 def check_row(row: IndexRow, corpus: Sequence[CorpusRow]) -> Verdict:
-    """All three checks for one index row against the whole corpus."""
+    """All four checks for one index row against the whole corpus."""
     stmt = normalize(row.tpe)
     near = dequalify(row.tpe)
     needle = needle_of(row.gold_term)

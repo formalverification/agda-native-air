@@ -9,8 +9,10 @@ The checker is a pure predicate over index and corpus rows, so the tests
 build rows and assert verdicts.  Pinned here: the normalization agrees with
 the proposer's documented example (positional renaming makes `+-comm`'s two
 spellings equal), the near-alias form catches an expanded-form alias printed
-the way the corpus prints it and lets a diagonal instance through, and the
-three rules each report the offending qname rather than a bare failure.
+the way the corpus prints it, with the same binder names or with renamed
+ones, and lets a diagonal instance through, the three rules each report the
+offending qname rather than a bare failure, and a gold whose needle is absent
+from the corpus fails the verdict (both from the Copilot review of PR #150).
 
 Usage
 -----
@@ -70,12 +72,33 @@ def test_near_alias_lets_the_diagonal_instance_through() -> None:
     assert dequalify("∀ (m : ℕ) → m + suc m ≡ suc (m + m)") != dequalify(PLUS_SUC_TYPE)
 
 
+def test_near_alias_renames_binders_inside_intact_groups() -> None:
+    # Copilot review of PR #150: renaming after the parentheses were dropped
+    # left explicitly bound binders unrecognized, so these two were distinct.
+    assert dequalify("(m : ℕ) → m ≡ m") == dequalify("(x : ℕ) → x ≡ x")
+    renamed_corpus_print = PLUS_SUC_TYPE.replace("(m n :", "(x y :").replace("(m ", "(x ").replace(" n)", " y)").replace("suc n", "suc y")
+    assert renamed_corpus_print != PLUS_SUC_TYPE
+    assert dequalify("∀ (m n : ℕ) → m + suc n ≡ suc (m + n)") == dequalify(renamed_corpus_print)
+    # Hidden binder groups rename the same way.
+    assert dequalify("{m : ℕ} (n : ℕ) → m ≤ n") == dequalify("{a : ℕ} (b : ℕ) → a ≤ b")
+
+
 def test_a_haystack_row_passes_and_names_its_needle() -> None:
     v = check_row(index("haystack-nat-plus-suc-diag", "+-suc-diag-hole",
                         "∀ (m : ℕ) → m + suc m ≡ suc (m + m)", "Data.Nat.Properties.+-suc m m"), CORPUS)
     assert v.passed
     assert v.needle == "Data.Nat.Properties.+-suc"
     assert v.needle_in_corpus
+
+
+def test_a_missing_needle_fails_the_verdict() -> None:
+    # Copilot review of PR #150: needle presence was reported but not enforced.
+    v = check_row(index("x", "fresh", "∀ (m : ℕ) → m + suc m ≡ suc (m + m)",
+                        "Data.Nat.Properties.+-suk m m"), CORPUS)
+    assert not v.needle_in_corpus
+    assert v.name_hits == () and v.statement_hits == () and v.near_alias_hits == ()
+    assert not v.passed
+    assert v.to_json()["passed"] is False
 
 
 def test_the_name_rule_reports_the_colliding_qname() -> None:
