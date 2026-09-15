@@ -748,7 +748,7 @@ because env tokens can shadow your stored auth.
 `agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
 Cursor, etc.) interact with Agda through standard tool calls.
 
-The server exposes **thirteen tools**:
+The server exposes **fourteen tools**:
 
 +  **core proof-state tools** (4): `get_goal`, `fill_hole`, `check_file`,
    `get_diagnostics`,
@@ -756,9 +756,11 @@ The server exposes **thirteen tools**:
 +  **live-query tools** answered by a persistent interaction lane (5): `type_of`,
    `normalize`, `resolve_name`, `definition_of`, `exports_of` (issue #75; see
    `docs/agda-mcp/agda-mcp-interaction-lane.md`), all always available,
-+  **corpus-backed search tools** (3): `search_by_name`, `search_by_type`,
-   `get_dependencies`, that are registered only when you start the server with
-   `--corpus PATH` (an agda-strux JSONL corpus).
++  **corpus-backed tools** (4): the three lookups `search_by_name`,
+   `search_by_type`, `get_dependencies`, and the scope-aware `search_in_scope`
+   (issue #17), which returns only rows the queried file can name, each typed by
+   the interaction lane; all four are registered only when you start the server
+   with `--corpus PATH` (an agda-strux JSONL corpus).
 
 For the full command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`,
 `--corpus`, `--timeout`, `--check-command`, `--check-timeout`, `--verbose`), see

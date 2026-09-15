@@ -58,6 +58,16 @@ module AgdaMCP.Tools.LiveQueries
   , interactionFailure
   , laneCommandEcho
   , laneEchoFrom
+    -- * The spine, shared with search_in_scope (issue #17)
+  , LiveCtx (..)
+  , QueryScope (..)
+  , withLiveFile
+  , liveMeta
+  , scopeFor
+  , inferredTypeOf
+  , queryError
+  , loadError
+  , opaqueAnswer
     -- * Exposed for testing
   , candidateFrom
   , defSiteFrom
@@ -91,13 +101,17 @@ import AgdaMCP.Types
 data LiveCtx = LiveCtx
   { lcHandle  :: LaneHandle
   , lcAbsPath :: FilePath
+  , lcSource  :: Text           -- ^ The file's decoded source, as read for this
+                                --   call; search_in_scope reads the import
+                                --   surface off its code-only view (issue #17).
   , lcLoad    :: LoadReport
   , lcProject :: ProjectContext
   , lcConfig  :: AgdaConfig
   , lcStartNs :: Word64
   }
 
--- | withLiveFile: the spine shared by all five handlers.  Mirrors the batch
+-- | withLiveFile: the spine shared by all five handlers, and by
+-- search_in_scope (issue #17).  Mirrors the batch
 -- tools' 'AgdaMCP.Tools.ProofState.withProject' flag assembly exactly (the
 -- server's flags, plus what resolution implies, plus the file's own directory
 -- when nothing else reaches it) so a lane load resolves against the same
@@ -110,7 +124,7 @@ withLiveFile
   -> (LiveCtx -> IO (Either ToolFailure a))
   -> IO (Either ToolFailure a)
 withLiveFile lanes cfg0 requested reload body =
-  withSourceFile requested $ \absPath _bytes _src -> do
+  withSourceFile requested $ \absPath _bytes src -> do
     resolved <- resolveProject cfg0 absPath
     case resolved of
       Left mismatch -> pure (Left (FailProject mismatch))
@@ -127,7 +141,7 @@ withLiveFile lanes cfg0 requested reload body =
             Left lf -> Left . FailInteraction
                          <$> interactionFailure pc cfg startNs lf
             Right lr ->
-              body (LiveCtx lh absPath lr pc cfg startNs)
+              body (LiveCtx lh absPath src lr pc cfg startNs)
         case outcome of
           Left lf      -> Left . FailInteraction
                             <$> interactionFailure pc cfg startNs lf

@@ -6,6 +6,9 @@ cabal-version: 3.0
 -- Description:
 --   Cabal package definition for the agda-mcp MCP server.
 --
+--   issue #17 (M2-3, phase 1): adds search_in_scope, scope-aware retrieval
+--   over the corpus index with every rendering validated by the interaction
+--   lane (AgdaMCP.Scope, AgdaMCP.Retrieval, AgdaMCP.Tools.SearchInScope).
 --   v0.2.0 (M1-3): adds search tools (search_by_name, search_by_type,
 --   get_dependencies) backed by an in-memory corpus index from agda-strux JSONL.
 --   v0.1.0 (M1-2): four core proof-state tools over stdio transport.
@@ -54,10 +57,13 @@ library
     AgdaMCP.Project
     AgdaMCP.Gate
     AgdaMCP.Corpus
+    AgdaMCP.Scope
+    AgdaMCP.Retrieval
     AgdaMCP.Tools.CheckProject
     AgdaMCP.Tools.LiveQueries
     AgdaMCP.Tools.ProofState
     AgdaMCP.Tools.Search
+    AgdaMCP.Tools.SearchInScope
   build-depends:
       base          >= 4.18 && < 5
     , aeson         >= 2.1  && < 3

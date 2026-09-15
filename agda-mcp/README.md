@@ -2,10 +2,10 @@
 
 # agda-mcp
 
-> **Status: v0.2.0 (M1-3)**.  Thirteen tools over stdio transport: four core
+> **Status: v0.2.0 (M1-3)**.  Fourteen tools over stdio transport: four core
 > proof-state tools, the whole-project gate, five live-query tools answered by
-> a persistent interaction lane (issue #75), plus three corpus-backed search
-> tools.
+> a persistent interaction lane (issue #75), plus four corpus-backed tools:
+> three search lookups and the scope-aware `search_in_scope` (issue #17).
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
 Agda's proof engine — batch typechecking verdicts, goal introspection, and
@@ -91,9 +91,10 @@ For Claude Code setup and MCP client configuration, see [Configuring MCP Clients
 
 ## Tool Surface
 
-Thirteen tools are implemented: four core proof-state tools (Milestone [M1-2]),
+Fourteen tools are implemented: four core proof-state tools (Milestone [M1-2]),
 the whole-project gate (issue #78), five live-query tools over the interaction
-lane (issue #75), and three corpus-backed search tools (Milestone [M1-3]).
+lane (issue #75), three corpus-backed search tools (Milestone [M1-3]), and the
+scope-aware retrieval tool `search_in_scope` (issue #17, phase 1).
 Navigation tools and neural premise selection are planned for later
 milestones; see [GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
 
@@ -248,6 +249,28 @@ surface.
 | `search_by_type`    | Find definitions whose type signature contains a substring. |
 | `get_dependencies`  | Return a definition's dependencies, optionally expanded one hop. |
 
+### Scope-aware retrieval (issue #17)
+
+The fourth corpus tool is registered with the three lookups and is the one corpus
+tool that also takes the interaction lane.  It answers the question the three
+lookups cannot: of the corpus rows that could help *here*, which ones can this
+file actually name, and what does Agda say each one's type is?
+
+| Tool | Description |
+|------|-------------|
+| `search_in_scope`   | Corpus rows the queried file can name, ranked, each rendering typed by the interaction lane in that file's scope, with an honesty ledger on every response. |
+
+It rides the corpus index for the pool and the lane for validation, so it is a
+knowledge tool under the two-lane policy: it informs and never decides, no
+response carries `success` or `verdict`, and a returned rendering typechecks
+*as an expression* in the file's scope, which says nothing about whether it
+fills any hole (`fill_hole` judges that).  The file's import surface (`import`
+and `open import`, with `using`, `hiding`, `renaming`, `as`, and `public`) is
+read off the code-only view, because no interaction command enumerates a
+scope; that derived answer is subordinated completely, since every rendering
+it proposes is typed by lane `type_of` before it is returned.  See
+[`search_in_scope`](#search_in_scope) below for the contract.
+
 
 
 ---
@@ -265,7 +288,7 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--cwd DIR`          | Working directory to enter before anything else.  Every later relative path (`--corpus`, client file paths, gate discovery) resolves inside it, and the checking `agda` runs there, so Agda's own project discovery (the nearest `*.agda-lib`) anchors to it.  Set it to the client project's checkout root when this server checks a project it is not started in (issue #103).  A directory the server cannot enter is a fatal startup error, reported by name. |
 | `--agda-bin PATH`    | Path to the `agda` binary (default: `agda` on `PATH`). |
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
-| `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the three search tools. |
+| `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the four corpus tools (`search_by_name`, `search_by_type`, `get_dependencies`, `search_in_scope`). |
 | `--timeout N`        | Per-typecheck timeout in seconds (default: 300; `0` means no limit).  Enforced: on expiry the `agda` process group is killed and the tool reports a timeout.  Size it for a *cold* first check; see below. |
 | `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect, and nothing this server puts around your gate can mask its exit code.  (A wrapper *script* you name here can still lie about its own; that is what `maskedFailure` catches.)  Without it, `check_project` discovers the gate (see below). |
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
@@ -341,11 +364,14 @@ agda-mcp/
 │       ├── Gate.hs              ← Which command is the project's gate: make target, configured, Everything
 │       ├── Interaction.hs       ← The interaction lane: persistent agda --interaction-json child per root
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
+│       ├── Scope.hs             ← The import surface off the code-only view; the rendering ladder
+│       ├── Retrieval.hs         ← Tokens, statement normalization, the scorer, the pool pipeline
 │       └── Tools/
 │           ├── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
 │           ├── CheckProject.hs  ← check_project: run the gate, never misreport its exit code
 │           ├── LiveQueries.hs   ← type_of, normalize, resolve_name, definition_of, exports_of
-│           └── Search.hs        ← search_by_name, search_by_type, get_dependencies
+│           ├── Search.hs        ← search_by_name, search_by_type, get_dependencies
+│           └── SearchInScope.hs ← search_in_scope: the pool, the ladder on the lane, the ledger
 └── test/
     └── Main.hs                  ← Pure + corpus + integration tests
 ```
@@ -719,7 +745,9 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence i
 ### Corpus-backed search tools (Milestone 1 [M1-3])
 
 Registered only when `--corpus PATH` points at an agda-strux JSONL corpus.  All
-three are pure lookups on the in-memory index; they never invoke Agda.
+three are pure lookups on the in-memory index; they never invoke Agda.  The
+fourth corpus tool, `search_in_scope`, is documented after them; it reads the
+same index and asks the interaction lane about every row it returns.
 
 **At library scale**.  The published agda-algebras corpus (issue #84, dataset card at [`docs/corpora/agda-algebras-v0.md`](../docs/corpora/agda-algebras-v0.md)) is 11,666 rows and 185 MB of JSONL; it loads in about 1.4 s to a 308 MB resident footprint.  The index keeps only the fields these tools serve — the `typeAst` and the proof bodies are read and dropped, which is the difference between that and 2.7 GB — so `hasBody` tells an agent a proof term exists to go and read, and the corpus file is where to read it.  Two consequences of a real corpus worth knowing before you write a query: its dependency tokens are *fully qualified* (`Overture.Signatures.Signature`, not `Signature`), and 655 of its `prettyQname` keys are shared by more than one row, so the index holds 10,520 of the 11,666.  `make corpus-mcp-smoke` drives all three tools against it over this transport.
 
@@ -754,6 +782,101 @@ also return the one-hop neighbourhood (each dependency's own record).
 ```json
 { "name": "Homomorphisms.Basic.∘-hom", "expand": true }
 ```
+
+### Scope-aware retrieval (issue #17, phase 1)
+
+#### `search_in_scope`
+
+Of the corpus rows that match a query, which ones can this file actually name,
+and what does Agda say each one's type is?  The pool is the corpus index; the
+scope is the file's import surface; and the validation is the interaction lane,
+which types every candidate rendering in the file's scope (goal-scoped when the
+anchor addresses a hole) before it is returned.  The contract was agreed on
+issue #17 before the tool was built, and the description a client receives
+carries it in full.
+
+**Input**.  Only `filePath` is required.  `query` may be omitted when
+`line`/`column` addresses a hole: the tokens are then derived from that goal's
+own displayed type, through the same normalized display `get_goal`'s lane path
+reads, and the response says `query.source: "goal"`.
+
+```json
+{
+  "filePath": "/abs/agda-mcp/test/resources/ScopeSearch.agda",
+  "line": 23, "column": 11,
+  "query": { "tokens": ["Nat"] },
+  "limit": 10,
+  "exclude": { "names": ["probe"], "statement": "(n : Nat) → twice n ≡ n + n" }
+}
+```
+
+| Property | Meaning |
+|----------|---------|
+| `query` | `{name?, tokens?}`: a case-insensitive substring over the qualified and unqualified names, and/or type tokens as a goal display spells them (`+`, `≡`, `Commutative`, `hom`), matched after the corpus's qualified tokens are reduced to bare ones (`Agda.Builtin.Nat._+_` meets `+`).  Both given means both must hold. |
+| `limit` | Accepted rows to return (default 8).  The cut is taken **after** lane validation, so a rejected rendering never consumes a slot. |
+| `maxProbes` | Ranked rows sent to the lane before the walk gives up on filling `limit` (default 4 × `limit`), so a pool of stale rows cannot hold the call. |
+| `exclude` | `{names?, statement?}`: your policy, never the server's.  Rows whose bare name is listed, or whose type normalizes to the statement (on the corpus text, and again on Agda's printing of the accepted rendering), are set aside and **named** in the ledger with a reason. |
+
+**Output**.  Captured over the stdio transport against the fixture corpus and
+`test/resources/ScopeSearch.agda`, whose imports are deliberately narrow
+(`open import ScopeSearchLib using (twice)`; `import ScopeSearchBarrel`, not
+opened).  The lane echo (`lane`, `command`, `project`, `elapsedMs`,
+`checkedFromSource`) is the live-query echo and is elided here.
+
+```json
+{
+  "query": { "tokens": ["Nat"], "source": "given" },
+  "scope": "goal 0 (line 23, column 11)",
+  "imports": [
+    { "module": "Agda.Builtin.Nat", "opened": true },
+    { "module": "Agda.Builtin.Equality", "opened": true },
+    { "module": "ScopeSearchLib", "opened": true, "using": ["twice"] },
+    { "module": "ScopeSearchBarrel", "opened": false }
+  ],
+  "results": [
+    { "prettyQname": "ScopeSearchBarrel.Core.quad", "rendering": "ScopeSearchBarrel.quad",
+      "type": "Nat → Nat", "via": { "module": "ScopeSearchBarrel", "rung": "importing-module" },
+      "module": "ScopeSearchBarrel.Core", "defKind": "function", "hasBody": true,
+      "corpusType": "Nat → Nat", "score": 2 },
+    { "prettyQname": "ScopeSearchLib.Box.unbox", "rendering": "ScopeSearchLib.Box.unbox",
+      "type": "ScopeSearchLib.Box → Nat", "via": { "module": "ScopeSearchLib", "rung": "qualified" }, "…": "…" },
+    { "prettyQname": "ScopeSearchLib.Inner.thrice", "rendering": "ScopeSearchLib.Inner.thrice",
+      "type": "Nat → Nat", "via": { "module": "ScopeSearchLib", "rung": "qualified" }, "…": "…" },
+    { "prettyQname": "ScopeSearchLib.twice", "rendering": "twice",
+      "type": "Nat → Nat", "via": { "module": "ScopeSearchLib", "rung": "bare" }, "…": "…" },
+    { "prettyQname": "ScopeSearchLib.twice-def", "rendering": "ScopeSearchLib.twice-def",
+      "type": "(n₁ : Nat) → n₁ + n₁ ≡ n₁ + n₁", "via": { "module": "ScopeSearchLib", "rung": "qualified" }, "score": 0, "…": "…" }
+  ],
+  "ledger": {
+    "hits": 7, "inScope": 6, "outOfScope": 1,
+    "excluded": [], "nonFunction": 0, "ranked": 6, "probed": 6, "laneCalls": 7,
+    "laneRejected": [ { "prettyQname": "ScopeSearchLib.ghost", "tried": ["ScopeSearchLib.ghost"] } ],
+    "accepted": 5, "truncated": false, "stoppedBy": "exhausted"
+  },
+  "timing": { "poolMs": 0, "laneMs": 14 },
+  "elapsedMs": 75, "lane": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+}
+```
+
+Three things are contractual.
+
++  **Every `rendering` was typed by Agda in this file's scope, and `type` is Agda's printing**.  Three of the ladder's four rungs are visible above: `twice` is `using`-listed and renders bare; the nested rows render by their own qualified name; and `quad`, defined in `ScopeSearchBarrel.Core` and re-exported by the barrel this file imports, renders as `ScopeSearchBarrel.quad` because the lane refused `ScopeSearchBarrel.Core.quad` (that module is not in the file's scope).  The fourth, `re-export`, is the importing module qualifying the tail of the row's module path, which is how a record field defined in a file that an imported module re-exports is named (`Setoid.Homomorphisms.IsHom.compatible` for the agda-algebras row `Setoid.Homomorphisms.Basic.IsHom.compatible`); the first measurement on that corpus found those rows refused under every other spelling, and the ladder grew the rung.  `ScopeSearchLib.ghost`, a row the corpus carries and the library no longer defines, is not returned; it is named in `laneRejected` with the spelling that was tried.
++  **An empty result states its bounds**.  `hits` counts the query's matches over the whole corpus, before scope, so `hits: 12, inScope: 0` reads as "the lemma exists and this file does not import its module"; `excluded` names every row your own `exclude` set aside and why (`name`, `statement`, or `lane-statement`); `laneRejected` names every row the loaded library disagreed with; and `stoppedBy` says whether the walk ended because `limit` was filled, `maxProbes` was spent, or the ranked list ran out.
++  **No verdict**.  A file that does not load answers `error.stage: "load"` with Agda's message and runs no query; no `query` with no goal at the anchor answers `error.stage: "query"`.  Process-level lane failures and path refusals are the same structured `isError` payloads the live-query tools raise.
+
+`timing.poolMs` is the corpus half (query, scope, exclusion, rank over the whole
+index) and `timing.laneMs` the lane half (every `type_of`, plus the goal read
+when the query was derived).  Measured on the agda-algebras v0.1 corpus (11,865
+indexed rows) from a benchmark obligation whose seven `using` imports reach 98
+to 247 rows per query: the pool half answers in 7 to 35 ms whatever the query
+(one token, four goal-derived tokens, or a name), because bare type tokens are
+indexed at corpus load (about half a second of the 2.3 s load); a warm lane
+types a rendering in 4 to 5 ms, so a default call of eight results costs 9 to
+13 lane calls and about 50 ms; and the one cold cost is the file's first lane
+load, 5.6 to 5.8 s for that obligation, paid once per file and shared with
+every live-query tool.  The full table is on issue #17.  Phase 2 of the issue,
+`search_term` (bounded synthesis at a hole, committed-checkable terms only), is
+not part of this tool.
 
 ---
 
