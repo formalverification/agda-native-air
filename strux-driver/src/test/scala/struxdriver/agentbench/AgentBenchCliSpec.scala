@@ -23,16 +23,16 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     "--server-bin", "bin", "--model", "m", "--corpus-stdlib", "s.jsonl", "--corpus-algebras", "a.jsonl")
 
   test("--all alone and --ids alone parse; both together, neither, and an empty --ids are refused") {
-    AgentBench.parseArgs(base ++ List("--all")).map(_.ids) shouldBe Right(None)
-    AgentBench.parseArgs(base ++ List("--ids", "a, b,")).map(_.ids) shouldBe Right(Some(Set("a", "b")))
-    AgentBench.parseArgs(base ++ List("--ids", "a", "--all")) shouldBe Left("pass exactly one of --ids and --all")
-    AgentBench.parseArgs(base) shouldBe Left("pass exactly one of --ids and --all")
-    AgentBench.parseArgs(base ++ List("--ids", "")) shouldBe Left("--ids names no obligation")
-    AgentBench.parseArgs(base ++ List("--ids", " , ")) shouldBe Left("--ids names no obligation")
+    Cli.parse(base ++ List("--all")).map(_.ids) shouldBe Right(None)
+    Cli.parse(base ++ List("--ids", "a, b,")).map(_.ids) shouldBe Right(Some(Set("a", "b")))
+    Cli.parse(base ++ List("--ids", "a", "--all")) shouldBe Left("pass exactly one of --ids and --all")
+    Cli.parse(base) shouldBe Left("pass exactly one of --ids and --all")
+    Cli.parse(base ++ List("--ids", "")) shouldBe Left("--ids names no obligation")
+    Cli.parse(base ++ List("--ids", " , ")) shouldBe Left("--ids names no obligation")
   }
 
   test("an unknown flag and a bad on|off value are refused by name") {
-    AgentBench.parseArgs(base ++ List("--all", "--bogus", "1")) shouldBe Left("unrecognized argument: --bogus")
-    AgentBench.parseArgs(base ++ List("--all", "--safe", "maybe")) shouldBe Left("bad --safe: maybe (on|off)")
+    Cli.parse(base ++ List("--all", "--bogus", "1")) shouldBe Left("unrecognized argument: --bogus")
+    Cli.parse(base ++ List("--all", "--safe", "maybe")) shouldBe Left("bad --safe: maybe (on|off)")
   }
 }

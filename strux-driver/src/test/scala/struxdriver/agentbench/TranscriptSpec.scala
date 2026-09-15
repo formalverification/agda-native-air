@@ -61,19 +61,16 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
 
   test("captured transcript: the audit finds the instrument in hand and nothing outside the protocol") {
     val t   = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
-    val iso = AgentBench.audit(t, workDir)
+    val iso = Audit.isolation(t, workDir)
     iso.instrumentOk shouldBe true
     iso.confined shouldBe true
     iso.extraTools shouldBe Vector.empty
     iso.deniedPaths shouldBe Vector.empty
-    AgentBench.terminalOf(killed = false, t.result) shouldBe "completed"
+    Audit.terminalOf(killed = false, t.result) shouldBe "completed"
   }
 
   private val entry = IndexEntry("x-id", "agda-stdlib", "M", Paths.get("data/x/X.agda"), Paths.get("data/g/X.agda"),
     "refl", "x", "T", Difficulty.Routine, "d", "s", Vector.empty)
-
-  private val cfg = AgentBenchConfig(Paths.get("i"), None, Paths.get("/w/out"), "run", Paths.get("/w"), None, 600, "",
-    None, 30, 900, BigDecimal(3), 1, safe = true, persistSessions = false, "claude", None, None, rejudge = false, resume = false)
 
   test("synthetic transcript: probes become attempt rows, escapes are audited, deferral and rejection are seen") {
     val t = Transcript.parse(resource("transcript-synthetic.jsonl"))
@@ -82,7 +79,7 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     t.rateLimitMax shouldBe Some(1.0)
     t.toolCounts shouldBe Vector("mcp__agda__fill_hole" -> 2, "Read" -> 2, "Bash" -> 1)
 
-    val rows = AgentBench.attemptRows(cfg, entry, t, "subjects/x-id/transcript.jsonl")
+    val rows = Audit.attemptRows(entry, Paths.get("/w/work/x/X.agda"), t, "subjects/x-id/transcript.jsonl")
     rows.map(_.candidate) shouldBe Vector("refl", "tt")
     rows.map(_.status) shouldBe Vector("type_error", "crash")
     rows.head.holeLine shouldBe 18
@@ -93,7 +90,7 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     rows(1).holeIndex shouldBe 0
     rows(1).rc shouldBe -1
 
-    val iso = AgentBench.audit(t, Paths.get("/w/work/x"))
+    val iso = Audit.isolation(t, Paths.get("/w/work/x"))
     iso.mcpConnected shouldBe false
     iso.missingAgdaTools.size shouldBe 10
     iso.extraTools shouldBe Vector("Bash")
@@ -106,8 +103,8 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     val r = t.result.get
     r.isError shouldBe true
     r.permissionDenials shouldBe 1
-    AgentBench.terminalOf(killed = false, t.result) shouldBe "max_turns"
-    AgentBench.terminalOf(killed = true, t.result) shouldBe "wall_cap"
-    AgentBench.terminalOf(killed = false, None) shouldBe "crash"
+    Audit.terminalOf(killed = false, t.result) shouldBe "max_turns"
+    Audit.terminalOf(killed = true, t.result) shouldBe "wall_cap"
+    Audit.terminalOf(killed = false, None) shouldBe "crash"
   }
 }

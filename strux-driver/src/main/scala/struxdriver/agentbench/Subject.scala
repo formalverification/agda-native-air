@@ -72,7 +72,16 @@ final case class SubjectConfig(
 }
 
 /** How a subject process ended: its exit code (None when the wall cap killed it) and its wall clock. */
-final case class SubjectRun(exitCode: Option[Int], wallMs: Long, killed: Boolean)
+final case class SubjectRun(exitCode: Option[Int], wallMs: Long, killed: Boolean) {
+  def toJson: Json = Json.obj("exitCode" -> exitCode.asJson, "wallMs" -> wallMs.asJson, "killed" -> killed.asJson)
+}
+object SubjectRun {
+  def fromJson(j: Json): Option[SubjectRun] =
+    for {
+      wallMs <- j.hcursor.get[Long]("wallMs").toOption
+      killed <- j.hcursor.get[Boolean]("killed").toOption
+    } yield SubjectRun(j.hcursor.get[Option[Int]]("exitCode").toOption.flatten, wallMs, killed)
+}
 
 object Subject {
 
@@ -131,6 +140,15 @@ object Subject {
   /** The environment additions, and the prefix of the variables removed. */
   val envAdded: Map[String, String] = Map("MCP_TIMEOUT" -> "120000", "ENABLE_TOOL_SEARCH" -> "false")
   val envRemovedPrefix: String      = "CLAUDE"
+
+  /** The client's own version string, for the report (`unknown` when the binary cannot be run). */
+  def version(bin: String): IO[String] =
+    IO.blocking {
+      val p   = new ProcessBuilder(bin, "--version").redirectErrorStream(true).start()
+      val out = new String(p.getInputStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim
+      p.waitFor()
+      out
+    }.handleError(e => s"unknown (${e.getMessage})")
 
   private def killGroup(proc: Process): IO[Unit] =
     IO.blocking {

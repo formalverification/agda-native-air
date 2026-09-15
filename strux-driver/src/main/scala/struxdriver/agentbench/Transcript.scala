@@ -35,6 +35,8 @@ package struxdriver.agentbench
 import io.circe.{ACursor, Json}
 import io.circe.parser.parse
 
+import struxdriver.search.ToolReply
+
 /** A tool call the model made: the block id (pairs it with its result), the tool name, the arguments. */
 final case class ToolUse(id: String, name: String, input: Json) {
   def str(field: String): Option[String] = input.hcursor.get[String](field).toOption
@@ -45,6 +47,8 @@ final case class ToolUse(id: String, name: String, input: Json) {
 final case class ToolResult(toolUseId: String, isError: Boolean, text: String) {
   /** The MCP body as JSON, when the text is JSON. */
   def body: Option[Json] = parse(text).toOption
+  /** The same reply as the search's client sees it, for the strict Wire decoders. */
+  def reply: ToolReply = ToolReply(isError, text)
 }
 
 /** The `system/init` record: the client's view of the session at start. */
