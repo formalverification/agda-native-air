@@ -52,7 +52,13 @@
   *  of implicit binders), and the report says which source was used.  When
   *  both are available the reconstruction is checked against the live
   *  context and any mismatch is recorded, so the fallback is validated by
-  *  every run that carries the real thing.
+  *  every run that carries the real thing.  The fallback carries names
+  *  only: a scorer that reads the hypotheses' types
+  *  (`CandidateScorer.readsHypotheses`) would silently run as its
+  *  no-hypotheses variant over it, so the instrument refuses that replay
+  *  unless `--allow-untyped-context on` is passed, and then marks each such
+  *  fixture `degraded` in the report and on stdout (PR #152 review, round
+  *  two).
   *
   *  Invocation (see the proof-search-recall Make target)
   *  -----------------------------------------------------
