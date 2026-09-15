@@ -1,0 +1,14 @@
+-- data/benchmarks/agda-algebras-v0/gold/agda-algebras-v0-gold.agda-lib
+-- Project file for the gold fixtures, so any tool that resolves the nearest
+-- .agda-lib (editors via agda-mode, agda-mcp's check_file, a bare `agda`
+-- given only --library-file) can type-check a gold in isolation.  The twin
+-- obligations directory carries its own project file: the two directories
+-- hold modules with identical top-level names, so they must never share one
+-- library (a shared include would make every module name ambiguous).
+-- The depend names resolve against a libraries file that registers them;
+-- inside the dev shell that is the repo's agda/libraries, written by the
+-- shellHook (standard-library and agda-dojang always; agda-algebras from the
+-- flake-pinned store copy, or a live checkout via AGDA_ALGEBRAS_ROOT).
+name: agda-algebras-v0-gold
+include: .
+depend: standard-library agda-dojang agda-algebras
