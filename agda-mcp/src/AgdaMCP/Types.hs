@@ -2108,7 +2108,13 @@ data ScopeLedger = ScopeLedger
   , slNonFunction  :: Int              -- ^ In-scope rows dropped by kind.
   , slRanked       :: Int              -- ^ Rows that entered the ranked list.
   , slProbed       :: Int              -- ^ Ranked rows sent to the lane.
-  , slLaneCalls    :: Int              -- ^ @type_of@ calls those took.
+  , slLaneCalls    :: Int              -- ^ Lane calls spent validating them: a
+                                       --   @type_of@ per rung tried, plus one
+                                       --   @WhyInScope@ identity check per
+                                       --   accepted spelling other than the
+                                       --   row's own qualified name.  The goal
+                                       --   read of a derived query is timed into
+                                       --   'ScopeTiming' and not counted here.
   , slLaneRejected :: [ScopeRejection] -- ^ Rows no rendering of which typed.
   , slAccepted     :: Int              -- ^ The length of @results@.
   , slTruncated    :: Bool             -- ^ Ranked rows remained unprobed.

@@ -2283,7 +2283,16 @@ scopeRetrievalTests = do
           -- mentions each cost one, as in the driver.
           assertEqual "name bonus under two misfits" (-1) (score (Set.fromList ["+"]) "+-comm" "Commutative _≡_ _∙_")
         , assertEqual "nothing" 0 (score goalToks "id" "A → A")
+        , -- A name-only query carries no tokens and must not order rows by
+          -- their operator content (Copilot's review of PR #161).
+          assertEqual "no tokens, no penalty" 0 (score Set.empty "*-comm" "(a b : ℕ) → a * b ≡ b * a")
         ]
+    , runTest "rank: a name-only query ranks on arity and name, whatever the operators" $
+        let a = scopeEntry "M" "zed" "ℕ → ℕ" "function"
+            b = scopeEntry "M" "ops" "(x y : ℕ) → x * y ≡ y * x" "function"
+            c = scopeEntry "M" "amb" "(x : ℕ) → x ≡ x" "function"
+        in  assertEqual "order" ["M.amb", "M.zed", "M.ops"]
+              (map (cePrettyQname . rkEntry) (rank Set.empty [ (e, []) | e <- [a, b, c] ]))
     , runTest "rank: score, then cheap before expensive, then the name" $
         let a = scopeEntry "M" "a" "(x y : ℕ) → x + y ≡ y + x" "function"
             b = scopeEntry "M" "b" "(x : ℕ) → x + x ≡ x + x" "function"
@@ -5398,6 +5407,18 @@ interactionWireTests = do
             pure (firstFailure [r1, r2, r3, r4])
           other -> pure (Fail $ "unexpected: " <> show other)
 
+    , runTest "parseWhyInScope: a shadowing variable is a variable, its location parsed, no qualified name" $
+        -- Probed at ScopeSearch.agda's shadow hole: the local's bullet carries a
+        -- trailing "shadowing" on its own line, then the shadowed import follows.
+        let msg = "twice is in scope as\n  * a variable bound at /fx/ScopeSearch.agda:32.8-13\n    shadowing\n  * a defined name ScopeSearchLib.twice brought into scope by\n    - the opening of ScopeSearchLib at /fx/ScopeSearch.agda:19.13-27\n    - its definition at /fx/ScopeSearchLib.agda:19.1-6"
+        in  case parseWhyInScope msg of
+              Just [v, d] -> allOf
+                [ assertEqual "variable description" "a variable" (scDescription v)
+                , assertEqual "variable has no qualified name" Nothing (scQualified v)
+                , assertEqual "variable location" (Just (SrcLoc "/fx/ScopeSearch.agda" 32 8 32 13)) (scDefinition v)
+                , assertEqual "the shadowed import" (Just "ScopeSearchLib.twice") (scQualified d)
+                ]
+              other -> pure (Fail $ "expected two candidates, got " <> show other)
     , runTest "parseWhyInScope: re-export chain keeps location-less steps" $ do
         let msg = "originalName is in scope as\n  * a defined name ReexportOrigin.originalName brought into scope by\n    - the opening of ReexportBarrel at\n    - the opening of ReexportOrigin at\n    - its definition at /res/ReexportOrigin.agda:14.1-13"
         case parseWhyInScope msg of
@@ -6438,7 +6459,13 @@ searchInScopeLaneTests cfg repoRoot = do
                 , assertEqual "accepted" 5 (slAccepted l)
                 , assertEqual "stoppedBy" "exhausted" (slStoppedBy l)
                 , assert "not truncated" (not (slTruncated l))
-                , assert "lane calls counted" (slLaneCalls l >= 6)
+                , -- Nine: a type_of per rung tried (quad's qualified rung
+                  -- refused, then its importing rung; unbox, thrice, and
+                  -- twice-def qualified; twice bare; ghost's qualified rung
+                  -- refused, its importing spelling deduplicated away) plus an
+                  -- identity check for each accepted non-qualified spelling
+                  -- (quad's and twice's).
+                  assertEqual "lane calls" 9 (slLaneCalls l)
                 , assert "no error" (isNothing (sirError res))
                 ]
 
@@ -6450,6 +6477,34 @@ searchInScopeLaneTests cfg repoRoot = do
               , assertEqual "its score" [4] (map srowScore (sirResults res))
               , assertEqual "hits" 2 (slHits (sirLedger res))
               , assertEqual "outOfScope" 1 (slOutOfScope (sirLedger res))
+              , -- The goal read is timed, not counted: one qualified type_of.
+                assertEqual "laneCalls" 1 (slLaneCalls (sirLedger res))
+              ]
+
+        , runTest "search_in_scope: a local named like a using-listed import cannot stand in for the row" $ do
+            -- In `shadow twice = {!!}` the bare spelling `twice` types as the
+            -- pattern variable (Nat); WhyInScope answers a variable, not the
+            -- row, so the bare rung is refused and the row renders qualified.
+            r <- call base { sipLine = Just 32, sipQuery = natQuery, sipLimit = Just 10 }
+            withRes r $ \res ->
+              case [ row | row <- sirResults res, srowPrettyQname row == "ScopeSearchLib.twice" ] of
+                [row] -> allOf
+                  [ assertEqual "rendering" "ScopeSearchLib.twice" (srowRendering row)
+                  , assertEqual "rung" RungQualified (srowRung row)
+                  , assertEqual "type is the row's, not the local's" "Nat → Nat" (srowType row)
+                  ]
+                rows -> pure (Fail $ "expected the twice row once, got " <> show (length rows))
+
+        , runTest "search_in_scope: a goal whose display yields no tokens is the in-band query error" $ do
+            -- `idish A x = {!!}` has goal `A`, a context name, so the derived
+            -- query would be empty and must not become a match-all search.
+            r <- call base { sipLine = Just 35 }
+            withRes r $ \res -> allOf
+              [ assertEqual "stage" (Just "query") (lveStage <$> sirError res)
+              , assert "names the goal" (maybe False (("`A`" `T.isInfixOf`) . lveMessage) (sirError res))
+              , assertEqual "no results" [] (sirResults res)
+              , assertEqual "hits" 0 (slHits (sirLedger res))
+              , assertEqual "no query echoed" Nothing (sirQuery res)
               ]
 
         , runTest "search_in_scope: exclusions are the caller's, and are named with reasons" $ do

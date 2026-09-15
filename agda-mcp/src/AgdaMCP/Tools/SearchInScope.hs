@@ -34,6 +34,16 @@
 --     on probes is what keeps a pool of thousands of stale rows from holding
 --     the call.  A lane process failure mid-walk aborts the call with the
 --     structured failure the live-query tools raise; a rejection is an answer.
+--   * The identity check.  That a spelling TYPES does not prove it denotes
+--     the corpus row (Copilot's review of PR #161): in goal scope a pattern
+--     variable named like a using-listed import shadows it, so the bare
+--     spelling types as the local; and a re-exported spelling can resolve to
+--     whatever the importing module exports under that name.  So every
+--     accepted spelling other than the row's own qualified name is asked
+--     @WhyInScope@, and it is kept only if a candidate's defined name is the
+--     row's (anonymous-module segments dropped on both sides, as the
+--     extractor's @prettyQname@ drops them); a local answers @a variable
+--     bound at@ with no defined name and is refused, and the ladder goes on.
 --   * The lane-form statement exclusion.  The caller's @exclude.statement@ is
 --     applied a second time to Agda's printing of the accepted rendering,
 --     because corpus text and lane text agree only in unit tests.
@@ -57,6 +67,7 @@ module AgdaMCP.Tools.SearchInScope
   ) where
 
 import Control.Exception (evaluate)
+import Control.Monad (when)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import Data.List (partition)
 import qualified Data.Map.Strict as Map
@@ -69,15 +80,17 @@ import AgdaMCP.Agda (AgdaConfig)
 import AgdaMCP.Holes (codeOnly, flavourOf)
 import AgdaMCP.Interaction
   ( GoalContext (..), GoalCtxEntry (..), IResponse, InteractionLanes, LoadReport (..)
-  , cmdGoalTypeContext, cmdInferAtGoal, cmdInferToplevel, goalContextOf, runQuery
+  , ScopeCandidate (..), cmdGoalTypeContext, cmdInferAtGoal, cmdInferToplevel
+  , cmdWhyInScopeAtGoal, cmdWhyInScopeToplevel, goalContextOf, parseWhyInScope, runQuery
   )
 import AgdaMCP.Retrieval
   ( Pool (..), Ranked (..), buildPool, normalizeStatement, queryTokensOf )
 import AgdaMCP.Scope (parseImports, renderings)
 import AgdaMCP.Tools.LiveQueries
   ( LiveCtx (..), QueryScope (..), inferredTypeOf, interactionFailure, liveMeta
-  , loadError, opaqueAnswer, queryError, scopeFor, withLiveFile
+  , loadError, opaqueAnswer, queryError, scopeFor, whyInScopeMessageOf, withLiveFile
   )
+import qualified Data.Text as T
 import AgdaMCP.Types
 
 
@@ -184,14 +197,26 @@ resolveQuery ctx counters mQuery scope = case (mQuery, scope) of
                    \the query can be derived from that goal's type"
     }
   (Nothing, AtGoal g) -> do
-    answered <- timedQuery ctx counters (cmdGoalTypeContext g)
+    answered <- timedQuery ctx counters GoalRead (cmdGoalTypeContext g)
     case answered of
       Left tf -> pure (Left tf)
       Right resps -> case goalContextOf resps of
         Just gc ->
           let ctxNames = [ geName e | e <- gcEntries gc ]
               toks     = queryTokensOf (gcType gc) ctxNames
-          in  pure . Right . Right $ (SearchQuery Nothing toks, "goal")
+          in  if null toks
+                -- A goal that is only a context variable (or otherwise
+                -- yields no tokens) must not become the match-all query an
+                -- empty token list would be (Copilot's review of PR #161).
+                then pure . Right . Left $ LiveError
+                  { lveStage   = "query"
+                  , lveCode    = Nothing
+                  , lveMessage = "the goal at the anchor displays as `" <> gcType gc
+                      <> "`, which yields no retrieval tokens once context names, \
+                         \metas, numerals, and structure are dropped; pass \
+                         \query {name, tokens}"
+                  }
+                else pure . Right . Right $ (SearchQuery Nothing toks, "goal")
         Nothing -> pure . Right . Left $
           fromMaybe (opaqueAnswer "goal" resps) (queryError "goal" resps)
 
@@ -233,7 +258,7 @@ walk ctx counters scope lim budget mExclude = go Map.empty 0 [] [] []
               qname  = cePrettyQname entry
               modul  = cePrettyModule entry
               ladder = preferRung (Map.lookup modul memo) (renderings (rkImports r) qname)
-          outcome <- tryLadder ctx counters scope ladder
+          outcome <- tryLadder ctx counters scope qname ladder
           case outcome of
             Left tf -> pure (Left tf)
             Right Nothing ->
@@ -283,33 +308,80 @@ walk ctx counters scope lim budget mExclude = go Map.empty 0 [] [] []
       , wStoppedBy = why
       }
 
--- | tryLadder: the first rendering the lane types, with its rung and Agda's
--- printed type; @Nothing@ when no rung types.  A lane rejection (an in-band
--- Agda error) moves to the next rung; a lane process failure aborts.
+-- | tryLadder: the first rendering the lane types AND that denotes the row,
+-- with its rung and Agda's printed type; @Nothing@ when no rung does.  A lane
+-- rejection (an in-band Agda error) or a spelling that denotes something
+-- else moves to the next rung; a lane process failure aborts.  The row's own
+-- qualified name needs no identity check: typing it is resolving it.
 tryLadder
-  :: LiveCtx -> Counters -> QueryScope -> [(Rung, Text)]
+  :: LiveCtx -> Counters -> QueryScope -> Text -> [(Rung, Text)]
   -> IO (Either ToolFailure (Maybe (Rung, Text, Text)))
-tryLadder _ _ _ [] = pure (Right Nothing)
-tryLadder ctx counters scope ((rung, rendering) : rest) = do
+tryLadder _ _ _ _ [] = pure (Right Nothing)
+tryLadder ctx counters scope qname ((rung, rendering) : rest) = do
   let cmd = case scope of
         AtGoal g -> cmdInferAtGoal g rendering
         Toplevel -> cmdInferToplevel rendering
-  answered <- timedQuery ctx counters cmd
+  answered <- timedQuery ctx counters ValidationCall cmd
   case answered of
     Left tf -> pure (Left tf)
     Right resps -> case inferredTypeOf resps of
-      Just printed -> pure (Right (Just (rung, rendering, printed)))
-      Nothing      -> tryLadder ctx counters scope rest
+      Nothing -> next
+      Just printed
+        | rung == RungQualified -> pure (Right (Just (rung, rendering, printed)))
+        | otherwise -> do
+            identity <- denotesRow ctx counters scope rendering qname
+            case identity of
+              Left tf     -> pure (Left tf)
+              Right True  -> pure (Right (Just (rung, rendering, printed)))
+              Right False -> next
+  where
+    next = tryLadder ctx counters scope qname rest
 
--- | timedQuery: one lane command, its wall time and count added to the lane
--- half of the ledger, its process failure shaped as the live tools shape it.
-timedQuery :: LiveCtx -> Counters -> Text -> IO (Either ToolFailure [IResponse])
-timedQuery ctx counters cmd = do
+-- | denotesRow: does this spelling, in this scope, resolve to the corpus
+-- row?  Agda's @WhyInScope@ lists every binding of the spelling, the one
+-- that wins AND the ones it shadows (probed at the fixture's @shadow@ hole:
+-- @a variable bound at …:32.8-13 shadowing@ first, then @a defined name
+-- ScopeSearchLib.twice@).  So the spelling denotes the row iff no candidate
+-- is a variable (a local always wins over a defined name) and one
+-- candidate's defined name is the row's @prettyQname@ once anonymous-module
+-- segments are dropped from Agda's printing (the extractor's own
+-- normalization, @normalizeQNameText@ in agda-strux).  An unparseable
+-- answer is a refusal; every refusal sends the ladder to its next rung.
+denotesRow
+  :: LiveCtx -> Counters -> QueryScope -> Text -> Text -> IO (Either ToolFailure Bool)
+denotesRow ctx counters scope rendering qname = do
+  let cmd = case scope of
+        AtGoal g -> cmdWhyInScopeAtGoal g rendering
+        Toplevel -> cmdWhyInScopeToplevel rendering
+  answered <- timedQuery ctx counters ValidationCall cmd
+  pure $ case answered of
+    Left tf -> Left tf
+    Right resps -> Right $ case parseWhyInScope =<< whyInScopeMessageOf resps of
+      Just cands ->
+        not (any isVariable cands)
+          && any (\c -> (normalizeQName <$> scQualified c) == Just (normalizeQName qname)) cands
+      Nothing    -> False
+  where
+    isVariable c = "a variable" `T.isPrefixOf` scDescription c
+    normalizeQName = T.intercalate "." . filter (\s -> not (T.null s) && s /= "_") . T.splitOn "."
+
+-- | LaneUse: what a lane command is for, which decides whether it counts in
+-- @ledger.laneCalls@ (the calls spent validating renderings: every
+-- @type_of@ and every identity check) or only in @timing.laneMs@ (the goal
+-- read of a derived query, which validates nothing).
+data LaneUse = ValidationCall | GoalRead
+  deriving (Eq)
+
+-- | timedQuery: one lane command, its wall time added to the lane half of the
+-- ledger and its count when it is a validation call, its process failure
+-- shaped as the live tools shape it.
+timedQuery :: LiveCtx -> Counters -> LaneUse -> Text -> IO (Either ToolFailure [IResponse])
+timedQuery ctx counters use cmd = do
   t0 <- getMonotonicTimeNSec
   rs <- runQuery (lcHandle ctx) (lcAbsPath ctx) cmd
   t1 <- getMonotonicTimeNSec
   modifyIORef' (cLaneNs counters) (+ (t1 - t0))
-  modifyIORef' (cLaneCalls counters) (+ 1)
+  when (use == ValidationCall) $ modifyIORef' (cLaneCalls counters) (+ 1)
   case rs of
     Left lf -> Left . FailInteraction
                  <$> interactionFailure (lcProject ctx) (lcConfig ctx) (lcStartNs ctx) lf

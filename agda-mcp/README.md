@@ -849,20 +849,20 @@ opened).  The lane echo (`lane`, `command`, `project`, `elapsedMs`,
   ],
   "ledger": {
     "hits": 7, "inScope": 6, "outOfScope": 1,
-    "excluded": [], "nonFunction": 0, "ranked": 6, "probed": 6, "laneCalls": 7,
+    "excluded": [], "nonFunction": 0, "ranked": 6, "probed": 6, "laneCalls": 9,
     "laneRejected": [ { "prettyQname": "ScopeSearchLib.ghost", "tried": ["ScopeSearchLib.ghost"] } ],
     "accepted": 5, "truncated": false, "stoppedBy": "exhausted"
   },
-  "timing": { "poolMs": 0, "laneMs": 14 },
-  "elapsedMs": 75, "lane": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+  "timing": { "poolMs": 0, "laneMs": 8 },
+  "elapsedMs": 68, "lane": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
 }
 ```
 
 Three things are contractual.
 
-+  **Every `rendering` was typed by Agda in this file's scope, and `type` is Agda's printing**.  Three of the ladder's four rungs are visible above: `twice` is `using`-listed and renders bare; the nested rows render by their own qualified name; and `quad`, defined in `ScopeSearchBarrel.Core` and re-exported by the barrel this file imports, renders as `ScopeSearchBarrel.quad` because the lane refused `ScopeSearchBarrel.Core.quad` (that module is not in the file's scope).  The fourth, `re-export`, is the importing module qualifying the tail of the row's module path, which is how a record field defined in a file that an imported module re-exports is named (`Setoid.Homomorphisms.IsHom.compatible` for the agda-algebras row `Setoid.Homomorphisms.Basic.IsHom.compatible`); the first measurement on that corpus found those rows refused under every other spelling, and the ladder grew the rung.  `ScopeSearchLib.ghost`, a row the corpus carries and the library no longer defines, is not returned; it is named in `laneRejected` with the spelling that was tried.
-+  **An empty result states its bounds**.  `hits` counts the query's matches over the whole corpus, before scope, so `hits: 12, inScope: 0` reads as "the lemma exists and this file does not import its module"; `excluded` names every row your own `exclude` set aside and why (`name`, `statement`, or `lane-statement`); `laneRejected` names every row the loaded library disagreed with; and `stoppedBy` says whether the walk ended because `limit` was filled, `maxProbes` was spent, or the ranked list ran out.
-+  **No verdict**.  A file that does not load answers `error.stage: "load"` with Agda's message and runs no query; no `query` with no goal at the anchor answers `error.stage: "query"`.  Process-level lane failures and path refusals are the same structured `isError` payloads the live-query tools raise.
++  **Every `rendering` was typed by Agda in this file's scope, and `type` is Agda's printing**.  Typing alone is not identity, though: a pattern variable named like a `using`-listed import shadows it inside a hole, and a re-exported spelling resolves to whatever the importing module exports under that name, so every accepted spelling other than the row's own qualified name is also asked Agda's `WhyInScope` and kept only if a candidate's defined name is the row's (the `shadow` hole of the fixture pins the local case: `twice` types there as `Nat`, is refused, and the row renders as `ScopeSearchLib.twice`).  Three of the ladder's four rungs are visible above: `twice` is `using`-listed and renders bare; the nested rows render by their own qualified name; and `quad`, defined in `ScopeSearchBarrel.Core` and re-exported by the barrel this file imports, renders as `ScopeSearchBarrel.quad` because the lane refused `ScopeSearchBarrel.Core.quad` (that module is not in the file's scope).  The fourth, `re-export`, is the importing module qualifying the tail of the row's module path, which is how a record field defined in a file that an imported module re-exports is named (`Setoid.Homomorphisms.IsHom.compatible` for the agda-algebras row `Setoid.Homomorphisms.Basic.IsHom.compatible`); the first measurement on that corpus found those rows refused under every other spelling, and the ladder grew the rung.  `ScopeSearchLib.ghost`, a row the corpus carries and the library no longer defines, is not returned; it is named in `laneRejected` with the spelling that was tried.
++  **An empty result states its bounds**.  `hits` counts the query's matches over the whole corpus, before scope, so `hits: 12, inScope: 0` reads as "the lemma exists and this file does not import its module"; `excluded` names every row your own `exclude` set aside and why (`name`, `statement`, or `lane-statement`); `laneRejected` names every row the loaded library disagreed with; `laneCalls` counts the lane calls spent validating (a `type_of` per rung tried, plus one identity check per accepted spelling other than the row's own qualified name; the goal read of a derived query is timed, not counted); and `stoppedBy` says whether the walk ended because `limit` was filled, `maxProbes` was spent, or the ranked list ran out.
++  **No verdict**.  A file that does not load answers `error.stage: "load"` with Agda's message and runs no query; no `query` with no goal at the anchor, or with a goal whose display yields no tokens (a goal that is only a context variable), answers `error.stage: "query"` rather than searching the whole corpus.  Process-level lane failures and path refusals are the same structured `isError` payloads the live-query tools raise.
 
 `timing.poolMs` is the corpus half (query, scope, exclusion, rank over the whole
 index) and `timing.laneMs` the lane half (every `type_of`, plus the goal read
@@ -871,9 +871,10 @@ indexed rows) from a benchmark obligation whose seven `using` imports reach 98
 to 247 rows per query: the pool half answers in 7 to 35 ms whatever the query
 (one token, four goal-derived tokens, or a name), because bare type tokens are
 indexed at corpus load (about half a second of the 2.3 s load); a warm lane
-types a rendering in 4 to 5 ms, so a default call of eight results costs 9 to
-13 lane calls and about 50 ms; and the one cold cost is the file's first lane
-load, 5.6 to 5.8 s for that obligation, paid once per file and shared with
+answers a `type_of` or an identity check in 3 to 5 ms, so a default call of
+eight results, all reached through re-exports on that obligation, costs 20 to
+23 lane calls and 55 to 70 ms; and the one cold cost is the file's first lane
+load, 5.6 to 6.4 s for that obligation, paid once per file and shared with
 every live-query tool.  The full table is on issue #17.  Phase 2 of the issue,
 `search_term` (bounded synthesis at a hole, committed-checkable terms only), is
 not part of this tool.

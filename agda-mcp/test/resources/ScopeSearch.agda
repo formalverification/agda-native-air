@@ -21,3 +21,15 @@ import ScopeSearchBarrel
 
 probe : (n : Nat) → twice n ≡ n + n
 probe n = {!!}
+
+-- Two more holes pin the identity check (PR #161 review): in `shadow`, a
+-- pattern variable named like the using-listed import means the bare
+-- spelling `twice` types but denotes the local, so the row must render
+-- qualified; in `idish`, the goal is only a context variable and its
+-- display yields no retrieval tokens, so a call with no query there must
+-- answer in band rather than search the whole corpus.
+shadow : Nat → Nat
+shadow twice = {!!}
+
+idish : (A : Set) → A → A
+idish A x = {!!}

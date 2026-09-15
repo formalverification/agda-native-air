@@ -65,6 +65,7 @@ module AgdaMCP.Tools.LiveQueries
   , liveMeta
   , scopeFor
   , inferredTypeOf
+  , whyInScopeMessageOf
   , queryError
   , loadError
   , opaqueAnswer

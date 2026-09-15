@@ -379,9 +379,14 @@ candidatesOf idx toks =
 -- names spell whole statements in operator glyphs, and an uncapped count
 -- hands the top ranks to symbol soup), minus one per pure-symbol operator
 -- the query never mentions (evidence of a different statement family).
--- Identifiers and numerals are never penalized.
+-- Identifiers and numerals are never penalized.  A query with no tokens (a
+-- name-only query) scores every row zero, so the rank falls through to
+-- arity and name as the contract says; without this, the misfit penalty
+-- would order such a query by operator content (Copilot's review of PR #161).
 score :: Set Text -> Text -> Text -> Int
-score queryTokens bare typ =
+score queryTokens bare typ
+  | Set.null queryTokens = 0
+  | otherwise =
   let typeTokens = bareTypeTokens typ
       overlap    = Set.size (Set.intersection queryTokens typeTokens)
       nameHit    = if any (`T.isInfixOf` bare) (Set.toList queryTokens) then 1 else 0

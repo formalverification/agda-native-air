@@ -914,7 +914,11 @@ searchInScopeNote =
   \('re-export', how a record field defined in a file the imported module \
   \re-exports is named), and the importing module qualifying the bare name \
   \alone ('importing-module', valid for re-exports whose defining module is \
-  \not itself imported); via.rung says which was accepted. RANK: twice \
+  \not itself imported); via.rung says which was accepted. A spelling that \
+  \types is ALSO checked to denote the row (Agda's WhyInScope) unless it is \
+  \the row's own qualified name, so a local binder or file-local definition \
+  \of the same name cannot stand in for a corpus row, and a re-exported \
+  \spelling that resolves to a different definition is refused. RANK: twice \
   \the overlap between the query tokens and the row's bare type tokens, plus \
   \a name bonus capped at one, minus one per pure-symbol operator the query \
   \never mentions; ties break cheap-before-expensive on approximate arity, \
@@ -930,7 +934,9 @@ searchInScopeNote =
   \in ledger.excluded with its reason: name, statement, or lane-statement. \
   \THE LEDGER: every response carries ledger {hits (rows matching the query \
   \corpus-wide, BEFORE scope), inScope, outOfScope, excluded [{prettyQname, \
-  \reason}], nonFunction, ranked, probed, laneCalls, laneRejected \
+  \reason}], nonFunction, ranked, probed, laneCalls (type_of calls plus \
+  \identity checks; the goal read of a derived query is timed but not \
+  \counted), laneRejected \
   \[{prettyQname, tried}], accepted, truncated, stoppedBy ('limit', \
   \'maxProbes', or 'exhausted')}, so an EMPTY results list always states its \
   \bounds: hits > 0 with inScope = 0 means the definition exists in the \
@@ -938,9 +944,10 @@ searchInScopeNote =
   \= 0 and laneRejected naming them means the corpus and the loaded library \
   \disagree. timing {poolMs, laneMs} reports the corpus half of the latency \
   \apart from the lane half. A file that does not load answers \
-  \error.stage='load' with Agda's message and runs no query; no query and no \
-  \goal at the anchor answers error.stage='query'. Registered only when the \
-  \server was started with --corpus."
+  \error.stage='load' with Agda's message and runs no query; no query with \
+  \no goal at the anchor, or with a goal whose display yields no tokens, \
+  \answers error.stage='query'. Registered only when the server was started \
+  \with --corpus."
 
 -- | searchLineDoc: the anchor's contract for search_in_scope; the live-query
 -- line contract, restated for a tool whose scope decides the validation.
