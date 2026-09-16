@@ -22,11 +22,18 @@
 --      over fixture projects — never over this repository's own gate;
 --      1g: the requested path (#101) — a relative path resolved against the
 --      server's own working directory, and every way a path can fail to name
---      a readable file, each refused by name rather than crashing the call.
+--      a readable file, each refused by name rather than crashing the call;
+--      1i: scope-aware retrieval (#17), pure: the import surface read off the
+--      code-only view, the scope rule, the rendering ladder, the tokenizer,
+--      statement normalization, the scorer and its rank, the exclusion rules,
+--      the pool's ledger arithmetic, and the tool's declared schema.
 --   2. Subprocess tests (needs agda on PATH) — full tool round-trips,
 --      including 2d: hole-enumeration parity against batch Agda, the module
 --      name Agda itself resolves (#100), and 2f: re-anchoring by position
 --      across a fill (#79).
+--   3. The interaction lane (needs agda on PATH): the live-query tools, and
+--      3b: search_in_scope (#17) against the fixture corpus and the narrow
+--      imports of ScopeSearch.agda, every rendering typed by the lane.
 --
 --   Tier 2 tests are skipped gracefully if Agda is not available, making the test
 --   suite safe to run in CI without a Nix shell.
@@ -91,7 +98,7 @@ import AgdaMCP.Holes
   , HoleRef (..) , offsetOfPosition , resolveHoleRef
   , injectReportExpr , substituteHole
   )
-import AgdaMCP.Corpus (loadCorpus, searchByName, searchByType, getDeps)
+import AgdaMCP.Corpus (corpusIndexOf, loadCorpus, searchByName, searchByType, getDeps)
 import AgdaMCP.Path (ioProblem)
 import AgdaMCP.Diagnostics
   ( attachUnsolvedMetas, capDiagnostics, defaultMaxDiagnostics, diagnosticRank
@@ -128,6 +135,14 @@ import AgdaMCP.Tools.LiveQueries
   , handleTypeOf )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
+import AgdaMCP.Tools.SearchInScope (handleSearchInScope, needsIdentityCheck, probeBudget)
+import AgdaMCP.Scope
+  ( bareNameOf, bareRenderingOf, importingModulesOf, parseImports, renderings )
+import AgdaMCP.Retrieval
+  ( Pool (..), Ranked (..), approxVisibleArity, bareToken, buildPool
+  , exclusionReason, matchesQuery, normalizeStatement, queryHasSignal
+  , queryTokensOf, rank, score, splitTopLevelArrows, tokens )
+import qualified Data.Set as Set
 import AgdaMCP.Types
 
 
@@ -1846,8 +1861,7 @@ rowWithoutTypeAst = BS8.pack
 -- its 24 rows and its unqualified-token case, which the prettyName fallback
 -- still has to serve.
 qualifiedTokenIndex :: CorpusIndex
-qualifiedTokenIndex =
-  CorpusIndex { ciEntries = entries, ciSize = Map.size entries }
+qualifiedTokenIndex = corpusIndexOf entries
   where
     entries = Map.fromList [ (cePrettyQname e, e) | e <- [caller, stranger, callee] ]
 
@@ -1883,8 +1897,11 @@ corpusTests = do
   hPutStrLn stderr "\n── Corpus / search tests (tier 1b: no Agda) ──"
   sequence
     [ -- Corpus loading
-      withCorpus "loadCorpus: fixture has 24 entries" $ \idx ->
-        assertEqual "entry count" 24 (ciSize idx)
+      -- 24 agda-algebras rows, plus the eight scope-fixture rows issue #17
+      -- added for search_in_scope (ScopeSearchLib, ScopeSearchBarrel.Core,
+      -- and one stranger module no fixture imports).
+      withCorpus "loadCorpus: fixture has 32 entries" $ \idx ->
+        assertEqual "entry count" 32 (ciSize idx)
     , withCorpus "loadCorpus: expected keys present" $ \idx ->
         let entries = ciEntries idx
         in assert "Algebra, hom, Con should be present"
@@ -2034,6 +2051,352 @@ timeoutFixturePath = "test" </> "resources" </> "TimeoutFixture.agda"
 -- | How long the fake agda "typechecks" for in the tests that expect a timeout.
 -- Must comfortably exceed 'fakeTimeoutSecs' so the bound is what ends the run,
 -- and must be short enough that a test can outwait it to check for an orphan.
+-- ---------------------------------------------------------------------------
+-- Tier 1i: scope-aware retrieval (issue #17), pure
+-- ---------------------------------------------------------------------------
+
+-- | scopeImportOf: a 'ScopeImport' with the defaults, for the ladder tests.
+scopeImportOf :: Text -> Bool -> ScopeImport
+scopeImportOf m opened = ScopeImport
+  { siModule = m, siOpened = opened, siPublic = False, siAs = Nothing
+  , siUsing = Nothing, siHiding = [], siRenaming = [] }
+
+-- | scopeEntry: a synthetic corpus row for the pool tests.
+scopeEntry :: Text -> Text -> Text -> Text -> CorpusEntry
+scopeEntry m n typ kind = CorpusEntry
+  { ceFile = "F.agda", ceModule = m, ceName = n, ceQname = m <> "." <> n
+  , cePrettyModule = m, cePrettyName = n, cePrettyQname = m <> "." <> n
+  , ceType = typ, ceTypeAstVer = "0.3-v0", ceDefKind = kind
+  , ceDependencies = [], ceAstSize = T.length typ, ceHasBody = False }
+
+-- | indexOf: a 'CorpusIndex' over synthetic rows.
+indexOf :: [CorpusEntry] -> CorpusIndex
+indexOf es = corpusIndexOf (Map.fromList [ (cePrettyQname e, e) | e <- es ])
+
+-- | corpusTools: the tool definitions a client receives WITH a corpus loaded
+-- (the empty index is enough: registration keys on presence).
+corpusTools :: Aeson.Value
+corpusTools = toolDefinitions ServerConfig
+  { scAgdaConfig  = defaultConfig
+  , scGateConfig  = defaultGateConfig
+  , scServerName  = "agda-mcp-test"
+  , scVersion     = "0"
+  , scCorpusIndex = Just (indexOf [])
+  }
+
+-- | toolNamesOf: the names a tools/list value advertises, in order.
+toolNamesOf :: Aeson.Value -> [Text]
+toolNamesOf v = case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
+  Aeson.Success ts -> [ n | t <- ts, Just (Aeson.String n) <- [KM.lookup "name" t] ]
+  Aeson.Error _    -> []
+
+-- | descriptionOf: one tool's description text.
+descriptionOf :: Text -> Aeson.Value -> Text
+descriptionOf name v = case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
+  Aeson.Success ts -> T.concat
+    [ d | t <- ts, KM.lookup "name" t == Just (Aeson.String name)
+        , Just (Aeson.String d) <- [KM.lookup "description" t] ]
+  Aeson.Error _ -> ""
+
+-- | subProperties: the declared properties of an object-valued property.
+subProperties :: Text -> Text -> Aeson.Value -> [Text]
+subProperties tool propName v =
+  case KM.lookup "properties" (inputSchemaOf tool v) of
+    Just (Aeson.Object props) -> case KM.lookup (Key.fromText propName) props of
+      Just (Aeson.Object p) -> case KM.lookup "properties" p of
+        Just (Aeson.Object sub) -> sort (map Key.toText (KM.keys sub))
+        _                       -> []
+      _ -> []
+    _ -> []
+
+-- | decodeScopeParams: decode a request written as Text.  Through UTF-8, not
+-- through a ByteString literal, whose IsString instance truncates every
+-- character to a byte (a @≡@ arrives as @a@).
+decodeScopeParams :: Text -> Either String SearchInScopeParams
+decodeScopeParams = Aeson.eitherDecode . LBS.fromStrict . TE.encodeUtf8
+
+scopeRetrievalTests :: IO [Bool]
+scopeRetrievalTests = do
+  hPutStrLn stderr "\n── Scope-aware retrieval (tier 1i: no Agda, #17) ──"
+  fixtureSrc <- TIO.readFile ("test" </> "resources" </> "ScopeSearch.agda")
+  let fixtureImports = parseImports (codeOnly PlainAgda fixtureSrc)
+      lib    = (scopeImportOf "ScopeSearchLib" True) { siUsing = Just ["twice"] }
+      barrel = scopeImportOf "ScopeSearchBarrel" False
+      goalToks = Set.fromList ["+", "≡"]
+  sequence
+    [ -- The import surface, off the fixture.
+      runTest "parseImports: the fixture's four imports, with their modifiers" $
+        assertEqual "imports"
+          [ scopeImportOf "Agda.Builtin.Nat" True
+          , scopeImportOf "Agda.Builtin.Equality" True
+          , lib
+          , barrel ]
+          fixtureImports
+
+    , runTest "parseImports: every modifier, in any order, on one line" $
+        assertEqual "import"
+          [ ScopeImport "M" True True (Just "N") (Just ["a", "_+_"]) ["d"] [("b", "c")] ]
+          (parseImports "open import M using (a; _+_) renaming (b to c) hiding (d) public as N")
+
+    , runTest "parseImports: a using list spanning lines is read whole, and the next statement is not" $
+        -- The list opens on the next line (Agda's layout rule: a more-indented
+        -- line continues the statement), wraps over three, and a blank line
+        -- and a statement at the head's indentation end it.
+        assertEqual "imports"
+          [ (scopeImportOf "Data.Nat.Properties" True) { siUsing = Just ["+-comm", "+-assoc", "*-comm"] }
+          , scopeImportOf "Data.Nat" True ]
+          (parseImports "open import Data.Nat.Properties using\n  ( +-comm\n  ; +-assoc\n  ; *-comm )\n\nopen import Data.Nat\n")
+
+    , runTest "parseImports: a plain import is not opened; a hiding import opens the rest" $
+        assertEqual "imports"
+          [ scopeImportOf "A" False, (scopeImportOf "B" True) { siHiding = ["x"] } ]
+          (parseImports "import A\nopen import B hiding (x)\n")
+
+    , runTest "parseImports: comments, pragmas, and hole interiors never import (code-only view)" $
+        assertEqual "imports" [scopeImportOf "Real" True] $
+          parseImports (codeOnly PlainAgda
+            "-- open import LineGhost\n{- open import BlockGhost -}\n\
+            \{-# FOREIGN GHC import Data.List #-}\nopen import Real\nx = {! open import HoleGhost !}\n")
+
+    , -- The scope rule.
+      runTest "importingModulesOf: equal, dot-boundary extension, and the longest prefix" $ allOf
+        [ assertEqual "equal" [lib] (importingModulesOf [lib, barrel] "ScopeSearchLib")
+        , assertEqual "nested" [lib] (importingModulesOf [lib, barrel] "ScopeSearchLib.Inner")
+        , assertEqual "barrel core" [barrel] (importingModulesOf [lib, barrel] "ScopeSearchBarrel.Core")
+        , assertEqual "not at a dot boundary" [] (importingModulesOf [lib] "ScopeSearchLibrary")
+        , assertEqual "unrelated" [] (importingModulesOf [lib, barrel] "Elsewhere.Stranger")
+        , assertEqual "longest wins"
+            [scopeImportOf "A.B" True]
+            (importingModulesOf [scopeImportOf "A" True, scopeImportOf "A.B" True] "A.B.C")
+        ]
+
+    , -- The ladder.
+      runTest "renderings: bare when using-listed, then qualified; the importing rung dedups" $ allOf
+        [ assertEqual "twice" [(RungBare, "twice"), (RungQualified, "ScopeSearchLib.twice")]
+            (renderings [lib] "ScopeSearchLib.twice")
+        , assertEqual "twice-def" [(RungQualified, "ScopeSearchLib.twice-def")]
+            (renderings [lib] "ScopeSearchLib.twice-def")
+        ]
+    , runTest "renderings: a nested row is qualified, then the importing module qualifies the bare name" $
+        assertEqual "thrice"
+          [(RungQualified, "ScopeSearchLib.Inner.thrice"), (RungImporting, "ScopeSearchLib.thrice")]
+          (renderings [lib] "ScopeSearchLib.Inner.thrice")
+    , runTest "renderings: a two-segment tail tries the re-export spelling between them" $
+        -- The agda-algebras shape: a record field defined in a file the
+        -- imported module re-exports is named through the importing module
+        -- and the record, not through the defining file.
+        assertEqual "compatible"
+          [ (RungQualified, "Setoid.Homomorphisms.Basic.IsHom.compatible")
+          , (RungReexport 1, "Setoid.Homomorphisms.IsHom.compatible")
+          , (RungImporting, "Setoid.Homomorphisms.compatible") ]
+          (renderings [(scopeImportOf "Setoid.Homomorphisms" True) { siUsing = Just ["hom"] }]
+                      "Setoid.Homomorphisms.Basic.IsHom.compatible")
+    , runTest "renderings: a plain import offers no bare rung; an alias replaces the module" $ allOf
+        [ assertEqual "barrel"
+            [(RungQualified, "ScopeSearchBarrel.Core.quad"), (RungImporting, "ScopeSearchBarrel.quad")]
+            (renderings [barrel] "ScopeSearchBarrel.Core.quad")
+        , assertEqual "aliased"
+            [(RungQualified, "Q.Core.quad"), (RungImporting, "Q.quad")]
+            (renderings [barrel { siAs = Just "Q" }] "ScopeSearchBarrel.Core.quad")
+        ]
+    , runTest "bareRenderingOf: whole-module opens all; hiding withholds; renaming respells" $ allOf
+        [ assertEqual "whole" (Just "x") (bareRenderingOf (scopeImportOf "M" True) "x")
+        , assertEqual "hidden" Nothing (bareRenderingOf ((scopeImportOf "M" True) { siHiding = ["x"] }) "x")
+        , assertEqual "renamed" (Just "y") (bareRenderingOf ((scopeImportOf "M" True) { siRenaming = [("x", "y")] }) "x")
+        , assertEqual "not listed" Nothing (bareRenderingOf lib "twice-def")
+        , assertEqual "plain import" Nothing (bareRenderingOf barrel "quad")
+        ]
+    , runTest "bareNameOf: the last dot segment, operators included" $ allOf
+        [ assertEqual "op" "_+_" (bareNameOf "Agda.Builtin.Nat._+_")
+        , assertEqual "plain" "quad" (bareNameOf "ScopeSearchBarrel.Core.quad")
+        , assertEqual "bare already" "x" (bareNameOf "x")
+        ]
+
+    , -- Tokens and statements.
+      runTest "tokens: delimiters stand alone, runs split on whitespace" $
+        assertEqual "tokens"
+          ["(", "m", "n", ":", "ℕ", ")", "→", "m", "+", "n", "≡", "n", "+", "m"]
+          (tokens "(m n : ℕ) → m + n ≡ n + m")
+    , runTest "bareToken: last segment, outer underscores stripped" $ allOf
+        [ assertEqual "+" "+" (bareToken "Agda.Builtin.Nat._+_")
+        , assertEqual "≡" "≡" (bareToken "_≡_")
+        , assertEqual "Nat" "Nat" (bareToken "Nat")
+        ]
+    , runTest "normalizeStatement: binder renaming and ∀ sugar; different statements stay apart" $ allOf
+        [ assertEqual "renamed binders"
+            (normalizeStatement "(m n : ℕ) → m + n ≡ n + m")
+            (normalizeStatement "(x y : ℕ) → x + y ≡ y + x")
+        , assertEqual "∀ dropped"
+            (normalizeStatement "∀ (n : ℕ) → n ≡ n")
+            (normalizeStatement "(k : ℕ) → k ≡ k")
+        , assert "different" (normalizeStatement "(n : ℕ) → n ≡ n" /= normalizeStatement "(n : ℕ) → n + n ≡ n")
+        ]
+    , runTest "splitTopLevelArrows: standalone depth-0 arrows only" $ allOf
+        [ assertEqual "glued arrow" ["IsInRange→IsInImage"] (splitTopLevelArrows "IsInRange→IsInImage")
+        , assertEqual "bracket mixfix" ["𝔻[ A → B ]", "C"] (splitTopLevelArrows "𝔻[ A → B ] → C")
+        , assertEqual "binders" ["(m n : ℕ)", "m + n ≡ n + m"] (splitTopLevelArrows "(m n : ℕ) → m + n ≡ n + m")
+        ]
+    , runTest "approxVisibleArity: visible binder groups count, hidden ones and alias forms do not" $ allOf
+        [ assertEqual "two names" 2 (approxVisibleArity "(m n : ℕ) → m + n ≡ n + m")
+        , assertEqual "hidden then bare" 1 (approxVisibleArity "{A : Set} → A → A")
+        , assertEqual "alias form" 0 (approxVisibleArity "Commutative _≡_ _+_")
+        , assertEqual "three arrows" 2 (approxVisibleArity "Nat → Nat → Nat")
+        ]
+
+    , -- Queries and the scorer.
+      runTest "queryTokensOf: context names, single letters, numerals, metas, structure dropped" $ allOf
+        [ assertEqual "goal" ["+", "≡"] (queryTokensOf "n + n ≡ n + n" ["n"])
+        , assertEqual "metas and numerals" ["hom", "⊙"]
+            (queryTokensOf "hom 𝑨 𝑪 → _x_9 ≡ 2 ⊙ _12" ["𝑨", "𝑪", "≡"])
+        , -- A normalized goal in a using-import file prints its names qualified.
+          assertEqual "qualified display tokens are bare-reduced" ["Σ", "Func", "IsHom"]
+            (queryTokensOf "Data.Product.Σ (Function.Bundles.Func 𝑨 𝑩) (Setoid.Homomorphisms.IsHom 𝑨 𝑩)" ["𝑨", "𝑩"])
+        ]
+    , runTest "matchesQuery: a token given qualified meets the row's bare token" $
+        let e = scopeEntry "L" "lemma" "(f : Function.Bundles.Func A B) → Set" "function"
+        in  allOf
+          [ assert "qualified query token" (matchesQuery (SearchQuery Nothing ["Function.Bundles.Func"]) e)
+          , assert "bare query token" (matchesQuery (SearchQuery Nothing ["Func"]) e)
+          , assert "unrelated" (not (matchesQuery (SearchQuery Nothing ["Nat"]) e))
+          ]
+    , runTest "buildPool: the token index answers exactly what matchesQuery specifies" $ do
+        loaded <- loadCorpus corpusFixturePath
+        case loaded of
+          Left err  -> pure (Fail (T.unpack err))
+          Right idx ->
+            let everything = [ scopeImportOf m True | m <- Set.toList (Set.fromList (map cePrettyModule (Map.elems (ciEntries idx)))) ]
+                agrees q = poolHits (buildPool q Nothing everything idx)
+                             == length (filter (matchesQuery q) (Map.elems (ciEntries idx)))
+            in  allOf
+              [ assert "tokens" (agrees (SearchQuery Nothing ["Nat"]))
+              , assert "operator token" (agrees (SearchQuery Nothing ["≡"]))
+              , assert "name fragment only" (agrees (SearchQuery Nothing ["hom"]))
+              , assert "name and tokens" (agrees (SearchQuery (Just "hom") ["Algebra"]))
+              , assert "name only" (agrees (SearchQuery (Just "Basic") []))
+              , assert "qualified token" (agrees (SearchQuery Nothing ["Algebras.Basic.Algebra"]))
+              ]
+    , runTest "score: overlap twice, name bonus once, one per misfit operator" $ allOf
+        [ assertEqual "twice-def" 4 (score goalToks "twice-def" "(n : Nat) → twice n ≡ n + n")
+        , assertEqual "misfit *" 1 (score goalToks "*-comm" "(a b : ℕ) → a * b ≡ b * a")
+        , assertEqual "name bonus" 1 (score (Set.fromList ["+"]) "+-comm" "Commutative A B")
+        , -- The bonus is capped at one and the two operators the query never
+          -- mentions each cost one, as in the driver.
+          assertEqual "name bonus under two misfits" (-1) (score (Set.fromList ["+"]) "+-comm" "Commutative _≡_ _∙_")
+        , assertEqual "nothing" 0 (score goalToks "id" "A → A")
+        , -- A name-only query carries no tokens and must not order rows by
+          -- their operator content (Copilot's review of PR #161).
+          assertEqual "no tokens, no penalty" 0 (score Set.empty "*-comm" "(a b : ℕ) → a * b ≡ b * a")
+        ]
+    , runTest "rank: a name-only query ranks on arity and name, whatever the operators" $
+        let a = scopeEntry "M" "zed" "ℕ → ℕ" "function"
+            b = scopeEntry "M" "ops" "(x y : ℕ) → x * y ≡ y * x" "function"
+            c = scopeEntry "M" "amb" "(x : ℕ) → x ≡ x" "function"
+        in  assertEqual "order" ["M.amb", "M.zed", "M.ops"]
+              (map (cePrettyQname . rkEntry) (rank Set.empty [ (e, []) | e <- [a, b, c] ]))
+    , runTest "rank: score, then cheap before expensive, then the name" $
+        let a = scopeEntry "M" "a" "(x y : ℕ) → x + y ≡ y + x" "function"
+            b = scopeEntry "M" "b" "(x : ℕ) → x + x ≡ x + x" "function"
+            c = scopeEntry "M" "c" "ℕ → ℕ" "function"
+            d = scopeEntry "M" "d" "(x : ℕ) → x + x ≡ x + x" "function"
+            ranked = rank goalToks [ (e, []) | e <- [a, c, d, b] ]
+        in  assertEqual "order" ["M.b", "M.d", "M.a", "M.c"] (map (cePrettyQname . rkEntry) ranked)
+
+    , -- Exclusion.
+      runTest "exclusionReason: by bare name, by normalized statement, or not at all" $
+        let e = scopeEntry "M" "+-comm" "(m n : ℕ) → m + n ≡ n + m" "function"
+        in  allOf
+          [ assertEqual "name" (Just "name") (exclusionReason (SearchExclude ["+-comm"] Nothing) e)
+          , assertEqual "statement" (Just "statement")
+              (exclusionReason (SearchExclude [] (Just "(x y : ℕ) → x + y ≡ y + x")) e)
+          , assertEqual "neither" Nothing (exclusionReason (SearchExclude ["other"] (Just "ℕ")) e)
+          ]
+
+    , -- The pool's ledger arithmetic.
+      runTest "buildPool: every cut counted, exclusions named, only functions ranked" $
+        let inA   = scopeEntry "L" "lemma" "(n : Nat) → n + n ≡ n" "function"
+            inRec = scopeEntry "L" "Box" "Nat → Set" "record"
+            outC  = scopeEntry "Else" "other" "Nat → Nat" "function"
+            exD   = scopeEntry "L" "target" "Nat → Nat" "function"
+            missE = scopeEntry "L" "unrelated" "Set" "function"
+            pool  = buildPool (SearchQuery Nothing ["Nat"])
+                      (Just (SearchExclude ["target"] Nothing))
+                      [scopeImportOf "L" True] (indexOf [inA, inRec, outC, exD, missE])
+        in  allOf
+          [ assertEqual "hits" 4 (poolHits pool)
+          , assertEqual "inScope" 3 (poolInScope pool)
+          , assertEqual "outOfScope" 1 (poolOutOfScope pool)
+          , assertEqual "excluded" [ScopeExclusion "L.target" "name"] (poolExcluded pool)
+          , assertEqual "nonFunction" 1 (poolNonFunction pool)
+          , assertEqual "ranked" ["L.lemma"] (map (cePrettyQname . rkEntry) (poolRanked pool))
+          ]
+    , runTest "buildPool: a name AND tokens query must satisfy both" $
+        let a = scopeEntry "L" "+-comm" "(m n : ℕ) → m + n ≡ n + m" "function"
+            b = scopeEntry "L" "+-assoc" "(m n o : ℕ) → m + n + o ≡ m + (n + o)" "function"
+            c = scopeEntry "L" "*-comm" "(m n : ℕ) → m * n ≡ n * m" "function"
+            pool = buildPool (SearchQuery (Just "comm") ["+"]) Nothing
+                     [scopeImportOf "L" True] (indexOf [a, b, c])
+        in  assertEqual "ranked" ["L.+-comm"] (map (cePrettyQname . rkEntry) (poolRanked pool))
+
+    , -- The tool as a client sees it.
+      runTest "tools/list: fourteen tools with a corpus, search_in_scope last; ten without" $ allOf
+        [ assertEqual "with corpus" 14 (length (toolNamesOf corpusTools))
+        , assertEqual "last" (Just "search_in_scope") (listToMaybe (reverse (toolNamesOf corpusTools)))
+        , assertEqual "without" 10 (length (toolNamesOf advertisedTools))
+        , assert "absent without a corpus" ("search_in_scope" `notElem` toolNamesOf advertisedTools)
+        ]
+    , runTest "search_in_scope schema: every accepted argument is a declared property" $ allOf
+        [ assertEqual "properties"
+            ["col", "column", "exclude", "filePath", "limit", "line", "maxProbes", "query", "reload"]
+            (sort (schemaProperties "search_in_scope" corpusTools))
+        , assertEqual "query" ["name", "tokens"] (subProperties "search_in_scope" "query" corpusTools)
+        , assertEqual "exclude" ["names", "statement"] (subProperties "search_in_scope" "exclude" corpusTools)
+        , assertEqual "required" (Just (Aeson.toJSON ["filePath" :: Text]))
+            (KM.lookup "required" (inputSchemaOf "search_in_scope" corpusTools))
+        ]
+    , runTest "search_in_scope description: carries the contract's load-bearing sentences" $
+        let d = descriptionOf "search_in_scope" corpusTools
+        in  allOf
+          [ assert "informs, never decides" ("INFORMS AND NEVER DECIDES" `T.isInfixOf` d)
+          , assert "every rendering typed" ("EVERY rendering was typed" `T.isInfixOf` d)
+          , assert "the ledger" ("ledger {hits" `T.isInfixOf` d)
+          , assert "exclusion is the caller's" ("EXCLUSION is your policy" `T.isInfixOf` d)
+          , assert "derived scope" ("DERIVED from source text" `T.isInfixOf` d)
+          , assert "the lane note" ("LIVE QUERY (interaction lane)" `T.isInfixOf` d)
+          , assert "registered with --corpus" ("--corpus" `T.isInfixOf` d)
+          ]
+    , runTest "SearchInScopeParams: an empty query is refused; both column spellings are refused" $ allOf
+        [ assert "empty query" (isLeft (decodeScopeParams "{\"filePath\":\"f\",\"query\":{}}"))
+        , assert "two columns" (isLeft (decodeScopeParams "{\"filePath\":\"f\",\"line\":1,\"col\":2,\"column\":3}"))
+        , assert "column without line" (isLeft (decodeScopeParams "{\"filePath\":\"f\",\"column\":3}"))
+        , assertEqual "no query is legal"
+            (Right Nothing) (sipQuery <$> decodeScopeParams "{\"filePath\":\"f\"}")
+        , assertEqual "a full request"
+            (Right (SearchInScopeParams "f" (Just 3) (Just 4)
+              (Just (SearchQuery (Just "hom") ["≡"])) (Just 5) (Just 9)
+              (Just (SearchExclude ["t"] (Just "S"))) True))
+            (decodeScopeParams "{\"filePath\":\"f\",\"line\":3,\"col\":4,\"query\":{\"name\":\"hom\",\"tokens\":[\"≡\"]},\"limit\":5,\"maxProbes\":9,\"exclude\":{\"names\":[\"t\"],\"statement\":\"S\"},\"reload\":true}")
+        ]
+    , runTest "probeBudget: four times the limit by default, never below the limit" $ allOf
+        [ assertEqual "default" 32 (probeBudget 8 Nothing)
+        , assertEqual "given" 12 (probeBudget 8 (Just 12))
+        , assertEqual "floored" 8 (probeBudget 8 (Just 2))
+        ]
+    , runTest "queryHasSignal: a token that reduces to nothing selects nothing, not everything" $ allOf
+        [ assert "underscore alone" (not (queryHasSignal (SearchQuery Nothing ["_"])))
+        , assert "two underscores" (not (queryHasSignal (SearchQuery Nothing ["_", "__"])))
+        , assert "a real token" (queryHasSignal (SearchQuery Nothing ["+"]))
+        , assert "an operator spelled with underscores" (queryHasSignal (SearchQuery Nothing ["_+_"]))
+        , assert "a name beside inert tokens" (queryHasSignal (SearchQuery (Just "hom") ["_"]))
+        , assert "a blank name is not a name" (not (queryHasSignal (SearchQuery (Just " ") ["_"])))
+        ]
+    , runTest "needsIdentityCheck: the row's own qualified name is exempt, an aliased or bare spelling is not" $ allOf
+        [ assert "own name exempt" (not (needsIdentityCheck "ScopeSearchBarrel.Core.quad" "ScopeSearchBarrel.Core.quad"))
+        , assert "alias checked" (needsIdentityCheck "Q.Core.quad" "ScopeSearchBarrel.Core.quad")
+        , assert "bare checked" (needsIdentityCheck "twice" "ScopeSearchLib.twice")
+        ]
+    ]
+
+
 fakeSleepSecs :: Int
 fakeSleepSecs = 4
 
@@ -5057,6 +5420,18 @@ interactionWireTests = do
             pure (firstFailure [r1, r2, r3, r4])
           other -> pure (Fail $ "unexpected: " <> show other)
 
+    , runTest "parseWhyInScope: a shadowing variable is a variable, its location parsed, no qualified name" $
+        -- Probed at ScopeSearch.agda's shadow hole: the local's bullet carries a
+        -- trailing "shadowing" on its own line, then the shadowed import follows.
+        let msg = "twice is in scope as\n  * a variable bound at /fx/ScopeSearch.agda:32.8-13\n    shadowing\n  * a defined name ScopeSearchLib.twice brought into scope by\n    - the opening of ScopeSearchLib at /fx/ScopeSearch.agda:19.13-27\n    - its definition at /fx/ScopeSearchLib.agda:19.1-6"
+        in  case parseWhyInScope msg of
+              Just [v, d] -> allOf
+                [ assertEqual "variable description" "a variable" (scDescription v)
+                , assertEqual "variable has no qualified name" Nothing (scQualified v)
+                , assertEqual "variable location" (Just (SrcLoc "/fx/ScopeSearch.agda" 32 8 32 13)) (scDefinition v)
+                , assertEqual "the shadowed import" (Just "ScopeSearchLib.twice") (scQualified d)
+                ]
+              other -> pure (Fail $ "expected two candidates, got " <> show other)
     , runTest "parseWhyInScope: re-export chain keeps location-less steps" $ do
         let msg = "originalName is in scope as\n  * a defined name ReexportOrigin.originalName brought into scope by\n    - the opening of ReexportBarrel at\n    - the opening of ReexportOrigin at\n    - its definition at /res/ReexportOrigin.agda:14.1-13"
         case parseWhyInScope msg of
@@ -6033,6 +6408,219 @@ interactionLaneTests cfg repoRoot = do
   shutdownLanes lanes
   pure (results <> failureResults)
 
+-- ---------------------------------------------------------------------------
+-- Tier 3b: search_in_scope on the lane (issue #17)
+-- ---------------------------------------------------------------------------
+
+-- | searchInScopeLaneTests: the tool against the fixture corpus and the
+-- narrow imports of ScopeSearch.agda.  The expected renderings and types are
+-- what the lane answered when the tool was first driven over the real stdio
+-- transport (the capture is quoted in the PR for #17); a change here is a
+-- change in what the file can name, or in how Agda prints it.
+searchInScopeLaneTests :: AgdaConfig -> FilePath -> IO [Bool]
+searchInScopeLaneTests cfg repoRoot = do
+  hPutStrLn stderr "\n── search_in_scope (tier 3b: #17, Agda subprocess) ──"
+  let resources = repoRoot </> "agda-mcp" </> "test" </> "resources"
+      fixture   = resources </> "ScopeSearch.agda"
+  loaded <- loadCorpus corpusFixturePath
+  case loaded of
+    Left err -> do
+      hPutStrLn stderr $ "  [skip] corpus fixture did not load: " <> T.unpack err
+      pure []
+    Right idx -> do
+      lanes <- newInteractionLanes
+      let call params = handleSearchInScope lanes cfg idx params
+          base = SearchInScopeParams
+            { sipFilePath = fixture, sipLine = Nothing, sipColumn = Nothing
+            , sipQuery = Nothing, sipLimit = Nothing, sipMaxProbes = Nothing
+            , sipExclude = Nothing, sipReload = False }
+          atHole = base { sipLine = Just 23, sipColumn = Just 11 }
+          natQuery = Just (SearchQuery Nothing ["Nat"])
+          withRes r k = case r of
+            Left err  -> pure (Fail $ T.unpack (failureText err))
+            Right res -> k res
+      results <- sequence
+        [ runTest "search_in_scope: every rung of the ladder, goal-scoped, with the ledger" $ do
+            r <- call atHole { sipQuery = natQuery, sipLimit = Just 10 }
+            withRes r $ \res -> do
+              let rows = sirResults res
+                  l    = sirLedger res
+              allOf
+                [ assertEqual "scope" "goal 0 (line 23, column 11)" (sirScope res)
+                , assertEqual "query echo" (Just (SearchQuery Nothing ["Nat"], "given")) (sirQuery res)
+                , assertEqual "imports" 4 (length (sirImports res))
+                , assertEqual "renderings, in rank order"
+                    [ "ScopeSearchBarrel.quad", "ScopeSearchLib.Box.unbox"
+                    , "ScopeSearchLib.Inner.thrice", "twice", "ScopeSearchLib.twice-def" ]
+                    (map srowRendering rows)
+                , assertEqual "rungs"
+                    [RungImporting, RungQualified, RungQualified, RungBare, RungQualified]
+                    (map srowRung rows)
+                , assertEqual "via" ["ScopeSearchBarrel", "ScopeSearchLib", "ScopeSearchLib", "ScopeSearchLib", "ScopeSearchLib"]
+                    (map srowVia rows)
+                , assertEqual "quad's lane-printed type" (Just "Nat → Nat") (srowType <$> listToMaybe rows)
+                , assert "every row typed" (all (not . T.null . srowType) rows)
+                , assertEqual "hits (corpus-wide, before scope)" 7 (slHits l)
+                , assertEqual "inScope" 6 (slInScope l)
+                , assertEqual "outOfScope (the stranger)" 1 (slOutOfScope l)
+                , assertEqual "excluded" [] (slExcluded l)
+                , assertEqual "nonFunction" 0 (slNonFunction l)
+                , assertEqual "ranked" 6 (slRanked l)
+                , assertEqual "probed" 6 (slProbed l)
+                , assertEqual "lane rejected, with the renderings tried"
+                    [ScopeRejection "ScopeSearchLib.ghost" ["ScopeSearchLib.ghost"]] (slLaneRejected l)
+                , assertEqual "accepted" 5 (slAccepted l)
+                , assertEqual "stoppedBy" "exhausted" (slStoppedBy l)
+                , assert "not truncated" (not (slTruncated l))
+                , -- Nine: a type_of per rung tried (quad's qualified rung
+                  -- refused, then its importing rung; unbox, thrice, and
+                  -- twice-def qualified; twice bare; ghost's qualified rung
+                  -- refused, its importing spelling deduplicated away) plus an
+                  -- identity check for each accepted non-qualified spelling
+                  -- (quad's and twice's).
+                  assertEqual "lane calls" 9 (slLaneCalls l)
+                , assert "no error" (isNothing (sirError res))
+                ]
+
+        , runTest "search_in_scope: no query at a hole derives the tokens from the goal" $ do
+            r <- call atHole
+            withRes r $ \res -> allOf
+              [ assertEqual "derived query" (Just (SearchQuery Nothing ["+", "≡"], "goal")) (sirQuery res)
+              , assertEqual "the one matching row" ["ScopeSearchLib.twice-def"] (map srowRendering (sirResults res))
+              , assertEqual "its score" [4] (map srowScore (sirResults res))
+              , assertEqual "hits" 2 (slHits (sirLedger res))
+              , assertEqual "outOfScope" 1 (slOutOfScope (sirLedger res))
+              , -- The goal read is timed, not counted: one qualified type_of.
+                assertEqual "laneCalls" 1 (slLaneCalls (sirLedger res))
+              ]
+
+        , runTest "search_in_scope: a local named like a using-listed import cannot stand in for the row" $ do
+            -- In `shadow twice = {!!}` the bare spelling `twice` types as the
+            -- pattern variable (Nat); WhyInScope answers a variable, not the
+            -- row, so the bare rung is refused and the row renders qualified.
+            r <- call base { sipLine = Just 32, sipQuery = natQuery, sipLimit = Just 10 }
+            withRes r $ \res ->
+              case [ row | row <- sirResults res, srowPrettyQname row == "ScopeSearchLib.twice" ] of
+                [row] -> allOf
+                  [ assertEqual "rendering" "ScopeSearchLib.twice" (srowRendering row)
+                  , assertEqual "rung" RungQualified (srowRung row)
+                  , assertEqual "type is the row's, not the local's" "Nat → Nat" (srowType row)
+                  ]
+                rows -> pure (Fail $ "expected the twice row once, got " <> show (length rows))
+
+        , runTest "search_in_scope: a goal whose display yields no tokens is the in-band query error" $ do
+            -- `idish A x = {!!}` has goal `A`, a context name, so the derived
+            -- query would be empty and must not become a match-all search.
+            r <- call base { sipLine = Just 35 }
+            withRes r $ \res -> allOf
+              [ assertEqual "stage" (Just "query") (lveStage <$> sirError res)
+              , assert "names the goal" (maybe False (("`A`" `T.isInfixOf`) . lveMessage) (sirError res))
+              , assertEqual "no results" [] (sirResults res)
+              , assertEqual "hits" 0 (slHits (sirLedger res))
+              , assertEqual "no query echoed" Nothing (sirQuery res)
+              ]
+
+        , runTest "search_in_scope: exclusions are the caller's, and are named with reasons" $ do
+            r <- call base
+                   { sipQuery = Just (SearchQuery (Just "twice") [])
+                   , sipExclude = Just (SearchExclude ["twice"] (Just "(m : Nat) → twice m ≡ m + m")) }
+            withRes r $ \res -> allOf
+              [ assertEqual "scope" "toplevel" (sirScope res)
+              , assertEqual "excluded"
+                  [ ScopeExclusion "ScopeSearchLib.twice" "name"
+                  , ScopeExclusion "ScopeSearchLib.twice-def" "statement" ]
+                  (slExcluded (sirLedger res))
+              , assertEqual "accepted" 0 (slAccepted (sirLedger res))
+              , assertEqual "no lane call was needed" 0 (slLaneCalls (sirLedger res))
+              ]
+
+        , runTest "search_in_scope: the lane-form statement rule catches what the corpus text misses" $ do
+            -- The corpus states twice-def as `twice n ≡ n + n`; the lane
+            -- prints it normalized, `n₁ + n₁ ≡ n₁ + n₁`.  A statement in the
+            -- lane's form misses the corpus-text check and is caught after
+            -- resolution, named lane-statement, and its slot stays open.
+            r <- call atHole
+                   { sipQuery = natQuery
+                   , sipExclude = Just (SearchExclude [] (Just "(k : Nat) → k + k ≡ k + k")) }
+            withRes r $ \res -> allOf
+              [ assertEqual "excluded" [ScopeExclusion "ScopeSearchLib.twice-def" "lane-statement"]
+                  (slExcluded (sirLedger res))
+              , assertEqual "accepted" 4 (slAccepted (sirLedger res))
+              , assert "twice-def absent" ("ScopeSearchLib.twice-def" `notElem` map srowRendering (sirResults res))
+              ]
+
+        , runTest "search_in_scope: no query and no goal at the anchor is the in-band query error" $ do
+            r <- call base
+            withRes r $ \res -> allOf
+              [ assertEqual "stage" (Just "query") (lveStage <$> sirError res)
+              , assertEqual "no results" [] (sirResults res)
+              , assertEqual "no query echoed" Nothing (sirQuery res)
+              ]
+
+        , runTest "search_in_scope: limit is cut after validation and reports the truncation" $ do
+            r <- call base { sipQuery = natQuery, sipLimit = Just 2, sipMaxProbes = Just 3 }
+            withRes r $ \res -> allOf
+              [ assertEqual "accepted" 2 (slAccepted (sirLedger res))
+              , assertEqual "probed" 2 (slProbed (sirLedger res))
+              , assertEqual "stoppedBy" "limit" (slStoppedBy (sirLedger res))
+              , assert "truncated" (slTruncated (sirLedger res))
+              ]
+
+        , runTest "search_in_scope: maxProbes bounds the walk and says so" $ do
+            -- The budget is floored at the limit (fewer probes than the
+            -- limit could never fill it), so it binds only through
+            -- rejections: with five accepted wanted and five probes allowed,
+            -- the ghost's rejection (ranked fourth by name) leaves four
+            -- accepted when the budget runs out, and twice-def unprobed.
+            r <- call base { sipQuery = natQuery, sipLimit = Just 5, sipMaxProbes = Just 5 }
+            withRes r $ \res -> allOf
+              [ assertEqual "probed" 5 (slProbed (sirLedger res))
+              , assertEqual "accepted" 4 (slAccepted (sirLedger res))
+              , assertEqual "rejected" ["ScopeSearchLib.ghost"] (map srjName (slLaneRejected (sirLedger res)))
+              , assertEqual "stoppedBy" "maxProbes" (slStoppedBy (sirLedger res))
+              , assert "truncated" (slTruncated (sirLedger res))
+              , assert "twice-def unprobed" ("ScopeSearchLib.twice-def" `notElem` map srowRendering (sirResults res))
+              ]
+
+        , runTest "search_in_scope: a record in scope is counted nonFunction, its field is ranked" $ do
+            r <- call base { sipQuery = Just (SearchQuery (Just "Box") []) }
+            withRes r $ \res -> allOf
+              [ assertEqual "hits" 2 (slHits (sirLedger res))
+              , assertEqual "inScope" 2 (slInScope (sirLedger res))
+              , assertEqual "nonFunction" 1 (slNonFunction (sirLedger res))
+              , assertEqual "results" ["ScopeSearchLib.Box.unbox"] (map srowRendering (sirResults res))
+              , assertEqual "unbox's lane-printed type" ["ScopeSearchLib.Box → Nat"] (map srowType (sirResults res))
+              ]
+
+        , runTest "search_in_scope: a file that does not load answers error.stage='load' and runs no query" $ do
+            r <- call base
+                   { sipFilePath = resources </> "diagnostics" </> "UnequalTerms.agda"
+                   , sipQuery = natQuery }
+            withRes r $ \res -> allOf
+              [ assertEqual "stage" (Just "load") (lveStage <$> sirError res)
+              , assertEqual "no results" [] (sirResults res)
+              , assertEqual "ledger zero" 0 (slHits (sirLedger res))
+              ]
+
+        , runTest "search_in_scope: the response carries the lane echo and no verdict" $ do
+            r <- call atHole { sipQuery = natQuery }
+            withRes r $ \res -> do
+              let v = Aeson.toJSON res
+                  keys = case v of
+                    Aeson.Object o -> map Key.toText (KM.keys o)
+                    _              -> []
+              allOf
+                [ assert "lane" ("lane" `elem` keys)
+                , assert "command" ("command" `elem` keys)
+                , assert "project" ("project" `elem` keys)
+                , assert "timing" ("timing" `elem` keys)
+                , assert "no success" ("success" `notElem` keys)
+                , assert "no verdict" ("verdict" `notElem` keys)
+                ]
+        ]
+      shutdownLanes lanes
+      pure results
+
 -- | parityCheck: one fixture's lane points against its lexical scan.
 parityCheck :: InteractionLanes -> AgdaConfig -> FilePath -> IO TestResult
 parityCheck lanes cfg file = do
@@ -6102,6 +6690,8 @@ main = do
   pathResults <- pathTests
   -- Tier 1h: the interaction lane's wire model and prose parsers (#75).
   wireResults <- interactionWireTests
+  -- Tier 1i: scope-aware retrieval, the pure half (#17).
+  scopeResults <- scopeRetrievalTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -6127,12 +6717,18 @@ main = do
       hPutStrLn stderr "\n── Interaction lane (tier 3: #75): SKIPPED ──"
       pure []
     Just (cfg, _fixture, repoRoot) -> interactionLaneTests cfg repoRoot
+  -- Tier 3b: search_in_scope on the lane (#17), same gate.
+  scopeLaneResults <- case mEnv of
+    Nothing -> do
+      hPutStrLn stderr "\n── search_in_scope (tier 3b: #17): SKIPPED ──"
+      pure []
+    Just (cfg, _fixture, repoRoot) -> searchInScopeLaneTests cfg repoRoot
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
-          <> pathResults <> wireResults <> integrationResults <> cwdResults
-          <> laneResults
+          <> pathResults <> wireResults <> scopeResults <> integrationResults
+          <> cwdResults <> laneResults <> scopeLaneResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

@@ -152,6 +152,18 @@ module AgdaMCP.Types
   , DefinitionOfResult (..)
   , ExportsOfResult (..)
   , InteractionFailure (..)
+    -- * Scope-aware retrieval (issue #17): search_in_scope
+  , Rung (..)
+  , ScopeImport (..)
+  , SearchQuery (..)
+  , SearchExclude (..)
+  , SearchInScopeParams (..)
+  , ScopeRow (..)
+  , ScopeExclusion (..)
+  , ScopeRejection (..)
+  , ScopeLedger (..)
+  , ScopeTiming (..)
+  , SearchInScopeResult (..)
   ) where
 
 import Data.Aeson
@@ -160,6 +172,7 @@ import Data.Aeson
   )
 import Data.Aeson.Types (Object, Pair, Parser)
 import Data.Map.Strict (Map)
+import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -1417,12 +1430,20 @@ instance ToJSON CorpusEntry where
 --
 -- The primary structure is a 'Map' from @prettyQname@ to 'CorpusEntry'.
 -- For M1-3, name and type search are O(n) linear scans over 'ciEntries'.
--- M2-2 will add inverted indices and a graph adjacency list.
+-- M2-2 (issue #16) will add the remaining inverted indices and a graph
+-- adjacency list; 'ciTokens' is the first of them, built for
+-- @search_in_scope@ (issue #17): every bare type token, to the rows whose
+-- type carries it, so a token query is a union of posting lists rather than
+-- a tokenization of every row (measured on the agda-algebras corpus: a
+-- four-token pool fell from about 150 ms to well under the issue's 100 ms
+-- figure).  Build it with 'AgdaMCP.Corpus.corpusIndexOf', never by hand.
 data CorpusIndex = CorpusIndex
   { ciEntries :: Map Text CorpusEntry
     -- ^ All entries, keyed by @prettyQname@.
   , ciSize    :: Int
     -- ^ Number of entries (cached for diagnostics).
+  , ciTokens  :: Map Text (Set Text)
+    -- ^ Bare type token, to the @prettyQname@s whose type carries it.
   } deriving (Eq, Show)
 
 
@@ -1894,3 +1915,271 @@ instance ToJSON InteractionFailure where
     , "command"    .= xfCommand f
     , "project"    .= xfProject f
     ]
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § Scope-aware retrieval (issue #17, phase 1): search_in_scope
+--
+-- The corpus index supplies the pool and the interaction lane validates every
+-- rendering, so this is a knowledge tool under the two-lane policy: it informs
+-- and never decides, and no response here carries @success@ or @verdict@.
+-- What it carries instead is the honesty ledger, so an empty result always
+-- comes with its bounds.  The contract is the one agreed on issue #17.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | Rung: which spelling of the rendering ladder the lane accepted.
+--
+-- @bare@ when the importing module opens the name; @qualified@ for the row's
+-- own @prettyQname@ (valid for rows nested inside an imported module);
+-- @importing-module@ for the importing module qualifying the bare name (valid
+-- for re-exports whose defining module is not itself imported); and
+-- @re-export@ for the spellings between those two, the importing module
+-- qualifying the tail of the row's module path, which is how a record field
+-- defined in a re-exported file is named (@Setoid.Homomorphisms.IsHom.compatible@
+-- for the row @Setoid.Homomorphisms.Basic.IsHom.compatible@ under an import
+-- of @Setoid.Homomorphisms@; measured on the agda-algebras corpus, PR for
+-- #17).  The integer is how many leading segments of that tail were dropped.
+data Rung = RungBare | RungQualified | RungReexport Int | RungImporting
+  deriving (Eq, Show)
+
+instance ToJSON Rung where
+  toJSON RungBare         = String "bare"
+  toJSON RungQualified    = String "qualified"
+  toJSON (RungReexport _) = String "re-export"
+  toJSON RungImporting    = String "importing-module"
+
+-- | ScopeImport: one @import@ or @open import@ statement of the queried
+-- file, as the derived import surface reads it ('AgdaMCP.Scope').
+--
+-- 'siUsing' is @Nothing@ for an import with no @using@ list, which opens
+-- everything the module exports when 'siOpened'; @Just names@ opens only
+-- those.  A plain @import@ ('siOpened' False) admits the module qualified
+-- and opens nothing.
+data ScopeImport = ScopeImport
+  { siModule   :: Text            -- ^ The imported module.
+  , siOpened   :: Bool            -- ^ @open import@ rather than @import@.
+  , siPublic   :: Bool            -- ^ Carries @public@.
+  , siAs       :: Maybe Text      -- ^ The @as N@ alias, when given.
+  , siUsing    :: Maybe [Text]    -- ^ The @using@ list, when given.
+  , siHiding   :: [Text]          -- ^ The @hiding@ list.
+  , siRenaming :: [(Text, Text)]  -- ^ The @renaming (old to new)@ pairs.
+  } deriving (Eq, Show)
+
+instance ToJSON ScopeImport where
+  toJSON i = object $
+    [ "module" .= siModule i
+    , "opened" .= siOpened i
+    ]
+    <> [ "public" .= True | siPublic i ]
+    <> maybe [] (\a -> ["as" .= a]) (siAs i)
+    <> maybe [] (\u -> ["using" .= u]) (siUsing i)
+    <> (if null (siHiding i) then [] else ["hiding" .= siHiding i])
+    <> (if null (siRenaming i) then []
+        else ["renaming" .= [ object ["from" .= o, "to" .= n] | (o, n) <- siRenaming i ]])
+
+-- | SearchQuery: what to search for.  A name pattern (case-insensitive
+-- substring over the qualified and unqualified names) and/or type tokens as
+-- a goal display spells them.  When both are given a row must satisfy both.
+data SearchQuery = SearchQuery
+  { sqName   :: Maybe Text
+  , sqTokens :: [Text]
+  } deriving (Eq, Show)
+
+instance FromJSON SearchQuery where
+  parseJSON = withObject "SearchQuery" $ \o -> do
+    mName  <- o .:? "name"
+    toks   <- o .:? "tokens" .!= []
+    let q = SearchQuery mName (filter (not . T.null) toks)
+    if maybe True T.null (sqName q) && null (sqTokens q)
+      then fail "query needs a name pattern, type tokens, or both"
+      else pure q
+
+instance ToJSON SearchQuery where
+  toJSON q = object $
+    [ "tokens" .= sqTokens q ]
+    <> maybe [] (\n -> ["name" .= n]) (sqName q)
+
+-- | SearchExclude: the caller's exclusion policy.  The server excludes only
+-- what is passed here, and names every exclusion in the response.
+data SearchExclude = SearchExclude
+  { sxNames     :: [Text]      -- ^ Bare names to exclude.
+  , sxStatement :: Maybe Text  -- ^ A statement; rows whose type normalizes to it are excluded.
+  } deriving (Eq, Show)
+
+instance FromJSON SearchExclude where
+  parseJSON = withObject "SearchExclude" $ \o ->
+    SearchExclude <$> (o .:? "names" .!= []) <*> o .:? "statement"
+
+instance ToJSON SearchExclude where
+  toJSON x = object $
+    [ "names" .= sxNames x ]
+    <> maybe [] (\st -> ["statement" .= st]) (sxStatement x)
+
+-- | Parameters for the @search_in_scope@ tool.
+--
+-- 'sipQuery' may be omitted when the @(line, column)@ anchor addresses a
+-- hole: the tokens are then derived from that goal's own displayed type.
+-- 'sipLimit' bounds the ACCEPTED rows (the cut is taken after lane
+-- resolution); 'sipMaxProbes' bounds how many ranked rows are sent to the
+-- lane before the walk gives up on filling the limit (default four times
+-- the limit).  The column is accepted as @column@ or @col@, as in the
+-- live-query tools, and both at once is rejected.
+data SearchInScopeParams = SearchInScopeParams
+  { sipFilePath  :: FilePath
+  , sipLine      :: Maybe Int
+  , sipColumn    :: Maybe Int
+  , sipQuery     :: Maybe SearchQuery
+  , sipLimit     :: Maybe Int
+  , sipMaxProbes :: Maybe Int
+  , sipExclude   :: Maybe SearchExclude
+  , sipReload    :: Bool
+  } deriving (Eq, Show)
+
+instance FromJSON SearchInScopeParams where
+  parseJSON = withObject "SearchInScopeParams" $ \o -> do
+    mLine <- o .:? "line"
+    SearchInScopeParams
+      <$> o .: "filePath"
+      <*> pure mLine
+      <*> scopeColumn mLine o
+      <*> o .:? "query"
+      <*> o .:? "limit"
+      <*> o .:? "maxProbes"
+      <*> o .:? "exclude"
+      <*> (o .:? "reload" .!= False)
+
+-- | ScopeRow: one accepted result.  'srowRendering' was typed by the lane in
+-- the queried file's scope, and 'srowType' is what Agda printed for it; the
+-- corpus's own printing rides along as 'srowCorpusType' for comparison.
+data ScopeRow = ScopeRow
+  { srowPrettyQname :: Text   -- ^ The corpus key.
+  , srowRendering   :: Text   -- ^ The spelling the lane accepted.
+  , srowType        :: Text   -- ^ The lane-printed type of that rendering.
+  , srowVia         :: Text   -- ^ The imported module that admits the row.
+  , srowRung        :: Rung   -- ^ Which rung of the ladder was accepted.
+  , srowModule      :: Text   -- ^ The row's own module.
+  , srowDefKind     :: Text
+  , srowHasBody     :: Bool
+  , srowCorpusType  :: Text   -- ^ The type as the corpus printed it.
+  , srowScore       :: Int    -- ^ The phase-1 rank score.
+  } deriving (Eq, Show)
+
+instance ToJSON ScopeRow where
+  toJSON r = object
+    [ "prettyQname" .= srowPrettyQname r
+    , "rendering"   .= srowRendering r
+    , "type"        .= srowType r
+    , "via"         .= object [ "module" .= srowVia r, "rung" .= srowRung r ]
+    , "module"      .= srowModule r
+    , "defKind"     .= srowDefKind r
+    , "hasBody"     .= srowHasBody r
+    , "corpusType"  .= srowCorpusType r
+    , "score"       .= srowScore r
+    ]
+
+-- | ScopeExclusion: one row the caller's policy set aside, and why:
+-- @name@, @statement@ (the corpus type), or @lane-statement@ (Agda's
+-- printing of the accepted rendering).
+data ScopeExclusion = ScopeExclusion
+  { sxqName   :: Text
+  , sxqReason :: Text
+  } deriving (Eq, Show)
+
+instance ToJSON ScopeExclusion where
+  toJSON x = object [ "prettyQname" .= sxqName x, "reason" .= sxqReason x ]
+
+-- | ScopeRejection: one row no rung of the ladder could type, with every
+-- rendering that was tried.
+data ScopeRejection = ScopeRejection
+  { srjName  :: Text
+  , srjTried :: [Text]
+  } deriving (Eq, Show)
+
+instance ToJSON ScopeRejection where
+  toJSON x = object [ "prettyQname" .= srjName x, "tried" .= srjTried x ]
+
+-- | ScopeLedger: every cut of the pipeline, counted, so an empty result
+-- always comes with its bounds.
+data ScopeLedger = ScopeLedger
+  { slHits         :: Int              -- ^ Rows matching the query, corpus-wide.
+  , slInScope      :: Int              -- ^ Hits the file's imports reach.
+  , slOutOfScope   :: Int              -- ^ Hits they do not.
+  , slExcluded     :: [ScopeExclusion] -- ^ Named, never a count alone.
+  , slNonFunction  :: Int              -- ^ In-scope rows dropped by kind.
+  , slRanked       :: Int              -- ^ Rows that entered the ranked list.
+  , slProbed       :: Int              -- ^ Ranked rows sent to the lane.
+  , slLaneCalls    :: Int              -- ^ Lane calls spent validating them: a
+                                       --   @type_of@ per rung tried, plus one
+                                       --   @WhyInScope@ identity check per
+                                       --   accepted spelling other than the
+                                       --   row's own qualified name.  The goal
+                                       --   read of a derived query is timed into
+                                       --   'ScopeTiming' and not counted here.
+  , slLaneRejected :: [ScopeRejection] -- ^ Rows no rendering of which typed.
+  , slAccepted     :: Int              -- ^ The length of @results@.
+  , slTruncated    :: Bool             -- ^ Ranked rows remained unprobed.
+  , slStoppedBy    :: Text             -- ^ @limit@, @maxProbes@, or @exhausted@.
+  } deriving (Eq, Show)
+
+instance ToJSON ScopeLedger where
+  toJSON l = object
+    [ "hits"         .= slHits l
+    , "inScope"      .= slInScope l
+    , "outOfScope"   .= slOutOfScope l
+    , "excluded"     .= slExcluded l
+    , "nonFunction"  .= slNonFunction l
+    , "ranked"       .= slRanked l
+    , "probed"       .= slProbed l
+    , "laneCalls"    .= slLaneCalls l
+    , "laneRejected" .= slLaneRejected l
+    , "accepted"     .= slAccepted l
+    , "truncated"    .= slTruncated l
+    , "stoppedBy"    .= slStoppedBy l
+    ]
+
+-- | ScopeTiming: the two halves of the call's latency, apart: the pool
+-- (query, scope, exclusion, rank over the index) and the lane (every
+-- @type_of@ and the goal read, when one was made).  The issue's acceptance
+-- figure is for the pool half, and only a split measures it.
+data ScopeTiming = ScopeTiming
+  { stPoolMs :: Int
+  , stLaneMs :: Int
+  } deriving (Eq, Show)
+
+instance ToJSON ScopeTiming where
+  toJSON t = object [ "poolMs" .= stPoolMs t, "laneMs" .= stLaneMs t ]
+
+-- | Result of @search_in_scope@.
+--
+-- 'sirQuery' echoes what was searched for and where it came from (@given@ or
+-- @goal@); it is absent whenever no query was formed: a load failure, no
+-- query with no goal at the anchor, or a goal whose display yields no tokens
+-- (the cases 'sirError' names).
+-- 'sirError' is the in-band negative: @stage: "load"@ when the file does not
+-- load on the lane, @stage: "query"@ when neither the caller nor a goal at
+-- the anchor supplied anything to search for.  The echo is the live-query
+-- echo, with no verdict.
+data SearchInScopeResult = SearchInScopeResult
+  { sirQuery   :: Maybe (SearchQuery, Text)  -- ^ The query and its source.
+  , sirScope   :: Text                       -- ^ Where validation ran, as @type_of@ reports it.
+  , sirImports :: [ScopeImport]              -- ^ The derived import surface.
+  , sirResults :: [ScopeRow]
+  , sirLedger  :: ScopeLedger
+  , sirTiming  :: ScopeTiming
+  , sirError   :: Maybe LiveError
+  , sirMeta    :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON SearchInScopeResult where
+  toJSON r = object $
+    [ "scope"   .= sirScope r
+    , "imports" .= sirImports r
+    , "results" .= sirResults r
+    , "ledger"  .= sirLedger r
+    , "timing"  .= sirTiming r
+    ]
+    <> maybe [] (\(q, src) -> ["query" .= object
+         ( [ "tokens" .= sqTokens q, "source" .= src ]
+           <> maybe [] (\n -> ["name" .= n]) (sqName q) )]) (sirQuery r)
+    <> maybe [] (\e -> ["error" .= e]) (sirError r)
+    <> liveMetaPairs (sirMeta r)

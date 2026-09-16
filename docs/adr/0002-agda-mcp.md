@@ -11,12 +11,12 @@ File: `agda-native-air/docs/adr/0002-agda-mcp.md`
 
 ## Executive summary
 
-`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent thirteen tools over the pinned `agda`.
+`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent fourteen tools over the pinned `agda`.
 
 +  **Proof-state tools**: `check_file`, `get_diagnostics`, `get_goal`, `fill_hole`.
 +  **Whole-project gate**: `check_project`.
 +  **Live queries**: `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`.
-+  **Corpus lookups**: `search_by_name`, `search_by_type`, `get_dependencies` when started with `--corpus`.
++  **Corpus tools**: `search_by_name`, `search_by_type`, `get_dependencies`, and since [#17] phase 1 the scope-aware `search_in_scope`, when started with `--corpus`.
 
 This document is the design record: what was decided, the evidence that earned each decision, and what each one still owes.  The deep notes it distills stay where they are, under `docs/agda-mcp/`, and every decision links to its own note.
 
@@ -49,7 +49,7 @@ Why it is shaped this way comes down to one field datum and one measurement.
 
 **The datum**.  In July 2026 a Claude Code session formalized about 1200 lines of literate Agda in `ualib/agda-algebras` with the server configured and its four tools listed, and never called it once, because nothing said whether green meant the build passed, and the two tools with no shell equivalent were unreliable on the literate files that repository is made of.
 
-**The measurement**.  A batch judgment costs about 2.6 s of interface loading on a standard-library fixture, while a question about a file the lane has loaded costs 1–3 ms.  So verdicts are made expensive and unimpeachable, knowledge is made cheap and explicitly non-authoritative, and the proof-state and live-query tools say, in every response and in their descriptions, which of the two they are.  The three corpus lookups ride neither lane and run no Agda at all (§ 10).
+**The measurement**.  A batch judgment costs about 2.6 s of interface loading on a standard-library fixture, while a question about a file the lane has loaded costs 1–3 ms.  So verdicts are made expensive and unimpeachable, knowledge is made cheap and explicitly non-authoritative, and the proof-state and live-query tools say, in every response and in their descriptions, which of the two they are.  The three corpus lookups ride neither lane and run no Agda at all; `search_in_scope` reads the same index and validates every result through the interaction lane (§ 10).
 
 ### Where it stands
 
@@ -123,7 +123,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 +  **`scope_at` was omitted rather than approximated**: no interaction command enumerates the names in scope, and the bar (§ 2.2 of the field report) is to ship a tool only if it helps the server beat the shell.  The finding is recorded on [#75].
 
-+  **Corpus tools ride neither lane**; they are pure lookups on an in-memory index (§ 10).
++  **The corpus lookups ride neither lane**; they are pure lookups on an in-memory index (§ 10).  `search_in_scope` ([#17], phase 1) is the one corpus tool that also takes the interaction lane, and only as knowledge: it types each candidate rendering in the queried file's scope and returns nothing the lane refused.
 
 **Evidence**.  The lane note was written from live probes of the protocol under the pinned Agda 2.8.0 before the Haskell existed, and the implementation cites it.  The economics, measured disk-warm: a batch call costs 2.78 s and 2.60 s on the repeat, paid per call; the lane's process start plus `Cmd_load` costs 2.59 s once, and five knowledge queries after it added less than measurement noise (2.580 s for the load plus five, against 2.589 s for the load alone).  Switching between two files under one root pays the switched-to file's load, tens of milliseconds warm.  The [#83] shell baseline was a 10.0 s median per check.  Three protocol facts are load-bearing and were each probed: commands execute strictly in order, so a `Cmd_show_version` sentinel after every command frames responses without heuristics or timeouts; a per-load argv must carry the resolved project flags, because `Cmd_load` with an empty list inherits no useful context; and a hole-free file's completed top-level scope loses file-local `open`s, so `resolve_name` prefers a goal-scoped query whenever the file has an interaction point.
 
@@ -256,11 +256,11 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 (See also [#11] (M1-3) and [`agda-mcp/README.md`].)
 
-**Decision**.  Three pure lookups over an in-memory index of an `agda-strux` JSONL corpus, registered only when the server starts with `--corpus`, and never invoking Agda: `search_by_name` (case-insensitive substring over names), `search_by_type` (substring over printed types), and `get_dependencies` (a definition's dependency list, optionally expanded one hop).
+**Decision**.  Three pure lookups over an in-memory index of an `agda-strux` JSONL corpus, registered only when the server starts with `--corpus`, and never invoking Agda: `search_by_name` (case-insensitive substring over names), `search_by_type` (substring over printed types), and `get_dependencies` (a definition's dependency list, optionally expanded one hop).  Since phase 1 of [#17] (the status below) a fourth corpus tool, `search_in_scope`, reads the same index and validates every result through the interaction lane, so it is a corpus tool and a lane tool at once; the three lookups remain pure.
 
-**Evidence**.  At library scale (the published agda-algebras v0 corpus, `docs/corpora/`), 11,666 rows and 185 MB of JSONL load in about 1.4 s to a 308 MB resident footprint, because the index keeps only the fields the tools serve and drops `typeAst` and proof bodies; `hasBody` tells an agent a term exists to go and read.  Two consequences are documented for query writers: dependency tokens are fully qualified, and 655 `prettyQname` keys are shared by more than one row.  `make corpus-mcp-smoke` drives all three tools over the transport.
+**Evidence**.  At library scale (the published agda-algebras v0 corpus, `docs/corpora/`), 11,666 rows and 185 MB of JSONL load in about 1.4 s to a 308 MB resident footprint, because the index keeps only the fields the tools serve and drops `typeAst` and proof bodies; `hasBody` tells an agent a term exists to go and read.  Two consequences are documented for query writers: dependency tokens are fully qualified, and 655 `prettyQname` keys are shared by more than one row.  `make corpus-mcp-smoke` drives the three lookups over the transport.
 
-**Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.
+**Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.  Its phase 1 landed on 2026-09-15 (PR [#161]): `search_in_scope`, the fourteenth tool, reads the file's import surface off the code-only view, ranks the in-scope rows of the index with the driver's token-overlap scorer, and returns only renderings the interaction lane has typed in the file's scope, with an honesty ledger on every response; the contract is the issue's comment of that date, and phase 2 (`search_term`) stays open on [#17].
 
 ---
 
@@ -435,6 +435,7 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 [#146]: https://github.com/formalverification/agda-native-air/issues/146
 [#147]: https://github.com/formalverification/agda-native-air/issues/147
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
 
 [#459]: https://github.com/ualib/agda-algebras/issues/459
 [#507]: https://github.com/ualib/agda-algebras/pull/507

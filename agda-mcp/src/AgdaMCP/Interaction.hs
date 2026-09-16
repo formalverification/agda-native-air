@@ -1439,9 +1439,14 @@ parseWhyInScope msg
           , scDefinition  = Nothing
           }
         Nothing ->
-          -- A one-line bullet: @a variable bound at <loc>@ and kin.
+          -- A one-line bullet: @a variable bound at <loc>@ and kin.  A
+          -- variable that shadows another binding of the name carries a
+          -- trailing @shadowing@ (on its own wrapped line, joined above; probed
+          -- on a pattern variable named like an import), which is not part
+          -- of the location.
           let (desc, locT) = T.breakOn " bound at " body
-          in case parseSrcLoc (T.drop (T.length (" bound at " :: Text)) locT) of
+              locOnly = fromMaybe locT (T.stripSuffix " shadowing" locT)
+          in case parseSrcLoc (T.drop (T.length (" bound at " :: Text)) locOnly) of
                Just loc -> ScopeCandidate
                  { scDescription = T.strip desc
                  , scQualified   = Nothing

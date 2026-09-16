@@ -23,6 +23,12 @@
 --   * Three search tools: search_by_name, search_by_type, get_dependencies.
 --   * Search tools appear in tools/list only when a corpus is loaded.
 --
+-- Issue #17 addition (M2-3, phase 1):
+--   * search_in_scope, the fourth corpus tool: scope-aware retrieval whose
+--     every returned rendering the interaction lane has typed in the queried
+--     file's scope.  Registered with the other three behind @--corpus@, and
+--     the one corpus tool that also takes the lanes.
+--
 -- Issue #78 addition:
 --   * check_project — the whole-project gate.  Always registered, and the one
 --     tool that reads 'scGateConfig' as well as 'scAgdaConfig'.  Its call
@@ -69,6 +75,7 @@ import AgdaMCP.Tools.CheckProject (handleCheckProject)
 import AgdaMCP.Tools.LiveQueries
 import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
+import AgdaMCP.Tools.SearchInScope (handleSearchInScope)
 import AgdaMCP.Types (CorpusIndex, ToolFailure (..))
 
 -- ---------------------------------------------------------------------------
@@ -435,6 +442,39 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
               , prop "expand" "boolean" "If true, also return corpus entries for each dependency (1-hop neighborhood)."
               ]
               ["name"]
+
+          -- The scope-aware retrieval tool (issue #17, phase 1).  Its
+          -- description carries the whole client-visible contract agreed on
+          -- the issue, because an agent picks a tool by reading the
+          -- description and nothing else; and every argument the handler
+          -- accepts is a declared property, since a client that validates
+          -- its arguments sees only what the schema declares.
+          , toolDef "search_in_scope"
+              (searchInScopeNote <> " " <> liveLaneNote)
+              [ prop "filePath" "string"  liveFilePathDoc
+              , prop "line"     "integer" searchLineDoc
+              , prop "column"   "integer" liveColumnDoc
+              , prop "col"      "integer" liveColDoc
+              , propObject "query" searchQueryDoc
+                  [ prop "name"   "string" "A case-insensitive substring of the \
+                      \definition's qualified or unqualified name."
+                  , propArray "tokens" "string" "Type tokens as a goal display \
+                      \spells them (+, ≡, Commutative, hom), matched against the \
+                      \row's type and name after the corpus's qualified tokens are \
+                      \reduced to bare ones (Agda.Builtin.Nat._+_ meets +)."
+                  ]
+              , prop "limit"     "integer" searchLimitDoc
+              , prop "maxProbes" "integer" searchMaxProbesDoc
+              , propObject "exclude" searchExcludeDoc
+                  [ propArray "names" "string" "Bare (unqualified) names to set aside."
+                  , prop "statement" "string" "A type; rows whose type normalizes \
+                      \to it (whitespace, ∀ sugar, binder names) are set aside, \
+                      \checked on the corpus text and again on Agda's printing of \
+                      \the accepted rendering."
+                  ]
+              , prop "reload"    "boolean" liveReloadDoc
+              ]
+              ["filePath"]
           ]
       | otherwise = []
 
@@ -831,6 +871,130 @@ liveReloadDoc =
   \changed; checkedFromSource reports whether this file itself was \
   \re-typechecked. The response echoes lane.load='forced'."
 
+-- | searchInScopeNote: the contract of search_in_scope (issue #17), stated
+-- where the client reads it.  In order: the question the tool answers; that
+-- it informs and never decides; that every rendering was typed by Agda here
+-- and @type@ is Agda's printing; the query and its goal-derived default; the
+-- derived-scope caveat and its subordination to the lane; the ranking and
+-- the two bounds; that exclusion is the caller's policy and is named; the
+-- ledger, field by field, and what an empty result means; the timing split;
+-- and the two in-band errors.
+searchInScopeNote :: Text
+searchInScopeNote =
+  "Corpus-backed retrieval IN A FILE'S SCOPE: of the corpus rows that match \
+  \the query, which ones can filePath actually name, and what does Agda say \
+  \each one's type is? Answers results [{prettyQname, rendering, type, via \
+  \{module, rung}, module, defKind, hasBody, corpusType, score}] in rank \
+  \order, where EVERY rendering was typed by this server through the \
+  \interaction lane in filePath's scope (goal-scoped when line/column \
+  \addresses a hole, top-level otherwise; the response's scope field says \
+  \which) and type is Agda's own printing of it, not the corpus's. A row the \
+  \lane cannot type under any spelling is not returned; it is named in \
+  \ledger.laneRejected with the spellings tried. THIS TOOL INFORMS AND NEVER \
+  \DECIDES: there is no success or verdict field, and a returned rendering \
+  \typechecks as an expression here, which says nothing about whether it \
+  \fills any hole (fill_hole judges that). QUERY: query {name?, tokens?} is \
+  \a case-insensitive substring over names and/or type tokens as a goal \
+  \display spells them; when both are given a row must satisfy both. Both \
+  \sides are reduced the same way (a name's outer underscores stripped, so \
+  \`_+_` meets `+`), and a query whose tokens all reduce to nothing with no \
+  \name beside them selects nothing rather than everything: it answers \
+  \error.stage='query'. Omit \
+  \query when line/column addresses a hole: the tokens are then derived from \
+  \that goal's own displayed type (context names, metas, numerals, and \
+  \structural tokens dropped), and the response's query.source says 'given' \
+  \or 'goal'. SCOPE: the file's import statements (import and open import, \
+  \with using, hiding, renaming, as, and public) are read off the source's \
+  \code-only view and echoed as imports; a row is in scope iff its module \
+  \equals an imported module or extends one at a dot boundary, and a \
+  \whole-module open import admits all of it bare. That rule is a name \
+  \prefix over THIS file's import lines, so a row that another file \
+  \re-exports into an imported module from outside that prefix is reported \
+  \in ledger.outOfScope even though you could name it: the miss costs \
+  \recall, never correctness. That import surface is \
+  \DERIVED from source text, because no Agda command enumerates a scope, \
+  \which is exactly why every rendering is validated by the lane before it \
+  \is returned: a misread import costs a rendering or a count, never a name \
+  \the file cannot write. The rendering ladder, tried in order: the bare \
+  \name when the import opens it (rung 'bare'), the row's prettyQname \
+  \('qualified', valid for rows nested inside an imported module), the \
+  \importing module qualifying the tail of the row's module path \
+  \('re-export', how a record field defined in a file the imported module \
+  \re-exports is named), and the importing module qualifying the bare name \
+  \alone ('importing-module', valid for re-exports whose defining module is \
+  \not itself imported); via.rung says which was accepted. A spelling that \
+  \types is ALSO checked to denote the row (Agda's WhyInScope) unless it is \
+  \the row's own qualified name, so a local binder or file-local definition \
+  \of the same name cannot stand in for a corpus row, and a re-exported \
+  \spelling that resolves to a different definition is refused. RANK: twice \
+  \the overlap between the query tokens and the row's bare type tokens, plus \
+  \a name bonus capped at one, minus one per pure-symbol operator the query \
+  \never mentions; ties break cheap-before-expensive on approximate arity, \
+  \then by name. limit (default 8) bounds ACCEPTED rows and is cut AFTER \
+  \validation, so a rejected rendering never consumes a slot; maxProbes \
+  \(default 4 x limit) bounds how many ranked rows are sent to the lane \
+  \before the walk gives up on filling limit. Only defKind 'function' rows \
+  \are ranked (constructors, records, and data types are counted in \
+  \ledger.nonFunction). EXCLUSION is your policy, never this server's: \
+  \exclude {names?, statement?} sets aside rows whose bare name is listed or \
+  \whose type normalizes to the statement (on the corpus text, and again on \
+  \Agda's printing of the accepted rendering), and every exclusion is NAMED \
+  \in ledger.excluded with its reason: name, statement, or lane-statement. \
+  \THE LEDGER: every response carries ledger {hits (rows matching the query \
+  \corpus-wide, BEFORE scope), inScope, outOfScope, excluded [{prettyQname, \
+  \reason}], nonFunction, ranked, probed, laneCalls (type_of calls plus \
+  \identity checks; the goal read of a derived query is timed but not \
+  \counted), laneRejected \
+  \[{prettyQname, tried}], accepted, truncated, stoppedBy ('limit', \
+  \'maxProbes', or 'exhausted')}, so an EMPTY results list always states its \
+  \bounds: hits > 0 with inScope = 0 means the definition exists in the \
+  \corpus and this file does not import its module; ranked > 0 with accepted \
+  \= 0 and laneRejected naming them means the corpus and the loaded library \
+  \disagree. timing {poolMs, laneMs} reports the corpus half of the latency \
+  \apart from the lane half. A file that does not load answers \
+  \error.stage='load' with Agda's message and runs no query; no query with \
+  \no goal at the anchor, or with a goal whose display yields no tokens, \
+  \answers error.stage='query'. Registered only when the server was started \
+  \with --corpus."
+
+-- | searchLineDoc: the anchor's contract for search_in_scope; the live-query
+-- line contract, restated for a tool whose scope decides the validation.
+searchLineDoc :: Text
+searchLineDoc =
+  "Optional 1-based line in the file as written. Inside a hole: every \
+  \rendering is validated in that goal's scope (locals visible, file-local \
+  \opens live), and with no query the goal's own type supplies the tokens. \
+  \Elsewhere or omitted: the file's top-level scope, and a query is \
+  \required. When two holes share the line, the earliest answers unless \
+  \column (or col) picks one."
+
+searchQueryDoc :: Text
+searchQueryDoc =
+  "What to search for: {name?: string, tokens?: [string]}. Optional when \
+  \line/column addresses a hole (the goal's type supplies the tokens); \
+  \required otherwise. When both name and tokens are given a row must \
+  \satisfy both."
+
+searchLimitDoc :: Text
+searchLimitDoc =
+  "Maximum ACCEPTED rows to return (default 8; a non-positive value means 1). \
+  \The cut is taken after lane validation, so a rejected rendering never \
+  \consumes a slot; ledger.truncated says whether ranked rows remained."
+
+searchMaxProbesDoc :: Text
+searchMaxProbesDoc =
+  "Maximum ranked rows to send to the lane before giving up on filling limit \
+  \(default 4 x limit; never below limit). ledger.probed reports how many \
+  \were sent and ledger.stoppedBy whether this bound ended the walk."
+
+searchExcludeDoc :: Text
+searchExcludeDoc =
+  "Your exclusion policy: {names?: [string], statement?: string}. The server \
+  \excludes only what you pass here, and names every exclusion in \
+  \ledger.excluded with its reason. Typical use: the name and stated type of \
+  \the definition you are proving, so the answer cannot be the definition \
+  \itself."
+
 -- | Build a tool definition object (MCP tools/list schema).
 toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
 toolDef name desc props required = toolDefWith name desc props required []
@@ -880,6 +1044,30 @@ addressAlternatives =
 -- | Build a property definition for the input schema.
 prop :: Text -> Text -> Text -> (Text, Value)
 prop name typ desc = (name, object ["type" .= typ, "description" .= desc])
+
+-- | propObject: an object-valued property with its own declared properties
+-- (search_in_scope's @query@ and @exclude@, issue #17).  Declared in full so
+-- a client that validates its arguments sees every key the handler accepts.
+propObject :: Text -> Text -> [(Text, Value)] -> (Text, Value)
+propObject name desc props =
+  ( name
+  , object
+      [ "type"        .= ("object" :: Text)
+      , "description" .= desc
+      , "properties"  .= object [ Key.fromText k .= v | (k, v) <- props ]
+      ]
+  )
+
+-- | propArray: an array-valued property whose items share one type.
+propArray :: Text -> Text -> Text -> (Text, Value)
+propArray name itemType desc =
+  ( name
+  , object
+      [ "type"        .= ("array" :: Text)
+      , "description" .= desc
+      , "items"       .= object [ "type" .= itemType ]
+      ]
+  )
 
 
 -- ---------------------------------------------------------------------------
@@ -1125,6 +1313,17 @@ dispatchTool cfg _lanes "get_dependencies" args =
     Just idx ->
       case Aeson.fromJSON args of
         Aeson.Success p -> pure . eitherToMcp $ handleGetDependencies idx p
+        Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+-- Scope-aware retrieval (issue #17): the one corpus tool that also takes the
+-- lanes, since every rendering it returns is typed there.
+dispatchTool cfg lanes "search_in_scope" args =
+  case scCorpusIndex cfg of
+    Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
+    Just idx ->
+      case Aeson.fromJSON args of
+        Aeson.Success p ->
+          failureToMcp <$> handleSearchInScope lanes (scAgdaConfig cfg) idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Live-query tools (issue #75): the interaction lane.

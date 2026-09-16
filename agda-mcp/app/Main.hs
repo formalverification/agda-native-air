@@ -28,6 +28,8 @@
 -- M1-3 additions:
 --   --corpus PATH   Load agda-strux JSONL corpus for search tools.
 --                   Without this flag, search tools are not registered.
+--                   Since issue #17 the flag also registers search_in_scope,
+--                   the scope-aware retrieval tool over the same index.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -219,8 +221,9 @@ usage = unlines
   , ""
   , "The server reads JSON-RPC (MCP) from stdin and writes to stdout."
   , ""
-  , "When --corpus is provided, three additional tools are registered:"
+  , "When --corpus is provided, four additional tools are registered:"
   , "  search_by_name      Find definitions by name pattern"
   , "  search_by_type      Find definitions by type signature pattern"
   , "  get_dependencies    Retrieve the dependency neighborhood of a definition"
+  , "  search_in_scope     Corpus rows a file can name, each typed by the lane"
   ]

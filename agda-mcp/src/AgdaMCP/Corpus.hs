@@ -36,6 +36,7 @@
 module AgdaMCP.Corpus
   ( -- * Loading
     loadCorpus
+  , corpusIndexOf
     -- * Search (pure)
   , searchByName
   , searchByType
@@ -53,6 +54,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import System.IO (hPutStrLn, stderr)
 
+import AgdaMCP.Retrieval (tokenIndex)
 import AgdaMCP.Types
 
 
@@ -79,7 +81,7 @@ loadCorpus path = do
       let lns      = filter (not . BS8.null) (BS8.lines contents)
           (ok, bad) = foldl' parseLine ([], 0 :: Int) (zip [1 :: Int ..] lns)
           entryMap = Map.fromList [ (cePrettyQname e, e) | e <- reverse ok ]
-          idx      = CorpusIndex { ciEntries = entryMap, ciSize = Map.size entryMap }
+          idx      = corpusIndexOf entryMap
       if bad > 0
         then do
           hPutStrLn stderr $
@@ -104,6 +106,17 @@ loadCorpus path = do
       case eitherDecodeStrict' bs of
         Right entry -> (entry : acc, errCount)
         Left _err   -> (acc, errCount + 1)
+
+
+-- | corpusIndexOf: the index over a map of entries, its token index built
+-- here so every 'CorpusIndex' carries one (issue #17's search_in_scope reads
+-- it; see 'AgdaMCP.Retrieval.tokenIndex').  The one way to build an index.
+corpusIndexOf :: Map.Map Text CorpusEntry -> CorpusIndex
+corpusIndexOf entryMap = CorpusIndex
+  { ciEntries = entryMap
+  , ciSize    = Map.size entryMap
+  , ciTokens  = tokenIndex entryMap
+  }
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
