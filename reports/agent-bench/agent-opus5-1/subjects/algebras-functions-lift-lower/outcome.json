@@ -51,13 +51,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3387,
+  "agdaMs" : 3685,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{α ρᵃ β : Agda.Primitive.Level}\n(𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ)\n(a : Level.Lift β (Relation.Binary.Bundles.Setoid.Carrier 𝑨)) →\n(Setoid.Functions.Basic.𝑙𝑖𝑓𝑡 β Relation.Binary.Bundles.Setoid.≈ a)\na",
+    "gold" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
     "final" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
     "equal" : true
   },

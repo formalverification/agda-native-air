@@ -45,13 +45,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3048,
+  "agdaMs" : 3786,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{A : Agda.Primitive.Set} (xs : Agda.Builtin.List.List A) →\nData.List.Base.map Function.Base.id xs Agda.Builtin.Equality.≡ xs",
+    "gold" : "{A : Set} (xs : List A) → map id xs ≡ xs",
     "final" : "{A : Set} (xs : List A) → map id xs ≡ xs",
     "equal" : true
   },

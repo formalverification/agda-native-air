@@ -51,13 +51,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 5599,
+  "agdaMs" : 5998,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑩 →\nSetoid.Homomorphisms.Basic.hom 𝑩 𝑪 →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑪",
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
     "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
     "equal" : true
   },

@@ -49,13 +49,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3146,
+  "agdaMs" : 3348,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{a b : Agda.Primitive.Level} {A : Agda.Primitive.Set a} →\n((λ r → Level.Lift.lower r) Function.Base.∘ Level.lift)\nAgda.Builtin.Equality.≡ Overture.Basic.𝑖𝑑 A",
+    "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
     "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
     "equal" : true
   },

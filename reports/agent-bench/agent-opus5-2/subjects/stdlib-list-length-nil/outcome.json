@@ -46,13 +46,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3042,
+  "agdaMs" : 4164,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{A : Agda.Primitive.Set} →\nData.List.Base.length Agda.Builtin.List.List.[]\nAgda.Builtin.Equality.≡ 0",
+    "gold" : "{A : Set} → length [] ≡ 0",
     "final" : "{A : Set} → length [] ≡ 0",
     "equal" : true
   },

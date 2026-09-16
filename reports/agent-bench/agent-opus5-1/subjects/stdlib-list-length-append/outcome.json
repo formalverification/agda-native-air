@@ -45,13 +45,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3049,
+  "agdaMs" : 3265,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{A : Agda.Primitive.Set} (xs ys : Agda.Builtin.List.List A) →\nData.List.Base.length (xs Data.List.Base.++ ys)\nAgda.Builtin.Equality.≡\n(Data.List.Base.length xs Agda.Builtin.Nat.+\n Data.List.Base.length ys)",
+    "gold" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
     "final" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
     "equal" : true
   },

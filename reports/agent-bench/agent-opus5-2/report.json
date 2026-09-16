@@ -1,11 +1,11 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "agent-opus5-2",
-  "timestamp" : "2026-09-15T22:03:59.694653705Z",
+  "timestamp" : "2026-09-16T00:01:50.635674513Z",
   "rejudged" : true,
   "config" : {
     "safe" : true,
-    "rejudgedAt" : "2026-09-15T22:03:59.693612234Z",
+    "rejudgedAt" : "2026-09-16T00:01:50.633494369Z",
     "model" : "claude-opus-5",
     "maxTurns" : 30,
     "wallCapSec" : 900,
@@ -443,13 +443,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3042,
+      "agdaMs" : 3237,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(0 Agda.Builtin.Nat.+ n) Agda.Builtin.Equality.≡ n",
+        "gold" : "(n : ℕ) → 0 + n ≡ n",
         "final" : "(n : ℕ) → 0 + n ≡ n",
         "equal" : true
       },
@@ -511,13 +511,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3053,
+      "agdaMs" : 3007,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(b : Agda.Builtin.Bool.Bool) →\nData.Bool.Base.not (Data.Bool.Base.not b) Agda.Builtin.Equality.≡ b",
+        "gold" : "(b : Bool) → not (not b) ≡ b",
         "final" : "(b : Bool) → not (not b) ≡ b",
         "equal" : true
       },
@@ -580,13 +580,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2908,
+      "agdaMs" : 3798,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "Agda.Builtin.Unit.⊤",
+        "gold" : "⊤",
         "final" : "⊤",
         "equal" : true
       },
@@ -649,13 +649,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3053,
+      "agdaMs" : 4935,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A B : Agda.Primitive.Set} → A → B → A Data.Product.Base.× B",
+        "gold" : "{A B : Set} → A → B → A × B",
         "final" : "{A B : Set} → A → B → A × B",
         "equal" : true
       },
@@ -718,13 +718,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3023,
+      "agdaMs" : 4707,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A B : Agda.Primitive.Set} {f : A → B} →\nData.Maybe.Base.map f Agda.Builtin.Maybe.Maybe.nothing\nAgda.Builtin.Equality.≡ Agda.Builtin.Maybe.Maybe.nothing",
+        "gold" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
         "final" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
         "equal" : true
       },
@@ -787,13 +787,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3042,
+      "agdaMs" : 4164,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A : Agda.Primitive.Set} →\nData.List.Base.length Agda.Builtin.List.List.[]\nAgda.Builtin.Equality.≡ 0",
+        "gold" : "{A : Set} → length [] ≡ 0",
         "final" : "{A : Set} → length [] ≡ 0",
         "equal" : true
       },
@@ -856,13 +856,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3086,
+      "agdaMs" : 4098,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{n : Agda.Builtin.Nat.Nat} →\n0 Data.Nat.Base.< Agda.Builtin.Nat.Nat.suc n",
+        "gold" : "{n : ℕ} → 0 < suc n",
         "final" : "{n : ℕ} → 0 < suc n",
         "equal" : true
       },
@@ -925,13 +925,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3035,
+      "agdaMs" : 4214,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ m)",
+        "gold" : "(m n : ℕ) → m + n ≡ n + m",
         "final" : "(m n : ℕ) → m + n ≡ n + m",
         "equal" : true
       },
@@ -993,13 +993,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3103,
+      "agdaMs" : 3377,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(n Agda.Builtin.Nat.+ 0) Agda.Builtin.Equality.≡ n",
+        "gold" : "(n : ℕ) → n + 0 ≡ n",
         "final" : "(n : ℕ) → n + 0 ≡ n",
         "equal" : true
       },
@@ -1061,13 +1061,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3091,
+      "agdaMs" : 3222,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ Agda.Builtin.Nat.Nat.suc n)\nAgda.Builtin.Equality.≡\nAgda.Builtin.Nat.Nat.suc (m Agda.Builtin.Nat.+ n)",
+        "gold" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
         "final" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
         "equal" : true
       },
@@ -1129,13 +1129,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3090,
+      "agdaMs" : 3228,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n((m Agda.Builtin.Nat.+ n) Agda.Builtin.Nat.+ p)\nAgda.Builtin.Equality.≡\n(m Agda.Builtin.Nat.+ (n Agda.Builtin.Nat.+ p))",
+        "gold" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
         "final" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
         "equal" : true
       },
@@ -1197,13 +1197,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3079,
+      "agdaMs" : 3359,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(n Agda.Builtin.Nat.* 0) Agda.Builtin.Equality.≡ 0",
+        "gold" : "(n : ℕ) → n * 0 ≡ 0",
         "final" : "(n : ℕ) → n * 0 ≡ 0",
         "equal" : true
       },
@@ -1265,13 +1265,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3051,
+      "agdaMs" : 3253,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(n Agda.Builtin.Nat.* 1) Agda.Builtin.Equality.≡ n",
+        "gold" : "(n : ℕ) → n * 1 ≡ n",
         "final" : "(n : ℕ) → n * 1 ≡ n",
         "equal" : true
       },
@@ -1333,13 +1333,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3068,
+      "agdaMs" : 3449,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A : Agda.Primitive.Set} (xs ys : Agda.Builtin.List.List A) →\nData.List.Base.length (xs Data.List.Base.++ ys)\nAgda.Builtin.Equality.≡\n(Data.List.Base.length xs Agda.Builtin.Nat.+\n Data.List.Base.length ys)",
+        "gold" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
         "final" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
         "equal" : true
       },
@@ -1401,13 +1401,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3048,
+      "agdaMs" : 3786,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A : Agda.Primitive.Set} (xs : Agda.Builtin.List.List A) →\nData.List.Base.map Function.Base.id xs Agda.Builtin.Equality.≡ xs",
+        "gold" : "{A : Set} (xs : List A) → map id xs ≡ xs",
         "final" : "{A : Set} (xs : List A) → map id xs ≡ xs",
         "equal" : true
       },
@@ -1469,13 +1469,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3127,
+      "agdaMs" : 3436,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A : Agda.Primitive.Set} (xs ys zs : Agda.Builtin.List.List A) →\n((xs Data.List.Base.++ ys) Data.List.Base.++ zs)\nAgda.Builtin.Equality.≡\n(xs Data.List.Base.++ (ys Data.List.Base.++ zs))",
+        "gold" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
         "final" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
         "equal" : true
       },
@@ -1537,13 +1537,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3072,
+      "agdaMs" : 3401,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A B C : Agda.Primitive.Set} (f : B → C) (g : A → B)\n(xs : Agda.Builtin.List.List A) →\nData.List.Base.map (f Function.Base.∘ g) xs Agda.Builtin.Equality.≡\nData.List.Base.map f (Data.List.Base.map g xs)",
+        "gold" : "{A B C : Set} (f : B → C) (g : A → B) (xs : List A) →\nmap (f ∘ g) xs ≡ map f (map g xs)",
         "final" : "{A B C : Set} (f : B → C) (g : A → B) (xs : List A) →\nmap (f ∘ g) xs ≡ map f (map g xs)",
         "equal" : true
       },
@@ -1606,13 +1606,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3116,
+      "agdaMs" : 3429,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.* n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.* m)",
+        "gold" : "(m n : ℕ) → m * n ≡ n * m",
         "final" : "(m n : ℕ) → m * n ≡ n * m",
         "equal" : true
       },
@@ -1674,13 +1674,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3096,
+      "agdaMs" : 3584,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n((n Agda.Builtin.Nat.+ p) Agda.Builtin.Nat.* m)\nAgda.Builtin.Equality.≡\n((n Agda.Builtin.Nat.* m) Agda.Builtin.Nat.+\n (p Agda.Builtin.Nat.* m))",
+        "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
         "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
         "equal" : true
       },
@@ -1743,13 +1743,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3073,
+      "agdaMs" : 3478,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.* (n Agda.Builtin.Nat.+ p))\nAgda.Builtin.Equality.≡\n((m Agda.Builtin.Nat.* n) Agda.Builtin.Nat.+\n (m Agda.Builtin.Nat.* p))",
+        "gold" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
         "final" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
         "equal" : true
       },
@@ -1812,13 +1812,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3090,
+      "agdaMs" : 3395,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n((m Agda.Builtin.Nat.* n) Agda.Builtin.Nat.* p)\nAgda.Builtin.Equality.≡\n(m Agda.Builtin.Nat.* (n Agda.Builtin.Nat.* p))",
+        "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
         "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
         "equal" : true
       },
@@ -1881,13 +1881,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3077,
+      "agdaMs" : 3429,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A B : Agda.Primitive.Set} →\n(A → B) →\n(B → A) →\nRelation.Nullary.Decidable.Core.Dec A →\nRelation.Nullary.Decidable.Core.Dec B",
+        "gold" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
         "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
         "equal" : true
       },
@@ -1953,13 +1953,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3199,
+      "agdaMs" : 3504,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{a b : Agda.Primitive.Level} {A : Agda.Primitive.Set a} →\n(Level.lift Function.Base.∘ (λ r → Level.Lift.lower r))\nAgda.Builtin.Equality.≡ Overture.Basic.𝑖𝑑 (Level.Lift b A)",
+        "gold" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
         "final" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
         "equal" : true
       },
@@ -2025,13 +2025,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3172,
+      "agdaMs" : 3525,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{a b : Agda.Primitive.Level} {A : Agda.Primitive.Set a} →\n((λ r → Level.Lift.lower r) Function.Base.∘ Level.lift)\nAgda.Builtin.Equality.≡ Overture.Basic.𝑖𝑑 A",
+        "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
         "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
         "equal" : true
       },
@@ -2097,13 +2097,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3126,
+      "agdaMs" : 3472,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓥 a : Agda.Primitive.Level} {I : Agda.Primitive.Set 𝓥}\n{A : Agda.Primitive.Set a} →\nI → Overture.Operations.Op I A",
+        "gold" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
         "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
         "equal" : true
       },
@@ -2171,13 +2171,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3418,
+      "agdaMs" : 3860,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{α ρᵃ β : Agda.Primitive.Level}\n(𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ)\n(a : Level.Lift β (Relation.Binary.Bundles.Setoid.Carrier 𝑨)) →\n(Setoid.Functions.Basic.𝑙𝑖𝑓𝑡 β Relation.Binary.Bundles.Setoid.≈ a)\na",
+        "gold" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
         "final" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
         "equal" : true
       },
@@ -2247,13 +2247,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3494,
+      "agdaMs" : 3859,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n(F : Function.Bundles.Func 𝑨 𝑩)\n(a : Relation.Binary.Bundles.Setoid.Carrier 𝑨) →\nSetoid.Functions.Inverses._.Image F ∋ Function.Bundles.Func.to F a",
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
         "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
         "equal" : true
       },
@@ -2321,13 +2321,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3436,
+      "agdaMs" : 3722,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n{F : Function.Bundles.Func 𝑨 𝑩}\n{a : Relation.Binary.Bundles.Setoid.Carrier 𝑨} →\n(𝑨 Relation.Binary.Bundles.Setoid.≈\n Setoid.Functions.Inverses.Inv F Setoid.Functions.Inverses.Imagef∋f)\na",
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
         "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
         "equal" : true
       },
@@ -2394,13 +2394,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3414,
+      "agdaMs" : 3722,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n(f : Function.Bundles.Func 𝑨 𝑩)\n(fE : Setoid.Functions.Surjective.IsSurjective f)\n{b : Relation.Binary.Bundles.Setoid.Carrier 𝑩} →\n(𝑩 Relation.Binary.Bundles.Setoid.≈\n Function.Bundles.Func.to f\n (Setoid.Functions.Surjective.SurjInv f fE b))\nb",
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
         "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
         "equal" : true
       },
@@ -2469,13 +2469,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3426,
+      "agdaMs" : 3702,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n{𝑪 : Relation.Binary.Bundles.Setoid γ ρᶜ}\n(f : Function.Bundles.Func 𝑨 𝑩) (g : Function.Bundles.Func 𝑩 𝑪) →\nSetoid.Functions.Injective.IsInjective f →\nSetoid.Functions.Injective.IsInjective g →\nSetoid.Functions.Injective.IsInjective\n(g Setoid.Functions.Basic.⊙ f)",
+        "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
         "final" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
         "equal" : true
       },
@@ -2545,13 +2545,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5374,
+      "agdaMs" : 5938,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑨",
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
         "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
         "equal" : true
       },
@@ -2619,13 +2619,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5515,
+      "agdaMs" : 7074,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑩 →\nSetoid.Homomorphisms.Basic.hom 𝑩 𝑪 →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑪",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
         "equal" : true
       },
@@ -2695,13 +2695,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5557,
+      "agdaMs" : 7074,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ} →\nSetoid.Homomorphisms.Basic.mon 𝑨 𝑩 →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑩",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
         "equal" : true
       },
@@ -2773,13 +2773,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3465,
+      "agdaMs" : 4148,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n{F : Function.Bundles.Func 𝑨 𝑩}\n{b : Relation.Binary.Bundles.Setoid.Carrier 𝑩} →\nSetoid.Functions.Inverses.IsInRange F b →\nSetoid.Functions.Inverses._.Image F ∋ b",
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
         "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
         "equal" : true
       },
@@ -2847,13 +2847,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5894,
+      "agdaMs" : 7070,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 𝑩 : Setoid.Algebras.Basic.Algebra α ρᵃ} →\n𝑨 Setoid.Homomorphisms.Isomorphisms._.≅ 𝑩 →\n𝑨 Setoid.Subalgebras.Basic._.≥ 𝑩",
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
         "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
         "equal" : true
       },
@@ -2921,13 +2921,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6098,
+      "agdaMs" : 7638,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\n𝑨 Setoid.Subalgebras.Basic._.≥ 𝑩 →\n𝑩 Setoid.Subalgebras.Basic._.≥ 𝑪 → 𝑨 Setoid.Subalgebras.Basic._.≥ 𝑪",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
         "equal" : true
       },
@@ -2997,13 +2997,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5536,
+      "agdaMs" : 6885,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ} →\nSetoid.Homomorphisms.Basic.mon 𝑨 𝑩 →\nData.Product.Base.Σ-syntax (Setoid.Homomorphisms.Basic.hom 𝑨 𝑩)\n(λ h →\n   Setoid.Functions.Injective.IsInjective\n   (Agda.Builtin.Sigma.Σ.fst h))",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
         "equal" : true
       },
@@ -3072,13 +3072,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5562,
+      "agdaMs" : 6723,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑩 →\n(θ : Setoid.Congruences.Basic.Con 𝑨 ℓ) →\nSetoid.Homomorphisms.Basic.hom 𝑨 (𝑨 Setoid.Congruences.Basic._.╱ θ)",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
         "equal" : true
       },
@@ -3150,13 +3150,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6037,
+      "agdaMs" : 7471,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ} →\n𝑨 Setoid.Subalgebras.Basic._.≤ 𝑨",
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
         "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
         "equal" : true
       },
@@ -3226,13 +3226,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6026,
+      "agdaMs" : 7684,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\n𝑨 Setoid.Subalgebras.Basic._.≤ 𝑩 →\n𝑩 Setoid.Subalgebras.Basic._.≤ 𝑪 → 𝑨 Setoid.Subalgebras.Basic._.≤ 𝑪",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
         "equal" : true
       },
@@ -3307,13 +3307,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6059,
+      "agdaMs" : 7542,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n{𝑪 : Setoid.Algebras.Basic.Algebra γ ρᶜ} →\n𝑨 Setoid.Subalgebras.Basic._.≤ 𝑩 →\n𝑩 Setoid.Homomorphisms.Isomorphisms._.≅ 𝑪 →\n𝑨 Setoid.Subalgebras.Basic._.≤ 𝑪",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
         "equal" : true
       },
@@ -3386,13 +3386,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5567,
+      "agdaMs" : 6867,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ} →\nSetoid.Homomorphisms.Basic.hom 𝑨 𝑩 →\nSetoid.Congruences.Basic.Con 𝑨 ρᵇ",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
         "equal" : true
       },
@@ -3459,13 +3459,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5545,
+      "agdaMs" : 6283,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Agda.Primitive.Level}\n{𝑆 : Overture.Signatures.Signature 𝓞 𝓥}\n{𝑨 : Setoid.Algebras.Basic.Algebra α ρᵃ}\n{𝑩 : Setoid.Algebras.Basic.Algebra β ρᵇ}\n(h : Setoid.Homomorphisms.Basic.hom 𝑨 𝑩)\n{θ : Setoid.Congruences.Basic.Con 𝑨 ℓ}\n{x y\n : Relation.Binary.Bundles.Setoid.Carrier\n   Setoid.Algebras.Basic.𝔻[ 𝑨 ]} →\nAgda.Builtin.Sigma.Σ.fst\n(Setoid.Homomorphisms.Kernels.kercon\n (Setoid.Homomorphisms.Kernels.πhom h θ))\nx y →\nAgda.Builtin.Sigma.Σ.fst θ x y",
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
         "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
         "equal" : true
       },
@@ -3528,13 +3528,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3127,
+      "agdaMs" : 3214,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ Agda.Builtin.Nat.Nat.suc m)\nAgda.Builtin.Equality.≡\nAgda.Builtin.Nat.Nat.suc (m Agda.Builtin.Nat.+ m)",
+        "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
         "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
         "equal" : true
       },
@@ -3598,13 +3598,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3052,
+      "agdaMs" : 3311,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ m) Agda.Builtin.Equality.≡ 0 →\nm Agda.Builtin.Equality.≡ 0",
+        "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
         "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
         "equal" : true
       },
@@ -3667,13 +3667,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3065,
+      "agdaMs" : 3251,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.≤ n →\n(m Agda.Builtin.Nat.+ m) Data.Nat.Base.≤ (n Agda.Builtin.Nat.+ n)",
+        "gold" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
         "final" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
         "equal" : true
       },
@@ -3737,13 +3737,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3103,
+      "agdaMs" : 3366,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.≤ n →\n(m Agda.Builtin.Nat.* m) Data.Nat.Base.≤ (n Agda.Builtin.Nat.* n)",
+        "gold" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
         "final" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
         "equal" : true
       },
@@ -3807,13 +3807,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3120,
+      "agdaMs" : 3342,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.≤ n →\n((n Agda.Builtin.Nat.+ n) Agda.Builtin.Nat.- m)\nAgda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ (n Agda.Builtin.Nat.- m))",
+        "gold" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
         "final" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
         "equal" : true
       },
@@ -3877,13 +3877,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3119,
+      "agdaMs" : 3424,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{m n : Agda.Builtin.Nat.Nat} →\nm Data.Nat.Base.< n →\n(m Agda.Builtin.Nat.+ m) Data.Nat.Base.< (n Agda.Builtin.Nat.+ n)",
+        "gold" : "{m n : ℕ} → m < n → m + m < n + n",
         "final" : "{m n : ℕ} → m < n → m + m < n + n",
         "equal" : true
       },
@@ -3947,13 +3947,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3087,
+      "agdaMs" : 3416,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{m n : Agda.Builtin.Nat.Nat} →\n(m Agda.Builtin.Nat.+ m) Data.Nat.Base.≤ n → m Data.Nat.Base.≤ n",
+        "gold" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
         "final" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
         "equal" : true
       },
@@ -4016,13 +4016,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3172,
+      "agdaMs" : 3572,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A : Agda.Primitive.Set} (xs : Agda.Builtin.List.List A) →\nData.List.Base.length (xs Data.List.Base.++ xs)\nAgda.Builtin.Equality.≡\n(Data.List.Base.length xs Agda.Builtin.Nat.+\n Data.List.Base.length xs)",
+        "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
         "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
         "equal" : true
       },
@@ -4086,13 +4086,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3138,
+      "agdaMs" : 3556,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "{A : Agda.Primitive.Set} {x y : A}\n{xs : Agda.Builtin.List.List A} →\n(x Agda.Builtin.List.List.∷ xs) Agda.Builtin.Equality.≡\n(y Agda.Builtin.List.List.∷ xs) →\nx Agda.Builtin.Equality.≡ y",
+        "gold" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
         "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
         "equal" : true
       },
@@ -4156,13 +4156,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3110,
+      "agdaMs" : 3453,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(f : Agda.Builtin.Nat.Nat → Agda.Builtin.Nat.Nat)\n(xs : Agda.Builtin.List.List Agda.Builtin.Nat.Nat) →\nData.List.Base.map f (xs Data.List.Base.++ xs)\nAgda.Builtin.Equality.≡\n(Data.List.Base.map f xs Data.List.Base.++ Data.List.Base.map f xs)",
+        "gold" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
         "final" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
         "equal" : true
       },
@@ -4225,13 +4225,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2916,
+      "agdaMs" : 3529,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(a b : Agda.Builtin.Bool.Bool) →\n((a Data.Bool.Base.∧ b) Data.Bool.Base.∧ a) Agda.Builtin.Equality.≡\n(a Data.Bool.Base.∧ (b Data.Bool.Base.∧ a))",
+        "gold" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
         "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
         "equal" : true
       },
@@ -4294,13 +4294,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3088,
+      "agdaMs" : 3274,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(a b : Agda.Builtin.Bool.Bool) →\n(a Data.Bool.Base.∧ (a Data.Bool.Base.∨ b)) Agda.Builtin.Equality.≡\n((a Data.Bool.Base.∧ a) Data.Bool.Base.∨ (a Data.Bool.Base.∧ b))",
+        "gold" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
         "final" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
         "equal" : true
       },

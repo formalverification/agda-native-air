@@ -45,13 +45,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3078,
+  "agdaMs" : 3302,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "(n : Agda.Builtin.Nat.Nat) →\n(n Agda.Builtin.Nat.* 0) Agda.Builtin.Equality.≡ 0",
+    "gold" : "(n : ℕ) → n * 0 ≡ 0",
     "final" : "(n : ℕ) → n * 0 ≡ 0",
     "equal" : true
   },

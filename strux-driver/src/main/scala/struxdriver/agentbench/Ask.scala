@@ -24,6 +24,9 @@
   *                bodies refer to (`bodyRefs`, read off the internal terms).
   *                The statement gate compares the final file's type AST with
   *                the gold's; the restatement gate reads the references.
+  *                The file is always elaborated from source (a fresh copy
+  *                in an empty directory), so the printed types in the
+  *                ledger read the same on every run.
   *
   *  Design notes
   *  ------------
@@ -77,11 +80,29 @@ trait Agda {
 /** The agda-strux extractor, driven on one file. */
 final case class Extractor(bin: Path, includes: Vector[Path], agdaDir: String, timeout: FiniteDuration) {
 
+  /** Delete a temp tree: the copy, and whatever Agda wrote beside it. */
+  private def deleteTree(root: Path): Unit = {
+    val paths = Files.walk(root).iterator().asScala.toVector.reverse
+    paths.foreach(p => Files.deleteIfExists(p))
+  }
+
+  /** The file's rows.  The extractor works on a fresh copy of the file in
+    * an empty directory, where no interface can exist, so every extraction
+    * is an elaboration from source and nothing is left in the tree: a file
+    * loaded from an interface agda-json wrote prints its types with
+    * qualified names, a file elaborated from source with the names the
+    * module sees, and the ledger should read the same on every run
+    * (measured on a gold: the `typeAst` and the `bodyRefs` are identical
+    * either way, only the printing moves).
+    */
   def rows(file: Path): IO[Either[String, Vector[DefRow]]] =
     IO.blocking {
       val out = Files.createTempFile("agent-bench-refs-", ".jsonl")
+      val dir = Files.createTempDirectory("agent-bench-extract-")
       try {
-        val cmd = Vector(bin.toString, "--input", file.toString, "--output", out.toString) ++
+        val copy = dir.resolve(file.getFileName)
+        Files.copy(file, copy)
+        val cmd = Vector(bin.toString, "--input", copy.toString, "--output", out.toString) ++
           includes.flatMap(p => Vector("--include", p.toString))
         val pb = new ProcessBuilder(cmd.asJava)
         pb.environment().put("AGDA_DIR", agdaDir)
@@ -100,7 +121,7 @@ final case class Extractor(bin: Path, includes: Vector[Path], agdaDir: String, t
             } yield DefRow(q, ast, tpe, refs)
           }
         })
-      } finally Files.deleteIfExists(out)
+      } finally { Files.deleteIfExists(out); deleteTree(dir) }
     }.timeout(timeout).handleError(e => Left(s"agda-json: ${e.getMessage}"))
 }
 

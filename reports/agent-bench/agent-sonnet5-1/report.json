@@ -1,11 +1,11 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "agent-sonnet5-1",
-  "timestamp" : "2026-09-15T21:54:22.370562320Z",
+  "timestamp" : "2026-09-15T23:51:18.446506341Z",
   "rejudged" : true,
   "config" : {
     "safe" : true,
-    "rejudgedAt" : "2026-09-15T21:54:22.368412158Z",
+    "rejudgedAt" : "2026-09-15T23:51:18.445476828Z",
     "model" : "claude-sonnet-5",
     "maxTurns" : 30,
     "wallCapSec" : 900,
@@ -443,7 +443,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3546,
+      "agdaMs" : 2965,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -511,7 +511,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3417,
+      "agdaMs" : 3177,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -580,7 +580,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3002,
+      "agdaMs" : 3134,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -649,7 +649,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2990,
+      "agdaMs" : 3106,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -717,7 +717,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2994,
+      "agdaMs" : 3139,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -786,7 +786,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3028,
+      "agdaMs" : 3191,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -854,7 +854,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2972,
+      "agdaMs" : 3146,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -923,13 +923,13 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2986,
+      "agdaMs" : 3137,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
       ],
       "statement" : {
-        "gold" : "(m n : Agda.Builtin.Nat.Nat) →\n(m Agda.Builtin.Nat.+ n) Agda.Builtin.Equality.≡\n(n Agda.Builtin.Nat.+ m)",
+        "gold" : "(m n : ℕ) → m + n ≡ n + m",
         "final" : "(m n : ℕ) → m + n ≡ n + m",
         "equal" : true
       },
@@ -991,7 +991,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2994,
+      "agdaMs" : 3138,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1059,7 +1059,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3007,
+      "agdaMs" : 3132,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1127,7 +1127,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2988,
+      "agdaMs" : 3121,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1195,7 +1195,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3012,
+      "agdaMs" : 3139,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1263,7 +1263,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3009,
+      "agdaMs" : 3135,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1331,7 +1331,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3047,
+      "agdaMs" : 3161,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1399,7 +1399,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3053,
+      "agdaMs" : 3201,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1467,7 +1467,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3020,
+      "agdaMs" : 3141,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1535,7 +1535,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3044,
+      "agdaMs" : 3218,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1605,7 +1605,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3056,
+      "agdaMs" : 3140,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1674,7 +1674,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3010,
+      "agdaMs" : 3219,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1744,7 +1744,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3003,
+      "agdaMs" : 3221,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1813,7 +1813,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3056,
+      "agdaMs" : 3243,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1881,7 +1881,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3090,
+      "agdaMs" : 3149,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1952,7 +1952,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3086,
+      "agdaMs" : 3218,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2023,7 +2023,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3130,
+      "agdaMs" : 3224,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2094,7 +2094,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3090,
+      "agdaMs" : 3188,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2169,7 +2169,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3394,
+      "agdaMs" : 3534,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2242,7 +2242,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3464,
+      "agdaMs" : 3513,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2316,7 +2316,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3392,
+      "agdaMs" : 3582,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2389,7 +2389,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3454,
+      "agdaMs" : 3666,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2465,7 +2465,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3441,
+      "agdaMs" : 3611,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2540,7 +2540,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5413,
+      "agdaMs" : 5718,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2616,7 +2616,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5579,
+      "agdaMs" : 5770,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2690,7 +2690,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5724,
+      "agdaMs" : 5772,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2766,7 +2766,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3477,
+      "agdaMs" : 3586,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2840,7 +2840,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6061,
+      "agdaMs" : 6013,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2915,7 +2915,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6271,
+      "agdaMs" : 6249,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2993,7 +2993,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5786,
+      "agdaMs" : 5913,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3069,7 +3069,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5775,
+      "agdaMs" : 5859,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3144,7 +3144,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6283,
+      "agdaMs" : 6378,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3223,7 +3223,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6328,
+      "agdaMs" : 6412,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3304,7 +3304,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 6241,
+      "agdaMs" : 6393,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3385,7 +3385,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5723,
+      "agdaMs" : 5970,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3460,7 +3460,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 5691,
+      "agdaMs" : 6086,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3529,7 +3529,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3142,
+      "agdaMs" : 3254,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3598,7 +3598,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3180,
+      "agdaMs" : 3211,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3667,7 +3667,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3103,
+      "agdaMs" : 3297,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3736,7 +3736,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3089,
+      "agdaMs" : 3276,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3806,7 +3806,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3107,
+      "agdaMs" : 3277,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3875,7 +3875,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3114,
+      "agdaMs" : 3271,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3944,7 +3944,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3095,
+      "agdaMs" : 3205,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4013,7 +4013,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3101,
+      "agdaMs" : 3265,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4082,7 +4082,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3111,
+      "agdaMs" : 3296,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4151,7 +4151,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3108,
+      "agdaMs" : 3284,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4220,7 +4220,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 2994,
+      "agdaMs" : 3269,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4289,7 +4289,7 @@
         ]
       },
       "agdaExit" : 0,
-      "agdaMs" : 3147,
+      "agdaMs" : 3148,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [

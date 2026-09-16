@@ -45,13 +45,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3096,
+  "agdaMs" : 3584,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "(m n p : Agda.Builtin.Nat.Nat) →\n((n Agda.Builtin.Nat.+ p) Agda.Builtin.Nat.* m)\nAgda.Builtin.Equality.≡\n((n Agda.Builtin.Nat.* m) Agda.Builtin.Nat.+\n (p Agda.Builtin.Nat.* m))",
+    "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
     "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
     "equal" : true
   },

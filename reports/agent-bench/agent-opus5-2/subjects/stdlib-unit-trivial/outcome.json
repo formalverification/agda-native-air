@@ -46,13 +46,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2908,
+  "agdaMs" : 3798,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "Agda.Builtin.Unit.⊤",
+    "gold" : "⊤",
     "final" : "⊤",
     "equal" : true
   },

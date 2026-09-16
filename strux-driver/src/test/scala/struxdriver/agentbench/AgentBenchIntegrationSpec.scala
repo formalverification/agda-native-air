@@ -83,6 +83,13 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
       )
     }.unsafeRunSync()
 
+    // The gold is extracted once per case; every extraction elaborates it
+    // from source, so its printed statement is one string, in the module's
+    // own names (loaded from an interface, Agda would print it qualified).
+    val goldPrintings = verdicts.values.flatMap(_.statement.map(_.gold)).toSet
+    goldPrintings.size shouldBe 1
+    goldPrintings.head should not include "Agda.Builtin"
+
     val g = verdicts("gold")
     g.gate shouldBe None
     g.solved shouldBe true

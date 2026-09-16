@@ -48,13 +48,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3172,
+  "agdaMs" : 3191,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{𝓥 a : Agda.Primitive.Level} {I : Agda.Primitive.Set 𝓥}\n{A : Agda.Primitive.Set a} →\nI → Overture.Operations.Op I A",
+    "gold" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
     "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
     "equal" : true
   },

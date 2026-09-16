@@ -45,13 +45,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 2925,
+  "agdaMs" : 3276,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "(b : Agda.Builtin.Bool.Bool) →\nData.Bool.Base.not (Data.Bool.Base.not b) Agda.Builtin.Equality.≡ b",
+    "gold" : "(b : Bool) → not (not b) ≡ b",
     "final" : "(b : Bool) → not (not b) ≡ b",
     "equal" : true
   },

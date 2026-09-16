@@ -45,13 +45,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3087,
+  "agdaMs" : 3337,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{A B : Agda.Primitive.Set} {f : A → B} →\nData.Maybe.Base.map f Agda.Builtin.Maybe.Maybe.nothing\nAgda.Builtin.Equality.≡ Agda.Builtin.Maybe.Maybe.nothing",
+    "gold" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
     "final" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
     "equal" : true
   },

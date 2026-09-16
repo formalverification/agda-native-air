@@ -50,13 +50,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3414,
+  "agdaMs" : 3722,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{α ρᵃ β ρᵇ : Agda.Primitive.Level}\n{𝑨 : Relation.Binary.Bundles.Setoid α ρᵃ}\n{𝑩 : Relation.Binary.Bundles.Setoid β ρᵇ}\n(f : Function.Bundles.Func 𝑨 𝑩)\n(fE : Setoid.Functions.Surjective.IsSurjective f)\n{b : Relation.Binary.Bundles.Setoid.Carrier 𝑩} →\n(𝑩 Relation.Binary.Bundles.Setoid.≈\n Function.Bundles.Func.to f\n (Setoid.Functions.Surjective.SurjInv f fE b))\nb",
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
     "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
     "equal" : true
   },

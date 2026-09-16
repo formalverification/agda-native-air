@@ -46,13 +46,13 @@
     ]
   },
   "agdaExit" : 0,
-  "agdaMs" : 3077,
+  "agdaMs" : 3429,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
   ],
   "statement" : {
-    "gold" : "{A B : Agda.Primitive.Set} →\n(A → B) →\n(B → A) →\nRelation.Nullary.Decidable.Core.Dec A →\nRelation.Nullary.Decidable.Core.Dec B",
+    "gold" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
     "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
     "equal" : true
   },
