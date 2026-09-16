@@ -64,6 +64,7 @@ module AgdaMCP.Tools.SearchInScope
     -- * Exposed for testing
   , defaultLimit
   , probeBudget
+  , needsIdentityCheck
   ) where
 
 import Control.Exception (evaluate)
@@ -125,15 +126,21 @@ handleSearchInScope lanes cfg0 idx p =
       -- Agda's message is the whole answer.
       Left loadMsg -> do
         meta <- liveMeta ctx
-        pure . Right $ emptyResult Nothing "toplevel" imports (Just (loadError loadMsg)) meta
+        pure . Right $ emptyResult Nothing "toplevel" imports (Just (loadError loadMsg))
+                                   (ScopeTiming 0 0) meta
       Right _ -> do
         let (scope, scopeTxt) = scopeFor (sipLine p) (sipColumn p) (lcLoad ctx)
         queried <- resolveQuery ctx counters (sipQuery p) scope
         case queried of
           Left tf -> pure (Left tf)
           Right (Left err) -> do
-            meta <- liveMeta ctx
-            pure . Right $ emptyResult Nothing scopeTxt imports (Just err) meta
+            -- The goal read, when one was made, is lane time this call spent
+            -- and belongs in timing.laneMs (Copilot's second review of PR
+            -- #161); it stays out of laneCalls, as every goal read does.
+            laneNs <- readIORef (cLaneNs counters)
+            meta   <- liveMeta ctx
+            pure . Right $ emptyResult Nothing scopeTxt imports (Just err)
+                                       (ScopeTiming 0 (msOf laneNs)) meta
           Right (Right (q, source)) -> do
             -- The pool half, timed on its own: query, scope, exclusion,
             -- kind, rank, over the whole index.  Forcing the ranked list's
@@ -327,7 +334,8 @@ tryLadder ctx counters scope qname ((rung, rendering) : rest) = do
     Right resps -> case inferredTypeOf resps of
       Nothing -> next
       Just printed
-        | rung == RungQualified -> pure (Right (Just (rung, rendering, printed)))
+        | not (needsIdentityCheck rendering qname) ->
+            pure (Right (Just (rung, rendering, printed)))
         | otherwise -> do
             identity <- denotesRow ctx counters scope rendering qname
             case identity of
@@ -336,6 +344,15 @@ tryLadder ctx counters scope qname ((rung, rendering) : rest) = do
               Right False -> next
   where
     next = tryLadder ctx counters scope qname rest
+
+-- | needsIdentityCheck: every accepted spelling except the row's own
+-- qualified name is asked @WhyInScope@.  The comparison is on the spelling
+-- and not on the rung: under an @as@ alias the ladder's first rung is
+-- @Q.Core.quad@ for the row @ScopeSearchBarrel.Core.quad@, a spelling the
+-- file resolves through the alias and one that could name something else
+-- (Copilot's second review of PR #161).
+needsIdentityCheck :: Text -> Text -> Bool
+needsIdentityCheck rendering qname = rendering /= qname
 
 -- | denotesRow: does this spelling, in this scope, resolve to the corpus
 -- row?  Agda's @WhyInScope@ lists every binding of the spelling, the one
@@ -388,17 +405,18 @@ timedQuery ctx counters use cmd = do
     Right resps -> pure (Right resps)
 
 -- | emptyResult: the shape of a call that ran no walk: a load failure, or
--- nothing to search for.  The ledger is all zeros and says so.
+-- nothing to search for.  The ledger is all zeros and says so; the timing
+-- is the caller's, since a goal read may have been made on the way.
 emptyResult
-  :: Maybe (SearchQuery, Text) -> Text -> [ScopeImport] -> Maybe LiveError -> LiveMeta
-  -> SearchInScopeResult
-emptyResult q scopeTxt imports err meta = SearchInScopeResult
+  :: Maybe (SearchQuery, Text) -> Text -> [ScopeImport] -> Maybe LiveError -> ScopeTiming
+  -> LiveMeta -> SearchInScopeResult
+emptyResult q scopeTxt imports err timing meta = SearchInScopeResult
   { sirQuery   = q
   , sirScope   = scopeTxt
   , sirImports = imports
   , sirResults = []
   , sirLedger  = ScopeLedger 0 0 0 [] 0 0 0 0 [] 0 False "exhausted"
-  , sirTiming  = ScopeTiming 0 0
+  , sirTiming  = timing
   , sirError   = err
   , sirMeta    = meta
   }

@@ -2152,7 +2152,9 @@ instance ToJSON ScopeTiming where
 -- | Result of @search_in_scope@.
 --
 -- 'sirQuery' echoes what was searched for and where it came from (@given@ or
--- @goal@); it is absent only on a load failure, where no query was formed.
+-- @goal@); it is absent whenever no query was formed: a load failure, no
+-- query with no goal at the anchor, or a goal whose display yields no tokens
+-- (the cases 'sirError' names).
 -- 'sirError' is the in-band negative: @stage: "load"@ when the file does not
 -- load on the lane, @stage: "query"@ when neither the caller nor a goal at
 -- the anchor supplied anything to search for.  The echo is the live-query

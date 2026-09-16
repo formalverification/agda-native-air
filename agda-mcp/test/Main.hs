@@ -135,7 +135,7 @@ import AgdaMCP.Tools.LiveQueries
   , handleTypeOf )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
-import AgdaMCP.Tools.SearchInScope (handleSearchInScope, probeBudget)
+import AgdaMCP.Tools.SearchInScope (handleSearchInScope, needsIdentityCheck, probeBudget)
 import AgdaMCP.Scope
   ( bareNameOf, bareRenderingOf, importingModulesOf, parseImports, renderings )
 import AgdaMCP.Retrieval
@@ -2380,6 +2380,11 @@ scopeRetrievalTests = do
         [ assertEqual "default" 32 (probeBudget 8 Nothing)
         , assertEqual "given" 12 (probeBudget 8 (Just 12))
         , assertEqual "floored" 8 (probeBudget 8 (Just 2))
+        ]
+    , runTest "needsIdentityCheck: the row's own qualified name is exempt, an aliased or bare spelling is not" $ allOf
+        [ assert "own name exempt" (not (needsIdentityCheck "ScopeSearchBarrel.Core.quad" "ScopeSearchBarrel.Core.quad"))
+        , assert "alias checked" (needsIdentityCheck "Q.Core.quad" "ScopeSearchBarrel.Core.quad")
+        , assert "bare checked" (needsIdentityCheck "twice" "ScopeSearchLib.twice")
         ]
     ]
 
