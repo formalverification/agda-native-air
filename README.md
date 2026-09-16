@@ -6,8 +6,8 @@
 *Agda-native Artificial Intelligence Reasoning environment*
 
 `agda-native-air` is a research project for building the interaction, retrieval, and
-evaluation infrastructure that allows modern AI agents to work effectively with
-**Agda**.
+evaluation infrastructure that allows modern AI agents to interact effectively with
+**Agda**, to prove theorems and do general formal verification work.
 
 The project is organized around four core components.
 
@@ -31,11 +31,11 @@ This repository focuses on building that path:
 
 - **AgdaDojang**: programmatic interaction with Agda;
 - **agda-mcp**: MCP bridge for frontier coding agents;
-- **structured extraction**: retrieval- and analysis-friendly Agda corpus data;
+- **agda-strux**: structured extraction for retrieval- and analysis-friendly Agda corpus data;
 - **deterministic evaluation**: reproducible proof-completion and benchmarking workflows.
 
 The long-term vision is ambitious: AI systems that help with proof development,
-library growth, counterexample discovery, and eventually mathematical exploration.
+library growth, counterexample discovery, and mathematical exploration.
 But the near-term goal is sharper and more practical: a credible,
 publishable **Agda-native reasoning environment**.
 
@@ -57,7 +57,6 @@ agda-native-air/
 ├── ml-pipeline/               # Spark ETL (Scala) and training / retrieval / evaluation (Python)
 ├── configs/                   # pipeline configuration: the agda-algebras extraction config, logging
 ├── data/
-│   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
 │   └── benchmarks/            # the proof-obligation benchmark: fixtures, golds, index
 ├── docs/
 │   ├── README.md              # index of the documentation, with a reading order
