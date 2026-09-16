@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "algebras-homs-id-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.𝒾𝒹",
+    "target:Setoid.Functions.Basic.𝑖𝑑",
+    "target:Setoid.Homomorphisms.Basic.mkIsHom"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "𝒾𝒹′",
+  "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} → hom 𝑨 𝑨",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 12,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__normalize" : 2,
+    "mcp__agda__exports_of" : 1,
+    "mcp__agda__fill_hole" : 2,
+    "mcp__agda__type_of" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 11,
+  "wallMs" : 63996,
+  "costUsd" : 0.39151549999999996,
+  "tokens" : {
+    "input" : 18,
+    "output" : 3232,
+    "cacheRead" : 209107,
+    "cacheCreation" : 20492
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 5522,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-id-hom/final/Homs-id-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-id-hom/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `mkhom 𝑨 𝑨 𝑖𝑑 (Setoid.reflexive 𝔻[ 𝑨 ] refl)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.59,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

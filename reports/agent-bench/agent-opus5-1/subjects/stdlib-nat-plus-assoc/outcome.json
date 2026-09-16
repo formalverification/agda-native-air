@@ -1,0 +1,68 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-assoc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-assoc",
+  "goal" : "∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19569,
+  "costUsd" : 0.0855205,
+  "tokens" : {
+    "input" : 8,
+    "output" : 625,
+    "cacheRead" : 61085,
+    "cacheCreation" : 3819
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3048,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+    "final" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-plus-assoc/final/Nat-plus-assoc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-assoc/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (0 errors, 0 holes), with `+-assoc` proved by induction on `m`: `refl` in the base case and `cong suc (+-assoc m n p)` in the step.",
+  "rateLimit" : {
+    "maxUtilization" : 0.49,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

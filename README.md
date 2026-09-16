@@ -161,6 +161,19 @@ As of September 2026 the following are built, measured, and in use.
    carries the current numbers.  How the search works is
    [`docs/proof-search/overview.md`](docs/proof-search/overview.md); its decisions
    and numbers are [ADR 0001](docs/adr/0001-proof-search-on-agda-mcp.md).
++  **An agent in the loop, measured**
+   ([#154](https://github.com/formalverification/agda-native-air/issues/154)):
+   a frontier model driving the server over the same 55 obligations, one
+   fresh session per obligation with the thirteen tools and the one file,
+   judged by the gold verifier's own `agda` invocation.  Sonnet 5 solves 46
+   of 55 and Opus 5 solves 54 of 55, against the search's 8 and 14; a file
+   that names the library's own lemma for the statement is reported
+   *restated*, never solved (8 rows for Sonnet, 1 for Opus, all on the
+   agda-algebras tier), and the standard-library rows, which every model has
+   memorized, are read as memory rather than search.  The harness is
+   `make agent-bench`; the transcripts and verdicts of every quoted run are
+   archived under [`reports/agent-bench/`](reports/agent-bench/README.md), and
+   the record is [ADR 0001](docs/adr/0001-proof-search-on-agda-mcp.md) § 9.
 +  **The extraction and evaluation pipeline**, end to end: `agda-strux` →
    `strux-driver` → the Spark ETL and Python layers, with a proof-completion
    evaluator whose reports share one schema with the search's, so a model's
@@ -172,9 +185,6 @@ What comes next, in the order the evidence argues for:
    the agda-algebras ledgers and the haystack nulls locate the binding
    constraint in ranking thousands of in-scope lemmas; a learned
    premise-selection scorer slots into the seam the search already exposes.
-+  **An agent-in-the-loop measurement** ([#154](https://github.com/formalverification/agda-native-air/issues/154)):
-   a frontier model driving the server over the same 43 obligations under a
-   fixed prompt and budget, reported per tier beside the search's numbers.
 +  **The field stream** (Milestone 5): the ergonomics the field reports keep
    asking for, such as batch verdicts, a returned patch from `fill_hole`, a
    library registry that survives worktree churn, and a profiling tool.

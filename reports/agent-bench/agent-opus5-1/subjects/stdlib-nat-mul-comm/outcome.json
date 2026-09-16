@@ -1,0 +1,69 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-comm",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-comm",
+  "goal" : "∀ (m n : ℕ) → m * n ≡ n * m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 24415,
+  "costUsd" : 0.10563499999999998,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1135,
+    "cacheRead" : 61928,
+    "cacheCreation" : 4514
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3167,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : ℕ) → m * n ≡ n * m",
+    "final" : "(m n : ℕ) → m * n ≡ n * m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-comm/final/Nat-mul-comm.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-comm/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.54,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

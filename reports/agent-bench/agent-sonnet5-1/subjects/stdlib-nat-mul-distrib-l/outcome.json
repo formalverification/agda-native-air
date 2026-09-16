@@ -1,0 +1,70 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-distrib-l",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-distribˡ-+",
+  "goal" : "∀ (m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__type_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 34208,
+  "costUsd" : 0.0664294,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1807,
+    "cacheRead" : 86862,
+    "cacheCreation" : 7459
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3120,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+    "final" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-distrib-l/final/Nat-mul-distribL.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-distrib-l/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes), so the module now type-checks.",
+  "rateLimit" : {
+    "maxUtilization" : 0.38,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

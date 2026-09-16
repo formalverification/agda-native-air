@@ -1,0 +1,69 @@
+{
+  "benchmarkId" : "haystack-nat-plus-mono-diag",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-mono-diag",
+  "goal" : "∀ {m n : ℕ} → m ≤ n → m + m ≤ n + n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 23944,
+  "costUsd" : 0.0403006,
+  "tokens" : {
+    "input" : 8,
+    "output" : 837,
+    "cacheRead" : 64308,
+    "cacheCreation" : 4478
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3126,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
+    "final" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-mono-diag/final/Nat-plus-mono-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-mono-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics), so the module now type-checks with the hole filled by `Data.Nat.Properties.+-mono-≤ le le`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.47,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

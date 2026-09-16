@@ -1,0 +1,72 @@
+{
+  "benchmarkId" : "algebras-overture-lower-lift",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "universe-polymorphic",
+    "restates:Overture.Basic.lower∼lift"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "lower∼lift",
+  "goal" : "{a b : Level} {A : Set a} → lower {a}{b} ∘ lift ≡ 𝑖𝑑 A",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 24972,
+  "costUsd" : 0.118653,
+  "tokens" : {
+    "input" : 10,
+    "output" : 758,
+    "cacheRead" : 80836,
+    "cacheCreation" : 5809
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3578,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda",
+  "transcriptPath" : "subjects/algebras-overture-lower-lift/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled by `refl`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.78,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

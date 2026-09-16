@@ -1,0 +1,69 @@
+{
+  "benchmarkId" : "haystack-nat-plus-suc-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-suc-diag",
+  "goal" : "∀ (m : ℕ) → m + suc m ≡ suc (m + m)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 22207,
+  "costUsd" : 0.040129200000000004,
+  "tokens" : {
+    "input" : 8,
+    "output" : 821,
+    "cacheRead" : 64316,
+    "cacheCreation" : 4464
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3191,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success: true (exit code 0, no diagnostics, no holes) — the file type-checks with the hole filled by `Data.Nat.Properties.+-suc m m`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.47,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

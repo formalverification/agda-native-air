@@ -1,0 +1,76 @@
+{
+  "benchmarkId" : "algebras-inverses-range-to-image",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.IsInRange→IsInImage",
+    "target:Setoid.Functions.Inverses.Image_∋_.eq",
+    "target:Relation.Binary.Bundles.Setoid.sym"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "IsInRange→IsInImage′",
+  "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →  IsInRange F b → Image F ∋ b",
+  "solved" : false,
+  "restated" : true,
+  "restatementEvidence" : [
+    "ref Setoid.Functions.Inverses.IsInRange→IsInImage"
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__exports_of" : 1,
+    "mcp__agda__get_goal" : 2,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 30932,
+  "costUsd" : 0.1237852,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1720,
+    "cacheRead" : 163451,
+    "cacheCreation" : 18177
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3441,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-inverses-range-to-image/final/Inverses-range-to-image.agda",
+  "transcriptPath" : "subjects/algebras-inverses-range-to-image/transcript.jsonl",
+  "lastWords" : "check_file reports success:true (exit code 0) on the final file, confirming the module type-checks with the hole filled by `IsInRange→IsInImage w`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.42,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

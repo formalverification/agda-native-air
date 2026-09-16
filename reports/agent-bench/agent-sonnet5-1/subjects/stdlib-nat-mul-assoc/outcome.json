@@ -1,0 +1,69 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-assoc",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-assoc",
+  "goal" : "∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__type_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 36127,
+  "costUsd" : 0.0652356,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1753,
+    "cacheRead" : 86063,
+    "cacheCreation" : 7337
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3483,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
+  "lastWords" : "check_file reports success: true (exit code 0, no diagnostics, no holes), so the file now type-checks correctly.",
+  "rateLimit" : {
+    "maxUtilization" : 0.38,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

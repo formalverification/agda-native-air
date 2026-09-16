@@ -193,6 +193,15 @@ This is a **derived-but-stored** view: it can be emitted by the backend (preferr
 
 +  `refsFromBody`: heuristic identifier tokens from `body`.
 +  `wires`: `dedupe(dependencies ∪ refsFromBody)`.
++  `bodyRefs` (extractor output, optional, since 2026-09-15): the definitions a
+   function's clause bodies refer to, EXACTLY, read off Agda's internal terms
+   by `agda-json`: every `Def` and `Con` head, as fully qualified names
+   normalized like `prettyQname`, duplicates removed; empty for anything
+   without clauses.  Unlike `dependencies` and `refsFromBody`, nothing is
+   inferred from text, so a consumer that asks "does this proof use that
+   lemma" (the agent bench's restatement gate, issue #154) can trust it.  A
+   where-bound helper is its own row and carries its own `bodyRefs`; the
+   closure is the consumer's to take.
 
 
 ### 6.3 Intended uses

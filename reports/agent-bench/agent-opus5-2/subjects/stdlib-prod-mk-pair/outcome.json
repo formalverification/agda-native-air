@@ -1,0 +1,69 @@
+{
+  "benchmarkId" : "stdlib-prod-mk-pair",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "mk-pair",
+  "goal" : "{A B : Set} → A → B → A × B",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19853,
+  "costUsd" : 0.0822535,
+  "tokens" : {
+    "input" : 8,
+    "output" : 551,
+    "cacheRead" : 60865,
+    "cacheCreation" : 3689
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3313,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Set} → A → B → A × B",
+    "final" : "{A B : Set} → A → B → A × B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
+  "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with the hole filled as `mk-pair a b = a , b`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

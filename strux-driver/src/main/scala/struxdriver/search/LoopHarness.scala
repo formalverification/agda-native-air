@@ -575,7 +575,7 @@ object ProofSearchLoop extends IOApp {
     * beside the corpus (the corpus lanes put it there) — so a run report
     * pins WHAT was retrieved from, not just where it lay on disk.
     */
-  private def corpusProvenance(corpus: Path): IO[Json] =
+  private[struxdriver] def corpusProvenance(corpus: Path): IO[Json] =
     for {
       digest <- Digest.sha256Hex(corpus)
       prov   <- provenanceSibling(corpus.resolveSibling("provenance.json"))

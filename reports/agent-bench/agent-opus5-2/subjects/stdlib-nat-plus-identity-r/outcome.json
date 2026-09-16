@@ -1,0 +1,68 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-identity-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-identityʳ",
+  "goal" : "∀ (n : ℕ) → n + 0 ≡ n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 19733,
+  "costUsd" : 0.085948,
+  "tokens" : {
+    "input" : 8,
+    "output" : 637,
+    "cacheRead" : 61100,
+    "cacheCreation" : 3829
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3370,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : ℕ) → n + 0 ≡ n",
+    "final" : "(n : ℕ) → n + 0 ≡ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file (0 errors, 0 holes), with the hole replaced by induction: `+-identityʳ zero = refl` and `+-identityʳ (suc n) = cong suc (+-identityʳ n)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.71,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

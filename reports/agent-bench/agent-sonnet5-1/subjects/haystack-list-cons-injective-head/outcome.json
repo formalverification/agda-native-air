@@ -1,0 +1,69 @@
+{
+  "benchmarkId" : "haystack-list-cons-injective-head",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "∷-injective-head",
+  "goal" : "∀ {A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 17590,
+  "costUsd" : 0.0382322,
+  "tokens" : {
+    "input" : 8,
+    "output" : 685,
+    "cacheRead" : 64291,
+    "cacheCreation" : 4344
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "mcpConnected" : true,
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ]
+  },
+  "agdaExit" : 0,
+  "agdaMs" : 3104,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
+  "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
+  "lastWords" : "check_file reports success: true (exit code 0), so the module type-checks with no holes remaining.",
+  "rateLimit" : {
+    "maxUtilization" : 0.48,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
