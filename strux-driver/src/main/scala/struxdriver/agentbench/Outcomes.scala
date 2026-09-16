@@ -27,9 +27,12 @@
   *  the stated caps, or a process that ended with no result record at all
   *  (a crash; a wall-cap kill is a stated cap, not an anomaly); and when the
   *  final file leaves the judge without an answer it should have, which is a
-  *  configuration fact, not a fact about the proof: the two batch verdicts
-  *  (the gold verifier's agda and the server's check_file) disagreeing, or a
-  *  file Agda checked that the extractor could not read.  The rules are
+  *  configuration fact, not a fact about the proof: a `check_file` answer
+  *  that is not usable at all (it timed out, or carries no exit code, or
+  *  contradicts itself), the two batch verdicts (the gold verifier's agda
+  *  and the server's check_file) disagreeing, or a file Agda checked that
+  *  the extractor could not read.  An anomalous row is never counted a solve
+  *  or a restatement, whatever its file earned: it is not a measured row.  The rules are
   *  `anomalyOf`, first that applies.  The gates still run on the file, so the
   *  anomaly keeps its diagnostics, and the run exits non-zero.
   *
@@ -171,6 +174,7 @@ object Outcomes {
     else if (terminal == "crash") Some("no result record: the subject's process ended without one (see stderr.log)")
     else if (verdict.agdaExit.contains(0) && verdict.evidenceSource.startsWith("unavailable"))
       Some(s"the final file type-checks but the extractor could not read it: ${verdict.evidenceSource.stripPrefix("unavailable: ")}")
+    else if (verdict.checkUnusable) Some(s"check_file gave no usable verdict for the final file (exit ${verdict.checkExit.map(_.toString).getOrElse("none")}), so the escape and hole gates had nothing to read")
     else if (verdict.verdictsDisagree) Some(s"the gold verifier's agda (exit ${verdict.agdaExit.getOrElse(-1)}) and check_file (exit ${verdict.checkExit.getOrElse(-1)}) disagree on the final file")
     else None
   }
@@ -201,8 +205,11 @@ object Outcomes {
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
                     else verdict.gate
       anomaly     = anomalyOf(t, iso, verdict, terminal)
-      solved      = gate.isEmpty && verdict.solved
-      restated    = gate.isEmpty && verdict.restated
+      // An anomaly is not a result: a row the harness could not measure
+      // properly is never published as a solve or a restatement, whatever
+      // the file itself earned.
+      solved      = anomaly.isEmpty && gate.isEmpty && verdict.solved
+      restated    = anomaly.isEmpty && gate.isEmpty && verdict.restated
       outcome     = Outcome(
         entry             = entry,
         solved            = solved,

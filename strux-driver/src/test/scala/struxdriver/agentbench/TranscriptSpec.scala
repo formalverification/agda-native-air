@@ -69,7 +69,7 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     Audit.terminalOf(killed = false, t.result) shouldBe "completed"
   }
 
-  private val cleanVerdict = Verdict(None, Vector.empty, Vector.empty, "bodyRefs", None, Vector.empty, Some(0), Some(0), Some(1L), None)
+  private val cleanVerdict = Verdict(None, Vector.empty, Vector.empty, "bodyRefs", None, Vector.empty, Some(0), checkUnusable = false, Some(0), Some(1L), None)
 
   test("a tool presented beyond the protocol is an anomaly, used or not") {
     val t   = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
@@ -89,6 +89,22 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     Audit.terminalOf(killed = true, noResult.result) shouldBe "wall_cap"
     Outcomes.anomalyOf(noResult, iso, cleanVerdict, "crash").exists(_.startsWith("no result record")) shouldBe true
     Outcomes.anomalyOf(noResult, iso, cleanVerdict, "wall_cap") shouldBe None
+  }
+
+  test("a check_file answer that is not usable at all is an anomaly: the escape and hole gates read nothing") {
+    val t   = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
+    val iso = Audit.isolation(t, workDir)
+    Outcomes.anomalyOf(t, iso, cleanVerdict.copy(checkUnusable = true), "completed")
+      .exists(_.startsWith("check_file gave no usable verdict")) shouldBe true
+    // What makes an answer usable, by the server's own fields.
+    def checked(success: Boolean, timedOut: Boolean, exit: Option[Int]) =
+      Checked(success, timedOut, exit, 0, Vector.empty, Map.empty, 1L)
+    checked(true,  false, Some(0)).usable  shouldBe true
+    checked(false, false, Some(1)).usable  shouldBe true      // a plain failure is an answer
+    checked(true,  true,  Some(0)).usable  shouldBe false     // the server's agda timed out
+    checked(true,  false, None).usable     shouldBe false     // no verdict at all
+    checked(true,  false, Some(1)).usable  shouldBe false     // the answer contradicts itself
+    checked(false, false, Some(0)).usable  shouldBe false
   }
 
   test("a file Agda checked that the extractor could not read is an anomaly, never a quiet solve") {

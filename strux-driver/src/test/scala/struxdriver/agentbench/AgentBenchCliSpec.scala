@@ -43,6 +43,16 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     Cli.parse(base ++ List("--all", "--agda-flags", "-l x", "--safe", "off")).map(_.serverAgdaFlags) shouldBe Right("-l x")
   }
 
+  test("every input path resolves from the project root, the index included") {
+    val c = Cli.parse(List("--index", "data/benchmarks/benchmark-index.jsonl", "--out-dir", "out", "--run-id", "r",
+      "--project-root", "/repo", "--all", "--server-bin", "bin/agda-mcp", "--agda-json-bin", "/abs/agda-json",
+      "--model", "m", "--corpus-stdlib", "data/s.jsonl", "--corpus-algebras", "data/a.jsonl")).getOrElse(fail("parse"))
+    c.index.toString        shouldBe "/repo/data/benchmarks/benchmark-index.jsonl"
+    c.serverBin.map(_.toString)      shouldBe Some("/repo/bin/agda-mcp")
+    c.agdaJsonBin.map(_.toString)    shouldBe Some("/abs/agda-json")     // an absolute path is left alone
+    c.corpusStdlib.map(_.toString)   shouldBe Some("/repo/data/s.jsonl")
+  }
+
   test("an unknown flag and a bad on|off value are refused by name") {
     Cli.parse(base ++ List("--all", "--bogus", "1")) shouldBe Left("unrecognized argument: --bogus")
     Cli.parse(base ++ List("--all", "--safe", "maybe")) shouldBe Left("bad --safe: maybe (on|off)")

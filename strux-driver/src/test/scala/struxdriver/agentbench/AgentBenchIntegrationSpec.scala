@@ -44,6 +44,57 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
       .map(l => io.circe.parser.decode[struxdriver.benchmark.Obligation](l).toOption.get)
       .find(_.id == id).get
 
+  test("an anomalous subject is never published as a solve, though its file earns one") {
+    val root = rootEnv.getOrElse(cancel("AGDA_NATIVE_AIR_ROOT not set; skipping the judge's live test"))
+    val bin  = binEnv.getOrElse(cancel("AGDA_MCP_BIN not set; skipping the judge's live test"))
+    val json = jsonEnv.getOrElse(cancel("AGDA_JSON_BIN not set; skipping the judge's live test"))
+    assume(sys.env.contains("AGDA_DIR"), "AGDA_DIR not set: run inside nix develop .#backend")
+    assume(Files.isRegularFile(bin) && Files.isRegularFile(json), "the server or the extractor binary is missing")
+    val archived = root.resolve("reports/agent-bench/smoke-haiku-1/subjects/stdlib-nat-plus-identity-l")
+    assume(Files.isDirectory(archived), "the archived smoke subject is missing")
+
+    // One archived subject, judged twice: intact, and with its result record
+    // removed, which is a process that died before saying how it ended.
+    val out = Files.createTempDirectory(Paths.get("target").toAbsolutePath, "agentbench-anomaly-")
+    val dst = out.resolve("it-anomaly/subjects/stdlib-nat-plus-identity-l")
+    Files.createDirectories(dst.resolve("final"))
+    Files.list(archived).forEach { p => if (Files.isRegularFile(p)) Files.copy(p, dst.resolve(p.getFileName)) }
+    Files.list(archived.resolve("final")).forEach { p => Files.copy(p, dst.resolve("final").resolve(p.getFileName)) }
+
+    val cfg = Cli.parse(List("--rejudge", "--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString,
+      "--all", "--out-dir", out.toString, "--run-id", "it-anomaly", "--project-root", root.toString,
+      "--server-bin", bin.toString, "--agda-json-bin", json.toString)).getOrElse(fail("cli"))
+    val e       = entry(root, "stdlib-nat-plus-identity-l")
+    val server  = ServerConfig(bin, Scaffold.defaultAgdaFlags + " --safe", 600, root, out.resolve("server-stderr.log"), None)
+    val agdaDir = GoldVerifier.agdaDirOf(root)
+
+    def judgeArchive(): Outcome = McpClient.resource(server).use { client =>
+      for {
+        oracle   <- Oracle.create(client)
+        includes <- Extractor.includesFromRegistry(Paths.get(agdaDir).resolve("libraries"))
+        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id))
+      } yield judged.outcome
+    }.unsafeRunSync()
+
+    val intact = judgeArchive()
+    intact.anomaly shouldBe None
+    intact.gate    shouldBe None
+    intact.solved  shouldBe true
+    intact.terminal shouldBe "completed"
+
+    val transcript = dst.resolve("transcript.jsonl")
+    val kept = new String(Files.readAllBytes(transcript), StandardCharsets.UTF_8)
+      .linesIterator.filterNot(_.contains("\"type\":\"result\"")).mkString("\n") + "\n"
+    Files.write(transcript, kept.getBytes(StandardCharsets.UTF_8))
+
+    val crashed = judgeArchive()
+    crashed.terminal shouldBe "crash"
+    crashed.anomaly.exists(_.startsWith("no result record")) shouldBe true
+    crashed.gate     shouldBe None            // the file itself still passes every gate
+    crashed.solved   shouldBe false           // and is still not published as a solve
+    crashed.restated shouldBe false
+  }
+
   test("the judge, through the server, agda, and the extractor, names every gate and the restatement") {
     val root = rootEnv.getOrElse(cancel("AGDA_NATIVE_AIR_ROOT not set; skipping the judge's live test"))
     val bin  = binEnv.getOrElse(cancel("AGDA_MCP_BIN not set; skipping the judge's live test"))

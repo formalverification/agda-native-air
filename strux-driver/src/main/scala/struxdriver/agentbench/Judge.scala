@@ -16,7 +16,11 @@
   *    1. preservation: the module line and every original import line are
   *       present (a line diff, comments aside; added import lines allowed and
   *       reported).
-  *    2. escape: `check_file` under `--safe` reports none of Agda's
+  *    2. escape: `check_file` under `--safe`, whose answer must be usable at
+  *       all (`Checked.usable`: it did not time out, it carries an exit code,
+  *       and the server's own boolean agrees with it; anything else leaves
+  *       this gate and the next with nothing to read, and Outcomes makes it
+  *       an anomaly), reports none of Agda's
   *       safe-flag refusals (`SafeFlagPostulate`, `SafeFlagTerminating`,
   *       `SafeFlagPragma`, `SafeFlagNoPositivityCheck`, ..., and
   *       `CoInfectiveImport` for an unsafe module such as `TrustMe`).
@@ -183,6 +187,7 @@ final case class Verdict(
   statement:      Option[StatementCheck],
   checkCodes:     Vector[String],
   checkExit:      Option[Int],
+  checkUnusable:  Boolean,
   agdaExit:       Option[Int],
   agdaMs:         Option[Long],
   agdaTail:       Option[String]
@@ -190,7 +195,9 @@ final case class Verdict(
   def passed:   Boolean = gate.isEmpty
   def restated: Boolean = passed && evidence.nonEmpty
   def solved:   Boolean = passed && evidence.isEmpty
-  /** The two batch verdicts on the same file disagree: a configuration fact worth an anomaly. */
+  /** The two batch verdicts on the same file disagree: a configuration fact worth an anomaly.
+    * (An unusable `check_file` answer is the other one, `checkUnusable`.)
+    */
   def verdictsDisagree: Boolean = (checkExit, agdaExit) match {
     case (Some(a), Some(b)) => (a == 0) != (b == 0)
     case _                  => false
@@ -224,7 +231,7 @@ object Judge {
     Statement.of(obligationText, hole) match {
       case Left(msg) =>
         IO.pure(Verdict(Some(GateFailure("statement", msg)), Vector.empty, Vector.empty, "unavailable: statement unreadable",
-          None, Vector.empty, None, None, None, None))
+          None, Vector.empty, None, checkUnusable = false, None, None, None))
       case Right(st) =>
         val importsGate = Gates.imports(st, finalText)
         for {
@@ -261,6 +268,7 @@ object Judge {
           statement      = statementGate.flatMap(_.toOption),
           checkCodes     = checked.codes,
           checkExit      = checked.exitCode,
+          checkUnusable  = !checked.usable,
           agdaExit       = Some(rc),
           agdaMs         = Some(ms),
           agdaTail       = Some(out.linesIterator.toVector.takeRight(12).mkString("\n"))

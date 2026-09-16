@@ -16,7 +16,9 @@
   *                server's own hole model counted, and every structured
   *                diagnostic's code (`SafeFlagPostulate`,
   *                `UnsolvedInteractionMetas`, ...).
-  *    + `rows`: agda-strux's `agda-json` on a file (Agda as a library): for
+  *    + `rows`: agda-strux's `agda-json` on a file (Agda as a library), a
+  *                child bounded by the harness's timeout and destroyed on
+  *                every path: for
   *                every definition the file holds, its elaborated type as a
   *                structural AST (`typeAst`: de Bruijn indices, fully
   *                qualified names, hiding; binder names only as hints), the
@@ -51,20 +53,32 @@ import cats.effect.IO
 import io.circe.Json
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 import struxdriver.search.{CallCtx, Oracle}
 
-/** What `check_file` established about a file. */
+/** What `check_file` established about a file, the server's own verdict
+  * included: `success` and `timedOut` are what makes an answer usable at all,
+  * and the judge refuses to certify a row whose answer is not (Judge.scala).
+  */
 final case class Checked(
   success:    Boolean,
+  timedOut:   Boolean,
   exitCode:   Option[Int],
   holesCount: Int,
   codes:      Vector[String],
   messages:   Map[String, String], // first message per code
   elapsedMs:  Long
-)
+) {
+  /** The server gave a batch verdict this judge can read: it did not time
+    * out, it reported an exit code, and its own boolean agrees with that
+    * code.  Anything else leaves the escape and hole gates with nothing,
+    * which is a configuration fact, not a fact about the proof.
+    */
+  def usable: Boolean = !timedOut && exitCode.exists(rc => success == (rc == 0))
+}
 
 /** One definition of a file: its elaborated type as Agda's structural AST,
   * the type as printed, and the names its clause bodies refer to.
@@ -96,34 +110,55 @@ final case class Extractor(bin: Path, includes: Vector[Path], agdaDir: String, t
     * (measured on a gold: the `typeAst` and the `bodyRefs` are identical
     * either way, only the printing moves).
     */
+  /** The rows of one extractor output file. */
+  private def parse(out: Path): Vector[DefRow] =
+    Files.readAllLines(out, StandardCharsets.UTF_8).asScala.toVector.filter(_.trim.nonEmpty).flatMap { line =>
+      io.circe.parser.parse(line).toOption.flatMap { j =>
+        for {
+          q    <- j.hcursor.get[String]("prettyQname").toOption
+          ast  <- j.hcursor.downField("typeAst").focus
+          tpe  <- j.hcursor.get[String]("type").toOption
+          refs <- j.hcursor.get[Vector[String]]("bodyRefs").toOption
+        } yield DefRow(q, ast, tpe, refs)
+      }
+    }
+
+  private def tail(log: Path): String =
+    scala.util.Try(Files.readAllLines(log, StandardCharsets.UTF_8).asScala.toVector.takeRight(6).mkString(" | ")).getOrElse("")
+
   def rows(file: Path): IO[Either[String, Vector[DefRow]]] =
     IO.blocking {
-      val out = Files.createTempFile("agent-bench-refs-", ".jsonl")
-      val dir = Files.createTempDirectory("agent-bench-extract-")
-      try {
-        val copy = dir.resolve(file.getFileName)
-        Files.copy(file, copy)
-        val cmd = Vector(bin.toString, "--input", copy.toString, "--output", out.toString) ++
-          includes.flatMap(p => Vector("--include", p.toString))
-        val pb = new ProcessBuilder(cmd.asJava)
-        pb.environment().put("AGDA_DIR", agdaDir)
-        pb.redirectErrorStream(true)
-        val proc = pb.start()
-        val log  = new String(proc.getInputStream.readAllBytes(), StandardCharsets.UTF_8)
-        val rc   = proc.waitFor()
-        if (rc != 0) Left(s"agda-json exit $rc: ${log.linesIterator.toVector.takeRight(6).mkString(" | ")}")
-        else Right(Files.readAllLines(out, StandardCharsets.UTF_8).asScala.toVector.filter(_.trim.nonEmpty).flatMap { line =>
-          io.circe.parser.parse(line).toOption.flatMap { j =>
-            for {
-              q    <- j.hcursor.get[String]("prettyQname").toOption
-              ast  <- j.hcursor.downField("typeAst").focus
-              tpe  <- j.hcursor.get[String]("type").toOption
-              refs <- j.hcursor.get[Vector[String]]("bodyRefs").toOption
-            } yield DefRow(q, ast, tpe, refs)
-          }
-        })
-      } finally { Files.deleteIfExists(out); deleteTree(dir) }
-    }.timeout(timeout).handleError(e => Left(s"agda-json: ${e.getMessage}"))
+      val out  = Files.createTempFile("agent-bench-refs-", ".jsonl")
+      val log  = Files.createTempFile("agent-bench-refs-", ".log")
+      val dir  = Files.createTempDirectory("agent-bench-extract-")
+      val copy = dir.resolve(file.getFileName)
+      Files.copy(file, copy)
+      val cmd = Vector(bin.toString, "--input", copy.toString, "--output", out.toString) ++
+        includes.flatMap(p => Vector("--include", p.toString))
+      val pb = new ProcessBuilder(cmd.asJava)
+      pb.environment().put("AGDA_DIR", agdaDir)
+      pb.redirectErrorStream(true)
+      // To a file, not a pipe: a child that outruns the pipe buffer would
+      // wedge a wait that nothing drains, and the wait is the timeout.
+      pb.redirectOutput(log.toFile)
+      (pb.start(), out, log, dir)
+    }.bracket { case (proc, out, log, _) =>
+      IO.blocking {
+        if (!proc.waitFor(timeout.toMillis, TimeUnit.MILLISECONDS))
+          Left(s"agda-json did not finish within ${timeout.toSeconds}s: ${tail(log)}")
+        else if (proc.exitValue() != 0) Left(s"agda-json exit ${proc.exitValue()}: ${tail(log)}")
+        else Right(parse(out))
+      }
+    } { case (proc, out, log, dir) =>
+      // The child is destroyed on every path, so a hung extractor cannot
+      // outlive the judge; then the tree it worked in goes with it.
+      IO.blocking {
+        if (proc.isAlive) { proc.destroyForcibly().waitFor(); () }
+        Files.deleteIfExists(out)
+        Files.deleteIfExists(log)
+        deleteTree(dir)
+      }
+    }.handleError(e => Left(s"agda-json: ${e.getMessage}"))
 }
 
 object Extractor {
@@ -152,6 +187,7 @@ final class ServerAgda(oracle: Oracle, extractor: Extractor, fixtureId: String) 
       val b = a.body
       Checked(
         success    = b.success,
+        timedOut   = b.timedOut,
         exitCode   = b.exitCode,
         holesCount = b.holesCount,
         codes      = b.diagnostics.flatMap(_.code),

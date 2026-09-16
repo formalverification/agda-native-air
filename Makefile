@@ -452,7 +452,7 @@ help:
 	@echo "  make proof-search-loop-it        - Proof-search P1: live full-search regression vs the real agda-mcp"
 	@echo "  make proof-search-retrieval-it   - Proof-search P2: live corpus-tool transport test (issue 123)"
 	@echo "  make agent-bench                 - Agent-in-the-loop: a frontier model driving agda-mcp over the benchmark (issue 154)"
-	@echo "  make agent-bench-rejudge         - Re-judge an existing agent-bench run from its archived final files and transcripts"
+	@echo "  make agent-bench-rejudge         - Re-judge an existing agent-bench run from its archived final files and transcripts (pass the run's own AGENT_BENCH_IDS)"
 	@echo "  make agent-bench-it              - Agent-bench: the judge's Agda typecheck gate against a committed gold and obligation"
 	@echo "  make agent-bench-archive         - Copy a quoted agent-bench run (report, rows, prompts, transcripts, final files) under reports/agent-bench/"
 	@echo "  make tree                        - Pretty tree view"
@@ -1788,7 +1788,7 @@ agent-bench-rejudge: _check-sbt
 	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
 	echo ">> [agent-bench-rejudge] run-id=$(AGENT_BENCH_RUN_ID)"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) --all --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE)"
+	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE)"
 
 # The judge against the real server, agda, and extractor (AgentBenchIntegrationSpec):
 # a committed gold is solved; the obligation fails on holes; a weakened
@@ -1812,9 +1812,11 @@ agent-bench-archive:
 	cp "$$src"/report.json "$$src"/results.jsonl "$$src"/fixtures.jsonl "$$dst"/; \
 	if [ -f "$$src"/protocol.json ]; then cp "$$src"/protocol.json "$$dst"/; fi; \
 	cp "$$src"/prompts/*.md "$$dst"/prompts/; \
-	for d in "$$src"/subjects/*/; do id=$$(basename "$$d"); mkdir -p "$$dst/subjects/$$id/final"; \
-	  cp "$$d"transcript.jsonl "$$d"outcome.json "$$d"mcp.json "$$d"prompt.txt "$$d"run.json "$$dst/subjects/$$id/"; \
-	  cp "$$d"final/*.agda "$$dst/subjects/$$id/final/"; \
+	for d in "$$src"/subjects/*/; do test -d "$$d" || continue; id=$$(basename "$$d"); mkdir -p "$$dst/subjects/$$id"; \
+	  for f in transcript.jsonl outcome.json mcp.json prompt.txt run.json; do \
+	    if [ -f "$$d$$f" ]; then cp "$$d$$f" "$$dst/subjects/$$id/"; fi; done; \
+	  if [ -s "$$d"stderr.log ]; then cp "$$d"stderr.log "$$dst/subjects/$$id/"; fi; \
+	  if ls "$$d"final/*.agda >/dev/null 2>&1; then mkdir -p "$$dst/subjects/$$id/final"; cp "$$d"final/*.agda "$$dst/subjects/$$id/final/"; fi; \
 	done; \
 	echo ">> [agent-bench-archive] $$dst: $$(ls "$$dst/subjects" | wc -l) subject(s), $$(du -sh "$$dst" | cut -f1)"
 

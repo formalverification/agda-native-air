@@ -61,7 +61,7 @@ object Cli {
 
   val usage: String =
     """usage: runMain struxdriver.agentbench.AgentBench
-      |    --index PATH              benchmark-index.jsonl
+      |    --index PATH              benchmark-index.jsonl (relative: from --project-root, as every input path)
       |    (--ids id1,id2 | --all)   exactly one
       |    --out-dir PATH            run roots land here
       |    --run-id STR              the run directory name (a new protocol is a new run id)
@@ -144,7 +144,7 @@ object Cli {
       persist <- onOff(m, "persist-sessions", false)
       resume  <- onOff(m, "resume", false)
     } yield AgentBenchConfig(
-      index           = Paths.get(ix),
+      index           = abs(ix),
       ids             = ids,
       outDir          = Paths.get(out).toAbsolutePath.normalize,
       runId           = runId,

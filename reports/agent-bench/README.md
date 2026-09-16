@@ -65,8 +65,13 @@ from the harness's own output and never edited by hand.
    A subject that never had that instrument (the first two, a tool presented
    beyond the fifteen included, used or not) is an anomaly, not a row, as is
    one whose process ended with no result record at all (a crash; a wall-cap
-   kill is a stated cap); one that used a tool beyond them or left the
-   directory fails the isolation gate.
+   kill is a stated cap) and one whose file left the judge without an answer
+   it should have (a `check_file` that timed out or gave no usable verdict, a
+   disagreement between the two batch verdicts, a file Agda checked that the
+   extractor could not read).  An anomalous row is never counted a solve or a
+   restatement, whatever its file earned, so the measured columns and the
+   anomaly count never describe the same row.  A subject that used a tool
+   beyond the fifteen or left the work directory fails the isolation gate.
 
 ## What a run directory holds
 
@@ -80,6 +85,10 @@ from the harness's own output and never edited by hand.
 | `subjects/<id>/final/<Stem>.agda` | the file as the subject left it, which is what was judged |
 | `subjects/<id>/outcome.json` | the judge's verdict and the transcript audit for that row |
 | `subjects/<id>/mcp.json`, `prompt.txt`, `run.json` | the subject's server configuration, its rendered prompt, and how its process ended |
+| `subjects/<id>/stderr.log` | the client's standard error, archived when it is not empty; this is what an anomaly message means by "see stderr.log" |
+
+A subject that ended early has only what it wrote: the archive copies each of
+these when it exists, so a run with anomalous rows archives like any other.
 
 The work copies, the staging server's log, and Agda's interface files stay
 behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
@@ -148,7 +157,10 @@ audit taking the work directory from the subject's own server config.  A run id 
 subject only when the run's `protocol.json` is the current protocol, field
 for field, digests included, so a corpus or an index regenerated in place
 refuses the run id rather than mixing two environments in one report (the
-archived arms predate the record and cannot be resumed).  A model's answers are not deterministic: a
+archived arms predate the record and cannot be resumed).  A re-judge takes
+the same `AGENT_BENCH_IDS` as the run it re-judges: a run made over a subset
+must be re-judged over that subset, or the rows it never ran are counted
+missing.  A model's answers are not deterministic: a
 second seed of the frontier arm is recorded above for that reason, and any
 new run gets a new run id.
 

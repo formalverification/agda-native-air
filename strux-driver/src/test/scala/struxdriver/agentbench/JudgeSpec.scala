@@ -132,15 +132,15 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Vector("SafeFlagPostulate", "SafeFlagTerminating", "SafeFlagNonTerminating", "SafeFlagPragma",
       "SafeFlagNoPositivityCheck", "SafeFlagNoCoverageCheck", "CoInfectiveImport").forall(Gates.isEscapeCode) shouldBe true
     Vector("NotInScope", "UnsolvedInteractionMetas", "UnequalTerms", "UnsolvedMetaVariables").exists(Gates.isEscapeCode) shouldBe false
-    val postulated = Checked(success = false, Some(42), 0, Vector("SafeFlagPostulate"), Map("SafeFlagPostulate" -> "Cannot postulate ax with safe flag"), 1)
+    val postulated = Checked(success = false, timedOut = false, Some(42), 0, Vector("SafeFlagPostulate"), Map("SafeFlagPostulate" -> "Cannot postulate ax with safe flag"), 1)
     Gates.escape(postulated) shouldBe Left(GateFailure("escape", "SafeFlagPostulate: Cannot postulate ax with safe flag"))
-    Gates.escape(Checked(success = true, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
+    Gates.escape(Checked(success = true, timedOut = false, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
   }
 
   test("holes: the server's count, or Agda's unsolved-interaction-metas code") {
-    Gates.holes(Checked(success = false, Some(42), 1, Vector("UnsolvedInteractionMetas"), Map.empty, 1)).left.map(_.gate) shouldBe Left("holes")
-    Gates.holes(Checked(success = false, Some(42), 0, Vector("UnsolvedInteractionMetas"), Map.empty, 1)).left.map(_.gate) shouldBe Left("holes")
-    Gates.holes(Checked(success = true, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
+    Gates.holes(Checked(success = false, timedOut = false, Some(42), 1, Vector("UnsolvedInteractionMetas"), Map.empty, 1)).left.map(_.gate) shouldBe Left("holes")
+    Gates.holes(Checked(success = false, timedOut = false, Some(42), 0, Vector("UnsolvedInteractionMetas"), Map.empty, 1)).left.map(_.gate) shouldBe Left("holes")
+    Gates.holes(Checked(success = true, timedOut = false, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
   }
 
   test("original: the restates: tag first, else the index module and the prime-stripped name") {
