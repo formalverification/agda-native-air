@@ -45,6 +45,29 @@
 --   does not reach the query point).  Each degrades to a qualified rendering
 --   or an out-of-scope count, never to a wrong name.
 --
+--   THE ONE MEASURED MISS: another file's @public@ re-export.  The rule below
+--   is a name-prefix rule over the QUERIED file's own import lines, so a row
+--   whose module is re-exported into an imported module from elsewhere in the
+--   library is counted out of scope, even though the file can name it.
+--   Measured on this repository's own fixtures (Copilot's third review of PR
+--   #161): @ReexportUse.agda@ imports only @ReexportBarrel@, which carries
+--   @open import ReexportOrigin public@; the lane types both @originalName@
+--   and @ReexportBarrel.originalName@ there and @resolve_name@ answers
+--   @ReexportOrigin.originalName@, while a corpus row for that name is
+--   reported @outOfScope@.  It is an under-approximation, so it costs recall
+--   and never correctness, and closing it needs knowledge this module does not
+--   have: the queried file's text says nothing about what its imports
+--   re-export, and a barrel that defines nothing has no corpus rows of its
+--   own.  The route, with its cost, is issue #165: one
+--   @Cmd_show_module_contents@ per import names the surface, and the
+--   identity check ('AgdaMCP.Tools.SearchInScope.denotesRow') is what makes
+--   admitting a row by name from that surface sound.
+--
+--   Note that a @public@ on the QUERIED file's own import is a different
+--   thing and is correctly not consulted here: it says the file re-exports
+--   the module onward, not what the file itself can name.  It is parsed and
+--   echoed because the response reports the import surface as it reads.
+--
 -- See also:
 --   AgdaMCP.Retrieval: the query, scorer, and pool pipeline.
 --   AgdaMCP.Tools.SearchInScope: the handler that runs the ladder on the lane.

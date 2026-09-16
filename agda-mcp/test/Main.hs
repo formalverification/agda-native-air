@@ -140,8 +140,8 @@ import AgdaMCP.Scope
   ( bareNameOf, bareRenderingOf, importingModulesOf, parseImports, renderings )
 import AgdaMCP.Retrieval
   ( Pool (..), Ranked (..), approxVisibleArity, bareToken, buildPool
-  , exclusionReason, matchesQuery, normalizeStatement, queryTokensOf, rank
-  , score, splitTopLevelArrows, tokens )
+  , exclusionReason, matchesQuery, normalizeStatement, queryHasSignal
+  , queryTokensOf, rank, score, splitTopLevelArrows, tokens )
 import qualified Data.Set as Set
 import AgdaMCP.Types
 
@@ -2338,7 +2338,7 @@ scopeRetrievalTests = do
         in  assertEqual "ranked" ["L.+-comm"] (map (cePrettyQname . rkEntry) (poolRanked pool))
 
     , -- The tool as a client sees it.
-      runTest "tools/list: fourteen tools with a corpus, search_in_scope last; thirteen without" $ allOf
+      runTest "tools/list: fourteen tools with a corpus, search_in_scope last; ten without" $ allOf
         [ assertEqual "with corpus" 14 (length (toolNamesOf corpusTools))
         , assertEqual "last" (Just "search_in_scope") (listToMaybe (reverse (toolNamesOf corpusTools)))
         , assertEqual "without" 10 (length (toolNamesOf advertisedTools))
@@ -2380,6 +2380,14 @@ scopeRetrievalTests = do
         [ assertEqual "default" 32 (probeBudget 8 Nothing)
         , assertEqual "given" 12 (probeBudget 8 (Just 12))
         , assertEqual "floored" 8 (probeBudget 8 (Just 2))
+        ]
+    , runTest "queryHasSignal: a token that reduces to nothing selects nothing, not everything" $ allOf
+        [ assert "underscore alone" (not (queryHasSignal (SearchQuery Nothing ["_"])))
+        , assert "two underscores" (not (queryHasSignal (SearchQuery Nothing ["_", "__"])))
+        , assert "a real token" (queryHasSignal (SearchQuery Nothing ["+"]))
+        , assert "an operator spelled with underscores" (queryHasSignal (SearchQuery Nothing ["_+_"]))
+        , assert "a name beside inert tokens" (queryHasSignal (SearchQuery (Just "hom") ["_"]))
+        , assert "a blank name is not a name" (not (queryHasSignal (SearchQuery (Just " ") ["_"])))
         ]
     , runTest "needsIdentityCheck: the row's own qualified name is exempt, an aliased or bare spelling is not" $ allOf
         [ assert "own name exempt" (not (needsIdentityCheck "ScopeSearchBarrel.Core.quad" "ScopeSearchBarrel.Core.quad"))

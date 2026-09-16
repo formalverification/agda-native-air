@@ -65,6 +65,7 @@ module AgdaMCP.Retrieval
   , queryTokensOf
   , matchesQuery
   , queryTokenSet
+  , queryHasSignal
     -- * The token index
   , tokenIndex
   , candidatesOf
@@ -80,9 +81,9 @@ module AgdaMCP.Retrieval
   ) where
 
 import Data.Char (isDigit, isLetter, isSpace)
+import Data.Either (partitionEithers)
 import Data.List (sortOn, tails)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
@@ -336,6 +337,22 @@ matchesName q e = case sqName q of
 queryTokenSet :: SearchQuery -> Set Text
 queryTokenSet q = Set.fromList (filter (not . T.null) (map bareToken (sqTokens q)))
 
+-- | queryHasSignal: does this query select anything at all?
+--
+-- The decoder refuses a syntactically empty query, but a token can be empty
+-- of SIGNAL while non-empty as text: 'bareToken' strips a name's outer
+-- underscores, so a caller's @_@ (or @__@) reduces to nothing, the token set
+-- is empty, and the token half of 'matchesQuery' then accepts every row.
+-- With no name pattern beside it that is a match-all over the whole corpus
+-- (measured on the fixture: @tokens: ["_"]@ answered @hits: 32@, its every
+-- row, against 7 for a real token), which is why the handler refuses it in
+-- band rather than searching (Copilot's third review of PR #161).  A name
+-- pattern carries signal on its own, so tokens that reduce to nothing beside
+-- one are simply inert, exactly as they are in 'matchesQuery'.
+queryHasSignal :: SearchQuery -> Bool
+queryHasSignal q =
+  maybe False (not . T.null . T.strip) (sqName q) || not (Set.null (queryTokenSet q))
+
 
 -- ---------------------------------------------------------------------------
 -- The token index
@@ -476,5 +493,7 @@ buildPool q mExclude imports idx =
         , poolRanked      = rank (queryTokenSet q) functions
         }
   where
-    partitionWith f xs = (mapMaybe (either Just (const Nothing) . f) xs,
-                          mapMaybe (either (const Nothing) Just . f) xs)
+    -- One classification per row: the exclusion rule normalizes a corpus
+    -- type, so evaluating it twice per row doubled that work on every
+    -- statement-excluded call (Copilot's third review of PR #161).
+    partitionWith f = partitionEithers . map f

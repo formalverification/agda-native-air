@@ -85,7 +85,8 @@ import AgdaMCP.Interaction
   , cmdWhyInScopeAtGoal, cmdWhyInScopeToplevel, goalContextOf, parseWhyInScope, runQuery
   )
 import AgdaMCP.Retrieval
-  ( Pool (..), Ranked (..), buildPool, normalizeStatement, queryTokensOf )
+  ( Pool (..), Ranked (..), buildPool, normalizeStatement, queryHasSignal
+  , queryTokensOf )
 import AgdaMCP.Scope (parseImports, renderings)
 import AgdaMCP.Tools.LiveQueries
   ( LiveCtx (..), QueryScope (..), inferredTypeOf, interactionFailure, liveMeta
@@ -195,7 +196,19 @@ resolveQuery
   :: LiveCtx -> Counters -> Maybe SearchQuery -> QueryScope
   -> IO (Either ToolFailure (Either LiveError (SearchQuery, Text)))
 resolveQuery ctx counters mQuery scope = case (mQuery, scope) of
-  (Just q, _) -> pure (Right (Right (q, "given")))
+  (Just q, _)
+    | queryHasSignal q -> pure (Right (Right (q, "given")))
+    -- Well-formed and yet selecting nothing: every token reduces away and no
+    -- name pattern stands beside them, which the pool would read as
+    -- match-all (see 'queryHasSignal').
+    | otherwise -> pure . Right . Left $ LiveError
+        { lveStage   = "query"
+        , lveCode    = Nothing
+        , lveMessage = "the query carries no retrieval signal: its tokens \
+            \reduce to nothing once a name's outer underscores are stripped \
+            \(the reduction the corpus side uses, so `_+_` meets `+`), and no \
+            \name pattern was given; pass a name, or tokens that survive it"
+        }
   (Nothing, Toplevel) -> pure . Right . Left $ LiveError
     { lveStage   = "query"
     , lveCode    = Nothing

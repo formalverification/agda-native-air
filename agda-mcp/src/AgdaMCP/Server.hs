@@ -895,7 +895,11 @@ searchInScopeNote =
   \typechecks as an expression here, which says nothing about whether it \
   \fills any hole (fill_hole judges that). QUERY: query {name?, tokens?} is \
   \a case-insensitive substring over names and/or type tokens as a goal \
-  \display spells them; when both are given a row must satisfy both. Omit \
+  \display spells them; when both are given a row must satisfy both. Both \
+  \sides are reduced the same way (a name's outer underscores stripped, so \
+  \`_+_` meets `+`), and a query whose tokens all reduce to nothing with no \
+  \name beside them selects nothing rather than everything: it answers \
+  \error.stage='query'. Omit \
   \query when line/column addresses a hole: the tokens are then derived from \
   \that goal's own displayed type (context names, metas, numerals, and \
   \structural tokens dropped), and the response's query.source says 'given' \
@@ -903,7 +907,11 @@ searchInScopeNote =
   \with using, hiding, renaming, as, and public) are read off the source's \
   \code-only view and echoed as imports; a row is in scope iff its module \
   \equals an imported module or extends one at a dot boundary, and a \
-  \whole-module open import admits all of it bare. That import surface is \
+  \whole-module open import admits all of it bare. That rule is a name \
+  \prefix over THIS file's import lines, so a row that another file \
+  \re-exports into an imported module from outside that prefix is reported \
+  \in ledger.outOfScope even though you could name it: the miss costs \
+  \recall, never correctness. That import surface is \
   \DERIVED from source text, because no Agda command enumerates a scope, \
   \which is exactly why every rendering is validated by the lane before it \
   \is returned: a misread import costs a rendering or a count, never a name \

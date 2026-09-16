@@ -271,6 +271,17 @@ scope; that derived answer is subordinated completely, since every rendering
 it proposes is typed by lane `type_of` before it is returned.  See
 [`search_in_scope`](#search_in_scope) below for the contract.
 
+One limitation is measured and stated rather than hidden: reachability is a
+name-prefix rule over the queried file's own import lines, so a row that
+another file re-exports into an imported module from outside that prefix is
+reported out of scope even though the file can name it.  On this repository's
+own fixtures, `ReexportUse.agda` imports only `ReexportBarrel`, which carries
+`open import ReexportOrigin public`; the lane types both `originalName` and
+`ReexportBarrel.originalName` there, while a corpus row for
+`ReexportOrigin.originalName` comes back in `outOfScope`.  It costs recall
+and never correctness, and closing it needs one module-contents probe per
+import, which is [issue #165](https://github.com/formalverification/agda-native-air/issues/165).
+
 
 
 ---
