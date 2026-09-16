@@ -56,11 +56,12 @@ object Report {
   }
 
   /** The config block of a fresh run: the protocol (Protocol.of, every knob
-    * a subject sees and the judge applies) plus what only this run of it
-    * chose (parallelism, the client binary, resume) and the gate names.
+    * a subject sees and the judge applies, every input by content) plus what
+    * only this run of it chose (parallelism, the client binary, resume) and
+    * the gate names.
     */
-  private def builtConfig(cfg: AgentBenchConfig, version: String, sysP: String, userT: String): Json =
-    Protocol.of(cfg, version, sysP, userT).deepMerge(Json.obj(
+  private def builtConfig(cfg: AgentBenchConfig, protocol: Json): Json =
+    protocol.deepMerge(Json.obj(
       "parallelism" -> cfg.parallelism.asJson,
       "claudeBin"   -> cfg.claudeBin.asJson,
       "resume"      -> cfg.resume.asJson,
@@ -73,9 +74,7 @@ object Report {
     entries:        Vector[IndexEntry],
     driven:         Vector[Judged],
     corpora:        Json,
-    version:        String,
-    sysP:           String,
-    userT:          String,
+    protocol:       Json,
     previousConfig: Option[Json]
   ): IO[Unit] = {
     val layout   = cfg.layout
@@ -84,7 +83,7 @@ object Report {
     val config   = previousConfig match {
       case Some(prev) if cfg.rejudge =>
         prev.deepMerge(Json.obj("safe" -> cfg.safe.asJson, "rejudgedAt" -> java.time.Instant.now().toString.asJson))
-      case _ => builtConfig(cfg, version, sysP, userT)
+      case _ => builtConfig(cfg, protocol)
     }
     val report = Json.obj(
       "schemaVersion" -> "agent-bench-report.v0".asJson,

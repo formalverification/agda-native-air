@@ -15,7 +15,11 @@
   *  config block is this record plus the run's own knobs.  A run id is one
   *  protocol: `--resume` keeps an archived subject only when the protocol on
   *  record is the current one, field for field, so a report never labels
-  *  subjects of two protocols with one config.  A run made before the record
+  *  subjects of two protocols with one config.  Every input the run reads is
+  *  identified by content, not by path (`inputs`): the index, the two
+  *  corpora, the server binary, and the extractor binary are recorded with
+  *  their SHA-256, so regenerating one in place, or rebuilding a binary,
+  *  refuses the resume instead of mixing two environments in one report.  A run made before the record
   *  existed has archived subjects and no `protocol.json`; it is not resumed.
   *
   *  ============================================================================
@@ -23,23 +27,46 @@
 package struxdriver.agentbench
 
 import cats.effect.IO
+import cats.syntax.all._
 import io.circe.Json
 import io.circe.syntax._
 import java.nio.file.{Files, Path}
 
 import struxdriver.io.TextIO
+import struxdriver.search.Digest
 
 object Protocol {
 
   private def abs(p: Path): String = p.toAbsolutePath.normalize.toString
 
+  /** One input file, by path and by content. */
+  private def fileId(p: Path): IO[Json] =
+    Digest.sha256Hex(p).map(d => Json.obj("path" -> abs(p).asJson, "sha256" -> d.asJson))
+
+  /** What the run reads, by content: the index, the binaries, and the corpora
+    * (whose provenance block already carries a digest and the assembly's own
+    * provenance).  The project root is a path: it is where everything else is
+    * resolved from, and its content is the repository.
+    */
+  def inputs(cfg: AgentBenchConfig, corpora: Json): IO[Json] =
+    for {
+      index  <- fileId(cfg.index)
+      server <- cfg.serverBin.traverse(fileId)
+      extr   <- cfg.agdaJsonBin.traverse(fileId)
+    } yield Json.obj(
+      "projectRoot" -> abs(cfg.projectRoot).asJson,
+      "index"       -> index,
+      "serverBin"   -> server.asJson,
+      "agdaJsonBin" -> extr.asJson,
+      "corpora"     -> corpora
+    ).dropNullValues
+
   /** The protocol as JSON: null-valued knobs (an unset model) are dropped, so
     * the record and the comparison see the same keys.
     */
-  def of(cfg: AgentBenchConfig, version: String, sysP: String, userT: String): Json = {
+  def of(cfg: AgentBenchConfig, version: String, sysP: String, userT: String, inputs: Json): Json = {
     val subject = SubjectConfig.of(cfg, sysP, userT)
     Json.obj(
-      "index"            -> abs(cfg.index).asJson,
       "model"            -> cfg.model.asJson,
       "maxTurns"         -> cfg.maxTurns.asJson,
       "wallCapSec"       -> cfg.wallCapSec.asJson,
@@ -54,8 +81,7 @@ object Protocol {
       "envRemovedPrefix" -> Subject.envRemovedPrefix.asJson,
       "tools"            -> (Subject.fileTools.toVector.sorted ++ Subject.agdaTools).asJson,
       "persistSessions"  -> cfg.persistSessions.asJson,
-      "corpusStdlib"     -> cfg.corpusStdlib.map(abs).asJson,
-      "corpusAlgebras"   -> cfg.corpusAlgebras.map(abs).asJson,
+      "inputs"           -> inputs,
       "prompts" -> Json.obj(
         "system" -> Json.obj("path" -> "prompts/system-prompt.md".asJson, "sha256" -> TextIO.sha256(sysP).asJson),
         "user"   -> Json.obj("path" -> "prompts/user-prompt.md".asJson,   "sha256" -> TextIO.sha256(userT).asJson))

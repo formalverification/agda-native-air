@@ -29,8 +29,10 @@ from the harness's own output and never edited by hand.
    verdict agrees with the judge's, so no verdict depends on the
    difference).  The flag set, the environment additions, and the prompts
    are recorded verbatim in each run's `report.json` and `prompts/`, and the
-   protocol (every knob a subject sees and the judge applies) in
-   `protocol.json`, written before the first subject spawns.
+   protocol (every knob a subject sees and the judge applies, and every
+   input the run reads by content: the index, the corpora, the server, and
+   the extractor by SHA-256) in `protocol.json`, written before the first
+   subject spawns.
 +  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own list-price
    accounting, per subject; three subjects at a time, so wall clocks are
    indicative only.
@@ -61,9 +63,10 @@ from the harness's own output and never edited by hand.
    not deferred; no tool used beyond them; and no Read or Edit outside the
    work directory that succeeded (refused attempts are counted separately).
    A subject that never had that instrument (the first two, a tool presented
-   beyond the fifteen included, used or not) is an anomaly, not a row; one
-   that used a tool beyond them or left the directory fails the isolation
-   gate.
+   beyond the fifteen included, used or not) is an anomaly, not a row, as is
+   one whose process ended with no result record at all (a crash; a wall-cap
+   kill is a stated cap); one that used a tool beyond them or left the
+   directory fails the isolation gate.
 
 ## What a run directory holds
 
@@ -143,8 +146,9 @@ again from its final files and its own archived prompts without a model call
 costs a sweep; a copy of an archive re-judges as the original, the isolation
 audit taking the work directory from the subject's own server config.  A run id is one protocol: `--resume on` keeps an archived
 subject only when the run's `protocol.json` is the current protocol, field
-for field, and refuses the run id otherwise (the archived arms predate the
-record and cannot be resumed).  A model's answers are not deterministic: a
+for field, digests included, so a corpus or an index regenerated in place
+refuses the run id rather than mixing two environments in one report (the
+archived arms predate the record and cannot be resumed).  A model's answers are not deterministic: a
 second seed of the frontier arm is recorded above for that reason, and any
 new run gets a new run id.
 

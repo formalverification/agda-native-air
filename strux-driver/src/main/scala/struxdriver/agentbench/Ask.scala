@@ -82,7 +82,8 @@ final case class Extractor(bin: Path, includes: Vector[Path], agdaDir: String, t
 
   /** Delete a temp tree: the copy, and whatever Agda wrote beside it. */
   private def deleteTree(root: Path): Unit = {
-    val paths = Files.walk(root).iterator().asScala.toVector.reverse
+    val walk  = Files.walk(root)                      // holds a directory handle: close it
+    val paths = try walk.iterator().asScala.toVector.reverse finally walk.close()
     paths.foreach(p => Files.deleteIfExists(p))
   }
 

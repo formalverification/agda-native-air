@@ -29,7 +29,9 @@
   *       comparison, so a renamed binder is not a changed statement; nothing
   *       is printed or parsed.  Asked only of a file Agda could check (an
   *       unchecked file has no elaborated type), so the verdict speaks for a
-  *       file that does not type-check.
+  *       file that does not type-check.  A file Agda checked that the
+  *       extractor cannot read fails this gate too: the statement is
+  *       unverified, so the row is not a solve.
   *    5. typecheck: the gold verifier's own `agda` invocation
   *       (GoldVerifier.agdaCommand) on the final file, with `--safe` added
   *       because every committed gold passes under it, exit-code verdict;
@@ -64,8 +66,12 @@ final case class GateFailure(gate: String, detail: String)
 
 /** The library original a row restates: its qualified name when the index
   * says (the `restates:` tag), its bare name, and whether the bare name alone
-  * is evidence (only when it differs from the hole; the hole's own name in
-  * its body is a recursive call).
+  * is evidence.  It is when the row is untagged, where the qualified name is
+  * a guess (the index's module and the hole's name, and the two disagree for
+  * a lemma the index files elsewhere), and when a tag's bare name differs
+  * from the hole's, where it widens the exact name to a re-export.  It is not
+  * when a tag names the hole's own name, where any same-named lemma anywhere
+  * would match an exactly known original.
   */
 final case class Original(qualified: Option[String], bare: String, bareIsEvidence: Boolean)
 
@@ -138,13 +144,18 @@ object Gates {
   def originalOf(module: String, hole: String, tags: Vector[String]): Original = {
     val tagged = tags.collectFirst { case t if t.startsWith("restates:") => t.stripPrefix("restates:") }
     val bare   = tagged.map(_.split('.').last).getOrElse(hole.stripSuffix("′"))
-    Original(tagged.orElse(Some(s"$module.$bare")), bare, bare != hole)
+    Original(tagged.orElse(Some(s"$module.$bare")), bare, tagged.isEmpty || bare != hole)
   }
 
   /** The names the definition's body refers to, closed over the file's own
     * definitions (helpers, where-blocks, extended lambdas), then the evidence:
-    * the original by its qualified name, or a name outside the file whose
-    * bare name is the original's.
+    * the original by its qualified name, or (when the original's bare name is
+    * evidence in itself, `Original.bareIsEvidence`) a name outside the file
+    * whose bare name is the original's.  The second is the fallback for an
+    * original whose module the index states differently from the corpus, and
+    * for a re-export under another path; it is off when the index names the
+    * original exactly and its bare name is the hole's own, where any
+    * same-named lemma anywhere would match.
     */
   def restatement(stem: String, hole: String, original: Original, rows: Vector[DefRow]): Vector[String] = {
     val byName = rows.map(r => r.prettyQname -> r.bodyRefs).toMap
@@ -157,7 +168,8 @@ object Gates {
     }
     val refs = close(Set.empty, List(s"$stem.$hole")).toVector.sorted
     refs.filter { r =>
-      original.qualified.contains(r) || (!own(r) && r.split('.').last == original.bare)
+      original.qualified.contains(r) ||
+        (original.bareIsEvidence && !own(r) && r.split('.').last == original.bare)
     }.map(r => s"ref $r")
   }
 }
@@ -225,10 +237,15 @@ object Judge {
           finalRows <- if (rc == 0) agda.rows(finalFile)
                        else IO.pure(Left("the file does not type-check, so it has no elaborated types to extract"): Either[String, Vector[DefRow]])
           goldRows  <- if (rc == 0) agda.rows(goldFile) else IO.pure(Left("not needed"): Either[String, Vector[DefRow]])
-          statementGate = (goldRows, finalRows) match {
-                            case (Right(g), Right(f)) => Some(Gates.statement(stem, hole, g, f))
-                            case (Left(e), Right(_))  => Some(Left(GateFailure("statement", s"the gold could not be extracted: $e")))
-                            case _                    => None
+          // A file Agda checked has an elaborated type; if the extractor
+          // cannot read it, the statement is unverified and the row is not a
+          // solve (and Outcomes makes it an anomaly).  A file Agda could not
+          // check is named by the verdict instead.
+          statementGate = (rc == 0, goldRows, finalRows) match {
+                            case (true, Right(g), Right(f)) => Some(Gates.statement(stem, hole, g, f))
+                            case (true, _, Left(e))         => Some(Left(GateFailure("statement", s"the final file type-checks but could not be extracted: $e")))
+                            case (true, Left(e), Right(_))  => Some(Left(GateFailure("statement", s"the gold could not be extracted: $e")))
+                            case _                          => None
                           }
           gate      = importsGate.left.toOption
                         .orElse(Gates.escape(checked).left.toOption)

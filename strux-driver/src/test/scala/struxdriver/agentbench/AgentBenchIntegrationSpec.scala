@@ -72,7 +72,14 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
         oracle   <- Oracle.create(client)
         includes <- Extractor.includesFromRegistry(Paths.get(agdaDir).resolve("libraries"))
         agda      = new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), "it")
+        // A file Agda checks but the extractor cannot read: the statement is
+        // unverified, so the row must not pass as a solve.
+        blind     = new Agda {
+                      def check(f: Path)            = agda.check(f)
+                      def rows(f: Path)             = IO.pure(Left("agda-json exit 1: forced"))
+                    }
       } yield Map(
+        "unreadable" -> judge(blind, "unreadable", gold),
         "gold"      -> judge(agda, "gold", gold),
         "hole"      -> judge(agda, "hole", ob),
         "weakened"  -> judge(agda, "weakened", ob.replace("+-comm : ∀ (m n : ℕ) → m + n ≡ n + m", "+-comm : ∀ (m n : ℕ) → m + n ≡ m + n").replace("{!!}", "refl")),
@@ -89,6 +96,13 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     val goldPrintings = verdicts.values.flatMap(_.statement.map(_.gold)).toSet
     goldPrintings.size shouldBe 1
     goldPrintings.head should not include "Agda.Builtin"
+
+    val u = verdicts("unreadable")
+    u.agdaExit shouldBe Some(0)                        // Agda checked it
+    u.gate.map(_.gate) shouldBe Some("statement")      // and the judge still refuses to call it solved
+    u.gate.exists(_.detail.startsWith("the final file type-checks but could not be extracted")) shouldBe true
+    u.statement shouldBe None
+    u.evidenceSource should startWith ("unavailable")
 
     val g = verdicts("gold")
     g.gate shouldBe None

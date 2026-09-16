@@ -53,9 +53,16 @@ object AgentBench extends IOApp {
       sysP     <- if (cfg.rejudge) archived(layout.prompts.resolve("system-prompt.md")) else TextIO.resource("agentbench/system-prompt.md")
       userT    <- if (cfg.rejudge) archived(layout.prompts.resolve("user-prompt.md")) else TextIO.resource("agentbench/user-prompt.md")
       version  <- if (cfg.rejudge) IO.pure("n/a (rejudge)") else Subject.version(cfg.claudeBin)
+      // The corpora by content, before anything runs: the same block the
+      // report carries, and the corpus half of the protocol's inputs.
+      fresh    <- if (cfg.rejudge) IO.pure(Json.obj())
+                  else Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
+                         .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*))
+      inputs   <- if (cfg.rejudge) IO.pure(Json.obj()) else Protocol.inputs(cfg, fresh)
+      protocol  = if (cfg.rejudge) Json.obj() else Protocol.of(cfg, version, sysP, userT, inputs)
       // A run id is one protocol: a fresh run records its own before anything
       // spawns, and a resumed one must be the protocol on record.
-      _        <- if (cfg.rejudge) IO.unit else Protocol.admit(layout, Protocol.of(cfg, version, sysP, userT), cfg.resume)
+      _        <- if (cfg.rejudge) IO.unit else Protocol.admit(layout, protocol, cfg.resume)
       _        <- if (cfg.rejudge) IO.unit
                   else TextIO.write(layout.prompts.resolve("system-prompt.md"), sysP) *> TextIO.write(layout.prompts.resolve("user-prompt.md"), userT)
       // A re-judge keeps the run's own record of how its subjects were run:
@@ -80,10 +87,8 @@ object AgentBench extends IOApp {
                     if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor)
                     else Run.driveAll(cfg, entries, client, extractor, sysP, userT)
                   }
-      corpora  <- previous.flatMap(_.hcursor.downField("corpora").focus).map(IO.pure).getOrElse(
-                    Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
-                      .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*)))
-      _        <- Report.write(cfg, entries, driven, corpora, version, sysP, userT, previous.flatMap(_.hcursor.downField("config").focus))
+      corpora   = previous.flatMap(_.hcursor.downField("corpora").focus).getOrElse(fresh)
+      _        <- Report.write(cfg, entries, driven, corpora, protocol, previous.flatMap(_.hcursor.downField("config").focus))
       anomalies = driven.map(_.outcome).filter(_.anomaly.isDefined)
       _        <- anomalies.traverse_(o => IO.println(s"!! ${o.entry.id} anomaly: ${o.anomaly.getOrElse("")}"))
     } yield if (anomalies.isEmpty) ExitCode.Success else ExitCode.Error

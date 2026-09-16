@@ -147,7 +147,11 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector("stratum:wholesale", "restates:Setoid.Functions.Basic.lift∼lower")) shouldBe
       Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
     Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector.empty) shouldBe Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
-    Gates.originalOf("Data.Nat.Properties", "+-comm", Vector.empty) shouldBe Original(Some("Data.Nat.Properties.+-comm"), "+-comm", false)
+    // Untagged: the qualified name is a guess, so the bare name is evidence even when it is the hole's.
+    Gates.originalOf("Data.Nat.Properties", "+-comm", Vector.empty) shouldBe Original(Some("Data.Nat.Properties.+-comm"), "+-comm", true)
+    // Tagged with the hole's own name: the original is known exactly, so the bare name alone is not evidence.
+    Gates.originalOf("Overture.Operations", "π", Vector("restates:Overture.Operations.π")) shouldBe
+      Original(Some("Overture.Operations.π"), "π", false)
     Gates.originalOf("M", "foo′", Vector("restates:Some.Where.bar")) shouldBe Original(Some("Some.Where.bar"), "bar", true)
   }
 
@@ -187,6 +191,19 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Gates.restatement("Nat-zero-lt-suc", "0<1+n", origLt, Vector(DefRow("Nat-zero-lt-suc.0<1+n", noAst, "", Vector("Data.Nat.Properties.0<1+n")))) shouldBe Vector("ref Data.Nat.Properties.0<1+n")
     // A missing row (the definition renamed away) yields no evidence rather than an error.
     Gates.restatement("X", "x", origLt, Vector.empty) shouldBe Vector.empty
+  }
+
+  test("restatement: a tag naming the hole's own name matches that name only, not a namesake elsewhere") {
+    val orig = Gates.originalOf("Overture.Operations", "π", Vector("stratum:wholesale", "restates:Overture.Operations.π"))
+    orig.bareIsEvidence shouldBe false
+    val exact    = Vector(DefRow("Overture-proj-op.π", noAst, "", Vector("Overture.Operations.π")))
+    val namesake = Vector(DefRow("Overture-proj-op.π", noAst, "", Vector("Data.Product.π", "Setoid.Algebras.Basic.𝔻[_]")))
+    Gates.restatement("Overture-proj-op", "π", orig, exact) shouldBe Vector("ref Overture.Operations.π")
+    Gates.restatement("Overture-proj-op", "π", orig, namesake) shouldBe Vector.empty
+    // Untagged, the same shape: the module is a guess, so a namesake outside the file is the evidence there is.
+    val guess = Gates.originalOf("Overture.Operations", "π", Vector.empty)
+    guess.bareIsEvidence shouldBe true
+    Gates.restatement("Overture-proj-op", "π", guess, namesake) shouldBe Vector("ref Data.Product.π")
   }
 
   test("every committed obligation reads as a statement and every gold keeps its frozen lines") {

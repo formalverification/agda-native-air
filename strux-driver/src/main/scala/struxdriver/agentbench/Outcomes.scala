@@ -23,10 +23,13 @@
   *  started), the agda server not connected, the tools presented as deferred
   *  names, one of the thirteen missing, a tool presented beyond Read, Edit,
   *  and the thirteen (used or not: the arm is exactly those fifteen), the
-  *  account's rate limit refusing service, or a client error that is not one
-  *  of the stated caps; and when the two batch verdicts on the final file
-  *  (the gold verifier's agda and the server's check_file) disagree, which is
-  *  a configuration fact, not a fact about the proof.  The rules are
+  *  account's rate limit refusing service, a client error that is not one of
+  *  the stated caps, or a process that ended with no result record at all
+  *  (a crash; a wall-cap kill is a stated cap, not an anomaly); and when the
+  *  final file leaves the judge without an answer it should have, which is a
+  *  configuration fact, not a fact about the proof: the two batch verdicts
+  *  (the gold verifier's agda and the server's check_file) disagreeing, or a
+  *  file Agda checked that the extractor could not read.  The rules are
   *  `anomalyOf`, first that applies.  The gates still run on the file, so the
   *  anomaly keeps its diagnostics, and the run exits non-zero.
   *
@@ -156,7 +159,7 @@ object Outcomes {
     judged(layout, Outcome.anomaly(entry, msg, 0L), Vector.empty)
 
   /** The anomaly rules of the header, first that applies. */
-  def anomalyOf(t: Transcript, iso: Isolation, verdict: Verdict): Option[String] = {
+  def anomalyOf(t: Transcript, iso: Isolation, verdict: Verdict, terminal: String): Option[String] = {
     val capped = t.result.exists(r => r.subtype.contains("max_turns") || r.subtype.contains("budget"))
     if (t.init.isEmpty) Some("no init record: the subject never started (see stderr.log)")
     else if (!iso.mcpConnected) Some("agda server not connected in the subject's session")
@@ -165,6 +168,9 @@ object Outcomes {
     else if (iso.extraTools.nonEmpty) Some(s"tools presented beyond the protocol: ${iso.extraTools.mkString(",")}")
     else if (t.rateLimitRejected) Some(s"rate limited: ${t.rateLimits.map(_._1).distinct.mkString(",")}")
     else if (t.result.exists(_.isError) && !capped) Some(s"client error (${t.result.map(_.subtype).getOrElse("?")}): ${t.result.map(_.text.take(200)).getOrElse("")}")
+    else if (terminal == "crash") Some("no result record: the subject's process ended without one (see stderr.log)")
+    else if (verdict.agdaExit.contains(0) && verdict.evidenceSource.startsWith("unavailable"))
+      Some(s"the final file type-checks but the extractor could not read it: ${verdict.evidenceSource.stripPrefix("unavailable: ")}")
     else if (verdict.verdictsDisagree) Some(s"the gold verifier's agda (exit ${verdict.agdaExit.getOrElse(-1)}) and check_file (exit ${verdict.checkExit.getOrElse(-1)}) disagree on the final file")
     else None
   }
@@ -190,10 +196,11 @@ object Outcomes {
       killed      = record.exists(_.killed)
       wallMs      = record.map(_.wallMs).getOrElse(t.result.map(_.durationMs).getOrElse(0L))
       iso         = Audit.isolation(t, workDir)
+      terminal    = Audit.terminalOf(killed, t.result)
       verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
                     else verdict.gate
-      anomaly     = anomalyOf(t, iso, verdict)
+      anomaly     = anomalyOf(t, iso, verdict, terminal)
       solved      = gate.isEmpty && verdict.solved
       restated    = gate.isEmpty && verdict.restated
       outcome     = Outcome(
@@ -203,7 +210,7 @@ object Outcomes {
         gate              = gate,
         evidence          = verdict.evidence,
         addedImports      = verdict.addedImports,
-        terminal          = Audit.terminalOf(killed, t.result),
+        terminal          = terminal,
         turns             = t.result.map(_.numTurns).getOrElse(0),
         toolCalls         = t.toolCounts,
         wallMs            = wallMs,

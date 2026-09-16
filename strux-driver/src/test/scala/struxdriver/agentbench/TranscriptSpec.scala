@@ -74,9 +74,30 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
   test("a tool presented beyond the protocol is an anomaly, used or not") {
     val t   = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
     val iso = Audit.isolation(t, workDir)
-    Outcomes.anomalyOf(t, iso, cleanVerdict) shouldBe None
-    Outcomes.anomalyOf(t, iso.copy(extraTools = Vector("Bash")), cleanVerdict) shouldBe Some("tools presented beyond the protocol: Bash")
-    Outcomes.anomalyOf(t, iso, cleanVerdict.copy(checkExit = Some(1))).exists(_.contains("disagree")) shouldBe true
+    Outcomes.anomalyOf(t, iso, cleanVerdict, "completed") shouldBe None
+    Outcomes.anomalyOf(t, iso.copy(extraTools = Vector("Bash")), cleanVerdict, "completed") shouldBe Some("tools presented beyond the protocol: Bash")
+    Outcomes.anomalyOf(t, iso, cleanVerdict.copy(checkExit = Some(1)), "completed").exists(_.contains("disagree")) shouldBe true
+  }
+
+  test("a subject that emitted no result record is an anomaly; a wall-cap kill is not") {
+    val full    = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
+    val iso     = Audit.isolation(full, workDir)
+    val noResult = Transcript.parse(resource("transcript-smoke-haiku.jsonl").linesIterator.filterNot(_.contains("\"type\":\"result\"")).mkString("\n"))
+    noResult.result shouldBe None
+    noResult.init should not be None
+    Audit.terminalOf(killed = false, noResult.result) shouldBe "crash"
+    Audit.terminalOf(killed = true, noResult.result) shouldBe "wall_cap"
+    Outcomes.anomalyOf(noResult, iso, cleanVerdict, "crash").exists(_.startsWith("no result record")) shouldBe true
+    Outcomes.anomalyOf(noResult, iso, cleanVerdict, "wall_cap") shouldBe None
+  }
+
+  test("a file Agda checked that the extractor could not read is an anomaly, never a quiet solve") {
+    val t   = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))
+    val iso = Audit.isolation(t, workDir)
+    val unreadable = cleanVerdict.copy(evidenceSource = "unavailable: agda-json exit 1")
+    Outcomes.anomalyOf(t, iso, unreadable, "completed") shouldBe Some("the final file type-checks but the extractor could not read it: agda-json exit 1")
+    // A file that does not type-check is named by the verdict, not by this rule.
+    Outcomes.anomalyOf(t, iso, unreadable.copy(agdaExit = Some(1), checkExit = Some(1)), "completed") shouldBe None
   }
 
   private val entry = IndexEntry("x-id", "agda-stdlib", "M", Paths.get("data/x/X.agda"), Paths.get("data/g/X.agda"),
