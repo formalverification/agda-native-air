@@ -28,8 +28,14 @@
  * One session plays, and then it stops.  There is no auto-advance from tab
  * to tab and no loop: a proof session is a minute of reading, not a
  * three-second vignette, and five of them in a row would be a demand rather
- * than an offer.  Any gesture (choosing a tab, pressing the replay button)
- * takes the wheel; from then on a panel plays only when asked.
+ * than an offer.  Any gesture (choosing a tab, pressing the control) takes
+ * the wheel; from then on a panel plays only when asked.
+ *
+ * The one control each panel has is a stop as well as a replay, because the
+ * first session starts on its own and the five run 6 to 25 seconds: that is
+ * auto-updating content beside other content, and WCAG 2.2.2 asks for a way
+ * to stop it.  While a panel plays, the button reads "stop" and settles it
+ * to the finished session; at rest it reads "replay" and starts one.
  *
  * Timing comes from the --motion-* custom properties, read off computed
  * style, so web/assets/demo.css stays the one place the rhythm is decided.
@@ -82,6 +88,26 @@
       return new Promise(function (r) { setTimeout(r, t); });
     }
 
+    // The replay control does two jobs, and which one decides whether this
+    // page is usable.  A replay starts on scroll into view and runs for 15
+    // to 25 seconds on the longer sessions, which is auto-updating content
+    // presented alongside the rest of the page, so WCAG 2.2.2 requires a
+    // way to stop it.  While a panel is playing this button stops it; while
+    // it is at rest, it plays it again.  Stopping settles the panel to the
+    // finished session rather than freezing it mid-line: a half-typed call
+    // is not a quotation of anything, and the finished state is the truth
+    // the replay was only ever arriving at.
+    var REPLAY_LABEL = "\u21bb replay";
+    var STOP_LABEL = "\u25a0 stop";
+
+    function setControl(p, playing) {
+      p.playing = playing;
+      p.button.textContent = playing ? STOP_LABEL : REPLAY_LABEL;
+      p.button.setAttribute("aria-label", playing
+        ? "Stop the replay and show the finished session"
+        : "Replay this session");
+    }
+
     // One state object per panel; null if the markup breaks the contract
     // render.py documents, in which case the whole player is left at rest.
     function build(el) {
@@ -109,6 +135,7 @@
     // finished session the next time it is shown, never a half-typed one.
     function settle(p) {
       p.run += 1;
+      setControl(p, false);
       p.steps.forEach(function (step) {
         step.el.hidden = false;
         step.typed.forEach(function (t) {
@@ -123,6 +150,7 @@
     function play(p) {
       var mine = ++p.run;
       p.played = true;
+      setControl(p, true);
       function live() { return p.run === mine; }
       function step(fn) {
         return function () { if (live()) return fn(); };
@@ -194,7 +222,9 @@
           }));
         }
       });
-      return q;
+      // Only this run may clear the control: a run cancelled by a stop or a
+      // tab switch has already had `settle` do it, and `step` skips this.
+      return q.then(step(function () { setControl(p, false); }));
     }
 
     function select(i) {
@@ -244,8 +274,11 @@
     if (!canReplay) return;
 
     panels.forEach(function (p) {
+      setControl(p, false);
       p.button.hidden = false;
-      p.button.addEventListener("click", function () { play(p); });
+      p.button.addEventListener("click", function () {
+        if (p.playing) settle(p); else play(p);
+      });
     });
 
     var io = new IntersectionObserver(function (entries) {

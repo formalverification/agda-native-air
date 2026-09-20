@@ -28,8 +28,12 @@ Description: Render the demo site's page from the data `make demo-data`
        split is the honest one: the agent typed its words and its calls, and
        the server answered in one response, the way a compiler answers in
        whole lines.
-    +  `.replay-again`, a replay control, shipped `hidden` for the same
-       reason as the tablist.
+    +  `.replay-again`, one control per panel, shipped `hidden` for the same
+       reason as the tablist.  The script gives it two states: while a panel
+       plays it stops the replay, and at rest it starts one.  The stop is
+       not decoration: the first session starts on its own when the player
+       scrolls into view, and the five run 6 to 25 seconds, which is exactly
+       what WCAG 2.2.2 asks for a way to stop.
 
   Panels other than the first are shipped visible and are hidden by CSS only
   when the document element carries `has-js`, which a one-line script in the
@@ -58,7 +62,7 @@ Design Principles:
 from __future__ import annotations
 
 from html import escape
-from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple
 
 #: The repository this page belongs to, for the links back to the evidence.
 REPO_URL = "https://github.com/formalverification/agda-native-air"
@@ -371,6 +375,46 @@ def player(replays: Sequence[Mapping[str, Any]]) -> str:
             f'archived agda-mcp sessions">{_tabs(replays)}{panels}</div>')
 
 
+# ------------------------------------------------- pointing at a tab
+
+#: Positions the prose can name.  The roster is five long and is data, so a
+#: sentence that says "the last tab" is a claim about it that can go stale in
+#: a way nothing catches; these are computed instead, and
+#: `test_demo_render.py` checks the published sentence against the rendered
+#: tab strip.
+_ORDINALS = ("first", "second", "third", "fourth", "fifth", "sixth",
+             "seventh", "eighth", "ninth", "tenth")
+
+
+def _ordinal(index: int) -> str:
+    return _ORDINALS[index] if index < len(_ORDINALS) else f"number {index + 1}"
+
+
+def _one_tab(replays: Sequence[Mapping[str, Any]],
+             verdict: str) -> Optional[Tuple[int, Mapping[str, Any]]]:
+    """The single tab with this verdict, or None if it is not unique."""
+    hits = [(at, replay) for at, replay in enumerate(replays)
+            if (replay.get("verdict") or {}).get("kind") == verdict]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _names(replay: Mapping[str, Any]) -> str:
+    """How the prose refers to one session: the way its own tab reads."""
+    return (f'<code>{_esc(replay.get("label"))}</code> as '
+            f'{_esc(replay.get("modelLabel"))} left it')
+
+
+def _the_pair(replays: Sequence[Mapping[str, Any]]) -> Optional[Tuple[int, int]]:
+    """The two adjacent tabs that are one obligation given to two models."""
+    for at in range(len(replays) - 1):
+        here, then = replays[at], replays[at + 1]
+        if here.get("subject") == then.get("subject") and \
+                (here.get("verdict") or {}).get("kind") != \
+                (then.get("verdict") or {}).get("kind"):
+            return at, at + 1
+    return None
+
+
 # ----------------------------------------------------------------- table
 
 def table(numbers: Mapping[str, Any]) -> str:
@@ -521,10 +565,17 @@ were each handed to one fresh, non-interactive Claude Code session with those
 thirteen tools, Read and Edit on a single staged file, and nothing else: no
 shell, no settings, no project instructions, no memory.  Each session ran
 under a 30-turn cap, a 900-second cap, and a USD 3.00 cap.</p>
-<p>Every fact about the file a session left behind is Agda&rsquo;s own answer,
-asked through the same server and the same <code>agda</code> invocation the
-benchmark&rsquo;s gold solutions are verified with.  Nothing below is a reading
-of the source text.</p>
+<p>Every fact the judge uses about the <em>Agda</em> in the file a session
+left behind is Agda&rsquo;s own answer, asked through the same server and the
+same <code>agda</code> invocation the benchmark&rsquo;s gold solutions are
+verified with: the elaborated type of the definition, the references in its
+body, the safe-flag refusals, the hole list, the exit code.  One gate is
+textual and stays textual, because it asks about the file rather than about
+the Agda in it: whether the module line and every original import line are
+still there, read as a line diff with comments stripped on both sides.  The
+marked listing at the foot of each session below is the page&rsquo;s own diff
+of the obligation against the final file, for the reader; the judge never
+saw it.</p>
 <p>The five sessions on this page are replayed out of the transcripts
 committed in this repository, under
 <a class="src" href="%(repo)s/tree/main/reports/agent-bench">reports/agent-bench/</a>.
@@ -534,8 +585,11 @@ switched off.</p>
 </section>""" % {"repo": REPO_URL}
 
 
-def _restated() -> str:
-    return """<section class="prose" id="restated">
+def _restated(replays: Sequence[Mapping[str, Any]]) -> str:
+    pair = _the_pair(replays)
+    which = (f"The {_ordinal(pair[0])} and {_ordinal(pair[1])} tabs above"
+             if pair else "Two of the tabs above")
+    return f"""<section class="prose" id="restated">
 <h2>What <em>restated</em> means</h2>
 <p class="callout">A file that type-checks, keeps the statement it was given,
 and proves it by calling the library&rsquo;s own lemma for that statement is not
@@ -550,14 +604,18 @@ definition off Agda&rsquo;s internal terms, through the
 obligation was mined from, which each row of the benchmark index names in a
 <code>restates:</code> tag.  A match is a restatement, whatever else the file
 earned.</p>
-<p>The first two tabs above are one obligation, given to two models with the
-same tools.  Both files type-check.  One is a solve and one is a
-restatement, and nothing in the difference is a matter of opinion.</p>
+<p>{which} are one obligation, given to two models with the same tools.
+Both files type-check.  One is a solve and one is a restatement, and nothing
+in the difference is a matter of opinion.</p>
 </section>"""
 
 
-def _numbers_section(numbers: Mapping[str, Any]) -> str:
+def _numbers_section(numbers: Mapping[str, Any],
+                     replays: Sequence[Mapping[str, Any]]) -> str:
     arms = numbers.get("arms") or {}
+    gate = _one_tab(replays, "gate")
+    refused = (f"the {_ordinal(gate[0])} tab above, {_names(gate[1])}:"
+               if gate else "one of the tabs above:")
     return f"""<section class="prose" id="numbers">
 <h2>The numbers</h2>
 <p>Both arms ran on 2026-09-15, one subject per obligation, three at a time.
@@ -579,8 +637,8 @@ no subject reached a cap: every session stopped because the model stopped.</p>
 <p>Two readings the table does not show on its own.  Sonnet&rsquo;s eight
 restatements are all <code>agda-algebras</code> rows, six of them from the
 stratum whose fixtures import whole modules and name nothing useful.  And the
-one row that is neither solved nor restated is the last tab above: a file
-Agda accepts, refused because the session reached for <code>trans</code> by
+one row that is neither solved nor restated is {refused} a file Agda
+accepts, refused because the session reached for <code>trans</code> by
 editing the fixture&rsquo;s own import line instead of adding one.  The gate is
 the protocol&rsquo;s, the file is fine, and the row stays unsolved.</p>
 </section>"""
@@ -681,8 +739,8 @@ def page(data: Mapping[str, Any]) -> str:
           'could hide a failure.</p>'
         + player(replays)
         + '</section>'
-        + _restated()
-        + _numbers_section(numbers)
+        + _restated(replays)
+        + _numbers_section(numbers, replays)
         + _haystack()
         + _built(data)
         + '</main>'

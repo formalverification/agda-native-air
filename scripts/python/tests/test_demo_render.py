@@ -31,10 +31,10 @@ Usage
 
 from __future__ import annotations
 
-import json
+import re
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pytest
 
@@ -340,3 +340,106 @@ def test_a_broken_data_directory_is_refused(tmp_path) -> None:
     outcome = build_site(REPO, empty, tmp_path / "site")
     assert outcome.is_err
     assert "no replays" in str(outcome.unwrap_err())
+
+
+# ------------------------------------------------ accessibility (PR #166)
+
+def _relative_luminance(hexcolor: str) -> float:
+    def channel(c: float) -> float:
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (int(hexcolor[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+
+
+def _contrast(a: str, b: str) -> float:
+    la, lb = _relative_luminance(a), _relative_luminance(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _palette(css: str, theme: str) -> Dict[str, str]:
+    """One theme's colour tokens, read out of the stylesheet itself."""
+    if theme == "light":
+        block = re.search(r"^:root \{(.*?)^\}", css, re.S | re.M)
+    else:
+        block = re.search(
+            r"@media \(prefers-color-scheme: dark\) \{\s*:root \{(.*?)\}",
+            css, re.S)
+    assert block, f"the {theme} palette is not where this test looks"
+    found = dict(re.findall(r"(--[a-z-]+):\s*(#[0-9a-fA-F]{6})", block.group(1)))
+    assert found, f"the {theme} palette parsed empty"
+    return found
+
+
+#: Tokens the stylesheet uses for text a reader has to be able to read, and
+#: the three surfaces any of them can land on.  `--ink-faint` is the tight
+#: one: the page uses it at 0.66rem, so the 3:1 allowance for large text
+#: never applies.
+_TEXT_TOKENS = ("--ink", "--ink-soft", "--ink-faint", "--accent",
+                "--good", "--warn", "--bad")
+_SURFACES = ("--page", "--surface", "--surface-sunk")
+_ON_TINTS = (("--good", "--good-soft"), ("--warn", "--warn-soft"),
+             ("--bad", "--bad-soft"), ("--accent", "--accent-soft"))
+
+#: WCAG 2.1 AA for normal-size text.
+_AA = 4.5
+
+
+def test_every_text_colour_meets_wcag_aa(built) -> None:
+    # Copilot found `--ink-faint` at 3.30:1 in the light palette on PR #166.
+    # The measurement was wider than the report: the dark one failed on two
+    # of its three surfaces too.  Recomputing the whole grid is what keeps a
+    # later "just a touch lighter" from reintroducing it.
+    css = (built["out"] / "assets" / "demo.css").read_text(encoding="utf-8")
+    problems = []
+    for theme in ("light", "dark"):
+        palette = _palette(css, theme)
+        for token in _TEXT_TOKENS:
+            for surface in _SURFACES:
+                ratio = _contrast(palette[token], palette[surface])
+                if ratio < _AA:
+                    problems.append(
+                        f"{theme}: {token} ({palette[token]}) on {surface} "
+                        f"({palette[surface]}) is {ratio:.2f}:1, below {_AA}")
+        for token, tint in _ON_TINTS:
+            ratio = _contrast(palette[token], palette[tint])
+            if ratio < _AA:
+                problems.append(
+                    f"{theme}: {token} on {tint} is {ratio:.2f}:1, "
+                    f"below {_AA}")
+    assert not problems, "\n".join(problems)
+
+
+def test_the_prose_points_at_the_tab_it_means(built) -> None:
+    # Copilot found the page calling the refused session "the last tab",
+    # which the roster had made false.  The sentence is generated from the
+    # roster now; this reads the rendered tab strip and checks the two
+    # positional claims the page makes against it.
+    tabs = built["root"].by_class("replay-tab")
+    verdicts = [next(p for p in tab.by_class("pip")).classes for tab in tabs]
+    gate = [i for i, cs in enumerate(verdicts) if "pip-gate" in cs]
+    assert len(gate) == 1, "the page's sentence assumes exactly one refusal"
+    assert f"the {render._ordinal(gate[0])} tab above" in built["html"], (
+        f"the refused session is tab {gate[0] + 1}; the page says otherwise")
+
+    panels = built["root"].by_class("replay-panel")
+    subjects = [p.attrs["data-obligation-path"] for p in panels]
+    pair = next(i for i in range(len(subjects) - 1)
+                if subjects[i] == subjects[i + 1])
+    assert (f"The {render._ordinal(pair)} and {render._ordinal(pair + 1)} "
+            "tabs above") in built["html"]
+
+
+def test_the_replay_can_be_stopped(built) -> None:
+    # WCAG 2.2.2: the first session starts on its own and the five run 6 to
+    # 25 seconds, so a stop has to exist.  The behaviour is the script's, and
+    # this pins the wiring it depends on: one control per panel, which both
+    # starts a replay and settles a running one.
+    script = (built["out"] / "assets" / "replay.js").read_text(encoding="utf-8")
+    assert "if (p.playing) settle(p); else play(p);" in script
+    assert "setControl(p, true);" in script       # play claims the control
+    assert "setControl(p, false);" in script      # settle releases it
+    assert script.count("STOP_LABEL") >= 2
+    buttons = built["root"].by_class("replay-again")
+    assert len(buttons) == len(ROSTER)
+    assert all("hidden" in b.attrs for b in buttons)

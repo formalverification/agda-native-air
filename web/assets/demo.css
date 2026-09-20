@@ -25,6 +25,15 @@
  * shipping one; nothing on this page makes a request off the origin.
  */
 
+/* Contrast.  Every token that carries text clears WCAG AA (4.5:1) against
+ * all three surfaces of its own theme, `--surface-sunk` being the worst of
+ * them and so the one that sets the faint values.  `--ink-faint` is the tight
+ * one: it is used at 0.66rem in places (the answer badges, the disclosure
+ * summaries), which is normal-size text for the purpose of the rule, so the
+ * 3:1 allowance for large text never applies to it.  A test recomputes every
+ * pair from this file, so a lighter grey fails the suite rather than the
+ * reader: `scripts/python/tests/test_demo_render.py`.
+ */
 :root {
   color-scheme: light dark;
 
@@ -38,7 +47,7 @@
 
   --ink: #17191d;
   --ink-soft: #565d67;
-  --ink-faint: #838b96;
+  --ink-faint: #676e79;   /* AA on every surface; see the note above */
   --page: #fbfaf8;
   --surface: #ffffff;
   --surface-sunk: #f2f1ee;
@@ -67,7 +76,7 @@
   :root {
     --ink: #e7e5e0;
     --ink-soft: #a7a9ad;
-    --ink-faint: #7c8087;
+    --ink-faint: #8b8f95;
     --page: #14161a;
     --surface: #1b1e23;
     --surface-sunk: #24282e;

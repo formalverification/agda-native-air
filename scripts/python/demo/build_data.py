@@ -39,7 +39,6 @@ from scripts.python.demo import numbers
 from scripts.python.demo.replays import ROSTER, build_replay, index_rows
 from scripts.python.utils.file_ops import load_json, write_text
 from scripts.python.utils.pipeline_types import (
-    ErrorType,
     PipelineError,
     Result,
     sequence_results,

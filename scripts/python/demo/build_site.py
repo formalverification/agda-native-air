@@ -8,9 +8,11 @@ Description: `make demo-site`.  Render the demo page from the data
 
   The output is a directory a static host can serve as it stands: one HTML
   file with every session's text already in it, plus the stylesheet, the
-  replay script, and a favicon.  Nothing is fetched at page load, from this
-  origin or any other, so the page works behind a firewall, from a file://
-  URL, and in a crawler.
+  replay script, and a favicon.  The page loads those three from its own
+  origin and nothing from any other, and it fetches no content: every
+  session, answer, and number is in the HTML when it arrives, so the page
+  works behind a firewall, from a `file://` URL, and in a crawler, and it is
+  complete before the stylesheet or the script has loaded at all.
 
   Both the output directory and the data directory are gitignored.  The page
   is rebuilt from the committed archive, in CI and by anyone who runs the two
