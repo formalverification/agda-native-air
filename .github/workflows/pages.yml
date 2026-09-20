@@ -1,0 +1,154 @@
+## =============================================================================
+#  pages.yml - build and publish the demo site (issue #85)
+#  -----------------------------------------------------------------------------
+#
+#  File: .github/workflows/pages.yml
+#
+#  Description:
+#    Builds the demo site with the same two Makefile targets a developer runs
+#    (`make demo-data` then `make demo-site`) and deploys the result to GitHub
+#    Pages.  Nothing generated is committed: the page is rebuilt here from
+#    `reports/agent-bench/`, which is.
+#
+#    The build needs Python and nothing else.  It runs no Agda, starts no
+#    server, and makes no network request of its own: every input is a file in
+#    this repository.  `make demo-data` refuses to write if the table it
+#    regenerates from each arm's `report.json` disagrees with ADR 0001 § 9, or
+#    if an absolute path from the machine the sweep ran on survived
+#    normalization, so a page that cannot be trusted fails this workflow rather
+#    than being published.
+#
+#    The `verify` job is the gate.  It runs the generator's own test suite
+#    (`scripts/python/tests/test_demo_*.py`), which builds the page into a
+#    temporary directory and asserts the markup contract `web/assets/replay.js`
+#    depends on, that every tool answer is on the page in full, and that
+#    nothing is fetched from off the origin at page load.  `deploy` runs only
+#    if it passes.
+#
+#    This workflow does not touch `ci.yml`'s lanes and is not part of its
+#    `all-green` gate: a page that fails to build should not block a code
+#    change, and a code change that breaks the page is caught by the same
+#    tests inside `ci.yml`'s `python-agda-dojang` lane, which already runs
+#    `scripts/python/tests`.
+#
+#  One-time setup, which is the repository owner's action and not this file's:
+#    Settings -> Pages -> "Build and deployment" -> Source: "GitHub Actions".
+#    Until that is set, this workflow builds and the deploy step fails with
+#    "Get Pages site failed"; nothing else in CI is affected.
+#
+## =============================================================================
+name: Demo site
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'reports/agent-bench/**'
+      - 'scripts/python/demo/**'
+      - 'scripts/python/tests/test_demo_*.py'
+      - 'scripts/python/utils/**'
+      - 'web/**'
+      - 'data/benchmarks/benchmark-index.jsonl'
+      - 'docs/adr/0001-proof-search-on-agda-mcp.md'
+      - '.github/workflows/pages.yml'
+      - 'Makefile'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'reports/agent-bench/**'
+      - 'scripts/python/demo/**'
+      - 'scripts/python/tests/test_demo_*.py'
+      - 'scripts/python/utils/**'
+      - 'web/**'
+      - 'data/benchmarks/benchmark-index.jsonl'
+      - 'docs/adr/0001-proof-search-on-agda-mcp.md'
+      - '.github/workflows/pages.yml'
+      - 'Makefile'
+  # So the page can be republished without a commit, once Pages is enabled.
+  workflow_dispatch:
+
+# Read the repository; write a Pages deployment and the token it needs.  The
+# deploy job narrows nothing further: these are the permissions
+# actions/deploy-pages documents, and no other job here writes anything.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one in flight: a half-finished
+# deploy would leave the published site in an unknown state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  verify:
+    name: Demo site • build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: pip install pytest
+
+      # The suite builds the page into a temporary directory of its own, so
+      # this proves the build before the build below writes anything.
+      - name: Test the generator and the page it produces
+        run: PYTHONPATH=. python3 -m pytest -q scripts/python/tests/test_demo_*.py
+
+      - name: Build the site
+        run: make demo
+
+      # A published page must not reach off its own origin at load.  The test
+      # suite asserts this on the page it built; this repeats it on the
+      # artifact that is actually uploaded, which is the thing being shipped.
+      - name: Check the uploaded page fetches nothing off-origin
+        run: |
+          set -euo pipefail
+          test -f site/index.html
+          test -f site/assets/demo.css
+          test -f site/assets/replay.js
+          if grep -nE '<(script|link|img|iframe)[^>]+(src|href)="(https?:)?//' site/index.html; then
+            echo "::error::the built page loads an off-origin asset"
+            exit 1
+          fi
+          echo "the page loads only its own assets"
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        # On a pull request the repository's Pages site may not exist yet, and
+        # a PR never deploys anyway; the upload below still runs, so the
+        # artifact can be inspected from the run.
+        continue-on-error: true
+
+      - name: Upload the site as a Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    name: Demo site • deploy
+    needs: verify
+    # Only from the default branch, and only on a push or a manual run: a
+    # pull request builds the page and stops there.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

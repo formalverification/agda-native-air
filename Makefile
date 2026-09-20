@@ -330,6 +330,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  smoke smoke-nix gen-sample smoke-sample test-ml-pipeline test-agda-dojang test-all test-integration \
                  extract-algebras-legacy extract-lib-old clean wipe tree probe-all \
                  eval-proof-completion eval-proof-completion-smoke demo-proof-completion \
+                 demo demo-data demo-site demo-clean \
                  test-agda-dojang-integration \
                  project-lint project-update project-update-check _check-ghproject
 
@@ -455,6 +456,10 @@ help:
 	@echo "  make agent-bench-rejudge         - Re-judge an existing agent-bench run from its archived final files and transcripts (pass the run's own AGENT_BENCH_IDS)"
 	@echo "  make agent-bench-it              - Agent-bench: the judge's Agda typecheck gate against a committed gold and obligation"
 	@echo "  make agent-bench-archive         - Copy a quoted agent-bench run (report, rows, prompts, transcripts, final files) under reports/agent-bench/"
+	@echo "  make demo                        - Build the demo site from reports/agent-bench/ (issue 85): demo-data then demo-site"
+	@echo "  make demo-data                   - Demo site: archive -> $(DEMO_DATA_DIR) (checks the table against ADR 0001 section 9)"
+	@echo "  make demo-site                   - Demo site: $(DEMO_DATA_DIR) + web/assets -> $(DEMO_SITE_DIR)/index.html"
+	@echo "  make demo-clean                  - Remove $(DEMO_DATA_DIR) and $(DEMO_SITE_DIR)"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1924,6 +1929,44 @@ wipe:
 	@rm -f $(RAW_JSON) $(DATA_TRAIN)
 	@rm -rf $(ML_PIPE_FEATURES) $(ML_PIPE_MODELS)
 	@echo "✅ wipe complete"
+
+
+# ------------------------------------------------------------------------------
+# 10.5) The demo site (issue 85)
+#
+# Two steps, both reading only what is committed and neither touching the
+# network.  `demo-data` reduces the 14 MB agent-bench archive to one small
+# JSON per replay plus the benchmark table, refusing to write anything if a
+# number disagrees with ADR 0001 section 9 or if an absolute path from the
+# sweep machine survived normalization.  `demo-site` renders the page from
+# those and copies web/assets beside it.  Both outputs are gitignored: the
+# archive is what is committed, and the page is rebuilt from it.
+.PHONY: demo demo-data demo-site demo-clean
+
+DEMO_DATA_DIR       ?= data/demo
+DEMO_SITE_DIR       ?= site
+# The generators import scripts.python.demo and scripts.python.utils, so the
+# repository root has to be importable; CORPUS_PY already says exactly that.
+DEMO_PY              = $(CORPUS_PY)
+
+# Sequenced through recursive make rather than declared as two prerequisites:
+# prerequisites are independent to make, so `make -j demo` could render the
+# page from a data directory the first step was still writing.
+demo:
+	@$(MAKE) demo-data
+	@$(MAKE) demo-site
+
+demo-data:
+	@echo ">> [demo-data] reports/agent-bench/ -> $(DEMO_DATA_DIR)"
+	@$(DEMO_PY) -m scripts.python.demo.build_data --repo "$(PROJECT_ROOT)" --out "$(DEMO_DATA_DIR)"
+
+demo-site:
+	@echo ">> [demo-site] $(DEMO_DATA_DIR) -> $(DEMO_SITE_DIR)/index.html"
+	@$(DEMO_PY) -m scripts.python.demo.build_site --repo "$(PROJECT_ROOT)" --data "$(DEMO_DATA_DIR)" --out "$(DEMO_SITE_DIR)"
+
+demo-clean:
+	@echo ">> [demo-clean] removing $(DEMO_DATA_DIR) and $(DEMO_SITE_DIR)"
+	@rm -rf "$(DEMO_DATA_DIR)" "$(DEMO_SITE_DIR)"
 
 # ------------------------------------------------------------------------------
 # 11) Utility: tree
