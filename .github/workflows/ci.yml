@@ -45,7 +45,9 @@
 #       - Run eval-proof-completion-smoke inside nix develop
 #       - Verify determinism by running twice and diffing output
 #
-#    7) Benchmark (gold verification smoke — conditional on benchmark/runner changes)
+#    7) Benchmark (gold verification smoke — conditional)
+#       - Trigger paths: data/benchmarks/, strux-driver/, agda-dojang/,
+#         flake.nix, flake.lock
 #       - Nix + Cachix; run eval-benchmark-smoke inside nix develop .#backend
 #
 #    8) Haskell (agda-mcp build & tests — conditional on agda-mcp/ changes)
@@ -421,9 +423,12 @@ jobs:
   # ---------------------------------------------------------------------------
   # Benchmark • gold verification smoke (requires Nix → Agda + stdlib + sbt)
   #
-  # Conditional: only runs when the benchmark fixtures, the runner, or the
-  # pinned toolchain change.  Verifies a one-per-tier slice of the M1-5 baseline
-  # benchmark and checks the JSON report is deterministic modulo wall-clock.
+  # Conditional: only runs when the benchmark fixtures, the runner, agda-dojang
+  # or the pinned toolchain change.  agda-dojang is in scope because every one
+  # of the 110 obligation and gold files imports `AgdaDojang.Debug`, so a change
+  # to that library can break every row in the suite (see issue #168).
+  # Verifies a one-per-tier slice of the M1-5 baseline benchmark and checks the
+  # JSON report is deterministic modulo wall-clock.
   # ---------------------------------------------------------------------------
   benchmark-gold:
     name: Benchmark • gold verification smoke
@@ -445,7 +450,7 @@ jobs:
             BASE="${{ github.event.before }}"
           fi
           if ! CHANGED=$(git diff --name-only "$BASE" HEAD -- \
-            'data/benchmarks/' 'strux-driver/' 'flake.nix' 'flake.lock'); then
+            'data/benchmarks/' 'strux-driver/' 'agda-dojang/' 'flake.nix' 'flake.lock'); then
             echo "Error: failed to compute diff between $BASE and HEAD."
             exit 1
           fi
@@ -455,7 +460,7 @@ jobs:
             echo "$CHANGED"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No benchmark or runner changes detected; skipping."
+            echo "No benchmark, runner or agda-dojang changes detected; skipping."
           fi
 
       - name: Install Nix
