@@ -40,10 +40,11 @@
 #    GitHub prints each job's grant under "GITHUB_TOKEN Permissions" in its
 #    own log, which is where to check this rather than by reading.
 #
-#  Repository setting, already in place: Settings -> Pages -> "Build and
-#    deployment" -> Source: "GitHub Actions".  If it is ever turned off, the
-#    deploy step fails with "Get Pages site failed" and nothing else in CI
-#    is affected.
+#  Repository setting, in place since 2026-09-20 (verify with
+#    `gh api repos/formalverification/agda-native-air --jq .has_pages`):
+#    Settings -> Pages -> "Build and deployment" -> Source: "GitHub Actions".
+#    If it is ever turned off, `deploy` fails and nothing else in CI is
+#    affected: this workflow is not part of `ci.yml`'s `all-green` gate.
 #
 ## =============================================================================
 name: Demo site
