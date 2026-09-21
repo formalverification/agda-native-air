@@ -1,0 +1,80 @@
+{
+  "benchmarkId" : "algebras-injective-comp-injective",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Functions.Injective.⊙-injective",
+    "target:Function.Base._∘_"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "⊙-injective′",
+  "goal" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →  IsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 2,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 23938,
+  "costUsd" : 0.04797320000000001,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1194,
+    "cacheRead" : 46096,
+    "cacheCreation" : 6412
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2568,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+    "final" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda",
+  "transcriptPath" : "subjects/algebras-injective-comp-injective/transcript.jsonl",
+  "lastWords" : "The type-check command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

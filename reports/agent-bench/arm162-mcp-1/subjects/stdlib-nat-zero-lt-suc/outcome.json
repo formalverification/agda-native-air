@@ -1,0 +1,90 @@
+{
+  "benchmarkId" : "stdlib-nat-zero-lt-suc",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "0<1+n",
+  "goal" : "∀ {n : ℕ} → 0 < suc n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 14812,
+  "costUsd" : 0.0390636,
+  "tokens" : {
+    "input" : 8,
+    "output" : 596,
+    "cacheRead" : 73058,
+    "cacheCreation" : 4335
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 222,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{n : ℕ} → 0 < suc n",
+    "final" : "{n : ℕ} → 0 < suc n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file with the hole filled by `s≤s z≤n`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

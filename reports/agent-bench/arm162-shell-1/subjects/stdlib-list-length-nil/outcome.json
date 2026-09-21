@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "stdlib-list-length-nil",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "length-[]",
+  "goal" : "{A : Set} → length {A = A} [] ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 8390,
+  "costUsd" : 0.029520400000000002,
+  "tokens" : {
+    "input" : 8,
+    "output" : 680,
+    "cacheRead" : 32137,
+    "cacheCreation" : 3789
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 716,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} → length [] ≡ 0",
+    "final" : "{A : Set} → length [] ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-list-length-nil/final/List-length-nil.agda",
+  "transcriptPath" : "subjects/stdlib-list-length-nil/transcript.jsonl",
+  "lastWords" : "The type-check command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

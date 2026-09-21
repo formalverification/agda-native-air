@@ -1,0 +1,81 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sub-reflexive",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Subalgebras.Properties.≤-reflexive",
+    "target:Setoid.Homomorphisms.Basic.𝒾𝒹",
+    "target:Setoid.Functions.Injective.id-is-injective"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "≤-reflexive′",
+  "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} →  𝑨 ≤ 𝑨",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 3,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 19503,
+  "costUsd" : 0.077849,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1207,
+    "cacheRead" : 71840,
+    "cacheCreation" : 12547
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5383,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-subalgebras-sub-reflexive/final/Subalgebras-sub-reflexive.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sub-reflexive/transcript.jsonl",
+  "lastWords" : "The file type-checks successfully — `agda --safe` reports success with no errors on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

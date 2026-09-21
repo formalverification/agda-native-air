@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-distrib-r",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-distribʳ-+",
+  "goal" : "∀ (m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): grep -n \"_\\*_\\|_+_\" /nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src/Agda/Builtin/Nat.agda 2>/dev/null; find / -name \"Nat.agda\" -path \"*Builtin*\" 2>/dev/null; Bash reads outside the arm's roots (/home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda): grep -n \"_+_\\|_\\*_\" /home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda",
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 3,
+    "Edit" : 2,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 39248,
+  "costUsd" : 0.1332946,
+  "tokens" : {
+    "input" : 18,
+    "output" : 2564,
+    "cacheRead" : 249223,
+    "cacheCreation" : 14162
+  },
+  "permissionDenials" : 1,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): grep -n \"_\\*_\\|_+_\" /nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src/Agda/Builtin/Nat.agda 2>/dev/null; find / -name \"Nat.agda\" -path \"*Builtin*\" 2>/dev/null",
+      "Bash reads outside the arm's roots (/home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda): grep -n \"_+_\\|_\\*_\" /home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda"
+    ],
+    "deniedPaths" : [
+      "Read /home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda"
+    ],
+    "shellClasses" : {
+      "library-read" : 2,
+      "other" : 1
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1798,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+    "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-distrib-r/final/Nat-mul-distribR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-distrib-r/transcript.jsonl",
+  "lastWords" : "The file type-checks successfully — the verdict is success (exit code 0, no diagnostics, no holes remaining).",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

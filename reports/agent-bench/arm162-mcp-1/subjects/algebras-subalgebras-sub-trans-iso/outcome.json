@@ -1,0 +1,100 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sub-trans-iso",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Subalgebras.Properties.≤-trans-≅",
+    "target:Setoid.Homomorphisms.Properties.⊙-hom",
+    "target:Setoid.Functions.Injective.⊙-injective",
+    "target:Setoid.Homomorphisms.Isomorphisms.≅toInjective"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "≤-trans-≅′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 12,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__search_by_name" : 1,
+    "mcp__agda__search_by_type" : 1,
+    "mcp__agda__definition_of" : 1,
+    "mcp__agda__exports_of" : 2,
+    "mcp__agda__type_of" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 11,
+  "wallMs" : 48370,
+  "costUsd" : 0.3941178,
+  "tokens" : {
+    "input" : 20,
+    "output" : 3068,
+    "cacheRead" : 482639,
+    "cacheCreation" : 66429
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5494,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sub-trans-iso/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

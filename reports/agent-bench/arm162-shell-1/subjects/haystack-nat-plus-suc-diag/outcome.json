@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "haystack-nat-plus-suc-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-suc-diag",
+  "goal" : "∀ (m : ℕ) → m + suc m ≡ suc (m + m)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 13313,
+  "costUsd" : 0.036493399999999995,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1081,
+    "cacheRead" : 32817,
+    "cacheCreation" : 4490
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 1885,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
+  "lastWords" : "The file type-checks successfully — Agda reports no errors on the final version.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

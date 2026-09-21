@@ -1,0 +1,81 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sub-trans",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Subalgebras.Properties.≤-trans",
+    "target:Setoid.Homomorphisms.Properties.⊙-hom",
+    "target:Setoid.Functions.Injective.⊙-injective"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "≤-trans′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 5,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 29403,
+  "costUsd" : 0.08092060000000001,
+  "tokens" : {
+    "input" : 16,
+    "output" : 1708,
+    "cacheRead" : 91048,
+    "cacheCreation" : 11107
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 4
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5432,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-subalgebras-sub-trans/final/Subalgebras-sub-trans.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sub-trans/transcript.jsonl",
+  "lastWords" : "The command reports success: the module type-checks with no errors or warnings.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

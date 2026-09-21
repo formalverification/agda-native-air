@@ -1,0 +1,76 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-identity-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-identityʳ",
+  "goal" : "∀ (n : ℕ) → n * 1 ≡ n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 9567,
+  "costUsd" : 0.0327886,
+  "tokens" : {
+    "input" : 8,
+    "output" : 890,
+    "cacheRead" : 32398,
+    "cacheCreation" : 4062
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 705,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : ℕ) → n * 1 ≡ n",
+    "final" : "(n : ℕ) → n * 1 ≡ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-identity-r/transcript.jsonl",
+  "lastWords" : "The command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

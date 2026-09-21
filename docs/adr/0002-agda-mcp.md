@@ -299,6 +299,22 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 Two honest patterns run through the record.  Hole-driven development was mostly unused, and the reports say that was the right call: when an agent can read the sources into context and design the proof whole, write-then-check wins, and holes pay when goal types are genuinely unknown.  And the server's value in these sessions was latency, structured diagnostics, and the project echo, not capability the shell lacks; the shell stayed better for per-file sweeps and for the final whole-library gate.  Both patterns are inputs to Milestone 5 and to [#17].
 
+### The controlled measurement of the same claim
+
+(See also [#162], [#154], [#17], and [`reports/agent-bench/README.md`].)
+
+The field record is a set of sessions in which an agent chose what to do; § 12's second pattern was therefore a reading of behavior rather than a measurement.  [#162] measures it: the 55-obligation benchmark run three times with Sonnet 5 at one protocol version, one arm per instrument, the same prompts, caps, and judge, with the libraries' own sources readable on every arm and the shell arms confined by an audit over the paths their commands name.
+
+**Decision**.  The field record's honest pattern is adopted as a measured finding, and sharpened by what the control shows.
+
++  **The value the record named is confirmed and is the verdict.**  Given the server and a shell together, the subject took all 55 of its verdicts from `check_file` and ran `agda` on the shell not once.  Latency and a structured answer are what an agent will not give up, which is § 12's "latency, structured diagnostics, and the project echo" measured rather than inferred.
++  **The rest of the surface is worse than a shell here, not merely reproducible by one.**  The knowledge tools collapse when a shell is beside them (`definition_of` 19 calls in the server-only arm and 0 in the both arm, `search_by_name` 18 and 1, `exports_of` 11 and 2, `type_of` 34 and 11), and the server-only arm restates six library lemmas that the shell-only arm proves.
++  **The missing capability is searching sources, not reading them.**  Both arms could read the libraries; the shell arm consulted them 82 times and the server arm 13, because `grep` over a tree needs no prior knowledge of where a thing is while `definition_of` answers where a definition is and not what it says.
+
+**Evidence**.  Runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1`, 2026-09-21, `claude-sonnet-5`, zero anomalies, USD 12.41: 50 solved and 0 restated on the shell arm, 47 and 6 on the server arm, 51 and 2 on both; 308, 342 and 327 turns.  The full table, the per-tool shift, the two qualifications the isolation gate imposes, and the reproduction of the archived arm are in [ADR 0001](0001-proof-search-on-agda-mcp.md) § 9 and in [`reports/agent-bench/README.md`].  Neither shell-bearing arm used `agda --interaction-json` once, though both prompts name it, and neither grepped its row's corpus, though both prompts give its path.
+
+**Status**.  Adopted ([#162]).  § 13's ordering is unchanged but its first item is now earned rather than assumed: [#17], retrieval as server tools, whose first rung is what a shell does best and this server cannot do at all, searching the library's own sources.  The Milestone 5 items that make the verdict cheaper keep their place, since the verdict is what the measurement says the server is for.
+
 ---
 
 ## 13.  Where it goes
@@ -434,6 +450,8 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 [#145]: https://github.com/formalverification/agda-native-air/issues/145
 [#146]: https://github.com/formalverification/agda-native-air/issues/146
 [#147]: https://github.com/formalverification/agda-native-air/issues/147
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
 
@@ -448,3 +466,4 @@ Two honest patterns run through the record.  Hole-driven development was mostly 
 [`feedback/agent-case-for-corpus-proof-search.md`]: ../feedback/agent-case-for-corpus-proof-search.md
 [`mcp-field-reports.md`]: ../mcp-field-reports.md
 [`adr/0001-proof-search-on-agda-mcp.md`]: 0001-proof-search-on-agda-mcp.md
+[`reports/agent-bench/README.md`]: ../../reports/agent-bench/README.md

@@ -1,0 +1,81 @@
+{
+  "benchmarkId" : "algebras-homs-comp-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Homomorphisms.Properties.⊙-hom",
+    "target:Setoid.Functions.Basic._⊙_",
+    "target:Setoid.Homomorphisms.Properties.⊙-is-hom"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "⊙-hom′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  hom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 4,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 18745,
+  "costUsd" : 0.12301420000000002,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1213,
+    "cacheRead" : 98566,
+    "cacheCreation" : 22503
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 3
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5067,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-comp-hom/final/Homs-comp-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-comp-hom/transcript.jsonl",
+  "lastWords" : "The file type-checks successfully—Agda reports no errors, confirming the module compiles cleanly with `--safe`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

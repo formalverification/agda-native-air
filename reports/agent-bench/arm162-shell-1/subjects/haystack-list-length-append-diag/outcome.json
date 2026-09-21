@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "haystack-list-length-append-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "length-++-diag",
+  "goal" : "∀ {A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 11522,
+  "costUsd" : 0.0333718,
+  "tokens" : {
+    "input" : 8,
+    "output" : 871,
+    "cacheRead" : 32714,
+    "cacheCreation" : 4243
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2506,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
+  "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
+  "lastWords" : "The type-check succeeded with no errors, so the command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

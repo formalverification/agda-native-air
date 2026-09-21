@@ -1,0 +1,76 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-assoc",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-assoc",
+  "goal" : "∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 8734,
+  "costUsd" : 0.0307066,
+  "tokens" : {
+    "input" : 8,
+    "output" : 743,
+    "cacheRead" : 32323,
+    "cacheCreation" : 3918
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 713,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+    "final" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-plus-assoc/final/Nat-plus-assoc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-assoc/transcript.jsonl",
+  "lastWords" : "The command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "haystack-bool-and-assoc-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "∧-assoc-diag",
+  "goal" : "∀ (a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ (b ∧ a)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 15876,
+  "costUsd" : 0.0339316,
+  "tokens" : {
+    "input" : 8,
+    "output" : 923,
+    "cacheRead" : 32888,
+    "cacheCreation" : 4242
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 1106,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+    "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda",
+  "transcriptPath" : "subjects/haystack-bool-and-assoc-diag/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully with the given `agda` command (no errors reported, hole filled with `Data.Bool.Properties.∧-assoc a b a`).",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

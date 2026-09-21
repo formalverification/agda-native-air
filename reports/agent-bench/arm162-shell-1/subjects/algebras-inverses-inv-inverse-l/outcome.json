@@ -1,0 +1,80 @@
+{
+  "benchmarkId" : "algebras-inverses-inv-inverse-l",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.InvIsInverseˡ",
+    "target:Relation.Binary.Bundles.Setoid.refl"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "InvIsInverseˡ′",
+  "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →  Setoid._≈_ 𝑨 (Inv F {b = Func.to F a} Imagef∋f) a",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 4,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 17209,
+  "costUsd" : 0.052548000000000004,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1463,
+    "cacheRead" : 64850,
+    "cacheCreation" : 5941
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 3
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2855,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda",
+  "transcriptPath" : "subjects/algebras-inverses-inv-inverse-l/transcript.jsonl",
+  "lastWords" : "The command reports success: the file type-checks cleanly with no errors.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "haystack-list-map-append-diag",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "map-++-diag",
+  "goal" : "∀ (f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 14442,
+  "costUsd" : 0.0329622,
+  "tokens" : {
+    "input" : 8,
+    "output" : 834,
+    "cacheRead" : 32776,
+    "cacheCreation" : 4230
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2613,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+    "final" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-list-map-append-diag/final/List-map-append-diag.agda",
+  "transcriptPath" : "subjects/haystack-list-map-append-diag/transcript.jsonl",
+  "lastWords" : "The command reports success — the file type-checks cleanly with no errors or holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

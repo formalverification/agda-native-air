@@ -1,0 +1,79 @@
+{
+  "benchmarkId" : "algebras-overture-lift-lower",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "universe-polymorphic",
+    "restates:Overture.Basic.lift∼lower"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "lift∼lower",
+  "goal" : "{a b : Level} {A : Set a} → lift ∘ lower ≡ 𝑖𝑑 (Lift b A)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 8660,
+  "costUsd" : 0.031071,
+  "tokens" : {
+    "input" : 8,
+    "output" : 756,
+    "cacheRead" : 32430,
+    "cacheCreation" : 3967
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 755,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+    "final" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-overture-lift-lower/final/Overture-lift-lower.agda",
+  "transcriptPath" : "subjects/algebras-overture-lift-lower/transcript.jsonl",
+  "lastWords" : "The Agda check command reports success (no errors) on the final file with `lift∼lower = refl`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

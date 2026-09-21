@@ -1,0 +1,76 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-zero-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-zeroʳ",
+  "goal" : "∀ (n : ℕ) → n * 0 ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 15167,
+  "costUsd" : 0.0367608,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1192,
+    "cacheRead" : 32914,
+    "cacheCreation" : 4278
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 747,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : ℕ) → n * 0 ≡ 0",
+    "final" : "(n : ℕ) → n * 0 ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-zero-r/final/Nat-mul-zeroR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-zero-r/transcript.jsonl",
+  "lastWords" : "The command reports success on the final file (Agda type-checks `Nat-mul-zeroR.agda` with no errors).",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

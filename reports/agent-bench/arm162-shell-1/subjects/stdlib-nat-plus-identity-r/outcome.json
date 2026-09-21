@@ -1,0 +1,76 @@
+{
+  "benchmarkId" : "stdlib-nat-plus-identity-r",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "+-identityʳ",
+  "goal" : "∀ (n : ℕ) → n + 0 ≡ n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 14362,
+  "costUsd" : 0.034588,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1013,
+    "cacheRead" : 32610,
+    "cacheCreation" : 4194
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 644,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(n : ℕ) → n + 0 ≡ n",
+    "final" : "(n : ℕ) → n + 0 ≡ n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
+  "lastWords" : "The type-check command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

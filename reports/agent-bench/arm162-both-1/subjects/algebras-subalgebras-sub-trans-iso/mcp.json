@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/data/benchmarks/reports/agent-bench/arm162-both-1/work/algebras-subalgebras-sub-trans-iso /home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/data/benchmarks/reports/agent-bench/arm162-both-1/work/algebras-subalgebras-sub-trans-iso/Subalgebras-sub-trans-iso.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-mcp/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-mcp-0.2.0/x/agda-mcp/build/agda-mcp/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}

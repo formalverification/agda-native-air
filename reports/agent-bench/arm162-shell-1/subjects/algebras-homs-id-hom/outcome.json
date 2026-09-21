@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "algebras-homs-id-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.𝒾𝒹",
+    "target:Setoid.Functions.Basic.𝑖𝑑",
+    "target:Setoid.Homomorphisms.Basic.mkIsHom"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "𝒾𝒹′",
+  "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} → hom 𝑨 𝑨",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash runs a program this audit does not model (xargs): ls /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/; echo ---; find /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09...",
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 8,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 31756,
+  "costUsd" : 0.1059804,
+  "tokens" : {
+    "input" : 22,
+    "output" : 2599,
+    "cacheRead" : 134472,
+    "cacheCreation" : 12976
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash runs a program this audit does not model (xargs): ls /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/; echo ---; find /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 7
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5175,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-id-hom/final/Homs-id-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-id-hom/transcript.jsonl",
+  "lastWords" : "The type-check command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

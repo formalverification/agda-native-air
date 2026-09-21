@@ -1,0 +1,79 @@
+{
+  "benchmarkId" : "algebras-overture-proj-op",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Overture.Operations.π"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "π",
+  "goal" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 5,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 14943,
+  "costUsd" : 0.052981999999999994,
+  "tokens" : {
+    "input" : 16,
+    "output" : 1268,
+    "cacheRead" : 74500,
+    "cacheCreation" : 6058
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 4
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 193,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+    "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
+  "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
+  "lastWords" : "The command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}
