@@ -1,0 +1,44 @@
+[
+ {
+  "benchmarkId": "cost-stdlib-accepted",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "refl",
+  "source": "cost",
+  "note": "accepted: the give consumes the hole, so a reload is owed"
+ },
+ {
+  "benchmarkId": "cost-stdlib-accepted",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "refl",
+  "source": "cost",
+  "note": "accepted: the give consumes the hole, so a reload is owed"
+ },
+ {
+  "benchmarkId": "cost-stdlib-accepted",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "refl",
+  "source": "cost",
+  "note": "accepted: the give consumes the hole, so a reload is owed"
+ },
+ {
+  "benchmarkId": "cost-stdlib-refused",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "tt",
+  "source": "cost",
+  "note": "refused: the hole survives, so no reload is owed"
+ },
+ {
+  "benchmarkId": "cost-stdlib-refused",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "tt",
+  "source": "cost",
+  "note": "refused: the hole survives, so no reload is owed"
+ },
+ {
+  "benchmarkId": "cost-stdlib-refused",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "tt",
+  "source": "cost",
+  "note": "refused: the hole survives, so no reload is owed"
+ }
+]
