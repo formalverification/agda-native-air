@@ -24,14 +24,16 @@ open import Agda.Builtin.Bool public
 open import Agda.Builtin.List using (List; []; _∷_) public
 open import Agda.Builtin.Nat  using (Nat; zero; suc; _+_) public
 open import Agda.Builtin.Sigma using (Σ; _,_; fst; snd) public
-open import Agda.Builtin.String using (String; primShowNat) public
+open import Agda.Builtin.String using (String; primShowNat; primStringEquality) public
 open import Agda.Builtin.Unit using (⊤; tt) public
-open import Data.Bool using (if_then_else_) public
-open import Data.String.Properties using (_==_) public
+open import Data.Bool.Base using (if_then_else_) public
 open import Function.Base using (case_of_) public
 open import Relation.Binary.PropositionalEquality.Core public
   using (_≡_) -- ; _≢_; refl; cong; cong₂; sym; _≗_; trans; ≢-sym; subst₂;
 
+infix 4 _==_
+_==_ : String → String → Bool
+_==_ = primStringEquality
 
 -- Reflection API; re-export the things we need
 open import Agda.Builtin.Reflection as R public
