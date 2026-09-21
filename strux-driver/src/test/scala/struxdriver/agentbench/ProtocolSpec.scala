@@ -105,6 +105,40 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
       .map(_.takeWhile(_ != ':')) shouldBe Vector("inputs")
   }
 
+  test("the record names the arm, its tools, and its read roots, so two arms are two protocols") {
+    def armed(a: String, dirs: Vector[java.nio.file.Path] = Vector.empty) = {
+      val c = Cli.parse(base ++ List("--model", "claude-sonnet-5", "--arm", a)).getOrElse(fail("parse"))
+      Protocol.of(c, "2.1.261", "system", "user", someInputs(), dirs)
+    }
+    armed("mcp").hcursor.get[String]("arm").toOption   shouldBe Some("mcp")
+    armed("shell").hcursor.get[String]("arm").toOption shouldBe Some("shell")
+    // The shell arm's tool list is its three built-ins and no agda tool; the
+    // mcp arm's is Read, Edit and the thirteen an arm with the server must have.
+    armed("shell").hcursor.get[Vector[String]]("tools").toOption shouldBe Some(Vector("Bash", "Edit", "Read"))
+    armed("mcp").hcursor.get[Vector[String]]("tools").toOption.map(_.size)  shouldBe Some(15)
+    armed("both").hcursor.get[Vector[String]]("tools").toOption.map(_.size) shouldBe Some(16)
+    // Two arms differ as protocols, named by the fields that carry the arm.
+    val ds = Protocol.differences(armed("mcp"), armed("shell")).map(_.takeWhile(_ != ':'))
+    ds should contain ("arm")
+    ds should contain ("tools")
+    ds should contain ("claudeFlags")
+    // The libraries' roots are part of the protocol, so a toolchain that moves
+    // them refuses a resume instead of mixing two environments.
+    Protocol.differences(armed("mcp"), armed("mcp", Vector(java.nio.file.Paths.get("/nix/store/x/src"))))
+      .map(_.takeWhile(_ != ':')) should contain ("addDirs")
+  }
+
+  test("a subject's own record carries the arm and the roots, and survives the round trip") {
+    val roots = ShellRoots(Paths.get("/w/work/x"), Vector(Paths.get("/nix/store/x/src")), Vector(Paths.get("/c/corpus.jsonl")))
+    val rec   = SubjectRecord(Arm.Both, roots)
+    SubjectRecord.fromJson(rec.toJson) shouldBe Some(rec)
+    SubjectRecord.fromJson(Json.obj()) shouldBe None
+    SubjectRecord.fromJson(Json.obj("arm" -> "nope".asJson, "workDir" -> "/w".asJson)) shouldBe None
+    // An archive written before the record existed has none, and the judge
+    // falls back to the mcp arm confined to its work directory.
+    Arm.default shouldBe Arm.Mcp
+  }
+
   test("admit records a fresh run, resumes the same protocol, and refuses a changed one or subjects without a record") {
     val root   = Files.createTempDirectory("agentbench-protocol")
     val layout = RunLayout(root.resolve("r"))

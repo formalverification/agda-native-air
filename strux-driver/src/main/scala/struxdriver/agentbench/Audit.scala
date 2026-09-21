@@ -8,12 +8,19 @@
   *  Purpose
   *  -------
   *  What a subject's transcript says about the subject (issue #154), read
-  *  once the session is over: whether the instrument was in its hands (the
-  *  server connected, the thirteen tools presented and not deferred), whether
-  *  it stayed inside the protocol (no tool beyond Read, Edit, and the
-  *  thirteen; no Read or Edit outside the work directory that succeeded, with
-  *  refused attempts counted apart), how the session ended, and the
-  *  `fill_hole` probes it made as eval-proof-completion.v0 attempt rows.
+  *  once the session is over: whether the instrument was in its hands (for an
+  *  arm with the server, that it connected and the required tools arrived
+  *  eagerly), whether it stayed inside the protocol (no tool beyond the arm's
+  *  set; no Read outside the arm's read roots and no Edit outside the work
+  *  directory that succeeded, with refused attempts counted apart; and, for an
+  *  arm with a shell, no Bash command naming a path outside those roots), how
+  *  the session ended, and the `fill_hole` probes it made as
+  *  eval-proof-completion.v0 attempt rows.
+  *
+  *  The arm decides what "inside the protocol" means (issue #162), so every
+  *  expectation below is read off it rather than fixed: a shell arm has no
+  *  server to connect and no agda tools to miss, and its Bash calls are
+  *  audited by ShellAudit, which is the only confinement Bash has.
   *
   *  Design notes
   *  ------------
@@ -38,28 +45,71 @@ import struxdriver.search.{AttemptRow, FillHoleBody, Scaffold}
 
 /** The isolation audit of one subject, from its transcript. */
 final case class Isolation(
-  mcpConnected:     Boolean,
-  missingAgdaTools: Vector[String],
-  extraTools:       Vector[String],
-  toolsDeferred:    Boolean,
-  foreignToolUses:  Vector[String],
-  violations:       Vector[String],
-  deniedPaths:      Vector[String]
+  arm:                Arm,
+  mcpConnected:       Boolean,
+  agdaToolsPresented: Vector[String],
+  missingAgdaTools:   Vector[String],
+  extraTools:         Vector[String],
+  toolsDeferred:      Boolean,
+  foreignToolUses:    Vector[String],
+  violations:         Vector[String],
+  deniedPaths:        Vector[String],
+  shellClasses:       Vector[(String, Int)] = Vector.empty
 ) {
-  /** The instrument was in the subject's hands: server up, thirteen tools eager. */
-  def instrumentOk: Boolean = mcpConnected && missingAgdaTools.isEmpty && !toolsDeferred
-  /** Nothing outside the protocol was done: no foreign tool, no successful escape. */
+  /** The instrument was in the subject's hands: for an arm with the server,
+    * that it connected and every required tool arrived eagerly; for a shell
+    * arm, that the tools arrived eagerly at all.
+    */
+  def instrumentOk: Boolean =
+    (!arm.hasServer || (mcpConnected && missingAgdaTools.isEmpty)) && !toolsDeferred
+
+  /** Nothing outside the protocol was done: no foreign tool, no successful
+    * escape by a file tool, no shell command outside the arm's roots.
+    */
   def confined: Boolean = foreignToolUses.isEmpty && violations.isEmpty
 
   def toJson: Json = Json.obj(
-    "mcpConnected"     -> mcpConnected.asJson,
-    "missingAgdaTools" -> missingAgdaTools.asJson,
-    "extraTools"       -> extraTools.asJson,
-    "toolsDeferred"    -> toolsDeferred.asJson,
-    "foreignToolUses"  -> foreignToolUses.asJson,
-    "violations"       -> violations.asJson,
-    "deniedPaths"      -> deniedPaths.asJson
+    "arm"                -> arm.name.asJson,
+    "mcpConnected"       -> mcpConnected.asJson,
+    "agdaToolsPresented" -> agdaToolsPresented.asJson,
+    "missingAgdaTools"   -> missingAgdaTools.asJson,
+    "extraTools"         -> extraTools.asJson,
+    "toolsDeferred"      -> toolsDeferred.asJson,
+    "foreignToolUses"    -> foreignToolUses.asJson,
+    "violations"         -> violations.asJson,
+    "deniedPaths"        -> deniedPaths.asJson,
+    "shellClasses"       -> Json.obj(shellClasses.map { case (c, k) => c -> k.asJson }: _*)
   )
+}
+
+/** What a run gave one subject: the arm, and the roots its tools and commands
+  * were allowed (issue #162).  Written beside the subject before it spawns and
+  * read back by the judge, so a re-judge audits a run under the arm and the
+  * roots it actually had -- not the operator's current `--arm`, and not
+  * today's nix store paths, which a toolchain bump would move.  An archive
+  * without one is the server-only arm confined to its work directory, which is
+  * what the runs made before this record existed were.
+  */
+final case class SubjectRecord(arm: Arm, roots: ShellRoots) {
+  def toJson: Json = Json.obj(
+    "arm"       -> arm.name.asJson,
+    "workDir"   -> roots.workDir.toString.asJson,
+    "readRoots" -> roots.readRoots.map(_.toString).asJson,
+    "corpora"   -> roots.corpora.map(_.toString).asJson
+  )
+}
+
+object SubjectRecord {
+  def fromJson(j: Json): Option[SubjectRecord] = {
+    val c = j.hcursor
+    for {
+      arm  <- c.get[String]("arm").toOption.flatMap(s => Arm.parse(s).toOption)
+      work <- c.get[String]("workDir").toOption.map(Paths.get(_))
+    } yield SubjectRecord(arm, ShellRoots(
+      workDir   = work,
+      readRoots = c.get[Vector[String]]("readRoots").getOrElse(Vector.empty).map(Paths.get(_)),
+      corpora   = c.get[Vector[String]]("corpora").getOrElse(Vector.empty).map(Paths.get(_))))
+  }
 }
 
 object Audit {
@@ -92,23 +142,36 @@ object Audit {
       .map(Paths.get(_)).filter(_.isAbsolute).flatMap(f => Option(f.getParent))
   }
 
-  def isolation(t: Transcript, workDir: Path): Isolation = {
-    val init    = t.init
-    val tools   = init.map(_.tools).getOrElse(Vector.empty)
-    val allowed = Subject.fileTools ++ Subject.agdaTools
-    val root    = workDir.toAbsolutePath.normalize
-    val outside = t.filePaths(Subject.fileTools).filter { case (_, _, p) =>
+  /** The audit of one transcript under one arm, against the roots the run gave
+    * that subject.  A Read may name any of the arm's read roots (the work
+    * directory, the libraries' sources, the row's corpus); an Edit only the
+    * work directory, since the libraries are not the subject's to change.
+    */
+  def isolation(t: Transcript, arm: Arm, roots: ShellRoots): Isolation = {
+    val init  = t.init
+    val tools = init.map(_.tools).getOrElse(Vector.empty)
+    val work  = roots.workDir.toAbsolutePath.normalize
+    def resolved(p: String): Path = {
       val q = Paths.get(p)
-      !(if (q.isAbsolute) q else workDir.resolve(q)).normalize.startsWith(root)
+      (if (q.isAbsolute) q else work.resolve(q)).normalize
     }
+    val outside = t.filePaths(Subject.fileTools).filter { case (u, _, p) =>
+      val q = resolved(p)
+      if (u.name == "Edit") !q.startsWith(work) else !roots.canRead(q)
+    }
+    val (shellViolations, shellClasses) =
+      if (arm.hasShell) ShellAudit.auditCalls(t, roots) else (Vector.empty[String], Vector.empty[(String, Int)])
     Isolation(
-      mcpConnected     = init.exists(_.mcpServers.contains(("agda", "connected"))),
-      missingAgdaTools = Subject.agdaTools.filterNot(tools.contains),
-      extraTools       = tools.filterNot(allowed.contains),
-      toolsDeferred    = t.toolsDeferred,
-      foreignToolUses  = t.uses.map(_.name).filterNot(allowed.contains).distinct,
-      violations       = outside.collect { case (u, r, p) if !r.exists(_.isError) => s"${u.name} $p" },
-      deniedPaths      = outside.collect { case (u, r, p) if r.exists(_.isError) => s"${u.name} $p" }
+      arm                = arm,
+      mcpConnected       = init.exists(_.mcpServers.contains(("agda", "connected"))),
+      agdaToolsPresented = tools.filter(_.startsWith(Arm.agdaPrefix)),
+      missingAgdaTools   = if (arm.hasServer) Subject.agdaToolsRequired.filterNot(tools.contains) else Vector.empty,
+      extraTools         = tools.filterNot(arm.presents),
+      toolsDeferred      = t.toolsDeferred,
+      foreignToolUses    = t.uses.map(_.name).filterNot(arm.presents).distinct,
+      violations         = outside.collect { case (u, r, p) if !r.exists(_.isError) => s"${u.name} $p" } ++ shellViolations,
+      deniedPaths        = outside.collect { case (u, r, p) if r.exists(_.isError) => s"${u.name} $p" },
+      shellClasses       = shellClasses
     )
   }
 

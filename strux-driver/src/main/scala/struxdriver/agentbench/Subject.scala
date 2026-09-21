@@ -8,10 +8,11 @@
   *  Purpose
   *  -------
   *  Spawn one subject of the agent-in-the-loop evaluation (issue #154): a
-  *  fresh, non-interactive `claude -p` session whose only tools are the
-  *  thirteen agda-mcp tools (its own server, started through the committed
-  *  launcher with the row's corpus) and Read and Edit on the one staged file,
-  *  under a turn cap, a cost cap, and a wall cap enforced from outside.
+  *  fresh, non-interactive `claude -p` session whose only tools are the arm's
+  *  (issue #162): the agda-mcp server (its own, started through the committed
+  *  launcher with the row's corpus), Bash, or both, plus Read and Edit on the
+  *  one staged file, under a turn cap, a cost cap, and a wall cap enforced
+  *  from outside.
   *
   *  Isolation, and how each part of it is obtained
   *  -----------------------------------------------
@@ -27,11 +28,26 @@
   *    ENABLE_TOOL_SEARCH=false in the environment present the tools eagerly,
   *    with their descriptions, rather than as deferred names (the #83 run-1
   *    lesson).
-  *  - `--tools Read,Edit` is the whole built-in set; `--restricted` confines
-  *    those to the working directory and refuses the code-running tools;
-  *    `--permission-mode acceptEdits --permission-prompts none` lets edits of
-  *    the staged file and the allowed server through and denies anything that
-  *    would have asked.  The transcript audit is still run on every row.
+  *  - `--tools` is the whole built-in set, and it is the arm's: Read and Edit
+  *    everywhere, Bash where the arm has a shell.  `--restricted` is kept on
+  *    every arm: measured on client 2.1.261, it removes the code-running tools
+  *    only when `--tools` does NOT name them, so a shell arm keeps Bash and
+  *    still gets what `--restricted` gives every arm -- the file tools confined
+  *    to the working directories, `--add-dir` included, and user, project and
+  *    local settings ignored.  `--permission-mode acceptEdits
+  *    --permission-prompts none` lets edits of the staged file through and
+  *    denies anything that would have asked, so a pre-approval is needed for a
+  *    tool that would ask: `--allowedTools` carries the server's namespace and
+  *    Bash (verified: without it every Bash call is denied for want of an
+  *    approval surface).  Bash is NOT confined by the client, so the shell
+  *    arm's confinement is the audit over the paths its commands name
+  *    (ShellAudit.scala); the transcript audit is run on every row of every
+  *    arm.
+  *  - `--add-dir` adds the registered libraries' source roots, on every arm,
+  *    so reading the library's own sources is allowed symmetrically: the
+  *    archived mcp arm refused eleven such reads for Sonnet and two for Opus
+  *    as a confinement side effect, and a shell arm that can `cat` a module
+  *    while the server arm cannot would confound the comparison (#162).
   *  - The environment loses every CLAUDE* variable, so a subject launched from
   *    inside a Claude Code session is not that session's child (no inherited
   *    session id, messaging socket, or effort level), and MCP_TIMEOUT covers
@@ -66,7 +82,9 @@ final case class SubjectConfig(
   serverTimeout:   Int,
   persistSessions: Boolean,
   systemPrompt:    String,
-  userTemplate:    String
+  userTemplate:    String,
+  arm:             Arm,
+  addDirs:         Vector[Path]
 ) {
   def runServer: Path = projectRoot.resolve("scripts/run-server.sh")
 }
@@ -75,7 +93,7 @@ object SubjectConfig {
   /** The one reading of the harness config into a subject's: the server flags
     * are the protocol's (`--safe` included when the judge is safe).
     */
-  def of(cfg: AgentBenchConfig, systemPrompt: String, userTemplate: String): SubjectConfig =
+  def of(cfg: AgentBenchConfig, systemPrompt: String, userTemplate: String, addDirs: Vector[Path] = Vector.empty): SubjectConfig =
     SubjectConfig(
       claudeBin       = cfg.claudeBin,
       model           = cfg.model.getOrElse(""),
@@ -88,7 +106,9 @@ object SubjectConfig {
       serverTimeout   = cfg.serverTimeout,
       persistSessions = cfg.persistSessions,
       systemPrompt    = systemPrompt.trim,
-      userTemplate    = userTemplate
+      userTemplate    = userTemplate,
+      arm             = cfg.arm,
+      addDirs         = addDirs
     )
 }
 
@@ -106,14 +126,19 @@ object SubjectRun {
 
 object Subject {
 
-  /** The thirteen tools, as the client names them. */
-  val agdaTools: Vector[String] = Vector(
+  /** The agda tools an arm with the server must have, as the client names
+    * them: the thirteen the archived arms ran with.  It is a floor, not the
+    * surface -- the server exposes more since `search_in_scope` landed (PR
+    * #161) -- so a run records what was actually presented and the audit
+    * admits any `mcp__agda__` tool (Arm.presents).
+    */
+  val agdaToolsRequired: Vector[String] = Vector(
     "get_goal", "fill_hole", "check_file", "get_diagnostics", "check_project",
     "type_of", "normalize", "resolve_name", "definition_of", "exports_of",
     "search_by_name", "search_by_type", "get_dependencies"
   ).map(t => s"mcp__agda__$t")
 
-  /** The built-in tools a subject is given. */
+  /** The file tools every arm is given. */
   val fileTools: Set[String] = Set("Read", "Edit")
 
   /** The per-subject MCP config: the committed launcher, anchored at the
@@ -135,27 +160,46 @@ object Subject {
       "alwaysLoad" -> Json.True
     )))
 
-  def userPrompt(template: String, workFile: Path, hole: String): String =
-    template.replace("{{path}}", workFile.toString).replace("{{hole}}", hole).trim
+  /** Render a prompt template for one row.  Both prompts go through this, so
+    * the shell arms can state the row's own `agda` command and corpus path
+    * (issue #162) while the archive keeps the templates themselves; a
+    * placeholder a template does not use is simply not there to replace.
+    */
+  def render(template: String, workFile: Path, hole: String, agdaCommand: String, corpus: Path): String =
+    template
+      .replace("{{path}}", workFile.toString)
+      .replace("{{hole}}", hole)
+      .replace("{{agda}}", agdaCommand)
+      .replace("{{corpus}}", corpus.toString)
+      .trim
 
-  /** The fixed flag set, in one place, so the report can quote it. */
+  /** The fixed flag set, in one place, so the report can quote it; the arm
+    * decides the built-in tools and the pre-approvals, and nothing else.
+    * `--strict-mcp-config` stays on the shell arm, where it is what makes the
+    * absent `--mcp-config` mean no MCP server at all rather than the user's.
+    */
   def fixedFlags(cfg: SubjectConfig): Vector[String] =
     Vector(
       "--output-format", "stream-json", "--verbose",
       "--max-turns", cfg.maxTurns.toString,
       "--max-budget-usd", cfg.maxBudgetUsd.toString,
       "--strict-mcp-config",
-      "--tools", fileTools.toVector.sorted.mkString(","),
-      "--allowedTools", "mcp__agda",
+      "--tools", cfg.arm.builtinTools.toVector.sorted.mkString(","),
+      "--allowedTools", cfg.arm.allowedTools.mkString(","),
       "--permission-mode", "acceptEdits",
       "--permission-prompts", "none",
       "--setting-sources", "",
       "--disable-slash-commands",
       "--restricted"
-    ) ++ (if (cfg.persistSessions) Vector.empty else Vector("--no-session-persistence"))
+    ) ++ (if (cfg.addDirs.isEmpty) Vector.empty else "--add-dir" +: cfg.addDirs.map(_.toString)) ++
+      (if (cfg.persistSessions) Vector.empty else Vector("--no-session-persistence"))
 
-  def argv(cfg: SubjectConfig, mcpConfig: Path, prompt: String): Vector[String] =
-    Vector("setsid", cfg.claudeBin, "-p", prompt, "--model", cfg.model, "--mcp-config", mcpConfig.toString) ++
+  /** The argument vector; a shell arm carries no `--mcp-config`, so with
+    * `--strict-mcp-config` it has no MCP server at all.
+    */
+  def argv(cfg: SubjectConfig, mcpConfig: Option[Path], prompt: String): Vector[String] =
+    Vector("setsid", cfg.claudeBin, "-p", prompt, "--model", cfg.model) ++
+      mcpConfig.toVector.flatMap(p => Vector("--mcp-config", p.toString)) ++
       fixedFlags(cfg) ++ Vector("--system-prompt", cfg.systemPrompt)
 
   /** The environment additions, and the prefix of the variables removed. */
@@ -196,7 +240,7 @@ object Subject {
     * (the stream-json) and stderr go to the named files.  The process group
     * is killed at the wall cap and on any other exit of this effect.
     */
-  def run(cfg: SubjectConfig, workDir: Path, mcpConfig: Path, prompt: String, stdout: Path, stderr: Path): IO[SubjectRun] = {
+  def run(cfg: SubjectConfig, workDir: Path, mcpConfig: Option[Path], prompt: String, stdout: Path, stderr: Path): IO[SubjectRun] = {
     val start = IO.blocking {
       val pb = new ProcessBuilder(argv(cfg, mcpConfig, prompt).asJava)
       pb.directory(workDir.toFile)

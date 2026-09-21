@@ -9,13 +9,23 @@
   *  -------
   *  The run's outputs (issue #154), in the loop's shape so the two
   *  instruments read side by side: `report.json` (runId, timestamp, config,
-  *  corpora, obligations, totals, perTier, perStratum, perTool, outcomes),
+  *  corpora, obligations, totals, perTier, perStratum, perTool, perShell,
+  *  perVia, outcomes),
   *  `results.jsonl` (one eval-proof-completion.v0 row per fill_hole probe),
   *  `fixtures.jsonl` (one per obligation), and the console summary.  The
   *  config block records the protocol (every cap and client flag, the
   *  prompts' digests, the client version; Protocol.scala) and the run's own
   *  knobs; a re-judge carries the run's own config and corpora blocks
   *  forward, since it is not told them again.
+  *
+  *  The arm's three additions (issue #162).  `perShell` is the shell side of
+  *  `perTool`: the Bash calls of the run counted by what they were
+  *  (`ShellAudit.classes`), which is the only way a Bash column says anything,
+  *  since every shell call is one tool name.  `perVia` counts the rows by
+  *  which instruments the subject used, and `perVerdictVia` by which it took
+  *  its last verdict from; on the `both` arm those two are the result.  The
+  *  classes are disjoint and exhaustive, so `perShell` sums to the run's Bash
+  *  calls and `perVia` to its rows.
   *
   *  ============================================================================
   */
@@ -55,6 +65,18 @@ object Report {
     all.map(_._1).distinct.map(n => n -> all.filter(_._1 == n).map(_._2).sum).sortBy { case (n, k) => (-k, n) }
   }
 
+  /** Bash calls per class over the run, in the classes' own order. */
+  private def perShell(outcomes: Vector[Outcome]): Vector[(String, Int)] = {
+    val all = outcomes.flatMap(_.isolation.toVector.flatMap(_.shellClasses))
+    ShellAudit.classes.map(c => c -> all.filter(_._1 == c).map(_._2).sum).filter(_._2 > 0)
+  }
+
+  /** Rows per value of a `via` column, in a fixed order so two arms' reports
+    * line up field for field.
+    */
+  private def perVia(outcomes: Vector[Outcome], of: Outcome => String): Vector[(String, Int)] =
+    Vector("mcp", "shell", "both", "none").map(v => v -> outcomes.count(of(_) == v)).filter(_._2 > 0)
+
   /** The config block of a fresh run: the protocol (Protocol.of, every knob
     * a subject sees and the judge applies, every input by content) plus what
     * only this run of it chose (parallelism, the client binary, resume) and
@@ -62,6 +84,7 @@ object Report {
     */
   private def builtConfig(cfg: AgentBenchConfig, protocol: Json): Json =
     protocol.deepMerge(Json.obj(
+      "arm"         -> cfg.arm.name.asJson,
       "parallelism" -> cfg.parallelism.asJson,
       "claudeBin"   -> cfg.claudeBin.asJson,
       "resume"      -> cfg.resume.asJson,
@@ -82,7 +105,10 @@ object Report {
     val strata   = outcomes.map(_.stratum).distinct
     val config   = previousConfig match {
       case Some(prev) if cfg.rejudge =>
-        prev.deepMerge(Json.obj("safe" -> cfg.safe.asJson, "rejudgedAt" -> java.time.Instant.now().toString.asJson))
+        // The arm is stamped even on a re-judge, because an archive made before
+        // the arm existed records none and the audit still ran under one.
+        prev.deepMerge(Json.obj("arm" -> cfg.arm.name.asJson, "safe" -> cfg.safe.asJson,
+          "rejudgedAt" -> java.time.Instant.now().toString.asJson))
       case _ => builtConfig(cfg, protocol)
     }
     val report = Json.obj(
@@ -97,6 +123,9 @@ object Report {
       "perTier"       -> Json.obj(tiers.map(t => t -> block(outcomes.filter(_.entry.difficulty.tag == t))): _*),
       "perStratum"    -> Json.obj(strata.map(s => s -> block(outcomes.filter(_.stratum == s))): _*),
       "perTool"       -> Json.obj(perTool(outcomes).map { case (n, k) => n -> k.asJson }: _*),
+      "perShell"      -> Json.obj(perShell(outcomes).map { case (n, k) => n -> k.asJson }: _*),
+      "perVia"        -> Json.obj(perVia(outcomes, _.via).map { case (n, k) => n -> k.asJson }: _*),
+      "perVerdictVia" -> Json.obj(perVia(outcomes, _.verdictVia).map { case (n, k) => n -> k.asJson }: _*),
       "outcomes"      -> Json.arr(outcomes.map(_.toJson): _*)
     ).dropNullValues
     for {
@@ -114,12 +143,17 @@ object Report {
     val byTier    = tiers.map(t => line(t, outcomes.filter(_.entry.difficulty.tag == t)))
     val byStratum = outcomes.map(_.stratum).distinct.map(s => line(s, outcomes.filter(_.stratum == s)))
     val tools     = perTool(outcomes).map { case (n, k) => s"$n=$k" }.mkString(" ")
+    val shell     = perShell(outcomes).map { case (n, k) => s"$n=$k" }.mkString(" ")
+    val via       = perVia(outcomes, _.via).map { case (n, k) => s"$n=$k" }.mkString(" ")
+    val verdict   = perVia(outcomes, _.verdictVia).map { case (n, k) => s"$n=$k" }.mkString(" ")
     s"""
-       |== agent-bench (model=${cfg.model.getOrElse("?")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} safe=${cfg.safe}) ==
+       |== agent-bench (arm=${cfg.arm.name} model=${cfg.model.getOrElse("?")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} safe=${cfg.safe}) ==
        |${byTier.mkString("\n")}
        |${byStratum.mkString("\n")}
        |${line("total", outcomes)}
        |tools: $tools
+       |shell: ${if (shell.isEmpty) "(none)" else shell}
+       |via:   ${if (via.isEmpty) "(none)" else via}   verdict via: ${if (verdict.isEmpty) "(none)" else verdict}
        |""".stripMargin
   }
 }
