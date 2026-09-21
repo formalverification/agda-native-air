@@ -15,6 +15,15 @@
 --   the specific imports and definitions that are currently needed for the AgdaDojang
 --   project. As the project evolves, we may add more imports or utilities here as needed.
 --
+--   Keep the import closure of this module small.  Every benchmark obligation
+--   opens `AgdaDojang.Debug`, which opens this module, so an import added here
+--   is paid by all of them: in type-checking time on every cold build, and in
+--   download size for a browser-hosted Agda, which has to fetch the interface
+--   files of whatever it checks.  Prefer an `Agda.Builtin.*` primitive or a
+--   `.Base` module to the full standard-library wrapper that re-exports a
+--   properties module alongside it.  Two ordinary-looking imports once cost
+--   154 modules and 31 MB of interfaces here; see issue #168.
+--
 {-# OPTIONS --safe --cubical-compatible #-}
 
 module AgdaDojang.Prelude where
@@ -26,11 +35,23 @@ open import Agda.Builtin.Nat  using (Nat; zero; suc; _+_) public
 open import Agda.Builtin.Sigma using (Σ; _,_; fst; snd) public
 open import Agda.Builtin.String using (String; primShowNat; primStringEquality) public
 open import Agda.Builtin.Unit using (⊤; tt) public
+-- `Data.Bool.Base`, not `Data.Bool`: the latter adds a re-export from
+-- `Data.Bool.Properties`, the boolean algebra development, none of which is
+-- used here.
 open import Data.Bool.Base using (if_then_else_) public
 open import Function.Base using (case_of_) public
 open import Relation.Binary.PropositionalEquality.Core public
   using (_≡_) -- ; _≢_; refl; cong; cong₂; sym; _≗_; trans; ≢-sym; subst₂;
 
+-- String equality on the primitive rather than `Data.String.Properties._==_`.
+-- The standard library's `_==_` is `isYes (s₁ ≟ s₂)`, and `_≟_` is built from
+-- char-wise pointwise equality and strict lexicographic order, so importing it
+-- brings in most of the relation and order hierarchy.  The standard library
+-- declines this very definition for itself, on the grounds that the partially
+-- applied `_==_` infers better inside a type; this library's only two uses
+-- (both in `AgdaDojang.Apply`) are fully applied in a boolean position, where
+-- that does not arise.  Keeping the name and the fixity means no call site
+-- has to change.
 infix 4 _==_
 _==_ : String → String → Bool
 _==_ = primStringEquality
