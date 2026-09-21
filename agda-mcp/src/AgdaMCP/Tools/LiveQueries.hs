@@ -420,6 +420,7 @@ opaqueAnswer stage rs = LiveError
       IDisplayInfo k _    -> "DisplayInfo/" <> k
       IInteractionPoints _ -> "InteractionPoints"
       IRunningInfo _      -> "RunningInfo"
+      IGiveAction _ _     -> "GiveAction"
       IOther k _          -> k
       IUnreadable _       -> "unreadable"
 

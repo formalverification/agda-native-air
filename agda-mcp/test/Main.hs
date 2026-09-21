@@ -59,7 +59,7 @@ import Data.Char (isDigit)
 import Data.Either (isLeft)
 import Data.List (find, isInfixOf, nub, sort, sortOn)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isJust, isNothing, listToMaybe)
+import Data.Maybe (isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -114,7 +114,10 @@ import AgdaMCP.Project
 import AgdaMCP.Interaction
   ( IPoint (..), IRange (..), IResponse (..), LaneGoal (..), LaneMeta (..)
   , LoadReport (..), LoadedInfo (..)
-  , cmdGoalTypeContext, cmdLoad, ensureLoaded, goalsOf, hsShow
+  , GiveClass (..), GiveForce (..), GiveOutcome (..), GiveReading (..)
+  , LaneHandle
+  , cmdGive, cmdGoalTypeContext, cmdLoad, ensureLoaded, giveCandidate
+  , goalsOf, hsShow, readGive
   , interactionPointsOf, iotcmLine, loadCheckedFromSource, metasOf
   , newInteractionLanes, parseAmbiguousName, parseDidYouMean, parseResponseLine
   , parseSrcLoc, parseWhyInScope
@@ -5561,6 +5564,130 @@ interactionWireTests = do
                 (ipId <$> pointContaining 26 Nothing ps)
         r5 <- assert "line 3 misses" (isNothing (pointContaining 3 Nothing ps))
         pure (firstFailure [r1, r2, r3, r4, r5])
+
+    , -- ---------------------------------------------------------------------
+      -- The lane's give (issue #163).  No tool sends this; the parity
+      -- measurement does, and the wire lines below are verbatim captures from
+      -- a live 2.8.0 child against the benchmark obligations named in the
+      -- issue, so the reader is pinned to what Agda actually emits.
+      -- ---------------------------------------------------------------------
+      runTest "cmdGive: the exact wire shape, both force flags" $
+        allOf
+          [ assertEqual "without force"
+              "Cmd_give WithoutForce 0 noRange \"(+-comm _ _)\""
+              (cmdGive WithoutForce 0 "(+-comm _ _)")
+          , assertEqual "with force"
+              "Cmd_give WithForce 2 noRange \"refl\""
+              (cmdGive WithForce 2 "refl")
+          , assertEqual "the expression is a Haskell string literal"
+              "Cmd_give WithoutForce 0 noRange \"\\955 x \\8594 x\""
+              (cmdGive WithoutForce 0 "\955 x \8594 x")
+          , assertEqual "and it rides a full IOTCM line"
+              "IOTCM \"/p/F.agda\" None Direct (Cmd_give WithoutForce 0 noRange \"zero\")"
+              (iotcmLine "/p/F.agda" (cmdGive WithoutForce 0 "zero"))
+          ]
+
+    , runTest "parseResponseLine: GiveAction carries the point and the text" $ do
+        let ln = "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":0,\"range\":[{\"end\":{\"col\":21,\"line\":18,\"pos\":538},\"start\":{\"col\":17,\"line\":18,\"pos\":534}}]},\"kind\":\"GiveAction\"}"
+        case parseResponseLine ln of
+          Just r  -> assertEqual "give" (IGiveAction (Just 0) (Just "refl")) r
+          Nothing -> pure (Fail "line did not parse")
+
+    , -- The gold of stdlib-nat-plus-identity-l, captured: a give that left
+      -- nothing at all.  This is the one shape that reads as `ok`.
+      runTest "readGive: an accepted give with nothing left is ok" $ do
+        let rs = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+              , "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+              , "{\"interactionPoints\":[],\"kind\":\"InteractionPoints\"}"
+              ]
+            g = readGive rs
+        allOf
+          [ assertEqual "class" GiveClassOk (grClass g)
+          , assertEqual "given" True (grGiven g)
+          , assertEqual "text" (Just "refl") (grText g)
+          , assertEqual "point" (Just 0) (grPoint g)
+          , assertEqual "no points left" (Just []) (grPoints g)
+          , assertEqual "goals were reported" True (grGoals g)
+          , assertEqual "no codes" [] (grCodes g)
+          ]
+
+    , -- `(+-comm {!!} {!!})` on stdlib-nat-plus-comm, captured.  Two NEW
+      -- visible goals do not make it a type error (a sub-hole is the
+      -- [UnsolvedInteractionMetas] class fill_hole tolerates), but the
+      -- blocked constraint beside them does.
+      runTest "readGive: new visible goals are tolerated, a blocked constraint is not" $ do
+        let withError = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"+-comm ? ?\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+              , "{\"info\":{\"errors\":[{\"message\":\"error: [UnsolvedConstraints]\\nFailed to solve the following constraints:\\n  ?2 + ?1 = n + m : \8469 (blocked on _n_6)\"}],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[{\"constraintObj\":{\"id\":1},\"kind\":\"OfType\",\"type\":\"\8469\"},{\"constraintObj\":{\"id\":2},\"kind\":\"OfType\",\"type\":\"\8469\"}],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+              , "{\"interactionPoints\":[{\"id\":1},{\"id\":2}],\"kind\":\"InteractionPoints\"}"
+              ]
+            -- The same responses with the error removed: the sub-holes alone.
+            subHolesOnly = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"suc ?\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+              , "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[{\"constraintObj\":{\"id\":1},\"kind\":\"OfType\",\"type\":\"Nat\"}],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+              , "{\"interactionPoints\":[{\"id\":1}],\"kind\":\"InteractionPoints\"}"
+              ]
+        allOf
+          [ assertEqual "blocked constraint" GiveClassTypeError
+              (grClass (readGive withError))
+          , assertEqual "its code" ["UnsolvedConstraints"] (grCodes (readGive withError))
+          , assertEqual "two new points" (Just 2)
+              (length <$> grPoints (readGive withError))
+          , assertEqual "a sub-hole alone is ok" GiveClassOk
+              (grClass (readGive subHolesOnly))
+          , assertEqual "and it reports the new point" (Just 1)
+              (length <$> grPoints (readGive subHolesOnly))
+          ]
+
+    , -- `(+-comm _ _)` on the same obligation, captured: the give succeeded
+      -- and left two *invisible* goals.  This is issue #69's
+      -- [UnsolvedMetaVariables] class, which fill_hole calls a type error; a
+      -- reader that only looked at the error list would still catch it here,
+      -- but a reader that only looked at the visible goals would not.
+      runTest "readGive: an accepted give that left an invisible goal is a type error" $ do
+        let rs = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"+-comm _ _\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+              , "{\"info\":{\"errors\":[{\"message\":\"error: [UnsolvedConstraints]\\nFailed to solve the following constraints:\\n  _n_6 + _m_5 = n + m : \8469 (blocked on _n_6)\"}],\"invisibleGoals\":[{\"constraintObj\":{\"name\":\"_m_5\"},\"kind\":\"OfType\",\"type\":\"\8469\"},{\"constraintObj\":{\"name\":\"_n_6\"},\"kind\":\"OfType\",\"type\":\"\8469\"}],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+              , "{\"interactionPoints\":[],\"kind\":\"InteractionPoints\"}"
+              ]
+            g = readGive rs
+        allOf
+          [ assertEqual "class" GiveClassTypeError (grClass g)
+          , assertEqual "the give still happened" True (grGiven g)
+          , assertEqual "the metas are named" ["_m_5", "_n_6"] (map lmetaName (grMetas g))
+          , assertEqual "and the point is gone" (Just []) (grPoints g)
+          ]
+
+    , -- `+-comm` (the bare name) and `tt` (not in scope), captured: a refusal
+      -- arrives as the command's own DisplayInfo/Error, with no GiveAction and
+      -- no AllGoalsWarnings at all, which is why 'grGoals' exists.  The hole
+      -- is untouched, so no reset is owed.
+      runTest "readGive: a refusal gives nothing, reports its code, and leaves the hole" $ do
+        let refusal code msg = mapMaybe parseResponseLine
+              [ "{\"info\":{\"error\":{\"message\":\"1.1-7: error: [" <> code <> "]\\n" <> msg <> "\"},\"kind\":\"Error\",\"warnings\":[]},\"kind\":\"DisplayInfo\"}" ]
+            unequal = readGive (refusal "UnequalTerms" "(m n : \8469) \8594 m + n \8801 n + m !=< m + n \8801 n + m")
+            notInScope = readGive (refusal "NotInScope" "Not in scope:\\n  tt at 1.1-3")
+        allOf
+          [ assertEqual "class" GiveClassTypeError (grClass unequal)
+          , assertEqual "nothing was given" False (grGiven unequal)
+          , assertEqual "no text" Nothing (grText unequal)
+          , assertEqual "no point list at all" Nothing (grPoints unequal)
+          , assertEqual "no goals response" False (grGoals unequal)
+          , assertEqual "the code" ["UnequalTerms"] (grCodes unequal)
+          , assertEqual "and the other refusal" ["NotInScope"] (grCodes notInScope)
+          ]
+
+    , -- The empty collection: a give whose responses never arrived at all is
+      -- not silently 'ok'.  'grGiven' is False, so the rule reads it as a
+      -- type error, and 'grGoals' says the state was never reported.
+      runTest "readGive: no responses is a type error, not a silent ok" $ do
+        let g = readGive []
+        allOf
+          [ assertEqual "class" GiveClassTypeError (grClass g)
+          , assertEqual "not given" False (grGiven g)
+          , assertEqual "no goals" False (grGoals g)
+          ]
     ]
 
 -- | loadedOk / loadFailed: the two 'LoadReport' outcomes the lane's cache
@@ -6340,6 +6467,98 @@ interactionLaneTests cfg repoRoot = do
               ]
         checks <- mapM (parityCheck lanes cfg . fx) fixtures
         pure (firstFailure checks)
+
+    , -- -------------------------------------------------------------------
+      -- The lane's give against real Agda (issue #163).  No tool sends this;
+      -- these tests are what keeps the library function honest, and the
+      -- middle one is a live parity assertion in miniature: the same
+      -- candidate on the same file, judged by both lanes, must land in the
+      -- same class.
+      -- -------------------------------------------------------------------
+      runTest "give: the loaded points are the source-order holes, ids 0 and 1 (#163)" $
+        -- The trap this forecloses: fill_hole addresses a hole by its index
+        -- in the source scan, the lane by Agda's interaction-point id.  The
+        -- parity driver indexes the point LIST rather than trusting id == n;
+        -- on a fresh load of the two-hole fixture the two do coincide, and
+        -- that is a fact about Agda, checked here rather than assumed.
+        withTwoHoles lanes cfg repoRoot $ \_lh li _flags -> allOf
+          [ assertEqual "two holes" 2 (length (liPoints li))
+          , assertEqual "the ids ARE the 0-based source-order indices"
+              [0 .. length (liPoints li) - 1] (map ipId (liPoints li))
+          , assert "in source order" (ascendingBy (fmap irLine . ipRange) (liPoints li))
+          ]
+
+    , runTest "give: an accepted candidate leaves the file's other hole open, and reads ok" $
+        withTwoHoles lanes cfg repoRoot $ \lh li flags -> do
+          r <- giveCandidate lh (fx "TwoHoles.agda") flags
+                 (firstPointId li) WithoutForce "zero"
+          case r of
+            Left lf -> pure (Fail (T.unpack (lfMessage lf)))
+            Right o -> do
+              let g = goReading o
+              allOf
+                [ assertEqual "class" GiveClassOk (grClass g)
+                , assertEqual "given" True (grGiven g)
+                , assertEqual "text" (Just "zero") (grText g)
+                  -- The other hole is still there: an open interaction point
+                  -- is the one class fill_hole tolerates, and the lane says
+                  -- the same by listing it rather than by erroring.
+                , assertEqual "the other hole survives" (Just [1])
+                    (map ipId <$> grPoints g)
+                , assertEqual "no metas" [] (map lmetaName (grMetas g))
+                  -- The give consumed a point, so a reset was owed and paid.
+                , assert "the reset ran" (isJust (goResetUs o))
+                , case goReset o of
+                    Just lr | Right li2 <- lrOutcome lr ->
+                      assertEqual "and it put both holes back" [0, 1]
+                        (map ipId (liPoints li2))
+                    _ -> assert "the reset reloaded the file" False
+                ]
+
+    , -- Issue #69's pattern, on the fixture built for it: `implicitOnly`
+      -- typechecks the clause and leaves an unsolved meta behind.  fill_hole
+      -- calls that a type error; so must the lane, and this asserts both
+      -- answers in one place rather than trusting a table to notice.
+      runTest "give: a candidate leaving an unsolved meta is a type error on both lanes (#69)" $
+        withTwoHoles lanes cfg repoRoot $ \lh li flags -> do
+          r <- giveCandidate lh (fx "TwoHoles.agda") flags
+                 (firstPointId li) WithoutForce "implicitOnly"
+          batch <- handleFillHole cfg
+                     (FillHoleParams (fx "TwoHoles.agda") (ByIndex 0) "implicitOnly")
+          case (r, batch) of
+            (Left lf, _)  -> pure (Fail (T.unpack (lfMessage lf)))
+            (_, Left err) -> pure (Fail (T.unpack (failureText err)))
+            (Right o, Right f) -> do
+              let g = goReading o
+              allOf
+                [ assertEqual "the give itself succeeded" True (grGiven g)
+                , assert "but it left an invisible goal" (not (null (grMetas g)))
+                , assertEqual "lane class" GiveClassTypeError (grClass g)
+                , assertEqual "batch status" FillTypeError (frStatus f)
+                ]
+
+    , -- The other half of the economics: a refusal never consumed the point,
+      -- so nothing is owed and the very next give works against the same
+      -- state.  Were that wrong, every refusal in the parity table would be
+      -- judged from a poisoned lane, and the table would be wrong in a way
+      -- that looks like a lane defect.
+      runTest "give: a refused candidate needs no reset, and the next give still works" $
+        withTwoHoles lanes cfg repoRoot $ \lh li flags -> do
+          let p0 = firstPointId li
+          bad  <- giveCandidate lh (fx "TwoHoles.agda") flags p0 WithoutForce "notAName"
+          good <- giveCandidate lh (fx "TwoHoles.agda") flags p0 WithoutForce "zero"
+          case (bad, good) of
+            (Left lf, _) -> pure (Fail (T.unpack (lfMessage lf)))
+            (_, Left lf) -> pure (Fail (T.unpack (lfMessage lf)))
+            (Right b, Right gd) -> allOf
+              [ assertEqual "refused" False (grGiven (goReading b))
+              , assertEqual "class" GiveClassTypeError (grClass (goReading b))
+              , assertEqual "code" ["NotInScope"] (grCodes (goReading b))
+              , assertEqual "no reset was owed" Nothing (goResetUs b)
+              , assertEqual "the hole was still there for the next give" True
+                  (grGiven (goReading gd))
+              , assertEqual "which reads ok" GiveClassOk (grClass (goReading gd))
+              ]
     ]
 
   -- Process-failure shapes, driven by stand-in binaries so the ladder and the
@@ -6620,6 +6839,40 @@ searchInScopeLaneTests cfg repoRoot = do
         ]
       shutdownLanes lanes
       pure results
+
+-- | ascendingBy: is the projected key non-decreasing across the list?  Used
+-- to say "in source order" without pinning a fixture's line numbers, which
+-- 'parityCheck' already holds to 'AgdaMCP.Holes.findHoles'.
+ascendingBy :: Ord b => (a -> b) -> [a] -> Bool
+ascendingBy f xs = and (zipWith (<=) ks (drop 1 ks)) where ks = map f xs
+
+-- | firstPointId: the id of a load's first interaction point, or a
+-- deliberately invalid one, so a fixture that lost its hole fails the give it
+-- is handed to rather than crashing the suite.
+firstPointId :: LoadedInfo -> Int
+firstPointId li = maybe (-1) ipId (listToMaybe (liPoints li))
+
+-- | withTwoHoles: the two-hole fixture, freshly loaded on the lane, together
+-- with the effective per-load flags the give and its reset must reuse.
+--
+-- The load is forced: a give that consumed a point leaves the child holding a
+-- module whose hole is gone while the bytes on disk still have it, so a test
+-- that inherited the previous test's state would be judging from it.
+withTwoHoles
+  :: InteractionLanes -> AgdaConfig -> FilePath
+  -> (LaneHandle -> LoadedInfo -> [String] -> IO TestResult)
+  -> IO TestResult
+withTwoHoles lanes cfg repoRoot body = do
+  let file  = repoRoot </> "agda-mcp" </> "test" </> "resources" </> "TwoHoles.agda"
+      flags = agdaFlags cfg <> ["-i", takeDirectory file]
+  outcome <- withLane lanes cfg (takeDirectory file) $ \lh -> do
+    loaded <- ensureLoaded lh True file flags
+    case loaded of
+      Left lf  -> pure (Fail (T.unpack (lfMessage lf)))
+      Right lr -> case lrOutcome lr of
+        Left msg -> pure (Fail ("TwoHoles.agda did not load: " <> T.unpack msg))
+        Right li -> body lh li flags
+  pure (either (Fail . T.unpack . lfMessage) id outcome)
 
 -- | parityCheck: one fixture's lane points against its lexical scan.
 parityCheck :: InteractionLanes -> AgdaConfig -> FilePath -> IO TestResult
