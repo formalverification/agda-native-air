@@ -64,16 +64,20 @@ object AgentBench extends IOApp {
                   else Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
                          .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*))
       inputs   <- if (cfg.rejudge) IO.pure(Json.obj()) else Protocol.inputs(cfg, fresh)
-      // The roots outside its own directory that a subject may read: the
-      // registered libraries' source roots, and the registry directory itself,
-      // whose `libraries` file the judge's `agda` command names, so a shell
-      // subject running that command is inside the roots.  One set, given to
-      // every arm's file tools (`--add-dir`) and used by the shell audit as
-      // its read roots, and recorded in the protocol, so a toolchain bump that
-      // moves them is a different protocol.
+      // The roots outside its own directory that a subject may read: every
+      // registered library's own directory (a library IS its directory, and a
+      // subject exploring one starts at its root) with its source roots, and
+      // the registry directory itself, whose `libraries` file the judge's
+      // `agda` command names, so a shell subject running that command is
+      // inside the roots.  One set, given to every arm's file tools
+      // (`--add-dir`) and used by the shell audit as its read roots, and
+      // recorded in the protocol, so a toolchain bump that moves them is a
+      // different protocol.
       agdaDir   = GoldVerifier.agdaDirOf(cfg.projectRoot)
-      includes <- Extractor.includesFromRegistry(java.nio.file.Paths.get(agdaDir).resolve("libraries"))
-      readRoots = (includes :+ java.nio.file.Paths.get(agdaDir)).map(_.toAbsolutePath.normalize).distinct
+      registry  = java.nio.file.Paths.get(agdaDir).resolve("libraries")
+      includes <- Extractor.includesFromRegistry(registry)
+      libRoots <- Extractor.libraryRootsFromRegistry(registry)
+      readRoots = (libRoots ++ includes :+ java.nio.file.Paths.get(agdaDir)).map(_.toAbsolutePath.normalize).distinct
       protocol  = if (cfg.rejudge) Json.obj() else Protocol.of(cfg, version, sysP, userT, inputs, readRoots)
       // A run id is one protocol: a fresh run records its own before anything
       // spawns, and a resumed one must be the protocol on record.

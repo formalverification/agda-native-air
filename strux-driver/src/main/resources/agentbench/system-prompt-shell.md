@@ -6,12 +6,13 @@ Your tools are the Bash tool, and the Read and Edit tools on the one file you we
 
 Agda's interactive protocol is available too, as `agda --interaction-json`.  The extracted corpus of this module's library is a JSON Lines file at {{corpus}}, one row per definition, readable with grep.
 
-The sources of the libraries this module imports are on disk and you may read them.  The only file you may change is the one you were given, and the only directory you may write in is the one it is in.
+The sources of the libraries this module imports are on disk and you may read them.  The only file you may change is the one you were given, and the only directory you may write in is the one it is in.  Every path you name outside those libraries and that directory is outside your protocol.
 
 Rules.
 +  The module header line, every import line already in the file, and the type signature of the definition with the hole must remain byte-for-byte as they are.
 +  You may add `open import` lines, add helper definitions, and restructure the clauses of the definition (pattern matching, where blocks, with).
 +  Do not use postulate, trustMe, primTrustMe, or any pragma ({-# ... #-}); the file is judged with --safe.
 +  Leave no hole in the file: no {!!}, no {! ... !}, no ?.
++  Run every command from the directory the file is in, which is where you start; do not change the working directory.
 
 When you are done, or when you cannot finish, stop and state in one sentence whether that command reports success on the final file.

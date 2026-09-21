@@ -39,11 +39,12 @@ import org.scalatest.matchers.should.Matchers
 final class ShellAuditSpec extends AnyFunSuite with Matchers {
 
   private val work    = Paths.get("/run/work/stdlib-nat-plus-comm")
-  private val stdlib  = Paths.get("/nix/store/aaa-standard-library-2.3/src")
+  private val libRoot = Paths.get("/nix/store/aaa-standard-library-2.3")
+  private val stdlib  = libRoot.resolve("src")
   private val dojang  = Paths.get("/repo/agda-dojang/agda")
   private val agdaDir = Paths.get("/repo/agda")
   private val corpus  = Paths.get("/repo/data/corpora/agda-stdlib/v0/corpus.jsonl")
-  private val roots   = ShellRoots(work, Vector(stdlib, dojang, agdaDir), Vector(corpus))
+  private val roots   = ShellRoots(work, Vector(libRoot, stdlib, dojang, agdaDir), Vector(corpus))
 
   private def bad(cmd: String): Vector[String] = ShellAudit.inspect(cmd, roots).violations
   private def ok(cmd: String): Unit            = withClue(s"expected no violation for: $cmd\n") { bad(cmd) shouldBe Vector.empty }
@@ -79,11 +80,27 @@ final class ShellAuditSpec extends AnyFunSuite with Matchers {
     ok("cat > notes.txt <<'EOF'\nsee /etc/passwd\nEOF")
   }
 
-  test("changing the working directory is a violation unless it is the work directory itself") {
+  test("a cd out of the roots is a violation; a cd into them is read, and what follows resolves there") {
     bad("cd .. && cat M.agda").size should be >= 1
     bad("cd /etc && ls").size should be >= 1
     bad("cd ..; cat ../gold/Nat.agda").size should be >= 1
+    bad("cd /repo && agda --library-file agda/libraries --safe M.agda").head should include ("outside the arm's roots")
     ok(s"cd $work && agda --version")
+    // A cd into a library root is where a subject reads its sources from, and
+    // the relative paths after it resolve there, not in the work directory.
+    ok(s"cd $stdlib && grep -rn 'identityL' Data/Nat/Properties.agda")
+    ok(s"cd $libRoot && cat standard-library.agda-lib")
+    // But a write still has to land in the work directory, wherever the cwd is.
+    bad(s"cd $stdlib && echo x > Data/Nat/Evil.agda").size shouldBe 1
+    bad(s"cd $stdlib && echo x > Data/Nat/Evil.agda").head should include ("writes outside the work directory")
+    // And a relative read after a cd into a root that leaves the roots is caught.
+    bad(s"cd $stdlib && cat ../../../etc/passwd").size shouldBe 1
+  }
+
+  test("a library's own directory is part of it, so exploring from its root passes") {
+    ok(s"find $libRoot -iname '*Properties*'")
+    ok(s"ls $libRoot")
+    cls(s"find $libRoot -iname '*Properties*'") shouldBe "library-read"
   }
 
   test("a program this audit does not model is a violation, named with its command") {

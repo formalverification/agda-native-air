@@ -35,9 +35,11 @@
   *       its arguments are not read: the program is the finding.  Widening
   *       this list is a change to the audit, and the rule is that every arm of
   *       a comparison is re-judged under one audit.
-  *    3. A `cd` anywhere but the work directory itself, because every relative
-  *       path in this reader resolves against the work directory, and a
-  *       command that moves the cwd would make that resolution wrong.
+  *    3. A `cd` out of the arm's roots.  A `cd` INTO one of them is read
+  *       faithfully: the reader carries the working directory across the simple
+  *       commands of a call, so the paths after a `cd` resolve where the shell
+  *       would resolve them.  A `cd` elsewhere is a shell leaving the roots,
+  *       and this reader could not resolve what followed it either.
   *
   *  What the roots mean
   *  -------------------
@@ -317,7 +319,15 @@ object ShellAudit {
     if (flat.length <= 200) flat else flat.take(197) + "..."
   }
 
-  /** Read one Bash command: what it may not do, and what class it is. */
+  /** Read one Bash command: what it may not do, and what class it is.
+    *
+    * The simple commands are folded in order, carrying the working directory,
+    * so a `cd` into one of the arm's roots is READ faithfully rather than
+    * refused: the paths after it resolve where the shell would resolve them.
+    * A `cd` to anywhere else is still a violation, because that is a shell
+    * leaving the arm's roots, and because this reader could not resolve what
+    * followed it.
+    */
   def inspect(command: String, roots: ShellRoots): ShellVerdict = {
     val cmd    = oneLine(command)
     val lexed  = lex(command)
@@ -327,27 +337,37 @@ object ShellAudit {
       // construct could carry any path at all.
       case Some(why) => ShellVerdict(fail(why), classOf(lexed.toks, roots))
       case None =>
-        val vs = simples(lexed.toks).flatMap(auditSimple(_, roots, cmd))
+        val vs = simples(lexed.toks).foldLeft((roots.workDir.toAbsolutePath.normalize, Vector.empty[String])) {
+          case ((cwd, acc), simple) =>
+            val (next, vs) = auditSimple(simple, roots, cmd, cwd)
+            (next, acc ++ vs)
+        }._2
         ShellVerdict(vs.distinct, classOf(lexed.toks, roots))
     }
   }
 
-  /** One simple command: its program first, then every path it names. */
-  private def auditSimple(s: Simple, roots: ShellRoots, cmd: String): Vector[String] = {
+  /** One simple command, read from `cwd`: the working directory it leaves
+    * behind, and what it may not do.
+    */
+  private def auditSimple(s: Simple, roots: ShellRoots, cmd: String, cwd: Path): (Path, Vector[String]) = {
     def fail(why: String): Vector[String] = Vector(s"Bash $why: $cmd")
     val prog = s.words.headOption.map(w => Paths.get(w.text).getFileName.toString).getOrElse("")
     val args = s.words.drop(1)
-    if (prog.isEmpty) Vector.empty
+    if (prog.isEmpty) (cwd, Vector.empty)
     else if (prog == "cd") {
-      // Every relative path here resolves against the work directory, so a cd
-      // elsewhere would make this whole reading wrong.
-      val target = args.map(_.text).find(!_.startsWith("-")).map(t => resolve(roots.workDir, t))
-      target match {
-        case Some(Some(p)) if roots.isWorkDir(p) => Vector.empty
-        case _                                   => fail("changes the working directory")
+      args.map(_.text).find(!_.startsWith("-")).map(t => resolve(cwd, t)) match {
+        case Some(Some(p)) if roots.canRead(p) => (p, Vector.empty)
+        case Some(Some(p))                     => (cwd, fail(s"changes the working directory outside the arm's roots ($p)"))
+        case _                                 => (cwd, fail("changes the working directory to a path this audit cannot resolve"))
       }
     }
-    else if (!allowedPrograms(prog)) fail(s"runs a program this audit does not model ($prog)")
+    else (cwd, auditProgram(prog, args, s, roots, cmd, cwd))
+  }
+
+  /** Everything but `cd`: the program, then every path the command names. */
+  private def auditProgram(prog: String, args: Vector[Word], s: Simple, roots: ShellRoots, cmd: String, cwd: Path): Vector[String] = {
+    def fail(why: String): Vector[String] = Vector(s"Bash $why: $cmd")
+    if (!allowedPrograms(prog)) fail(s"runs a program this audit does not model ($prog)")
     else if (prog == "find" && args.exists(a => findActions(a.text))) fail("uses a find action that runs a program or writes a file")
     else {
       val cands     = args.flatMap(a => pathOf(a.text))
@@ -359,14 +379,14 @@ object ShellAudit {
       val readArgs  = cands.filterNot(writeArgs.contains) ++ s.reads
       val writes    = writeArgs ++ s.writes
       val badWrites = writes.flatMap { c =>
-        resolve(roots.workDir, c) match {
+        resolve(cwd, c) match {
           case Some(p) if roots.canWrite(p) => None
           case Some(p)                      => Some(s"Bash writes outside the work directory ($p): $cmd")
           case None                         => Some(s"Bash names a path this audit cannot resolve ($c): $cmd")
         }
       }
       val badReads = readArgs.flatMap { c =>
-        resolve(roots.workDir, c) match {
+        resolve(cwd, c) match {
           case Some(p) if roots.canRead(p) => None
           case Some(p)                     => Some(s"Bash reads outside the arm's roots ($p): $cmd")
           case None                        => Some(s"Bash names a path this audit cannot resolve ($c): $cmd")
