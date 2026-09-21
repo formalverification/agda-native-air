@@ -73,11 +73,29 @@ in the issue's parity comment:
 Each row carries, beside the candidate and its provenance: `laneClass`,
 `laneGiven` (whether a `GiveAction` arrived, that is, whether the hole was
 consumed), `laneText` (Agda's own rendering of the given term, which is not the
-candidate's text), `lanePointRanges`, `laneMetas`, `laneCodes`, `laneGiveUs`
-and `laneResetUs`; and `batchStatus`, `batchCodes`, `batchMessage`,
-`batchRemaining` and `batchMs`.  `agree` is `null` rather than `false` when one
-of the two lanes could not answer at all, so a lane failure is never counted as
-a disagreement about Agda.
+candidate's text), `laneMetas`, `laneCodes`, `laneGiveUs` and `laneResetUs`;
+and `batchStatus`, `batchCodes`, `batchMessage`, `batchRemaining` and
+`batchMs`.
+
+The points a give leaves behind are three fields, and the distinction is
+load-bearing.  `laneRemainingPoints` is every interaction point Agda announced
+after the give; `laneNewPoints` counts only those the candidate introduced,
+which is the set difference against the load's own point list (Agda's ids are
+stable across a give, so it is exact); and `lanePoints` lists each one as
+`{id, new, range}`.  A give into one hole of a two-hole file leaves the other
+standing, so the two counts differ, and so do the coordinate systems: a **new**
+point's range is in the *candidate expression's* coordinates (giving
+`s≤s {!!}` reports `1.5-9`, where the sub-hole sits inside the string), while a
+point that was already open keeps its range in the **file**.  The wire shape is
+identical, so any tool that promises a re-anchored hole list turns on telling
+them apart.  `two-holes-sub-hole` in `deliberate-rows.jsonl` carries one of
+each in the same row.
+
+`agree` is `null` rather than `false` when one of the two lanes could not answer
+at all, and equally when the batch status is `timeout` or `crash`: those are
+facts about a process, the lane's reading has no counterpart for either, and
+recording one as a disagreement would inflate the count the table is read on.
+No row in this archive carries one.
 
 `agree` compares the *class*.  The two lanes reach it by different routes on 17
 of the 80 rows, and the error-code lists are what says so: a semicolon in a
@@ -95,7 +113,10 @@ BACKEND_USE_NIX=0 make lane-give-parity LANE_PARITY_CASES=agda-mcp/parity/delibe
 ```
 
 The run takes a few minutes: the batch side is a cold `agda` per candidate,
-about 5 s on the agda-algebras tier.  It changes nothing on disk.  `fill_hole`
+about 5 s on the agda-algebras tier.  A malformed row in either committed
+input stops it, naming the file and the line, rather than quietly producing a
+smaller table; measured, two truncated lines cost 16 candidates and a whole
+obligation before that was so.  It changes nothing on disk.  `fill_hole`
 restores under `bracket_` the file it patched, and the lane reloads after every
 give that consumed a hole, so `git status` is clean afterwards; if it is not,
 that is itself a finding.

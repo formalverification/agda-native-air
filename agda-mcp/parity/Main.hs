@@ -66,13 +66,14 @@ module Main (main) where
 import Control.Monad (forM, forM_, when)
 import Data.Aeson
   ( FromJSON (..), Value (..), (.:), (.:?), (.!=), (.=)
-  , decodeStrict', encode, object, withObject )
+  , encode, object, withObject )
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy.Char8 as BL8
+import Data.Char (isSpace)
 import Data.List (isPrefixOf, nub, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -83,7 +84,7 @@ import System.Directory
   ( doesDirectoryExist, doesFileExist, listDirectory, makeAbsolute
   , setCurrentDirectory )
 import System.Environment (getArgs)
-import System.Exit (exitFailure, exitSuccess)
+import System.Exit (die, exitFailure, exitSuccess)
 import System.FilePath ((</>), takeFileName)
 import System.IO (hFlush, hPutStrLn, stderr, stdout)
 
@@ -252,10 +253,22 @@ instance FromJSON ProbeRow where
     ProbeRow <$> o .: "benchmarkId" <*> o .: "candidate"
              <*> o .:? "holeIndex" .!= 0 <*> o .: "status"
 
+-- | readJsonl: every non-blank line of a JSONL file, or a named failure.
+--
+-- Deliberately not a 'mapMaybe' over 'decodeStrict''.  This executable's whole
+-- product is a count ("80 candidates, 0 disagreements"), and a decoder that
+-- drops what it cannot read can only make that count smaller without making it
+-- look wrong: two truncated lines in the archive cost 16 candidates and a whole
+-- obligation, silently, at exit 0 (measured; a Copilot review catch on PR 174).
+-- A malformed row stops the run and names the file and the line instead.
 readJsonl :: FromJSON a => FilePath -> IO [a]
 readJsonl p = do
   bytes <- BS.readFile p
-  pure (mapMaybe decodeStrict' (filter (not . BS.null) (BS8.lines bytes)))
+  let numbered = [ (n, l) | (n, l) <- zip [1 :: Int ..] (BS8.lines bytes)
+                 , not (BS8.all isSpace l) ]
+  forM numbered $ \(n, l) -> case Aeson.eitherDecodeStrict' l of
+    Right v  -> pure v
+    Left err -> die (p <> ":" <> show n <> ": could not read this JSONL row: " <> err)
 
 -- | termModeGold: is this row's @goldTerm@ a candidate, or prose describing a
 -- strategy?
@@ -416,7 +429,7 @@ runObligation lanes cfg0 oblRel cs = do
       batchAnswers <- forM cs $ \c ->
         handleFillHole cfg0 (FillHoleParams absPath (ByIndex (caseHole c)) (caseCand c))
       pure
-        [ row c loadMs (indexPoint (caseHole c) points) lane batch
+        [ row c loadMs points (indexPoint (caseHole c) points) lane batch
         | (c, lane, batch) <- zip3 cs laneAnswers batchAnswers ]
 
 -- | indexPoint: the interaction point at a 0-based /index/ of the load's own
@@ -454,9 +467,9 @@ oneLine = T.unwords . T.words
 -- both lanes answered: a case the lane could not judge because the lane
 -- itself failed is not a disagreement about Agda, and recording it as one
 -- would be the plausible-wrong table this measurement exists to avoid.
-row :: Case -> Int -> Maybe IPoint -> LaneAnswer
+row :: Case -> Int -> [IPoint] -> Maybe IPoint -> LaneAnswer
     -> Either e FillResult -> Value
-row c loadMs mPoint lane batch = object $
+row c loadMs before mPoint lane batch = object $
   [ "source"        .= caseSource c
   , "benchmarkId"   .= caseBench c
   , "obligation"    .= caseObl c
@@ -486,17 +499,27 @@ row c loadMs mPoint lane batch = object $
         , "laneGiven"     .= grGiven r
         , "laneText"      .= grText r
         , "lanePoint"     .= grPoint r
-        , "laneNewPoints" .= (length <$> grPoints r)
-          -- The ranges Agda announced for the points left after the give,
-          -- as [line, col, endLine, endCol].  The issue records that a
-          -- REFINE's new points arrive rangeless because the text was never
-          -- written to the file; a give's are not rangeless, and the raw
-          -- numbers are reported here rather than a yes-or-no, because a
-          -- range in the /candidate expression's/ coordinates and a range in
-          -- the file's are the same shape on the wire and mean different
-          -- things.  Any tool shape that promises a re-anchored hole list
-          -- turns on this.
-        , "lanePointRanges" .= (map rangeOf <$> grPoints r)
+          -- Every interaction point Agda announced AFTER the give, which is
+          -- not the same as the points the candidate introduced: a give into
+          -- one hole of a two-hole file leaves the other one standing, and
+          -- reporting that as a new point would misread the evidence (a
+          -- Copilot review catch on PR 174, where this field was called
+          -- laneNewPoints and counted both).
+        , "laneRemainingPoints" .= (length <$> grPoints r)
+          -- The points the candidate actually introduced: those whose id was
+          -- not in the load's own point list.  Agda's ids are stable across a
+          -- give, so the set difference is exact.
+        , "laneNewPoints" .= (length . filter isNew <$> grPoints r)
+          -- Each remaining point, with whether it is new and the range Agda
+          -- gave it as [line, col, endLine, endCol].  The distinction is the
+          -- whole reason this is a list and not a count: a NEW point's range
+          -- is in the /candidate expression's/ coordinates (giving `s≤s {!!}`
+          -- reports `1.5-9`, where the sub-hole sits inside the string), while
+          -- a point that was already open keeps its range in the FILE.  The
+          -- wire shape is identical, so any tool that promises a re-anchored
+          -- hole list turns on telling them apart.  The issue records refine's
+          -- new points as rangeless; a give's are not.
+        , "lanePoints" .= (map pointJson <$> grPoints r)
         , "laneMetas"     .= map lmetaName (grMetas r)
         , "laneGoals"     .= grGoals r
         , "laneCodes"     .= grCodes r
@@ -516,13 +539,29 @@ row c loadMs mPoint lane batch = object $
         , "batchRemaining" .= frRemainingHoles f
         ]
 
+    -- A timeout and a crash are facts about a process, and the lane's reading
+    -- has no counterpart for either, so a row carrying one is unjudged rather
+    -- than a disagreement: comparing the two texts would have recorded
+    -- `agree: false` for all four such combinations, inflating the count the
+    -- table is read on and contradicting the README's own contract (a Copilot
+    -- review catch on PR 174; no archived row carries one, so no measured
+    -- figure moves).
     agreement = case (lane, batch) of
-      (Right o, Right f) ->
-        [ "agree" .= (classText (grClass (goReading o)) == statusText (frStatus f)) ]
+      (Right o, Right f)
+        | Just judged <- semanticStatus (frStatus f) ->
+            [ "agree" .= (classText (grClass (goReading o)) == judged) ]
       _ -> [ "agree" .= Aeson.Null ]
 
     firstOf (x : _) = Just x
     firstOf []      = Nothing
+
+    beforeIds = map ipId before
+    isNew p   = ipId p `notElem` beforeIds
+    pointJson p = object
+      [ "id"    .= ipId p
+      , "new"   .= isNew p
+      , "range" .= rangeOf p
+      ]
 
 -- | rangeOf: one interaction point's range as [line, col, endLine, endCol],
 -- or the empty list when the wire carried none.
@@ -540,6 +579,15 @@ statusText FillOk        = "ok"
 statusText FillTypeError = "type_error"
 statusText FillTimeout   = "timeout"
 statusText FillCrash     = "crash"
+
+-- | semanticStatus: the two @fill_hole@ statuses that are a judgment about the
+-- candidate, as opposed to a report about the process that ran.  Only these
+-- are comparable with a lane reading.
+semanticStatus :: FillStatus -> Maybe Text
+semanticStatus FillOk        = Just "ok"
+semanticStatus FillTypeError = Just "type_error"
+semanticStatus FillTimeout   = Nothing
+semanticStatus FillCrash     = Nothing
 
 errorRow :: Case -> Text -> Value
 errorRow c msg = object

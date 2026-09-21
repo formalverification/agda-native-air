@@ -5688,6 +5688,32 @@ interactionWireTests = do
           , assertEqual "not given" False (grGiven g)
           , assertEqual "no goals" False (grGoals g)
           ]
+
+    , -- The partial collection, which is the dangerous one (a Copilot review
+      -- catch on PR 174): a GiveAction arrived and the AllGoalsWarnings that
+      -- says what state the give left did NOT.  There is then no error and no
+      -- invisible goal for the trivial reason that Agda never reported on the
+      -- state, and reading that as 'ok' would be a false green.  The rule's
+      -- first conjunct is that the report arrived, and this pins it.
+      runTest "readGive: a GiveAction with no following report is NOT ok" $ do
+        let partial = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}" ]
+            -- The same give, with the report: the control that shows the
+            -- difference is the report and nothing else.
+            complete = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+              , "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+              ]
+        allOf
+          [ assertEqual "the give happened" True (grGiven (readGive partial))
+          , assertEqual "but nothing reported the state" False (grGoals (readGive partial))
+          , assertEqual "no errors to find" [] (grErrors (readGive partial))
+          , assertEqual "no metas to find" [] (map lmetaName (grMetas (readGive partial)))
+          , assertEqual "so: type_error, not ok" GiveClassTypeError
+              (grClass (readGive partial))
+          , assertEqual "the report is the only difference" GiveClassOk
+              (grClass (readGive complete))
+          ]
     ]
 
 -- | loadedOk / loadFailed: the two 'LoadReport' outcomes the lane's cache

@@ -1394,7 +1394,8 @@ runQuery lh path cmd = runCmdOn lh (Just (path, cmd))
 
 -- | GiveClass: the lane's reading of one give, in @fill_hole@'s vocabulary.
 --
--- 'GiveClassOk' is a give Agda accepted that left nothing unsolved but
+-- 'GiveClassOk' is a give Agda accepted whose following @AllGoalsWarnings@
+-- arrived and left nothing unsolved but
 -- interaction points, the class @fill_hole@ tolerates by ADR 0002 § 3
 -- (a sub-hole inside the candidate, or another open hole in the file, is an
 -- @[UnsolvedInteractionMetas]@ and not a type error).  Everything else is
@@ -1458,23 +1459,32 @@ giveErrorsOf rs = mapMaybe errorMessageOf rs <> allGoalsErrors
 -- is @ok@, /whatever new visible goals it lists/, since a sub-hole is the
 -- @[UnsolvedInteractionMetas]@ class @fill_hole@ already tolerates and
 -- @(s≤s {!!})@ is a core candidate shape; anything else is a type error.
+--
+-- Note the first conjunct of that rule: the report has to have arrived.  A
+-- collection holding a @GiveAction@ and nothing else has no error and no
+-- invisible goal for the trivial reason that Agda never said what state the
+-- give left, and reading that as @ok@ would be the one direction a judgment
+-- may not be wrong in.  'grGoals' is what tells the two apart, which is why
+-- it is a conjunct here and not merely a field (a Copilot review catch on
+-- PR 174, where it was recorded and then not consulted).
 readGive :: [IResponse] -> GiveReading
 readGive rs = GiveReading
-  { grClass  = if given && null errs && null metas
+  { grClass  = if given && goalsSeen && null errs && null metas
                  then GiveClassOk else GiveClassTypeError
   , grGiven  = given
   , grText   = listToMaybe [t | IGiveAction _ (Just t) <- rs]
   , grPoint  = listToMaybe [i | IGiveAction (Just i) _ <- rs]
   , grPoints = interactionPointsOf rs
-  , grGoals  = not (null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs])
+  , grGoals  = goalsSeen
   , grMetas  = metas
   , grErrors = errs
   , grCodes  = mapMaybe errorCodeOf errs
   }
   where
-    given = not (null [() | IGiveAction _ _ <- rs])
-    metas = metasOf rs
-    errs  = giveErrorsOf rs
+    given     = not (null [() | IGiveAction _ _ <- rs])
+    goalsSeen = not (null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs])
+    metas     = metasOf rs
+    errs      = giveErrorsOf rs
 
 -- | GiveOutcome: one candidate judged on the lane, with what it cost.
 --
