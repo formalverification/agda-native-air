@@ -138,6 +138,22 @@ A real library session checks, profiles, registers, and fills through `agda-mcp`
 
 ---
 
+### Milestone 6 — Documentation & Dissemination
+
+**Description:**
+
+Make the work legible to people who did not build it.  Everything through Milestone 5 is measured and recorded, and almost all of it is recorded for someone who is already inside the project: the ADRs decide, `docs/` orients a contributor, and the archives under `reports/` hold the evidence.  None of it answers a stranger's first question.  This milestone builds the surface that does: a project site carrying the documentation, the benchmarks, and the demos, and the papers and reports that cite them.
+
+Its first three issues are the site itself, and they inherit a rule from [M1-8] (#85) that the rest of the milestone should keep: what the site shows is *generated from committed artifacts*, and the build refuses to publish when a figure disagrees with the record it came from.  The demo page's benchmark table is regenerated from each run's `report.json` and compared cell by cell with ADR 0001 § 9, so a number that drifts fails the build rather than reaching a reader.  That is why the site lives in this repository rather than in a site repository of its own: the artifacts it must not contradict are here.
+
+The publication targets already filed under other milestones belong to this one in spirit, and can be moved here when convenient rather than as a separate exercise: the tech report (#86) and the `paper` label's issues are the obvious candidates.
+
+**Exit criterion:**
+
+A stranger can reach the project cold, understand what it does, watch a real agent session, and find the numbers and the artifacts behind any claim, without reading the source.
+
+---
+
 ### Milestone dependencies
 
 Hand-authored; update never touches it.
@@ -150,6 +166,7 @@ graph TD
   M3["M3 — Research Mathematics"]
   M4["M4 — Routine Local Completion (stretch)"]
   M5["M5 — AgdaMCP as a Daily Research Instrument"]
+  M6["M6 — Documentation & Dissemination"]
   M0 --> M1
   M1 --> M2
   M2 --> M3
@@ -158,7 +175,11 @@ graph TD
   M3 --> M4
   M1 --> M5
   M5 --> M3
+  M1 --> M6
+  M2 --> M6
 ```
+
+M6 has no successor: it is where the other milestones' results leave the project.  It depends on M1 for the agent-in-the-loop measurement and the demo page the site is built around, and on M2 for the retrieval numbers the same page reports beside them; everything later feeds it as it lands rather than blocking it.
 
 ---
 
@@ -3287,6 +3308,15 @@ The flake's `exportLibPath` prepends Nix runtime libraries, openssl 3.0.14 among
 [#96]: https://github.com/formalverification/agda-native-air/issues/96
 
 <!-- END GENERATED: milestone-5 -->
+
+---
+
+## Milestone 6 — Documentation & Dissemination
+
+<!-- BEGIN GENERATED: milestone-6 -->
+
+_(not yet rendered: #169, #170 and #171 were filed after the last `make project-update`.  The next run fills this region from GitHub.)_
+<!-- END GENERATED: milestone-6 -->
 
 ---
 

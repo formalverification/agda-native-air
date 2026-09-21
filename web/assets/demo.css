@@ -1,0 +1,543 @@
+/* The demo site's stylesheet (agda-native-air, Issue #85).
+ *
+ * File: web/assets/demo.css
+ *
+ * Three things this file is responsible for beyond appearance.
+ *
+ * 1.  The timing tokens.  Every duration the replay uses is a `--motion-*`
+ *     custom property read here, and `replay.js` reads them off computed
+ *     style, so this file is the one place the replay's rhythm is decided.
+ *     The precedent is williamdemeo.github.io's tokens.css and proof.js.
+ *
+ * 2.  The JavaScript-off contract.  Every session panel ships visible, and
+ *     only `html.has-js` (set by a one-line script in the head, before this
+ *     markup is parsed) collapses them into a tab set.  A reader without
+ *     JavaScript gets five sessions in document order and no dead controls;
+ *     a reader with it gets tabs and no flash, because the class is on the
+ *     root element before the first paint.
+ *
+ * 3.  Wide content scrolls inside its own box.  Agda types run to hundreds
+ *     of characters and a tool answer is a wall of JSON; `.wide` gives each
+ *     its own horizontal scroller so the page body never scrolls sideways.
+ *
+ * No font is fetched.  The stacks below are the reader's own system faces,
+ * which is the only way to serve a typeface from this origin without
+ * shipping one; nothing on this page makes a request off the origin.
+ */
+
+/* Contrast.  Every token that carries text clears WCAG AA (4.5:1) against
+ * all three surfaces of its own theme, `--surface-sunk` being the worst of
+ * them and so the one that sets the faint values.  `--ink-faint` is the tight
+ * one: it is used at 0.66rem in places (the answer badges, the disclosure
+ * summaries), which is normal-size text for the purpose of the rule, so the
+ * 3:1 allowance for large text never applies to it.  A test recomputes every
+ * pair from this file, so a lighter grey fails the suite rather than the
+ * reader: `scripts/python/tests/test_demo_render.py`.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Motion.  `replay.js` reads every one of these off computed style. */
+  --motion-type: 14ms;           /* one code point of typed text */
+  --motion-call: 9ms;            /* one code point of a typed call line */
+  --motion-beat: 260ms;          /* before a call goes out */
+  --motion-answer: 420ms;        /* the server thinking, before its answer */
+  --motion-thought: 700ms;       /* a thinking marker holds the stage */
+  --motion-enter: 500ms;         /* after scroll-in, before the first step */
+
+  --ink: #17191d;
+  --ink-soft: #565d67;
+  --ink-faint: #676e79;   /* AA on every surface; see the note above */
+  --page: #fbfaf8;
+  --surface: #ffffff;
+  --surface-sunk: #f2f1ee;
+  --rule: #dedbd4;
+  --rule-soft: #ebe8e2;
+
+  --accent: #1d4ed8;
+  --accent-soft: #e6ecfd;
+  --good: #146c43;
+  --good-soft: #e4f2ea;
+  --warn: #8a5a00;
+  --warn-soft: #fbf0dc;
+  --bad: #a3231f;
+  --bad-soft: #fbe9e8;
+
+  --mono: ui-monospace, "DejaVu Sans Mono", "SFMono-Regular", Menlo,
+    Consolas, "Liberation Mono", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", "DejaVu Sans", Arial, sans-serif;
+
+  --measure: 34rem;
+  --wide: 58rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e7e5e0;
+    --ink-soft: #a7a9ad;
+    --ink-faint: #8b8f95;
+    --page: #14161a;
+    --surface: #1b1e23;
+    --surface-sunk: #24282e;
+    --rule: #333941;
+    --rule-soft: #272c33;
+
+    --accent: #8fb1ff;
+    --accent-soft: #1d2739;
+    --good: #6fd19b;
+    --good-soft: #14291e;
+    --warn: #e8bd6d;
+    --warn-soft: #2b2314;
+    --bad: #f39c96;
+    --bad-soft: #2e1918;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 400 16px/1.62 var(--sans);
+  overflow-x: hidden;            /* the body never scrolls sideways */
+}
+
+code, pre, .mono { font-family: var(--mono); }
+code { font-size: 0.9em; }
+
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+h1, h2, h3 { line-height: 1.22; font-weight: 640; letter-spacing: -0.012em; }
+h2 { font-size: 1.5rem; margin: 3rem 0 0.75rem; }
+h3 { font-size: 1.06rem; margin: 2rem 0 0.5rem; }
+
+/* ------------------------------------------------------------ the hero */
+
+.hero {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  padding: 3.25rem 1.25rem 1.75rem;
+}
+.hero > * { max-width: var(--wide); margin-inline: auto; }
+.eyebrow {
+  margin: 0 0 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+.hero h1 { margin: 0; font-size: clamp(1.8rem, 5.2vw, 2.7rem); }
+.lede {
+  margin: 0.7rem 0 0;
+  max-width: var(--measure);
+  font-size: 1.08rem;
+  color: var(--ink-soft);
+}
+.hero-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.9rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+.hero-figures strong {
+  display: block;
+  font-size: 1.55rem;
+  font-weight: 660;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin-top: 1.6rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 0.87rem;
+}
+
+/* ------------------------------------------------------------ the prose */
+
+main { display: block; }
+
+.prose {
+  max-width: var(--wide);
+  margin-inline: auto;
+  padding: 0 1.25rem;
+}
+.prose p, .prose ul { max-width: var(--measure); }
+.prose li { margin-bottom: 0.35rem; }
+
+.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 0.85rem 1rem;
+  margin: 1.2rem 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.src { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+.foot {
+  max-width: var(--wide);
+  margin: 4rem auto 0;
+  padding: 1.5rem 1.25rem 3rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.87rem;
+  color: var(--ink-soft);
+}
+
+/* --------------------------------------------------------- wide content */
+
+.wide {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule-soft);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+}
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 1.1rem 0; }
+
+/* ------------------------------------------------------------ the player */
+
+.replay {
+  max-width: var(--wide);
+  margin: 1.5rem auto 0;
+}
+
+.replay-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: -1px;
+}
+.replay-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-radius: 7px 7px 0 0;
+  cursor: pointer;
+}
+.replay-tab[aria-selected="true"] {
+  color: var(--ink);
+  background: var(--surface);
+  border-bottom-color: var(--surface);
+  font-weight: 560;
+}
+.tab-model { color: var(--ink-faint); font-size: 0.82rem; }
+
+.replay-panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 0 9px 9px 9px;
+  padding: 1.2rem 1.1rem 1.4rem;
+  margin-bottom: 1.6rem;
+}
+.panel-title { margin: 0 0 0.35rem; display: flex; flex-wrap: wrap;
+               align-items: baseline; gap: 0.5rem; }
+.panel-title code { font-size: 1rem; }
+.panel-model { color: var(--ink-faint); font-weight: 400; font-size: 0.9rem; }
+.panel-blurb { margin: 0 0 1rem; max-width: var(--measure);
+               color: var(--ink-soft); font-size: 0.94rem; }
+
+/* The tab set exists only where the script does; without it every panel
+ * stands on its own, headed by its own title. */
+.has-js .replay-panel:not(.is-active) { display: none; }
+.has-js .panel-title { display: none; }
+
+.pip {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pip-solved   { color: var(--good); background: var(--good-soft); }
+.pip-restated { color: var(--warn); background: var(--warn-soft); }
+.pip-gate     { color: var(--bad);  background: var(--bad-soft);  }
+
+/* ------------------------------------------------------- the panel facts */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.6rem 1rem;
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 0.9rem;
+  background: var(--surface-sunk);
+  border-radius: 7px;
+  font-size: 0.85rem;
+}
+.facts dt { color: var(--ink-faint); font-size: 0.76rem; }
+.facts dd { margin: 0.05rem 0 0; font-variant-numeric: tabular-nums; }
+.facts dd code { font-size: 0.78rem; word-break: break-all; }
+
+.goal { margin-bottom: 1.2rem; }
+.goal-label { display: block; font-size: 0.78rem; color: var(--ink-faint);
+              margin-bottom: 0.3rem; }
+
+/* ------------------------------------------------------------ the stream */
+
+.stream-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.2rem;
+}
+.replay-again {
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.12rem 0.62rem;
+  cursor: pointer;
+}
+.replay-again:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+.replay-stream {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0 0;
+  max-height: 32rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.step {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0 0.9rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.step:last-child { border-bottom: none; }
+.who {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  padding-top: 0.22rem;
+  text-align: right;
+  word-break: break-word;
+}
+.who-call { color: var(--ink-soft); }
+.step-mcp .who-call { color: var(--accent); }
+.said { min-width: 0; }
+.said > p:first-child { margin-top: 0; }
+.thought { color: var(--ink-faint); font-size: 0.88rem; }
+
+.call {
+  font-family: var(--mono);
+  font-size: 0.83rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.call-tool { font-weight: 620; color: var(--ink); }
+.step-mcp .call-tool { color: var(--accent); }
+.arg-name { color: var(--ink-faint); }
+.arg-value { color: var(--ink); }
+.sep { color: var(--ink-faint); }
+.together {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* ------------------------------------------------------------ an answer */
+
+.answer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 0.55rem;
+  margin-top: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--surface-sunk);
+  border-left: 2px solid var(--rule);
+  border-radius: 0 6px 6px 0;
+}
+.answer-error { border-left-color: var(--bad); background: var(--bad-soft); }
+.answer-badge {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--ink-faint);
+  text-transform: lowercase;
+}
+.answer-error .answer-badge { color: var(--bad); }
+.answer-body { min-width: 0; }
+.answer-headline {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.answer-headline .pair { display: inline; margin-right: 0.8rem; }
+.answer-headline .field { color: var(--ink-faint); }
+.answer-full > summary {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.answer-full > summary:hover { color: var(--ink-soft); }
+.answer-full[open] > summary { margin-bottom: 0.35rem; }
+.answer-full .wide { max-height: 26rem; overflow: auto; }
+
+/* ------------------------------------------------------------ a verdict */
+
+.stream-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  max-width: none;
+}
+
+.verdict {
+  margin-top: 1.1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--surface-sunk);
+}
+.verdict-solved   { border-color: var(--good); }
+.verdict-restated { border-color: var(--warn); }
+.verdict-gate     { border-color: var(--bad); }
+.verdict-head { display: flex; align-items: center; gap: 0.6rem;
+                flex-wrap: wrap; }
+.verdict-by { font-size: 0.76rem; color: var(--ink-faint); }
+.verdict-says { margin: 0.55rem 0 0; max-width: var(--measure);
+                font-size: 0.93rem; }
+.verdict-fields { margin-top: 0.7rem; display: grid; gap: 0.2rem;
+                  font-size: 0.8rem; }
+.v-field { color: var(--ink-faint); }
+.v-value { font-family: var(--mono); font-size: 0.78rem; }
+.v-value code { font-size: 1em; word-break: break-all; }
+
+.replay-file { margin-top: 1rem; }
+.replay-file > summary { font-size: 0.82rem; color: var(--ink-soft);
+                         cursor: pointer; }
+.listing { line-height: 1.45; }
+.line { display: block; }
+.gutter { display: inline-block; width: 1.2rem; color: var(--ink-faint); }
+.line-add { background: var(--good-soft); }
+.line-add .gutter { color: var(--good); }
+.line-del { background: var(--bad-soft); opacity: 0.85; }
+.line-del .gutter { color: var(--bad); }
+
+/* ------------------------------------------------------------- the table */
+
+.numbers {
+  border-collapse: collapse;
+  font-size: 0.87rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 34rem;
+}
+.numbers caption {
+  caption-side: top;
+  text-align: left;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  padding-bottom: 0.45rem;
+  max-width: var(--wide);
+}
+.numbers th, .numbers td {
+  padding: 0.34rem 0.7rem;
+  border-bottom: 1px solid var(--rule-soft);
+  text-align: left;
+}
+.numbers thead th {
+  font-size: 0.74rem;
+  font-weight: 560;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: bottom;
+}
+.numbers .num, .numbers thead th:not(:first-child) { text-align: right; }
+.numbers .name, .numbers tbody th { white-space: nowrap; }
+.numbers tr.total th, .numbers tr.total td {
+  font-weight: 640;
+  border-top: 1px solid var(--rule);
+  border-bottom: none;
+}
+.numbers.small { min-width: 0; }
+
+.arms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin: 1.4rem 0;
+}
+.arm {
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+}
+.arm h3 { margin: 0; font-size: 0.95rem; }
+.arm-run { margin: 0.2rem 0 0.6rem; font-size: 0.76rem;
+           color: var(--ink-faint); }
+.arm-facts { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
+.arm-facts strong { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------- replay-only states */
+
+/* The script hides a rewound step, and every answer inside it, through
+ * `el.hidden` and never through an inline style.  The user-agent sheet's
+ * `[hidden] { display: none }` is a type-selector rule and loses to any
+ * class rule that sets `display`, which `.step` and `.answer` both do, so
+ * the attribute is given the last word here. */
+[hidden] { display: none !important; }
+.is-typing::after {
+  content: "\2588";
+  margin-left: 1px;
+  color: var(--accent);
+  animation: caret 1.05s steps(2, start) infinite;
+}
+@keyframes caret { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The script does not replay here at all; the caret would be the only
+   * motion left, and it has nothing to mark. */
+  .is-typing::after { display: none; }
+}
+
+@media (max-width: 34rem) {
+  .step { grid-template-columns: 1fr; gap: 0.2rem; }
+  .who { text-align: left; padding-top: 0; }
+  .replay-panel { border-radius: 9px; }
+}
