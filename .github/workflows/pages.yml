@@ -31,49 +31,62 @@
 #    tests inside `ci.yml`'s `python-agda-dojang` lane, which already runs
 #    `scripts/python/tests`.
 #
-#  One-time setup, which is the repository owner's action and not this file's:
-#    Settings -> Pages -> "Build and deployment" -> Source: "GitHub Actions".
-#    Until that is set, this workflow builds and the deploy step fails with
-#    "Get Pages site failed"; nothing else in CI is affected.
+#    Two jobs, two capabilities.  `verify` runs code the pull request
+#    controls and holds `contents: read` and nothing else; `deploy` runs no
+#    repository code and is the only job that can publish.  Declaring the
+#    Pages tokens workflow-wide, as this did until the review on #166, gave
+#    `pages: write` to the job running PR-authored `make` and `pytest`,
+#    which on a same-repository branch is a capability and not a formality.
+#    GitHub prints each job's grant under "GITHUB_TOKEN Permissions" in its
+#    own log, which is where to check this rather than by reading.
+#
+#  Repository setting, already in place: Settings -> Pages -> "Build and
+#    deployment" -> Source: "GitHub Actions".  If it is ever turned off, the
+#    deploy step fails with "Get Pages site failed" and nothing else in CI
+#    is affected.
 #
 ## =============================================================================
 name: Demo site
 
 on:
+  # No paths filter here, on purpose.  The page embeds content from several
+  # trees (the archive, the obligation files the index names, the ADR's
+  # table, the assets), and an allowlist of them is a second copy of that
+  # list which drifts: this one already missed
+  # `data/benchmarks/**/obligations/*.agda`, whose text is rendered into
+  # every replay, so editing an obligation would have left the published
+  # page quoting the old one.  A rebuild takes under a minute; a stale
+  # published page is a page that lies.  Main rebuilds on every push.
   push:
     branches: [ main ]
-    paths:
-      - 'reports/agent-bench/**'
-      - 'scripts/python/demo/**'
-      - 'scripts/python/tests/test_demo_*.py'
-      - 'scripts/python/utils/**'
-      - 'web/**'
-      - 'data/benchmarks/benchmark-index.jsonl'
-      - 'docs/adr/0001-proof-search-on-agda-mcp.md'
-      - '.github/workflows/pages.yml'
-      - 'Makefile'
+  # A filter is fine here, where it only decides whether this extra check
+  # runs on a pull request: `ci.yml` runs the same tests unconditionally in
+  # its `scripts/python/tests` lane, so nothing goes unverified either way.
   pull_request:
     branches: [ main ]
     paths:
       - 'reports/agent-bench/**'
+      - 'data/benchmarks/**'
       - 'scripts/python/demo/**'
       - 'scripts/python/tests/test_demo_*.py'
       - 'scripts/python/utils/**'
       - 'web/**'
-      - 'data/benchmarks/benchmark-index.jsonl'
       - 'docs/adr/0001-proof-search-on-agda-mcp.md'
       - '.github/workflows/pages.yml'
       - 'Makefile'
-  # So the page can be republished without a commit, once Pages is enabled.
+  # So the page can be republished without a commit.
   workflow_dispatch:
 
-# Read the repository; write a Pages deployment and the token it needs.  The
-# deploy job narrows nothing further: these are the permissions
-# actions/deploy-pages documents, and no other job here writes anything.
+# Least privilege, and granted per job below rather than here.  `verify`
+# checks out and runs code the pull request controls (pytest, make), so it
+# gets `contents: read` and nothing else; only `deploy`, which runs no
+# repository code at all, holds the tokens that can publish.  Declared
+# workflow-wide, they handed `pages: write` to the job running PR-authored
+# code, which on a same-repository branch is a real capability: GitHub's own
+# job log for the previous revision printed "Pages: write" under the verify
+# job's GITHUB_TOKEN permissions.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One deployment at a time, and never cancel one in flight: a half-finished
 # deploy would leave the published site in an unknown state.
@@ -89,6 +102,11 @@ jobs:
     name: Demo site • build and test
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Runs pull-request-controlled code, so it may read the repository and
+    # nothing more.  The Pages artifact it uploads needs no permission of
+    # its own: an artifact is scoped to the workflow run that made it.
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -124,14 +142,6 @@ jobs:
           fi
           echo "the page loads only its own assets"
 
-      - name: Configure Pages
-        id: pages
-        uses: actions/configure-pages@v5
-        # On a pull request the repository's Pages site may not exist yet, and
-        # a PR never deploys anyway; the upload below still runs, so the
-        # artifact can be inspected from the run.
-        continue-on-error: true
-
       - name: Upload the site as a Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
@@ -145,6 +155,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The only job that publishes, and so the only one holding the tokens
+    # for it.  It checks out nothing and runs no repository code.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
