@@ -29,6 +29,9 @@ data/benchmarks/reports/
 # demo-site` the second, both from the committed reports/agent-bench/ archive.
 data/demo/
 /site/
+# The project site (issue 169): `make site` renders MkDocs around the demo
+# into this tree, with the demo copied under public/demo/.
+/public/
 
 # === Logs ===
 *.log
