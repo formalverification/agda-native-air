@@ -139,10 +139,10 @@ rows already pay for the full module through something else they import.
 
 By difficulty: `routine` 5 of 16, `compositional` 10 of 25, `non-obvious` 0 of
 14.  The 40 rows that do not move are 21 `agda-algebras` rows, whose
-`Overture`/`Setoid` imports dwarf everything; 17 rows that import
-`Data.Nat.Properties`, `Data.List.Properties` or `Data.Bool.Properties`, each of
-which pulls the full `Relation.Binary.PropositionalEquality` in anyway; and 2
-that never import it.
+`Overture`/`Setoid` imports dwarf everything; 15 rows that import
+`Data.Nat.Properties`, `Data.List.Properties` or `Data.Bool.Properties`, each
+of which pulls the full `Relation.Binary.PropositionalEquality` in anyway; and
+4 that never import it at all.
 
 The 15 that do move come in five shapes.  Module counts are on the issue's
 convention (the closure less this repository's own three modules, which ship no
