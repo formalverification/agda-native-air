@@ -97,6 +97,20 @@ facts about a process, the lane's reading has no counterpart for either, and
 recording one as a disagreement would inflate the count the table is read on.
 No row in this archive carries one.
 
+`laneHere` and `laneUnreadable` are the two conjuncts the lane reading uses to
+fail closed, carried as evidence rather than only consulted: whether the give
+could be shown to have landed on the point it was aimed at, and how many lines
+of its response window were not JSON.  Both hold on every row here (`laneHere`
+true on every accepted give, `laneUnreadable` zero throughout), which is what
+makes them safe conjuncts rather than a source of false type errors.
+
+Two things the run refuses rather than works around, because the table's
+product is a count and a count that quietly shrinks is worse than a run that
+stops: a malformed row in either committed input, and an archived probe row
+naming a benchmark id the index does not define.  Each names the file and the
+row.  Each candidate is also its own lane request, so `--timeout` bounds one
+judgment on both lanes rather than a whole obligation on one of them.
+
 `agree` compares the *class*.  The two lanes reach it by different routes on 17
 of the 80 rows, and the error-code lists are what says so: a semicolon in a
 candidate ends a declaration when spliced into a file and breaks an expression
