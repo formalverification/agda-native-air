@@ -81,7 +81,7 @@
   "benchmarkId": "later-use-hole",
   "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
   "candidate": "suc {!!}",
-  "note": "the same hole filled with a sub-hole: the later definition's constraint is now blocked on the NEW meta"
+  "note": "a partial fill whose remaining hole IS constrained by the later definition, and which CAN be completed (suc 0 typechecks, verified by hand): the two lanes answer different questions here"
  },
  {
   "benchmarkId": "extended-lambda",
@@ -110,5 +110,17 @@
   "holeIndex": 1,
   "candidate": "\"λ → ∀\"",
   "note": "non-ASCII inside a string literal, which hsShow ships as decimal escapes"
+ },
+ {
+  "benchmarkId": "later-use-hole-dead",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "suc (suc {!!})",
+  "note": "the discriminator: a partial fill NO completion can satisfy (suc (suc x) never equals 1, verified by hand for several x).  If the lane blessed sub-holes blindly it would say ok here"
+ },
+ {
+  "benchmarkId": "later-use-hole-dead-deeper",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "suc (suc (suc {!!}))",
+  "note": "the same dead end one level deeper, so the refusal is not an artifact of the first one"
  }
 ]

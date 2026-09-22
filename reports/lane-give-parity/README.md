@@ -104,6 +104,32 @@ of its response window were not JSON.  Both hold on every row here (`laneHere`
 true on every accepted give, `laneUnreadable` zero throughout), which is what
 makes them safe conjuncts rather than a source of false type errors.
 
+## What the two disagreements are, and are not
+
+`deliberate-rows.jsonl` carries two rows where the lanes differ, and they are
+different kinds of thing.
+
++  **`where-clause`**: batch `ok`, lane `type_error`
+   (`[Interaction.UnexpectedWhere]`).  A hard capability limit: `Cmd_give`
+   parses an expression and a `where` block is a clause tail.  The lane calls
+   a good candidate bad, which costs a solve and never a false claim.  No
+   committed candidate has the shape.
++  **`later-use-hole`**: batch `type_error`, lane `ok`, and this one is **not**
+   a false green, which is what the four rows around it establish.  The
+   candidate `suc {!!}` on `LaterUse.agda` is a partial fill whose remaining
+   hole is pinned by the file's later definition, and it *can* be completed:
+   `suc 0` typechecks, exit 0.  The lane is not blessing sub-holes blindly
+   either, which is what `later-use-hole-dead` and `-dead-deeper` are for:
+   `suc (suc {!!})` and `suc (suc (suc {!!}))` can be completed by nothing at
+   all, and the lane refuses both, agreeing with batch.  What the two lanes
+   are doing is answering different questions about a partially filled hole:
+   batch asks "is the module green, tolerating open interaction holes only",
+   so any residual constraint is a type error (ADR 0002 § 3); the lane asks
+   "does anything Agda can decide right now contradict this candidate", so a
+   constraint that depends on an unfilled hole is deferred rather than counted
+   against it.  On a candidate that completes the proof the two coincide, which
+   is the 80 of 80 above.
+
 Two things the run refuses rather than works around, because the table's
 product is a count and a count that quietly shrinks is worse than a run that
 stops: a malformed row in either committed input, and an archived probe row
