@@ -53,6 +53,52 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     c.corpusStdlib.map(_.toString)   shouldBe Some("/repo/data/s.jsonl")
   }
 
+  test("--arm names the instrument, defaults to the archived protocol's, and is refused by name otherwise") {
+    Cli.parse(base ++ List("--all")).map(_.arm)                      shouldBe Right(Arm.Mcp)
+    Cli.parse(base ++ List("--all", "--arm", "shell")).map(_.arm)     shouldBe Right(Arm.Shell)
+    Cli.parse(base ++ List("--all", "--arm", "both")).map(_.arm)      shouldBe Right(Arm.Both)
+    Cli.parse(base ++ List("--all", "--arm", "mcp")).map(_.arm)       shouldBe Right(Arm.Mcp)
+    Cli.parse(base ++ List("--all", "--arm", "sh"))                   shouldBe Left("bad --arm: sh (shell|mcp|both)")
+  }
+
+  test("an arm decides the built-in tools and the pre-approvals, and nothing else about the flags") {
+    def flags(arm: String) = {
+      val c = Cli.parse(base ++ List("--all", "--arm", arm)).getOrElse(fail("parse"))
+      Subject.fixedFlags(SubjectConfig.of(c, "system", "user"))
+    }
+    def valueOf(fs: Vector[String], flag: String) = fs.sliding(2).collectFirst { case Vector(`flag`, v) => v }
+    valueOf(flags("mcp"),   "--tools")        shouldBe Some("Edit,Read")
+    valueOf(flags("shell"), "--tools")        shouldBe Some("Bash,Edit,Read")
+    valueOf(flags("both"),  "--tools")        shouldBe Some("Bash,Edit,Read")
+    valueOf(flags("mcp"),   "--allowedTools") shouldBe Some("mcp__agda")
+    valueOf(flags("shell"), "--allowedTools") shouldBe Some("Bash")
+    valueOf(flags("both"),  "--allowedTools") shouldBe Some("mcp__agda,Bash")
+    // --restricted stays on every arm: it confines the file tools and drops the
+    // settings files, and it keeps Bash whenever --tools names it (measured on
+    // client 2.1.261).
+    Arm.all.map(_.name).foreach(a => withClue(a)(flags(a) should contain ("--restricted")))
+    // A shell arm carries no --mcp-config, so --strict-mcp-config gives it no server.
+    val shell = Cli.parse(base ++ List("--all", "--arm", "shell")).getOrElse(fail("parse"))
+    val argv  = Subject.argv(SubjectConfig.of(shell, "system", "user"), None, "prompt")
+    argv should contain ("--strict-mcp-config")
+    argv should not contain "--mcp-config"
+    Subject.argv(SubjectConfig.of(shell, "system", "user"), Some(java.nio.file.Paths.get("/m.json")), "p") should contain ("--mcp-config")
+  }
+
+  test("the arms' read roots reach the file tools through --add-dir, on every arm alike") {
+    val dirs = Vector(java.nio.file.Paths.get("/nix/store/x/src"), java.nio.file.Paths.get("/repo/agda-dojang/agda"))
+    Arm.all.foreach { arm =>
+      val c  = Cli.parse(base ++ List("--all", "--arm", arm.name)).getOrElse(fail("parse"))
+      val fs = Subject.fixedFlags(SubjectConfig.of(c, "system", "user", dirs))
+      withClue(arm.name) {
+        fs should contain ("--add-dir")
+        dirs.map(_.toString).foreach(d => fs should contain (d))
+      }
+    }
+    // No roots, no flag: an empty --add-dir would be an argument error.
+    Subject.fixedFlags(SubjectConfig.of(Cli.parse(base ++ List("--all")).getOrElse(fail("parse")), "s", "u")) should not contain "--add-dir"
+  }
+
   test("an unknown flag and a bad on|off value are refused by name") {
     Cli.parse(base ++ List("--all", "--bogus", "1")) shouldBe Left("unrecognized argument: --bogus")
     Cli.parse(base ++ List("--all", "--safe", "maybe")) shouldBe Left("bad --safe: maybe (on|off)")

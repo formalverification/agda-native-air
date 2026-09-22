@@ -16,13 +16,19 @@
   *  Because this step reads only what the runner archived, `--rejudge` can
   *  redo it for a finished run without a model call.
   *
+  *  The arm (issue #162) is read from the subject's own record, not from the
+  *  harness's current `--arm`, so a re-judge audits a run under the arm and the
+  *  roots it was run with; the `via` and `verdictVia` columns say which
+  *  instrument the subject actually used, and which it took its last verdict
+  *  from, which is the whole result of the `both` arm.
+  *
   *  Anomaly rules
   *  -------------
   *  A row is an anomaly, not a result, when the subject never had the
   *  instrument as the protocol fixes it: no init record (the client never
-  *  started), the agda server not connected, the tools presented as deferred
-  *  names, one of the thirteen missing, a tool presented beyond Read, Edit,
-  *  and the thirteen (used or not: the arm is exactly those fifteen), the
+  *  started), the agda server not connected or one of the required tools
+  *  missing (an arm with the server), the tools presented as deferred
+  *  names, a tool presented beyond the arm's set (used or not), the
   *  account's rate limit refusing service, a client error that is not one of
   *  the stated caps, or a process that ended with no result record at all
   *  (a crash; a wall-cap kill is a stated cap, not an anomaly); and when the
@@ -66,6 +72,8 @@ final case class Outcome(
   tokens:            Json,
   permissionDenials: Int,
   isolation:         Option[Isolation],
+  via:               String,
+  verdictVia:        String,
   agdaExit:          Option[Int],
   agdaMs:            Option[Long],
   agdaTail:          Option[String],
@@ -104,6 +112,8 @@ final case class Outcome(
     "tokens"              -> tokens,
     "permissionDenials"   -> permissionDenials.asJson,
     "isolation"           -> isolation.map(_.toJson).asJson,
+    "via"                 -> via.asJson,
+    "verdictVia"          -> verdictVia.asJson,
     "agdaExit"            -> agdaExit.asJson,
     "agdaMs"              -> agdaMs.asJson,
     "agdaTail"            -> agdaTail.asJson,
@@ -123,7 +133,8 @@ final case class Outcome(
 object Outcome {
   def anomaly(entry: IndexEntry, msg: String, wallMs: Long): Outcome =
     Outcome(entry, solved = false, restated = false, None, Vector.empty, Vector.empty, "anomaly", 0, Vector.empty,
-      wallMs, 0.0, Json.obj(), 0, None, None, None, None, None, Vector.empty, None, "unavailable: anomaly", Some(msg), None, None, "")
+      wallMs, 0.0, Json.obj(), 0, None, "none", "none", None, None, None, None, Vector.empty, None,
+      "unavailable: anomaly", Some(msg), None, None, "")
 }
 
 /** One obligation's three outputs: the report outcome, the fixtures.jsonl row, the results.jsonl rows. */
@@ -165,9 +176,9 @@ object Outcomes {
   def anomalyOf(t: Transcript, iso: Isolation, verdict: Verdict, terminal: String): Option[String] = {
     val capped = t.result.exists(r => r.subtype.contains("max_turns") || r.subtype.contains("budget"))
     if (t.init.isEmpty) Some("no init record: the subject never started (see stderr.log)")
-    else if (!iso.mcpConnected) Some("agda server not connected in the subject's session")
+    else if (iso.arm.hasServer && !iso.mcpConnected) Some("agda server not connected in the subject's session")
     else if (iso.toolsDeferred) Some("agda tools were presented as deferred names")
-    else if (iso.missingAgdaTools.nonEmpty) Some(s"agda tools missing from the session: ${iso.missingAgdaTools.mkString(",")}")
+    else if (iso.arm.hasServer && iso.missingAgdaTools.nonEmpty) Some(s"agda tools missing from the session: ${iso.missingAgdaTools.mkString(",")}")
     else if (iso.extraTools.nonEmpty) Some(s"tools presented beyond the protocol: ${iso.extraTools.mkString(",")}")
     else if (t.rateLimitRejected) Some(s"rate limited: ${t.rateLimits.map(_._1).distinct.mkString(",")}")
     else if (t.result.exists(_.isError) && !capped) Some(s"client error (${t.result.map(_.subtype).getOrElse("?")}): ${t.result.map(_.text.take(200)).getOrElse("")}")
@@ -177,6 +188,27 @@ object Outcomes {
     else if (verdict.checkUnusable) Some(s"check_file gave no usable verdict for the final file (exit ${verdict.checkExit.map(_.toString).getOrElse("none")}), so the escape and hole gates had nothing to read")
     else if (verdict.verdictsDisagree) Some(s"the gold verifier's agda (exit ${verdict.agdaExit.getOrElse(-1)}) and check_file (exit ${verdict.checkExit.getOrElse(-1)}) disagree on the final file")
     else None
+  }
+
+  /** Which instruments the subject used at all, from its calls. */
+  def viaOf(t: Transcript): String =
+    (t.uses.exists(_.name.startsWith(Arm.agdaPrefix)), t.uses.exists(_.name == Arm.bash)) match {
+      case (true, true)  => "both"
+      case (true, false) => "mcp"
+      case (false, true) => "shell"
+      case _             => "none"
+    }
+
+  /** Which instrument the subject took its LAST verdict from: the server's
+    * `check_file` / `check_project`, or an `agda` run on the shell (batch or
+    * interaction, both of which are Agda's own answer).  This is the column
+    * the `both` arm exists for.
+    */
+  def verdictViaOf(t: Transcript, roots: ShellRoots): String = {
+    def isShellAgda(u: ToolUse) =
+      u.name == Arm.bash && ShellAudit.inspect(u.str("command").getOrElse(""), roots).commandClass.startsWith("agda-")
+    t.uses.filter(u => u.name == "mcp__agda__check_file" || u.name == "mcp__agda__check_project" || isShellAgda(u))
+      .lastOption.fold("none")(u => if (u.name == Arm.bash) "shell" else "mcp")
   }
 
   /** Judge one archived subject: transcript, isolation, gates, outcome. */
@@ -192,14 +224,19 @@ object Outcomes {
       finalText  <- TextIO.read(finalFile)
       stream     <- TextIO.read(subj.transcript).handleError(_ => "")
       record     <- TextIO.readJson(subj.runRecord).map(_.flatMap(SubjectRun.fromJson))
-      // The work directory is the one the subject's server config names, so
-      // a copy of the archive re-judges as the original; the run root's is
-      // the fallback for an archive without one.
-      workDir    <- TextIO.readJson(subj.mcpConfig).map(_.flatMap(Audit.workDirOf).getOrElse(layout.workDir(entry.id)))
+      // The arm and the roots are the subject's own record; an archive made
+      // before that record existed is the server-only arm confined to the
+      // work directory its server config names, so a copy of either re-judges
+      // as the original.
+      rec        <- TextIO.readJson(subj.record).map(_.flatMap(SubjectRecord.fromJson))
+      legacyWork <- TextIO.readJson(subj.mcpConfig).map(_.flatMap(Audit.workDirOf).getOrElse(layout.workDir(entry.id)))
+      arm         = rec.map(_.arm).getOrElse(cfg.arm)
+      roots       = rec.map(_.roots).getOrElse(ShellRoots(legacyWork, Vector.empty, Vector.empty))
+      workDir     = roots.workDir
       t           = Transcript.parse(stream)
       killed      = record.exists(_.killed)
       wallMs      = record.map(_.wallMs).getOrElse(t.result.map(_.durationMs).getOrElse(0L))
-      iso         = Audit.isolation(t, workDir)
+      iso         = Audit.isolation(t, arm, roots)
       terminal    = Audit.terminalOf(killed, t.result)
       verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
@@ -225,6 +262,8 @@ object Outcomes {
         tokens            = t.result.map(_.tokens).getOrElse(Json.obj()),
         permissionDenials = t.result.map(_.permissionDenials).getOrElse(0),
         isolation         = Some(iso),
+        via               = viaOf(t),
+        verdictVia        = verdictViaOf(t, roots),
         agdaExit          = verdict.agdaExit,
         agdaMs            = verdict.agdaMs,
         agdaTail          = verdict.agdaTail,
@@ -245,7 +284,7 @@ object Outcomes {
                       Files.copy(finalFile, layout.solved.resolve(s"$stem.agda"), StandardCopyOption.REPLACE_EXISTING); ()
                     } else IO.unit
       _          <- TextIO.write(subj.outcome, outcome.toJson.spaces2)
-      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}${anomaly.fold("")(a => s"  ANOMALY: $a")}")
+      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}${anomaly.fold("")(a => s"  ANOMALY: $a")}")
     } yield judged(layout, outcome, Audit.attemptRows(entry, workDir.resolve(s"$stem.agda"), t, subj.transcriptRel))
   }
 }

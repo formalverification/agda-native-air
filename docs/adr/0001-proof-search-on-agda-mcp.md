@@ -291,6 +291,40 @@ By tier (Sonnet, Opus): routine 15 and 16 of 16, compositional 20 and 24 of 25, 
 
 **Status**.  Adopted and measured ([#154]); the harness is `struxdriver.agentbench` (`make agent-bench`), its judge's rules pinned by `JudgeSpec` on Agda's answer shapes and on extractor rows captured from archived files, its live gates by `AgentBenchIntegrationSpec` against the server, `agda`, and `agda-json` (a gold solved; a hole, a weakened statement, an edited import, a postulate, a wrong proof, and a restatement each named), its transcript reader by `TranscriptSpec` on a captured stream; the transcripts, verdicts, and final files of every quoted run are under [`reports/agent-bench/README.md`].  The arms were judged before [#152] merged, by the textual judge; every archived row re-judged under the Agda-backed gates and the `restates:` tags reaches the same verdict, and the archive holds the re-judged verdicts.
 
+### The attribution arms: what the server is worth
+
+(See also [#162], [#83], [#17], and [`reports/agent-bench/README.md`].)
+
+Every subject of § 9's arms had the server and nothing else, so those numbers say what a frontier model does *with* the instrument and nothing about what it does without it, and the obvious objection, that an agent can run the pinned `agda` itself, was unanswered; [#83] was designed around the question and its control arm was never run.  An *arm* is now one instrument: `shell` gives the subject Bash with the pinned `agda` on `PATH`, `mcp` gives it the server, `both` gives it both.
+
+**Decision**.  The server is measured against its own control, on the same suite, prompts, caps, and judge, with one symmetric change and one new confinement.
+
++  **One symmetric change**: the libraries' own sources are readable on every arm (the registry's library roots and source roots and the Agda registry directory, reached by `--add-dir`), because the archived arm refused eleven such reads for Sonnet as a confinement side effect and a shell arm that can `cat` a module while the server arm cannot would confound the comparison.
++  **The shell arms are confined by audit**, because the client cannot confine Bash.  `--restricted` keeps Bash whenever `--tools` names it, so it stays on every arm for what it does give (the file tools confined, the settings files ignored), and the paths each Bash command names are read afterwards: a command the reader cannot account for is a violation, never a pass.  The confinement is therefore post-hoc: a row whose commands left the roots is not a result and its `outcome.json` names the command.
++  **The `both` arm is not a tie-breaker but the measurement**, through two columns the report gains: `via` per row (which instruments the subject used) and `verdictVia` (which gave it its last verdict), with the run's Bash calls counted by class.
++  **The judge does not change**, and neither does the report shape; a run id is one arm, recorded in `protocol.json` and in each subject's own `subject.json` with the roots it was given, so a re-judge audits a run under the arm it ran with.
+
+**Evidence**.  Runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1` (`claude-sonnet-5`, 2026-09-21, Claude Code 2.1.261, one arm at a time at one protocol version, 30 turns, 900 s and USD 3.00 per subject, parallelism 3, the same two corpora); zero anomalies in all three; USD 12.41 together.
+
+| stratum | n | archive `mcp` | `shell` | `mcp` | `both` |
+|---|---|---|---|---|---|
+| agda-stdlib | 22 | 21 solved | 20 solved | 21 solved | 20 solved |
+| agda-stdlib/haystack | 12 | 12 solved | 12 solved | 12 solved | 12 solved |
+| agda-algebras/using | 11 | 9 solved, 2 restated | 9 solved | 9 solved, 1 restated | 11 solved |
+| agda-algebras/wholesale | 10 | 4 solved, 6 restated | 9 solved | 5 solved, 5 restated | 8 solved, 2 restated |
+| **total** | 55 | **46 solved, 8 restated** | **50 solved, 0 restated** | **47 solved, 6 restated** | **51 solved, 2 restated** |
+
+Turns and tool calls are the comparable columns (308, 342, 327 and 253, 287, 272; subjects ran three at a time).  Four readings.
+
++  **The control does not merely match the server arm; it beats it, and restates nothing.**  The difference sits where § 9 predicted a difference would sit, the `agda-algebras/wholesale` stratum and the restated column, with the sign reversed: 9 of 10 and none restated, against 5 and 5.
++  **The `both` arm says what the server is for.**  Offered both, the subject took all 55 verdicts from `check_file` and ran `agda` on the shell not once, while using Bash 65 times, every call a library-source read.  The knowledge tools collapse beside a shell and the verdict tool does not move: `definition_of` 19 calls in the `mcp` arm and 0 in the `both` arm, `search_by_name` 18 and 1, `exports_of` 11 and 2, `type_of` 34 and 11, `check_file` 56 and 57.
++  **The mechanism is searching, not reading.**  Every arm could read the library's sources; the `shell` arm consulted them 82 times and the `mcp` arm 13, because `grep` over a tree needs no prior knowledge of where a thing is, while `definition_of` answers where a definition is and not what it says (§ 9's own finding), leaving Read to be pointed at a file the subject must already have named.  A subject that reads the source writes the construction where one that queries the name cites it: on `algebras-homs-mon-to-hom` the server arms write `mon→hom′ m = mon→hom _ _ m` and the shell arm writes `mon→hom′ m = IsMon.HomReduct (proj₂ m)`, which is the term Opus wrote on that row in § 9's cost pair.
++  **Nobody used the protocol, and nobody read the corpus.**  Both shell-bearing arms were told in one sentence that `agda --interaction-json` exists and were given their row's corpus path; across 200 Bash calls the classes are `agda-batch` 56, `library-read` 141, `other` 3, `agda-interaction` 0, and `corpus-grep` 0.  The strongest possible test of the claim is that a frontier model does not reach for the protocol the server encodes, which argues for the batch lane rather than against it; and the extracted corpus is a retrieval substrate, not something an agent reads.
+
+Two qualifications the numbers carry.  Five rows across the two shell-bearing arms failed the isolation gate, and every one of those files type-checks with its statement preserved and no restatement evidence, so 50 and 51 are lower bounds and the files earned 54 and 52; three of the five are subjects hunting for Agda's own primitive modules (`Agda.Builtin.*`, which ship in Agda's data directory and belong to no registered library, so no read root contains them) by searching the filesystem, and two are the audit refusing `xargs`, which takes its paths from standard input and so names none the reader can account for.  Neither was changed while the comparison ran, because one audit across three arms is what makes them comparable.  And the `mcp` arm re-run reproduces the archive: 7 of 55 rows differ and they cancel, to 47 and 6 against 46 and 8, inside the variance the two Opus seeds already document, so the three protocol differences from the archive moved nothing measurable (the fourteenth tool `search_in_scope` from PR [#161], presented on every server-arm subject and called zero times; the readable library sources; the subjects' servers carrying the judge's `--safe`).
+
+**Status**.  Adopted and measured ([#162]).  ADR 0002 § 12's honest pattern stands and is sharpened: the server's value on this suite is the verdict, which is latency and a structured answer, and which the `both` arm shows an agent will not give up; its retrieval and knowledge surface is not merely reproducible by a shell but worse than one here, and that gap is worth six restatements.  The work it points at is [#17], retrieval as server tools, whose first rung is the thing a shell does best and the server cannot do at all, searching the library's own sources.  Open: the read roots omit Agda's primitive sources, and the audit does not model `xargs`; both are recorded on [#162] and cost no sweep to fix, since a re-judge re-audits every arm.  Opus arms are not run, since Opus is at 54 of 55 with the server and its control could only move the restated column and the cost.
+
 ## 10.  Where it is going
 
 +  **Premise selection** ([#19], [M2-5]).  The instrument and the bar now exist: a learned ranker is measured on the same `target:` and `restates:` ground truth, in the same excluded and unexcluded pools, and has to beat `idf-unfold`'s 9 of 33 fair targets and 12 of 21 originals in the top eight (§ 9).  What it has to learn is stated: the library's definitional unfoldings (which the deterministic scorer reads off the corpus bodies) and the discrimination among lemmas that conclude the same thing, where the hypotheses carry the signal.  Two changes outside ranking would move more than any scorer: candidate shapes that project hypotheses (`proj₂ m`) and nest applications, and a ranking query taken from the un-normalized goal display, which would state goals in the aliases the lemmas use.
@@ -323,6 +357,7 @@ By tier (Sonnet, Opus): routine 15 and 16 of 16, compositional 20 and 24 of 25, 
 | 18 | Ranking is measured offline against index ground truth (`target:`, `restates:`), by replaying the shared pool pipeline on recorded goals | Adopted ([#19]) | The instrument reproduces run `ctx-probe-1`'s pool counts and accepted order; `RetrievalRecallSpec` |
 | 19 | `idf-unfold` is the deterministic scorer; the default stays `token-overlap` so published numbers reproduce | Adopted ([#19]); the name rule re-instated after PR [#152]'s review un-confounded its knob | 9/33 fair targets and 12/21 originals in the top eight against 1/33 and 5/21; every rule pinned on corpus rows in `RetrieveSpec` |
 | 20 | The agent in the loop is a second instrument under the loop's verifier and report shape: one fresh session per obligation with the thirteen tools and one file, isolation verified per transcript, a restated column for a looked-up lemma, turns and tool calls as the comparable columns, and every fact about the final file Agda's own answer (check_file under --safe, agda-strux's elaborated types and body references) | Adopted ([#154]) | Sonnet 5 46/55 and Opus 5 54/55 against the loop's 14/55, 8 and 1 restated, zero anomalies; `JudgeSpec` over all 55 pairs, `TranscriptSpec` on a captured stream, `AgentBenchIntegrationSpec` (§ 9) |
+| 21 | The server is measured against its own control: an arm is one instrument (`shell`, `mcp`, `both`), the libraries' sources are readable on every arm, a shell arm is confined by a conservative audit over the paths its commands name rather than by the client, which cannot confine Bash, and the report gains `via`, `verdictVia`, and Bash calls by class | Adopted ([#162]) | Sonnet 5: shell 50/55 and 0 restated, mcp 47/55 and 6, both 51/55 and 2, zero anomalies; the `both` arm takes all 55 verdicts from `check_file` and runs `agda` on the shell never, `definition_of` 19 calls against 0; `ShellAuditSpec` written before the parser (§ 9) |
 
 ## References
 
@@ -340,6 +375,7 @@ By tier (Sonnet, Opus): routine 15 and 16 of 16, compositional 20 and 24 of 25, 
 [#108]: https://github.com/formalverification/agda-native-air/issues/108
 [#112]: https://github.com/formalverification/agda-native-air/issues/112
 [#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
 [#119]: https://github.com/formalverification/agda-native-air/issues/119
 [#121]: https://github.com/formalverification/agda-native-air/pull/121
 [#122]: https://github.com/formalverification/agda-native-air/issues/122
@@ -353,6 +389,8 @@ By tier (Sonnet, Opus): routine 15 and 16 of 16, compositional 20 and 24 of 25, 
 [#142]: https://github.com/formalverification/agda-native-air/issues/142
 [#152]: https://github.com/formalverification/agda-native-air/pull/152
 [#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#83]: https://github.com/formalverification/agda-native-air/issues/83
 
 [`proof-search/overview.md`]: ../proof-search/overview.md

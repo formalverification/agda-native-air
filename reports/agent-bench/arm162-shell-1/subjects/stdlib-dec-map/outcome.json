@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "stdlib-dec-map",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "map′",
+  "goal" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Function using (_∘_)"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 11514,
+  "costUsd" : 0.031075199999999997,
+  "tokens" : {
+    "input" : 8,
+    "output" : 790,
+    "cacheRead" : 32206,
+    "cacheCreation" : 3903
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 386,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+    "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
+  "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
+  "lastWords" : "The command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

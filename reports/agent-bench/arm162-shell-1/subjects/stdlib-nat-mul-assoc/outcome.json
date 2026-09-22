@@ -1,0 +1,82 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-assoc",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-assoc",
+  "goal" : "∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -xdev -iname \"Nat.agda\" -path \"*Builtin*\" 2>/dev/null; find / -xdev -iname \"*.agda\" -path \"*Builtin*Nat*\" 2>/dev/null",
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 5,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 106570,
+  "costUsd" : 0.1452918,
+  "tokens" : {
+    "input" : 16,
+    "output" : 2433,
+    "cacheRead" : 111889,
+    "cacheCreation" : 24358
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find / -xdev -iname \"Nat.agda\" -path \"*Builtin*\" 2>/dev/null; find / -xdev -iname \"*.agda\" -path \"*Builtin*Nat*\" 2>/dev/null"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 3,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 1593,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
+  "lastWords" : "The file type-checks with no errors — Agda's batch verdict reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

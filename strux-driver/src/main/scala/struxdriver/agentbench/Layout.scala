@@ -12,9 +12,15 @@
   *  disagree about a path.  A run root holds the report, the two JSONL
   *  files, the prompts, the staging server's log, the solved files, one work
   *  directory per subject (its cwd: the staged file and nothing else), and
-  *  one subject directory per obligation: the server config, the rendered
-  *  prompt, the stream-json transcript, the client's stderr, how the process
-  *  ended, the final file under its module stem, and the verdict.
+  *  one subject directory per obligation: the server config (an arm with the
+  *  server), the arm and the roots the subject was given (`subject.json`,
+  *  issue #162, so a re-judge audits the run's own arm and roots rather than
+  *  the operator's current ones), the rendered prompt, the stream-json
+  *  transcript, the client's stderr, how the process ended, the final file
+  *  under its module stem, and the verdict.  Both prompts are archived as the
+  *  subject saw them, rendered: the shell arms' carry the row's own `agda`
+  *  command and corpus path (issue #162), which the templates under the run
+  *  root do not.
   *
   *  ============================================================================
   */
@@ -43,7 +49,9 @@ final case class RunLayout(runRoot: Path) {
 /** One subject's archive. */
 final case class SubjectLayout(dir: Path, run: RunLayout) {
   def mcpConfig:  Path = dir.resolve("mcp.json")
+  def record:     Path = dir.resolve("subject.json")
   def prompt:     Path = dir.resolve("prompt.txt")
+  def sysPrompt:  Path = dir.resolve("system-prompt.txt")
   def transcript: Path = dir.resolve("transcript.jsonl")
   def stderr:     Path = dir.resolve("stderr.log")
   def runRecord:  Path = dir.resolve("run.json")

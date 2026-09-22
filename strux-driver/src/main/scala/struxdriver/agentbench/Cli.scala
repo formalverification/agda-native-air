@@ -8,8 +8,9 @@
   *  Purpose
   *  -------
   *  The agent bench's configuration and its argument parser (issue #154):
-  *  the caps, the paths, the model, the corpora, and the two modes that need
-  *  less (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
+  *  the caps, the paths, the model, the corpora, the arm (issue #162: which
+  *  instrument the subjects get), and the two modes that need less
+  *  (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
   *  in the LoopHarness style: unknown flags are refused by name, exactly one
   *  of `--ids` and `--all` is required, and an `--ids` that names nothing is
   *  refused at once rather than an hour into a sweep.  Pinned by
@@ -26,6 +27,7 @@ import struxdriver.search.Scaffold
 final case class AgentBenchConfig(
   index:           Path,
   ids:             Option[Set[String]],
+  arm:             Arm,
   outDir:          Path,
   runId:           String,
   projectRoot:     Path,
@@ -65,6 +67,7 @@ object Cli {
       |    (--ids id1,id2 | --all)   exactly one
       |    --out-dir PATH            run roots land here
       |    --run-id STR              the run directory name (a new protocol is a new run id)
+      |    [--arm shell|mcp|both]    which instrument the subjects get (default mcp: the archived protocol)
       |    --project-root PATH       repo root: the server's cwd; index paths resolve here
       |    --server-bin PATH         the agda-mcp binary (the subjects' servers, and the harness's own that stages and judges)
       |    --agda-json-bin PATH      the agda-strux extractor, for the judge's body references
@@ -86,7 +89,7 @@ object Cli {
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
     "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
-    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin")
+    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm")
 
   def parse(args: List[String]): Either[String, AgentBenchConfig] = {
     @annotation.tailrec
@@ -143,9 +146,11 @@ object Cli {
       safe    <- onOff(m, "safe", true)
       persist <- onOff(m, "persist-sessions", false)
       resume  <- onOff(m, "resume", false)
+      arm     <- m.get("arm").fold[Either[String, Arm]](Right(Arm.default))(Arm.parse)
     } yield AgentBenchConfig(
       index           = abs(ix),
       ids             = ids,
+      arm             = arm,
       outDir          = Paths.get(out).toAbsolutePath.normalize,
       runId           = runId,
       projectRoot     = rootAbs,

@@ -1,0 +1,281 @@
+{
+  "arm" : "shell",
+  "model" : "claude-sonnet-5",
+  "maxTurns" : 30,
+  "wallCapSec" : 900,
+  "maxBudgetUsd" : 3.00,
+  "safe" : true,
+  "serverTimeout" : 600,
+  "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+  "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+  "claudeVersion" : "2.1.261 (Claude Code)",
+  "claudeFlags" : [
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--max-turns",
+    "30",
+    "--max-budget-usd",
+    "3.00",
+    "--strict-mcp-config",
+    "--tools",
+    "Bash,Edit,Read",
+    "--allowedTools",
+    "Bash",
+    "--permission-mode",
+    "acceptEdits",
+    "--permission-prompts",
+    "none",
+    "--setting-sources",
+    "",
+    "--disable-slash-commands",
+    "--restricted",
+    "--add-dir",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-dojang",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-dojang/agda",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda",
+    "--no-session-persistence"
+  ],
+  "envAdded" : {
+    "MCP_TIMEOUT" : "120000",
+    "ENABLE_TOOL_SEARCH" : "false"
+  },
+  "envRemovedPrefix" : "CLAUDE",
+  "tools" : [
+    "Bash",
+    "Edit",
+    "Read"
+  ],
+  "addDirs" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-dojang",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-dojang/agda",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda"
+  ],
+  "persistSessions" : false,
+  "inputs" : {
+    "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench",
+    "index" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/data/benchmarks/benchmark-index.jsonl",
+      "sha256" : "ace10e29ef3def5af879e1ff57989242267fa4b1ce74a6124d7405ddb9e75719"
+    },
+    "serverBin" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-mcp/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-mcp-0.2.0/x/agda-mcp/build/agda-mcp/agda-mcp",
+      "sha256" : "e611e9b2061b946dc00607f99523dd0954580ab5804e121ce30e46c87b365595"
+    },
+    "agdaJsonBin" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/agda-strux/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-json-0.1.0.0/x/agda-json/build/agda-json/agda-json",
+      "sha256" : "5aca64e11431100073dfebbb846e6c26a1805517484c595394e95dbf809b9a47"
+    },
+    "corpora" : {
+      "agda-stdlib" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/data/corpora/agda-stdlib/v0/corpus.jsonl",
+        "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d",
+        "provenance" : {
+          "schema" : "agda-strux.provenance.v0",
+          "corpus" : {
+            "library" : "agda-stdlib",
+            "rowSchema" : "agda-strux full JSONL, docs/representation.md §3",
+            "typeAstVersions" : [
+              "0.3-v0"
+            ],
+            "rows" : 55576,
+            "bytes" : 462884404,
+            "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d",
+            "gzipBytes" : 13219208,
+            "gzipSha256" : "83e8beb0cfcf70a6a28b8d9ea4f4eb7c67c0f31607440e9337ccee5572ab03c1"
+          },
+          "source" : {
+            "library" : "agda-stdlib",
+            "remote" : "unknown",
+            "commit" : "unknown",
+            "commitRecordedBy" : "run-manifest",
+            "commitAtPackagingTime" : "unknown",
+            "commitMatchesCheckout" : true,
+            "workingTreeDirty" : false,
+            "untrackedFiles" : 0,
+            "untrackedSourcesUnderSrc" : [
+            ],
+            "srcDir" : "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src"
+          },
+          "producer" : {
+            "repository" : "formalverification/agda-native-air",
+            "commit" : "d2419c90420e0c73aba7bff063f432449b5c26d9",
+            "workingTreeDirty" : false,
+            "untrackedFiles" : 0,
+            "extractor" : "struxdriver.extract.AgdaJsonlDriver",
+            "backend" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/123-proof-search-p2/agda-strux/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-json-0.1.0.0/x/agda-json/build/agda-json/agda-json"
+          },
+          "toolchain" : {
+            "sampledAt" : "packaging-time",
+            "agda" : "Agda version 2.8.0",
+            "agdaLibraries" : [
+              "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/123-proof-search-p2/agda-dojang/agda-dojang.agda-lib",
+              "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/standard-library.agda-lib"
+            ],
+            "flakeInputs" : {
+              "github-project" : {
+                "type" : "github",
+                "owner" : "williamdemeo",
+                "repo" : "github-project",
+                "rev" : "446b51c9c2958684a8a2de522b7116ac55955ecf",
+                "narHash" : "sha256-8bMamwpnJJ8eC+SL6EKcY2t+z2OB6fqNw8ZDQNklFyU="
+              },
+              "nixpkgs" : {
+                "type" : "github",
+                "owner" : "NixOS",
+                "repo" : "nixpkgs",
+                "rev" : "b6018f87da91d19d0ab4cf979885689b469cdd41",
+                "narHash" : "sha256-twXPFqFsrrY5r28Zh7Homgcp2gUMBgQ6WDS98Q/3xFI="
+              },
+              "nixpkgs-agda" : {
+                "type" : "github",
+                "owner" : "NixOS",
+                "repo" : "nixpkgs",
+                "rev" : "9dcb002ca1690658be4a04645215baea8b95f31d",
+                "narHash" : "sha256-9jVDGZnvCckTGdYT53d/EfznygLskyLQXYwJLKMPsZs="
+              },
+              "nixpkgs_2" : {
+                "type" : "github",
+                "owner" : "NixOS",
+                "repo" : "nixpkgs",
+                "rev" : "b134951a4c9f3c995fd7be05f3243f8ecd65d798",
+                "narHash" : "sha256-OnSAY7XDSx7CtDoqNh8jwVwh4xNL/2HaJxGjryLWzX8="
+              }
+            }
+          },
+          "run" : {
+            "startedAt" : "2026-08-27T08:18:19.108662810Z",
+            "finishedAt" : "2026-08-27T08:23:10.335202253Z",
+            "runner" : "spark",
+            "runnerEffective" : "spark",
+            "sparkFallback" : false,
+            "sparkMaster" : "local[4]",
+            "parallelism" : 20,
+            "resume" : false,
+            "modulesFile" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/123-proof-search-p2/data/corpora-metadata/agda-stdlib/all-modules.txt"
+          },
+          "coverage" : {
+            "attempted" : 1153,
+            "succeeded" : 1149,
+            "failed" : 4,
+            "notAttempted" : 0
+          }
+        }
+      },
+      "agda-algebras" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/162-m1-38-agent-bench/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+        "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35",
+        "provenance" : {
+          "schema" : "agda-strux.provenance.v0",
+          "corpus" : {
+            "library" : "agda-algebras",
+            "rowSchema" : "agda-strux full JSONL, docs/representation.md §3",
+            "typeAstVersions" : [
+              "0.3-v0"
+            ],
+            "rows" : 13123,
+            "bytes" : 224646301,
+            "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35",
+            "gzipBytes" : 5709185,
+            "gzipSha256" : "a56785dc67df0e2a165a0cc3654c27e2357b98b26651c2d59bc3b7634d4fa1e2"
+          },
+          "source" : {
+            "library" : "agda-algebras",
+            "remote" : "git@github.com:ualib/agda-algebras.git",
+            "commit" : "4662373d281daf0f20a6319f1a46755a45d33293",
+            "commitRecordedBy" : "run-manifest",
+            "commitAtPackagingTime" : "4662373d281daf0f20a6319f1a46755a45d33293",
+            "commitMatchesCheckout" : true,
+            "workingTreeDirty" : false,
+            "untrackedFiles" : 30,
+            "untrackedSourcesUnderSrc" : [
+            ],
+            "srcDir" : "/home/williamdemeo/git/ualib/agda-algebras/master/src"
+          },
+          "producer" : {
+            "repository" : "formalverification/agda-native-air",
+            "commit" : "ba9272a7fdda4002bdc2e0f9d3eec88865965f9c",
+            "workingTreeDirty" : false,
+            "untrackedFiles" : 0,
+            "extractor" : "struxdriver.extract.AgdaJsonlDriver",
+            "backend" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/corpus-v01-cut/agda-strux/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-json-0.1.0.0/x/agda-json/build/agda-json/agda-json"
+          },
+          "toolchain" : {
+            "sampledAt" : "packaging-time",
+            "agda" : "Agda version 2.8.0",
+            "agdaLibraries" : [
+              "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/corpus-v01-cut/agda-dojang/agda-dojang.agda-lib",
+              "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/standard-library.agda-lib",
+              "/home/williamdemeo/git/ualib/agda-algebras/master/agda-algebras.agda-lib"
+            ],
+            "flakeInputs" : {
+              "github-project" : {
+                "type" : "github",
+                "owner" : "williamdemeo",
+                "repo" : "github-project",
+                "rev" : "446b51c9c2958684a8a2de522b7116ac55955ecf",
+                "narHash" : "sha256-8bMamwpnJJ8eC+SL6EKcY2t+z2OB6fqNw8ZDQNklFyU="
+              },
+              "nixpkgs" : {
+                "type" : "github",
+                "owner" : "NixOS",
+                "repo" : "nixpkgs",
+                "rev" : "b6018f87da91d19d0ab4cf979885689b469cdd41",
+                "narHash" : "sha256-twXPFqFsrrY5r28Zh7Homgcp2gUMBgQ6WDS98Q/3xFI="
+              },
+              "nixpkgs-agda" : {
+                "type" : "github",
+                "owner" : "NixOS",
+                "repo" : "nixpkgs",
+                "rev" : "9dcb002ca1690658be4a04645215baea8b95f31d",
+                "narHash" : "sha256-9jVDGZnvCckTGdYT53d/EfznygLskyLQXYwJLKMPsZs="
+              },
+              "nixpkgs_2" : {
+                "type" : "github",
+                "owner" : "NixOS",
+                "repo" : "nixpkgs",
+                "rev" : "b134951a4c9f3c995fd7be05f3243f8ecd65d798",
+                "narHash" : "sha256-OnSAY7XDSx7CtDoqNh8jwVwh4xNL/2HaJxGjryLWzX8="
+              }
+            }
+          },
+          "run" : {
+            "startedAt" : "2026-09-07T03:11:06.497398854Z",
+            "finishedAt" : "2026-09-07T03:17:32.680240901Z",
+            "runner" : "spark",
+            "runnerEffective" : "spark",
+            "sparkFallback" : false,
+            "sparkMaster" : "local[4]",
+            "parallelism" : 20,
+            "resume" : false,
+            "modulesFile" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/corpus-v01-cut/data/corpora-metadata/agda-algebras/everything-modules.txt"
+          },
+          "coverage" : {
+            "attempted" : 409,
+            "succeeded" : 409,
+            "failed" : 0,
+            "notAttempted" : 0
+          }
+        }
+      }
+    }
+  },
+  "prompts" : {
+    "system" : {
+      "path" : "prompts/system-prompt.md",
+      "sha256" : "dde6d6927859505a166345450ef00640fe1ec8402399d209192cf0bfff96eaf2"
+    },
+    "user" : {
+      "path" : "prompts/user-prompt.md",
+      "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+    }
+  }
+}

@@ -8,9 +8,11 @@
   *  Purpose
   *  -------
   *  The protocol of a run (issue #154): every knob that decides what a
-  *  subject sees and how its file is judged (the model, the caps, the
-  *  client's flags and version, the tools, the servers' Agda flags, the
-  *  prompts by digest, the index and the corpora by path).  A fresh run
+  *  subject sees and how its file is judged (the arm, the model, the caps, the
+  *  client's flags and version, the tools, the directories the file tools may
+  *  read, the servers' Agda flags, the prompts by digest, the index and the
+  *  corpora by path).  A run id is one arm (issue #162): the three attribution
+  *  arms are three run ids, and `arm` is the field that says which.  A fresh run
   *  writes it to `protocol.json` before any subject spawns, and the report's
   *  config block is this record plus the run's own knobs.  A run id is one
   *  protocol: `--resume` keeps an archived subject only when the protocol on
@@ -64,9 +66,10 @@ object Protocol {
   /** The protocol as JSON: null-valued knobs (an unset model) are dropped, so
     * the record and the comparison see the same keys.
     */
-  def of(cfg: AgentBenchConfig, version: String, sysP: String, userT: String, inputs: Json): Json = {
-    val subject = SubjectConfig.of(cfg, sysP, userT)
+  def of(cfg: AgentBenchConfig, version: String, sysP: String, userT: String, inputs: Json, addDirs: Vector[Path] = Vector.empty): Json = {
+    val subject = SubjectConfig.of(cfg, sysP, userT, addDirs)
     Json.obj(
+      "arm"              -> cfg.arm.name.asJson,
       "model"            -> cfg.model.asJson,
       "maxTurns"         -> cfg.maxTurns.asJson,
       "wallCapSec"       -> cfg.wallCapSec.asJson,
@@ -79,7 +82,13 @@ object Protocol {
       "claudeFlags"      -> Subject.fixedFlags(subject).asJson,
       "envAdded"         -> Subject.envAdded.asJson,
       "envRemovedPrefix" -> Subject.envRemovedPrefix.asJson,
-      "tools"            -> (Subject.fileTools.toVector.sorted ++ Subject.agdaTools).asJson,
+      // The tools a subject of this arm is given: its built-ins, and the agda
+      // tools an arm with the server must have.  What the server actually
+      // presented is recorded per subject (Isolation.agdaToolsPresented),
+      // because that surface grows between runs.
+      "tools"            -> (cfg.arm.builtinTools.toVector.sorted ++
+                             (if (cfg.arm.hasServer) Subject.agdaToolsRequired else Vector.empty)).asJson,
+      "addDirs"          -> addDirs.map(_.toString).asJson,
       "persistSessions"  -> cfg.persistSessions.asJson,
       "inputs"           -> inputs,
       "prompts" -> Json.obj(

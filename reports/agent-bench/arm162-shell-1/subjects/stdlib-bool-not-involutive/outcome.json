@@ -1,0 +1,76 @@
+{
+  "benchmarkId" : "stdlib-bool-not-involutive",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "not-involutive",
+  "goal" : "∀ (b : Bool) → not (not b) ≡ b",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 11900,
+  "costUsd" : 0.0301356,
+  "tokens" : {
+    "input" : 8,
+    "output" : 718,
+    "cacheRead" : 32208,
+    "cacheCreation" : 3844
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 620,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(b : Bool) → not (not b) ≡ b",
+    "final" : "(b : Bool) → not (not b) ≡ b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-bool-not-involutive/final/Bool-not-involutive.agda",
+  "transcriptPath" : "subjects/stdlib-bool-not-involutive/transcript.jsonl",
+  "lastWords" : "The command reports success (no errors, module type-checks cleanly).",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

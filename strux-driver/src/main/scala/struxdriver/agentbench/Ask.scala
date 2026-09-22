@@ -162,6 +162,19 @@ final case class Extractor(bin: Path, includes: Vector[Path], agdaDir: String, t
 }
 
 object Extractor {
+  /** Every registered library's own directory: the parent of each `.agda-lib`
+    * the registry names.  A library IS its directory, so a subject allowed to
+    * read the library's sources is allowed to read from there (issue #162: a
+    * `find` at the library root was refused when only the `include:` roots
+    * were allowed, which measured the audit rather than the subject).
+    */
+  def libraryRootsFromRegistry(librariesFile: Path): IO[Vector[Path]] =
+    IO.blocking {
+      Files.readAllLines(librariesFile, StandardCharsets.UTF_8).asScala.toVector.map(_.trim).filter(_.nonEmpty)
+        .map(Paths.get(_)).filter(Files.isRegularFile(_)).flatMap(lib => Option(lib.getParent))
+        .map(_.toAbsolutePath.normalize).distinct
+    }
+
   /** Every registered library's source roots: each line of the registry names
     * a `.agda-lib`, whose `include:` line lists roots relative to it.
     */
