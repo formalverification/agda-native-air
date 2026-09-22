@@ -146,6 +146,8 @@ Make the work legible to people who did not build it.  Everything through Milest
 
 Its first three issues are the site itself, and they inherit a rule from [M1-8] (#85) that the rest of the milestone should keep: what the site shows is *generated from committed artifacts*, and the build refuses to publish when a figure disagrees with the record it came from.  The demo page's benchmark table is regenerated from each run's `report.json` and compared cell by cell with ADR 0001 § 9, so a number that drifts fails the build rather than reaching a reader.  That is why the site lives in this repository rather than in a site repository of its own: the artifacts it must not contradict are here.
 
+The site's work is tracked by [M6-6] ([#180](https://github.com/formalverification/agda-native-air/issues/180)): the three issues above, then the custom domain cutover, [M6-7] ([#177](https://github.com/formalverification/agda-native-air/issues/177)), the link from `formalverification.io`, [M6-8] ([#178](https://github.com/formalverification/agda-native-air/issues/178)), and a demo comparing the arms, batch type-checking alone against `agda-mcp` without and with the agda-algebras corpus, [M6-9] ([#179](https://github.com/formalverification/agda-native-air/issues/179)).  The domain, when there is one, is the front door and not the archive: anything meant to be cited is cited by its GitHub URL or a Zenodo DOI.
+
 The publication targets already filed under other milestones belong to this one in spirit, and can be moved here when convenient rather than as a separate exercise: the tech report (#86) and the `paper` label's issues are the obvious candidates.
 
 **Exit criterion:**
@@ -2302,7 +2304,7 @@ Worth being blunt about what is *not* worth carrying: `propose_terms` and `propo
 
 ---
 
-### Issue M1-38: agent bench: a shell-only control arm and a both-tools arm, the attribution measurement for the server (#162)
+### Issue M1-38: agent bench: a shell-only control arm and a both-tools arm, the attribution measurement for the server (#162, closed)
 
 **Labels:** `agda-mcp`, `eval`, `M1: agda-dojang/mcp`
 
@@ -3764,7 +3766,7 @@ A stranger can land on the site and, within one screen, learn what the project i
 
 ---
 
-### Issue M6-4: Benchmark obligations import 5.9 MB of interfaces for _≡_ and refl (#167)
+### Issue M6-4: Benchmark obligations import 5.9 MB of interfaces for _≡_ and refl (#167, closed)
 
 **Labels:** `agda-dojang`, `cleanup`, `M6: docs + dissemination`
 
@@ -3943,6 +3945,159 @@ It was found while measuring whether a browser-hosted Agda could check this proj
 [#144]: https://github.com/williamdemeo/website/issues/144
 [#103]: https://github.com/williamdemeo/website/issues/103
 [#167]: https://github.com/formalverification/agda-native-air/issues/167
+
+---
+
+### Issue M6-6: site: the agda-native-air project site (tracking) (#180)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+Everything through Milestone 5 is measured and recorded for someone who is already inside the project.  This issue tracks the work that builds the surface for a stranger: the project site, generated from the committed artifacts of this repository and deployed from `main` by `.github/workflows/pages.yml`.  When it was filed the repository published exactly one page, the session replay from [#85] (PR [#166]).
+
+# The decision, and its trigger for revisiting
+
+Taken 2026-09-20: **the site lives in this repository**, not in a site repository of its own and not folded into `formalverification.io`.
+
++  The demo page's value is that it is generated from committed artifacts here, and that the build refuses to publish when they disagree.  `scripts/python/demo/` reads `reports/agent-bench/`, embeds the obligations under `data/benchmarks/`, and regenerates the table of ADR 0001 § 9, comparing it cell by cell; a mismatch fails the build.  A separate repository would reach across a boundary for all of that, by submodule, cross-repository checkout, or a published artifact, and each of those weakens the property that makes the page worth trusting.
++  `formalverification.io` is a MkDocs site with a different audience and its own release cadence; coupling to it buys nothing.
++  So the ordinary shape holds: the org site links to the project site, and the project site lives with its code.
++  Revisit when the site's non-generated content (tutorials, papers, posts) clearly outweighs its generated content.  Splitting later is easy; un-splitting is not.  If it is ever split, publish the demo's generated JSON (`data/demo/`, about 230 KB) as a release asset consumed by digest rather than as a submodule, and keep the ADR-agreement check on the producing side, where it can still fail a build.
+
+# The rule every site issue inherits
+
+Nothing generated is committed; what the site shows is generated from committed artifacts; and the build refuses to publish a figure that disagrees with the record it came from.  This is [#85]'s rule, and Milestone 6's.
+
+# The domain is the front door, not the archive
+
+Whatever address the site ends up at, anything meant to be cited (the benchmark, the corpora, the ADRs, the agent-bench archive) is cited by its GitHub URL or a Zenodo DOI, never by a domain whose renewal is one person's calendar reminder.  [#177] puts this where a future author will read it.
+
+# The issues
+
+1.  [#169] `[M6-1]`: the MkDocs Material skeleton, styled like williamdemeo.org, and one build, `make site`.
+2.  [#170] `[M6-2]`: the demo page carried in as the standalone document it is, and the two palettes reconciled.
+3.  [#171] `[M6-3]`: the landing page, and a curated nav over `docs/`.
+4.  [#177] `[M6-7]`: the custom domain cutover, if the domain is bought.
+5.  [#178] `[M6-8]`: a link from `formalverification.io`.
+6.  [#179] `[M6-9]`: a demo comparing the arms, batch type-checking alone against `agda-mcp` without and with the agda-algebras corpus.
+
+# Done
+
+Every issue above is closed; a stranger can reach the site cold, learn what the project is within one screen, watch a real agent session, and find the artifacts behind any claim; the site is served at its final address; and `git status` is clean after `make site` on a fresh checkout.
+
+# Relations
+
++  Milestone 6, whose description in `docs/GITHUB_PROJECT.md` carries the same decision.
++  The brief for the first three issues is `~/claude-kickoff-prompts/kickoff-39-air-project-site.md` (source: `claude-tooling/docs/kickoffs/air-project-site.md`).
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#171]: https://github.com/formalverification/agda-native-air/issues/171
+[#177]: https://github.com/formalverification/agda-native-air/issues/177
+[#178]: https://github.com/formalverification/agda-native-air/issues/178
+[#179]: https://github.com/formalverification/agda-native-air/issues/179
+
+---
+
+### Issue M6-7: site: the custom domain cutover, if the domain is bought (#177)
+
+**Labels:** `docs`, `infrastructure`, `M6: docs + dissemination`
+
+# Context
+
+The site is served at `https://formalverification.github.io/agda-native-air/`, built by `.github/workflows/pages.yml` with the repository's Pages source set to "GitHub Actions".  No custom domain is configured: `gh api repos/formalverification/agda-native-air/pages --jq .cname` returns `null` as of 2026-09-21.  William is considering `agda-native.ai` (AIR expands to Agda Native AI Reasoning); whether to buy it is his call, and this issue waits on that decision.
+
+# Work, once the domain exists
+
+The cutover is small, reversible, and well understood.  The order matters.
+
++  **`CNAME` in the uploaded artifact**, not only in the repository root.  When Pages is built by a workflow, GitHub reads the domain from the artifact that `upload-pages-artifact` uploads; a `CNAME` that is not in it is silently ignored and the domain reverts at the next deploy.  So `make site` has to write the one-line `CNAME` into the published tree, and a test has to assert it is there.
++  **DNS**: an `ALIAS` or `ANAME` record at the apex, or `A` records to GitHub Pages' four addresses, plus a `CNAME` record on `www` pointing at `formalverification.github.io`.  Then register the domain on the repository (`gh api -X PUT repos/formalverification/agda-native-air/pages -f cname=...`), wait for the certificate to be issued, and turn on "Enforce HTTPS".  The `deploying-to-cloudflare-pages` skill records the cutover order and the rollback even though the host here is GitHub.
++  **`site_url` in `mkdocs.yml`** moves to the new address.  It is not cosmetic: the canonical links, the sitemap, and Material's instant navigation (which decides from the sitemap which links it may intercept) all read it.
++  **The addresses that point here** follow: the README's links, the org site's link ([M6-8]), and any document that quotes the Pages address.
++  **Write the front-door rule into the site itself**, where a future author will see it: the domain is the front door, not the archive.  Anything meant to be cited in a paper (the benchmark, the corpora, the ADRs, the agent-bench archive) is cited by its GitHub URL or a Zenodo DOI, never by a domain whose renewal is one person's calendar reminder.
++  **Rollback** is removing the `CNAME` from the build and reverting `site_url`; the `github.io` address never stops working.
+
+# Done
+
+The site is served at the domain over HTTPS, with the certificate issued and HTTPS enforced; the `github.io` address redirects to it; `make site` emits the `CNAME` and a test pins it; `site_url` and the inbound links are updated; the front-door rule is on a published page; and the revert path is written down in the PR.
+
+# Relations
+
++  Depends on [#169], which builds the artifact, and on the purchase decision.
++  Tracked by [M6-6] ([#180]).
+
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+
+---
+
+### Issue M6-8: site: a link from formalverification.io (#178)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+The decision recorded in [M6-6] ([#180]): the org site links to the project site, and the project site lives with its code.  `formalverification/formalverification.io` is a MkDocs site with a different audience and its own release cadence, so this is one link, not an integration.
+
+# Work
+
++  A pull request on `formalverification/formalverification.io` adding the project site wherever that site lists projects (its nav or a projects page), with one sentence saying what `agda-native-air` is, pointing at the site's final address: the custom domain if [M6-7] lands first, otherwise `https://formalverification.github.io/agda-native-air/`, revisited when the domain does.
++  A link back from the project site's footer or landing page to the org site, so each is reachable from the other.
+
+# Done
+
+The link is live on `formalverification.io` and resolves; the return link is live here.
+
+# Relations
+
++  After [#171], so there is a landing page to link to; best after [M6-7].
++  Tracked by [M6-6] ([#180]).
+
+[#171]: https://github.com/formalverification/agda-native-air/issues/171
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+
+---
+
+### Issue M6-9: site: a demo comparing the arms: batch type-checking alone, agda-mcp without a corpus, agda-mcp with the agda-algebras corpus (#179)
+
+**Labels:** `eval`, `docs`, `M6: docs + dissemination`
+
+# Context
+
+The strongest thing the site could show a stranger is one obligation attempted three ways by the same frontier model: with the pinned `agda` on a shell and nothing else (batch type-checking), with `agda-mcp` started without a corpus (the proof-state and live-query tools, no search), and with `agda-mcp` started with the real agda-algebras corpus loaded (all fourteen tools).  Watching where each one reaches for what is the argument for the instrument, made by a session that happened rather than by prose.  William proposed the comparison in the session that filed this issue (2026-09-21).
+
+Two of the three arms already exist in the committed archive.  ADR 0001 § 9, "The attribution arms", records the `shell`, `mcp`, and `both` arms of [#162] (runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1`, all three with the two corpora loaded), and the [#154] runs the demo page replays today are `mcp` arms with the corpora.  The arm that does not exist is **`agda-mcp` without a corpus**: the server started with no `--corpus`, so the four corpus-backed tools are not registered.
+
+# Work
+
++  **The measurement first, and not on this issue.**  An agent-bench arm with the server started without a corpus, on the same 55 rows, prompts, caps, and judge as [#162], archived under `reports/agent-bench/` like the others.  It is a research measurement and belongs beside [#162] under Milestone 1; file it there if the comparison is wanted.  This issue depends on it.
++  **Then the page.**  For a small set of obligations, one panel per arm on the same row, replayed from the archive by the mechanism [#85] built (`scripts/python/demo/`), with each arm's totals read from its run's `report.json` and checked against ADR 0001 § 9 the way `numbers.py` checks the table today.  A row is chosen because the arms differ on it, and the page says so.
++  The page keeps the demo's rules: complete without JavaScript, every tool answer on the page in full, nothing fetched off the origin, no absolute path from the sweep machine.
+
+# One thing to be careful about
+
+The committed `.mcp.json` starts the server with `agda-mcp/test/resources/corpus-fixture.jsonl`, a fixture, not the published corpus.  A page that claims "the real corpus loaded" has to be generated from a run whose own archived `mcp.json` names the agda-algebras corpus (`corpus.jsonl` from the `agda-algebras-corpus-v0.1` release), and the page should print which corpus the server carried, read from that file rather than asserted.
+
+# Done
+
+A published page with three arms on the same obligations, generated from the archive, naming the corpus each server carried, with every total checked against the ADR; the 74 demo tests and any new ones pass.
+
+# Relations
+
++  Depends on [#169] and [#170], and on the no-corpus measurement to be filed under Milestone 1.
++  Builds on [#85], [#154], and [#162].
++  Tracked by [M6-6] ([#180]).
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
 
 <!-- END GENERATED: milestone-6 -->
 
