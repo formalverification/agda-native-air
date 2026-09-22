@@ -225,6 +225,19 @@ make eval-proof-completion-smoke
 make help    # see what's available and working now
 ```
 
+**The project site** (the pages at
+[formalverification.github.io/agda-native-air](https://formalverification.github.io/agda-native-air/),
+including the demo) is built and served locally with its own shell and three
+targets; `docs/HowToRun.md` § 16 has the details and the fallback for a
+machine without Nix.
+
+```sh
+nix develop .#site      # mkdocs + the pinned Material theme; no Agda
+make site               # demo, then the site around it -> public/
+make site-serve         # http://127.0.0.1:8000/agda-native-air/ with live reload
+make site-check         # nothing fetched off-origin, every link resolves
+```
+
 ---
 
 ## Project scope

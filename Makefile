@@ -2013,7 +2013,7 @@ _check-mkdocs:
 	@command -v "$(MKDOCS)" >/dev/null 2>&1 || { \
 	  echo "error: $(MKDOCS) not found on PATH"; \
 	  echo "       enter the site shell:  nix develop .#site"; \
-	  echo "       or install the pinned fallback:  python3 -m venv .venv-site && .venv-site/bin/pip install -r $(SITE_REQS)"; \
+	  echo "       or install the pinned fallback:  python3 -m venv .venv && .venv/bin/pip install -r $(SITE_REQS), then put .venv/bin on PATH"; \
 	  exit 1; }
 
 # Sequenced through recursive make, like `demo`: the MkDocs build reads the

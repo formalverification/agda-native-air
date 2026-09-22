@@ -34,7 +34,7 @@ The contract documents are as follows:
 
 The operating guides are as follows:
 
-+  [`HowToRun.md`](HowToRun.md): the copy-and-paste developer guide, end to end; § 13 configures agda-mcp against an external Agda project.
++  [`HowToRun.md`](HowToRun.md): the copy-and-paste developer guide, end to end; § 13 configures agda-mcp against an external Agda project, and § 16 builds, serves, and checks the project site.
 +  [`WORKFLOW.md`](WORKFLOW.md) and [`WORKFLOW-Cheatsheet.md`](WORKFLOW-Cheatsheet.md): the issue, branch, and worktree workflow, in full and condensed.
 +  [`branch-protection-setup.md`](branch-protection-setup.md): the admin runbook for the repository's merge settings.
 +  [`public-history.md`](public-history.md): notes on the migration that made the repository public.
