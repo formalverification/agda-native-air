@@ -22,7 +22,10 @@
 --   files of whatever it checks.  Prefer an `Agda.Builtin.*` primitive or a
 --   `.Base` module to the full standard-library wrapper that re-exports a
 --   properties module alongside it.  Two ordinary-looking imports once cost
---   154 modules and 31 MB of interfaces here; see issue #168.
+--   154 modules and 31 MB of interfaces here; see issue #168, and
+--   `docs/import-closure.md` for the measurement, the recipe that produces
+--   it, and why the benchmark fixtures are deliberately *not* trimmed the
+--   same way (issue #167).
 --
 {-# OPTIONS --safe --cubical-compatible #-}
 

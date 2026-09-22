@@ -75,6 +75,7 @@ AgdaDojang is guided by a few core principles.
 +  **Small action vocabulary**: prefer a few well-understood primitives over a large tactic language.
 +  **Transparency**: surface goals, contexts, and failures explicitly.
 +  **Research-oriented**: optimize for inspectability and extensibility, not raw automation.
++  **Small import closure**: `AgdaDojang.Prelude` is opened by `AgdaDojang.Debug`, which is opened by all 110 benchmark obligation and gold files and by the fixtures under `agda-dojang/data/fixtures/`, so an import added to the prelude is paid by every one of them, in type-checking time on every cold build and in interface bytes for anything that ships the closure.  Prefer an `Agda.Builtin.*` primitive or a `.Base` module to the full standard-library wrapper that re-exports a properties module alongside it.  Two ordinary-looking lines once cost 154 modules and 31.0 MB of interfaces here; the measurement, the recipe that produced it, and the rules that follow are in [`docs/import-closure.md`][import-closure].
 
 AgdaDojang is not intended to compete with mature tactic languages; it is intended to be *learnable* by machines.
 
@@ -844,8 +845,10 @@ All of those are "paths" in the Kleisli category of `TC`.
 + [`agda-strux/README.md`][agda-strux/README]
 + [`ml-pipeline/README.md`][ml-pipeline/README]
 + [`strux-driver/README.md`][strux-driver/README]
++ [`docs/import-closure.md`][import-closure]: what this repository's Agda costs to check and to ship, and why the prelude and the benchmark fixtures import what they do
 
 [Root project README]: https://github.com/formalverification/agda-native-air/blob/main/README.md
+[import-closure]: https://github.com/formalverification/agda-native-air/blob/main/docs/import-closure.md
 [agda-strux/README]: https://github.com/formalverification/agda-native-air/blob/main/agda-strux/README.md
 [strux-driver/README]: https://github.com/formalverification/agda-native-air/blob/main/strux-driver/README.md
 [ml-pipeline/README]: https://github.com/formalverification/agda-native-air/blob/main/ml-pipeline/README.md

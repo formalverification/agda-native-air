@@ -39,6 +39,7 @@ The operating guides are as follows:
 
 The evidence record is as follows:
 
++  [`import-closure.md`](import-closure.md): what this repository's Agda costs to check and to ship.  What an `open import` drags behind it, how to measure a module closure without getting a plausible wrong number, the measured record of [#168] (the prelude, cut from 190 modules to 36) and [#167] (the benchmark fixtures, deliberately left idiomatic), and what a fixture's imports are read by besides Agda.
 +  [`mcp-field-reports.md`](mcp-field-reports.md): the session-by-session record of agda-mcp in real use, appended newest last.  It stays at this path deliberately: the agda-algebras and fls standing instructions (in the claude-tooling repository) tell sessions in those projects to append to it by path.
 
 ## Reading order for a new collaborator
@@ -52,3 +53,5 @@ The evidence record is as follows:
 
 <!-- GitHub references -->
 [#68]: https://github.com/formalverification/agda-native-air/issues/68
+[#167]: https://github.com/formalverification/agda-native-air/issues/167
+[#168]: https://github.com/formalverification/agda-native-air/issues/168
