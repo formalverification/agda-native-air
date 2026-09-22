@@ -1,0 +1,27 @@
+{#-
+  File: web/overrides/partials/source.html
+
+  Material's header chip for the repository (its partials/source.html in
+  9.5.49), with one attribute removed: `data-md-component="source"`.  That
+  attribute is what makes Material's bundle fetch
+  api.github.com/repos/<owner>/<repo> on every page load, for a star and
+  fork count beside the name.  A page of this site fetches nothing off its
+  own origin (web/README.md), and the count is not worth an exception to
+  that rule; the chip stays, as a link, because the repository is public and
+  the source is what the site is about.
+
+  williamdemeo.org solved the same problem by dropping `repo_url` outright,
+  which also removed the chip; its repository is private and the link would
+  have led nowhere.  Here the link is the point, so the override is the
+  narrower change.  Keep in step with Material's own partial on an upgrade:
+  the classes below are 9.5.49's.
+-#}
+<a href="{{ config.repo_url }}" title="{{ lang.t('source') }}" class="md-source">
+  <div class="md-source__icon md-icon">
+    {% set icon = config.theme.icon.repo or "fontawesome/brands/git-alt" %}
+    {% include ".icons/" ~ icon ~ ".svg" %}
+  </div>
+  <div class="md-source__repository">
+    {{ config.repo_name }}
+  </div>
+</a>

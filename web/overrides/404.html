@@ -1,0 +1,264 @@
+{#-
+  File: web/overrides/404.html
+
+  The 404 as an open goal.  GitHub Pages serves 404.html from the site root
+  for every URL that resolves to nothing, which makes this the one page every
+  mistyped link reaches.  Material's default is `<h1>404 - Not found</h1>`
+  over the full docs frame.  This file shadows it (Material resolves
+  templates from `custom_dir` first) and turns the page into an Agda goal
+  that cannot be filled.  It is williamdemeo.org's page (overrides/404.html
+  in the williamdemeo/website repository at fcb6bf0, 2026-09-20) with this
+  site's paths, and without the mount point for a background component this
+  site does not have.
+
+  Four blocks are overridden:
+
+    htmltitle  MkDocs renders error templates with no `page` object, so the
+               default title collapses to the bare site name.
+    extrahead  The styles, scoped to this page.  They live here rather than
+               in extra.css because they style nothing else; last in <head>,
+               they win cascade ties against it.  Written in tokens, same
+               rule as extra.css, with the exceptions flagged where they
+               occur: two structural values no token covers, and one
+               per-scheme color pair for the typed comment's green.
+    site_nav   Emptied.  The nav sidebar is the docs frame, and a wrong URL
+               is not a docs page; search stays available in the header.
+    content    The goal itself.
+
+  URLs: mkdocs renders error templates with base_url taken from site_url's
+  path, not a relative prefix, so the links and stylesheet hrefs below
+  resolve however deep the missing URL is.  That is also why this page
+  cannot be previewed from file://; use `make site-serve` and request any
+  bogus path.
+
+  Nothing here fetches, and the only motion is the comment line typing
+  itself out once: pure CSS, one character per steps() frame over a
+  clip-path, so the full sentence is in the DOM from the start (screen
+  readers are never made to wait), the box never changes size, and
+  prefers-reduced-motion turns it off entirely.
+
+  The one script is the few lines at the bottom that put the missing URL's
+  own path into the goal.  It writes through textContent only (the path is
+  attacker-chosen text and must never be parsed as markup), and the static
+  `ThisPage` stands when scripts are off.
+
+  The Pygments spans in the goal block follow pygments.lexers.AgdaLexer's
+  vocabulary (`nf` for the defined name, `ow` for `:` and `=`), so the block
+  is colored exactly like every other Agda block on the site.  Keep in step
+  with the upstream template on a Material upgrade: the block names and the
+  md-* classes are Material's (9.5.49).
+-#}
+{% extends "base.html" %}
+
+{% block htmltitle %}
+  <title>404 · page not found · {{ config.site_name }}</title>
+{% endblock %}
+
+{% block extrahead %}
+  {{ super() }}
+  <style>
+    .md-typeset .goal-404 {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-6);
+      text-align: center;
+      /* Center the composition in the main column.  No token measures the
+         viewport; svh so a phone's collapsing URL bar does not jump it. */
+      min-height: 60vh;
+      min-height: 60svh;
+      padding: var(--space-16) 0;
+    }
+
+    /* The flex gap owns the vertical rhythm. */
+    .md-typeset .goal-404 > * {
+      margin: 0;
+    }
+
+    /* The h5 recipe from extra.css: the page's one heading, worn lightly,
+       so the goal block below it stays the signature. */
+    .md-typeset h1.goal-404__eyebrow {
+      font-family: var(--font-body), sans-serif;
+      font-size: var(--type-small);
+      font-weight: var(--strong-weight);
+      letter-spacing: var(--tracking-caps);
+      text-transform: uppercase;
+      color: var(--c-fg-muted);
+    }
+
+    .md-typeset .goal-404__goal {
+      width: fit-content;
+      max-width: 100%;
+      text-align: left;
+    }
+
+    .md-typeset .goal-404__goal pre {
+      margin: 0;
+    }
+
+    /* The type stays at the --type-code size every real block inherits;
+       only the padding is more generous than a block in running prose, so
+       the box holds the center of an otherwise empty page. */
+    .md-typeset .goal-404__goal pre > code {
+      padding: var(--space-6) var(--space-8);
+    }
+
+    /* agda2-mode paints an interactive hole green; this one wears the
+       site's accent.  A ring rather than a border, so the glyphs around it
+       do not shift by a pixel.  The text leans 20% toward the ink because
+       the bare accent measures 4.63:1 on the wash in light, passing but
+       thin; the mix clears 5.8:1 in both themes and keeps the hue. */
+    .md-typeset .goal-404__hole {
+      background-color: var(--c-accent-wash);
+      color: color-mix(in srgb, var(--c-accent) 80%, var(--c-fg));
+      border-radius: var(--radius-sm);
+      box-shadow: 0 0 0 var(--border-width)
+        color-mix(in srgb, var(--c-accent) 45%, transparent);
+      padding: 0 var(--space-1);
+    }
+
+    /* Material offers to copy every code block.  An unfillable hole is not
+       worth copying. */
+    .md-typeset .goal-404__goal .md-clipboard {
+      display: none;
+    }
+
+    /* The compiler's remark arrives the way it would in a buffer: typed.
+       The animation only unclips text that is already there, one character
+       per step (56 steps, 56 characters; keep the two in step if the
+       sentence changes), so the box never resizes and about 25 characters a
+       second reads as quick typing after a beat to find the goal. */
+    .md-typeset .goal-404__typed {
+      display: inline-block;
+      animation: goal-404-type 2.2s steps(56, end) 0.8s both;
+    }
+
+    @keyframes goal-404-type {
+      from { clip-path: inset(0 100% 0 0); }
+      to   { clip-path: inset(0 0 0 0); }
+    }
+
+    /* No base clip-path is set, so switching the animation off leaves the
+       whole line standing.  Same below 45em, where the line has to wrap: a
+       steps() clip over two wrapped lines reveals them in parallel, which
+       is a curtain, not typing. */
+    @media (prefers-reduced-motion: reduce) {
+      .md-typeset .goal-404__typed {
+        animation: none;
+      }
+    }
+
+    @media screen and (max-width: 44.9375em) {
+      .md-typeset .goal-404__typed {
+        animation: none;
+        white-space: normal;
+      }
+    }
+
+    /* An Agda comment, and on this site comments are gray; this one is the
+       page speaking, so it wears the classic editor green.  Pinned per
+       scheme like the syntax colors in extra.css: dark carries the
+       palette's own string green (12.5:1 on the raised surface); in light
+       that token measures 4.59:1 there, so light gets a deeper leaf of the
+       same green, 6.0:1. */
+    [data-md-color-scheme="default"] .goal-404__typed {
+      color: #136b34;
+    }
+
+    [data-md-color-scheme="slate"] .goal-404__typed {
+      color: #86efac;
+    }
+
+    .md-typeset .goal-404__paths {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--space-2) var(--space-8);
+    }
+
+    /* A real <button> into Material's search overlay, stripped to the
+       site's link clothes, so the visible affordance is itself operable by
+       keyboard: Tab reaches it, Enter and Space fire it, and the global
+       :focus-visible ring applies.  The script below wires it to the same
+       checkbox the header's magnifier toggles. */
+    .md-typeset .goal-404__search {
+      appearance: none;
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      color: var(--c-accent);
+      border-bottom: var(--border-width) solid
+        color-mix(in srgb, var(--c-accent) 35%, transparent);
+      cursor: pointer;
+      transition: border-color 120ms, color 120ms;
+    }
+
+    .md-typeset .goal-404__search:hover,
+    .md-typeset .goal-404__search:focus-visible {
+      color: var(--c-accent-hover);
+      border-bottom-color: var(--c-accent);
+    }
+  </style>
+{% endblock %}
+
+{% block site_nav %}{% endblock %}
+
+{% block content %}
+  <div class="goal-404">
+    <h1 class="goal-404__eyebrow">404 · page not found</h1>
+    <div class="highlight goal-404__goal">
+{#- Column 0 from here: everything inside <pre> renders verbatim.  The span
+    with data-goal-path is rewritten by the script below to name the URL the
+    visitor actually asked for; `ThisPage` is what stands without scripts.
+    `∃ demo/index.html` is even parseable Agda: `/` is legal in a name, so
+    the path reads as a qualified identifier. -#}
+<pre><code><span class="nf">_</span> <span class="ow">:</span> ∃ <span class="nf" data-goal-path>ThisPage</span>
+_ <span class="ow">=</span> <span class="goal-404__hole">{! !}</span>
+
+<span class="goal-404__typed">-- The hole cannot be filled.  Try the index, or search.</span></code></pre>
+    </div>
+    <nav class="goal-404__paths" aria-label="Where to go instead">
+      {#- base_url, not `nav.homepage.url | url`: the latter renders as "/."
+          here (no `page` object to relativize against), and for an error
+          template base_url is the site root's path. -#}
+      <a href="{{ base_url }}">index</a>
+      <a href="{{ 'demo/' | url }}">demo</a>
+      <button type="button" class="goal-404__search">search</button>
+    </nav>
+    <script>
+      /* Name the page that was asked for.  textContent only: the path is
+         attacker-chosen text and must never be parsed as markup.  Encoded
+         whitespace is flattened so a crafted URL cannot re-shape the goal,
+         and very long paths keep their tail, which is the part that names
+         the page. */
+      (() => {
+        const el = document.querySelector('[data-goal-path]');
+        let p = location.pathname.replace(/^\/+/, '');
+        try { p = decodeURIComponent(p); } catch { /* keep it encoded */ }
+        p = p.replace(/\s+/g, ' ');
+        if (p.length > 64) p = '…' + p.slice(-63);
+        if (el && p) el.textContent = p;
+
+        /* The search button drives the same checkbox the header's
+           magnifier toggles, then puts the caret in the query field, which
+           Material only auto-focuses from its own `s` shortcut.  Search is
+           a JS feature in Material end to end, so a button that needs JS
+           gives up nothing; if the search plugin is ever removed, hide the
+           dead control instead. */
+        const btn = document.querySelector('.goal-404__search');
+        const toggle = document.getElementById('__search');
+        if (btn && toggle) {
+          btn.addEventListener('click', () => {
+            toggle.click();
+            document.querySelector('.md-search__input')?.focus();
+          });
+        } else if (btn) {
+          btn.hidden = true;
+        }
+      })();
+    </script>
+  </div>
+{% endblock %}

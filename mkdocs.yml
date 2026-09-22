@@ -1,0 +1,206 @@
+# File: mkdocs.yml
+#
+# The agda-native-air project site (issue #169): MkDocs Material over a
+# curated subset of docs/, with the demo page of issue #85 carried in as the
+# standalone document it is.  `make site` builds it into public/, and
+# .github/workflows/pages.yml deploys that tree to GitHub Pages.
+#
+# The configuration inherits from williamdemeo.org (the williamdemeo/website
+# repository, mkdocs.yml at fcb6bf0, 2026-09-20), where every decision is
+# written beside the key that carries it; the same is done here, and where
+# this file departs from that one it says so.
+
+site_name: agda-native-air
+site_description: >-
+  Agda-native AI reasoning: the interaction, retrieval, and evaluation
+  infrastructure that lets AI agents work with the Agda proof assistant, and
+  the measurements behind it.
+
+# The canonical address.  It is read by the canonical <link> on every page,
+# by the sitemap, and by Material's instant navigation, which fetches the
+# sitemap and intercepts only the links it lists: a link the sitemap does
+# not know, such as the demo page below, is a full page load, which is what
+# a standalone document with its own script needs.  It moves to the custom
+# domain with [M6-7] (#177), together with the CNAME the uploaded artifact
+# must then carry.
+site_url: https://formalverification.github.io/agda-native-air/
+
+# The repository is public, so unlike williamdemeo.org this site keeps the
+# header's repository chip.  What it does not keep is the star-and-fork
+# count Material fetches from api.github.com for that chip on every page
+# load: web/overrides/partials/source.html drops the attribute that triggers
+# the fetch, because a page of this site fetches nothing off its own origin
+# (web/README.md).  `edit_uri` is empty on purpose, so MkDocs does not derive
+# one; the edit and view buttons are opt-in features in Material 9 and are
+# not enabled.
+repo_url: https://github.com/formalverification/agda-native-air
+repo_name: formalverification/agda-native-air
+edit_uri: ""
+
+copyright: >-
+  Code Apache 2.0, documentation CC BY 4.0.  Built with MkDocs Material.
+
+# Where the pages come from.  docs/ is written for contributors and much of
+# it is internal (the plan file, the workflow notes, the feedback imports),
+# so the build publishes nothing from it that is not named here: the first
+# pattern excludes everything, and each `!` line re-includes one thing.  The
+# nav below is then a real allowlist, and `validation` turns an included
+# page that is missing from the nav into a build failure rather than an
+# orphan.  [M6-3] (#171) curates the rest of docs/ page by page; each page it
+# publishes becomes a line here.  The patterns are gitignore syntax, matched
+# against each file's path under docs/, last match wins.
+docs_dir: docs
+exclude_docs: |
+  *
+  !index.md
+  !assets/
+  !assets/**
+  !stylesheets/
+  !stylesheets/**
+
+# site/ is the demo page's own output directory (`make demo-site`), so the
+# whole site cannot use MkDocs' default of the same name.  It is written to
+# public/, and the demo is copied under public/demo/ by the hook below.  Both
+# directories are gitignored, and the Makefile names both.
+site_dir: public
+
+# Warnings that `--strict` turns into errors.  `omitted_files` is the one
+# that matters for an allowlist: a page that is published but not in the
+# nav is one a reader can reach only by guessing its URL.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+theme:
+  name: material
+  language: en
+  # The overrides: 404.html, which replaces Material's not-found boilerplate
+  # with an unfillable Agda goal (williamdemeo.org's, with this site's
+  # paths), and partials/source.html, the header's repository chip without
+  # its API fetch.  Each file carries its reasoning.  They live under web/
+  # beside the demo's assets, so that everything the site serves that is not
+  # a document is in one directory.
+  custom_dir: web/overrides
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  # No Google Fonts.  Setting this to false is what removes the
+  # <link rel=preconnect> to fonts.gstatic.com and the stylesheet from
+  # fonts.googleapis.com that Material's base template emits otherwise;
+  # docs/assets/fonts/fonts.css declares the self-hosted faces instead, and
+  # tokens.css names them in --md-text-font and --md-code-font.  This is not
+  # a style choice: `make site-check` and the Pages workflow refuse a page
+  # that loads anything off its own origin.
+  font: false
+  # Dark first, and no `media:` on either entry.  Material selects the first
+  # palette when nothing is stored, and a `media` key would hand that
+  # decision back to the operating system.  The cost is real and is the
+  # reason it is written down: a visitor who has set a light-mode preference
+  # system-wide gets a dark page until they click the toggle once, after
+  # which their choice is remembered in local storage.  It is
+  # williamdemeo.org's default, and a sibling site should open the same way.
+  # The demo page decides its own palette in web/assets/demo.css; [M6-2]
+  # (#170) reconciles the two.
+  #
+  # `custom` on primary and accent means "no built-in Material color": the
+  # values come from tokens.css.
+  palette:
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  # The demo's favicon, an open hole with a term in it, so the two pages
+  # share a tab icon.  docs/assets/favicon.svg is a copy of
+  # web/assets/favicon.svg, and a test fails when the two differ.  The
+  # header logo is a pair of braces, the shape of a hole, from Material's
+  # bundled icon set; `icon.logo` rather than `logo:` so it takes the
+  # header's own color in both schemes.
+  favicon: assets/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/code-braces
+
+extra_css:
+  # Order matters: the faces have to be declared before the tokens that name
+  # them, and the tokens before the rules that use them.
+  - assets/fonts/fonts.css
+  - stylesheets/tokens.css
+  - stylesheets/extra.css
+  # No KaTeX yet, and no pymdownx.arithmatex below: no published page sets
+  # mathematics in LaTeX (the ADRs write their notation in Unicode).  When
+  # one does, ship KaTeX from this origin the way williamdemeo.org does,
+  # never from a CDN.
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      permalink_title: Link to this section
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  # Material's client-side search.  The one setting is the separator, which
+  # decides what a word is at index time and at query time alike.  The
+  # default, `[\s\-]+`, treats `Setoid.Homomorphisms.Kernels.kercon` as one
+  # word, so a visitor searching for `kercon` finds nothing; this one splits
+  # on the dot (but not inside `4.4`) and on the punctuation that surrounds
+  # an identifier.  It is williamdemeo.org's separator, which is Material's
+  # documented one with the camel-case clause dropped (that clause cut a
+  # proper name in two).
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;'
+
+# The demo page (issue #85) is not a Markdown page and is not rendered by
+# MkDocs: it is a standalone HTML document with its own stylesheet and
+# script, built by `make demo` into site/ and pinned by 74 tests against the
+# file that generator writes.  The hook registers that directory's files
+# with MkDocs so they are copied verbatim under demo/ (and so a Markdown link
+# to demo/index.html is validated like any other), and it appends the Demo
+# link to the nav.  It fails the build if the demo has not been built, so a
+# site with a dead Demo link cannot be published.  See the module's header.
+hooks:
+  - scripts/python/site/demo_hook.py
+
+extra:
+  # Where the built demo is, relative to this file.  The tests point it at a
+  # temporary build so the suite never touches the working tree; `make site`
+  # passes its own DEMO_SITE_DIR the same way.
+  demo_dir: !ENV [AIR_DEMO_DIR, "site"]
+
+nav:
+  - Home: index.md
+  # "Demo" follows, appended by scripts/python/site/demo_hook.py; see the
+  # `hooks` entry above.
