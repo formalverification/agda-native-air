@@ -4099,6 +4099,50 @@ A published page with three arms on the same obligations, generated from the arc
 [#170]: https://github.com/formalverification/agda-native-air/issues/170
 [#180]: https://github.com/formalverification/agda-native-air/issues/180
 
+---
+
+### Issue M6-10: site: an ADR for the project site, and its companion note under docs/ (#182)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+[#169] (PR [#181]) took a run of decisions that are written beside the keys and rules that carry them (`mkdocs.yml`, `flake.nix`, the Makefile's site section, the hook's header) and in the PR description, and nowhere else.  William asked for a decision record on 2026-09-21, after reviewing what the branch shipped: "we should probably have an adr about the site".  This issue is that record, and the companion note the record links to.
+
+# Work
+
++  **`docs/adr/0003-project-site.md`**, in the shape the repository's ADRs already have (see ADR 0002): a plain title, the `File:` line, Status, Date, Tracking, Ancestry; an executive summary; one section per decision area with Decision, Evidence, and Status; a numbered decision log; References with reference-style links for every issue, PR, and document.  Define every term on first use.
++  **A companion note, `docs/site/overview.md`**, which explains the component rather than deciding it: what the site is made of, how `make site` assembles it, how a page gets published, how the demo rides in, and how the gates fail.  The how-to that PR [#181]'s follow-up added to `docs/HowToRun.md` is the seed; the note can absorb it or link it, but there should be one canonical copy of each instruction.
++  Link both from `docs/README.md` (the ADR list and the subdirectory list).
+
+# The decision areas the record has to cover
+
++  **Where the site lives.**  In this repository, because the demo is generated from committed artifacts here and the build refuses to publish when they disagree; the alternatives considered (a separate site repository, folding into `formalverification.io`); the trigger for revisiting (non-generated content outweighing generated).  The tracking issue [#180] carries the text.
++  **The rule every page inherits.**  Nothing generated is committed; what the site shows is generated from committed artifacts; a figure that disagrees with its record fails the build.
++  **Two output directories.**  `site/` for the demo page alone and `public/` for the whole tree, because MkDocs' default output directory collides with the demo's.
++  **The demo as a standalone document.**  Not re-rendered as Markdown; registered with MkDocs from where the demo build wrote it (`File.generated`); the Demo link appended in `on_nav` after MkDocs' validation; kept out of the sitemap so Material's instant navigation does not intercept it.  The palette reconciliation of [#170] joins this section when it lands.
++  **Publishing by allowlist.**  `exclude_docs` excludes everything and re-includes named files; `validation.omitted_files: warn` under `--strict`; the curation of [#171] is the evidence.
++  **The toolchain.**  mkdocs 1.6.1 and mkdocs-material 9.5.49 (williamdemeo.org's pins); the site's Python from the flake's nixos-unstable pin because nixos-24.05 ships mkdocs 1.5.3; the override from the PyPI sdist; `requirements.txt` as the pip fallback and the pins check that holds the two together.
++  **The gates.**  The four targets the Pages workflow runs inside `nix develop .#site`; the off-origin scan's two refinements over the grep it replaced (stylesheets scanned, `rel` understood); the link check over the theme's markup.
++  **The look.**  Inherited from williamdemeo.org: `font: false` with self-hosted faces (load-bearing), dark first, the Constellation tokens; the repository chip kept, its API fetch removed; what was left and why (Meridian, KaTeX, the PNG favicons).
++  **The address.**  The domain is the front door, not the archive: cite by GitHub URL or DOI ([#177]).
+
+# Done
+
+The ADR and the companion note are merged and linked from `docs/README.md`; every decision above has a Decision, Evidence, and Status entry; the decision log is numbered; and `git grep` finds no site decision recorded only in a PR description.
+
+# Relations
+
++  Records [#169] (PR [#181]); should absorb [#170] and [#171] as they land.
++  Tracked by [M6-6] ([#180]).
+
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#171]: https://github.com/formalverification/agda-native-air/issues/171
+[#177]: https://github.com/formalverification/agda-native-air/issues/177
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+[#181]: https://github.com/formalverification/agda-native-air/pull/181
+
 <!-- END GENERATED: milestone-6 -->
 
 ---
