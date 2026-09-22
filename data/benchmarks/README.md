@@ -189,6 +189,14 @@ the original design catalog lives in `docs/benchmarks/obligations.md` (its
 Each obligation is a self-contained Agda module:
 
 +  It imports `AgdaDojang.Debug` and exactly the stdlib modules it needs.
++  It imports them the way a person writing Agda would, not the way a byte
+   budget would: `Relation.Binary.PropositionalEquality`, not its cheaper
+   `.Core`.  That costs interface bytes, and the cost is measured and
+   deliberate: see [`docs/import-closure.md`](../../docs/import-closure.md),
+   which records what a fixture's closure costs, why the suite's imports are
+   left idiomatic, and what an edit to one would break.  A consumer with a
+   byte budget, such as a browser-hosted checker, carries its own trimmed
+   copy of the obligation rather than reshaping the corpus.
 +  It contains exactly **one** `{!!}` hole to be filled.
 +  The module name matches the filename stem.
 +  Any prerequisite lemmas are provided as explicit imports; the obligation may
