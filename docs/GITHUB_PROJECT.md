@@ -949,6 +949,83 @@ In a "Claude Code on the web" container, Nix is not preinstalled and the usual i
 + Provisioning approach validated live in this environment (Nix 2.31.2 from `releases.nixos.org`; `.#backend` realizes Agda 2.8.0 + standard-library 2.3).
 + The hook is web-only (`CLAUDE_CODE_REMOTE`); local developers continue to use `nix develop` directly.
 
+---
+
+### Issue M0-14: plan file: two headings claim M0-13, so project-lint is permanently red (#172)
+
+**Labels:** `infrastructure`, `cleanup`, `M0: migration + infrastructure`
+
+# Context
+
+`make project-lint` fails, and has been failing for some time:
+
+```
+docs/GITHUB_PROJECT.md: error: duplicate issue ID M0-13 — populate would create one issue and orphan the other heading
+docs/GITHUB_PROJECT.md: 7 milestones, 19 labels, 93 issues — 1 error(s), 0 warning(s)
+```
+
+Two headings claim `M0-13`:
+
+| plan file | issue | state | created |
+|---|---|---|---|
+| line 917 | [#57] `[M0-13] Add Claude Code config (CLAUDE.md, SessionStart Nix hook, skills)` | closed | 2026-06-26 |
+| line 845 | [#96] `[M0-13] flake shellHook: unguarded variable reads put cwd on LD_LIBRARY_PATH` | open | 2026-08-17 |
+
+`[MN-k]` is the join key the engine uses to match a heading to a GitHub issue, so a collision means one heading cannot be matched. The lint message describes the `populate` direction, which this repository no longer runs; the practical cost today is that `project-lint` is permanently red, which is the same as having no lint at all, because a failure nobody can act on stops being read.
+
+# The one-line remedy, measured
+
+Renumbering the **later** claimant takes the file from one error to zero. Control, on scratch copies of the current file:
+
+```
+with the duplicate:  7 milestones, 19 labels, 93 issues — 1 error(s), 0 warning(s)
+#96 renumbered:      7 milestones, 19 labels, 93 issues — 0 error(s), 0 warning(s)
+```
+
+So this is the whole fix, and nothing else in the file is wrong.
+
+**Renumber [#96], not [#57]**, for two reasons: [#57] claimed the id first, and it is closed, so its identifier is already settled history that a rename would rewrite. [#96] is open and its title is cheap to change.
+
+The next free integer is **M0-15**: the integers run 1 through 13 (with 13 twice), and this issue takes M0-14. Note that `M0-10a` through `M0-10d` ([#52], [#53], [#54], [#55]) are sub-lettered rather than integers, so a naive `M0-[0-9]*` scan undercounts the headings by four; count with `^### Issue M0-`.
+
+# Tasks
+
++  Retitle [#96] to `[M0-15] flake shellHook: unguarded variable reads put cwd on LD_LIBRARY_PATH`.
++  Update its heading in `docs/GITHUB_PROJECT.md` to match, or let `make project-update` do it.
++  Confirm `make project-lint` reports 0 errors.
+
+# Acceptance criteria
+
++  `make project-lint` exits 0.
++  No two headings in `docs/GITHUB_PROJECT.md` share an `[MN-k]` id.
++  [#96] keeps its issue number, its body, and its history; only the title prefix moves.
+
+# A related gap, deliberately not bundled
+
+While measuring the above: **seven of the eighteen issues the plan file lists under Milestone 0 carry no GitHub milestone at all.**
+
+```
+#52 closed   #53 closed   #54 open   #55 open   #40 closed   #57 closed   #96 open
+```
+
+GitHub's milestone 0 therefore shows 11 issues where the plan file lists 18. The engine does not mind, because it joins on the title prefix rather than the milestone, which is why lint is clean once the duplicate goes; but anyone browsing milestones on GitHub sees a different Milestone 0 from the one the plan file describes.
+
+That is a different defect from an id collision, so it is recorded here rather than folded in. It is cheap to fix at the same time (`gh issue edit <n> --milestone "0. Solid Infrastructure"`, seven times) if whoever takes this wants to; otherwise it deserves its own issue.
+
+# Relations
+
++  Found while adding Milestone 6 in PR [#166]; the duplicate predates that work, and the same file on `main` reports the identical single error.
++  The engine is `williamdemeo/github-project`; the plan-file model is described at the top of `docs/GITHUB_PROJECT.md`.
+
+[#40]: https://github.com/formalverification/agda-native-air/issues/40
+[#52]: https://github.com/formalverification/agda-native-air/issues/52
+[#53]: https://github.com/formalverification/agda-native-air/issues/53
+[#54]: https://github.com/formalverification/agda-native-air/issues/54
+[#55]: https://github.com/formalverification/agda-native-air/issues/55
+[#57]: https://github.com/formalverification/agda-native-air/issues/57
+[#96]: https://github.com/formalverification/agda-native-air/issues/96
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+
 <!-- END GENERATED: milestone-0 -->
 
 ---
@@ -1167,29 +1244,31 @@ Write the first draft of a tool paper describing AgdaDojang and AgdaMCP, the arc
 
 **Labels:** `agda-mcp`, `eval`, `M1: agda-dojang/mcp`
 
-# Context
+## Description
+
+### Context
 
 The field test that motivated the #68 hardening wave produced a hard baseline: a frontier agent formalized ~1200 lines of literate Agda in `ualib/agda-algebras` with agda-mcp loaded and made **zero** MCP calls ([`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/main/docs/feedback/flrp-agda-mcp-improvements.md) § 0).  The P0 trust fixes (#69 via PR #81, then #70, #71, #73) exist to change that decision; this issue is the experiment that checks whether they did.
 
-# Method
+### Method
 
 +  After the P0 sub-issues of #68 land, replay a comparable real development task — an open FLRP work package in `ualib/agda-algebras` — with the hardened server configured exactly as in the baseline session (the same `.mcp.json` shape: `run-server.sh`, `--agda-flags` including `-l agda-algebras`, per-worktree `AGDA_ALGEBRAS_ROOT`).
 +  Use a fresh agent session with no prior knowledge of the server's internals, so adoption reflects the tool surface and the descriptions' stated contract rather than session memory.
 +  Record per-tool MCP call counts, iterations to a green strict gate, wall-clock, and 3–5 verbatim transcript moments where the agent chose the server over the shell or vice versa.
 
-# Deliverables
+### Deliverables
 
 +  A short results section under `docs/reports/` with the before/after numbers and an honest reading of them; a partial result — e.g. `get_goal` adopted while `fill_hole` still loses to whole-module checks — is a valid and reportable outcome.
 +  Archived transcripts under `reports/` (following the `reports/m1-4/` convention) for reuse in documentation and demos.
 
-# Relations
+### Relations
 
 +  This is the evaluation instance of #23 (M3-1) and the acceptance measurement for the #68 wave (its "the next real literate-repo session reaches for the MCP" criterion).
 +  Sequencing: blocked on PR #81 and on #70, #71, #73; #75 is optional but raises the ceiling on what the server can win.
 
 ---
 
-### Issue M1-8: demo page: animated agda-mcp session replay and corpus search (GitHub Pages) (#85)
+### Issue M1-8: demo page: animated agda-mcp session replay and corpus search (GitHub Pages) (#85, closed)
 
 **Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
 
@@ -1275,7 +1354,7 @@ The ADR states decisions and evidence; it does not restate the source documents,
 
 ---
 
-### Issue M1-10: agent-in-the-loop evaluation: a frontier model driving agda-mcp over the 43 obligations, per tier and stratum (#154)
+### Issue M1-10: agent-in-the-loop evaluation: a frontier model driving agda-mcp over the 43 obligations, per tier and stratum (#154, closed)
 
 **Labels:** `agda-mcp`, `eval`, `M1: agda-dojang/mcp`
 
@@ -2133,17 +2212,19 @@ The field-test arc is fully documented in primary sources — the imported feedb
 
 **Labels:** `agda-mcp`, `M1: agda-dojang/mcp`
 
-# Context
+## Description
+
+### Context
 
 A July 2026 Claude Code session formalized FLRP RP-2 in `ualib/agda-algebras` (its issue 459 / PR 507): ~1200 lines of literate Agda across roughly fifteen type-check iterations, with `agda-mcp` configured via `.mcp.json` and its four tools listed.  The headline datum: **the agent never called the server once**, running `agda <file>` from Bash every time — its reconstruction of why is § 2 of the feedback document, now imported at [`docs/feedback/flrp-agda-mcp-improvements.md`](https://github.com/formalverification/agda-native-air/blob/15db8a0ef6aac1f8a208b10b89990de6913a5cd8/docs/feedback/flrp-agda-mcp-improvements.md).  That document's § 0 asked that every claim be re-verified against the current server before filing issues; its § 7 addendum records that verification — scripted MCP stdio sessions against `911ae18`, cross-checked with direct `agda` runs under the pinned toolchain (Agda 2.8.0).
 
-# What verification found
+### What verification found
 
 +  **Confirmed, P0.**  `fill_hole` reports `ok` for candidates that leave unsolved metas, while `agda` exits 42 with `[UnsolvedMetaVariables]` on identical content; `get_goal` reports the reporting macro's unsolved type instead of the hole's goal, returning `(x₁ : _3 x) → _5 x x₁` where `Fixture01` documents `A`; hole detection matches only the literal token `{!!}`, misses `{! !}` / `{! e !}` / `?`, and counts (and even fills) tokens sitting in comments and markdown prose.
 +  **Not reproduced.**  The secondhand "`check_file` green on unsolved metas" claim: `check_file` and `get_diagnostics` were correctly red on every failing fixture, and the inferred interaction-mode cause is wrong — the server runs batch `agda` per call.  The surviving ask is to make the already-strict verdict explicit and contractual.
 +  **New defects found while re-testing.**  Diagnostics carry no source positions under Agda 2.8.0 (the parser expects `file:10,5-15` but Agda emits `file:9.12-13`), and `--timeout` is parsed but never enforced (`FillTimeout` is unreachable code).
 
-# Plan
+### Plan
 
 The document's § 6 framing survives contact with verification: P0 is trust, P1 is reach beyond the shell, P2 is economics and ergonomics.  Each fix should land with regression fixtures wired into `make agda-mcp-test` (the verification fixtures in the addendum are ready to be adopted as tests).
 
@@ -2153,13 +2234,13 @@ The document's § 6 framing survives contact with verification: P0 is trust, P1 
 
 Suggested sequencing: #69 and #70 are independent, high-value bug fixes; #71 then #73 share the hole-model rework (consider Agda's interaction points as the source of truth, which also lays groundwork for #75); #72 and #76 share the response-echo plumbing; #74 and #77 are self-contained; #78 and #79 build on the P0 layer.
 
-# Acceptance for the wave
+### Acceptance for the wave
 
 +  The three § 4 "moments" from the field session run as scripted acceptance tests; they are encoded in #69, #74, and #75.
 +  The next real literate-repo session (the #23 case-study frame) reaches for the MCP instead of the shell — the only metric that counts, per § 2 of the document.
 +  Tool descriptions state the client-visible contract — verdict semantics, supported file flavours, hole model, and latency — per the § 6 meta-suggestion (#72).
 
-# Relations
+### Relations
 
 +  #12 (M1-4) demonstrated the loop on fixtures; this wave is the field-test follow-up on a research-scale literate library.
 +  #23 (M3-1) is the case study these agda-algebras sessions instantiate; its future runs are this wave's evaluation.
@@ -2218,6 +2299,61 @@ Worth being blunt about what is *not* worth carrying: `propose_terms` and `propo
 +  The transferable lessons above are recorded in #113 before `search.py` leaves the live tree.
 +  `make ci-smoke`, `make test-agda-dojang`, `make test-agda-dojang-integration`, and `make eval-proof-completion-smoke` stay green.
 +  Whatever survives in the live tree has a working entry point, exercised by a test or a Make target, so a second five-month silence is not possible.
+
+---
+
+### Issue M1-38: agent bench: a shell-only control arm and a both-tools arm, the attribution measurement for the server (#162)
+
+**Labels:** `agda-mcp`, `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+The agent-in-the-loop evaluation ([#154], [M1-10], PR [#158]) measured what a frontier model does with the `agda-mcp` server over the 55 benchmark obligations: Sonnet 5 solved 46 and restated 8, Opus 5 solved 54 and restated 1 across two seeds with the same solve set, against the deterministic loop's 8 (fixed space) and 14 (retrieval under exclusion).  Every one of those subjects had the server and nothing else: the thirteen tools plus Read and Edit on the one file, no shell.  So the numbers say what an agent does *with* the instrument and nothing about what it does *without* it, and the question that came up while writing up PR [#161] cannot be answered from the archive: an agent can run the pinned `agda` itself, batch or `--interaction-json`, so is the server anything more than a convenience?  ADR 0002 § 12 is honest that the field record's value was latency, structured diagnostics, and the project echo rather than capability the shell lacks; the [#83] field test was designed around the same attribution question and its control arm was never run.  This issue is the control: the same subject, prompts, caps, and judge, with the raw materials instead of the wrapper.
+
+## Arms
+
+All arms run fresh at one protocol version (one client version, one day, one `protocol.json` per run id), because the archived arms predate the protocol record and cannot be resumed; the model is Sonnet 5 first, which has the headroom the comparison needs (Opus is at 54 of 55 with the server, so its shell arm can only show a difference in cost, wall, and the restated column), and Opus 5 if the budget allows.
+
++  **`shell`**.  Tools: Bash, Read, and Edit; no MCP server.  On `PATH`, the flake's pinned `agda` 2.8.0 with the same libraries the server resolves against; the prompt states the exact single-file invocation (the committed flag set plus `-l agda-algebras` and `-i` on the work directory, the one the judge runs) and says that `agda --interaction-json` is also available, in one sentence and with no protocol documentation, since the protocol's traps are the thing the server encodes.  The row's corpus JSONL is on disk and readable, so `grep` is the search tool.  Confinement is by audit rather than by `--restricted` (which refuses the code-running tools): every path a Bash command touches must lie under the work directory, the library roots, or the corpus file, and a command that writes anywhere else fails the isolation gate.
++  **`mcp`**.  The archived protocol, re-run at the same version so the three arms are comparable.
++  **`both`**.  The server and the shell together: the adoption question of [#83] asked on the benchmark, which tool the agent reaches for when both are there.
+
+One symmetric change across the three arms: reading the library's own sources is allowed everywhere (an `--add-dir` on the library roots for the file tools), because the archived `mcp` arm refused eleven such reads for Sonnet and two for Opus as a confinement side effect, and a shell arm that can `cat` a module while the server arm cannot would confound the comparison.
+
+## What the harness needs
+
++  An `--arm shell|mcp|both` knob in `Cli`, recorded in `protocol.json`, so a run id is one arm.
++  A subject configuration per arm in `Subject`: the shell arm drops `--mcp-config` and `--restricted`, adds Bash, and receives the environment the flake shell provides (`PATH` with `agda`, `AGDA_DIR`); the `both` arm has all of it.
++  The isolation audit extended to Bash: the paths a command names, and the anomaly rule "a presented tool beyond the arm's set" made per arm.
++  `perTool` extended with shell command classes read off the transcript, as follows: `agda` batch, `agda --interaction-json`, corpus greps, library-source reads, other; and a `via` column per row (`shell`, `mcp`, or both) so the `both` arm says what each tool was used for.
++  The judge and the report shape unchanged; the archive's README table gains an `arm` column.
+
+## What the result means, stated in advance
+
++  If the `shell` arm matches the `mcp` arm on solved and restated per stratum and differs only in turns, wall, and cost, the server's value on this suite is convenience: ADR 0002 § 12 stands as written, and the tools worth building next are the ones a shell cannot reproduce (the corpus-plus-scope class of [#17], and the lane-side judging of the sibling issue).
++  If the `mcp` arm solves rows the `shell` arm does not, the difference is attributable per stratum and per tool from the transcripts, and the `agda-algebras/wholesale` stratum and the restated column are where it is expected: those are the rows where the agent has to find a needle rather than remember one.
++  The `both` arm's per-tool counts are a result on their own: whether an agent offered both reaches for `check_file` or for `agda` on the shell for its verdicts, and for `definition_of` or for `cat` when it needs a source.
++  A shell subject that drives `agda --interaction-json` itself is the strongest possible test of the claim; the transcripts will show whether any subject does, and what it cost it.
+
+## Cost
+
+At list prices the archived arms cost USD 4.62 (Sonnet) and USD 9.14 and 9.46 (Opus) each; three Sonnet arms are about USD 15 and three Opus arms about USD 30, under the same caps (30 turns, 900 s, USD 3 per subject, three subjects at a time).  The five-hour usage window has to be read before each arm, as the run book says.
+
+## Acceptance
+
++  The `--arm` knob, the per-arm subject and audit, and the shell command classes in `perTool`, with tests for the shell isolation audit (a command that writes outside the work directory fails the gate; a corpus grep and a library read pass).
++  Three arms on Sonnet 5 over all 55 obligations, reported here per stratum beside the archived numbers, with the `both` arm's per-tool table; Opus 5 if the budget allows.
++  The finding recorded in ADR 0001 § 9 and ADR 0002 § 12, and in the archive's README.
+
+Related: [#154] is the measurement this controls; [#83] is the field test whose control arm this is; the sibling issues filed with it are [#163] (lane-side judging in `fill_hole`) and [#164] (the Agda-as-a-library prototype).
+
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
+[#83]: https://github.com/formalverification/agda-native-air/issues/83
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#158]: https://github.com/formalverification/agda-native-air/pull/158
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
+[#163]: https://github.com/formalverification/agda-native-air/issues/163
+[#164]: https://github.com/formalverification/agda-native-air/issues/164
 
 <!-- END GENERATED: milestone-1 -->
 
@@ -2411,7 +2547,9 @@ Potential working title: "Structure-Aware Retrieval for AI-Assisted Proof Develo
 
 **Labels:** `agda-mcp`, `retrieval`, `M2: retrieval + local models`
 
-# Context
+## Description
+
+### Context
 
 Proof search is the one part of the north star that has never had a plan.  `docs/PLAN.md` covers premise selection and retrieval thoroughly (Phase 2), but search itself appears only in passing, as the thing better representations would eventually enable.  The project has nonetheless had exactly one implementation of it: `agda-dojang/python/tools/search.py`, a v0.3 BFS/beam driver over the AgdaDojang action space, which has been dead since an incomplete rename on 2026-03-10 and is being archived under #112.
 
@@ -2421,7 +2559,7 @@ Three things changed recently, and together they make this worth starting proper
 +  **The corpus exists.**  `agda-strux` extraction plus `search_by_name` / `search_by_type` can supply candidate lemmas.  `search.py` could not: its action space is hardcoded to `goal == "Nat"` with two candidates and two tactics.
 +  **The measurement exists.**  `data/benchmarks/` is the M1-5 suite with difficulty tiers (`routine` / `compositional` / `non-obvious`, see `docs/benchmarks/taxonomy.md`), and the proof-completion evaluator already emits versioned JSONL (`results.jsonl`, `fixtures.jsonl`, `eval-proof-completion.v0`) that the Scala ETL turns into `proof-completion.v0` rows.  A search component can be scored on the same apparatus as the policy backend, with no new measurement to build.  This is the biggest single reason to do it here rather than as an outside project.
 
-# What the previous attempt worked out
+### What the previous attempt worked out
 
 Carried over from #112 so this issue stands alone.  `search.py` was small and its action space was a stub, but four of its ideas are substrate-independent and should survive into whatever replaces it.
 
@@ -2434,7 +2572,7 @@ And one defect to design out from the start, recorded so it is not rediscovered:
 
 +  **Obligations are conjunctive; that search was disjunctive.**  Its `State` carried a single goal and `expand` emitted one child *per binder* of an applied lemma, while `bfs` returned success as soon as any one state closed.  Applying a lemma with two obligations and discharging either one was reported as a solved proof.  The replacement must carry an obligation set, or an explicit AND/OR proof tree, and a regression test should pin exactly this.
 
-# The design fork
+### The design fork
 
 Where the search lives is the first real decision, and it is not obvious.
 
@@ -2443,14 +2581,14 @@ Where the search lives is the first real decision, and it is not obvious.
 
 A cheap way to settle it, rather than arguing: build the P0 spike below in one of them and measure the split between oracle time and proposal time on M1-5.
 
-# Plan
+### Plan
 
 +  **P0 — state model and substrate.**  Choose the host language.  Define the search state as an obligation set (or AND/OR tree) with the conjunctive semantics above, and a proof script that records only committed actions.  Land a single-step harness: given one benchmark obligation, propose `k` candidates and report which close it, driving `agda-mcp` for the check.  Deliverable: a Make target, tests, and the oracle-vs-proposal timing split that settles the fork.
 +  **P1 — the search loop.**  BFS/beam over that state model, with the two-cache discipline and the report-as-peek separation.  Baseline question: how many M1-5 obligations does search close with a fixed, non-learned action space, per difficulty tier?  That number is the thing every later phase has to beat.
 +  **P2 — proposals from retrieval.**  Replace the stub action space with candidates from `search_by_type` / `search_by_name` over the `agda-strux` corpus, ranked by premise selection.  This is where the search meets `docs/PLAN.md` Phase 2 rather than duplicating it.
 +  **P3 — proposals from a policy.**  The policy-backend contract already exists (`agda-dojang/python/tools/policy_contract.py`, mirrored 1-to-1 by `AgdaMCP.Types`), and `policy_fixture.py` is a working deterministic backend to test against.  A search that calls a learned policy for its proposals, checks with Agda, and reports on the M1-5 JSONL schema is the closed loop this project has been building toward.
 
-# Acceptance for the wave
+### Acceptance for the wave
 
 +  A search component exists with a working entry point, a Make target, and tests, and does not repeat #112's five-month silence.
 +  It is scored on `data/benchmarks/` M1-5 through the existing eval JSONL schema, so its results sit beside the policy-backend baseline rather than in a private format.
@@ -2458,7 +2596,7 @@ A cheap way to settle it, rather than arguing: build the P0 spike below in one o
 +  The four lessons above are encoded as tests or types, not as prose in a doc no one reads.
 +  `docs/GITHUB_PROJECT.md` gains a line for this tracking issue in the "Field-driven work outside the milestone plan" section, per that file's convention.
 
-# Relations
+### Relations
 
 +  #112 archives `search.py` under `experiments/archive/` and hands the lessons here; this issue should be open before that one lands, so nothing is lost in between.
 +  #109 / #111 retired the Python bridge, which is what surfaced the orphaned search code.
@@ -2619,7 +2757,7 @@ Part of #113; builds on #122 (loop, interface) and #123 (retrieval baseline); co
 
 ---
 
-### Issue M2-9e: Add retrieval tools to agda-mcp: corpus-backed search (#17)
+### Issue M2-9e: Add retrieval tools to agda-mcp: corpus-backed search (#17, closed)
 
 **Labels:** `agda-mcp`, `retrieval`, `M2: retrieval + local models`
 
@@ -2868,7 +3006,7 @@ This issue makes the ADR's story true by expanding the benchmark suite to reach 
 
 ---
 
-### Issue M2-17: proof search: the type_of peek rejects a correct candidate when the lemma keeps an implicit binder after its last visible one (#151)
+### Issue M2-17: proof search: `type_of` peek rejects correct candidate (#151)
 
 **Labels:** `bug`, `eval`, `retrieval`, `M2: retrieval + local models`
 
@@ -2952,6 +3090,119 @@ Related: [#129] (the single-needle instrument this extends), [#142] (style-paire
 [#142]: https://github.com/formalverification/agda-native-air/issues/142
 [#154]: https://github.com/formalverification/agda-native-air/issues/154
 [#152]: https://github.com/formalverification/agda-native-air/pull/152
+
+---
+
+### Issue M2-19: Agda as a library: a prototype in agda-strux for the three questions the interaction protocol cannot answer (#164)
+
+**Labels:** `agda-mcp`, `agda-strux`, `retrieval`, `M2: retrieval + local models`
+
+## Motivation
+
+`agda-mcp` never links Agda: its verdicts are a batch process per call and its knowledge is a persistent `agda --interaction-json` child, and the protocol that child speaks exports strings.  Three questions the server answers today are therefore approximations from text, each with a measured cost, as follows.
+
++  **Scope**.  No interaction command enumerates a scope, which is why `scope_at` was omitted on [#75], and why `search_in_scope` ([#17], PR [#161]) derives a file's import surface from its source text and then pays one `WhyInScope` per accepted row, 3 to 5 ms each, to confirm that a spelling denotes the corpus row it came from (a local binder or a re-export can shadow it, as the review of that PR showed).  The checker holds the scope of every module and every interaction point as data.
++  **Conversion**.  The proof-search peek compares Agda's printed types textually, with metas read as wildcards (ADR 0001 § 6).  Its measured failures are all failures of text where the checker would not fail: the two closers are exempt since [#127] because `lift ∘ lower ≡ 𝑖𝑑 (Lift b A)` closes by `refl` while the printed sides differ; the haystack tier ([#129]) recorded `length-++` refused for a retained trailing implicit binder and `m < n` displaying as `suc m ≤ n`; a renamed re-export splits the vocabulary (`∸` in the display, `Agda.Builtin.Nat.-` in the corpus).  A unifier answers "does this term have a type convertible with this goal" without printing anything.  The same gap sits under `search_by_type`, whose structural `typeAst` matching ([#16], on [#17]'s task list) has the corpus side of every type as an AST and no live side, since the goal's AST is not on the wire.
++  **Constraints**.  [#115] got unsolved metas as data from the lane's `AllGoalsWarnings`; the blocking constraints are still prose, and [#145] ([M5-7]) is the hundred-line dump that follows.  The checker holds both as values.
+
+The agent bench's judge ([#154], PR [#158]) already reached for the library once: its statement gate is structural equality of the `typeAst` that `agda-strux` extracts, because printed types proved unreliable in two ways, and it pays two fresh extractions per row for it.
+
+ADR 0002 § 13 records Agda as a library as the long-term plan for the batch lane's latency.  The sibling issue on lane-side judging attacks the latency without linking anything, so this prototype is scoped to the questions latency does not answer: the ones the protocol cannot express at all.
+
+## What is already there
+
+`agda-strux` links `Agda == 2.8.0` (GHC 9.10.3 in the backend shell) and runs the type checker as a library in `AgdaJsonl.Run` and `Extract`, walks internal terms (`bodyRefs`, added by PR [#158]), and encodes types structurally (`StructAst.typeToAst`, version `0.3-v0`).  The prototype extends that executable rather than the server: a mode that loads one file with the same flags the server resolves and then answers queries over stdin, so that a client that already speaks newline-delimited JSON can drive it the way the lane is driven.
+
+## The prototype
+
+Three queries, each measured against the text route it would replace, on the 55 benchmark obligations and the archived sweeps.
+
++  **`scope`**.  The names in scope at top level and at each interaction point of the loaded file, each with the definition it resolves to.  Measured against `search_in_scope`'s derived `imports` plus its identity check on every obligation: the rows where the two disagree, and the identity calls the checker's answer makes unnecessary.
++  **`fits`**.  Whether an expression, elaborated in the scope of a given interaction point, has a type convertible with that point's goal, answered by the unifier.  Measured against the peek's textual verdicts on the archived candidates (`results.jsonl` plus the peek captures): the candidates text refuses and the unifier accepts (the `lift∼lower` and `length-++` classes), the reverse, and the effect on the loop when the peek is replaced, with the closer exemption removed.
++  **`constraints`**.  Unsolved metas and their blocking constraints as data, measured against [#145]'s dump for the same file.
+
+Also measured, because they decide whether the thing can ship: load time and memory for a standard-library obligation and an agda-algebras one against the lane's, per-query latency, and the build cost in the backend shell.
+
+## The cost, stated before the result
+
+A binary that links Agda is one Agda version.  It cannot read interfaces written by another, so it cannot serve a project with its own pinned toolchain (formal-ledger-specifications through `--agda-bin`, [#103]), and ADR 0002 § 8's version-gate argument ([#114]) applies to every flag it passes.  So the prototype does not replace the subprocess server: if it graduates, it becomes a second server for the flake-pinned toolchain only, registered beside the first, and the subprocess server keeps every foreign-toolchain client.  The GHC floor `mcp-server` needs is no longer a problem (the backend shell is on 9.10.3), but the build weight and Agda's API churn across releases are, and the prototype has to state them from measurement.
+
+## Decision rule
+
+If the prototype changes a benchmark number (solves in the loop with a unifier peek, recall of `search_in_scope` with the checker's scope, or the judge's cost) it graduates to a tool behind the pinned toolchain with its own ADR entry; if it does not, the text approximations stand, and the measurement is recorded in ADR 0002 § 13 as the reason.
+
+## Acceptance
+
++  The three queries implemented in `agda-strux`, driven over stdin, with tests on the benchmark fixtures.
++  The three comparisons posted here as tables, with the load, latency, memory, and build figures beside the lane's.
++  The decision recorded in ADR 0002 § 13 either way.
+
+Related: [#16] and [#17] are the retrieval issues whose structural matching this would supply; the sibling issues filed with this one are [#162] (the shell-only control arm of the agent bench) and [#163] (lane-side judging in `fill_hole`).
+
+[#16]: https://github.com/formalverification/agda-native-air/issues/16
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
+[#75]: https://github.com/formalverification/agda-native-air/issues/75
+[#103]: https://github.com/formalverification/agda-native-air/issues/103
+[#114]: https://github.com/formalverification/agda-native-air/issues/114
+[#115]: https://github.com/formalverification/agda-native-air/issues/115
+[#127]: https://github.com/formalverification/agda-native-air/issues/127
+[#129]: https://github.com/formalverification/agda-native-air/issues/129
+[#145]: https://github.com/formalverification/agda-native-air/issues/145
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#158]: https://github.com/formalverification/agda-native-air/pull/158
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#163]: https://github.com/formalverification/agda-native-air/issues/163
+
+---
+
+### Issue M2-20: `search_in_scope`: follow public re-export chains or state recall cost (#165)
+
+**Labels:** `agda-mcp`, `retrieval`, `M2: retrieval + local models`
+
+## The gap, measured
+
+`search_in_scope` ([#17] phase 1, PR [#161]) decides reachability by a name-prefix rule over the queried file's own import lines: a corpus row is in scope iff its module equals an imported module or extends one at a dot boundary.  That rule cannot see a re-export chain that leaves the prefix, so a row another file publicly re-exports into an imported module is reported out of scope even though the queried file can name it.
+
+Measured on this repository's own fixtures (Copilot's third review of [#161]).  `agda-mcp/test/resources/ReexportUse.agda` imports `Agda.Builtin.Nat` and `ReexportBarrel`, and nothing else; `ReexportBarrel.agda` is `open import ReexportOrigin public` and defines nothing itself.  With a corpus row for `ReexportOrigin.originalName` added to the fixture corpus, the server answers as follows.
+
+| call | answer |
+|---|---|
+| `search_in_scope` on `ReexportUse.agda`, `query {name: "originalName"}` | `hits: 1`, `inScope: 0`, `outOfScope: 1`, no results |
+| `type_of` there, `originalName` | `Agda.Builtin.Nat.Nat` |
+| `type_of` there, `ReexportBarrel.originalName` | `Agda.Builtin.Nat.Nat` |
+| `resolve_name` there, `originalName` | one candidate, `ReexportOrigin.originalName` |
+
+So the file can write the name two ways, Agda resolves it to exactly the row, and retrieval never offers it.  It is an under-approximation: the cost is recall, never a wrong name, which is why phase 1 shipped with it and documents it (`AgdaMCP.Scope`'s header, the tool description's SCOPE sentence, and the README's scope section all now state it).
+
+The same shape is the common case in the libraries this is aimed at: `Setoid.Homomorphisms` re-exports `Setoid.Homomorphisms.Basic` and its siblings, and the agda-algebras corpus rows carry the defining module, not the barrel.  Phase 1's own measurement on that corpus (the latency comment on [#17]) only reached those rows because the defining modules happen to extend the imported one by name; a library that barrels across a path boundary is invisible to retrieval today.
+
+## Why the fix is not local
+
+The queried file's text says nothing about what its imports re-export, and a barrel that defines nothing has no corpus rows of its own (agda-strux emits one row per definition, and `belongsToThisFile` keeps only the module's own), so neither of the two sources phase 1 reads carries the edge.  The `public` keyword that `AgdaMCP.Scope` does parse is a different thing: on the queried file's own import it says the file re-exports the module onward, not what the file can name, and it is correctly not consulted for scope.
+
+## The route, and what it costs
+
+One `Cmd_show_module_contents` per imported module (the command behind `exports_of`) names that module's surface, re-exports included.  A row whose bare name is in that surface is then admissible, and the identity check phase 1 already performs (`denotesRow`: Agda's `WhyInScope` on the accepted spelling, kept only when a candidate's defined name is the row's) is what makes admitting by name sound rather than a guess.  So the mechanism exists at both ends; what is missing is the middle.
+
+Three things to settle with measurement rather than by argument.
+
++  **Cost**.  One lane call per import, cacheable per lane load: the benchmark obligation used for the phase-1 latency table imports seven modules.  Measure the added `laneMs` on a first call and on a warm one, against phase 1's 7 to 35 ms pool and 55 to 70 ms default call.
++  **Pool inflation**.  Admitting by name across a wide barrel can enlarge the in-scope pool substantially, and the ranking at that scale is precisely what [#19] found to be the binding constraint on the agda-algebras tier (token overlap drowning needles in 3,000-row pools).  Measure `inScope` and `ranked` per query on the benchmark obligations before and after, and report the recall change beside the pool change; a recall gain paid for by a pool the scorer cannot rank is not a gain.
++  **The ledger's meaning**.  `inScope` and `outOfScope` are currently a statement about the name-prefix rule.  If admission becomes two-sourced, the ledger should say which source admitted each row (the import's own prefix, or its re-exported surface), or the honesty ledger stops answering "why was this not offered".
+
+## Acceptance
+
++  The three measurements above posted here, on the fixture and on the agda-algebras corpus.
++  If the cost and the pool behaviour are acceptable: admission through the imported modules' surfaces, the ledger extended to name the admitting source, a live test on the `ReexportUse` / `ReexportBarrel` / `ReexportOrigin` fixtures with a corpus row for the origin, and the scope limitation removed from `AgdaMCP.Scope`'s header, the tool description, and the README.
++  If not: the measurement recorded here and in `AgdaMCP.Scope`'s header as the reason the limitation stands.
+
+Related: [#17] phase 1 shipped the limitation and its documentation; [#19] is the ranking work a larger pool lands on; [#16] is the structural-matching sibling.  The same `exports_of`-per-import probe is what phase 1's contract listed as "confirming each derived import with a module-contents probe", deliberately left out of phase 1.
+
+[#16]: https://github.com/formalverification/agda-native-air/issues/16
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
+[#19]: https://github.com/formalverification/agda-native-air/issues/19
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
 
 <!-- END GENERATED: milestone-2 -->
 
@@ -3307,6 +3558,69 @@ The flake's `exportLibPath` prepends Nix runtime libraries, openssl 3.0.14 among
 
 [#96]: https://github.com/formalverification/agda-native-air/issues/96
 
+---
+
+### Issue M5-11: `fill_hole` on interaction lane: judge a candidate by `Cmd_give` in ms (#163)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+## Motivation
+
+Every `fill_hole` judgment spawns a batch `agda`, and that process is the whole cost of everything built on it: the proof-search loop measured the subprocess at 99.79 % of oracle time, at 2.6 to 2.9 s per judgment on a standard-library obligation and about 3.5 s averaged over the suite once the agda-algebras tier is in (ADR 0001 § 4, [#113]); the field record has `check_file` rounds of 2 to 35 s per call; and the peek exists only because a question about a loaded file on the interaction lane costs 1 to 3 ms.  The two-lane policy (ADR 0002 § 2, decision 1) keeps the lane away from verdicts because interaction-mode Agda is tolerant: it loads a file with open holes where batch Agda exits 42.  But the tolerance is about interaction points, and `[UnsolvedInteractionMetas]` is exactly the one class `fill_hole` already tolerates by decision 6 ([#69]).  So the two verdicts may coincide by construction on everything else, and if they do, a candidate can be judged in milliseconds on the lane and the batch run kept for what it is uniquely good for, the verdict of record.
+
+## What the lane already answers, probed
+
+`Cmd_give` and `Cmd_refine` have never been sent by the lane (the protocol note lists only the query commands).  Driven by hand on 2026-09-15 against two standard-library obligations of the benchmark, with the same per-load flags the lane uses and each command timed by the sentinel, the lane answered as follows.
+
+| obligation | command | wall | answer |
+|---|---|---|---|
+| `Nat-plus-comm` | `Cmd_load` (first) | 2,560 ms | one visible goal |
+| | `Cmd_load` (again, unchanged) | 208 ms | the holed file re-checked, imports stay loaded |
+| | `Cmd_give 0 "(+-comm _ _)"` | 3.8 ms | `GiveAction`, then `[UnsolvedConstraints]` blocked on `_m_5` and `_n_6`, two invisible goals, no visible goal left |
+| | `Cmd_give 0 "(+-comm m n)"` | 2.2 ms | `[TerminationIssue]` (the self-call) |
+| | `Cmd_give 0 "(+-comm {!!} {!!})"` | 4.0 ms | `GiveAction` with two new points, then `[UnsolvedConstraints]` blocked on their metas |
+| | `Cmd_give 0 "+-comm"` | 4.6 ms | `[UnequalTerms]`, no give |
+| `Nat-plus-identityL` | `Cmd_give 0 "refl"` (the gold) | 1.4 ms | `GiveAction`, no goal, no meta, no error |
+| | `Cmd_give 0 "tt"` | 2.1 ms | `[NotInScope]`, no give |
+| either | `Cmd_load` (reset after a give) | 216 to 228 ms | the file's own check; the hole is back |
+
+The disk-warm batch runs of the same files, for the comparison, are 2.54 s and 2.61 s for the two golds (exit 0) and 2.60 s for the `Nat-plus-comm` obligation (exit 42), so a lane give-and-reset cycle is about a tenth of a batch judgment and a give alone is about a thousandth.
+
+Three facts to carry into the design.  The lane names the classes the batch verdict distinguishes, and names them the same way: a clean give with nothing left is what batch calls exit 0; a give that leaves invisible goals or reports a blocked constraint is the `[UnsolvedMetaVariables]` / `[UnsolvedConstraints]` type error of [#69] (the `(+-comm _ _)` row is the exact wire fact PR [#130] pinned in its `wire-fill-hole-blocked-*` captures, answered here in 4 ms instead of 2.6 s); a scope, type, or termination refusal is an error with no give.  A give that reports constraints still consumes the hole (`points=[]` above), so a state with a candidate given is not reusable and a reset is one reload, about 220 ms, while a refusal leaves the hole in place and needs none.  And a refine's new interaction points arrive without ranges (the text was never written to the file), so the re-anchored hole list `fill_hole` promises cannot come from the lane without an edit and a load.
+
+## The experiment
+
+Parity first, then cost, then the loop; nothing changes in a tool until the first two are on record, and whether the lane may judge is decided from the two tables by a reader, not by the session that produced them (the kickoff for this issue stops after posting them).
+
++  **Parity**.  Replay every depth-0 candidate of the archived proof-search sweeps (`results.jsonl` rows with `holeIndex` 0, hundreds across the P1, P2, haystack, and agda-algebras runs, each with the batch `status` and exit code beside it) through `Cmd_give` on a lane loaded with the obligation, and every term-mode gold, and compare the lane reading with the batch status row by row.  The reading: a `GiveAction` whose following `AllGoalsWarnings` carries no error and no invisible goal is `ok`, whatever new visible goals it lists, since a sub-hole is the `[UnsolvedInteractionMetas]` class `fill_hole` tolerates and `(s≤s {!!})` is a core candidate shape; anything else is `type_error`, including a `GiveAction` followed by `[UnsolvedConstraints]` or by an invisible goal, the `[UnsolvedMetaVariables]` class.  Then the deliberate cases: `WithForce` against `WithoutForce`, a candidate leaving `[UnsolvedInteractionMetas]` only (a sub-hole), `--safe` in the per-load argv (the judge's flag), a file with two holes where the other stays open, and a candidate with a where clause or a `with`, which `Cmd_give` may not accept at all.  Every disagreement is a row in the report with both answers; the experiment's product is that table, whatever it says.
++  **Cost**.  Give plus reset per candidate on a standard-library obligation and on an agda-algebras one (the reset re-checks the obligation file only; the 9 to 16 s import loading of that tier stays in the child), against the batch figure on the same file.
++  **The loop**.  If parity holds, run the P1 baseline and the P2 retrieval configuration with lane probes standing in for batch probes and the batch check kept for commits and the final claim, and report probes, wall, and the solve set against the archived runs; the budget is still counted in probes, so the solve set should be byte-identical and only the wall should move.
+
+## The tool shape, if parity holds
+
+Not a new verdict source: the two-lane policy is kept, and the change is recorded as a decision with the parity table as its evidence.
+
++  `fill_hole` gains a `probe: true` argument.  A probe answers from the lane in the same `status` vocabulary, carries `source: "interaction-lane"` and the lane echo, and carries no `verdict` block, exactly the two-shape echo `get_goal` already has ([#108]); the batch shape is unchanged and stays the default.  A probe's `holes` list is what the lane can say (the count of new points, rangeless) and the description says so, and says that a commit or a claim goes through the batch shape.
++  The description states the parity figure and the file it was measured on, and that a probe never writes the file.
++  The loop's `ProbeOutcome` records its source, so a report says how many judgments were lane probes and how many batch runs.
+
+## Acceptance
+
++  The parity table posted here, with every disagreement explained, over the archived depth-0 candidates and the term-mode golds.
++  The per-candidate cost on both tiers beside the batch figure.
++  If parity holds: the `probe` argument with its description and tests (the two shapes, the reset after a give, the refusal that needs none, the rangeless new holes), the loop's lane-probe mode with a re-run of the P1 and P2 configurations reported beside the archive, a decision added to ADR 0001 and ADR 0002 with the table as evidence, and the README's `fill_hole` section updated.
++  If parity does not hold: the disagreements recorded in ADR 0002 § 2 as the measured reason the lane stays a knowledge lane, which is the finding.
+
+Related: [#113] carries the loop record and the cost measurement this attacks; [#136] ([M5-3]) is the other open `fill_hole` change (an opt-in apply) and should share the description work; the sibling issues filed with this one are [#162] (the shell-only control arm of the agent bench) and [#164] (the Agda-as-a-library prototype, which is where a checker-side answer to the same question would live if the lane's turns out to be insufficient).
+
+[#69]: https://github.com/formalverification/agda-native-air/issues/69
+[#108]: https://github.com/formalverification/agda-native-air/issues/108
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#130]: https://github.com/formalverification/agda-native-air/pull/130
+[#136]: https://github.com/formalverification/agda-native-air/issues/136
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#164]: https://github.com/formalverification/agda-native-air/issues/164
+
 <!-- END GENERATED: milestone-5 -->
 
 ---
@@ -3315,7 +3629,321 @@ The flake's `exportLibPath` prepends Nix runtime libraries, openssl 3.0.14 among
 
 <!-- BEGIN GENERATED: milestone-6 -->
 
-_(not yet rendered: #169, #170 and #171 were filed after the last `make project-update`.  The next run fills this region from GitHub.)_
+### Issue M6-1: site: MkDocs Material skeleton, styled like williamdemeo.org, and one build (#169)
+
+**Labels:** `docs`, `infrastructure`, `M6: docs + dissemination`
+
+# Context
+
+[#85] (PR [#166]) publishes exactly one page: the session replay, generated from `reports/agent-bench/` by `make demo-data` and `make demo-site` and deployed by `.github/workflows/pages.yml`. That is a demo, not a site. A reader arriving at `https://formalverification.github.io/agda-native-air/` gets a single page with no way to reach anything else, and nothing anywhere answers "what is this project".
+
+The decision, taken 2026-09-20: **the site lives in this repository**, rather than in a separate site repo or folded into `formalverification.io`. The reason is that the demo is generated from committed artifacts here and *refuses to publish* when they disagree with each other: `scripts/python/demo/numbers.py` regenerates the benchmark table from each arm's `report.json` and compares it cell by cell with ADR 0001 § 9, and the build fails on a mismatch. Reaching across a repository boundary for the archive, the obligations and the ADR would weaken exactly the property that makes the page worth trusting.
+
+This issue is the foundation the other site work sits on. It ships no content of its own beyond what is needed to prove the build works.
+
+# Work
+
++  Add MkDocs Material to this repository, configured to look like [williamdemeo.org](https://williamdemeo.org) (source: the `williamdemeo/website` repository). Inherit its decisions rather than reinventing them, and say in the PR which were taken and which were left.
++  Pin the dependencies as that site does (`mkdocs==1.6.1`, `mkdocs-material[imaging]==9.5.49`), with the Nix flake as the primary path and a `requirements.txt` as the supported fallback for a machine without Nix.
++  Add `make site`, building the demo first and MkDocs around it. `make demo-data` and `make demo-site` must keep working on their own; they are what the test suite drives.
++  Extend `.github/workflows/pages.yml` to build and deploy the whole site rather than the demo page alone.
+
+# Three things that are load-bearing, not cosmetic
+
++  **`font: false`, with self-hosted faces.** Default Material emits a `<link rel=preconnect>` to `fonts.gstatic.com` and a stylesheet from `fonts.googleapis.com`. The Pages workflow already greps the built page for an off-origin `src`/`href` and fails on one, so default Material would turn the build red. `williamdemeo/website` has solved this: `docs/assets/fonts/fonts.css` declares the faces, `tokens.css` names them in `--md-text-font` and `--md-code-font`.
++  **Extend that off-origin grep to the whole built site.** It currently checks `site/index.html`, because that was the whole site. Once MkDocs pages exist, a theme upgrade that reintroduces a font link would ship unnoticed.
++  **`site/` is already taken.** `.gitignore` carries `/site/` for the demo build's output and MkDocs' default output directory is also `site/`. Pick distinct directories and name them in the Makefile, or one build eats the other's output.
+
+# One design constraint worth stating up front
+
+MkDocs copies non-Markdown files out of `docs/` verbatim, which is the obvious way to carry the demo page in, and it collides with this repository's rule that nothing generated is committed: it would mean generating into the source tree. Stage instead. Whatever the mechanism, a clean checkout plus `make site` must produce the whole site and leave `git status` clean; prove both in the PR.
+
+# Done
+
+`make site` builds the demo and a Material site around it from a clean checkout; `git status` is clean afterwards; the deployed site is styled like williamdemeo.org and fetches nothing off its own origin; the off-origin gate covers every page, not just the demo; the existing 74 tests in `scripts/python/tests/test_demo_*.py` still pass unchanged.
+
+# Relations
+
++  Builds on [#85] / [#166].
++  Blocks the demo's integration and the landing page (filed alongside this).
++  **Milestone is not set deliberately.** A documentation site is not one of the six research milestones, and the right answer is probably a new one. Left for William, following the pattern of [#167] and [#168].
++  The full brief for this work is `~/claude-kickoff-prompts/kickoff-39-air-project-site.md` (source: `claude-tooling/docs/kickoffs/air-project-site.md`).
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#167]: https://github.com/formalverification/agda-native-air/issues/167
+[#168]: https://github.com/formalverification/agda-native-air/issues/168
+
+---
+
+### Issue M6-2: site: carry the demo page in as a standalone document, and reconcile the palettes (#170)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+Once [#169] lands there are two pages with two opinions about how a page should look, and they disagree in a way a visitor will see in the first second.
+
+The demo page is **light first**: `web/assets/demo.css` defines the light palette on bare `:root` and the dark one only under `@media (prefers-color-scheme: dark)`. [williamdemeo.org](https://williamdemeo.org) is **dark first** on purpose: its palette lists `slate` before `default` and sets no `media:` key, so the site opens dark whatever the visitor's system says, and its `mkdocs.yml` explains why ("a mathematics page read at night is the common case"). Left alone, a visitor clicking from a dark site into the demo gets a white flash.
+
+# Work
+
++  Carry the demo page into the built site **as the standalone document it is**, not re-rendered as a Markdown page, and link it from the nav.
++  Reconcile the two palettes, on purpose, and say which way and why.
+
+# Why standalone, and not a Material page
+
+Two reasons, and the second is the one that would bite later.
+
++  Its correctness is asserted against the file the generator writes. `scripts/python/tests/test_demo_render.py` builds the page and checks the markup contract `web/assets/replay.js` depends on, that every tool answer is present character for character, the WCAG AA contrast of the whole palette, and that the prose points at the tab it means. A second rendering path is a second thing to keep true, and the tests would only cover one of them.
++  `williamdemeo.org` runs `navigation.instant`, which swaps page content without a reload. That is why its own scripts subscribe to `document$` rather than `DOMContentLoaded`. The demo's `replay.js` listens for `DOMContentLoaded` only, so inlining it into a Material page would leave the replay dead after any in-site navigation. A link to a non-Material page is a full load, so keeping it standalone sidesteps this; if it is ever inlined, this is the first thing to fix.
+
+# The palette question
+
+Two defensible answers, and the issue is to pick one with reasons rather than let them drift:
+
++  Give the demo a dark-first default to match the site, mirroring how `tokens.css` does it there. Simplest, and consistent by construction.
++  Have the demo read Material's stored choice, which Material keeps in `localStorage` under `__palette`, so the demo follows whatever the visitor last picked on the site. Better behaviour, more moving parts, and it needs a fallback for a visitor who arrives at the demo first.
+
+Whichever is chosen, the contrast test in `test_demo_render.py` recomputes every text token against every surface of **both** themes and requires 4.5:1, so a new default cannot quietly ship a failing pair. Do not weaken that test; extend it if the palette gains tokens.
+
+# Done
+
+The demo is reachable from the site nav and opens in a palette that does not fight the page the visitor came from; the 74 existing tests pass unchanged; the choice and its reasoning are in the PR and in `web/README.md`.
+
+# Relations
+
++  Depends on [#169].
++  Builds on [#85] / [#166].
++  Milestone deliberately unset; see [#169].
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+
+---
+
+### Issue M6-3: site: write the landing page, and curate a nav over docs/ (#171)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+[#169] gives the site a skeleton and [#170] puts the demo in it. Neither gives it anything to say.
+
+Two problems, and the first is the one that matters. **No file in `docs/` answers "what is this and why should I care".** `docs/architecture.md` describes four layers to someone who already knows what they are for; `README.md` is a contributor's orientation; the ADRs are decision records. A stranger arriving from a link, a paper, or a search has nothing to read. That page does not exist and has to be written, not wired up.
+
+The second is that `docs/` is written for contributors and publishing it wholesale would be wrong. It holds fifteen top-level Markdown files and seven directories, including `PLAN.md`, `WORKFLOW.md`, `WORKFLOW-Cheatsheet.md`, the 3,300-line generated `GITHUB_PROJECT.md`, `feedback/`, and `notes/`. MkDocs' nav is an allowlist, which is exactly the tool for this, but the curation is a judgment call per page and should be defended rather than assumed.
+
+# Work
+
++  **Write the landing page.** What `agda-native-air` is, what problem it addresses, what has been measured, and where to go next. The demo is the strongest thing the project has to show a stranger, so it should be reachable from the first screen. The numbers are available and already checked against ADR 0001 § 9 by `scripts/python/demo/numbers.py`; prefer reusing that over retyping them, so the landing page cannot drift from the record the way the PR description of [#166] did three times.
++  **Curate the nav**, page by page. For each file under `docs/`, decide: publish, publish with an edit, or leave for contributors. Say in the PR what was excluded and why. Expect the ADRs, `docs/proof-search/overview.md`, `docs/benchmarks/`, and `docs/corpora/` to be publishable close to as-is, and the workflow and plan files not to be.
++  Wire the nav so that a page which is published but not in the nav is a build failure rather than an orphan; MkDocs can be told to do this.
+
+# A trap worth knowing before you start
+
+Several `docs/` files are written with relative links to files that will not be published (for instance into `reports/` or to `GITHUB_PROJECT.md`). Publishing a page without fixing its links produces a site full of 404s that the build will not necessarily catch. Decide whether such a link becomes a GitHub link, gets dropped, or forces the target to be published too.
+
+# Not in scope
+
+The custom domain cutover, and a link from `formalverification.io`. Both are follow-ups and neither blocks this.
+
+# Done
+
+A stranger can land on the site and, within one screen, learn what the project is and click through to a real agent session; every published page is in the nav and every nav entry resolves; the exclusions are named in the PR with a reason each; no figure on the landing page is typed by hand where it could be read from the generated data.
+
+# Relations
+
++  Depends on [#169]; best done after [#170], so the demo is linkable.
++  Milestone deliberately unset; see [#169].
+
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+
+---
+
+### Issue M6-4: Benchmark obligations import 5.9 MB of interfaces for _≡_ and refl (#167)
+
+**Labels:** `agda-dojang`, `cleanup`, `M6: docs + dissemination`
+
+## tl;dr
+
+After the `Prelude` fix in the companion issue, a benchmark obligation's import closure is **70 modules and 5.89 MB** of interface files, and almost all of that is one line in the obligation itself:
+
+```agda
+open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl )
+```
+
+Importing `Relation.Binary.PropositionalEquality.Core` instead takes the same obligation to **34 modules and 940,810 bytes** gzipped, and its check under wasm32 from 3.58 s to **1.52 s**.  It type-checks unchanged.
+
+Unlike the `Prelude` fix, this one has a real trade-off and should not be applied without deciding it, which is why it is a separate issue.
+
+## The numbers
+
+Measured on `data/benchmarks/agda-stdlib-v0/gold/Bool-not-involutive.agda` with the flake's Agda 2.8.0 and standard library 2.3, with the `Prelude` fix already applied:
+
+| Obligation imports | Closure | Interfaces raw | Gzipped | wasm32 check |
+|---|---:|---:|---:|---:|
+| `Relation.Binary.PropositionalEquality` | 70 modules | 6,892,457 | 5,887,975 | 3.58 s |
+| `Relation.Binary.PropositionalEquality.Core` | 34 modules | 1,077,437 | 940,810 | 1.52 s |
+
+The full module re-exports the `Core` definitions plus the setoid bundles, the decidable-equality machinery and the reasoning combinators; `Core` has `_≡_`, `refl`, `sym`, `trans` and `cong`, which is what these obligations use.
+
+Together with the `Prelude` fix, the chain is worth stating end to end, because no single step looks decisive:
+
+| State | Closure | Interfaces gzipped |
+|---|---:|---:|
+| today | 190 modules | 27,329,749 |
+| `Prelude` fixed | 70 modules | 5,887,975 |
+| and the obligation uses `Core` | 34 modules | 940,810 |
+
+**29 times smaller**, for two edits in a library prelude and one import line per fixture.
+
+## The trade-off
+
+These are benchmark fixtures.  Their job is to look like the Agda a person would actually write, because a model's performance on them is supposed to transfer to real code, and real code imports `Relation.Binary.PropositionalEquality`, not its `.Core`.  Trimming imports to shrink a closure optimizes the benchmark against a property the benchmark is not measuring, and a fixture set that quietly stops resembling its domain is worth less than the bytes it saves.
+
+So the question is not "is `Core` cheaper" (it is, by 29 times) but "what are these fixtures for".  Three ways it could go, in the order I would consider them:
+
++  **Leave them alone.**  5.89 MB after the `Prelude` fix is already affordable for every use except a byte-budgeted web page, and the fixtures keep looking like ordinary Agda.  If the browser demo is the only consumer that cares, let the demo carry its own smaller variants rather than reshaping the corpus.
++  **Trim only where the obligation does not use anything outside `Core`.**  Mechanical, checkable, and it leaves every fixture that genuinely needs the full module alone.  Worth knowing how many of the 55 that is before choosing; I have not counted.
++  **Keep both.**  The obligation stays idiomatic and the demo ships a variant with trimmed imports, generated rather than hand-maintained.  Costs a generator and a check that the two stay in step.
+
+I have no standing to pick among these; the corpus is yours.  What this issue contributes is that the choice is now priced.
+
+## Related
+
++  [#168] fixes `AgdaDojang.Prelude`, which is a pure win with no trade-off and should land regardless of what is decided here.  Its numbers above assume that fix is in.
++  Found while measuring whether a browser-hosted Agda could check these obligations: williamdemeo/website [#103], with the follow-up in [#144] and the measurements in that repository's `docs/adr/015-in-browser-agda.md`.
+
+[#103]: https://github.com/williamdemeo/website/issues/103
+[#144]: https://github.com/williamdemeo/website/issues/144
+[#168]: https://github.com/formalverification/agda-native-air/issues/168
+
+---
+
+### Issue M6-5: `AgdaDojang.Prelude` pulls 154 modules + 31 MB of interfaces for 1 string comparison (#168, closed)
+
+**Labels:** `agda-dojang`, `cleanup`, `M6: docs + dissemination`
+
+## tl;dr
+
+Two lines in `agda-dojang/agda/AgdaDojang/Prelude.agda` pull **154 standard-library modules and 31 MB of interface files** into the import closure of every module that opens `AgdaDojang.Debug`, which is all 55 benchmark obligations.  Replacing them takes the closure of `AgdaDojang.Debug` from **188 modules / 32,067,236 bytes** of interfaces to **34 modules / 1,077,437 bytes**, and the whole library still type-checks.  Neither replacement changes any call site.
+
+The two lines are the following:
+
+```agda
+open import Data.Bool using (if_then_else_) public
+open import Data.String.Properties using (_==_) public
+```
+
+They have to be fixed **together**, and that is the one non-obvious part of this issue: measured separately each looks minor, because each is hiding behind the other.
+
+## Why `Data.String.Properties` is expensive
+
+`_==_` is used in exactly two places in the library, both in `AgdaDojang/Apply.agda` (lines 333 and 357), and both are the same expression:
+
+```agda
+let nm = if s == "" then "x" else s
+```
+
+A test for the empty string.  But `Data.String.Properties._==_` is not a primitive; it is decidable equality reduced to a boolean:
+
+```agda
+_==_ : String → String → Bool
+s₁ == s₂ = isYes (s₁ ≟ s₂)
+```
+
+and `_≟_` is built from char-wise pointwise equality and strict lexicographic order, so the module imports `Data.Char.Properties`, `Data.List.Relation.Binary.Pointwise`, `Data.List.Relation.Binary.Lex.Strict`, `Relation.Binary.Bundles`, `Relation.Binary.Structures` and `Relation.Nullary.Decidable`.  That is most of the relation and order hierarchy, arriving so that two string literals can be compared.
+
+`Agda.Builtin.String`, which `Prelude` **already imports on the line above**, offers the primitive directly:
+
+```agda
+primStringEquality : String → String → Bool
+```
+
+### The one objection, and why it does not apply here
+
+The standard library has a comment saying why it does *not* define `_==_ = primStringEquality`:
+
+> Why is the definition `_==_ = primStringEquality` not used?  One reason is that the present definition can sometimes improve type inference, at least with the version of Agda that is current at the time of writing: see unit-test below.
+
+The unit test it refers to is `P (_==_ "")`, where the operator appears **partially applied inside a type**.  Both of this library's uses are fully applied in a boolean position, which is not that case.  Verified rather than assumed: with the swap in place, `AgdaDojang.Debug`, `Apply`, `Refine` and `Everything` all type-check with exit 0.
+
+## Why `Data.Bool` is expensive, and only once the other is fixed
+
+`if_then_else_` is defined in `Data.Bool.Base`.  `Data.Bool` is `Data.Bool.Base` plus a re-export from `Data.Bool.Properties`:
+
+```agda
+open import Data.Bool.Base public
+open import Data.Bool.Properties public using (T?; _≟_; _≤?_; _<?_)
+```
+
+`Data.Bool.Properties` is the boolean algebra development, and none of it is used here.
+
+Measured on its own, changing this line saves **1 module and 21,839 bytes**, which looks like nothing.  That is because `Data.String.Properties` was already dragging `Data.Bool.Properties` in.  Once the string import is gone, the same one-line change is worth **52 modules and 10.1 MB**.  A session that measures either line alone will conclude neither is worth fixing.
+
+## The measurements
+
+Each row is a fresh copy of the library, checked with the flake's own Agda 2.8.0 and standard library 2.3; the closure comes from `--dependency-graph` and the byte counts are the `.agdai` files the nixpkgs standard-library derivation ships.
+
+| Variant | Closure of `AgdaDojang.Debug` | Interface bytes |
+|---|---:|---:|
+| as it stands today | 188 modules | 32,067,236 |
+| `Data.Bool` → `Data.Bool.Base` alone | 187 modules | 32,045,397 |
+| `_==_` → `primStringEquality` alone | 86 modules | 11,177,548 |
+| **both** | **34 modules** | **1,077,437** |
+
+And on the thing that matters, a benchmark obligation:
+
+| Variant | Closure of `Bool-not-involutive` | Interfaces gzipped | Check under wasm32 |
+|---|---:|---:|---:|
+| today | 190 modules | 27,329,749 | 5.38 s |
+| both changes | 70 modules | 5,887,975 | 3.58 s |
+
+The remaining 70 are dominated by the obligation's own import of `Relation.Binary.PropositionalEquality`; that is a separate question, and is [#167].
+
+## The change
+
+In `agda-dojang/agda/AgdaDojang/Prelude.agda`:
+
+```diff
+-open import Agda.Builtin.String using (String; primShowNat) public
++open import Agda.Builtin.String using (String; primShowNat; primStringEquality) public
+ open import Agda.Builtin.Unit using (⊤; tt) public
+-open import Data.Bool using (if_then_else_) public
+-open import Data.String.Properties using (_==_) public
++open import Data.Bool.Base using (if_then_else_) public
+ open import Function.Base using (case_of_) public
++
++infix 4 _==_
++_==_ : String → String → Bool
++_==_ = primStringEquality
+```
+
+Keeping the operator's name and fixity means `Apply.agda` needs no edit, and `_==_` stays exported from `Prelude` for anything that opens it.
+
+## What was measured and is *not* worth doing
+
++  `open import Function.Base using (case_of_)` → a three-line local definition: **0 modules and 0 bytes** saved, because `Function.Base` is already in the closure by other routes.  Leave it alone.
++  `open import Relation.Binary.PropositionalEquality.Core public` is already the `.Core` module rather than the full one, so there is nothing to win there either.
+
+## Verification
+
++  [ ] `Debug`, `Apply`, `Refine` and `Everything` type-check with exit 0.  (They did, in every variant above.)
++  [ ] `Examples` and `ApplyDemo` exit 42 **before and after**.  They exit 42 on the unmodified library too, by design: `Debug`'s macros report their information by raising a type error.  The baseline control is what establishes this is not a regression, and it is worth re-running rather than trusting this note.
++  [ ] The benchmark obligations still behave: the gold solutions exit 0, and an obligation with its hole exits 42 reporting `[UnsolvedInteractionMetas]` at the hole and nothing else.
+
+## Why this is worth doing now
+
+It was found while measuring whether a browser-hosted Agda could check this project's benchmark obligations (williamdemeo/website [#103], and the follow-up [#144]).  A browser has to download the interface closure of whatever it checks, so 27 MB against 1 MB is the difference between the obligations being demonstrable in a web page and not.  But nothing about the finding is browser-specific: it is 31 MB of interfaces, and the type-checking of 154 extra modules on any cold build, for one string comparison.
+
+[#144]: https://github.com/williamdemeo/website/issues/144
+[#103]: https://github.com/williamdemeo/website/issues/103
+[#167]: https://github.com/formalverification/agda-native-air/issues/167
+
 <!-- END GENERATED: milestone-6 -->
 
 ---
