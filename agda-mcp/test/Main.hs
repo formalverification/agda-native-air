@@ -5601,7 +5601,7 @@ interactionWireTests = do
               , "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
               , "{\"interactionPoints\":[],\"kind\":\"InteractionPoints\"}"
               ]
-            g = readGive rs
+            g = readGive 0 rs
         allOf
           [ assertEqual "class" GiveClassOk (grClass g)
           , assertEqual "given" True (grGiven g)
@@ -5630,14 +5630,14 @@ interactionWireTests = do
               ]
         allOf
           [ assertEqual "blocked constraint" GiveClassTypeError
-              (grClass (readGive withError))
-          , assertEqual "its code" ["UnsolvedConstraints"] (grCodes (readGive withError))
+              (grClass (readGive 0 withError))
+          , assertEqual "its code" ["UnsolvedConstraints"] (grCodes (readGive 0 withError))
           , assertEqual "two new points" (Just 2)
-              (length <$> grPoints (readGive withError))
+              (length <$> grPoints (readGive 0 withError))
           , assertEqual "a sub-hole alone is ok" GiveClassOk
-              (grClass (readGive subHolesOnly))
+              (grClass (readGive 0 subHolesOnly))
           , assertEqual "and it reports the new point" (Just 1)
-              (length <$> grPoints (readGive subHolesOnly))
+              (length <$> grPoints (readGive 0 subHolesOnly))
           ]
 
     , -- `(+-comm _ _)` on the same obligation, captured: the give succeeded
@@ -5651,7 +5651,7 @@ interactionWireTests = do
               , "{\"info\":{\"errors\":[{\"message\":\"error: [UnsolvedConstraints]\\nFailed to solve the following constraints:\\n  _n_6 + _m_5 = n + m : \8469 (blocked on _n_6)\"}],\"invisibleGoals\":[{\"constraintObj\":{\"name\":\"_m_5\"},\"kind\":\"OfType\",\"type\":\"\8469\"},{\"constraintObj\":{\"name\":\"_n_6\"},\"kind\":\"OfType\",\"type\":\"\8469\"}],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
               , "{\"interactionPoints\":[],\"kind\":\"InteractionPoints\"}"
               ]
-            g = readGive rs
+            g = readGive 0 rs
         allOf
           [ assertEqual "class" GiveClassTypeError (grClass g)
           , assertEqual "the give still happened" True (grGiven g)
@@ -5666,8 +5666,8 @@ interactionWireTests = do
       runTest "readGive: a refusal gives nothing, reports its code, and leaves the hole" $ do
         let refusal code msg = mapMaybe parseResponseLine
               [ "{\"info\":{\"error\":{\"message\":\"1.1-7: error: [" <> code <> "]\\n" <> msg <> "\"},\"kind\":\"Error\",\"warnings\":[]},\"kind\":\"DisplayInfo\"}" ]
-            unequal = readGive (refusal "UnequalTerms" "(m n : \8469) \8594 m + n \8801 n + m !=< m + n \8801 n + m")
-            notInScope = readGive (refusal "NotInScope" "Not in scope:\\n  tt at 1.1-3")
+            unequal = readGive 0 (refusal "UnequalTerms" "(m n : \8469) \8594 m + n \8801 n + m !=< m + n \8801 n + m")
+            notInScope = readGive 0 (refusal "NotInScope" "Not in scope:\\n  tt at 1.1-3")
         allOf
           [ assertEqual "class" GiveClassTypeError (grClass unequal)
           , assertEqual "nothing was given" False (grGiven unequal)
@@ -5682,7 +5682,7 @@ interactionWireTests = do
       -- not silently 'ok'.  'grGiven' is False, so the rule reads it as a
       -- type error, and 'grGoals' says the state was never reported.
       runTest "readGive: no responses is a type error, not a silent ok" $ do
-        let g = readGive []
+        let g = readGive 0 []
         allOf
           [ assertEqual "class" GiveClassTypeError (grClass g)
           , assertEqual "not given" False (grGiven g)
@@ -5705,14 +5705,53 @@ interactionWireTests = do
               , "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
               ]
         allOf
-          [ assertEqual "the give happened" True (grGiven (readGive partial))
-          , assertEqual "but nothing reported the state" False (grGoals (readGive partial))
-          , assertEqual "no errors to find" [] (grErrors (readGive partial))
-          , assertEqual "no metas to find" [] (map lmetaName (grMetas (readGive partial)))
+          [ assertEqual "the give happened" True (grGiven (readGive 0 partial))
+          , assertEqual "but nothing reported the state" False (grGoals (readGive 0 partial))
+          , assertEqual "no errors to find" [] (grErrors (readGive 0 partial))
+          , assertEqual "no metas to find" [] (map lmetaName (grMetas (readGive 0 partial)))
           , assertEqual "so: type_error, not ok" GiveClassTypeError
-              (grClass (readGive partial))
+              (grClass (readGive 0 partial))
           , assertEqual "the report is the only difference" GiveClassOk
-              (grClass (readGive complete))
+              (grClass (readGive 0 complete))
+          ]
+
+    , -- The other two shapes that satisfy the rule's sentence vacuously (both
+      -- Copilot review catches on PR 174).  Neither is reachable on a healthy
+      -- exchange, which is the point: the reading has to fail closed on a
+      -- response it could not establish, not on one it has seen go wrong.
+      runTest "readGive: a give that cannot be shown to have landed here is NOT ok" $ do
+        let report = "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+            -- A GiveAction whose interactionPoint carries no id that parses.
+            noId = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{},\"kind\":\"GiveAction\"}", report ]
+            -- A GiveAction naming a point other than the one asked for.
+            elsewhere = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":7},\"kind\":\"GiveAction\"}", report ]
+        allOf
+          [ assertEqual "no id: class" GiveClassTypeError (grClass (readGive 0 noId))
+          , assertEqual "no id: but a hole WAS consumed, so a reload is owed"
+              True (grGiven (readGive 0 noId))
+          , assertEqual "no id: and the reading says it cannot place it"
+              (Nothing, False) (grPoint (readGive 0 noId), grHere (readGive 0 noId))
+          , assertEqual "elsewhere: class" GiveClassTypeError (grClass (readGive 0 elsewhere))
+          , assertEqual "elsewhere: the point it did name" (Just 7)
+              (grPoint (readGive 0 elsewhere))
+          , assertEqual "elsewhere: asked about 7, it is ok" GiveClassOk
+              (grClass (readGive 7 elsewhere))
+          ]
+
+    , runTest "readGive: an unreadable line in the window is NOT ok" $ do
+        let giveLine = "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+            report   = "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+            noisy = mapMaybe parseResponseLine
+              [ giveLine, "cannot read: IOTCM \"/p/F.agda\" None Direct (Cmd_give", report ]
+            clean = mapMaybe parseResponseLine [ giveLine, report ]
+        allOf
+          [ assertEqual "class" GiveClassTypeError (grClass (readGive 0 noisy))
+          , assertEqual "the line is kept, not dropped" 1
+              (length (grUnreadable (readGive 0 noisy)))
+          , assertEqual "and nothing else in the reading differs" GiveClassOk
+              (grClass (readGive 0 clean))
           ]
     ]
 

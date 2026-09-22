@@ -94,8 +94,8 @@ import AgdaMCP.Holes (HoleRef (..))
 import AgdaMCP.Interaction
   ( GiveClass (..), GiveForce (..), GiveOutcome (..), GiveReading (..)
   , InteractionLanes, IPoint (..), LaneFailure (..), LoadReport (..)
-  , IRange (..), LoadedInfo (..), LaneMeta (..), ensureLoaded, giveCandidate
-  , newInteractionLanes, shutdownLanes, withLane )
+  , IRange (..), LaneHandle, LoadedInfo (..), LaneMeta (..), ensureLoaded
+  , giveCandidate, newInteractionLanes, shutdownLanes, withLane )
 import AgdaMCP.Project
   (fileDirIncludeFlags, projectExtraFlags, resolveProject)
 import AgdaMCP.Tools.ProofState (handleFillHole)
@@ -305,7 +305,7 @@ builtinCases = do
   runDirs <- archiveRuns
   probed <- forM runDirs $ \(runName, dir) -> do
     rows <- readJsonl (dir </> "results.jsonl")
-    pure [(runName, r) | r <- rows]
+    pure [(runName, n, r) | (n, r) <- zip [1 :: Int ..] rows]
   goldCases <- forM entries $ \e -> do
     obligation <- TIO.readFile (ieObligation e)
     gold <- TIO.readFile (ieGold e)
@@ -322,22 +322,30 @@ builtinCases = do
       , caseRuns = []
       , caseNote = Nothing
       }
-  let probeCases =
-        [ Case
-            { caseSource = "agent-bench"
-            , caseBench = prBench r
-            , caseObl = ieObligation e
-            , caseTier = tierOf (ieObligation e)
-            , caseCand = prCandidate r
-            , caseHole = prHoleIndex r
-            , caseForce = WithoutForce
-            , caseArch = [prStatus r]
-            , caseRuns = [runName]
-            , caseNote = Nothing
-            }
-        | (runName, r) <- concat probed
-        , Just e <- [Map.lookup (prBench r) byId]
-        ]
+  -- An archived row naming a benchmark the index does not define stops the
+  -- run.  A pattern guard here would have filtered it out instead, which is
+  -- the same completeness hole 'readJsonl' closes one layer down: the archive
+  -- is committed and the index is not, so a renamed or retired obligation
+  -- would quietly shrink the candidate set and the parity count with it (a
+  -- Copilot review catch on PR 174).
+  probeCases <- forM (concat probed) $ \(runName, n, r) ->
+    case Map.lookup (prBench r) byId of
+      Nothing -> die $ "reports/agent-bench/" <> T.unpack runName
+        <> "/results.jsonl:" <> show n <> ": this archived probe row names benchmark id "
+        <> show (T.unpack (prBench r))
+        <> ", which data/benchmarks/benchmark-index.jsonl does not define"
+      Just e -> pure Case
+        { caseSource = "agent-bench"
+        , caseBench = prBench r
+        , caseObl = ieObligation e
+        , caseTier = tierOf (ieObligation e)
+        , caseCand = prCandidate r
+        , caseHole = prHoleIndex r
+        , caseForce = WithoutForce
+        , caseArch = [prStatus r]
+        , caseRuns = [runName]
+        , caseNote = Nothing
+        }
   pure (mergeCases (probeCases <> goldCases))
 
 -- | archiveRuns: the agent-bench run directories that carry probe rows.
@@ -405,26 +413,43 @@ runObligation lanes cfg0 oblRel cs = do
       dirFlags <- fileDirIncludeFlags baseFlags pc0 absPath
       let effFlags = baseFlags <> dirFlags
           cfg = cfg0 { agdaFlags = effFlags }
-      -- Lane pass: one forced load, then every candidate through the give.
-      laneOutcome <- withLane lanes cfg (pcRoot pc0) $ \lh -> do
+      -- Lane pass: one forced load, then every candidate through the give,
+      -- each of them its OWN lane request.  'withLane' takes one deadline for
+      -- its whole body, so a single request around the load and every give
+      -- would make --timeout an obligation-wide budget on this lane while the
+      -- batch side gets a fresh bound per call, and a long obligation could
+      -- then fail its later candidates for nothing the candidates did (a
+      -- Copilot review catch on PR 174).  Splitting the requests costs no
+      -- child and no load: the registry hands back the same lane, and the
+      -- second and later calls find the file already loaded.
+      let root = pcRoot pc0
+      loadRes <- onLane lanes cfg root $ \lh -> do
         loaded <- ensureLoaded lh True absPath effFlags
-        case loaded of
-          Left lf -> pure (Left (laneFailureText lf))
+        pure $ case loaded of
+          Left lf -> Left (laneFailureText lf)
           Right lr -> case lrOutcome lr of
-            Left msg -> pure (Left ("the obligation did not load: " <> oneLine msg))
-            Right li -> do
-              answers <- forM cs $ \c ->
-                case pointAt (caseHole c) li of
-                  Nothing -> pure (Left ("the load announced no interaction point at index "
-                                          <> T.pack (show (caseHole c))) :: LaneAnswer)
-                  Just p -> do
-                    r <- giveCandidate lh absPath effFlags (ipId p) (caseForce c) (caseCand c)
-                    pure (either (Left . laneFailureText) Right r)
-              pure (Right (lrElapsedMs lr, liPoints li, answers))
-      let (loadMs, points, laneAnswers) = case laneOutcome of
-            Left lf -> (0, [], [Left (laneFailureText lf) | _ <- cs])
-            Right (Left msg) -> (0, [], [Left msg | _ <- cs])
-            Right (Right (ms, ps, as)) -> (ms, ps, as)
+            Left msg -> Left ("the obligation did not load: " <> oneLine msg)
+            Right li -> Right (lrElapsedMs lr, liPoints li)
+      (loadMs, points, laneAnswers) <- case loadRes of
+        Left err -> pure (0, [], [Left err | _ <- cs])
+        Right (ms, ps) -> do
+          as <- forM cs $ \c -> case indexPoint (caseHole c) ps of
+            Nothing -> pure (Left ("the load announced no interaction point at index "
+                                    <> T.pack (show (caseHole c))) :: LaneAnswer)
+            Just p -> onLane lanes cfg root $ \lh -> do
+              -- Not forced: the load above (or the previous candidate's own
+              -- reset) already put the lane in the state this give is to be
+              -- timed against, so this is a stamp check and nothing more.
+              -- A lane the previous candidate's timeout killed is respawned
+              -- here instead, which is the recovery this split buys.
+              ready <- ensureLoaded lh False absPath effFlags
+              case ready of
+                Left lf -> pure (Left (laneFailureText lf))
+                Right lr -> case lrOutcome lr of
+                  Left msg -> pure (Left ("the obligation did not load: " <> oneLine msg))
+                  Right _ -> either (Left . laneFailureText) Right
+                    <$> giveCandidate lh absPath effFlags (ipId p) (caseForce c) (caseCand c)
+          pure (ms, ps, as)
       -- Batch pass: the shipped handler, one cold agda per candidate.
       batchAnswers <- forM cs $ \c ->
         handleFillHole cfg0 (FillHoleParams absPath (ByIndex (caseHole c)) (caseCand c))
@@ -447,8 +472,18 @@ indexPoint n ps
       (p : _) -> Just p
       []      -> Nothing
 
-pointAt :: Int -> LoadedInfo -> Maybe IPoint
-pointAt n = indexPoint n . liPoints
+
+-- | onLane: one lane request, with its own copy of the configured timeout,
+-- flattened to the driver's @Either Text@.
+--
+-- Every caller here is one unit of work that the batch side also runs as one
+-- bounded call, which is the whole reason this exists rather than a single
+-- request around the obligation.
+onLane
+  :: InteractionLanes -> AgdaConfig -> FilePath
+  -> (LaneHandle -> IO (Either Text a)) -> IO (Either Text a)
+onLane lanes cfg root body =
+  either (Left . laneFailureText) id <$> withLane lanes cfg root body
 
 laneFailureText :: LaneFailure -> Text
 laneFailureText lf = T.pack (show (lfEvent lf)) <> ": " <> oneLine (lfMessage lf)
@@ -497,6 +532,14 @@ row c loadMs before mPoint lane batch = object $
         let r = goReading o in
         [ "laneClass"     .= classText (grClass r)
         , "laneGiven"     .= grGiven r
+          -- The two conjuncts the reading added to fail closed, carried as
+          -- evidence rather than only consulted: whether the give could be
+          -- shown to have landed on the point it was aimed at, and how many
+          -- lines of its response window were not JSON.  Across this archive
+          -- the first is true and the second is zero on every accepted give,
+          -- which is what makes them safe conjuncts.
+        , "laneHere"      .= grHere r
+        , "laneUnreadable" .= length (grUnreadable r)
         , "laneText"      .= grText r
         , "lanePoint"     .= grPoint r
           -- Every interaction point Agda announced AFTER the give, which is

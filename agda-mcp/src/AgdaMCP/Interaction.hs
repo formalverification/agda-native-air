@@ -1417,9 +1417,18 @@ data GiveClass = GiveClassOk | GiveClassTypeError
 -- reported on the state it left.
 data GiveReading = GiveReading
   { grClass  :: GiveClass
-  , grGiven  :: Bool         -- ^ A @GiveAction@ arrived: the point was consumed.
+  , grGiven  :: Bool         -- ^ A @GiveAction@ arrived: /some/ point was
+                             -- consumed.  This drives the reset, and it is
+                             -- deliberately weaker than the class: a give that
+                             -- landed somewhere unexpected still consumed a
+                             -- hole, so the reload is still owed.
   , grText   :: Maybe Text   -- ^ What Agda would write into the file.
-  , grPoint  :: Maybe Int    -- ^ The point the give consumed.
+  , grPoint  :: Maybe Int    -- ^ The point the give consumed, when the wire
+                             -- carried an id that parsed.
+  , grHere   :: Bool         -- ^ The give landed on the point it was aimed at.
+  , grUnreadable :: [Text]   -- ^ Lines in this command's window that were not
+                             -- JSON at all (Agda's @cannot read:@ reply, or
+                             -- anything else the reader could not classify).
   , grPoints :: Maybe [IPoint]
                              -- ^ The interaction points Agda announced after
                              -- the give, when it announced any; @Just []@ is
@@ -1452,7 +1461,8 @@ giveErrorsOf rs = mapMaybe errorMessageOf rs <> allGoalsErrors
     messageOf (String t) = Just t
     messageOf _          = Nothing
 
--- | readGive: classify one @Cmd_give@'s responses.
+-- | readGive: classify one @Cmd_give@'s responses, given the interaction point
+-- the give was aimed at.
 --
 -- The rule, stated in issue #163 and applied here unchanged: a @GiveAction@
 -- whose following @AllGoalsWarnings@ carries no error and no invisible goal
@@ -1460,20 +1470,33 @@ giveErrorsOf rs = mapMaybe errorMessageOf rs <> allGoalsErrors
 -- @[UnsolvedInteractionMetas]@ class @fill_hole@ already tolerates and
 -- @(s≤s {!!})@ is a core candidate shape; anything else is a type error.
 --
--- Note the first conjunct of that rule: the report has to have arrived.  A
--- collection holding a @GiveAction@ and nothing else has no error and no
--- invisible goal for the trivial reason that Agda never said what state the
--- give left, and reading that as @ok@ would be the one direction a judgment
--- may not be wrong in.  'grGoals' is what tells the two apart, which is why
--- it is a conjunct here and not merely a field (a Copilot review catch on
--- PR 174, where it was recorded and then not consulted).
-readGive :: [IResponse] -> GiveReading
-readGive rs = GiveReading
-  { grClass  = if given && goalsSeen && null errs && null metas
+-- What this adds to that sentence is that every clause of it has to have been
+-- /established/, because the one direction a judgment may not be wrong in is
+-- @ok@.  Three shapes satisfy the sentence vacuously and are read as type
+-- errors here (all three are Copilot review catches on PR 174):
+--
+-- * The report never arrived.  A collection holding a @GiveAction@ and nothing
+--   else has no error and no invisible goal for the trivial reason that Agda
+--   never said what state the give left.  'grGoals' is the conjunct.
+-- * The @GiveAction@ did not say which point it consumed, or said a different
+--   one.  "Agda accepted the candidate" is only an answer about the hole that
+--   was asked about, so the id has to have parsed and to match; 'grHere' is
+--   the conjunct, and it is separate from 'grGiven' because a give that landed
+--   anywhere still consumed a hole and still owes a reload.
+-- * A line in the command's window was not JSON at all.  The reader cannot
+--   vouch for a state it could not read, so 'grUnreadable' being empty is the
+--   third conjunct.  Measured across every give in the parity archive: never
+--   non-empty on a healthy exchange, which is what makes it a safe conjunct
+--   rather than a source of false type errors.
+readGive :: Int -> [IResponse] -> GiveReading
+readGive expected rs = GiveReading
+  { grClass  = if here && goalsSeen && null unreadable && null errs && null metas
                  then GiveClassOk else GiveClassTypeError
   , grGiven  = given
   , grText   = listToMaybe [t | IGiveAction _ (Just t) <- rs]
-  , grPoint  = listToMaybe [i | IGiveAction (Just i) _ <- rs]
+  , grPoint  = point
+  , grHere   = here
+  , grUnreadable = unreadable
   , grPoints = interactionPointsOf rs
   , grGoals  = goalsSeen
   , grMetas  = metas
@@ -1481,10 +1504,13 @@ readGive rs = GiveReading
   , grCodes  = mapMaybe errorCodeOf errs
   }
   where
-    given     = not (null [() | IGiveAction _ _ <- rs])
-    goalsSeen = not (null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs])
-    metas     = metasOf rs
-    errs      = giveErrorsOf rs
+    given      = not (null [() | IGiveAction _ _ <- rs])
+    point      = listToMaybe [i | IGiveAction (Just i) _ <- rs]
+    here       = point == Just expected
+    goalsSeen  = not (null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs])
+    unreadable = [t | IUnreadable t <- rs]
+    metas      = metasOf rs
+    errs       = giveErrorsOf rs
 
 -- | GiveOutcome: one candidate judged on the lane, with what it cost.
 --
@@ -1531,7 +1557,7 @@ giveCandidate lh path flags gid force expr = do
   case sent of
     Left lf  -> pure (Left lf)
     Right rs -> do
-      let reading = readGive rs
+      let reading = readGive gid rs
           giveUs  = elapsedUsBetween t0 t1
       if not (grGiven reading)
         then pure . Right $ GiveOutcome reading giveUs Nothing Nothing
