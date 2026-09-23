@@ -97,12 +97,26 @@ facts about a process, the lane's reading has no counterpart for either, and
 recording one as a disagreement would inflate the count the table is read on.
 No row in this archive carries one.
 
-`laneHere` and `laneUnreadable` are the two conjuncts the lane reading uses to
-fail closed, carried as evidence rather than only consulted: whether the give
-could be shown to have landed on the point it was aimed at, and how many lines
-of its response window were not JSON.  Both hold on every row here (`laneHere`
-true on every accepted give, `laneUnreadable` zero throughout), which is what
-makes them safe conjuncts rather than a source of false type errors.
+`laneHere`, `laneUnreadable` and `laneReport` are the three conjuncts the lane
+reading uses to fail closed, carried as evidence rather than only consulted:
+whether the give could be shown to have landed on the point it was aimed at,
+how many lines of its response window were not JSON, and whether its
+`AllGoalsWarnings` carried the two fields the class reads as readable arrays.
+All three hold on every row here, which is what makes them safe conjuncts
+rather than a source of false type errors: `laneHere` is true on all 137
+accepted gives, `laneUnreadable` is zero throughout, and `laneReport` is
+`complete` on all 146 rows where a give happened.  The other 75 rows are
+`missing`, and correctly so: a refused give emits no `AllGoalsWarnings` at all,
+and every one of those rows is a `type_error` on both lanes.
+
+The third is worth a sentence, because it is the one an eye would skip.  The
+class reads a report's `errors` and `invisibleGoals`, and the readers those
+share with the batch tools' peek answer "empty" for an absent field, a mistyped
+one, and an array holding a single unreadable entry alike.  So a report that
+said nothing readable would have produced the same `ok` as a clean one.  The
+peek's tolerance is deliberate and unchanged (there a dropped entry is a `"?"`
+in a display field, never a verdict); the give's check is a second totality
+policy over the same readers.
 
 ## What the two disagreements are, and are not
 
