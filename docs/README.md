@@ -12,7 +12,7 @@ An index of this directory and a reading order for a new collaborator.  The repo
 +  [`benchmarks/`](benchmarks/): the M1-5 baseline benchmark's difficulty taxonomy and its obligations document; the suite itself, its index, and its README are under [`data/benchmarks/`](../data/benchmarks/).
 +  [`corpora/`](corpora/): one dataset card per published corpus cut, and the procedure for publishing a corpus release.
 +  [`feedback/`](feedback/): documents imported from consumer projects (sessions in `ualib/agda-algebras`), kept verbatim apart from their header comments: the field report that motivated the [#68] wave, and the consumer-side case for corpus proof search.
-+  [`notes/`](notes/): working notes and background reading (currently a prior-art report on AI for theorem proving).
++  [`notes/`](notes/): working notes and background reading: a prior-art report on AI for theorem proving, and [a proposal](notes/browser-ide-proposal.md) for a browser workbench where people, models, and Agda build proofs together, with a proof-design view drawn from the checked source.
 
 ## Top-level documents
 
