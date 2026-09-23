@@ -117,7 +117,7 @@ import AgdaMCP.Interaction
   , GiveClass (..), GiveForce (..), GiveOutcome (..), GiveReading (..)
   , LaneHandle
   , cmdGive, cmdGoalTypeContext, cmdLoad, ensureLoaded, giveCandidate
-  , goalsOf, hsShow, readGive
+  , goalsOf, hsShow, readGive, ReportCheck (..), giveReportCheck
   , interactionPointsOf, iotcmLine, loadCheckedFromSource, metasOf
   , newInteractionLanes, parseAmbiguousName, parseDidYouMean, parseResponseLine
   , parseSrcLoc, parseWhyInScope
@@ -5752,6 +5752,54 @@ interactionWireTests = do
               (length (grUnreadable (readGive 0 noisy)))
           , assertEqual "and nothing else in the reading differs" GiveClassOk
               (grClass (readGive 0 clean))
+          ]
+
+    , -- The report arrived and could not be READ (a Copilot review catch on
+      -- PR 174, round three).  Every shape below makes the error list and the
+      -- meta list look empty for the same reason an absent report does, so the
+      -- same `ok` would come out of a report that said nothing at all.  Note
+      -- the last two: the array is present and well-typed, and only one entry
+      -- is unreadable, which the total reader drops silently.
+      runTest "readGive: a report the reading cannot trust is NOT ok" $ do
+        let giveLine = "{\"giveResult\":{\"str\":\"refl\"},\"interactionPoint\":{\"id\":0},\"kind\":\"GiveAction\"}"
+            with rep = readGive 0 (mapMaybe parseResponseLine [giveLine, rep])
+            healthy = with "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+            noErrKey = with "{\"info\":{\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\"},\"kind\":\"DisplayInfo\"}"
+            errNotArr = with "{\"info\":{\"errors\":null,\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\"},\"kind\":\"DisplayInfo\"}"
+            noMetaKey = with "{\"info\":{\"errors\":[],\"kind\":\"AllGoalsWarnings\"},\"kind\":\"DisplayInfo\"}"
+            badMeta = with "{\"info\":{\"errors\":[],\"invisibleGoals\":[{\"type\":\"Nat\"}],\"kind\":\"AllGoalsWarnings\"},\"kind\":\"DisplayInfo\"}"
+            badErr = with "{\"info\":{\"errors\":[{\"code\":\"UnsolvedConstraints\"}],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\"},\"kind\":\"DisplayInfo\"}"
+            malformed = [noErrKey, errNotArr, noMetaKey, badMeta, badErr]
+        allOf
+          [ assertEqual "the report Agda emits is complete" ReportComplete
+              (grReport healthy)
+          , assertEqual "and reads ok" GiveClassOk (grClass healthy)
+          , assert "every malformed report is a type error"
+              (all ((== GiveClassTypeError) . grClass) malformed)
+          , assert "each one because the report could not be trusted, and says why"
+              (all (\g -> case grReport g of ReportMalformed w -> not (T.null w)
+                                             _                 -> False) malformed)
+            -- The trap: all five look like "nothing wrong" to the total reader,
+            -- which is exactly why grGoals alone could not have caught them.
+          , assert "all five have an empty error and meta list"
+              (all (\g -> null (grErrors g) && null (grMetas g)) malformed)
+          , assert "and all five DID have a report response"
+              (all grGoals malformed)
+          ]
+
+    , -- The shared readers must be untouched by that check: metasOf and goalsOf
+      -- also serve the batch tools' peek (issues #108, #115), where a dropped
+      -- entry is a display gap and never a verdict, so their tolerance is
+      -- deliberate and must stay.
+      runTest "metasOf/goalsOf keep dropping what they cannot read (the peek's contract)" $ do
+        let rep = mapMaybe parseResponseLine
+              [ "{\"info\":{\"errors\":[],\"invisibleGoals\":[{\"type\":\"Nat\"},{\"constraintObj\":{\"name\":\"_n_4\"},\"kind\":\"OfType\",\"type\":\"Nat\"}],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[{\"no\":\"constraintObj\"},{\"constraintObj\":{\"id\":0},\"kind\":\"OfType\",\"type\":\"Nat\"}]},\"kind\":\"DisplayInfo\"}" ]
+        allOf
+          [ assertEqual "the readable meta survives" ["_n_4"] (map lmetaName (metasOf rep))
+          , assertEqual "the readable goal survives" [0] (map lgId (goalsOf rep))
+          , assertEqual "while the give's check refuses the same report"
+              (ReportMalformed "the report's `invisibleGoals` is absent, is not an array, or holds an entry with no meta name")
+              (giveReportCheck rep)
           ]
     ]
 

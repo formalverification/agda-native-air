@@ -132,6 +132,8 @@ module AgdaMCP.Interaction
     -- * Giving a candidate to a hole (issue #163; no tool registers this)
   , GiveClass (..)
   , GiveReading (..)
+  , ReportCheck (..)
+  , giveReportCheck
   , GiveOutcome (..)
   , readGive
   , giveErrorsOf
@@ -322,7 +324,17 @@ interactionPointsOf rs = listToMaybe [ps | IInteractionPoints ps <- rs]
 -- | goalsOf: the visible goals of the last @AllGoalsWarnings@ in a collection;
 -- i.e., each goal's interaction point and printed type.
 goalsOf :: [IResponse] -> [LaneGoal]
-goalsOf = goalArrayOf "visibleGoals" $ \g c -> do
+goalsOf = goalArrayOf "visibleGoals" goalEntryOf
+
+-- | goalEntryOf / metaEntryOf: the per-entry readers of the two goal arrays.
+--
+-- Named rather than inlined so that the total reading ('goalArrayOf', which
+-- drops an entry it cannot read) and the strict check ('goalArrayStrict', which
+-- refuses the whole array) are provably about the same elements read the same
+-- way.  A validator with its own copy of a reader is a validator that can
+-- disagree with what it validates.
+goalEntryOf :: Value -> Maybe LaneGoal
+goalEntryOf = splitEntry $ \g c -> do
   i <- intField "id" c
   pure (LaneGoal i (rangeField c) (fromMaybe "" (textField "type" g)))
 
@@ -333,9 +345,22 @@ goalsOf = goalArrayOf "visibleGoals" $ \g c -> do
 -- these are knowledge and never a verdict: batch @agda@ exits 42 on the same
 -- file, and that exit code stays the only verdict.
 metasOf :: [IResponse] -> [LaneMeta]
-metasOf = goalArrayOf "invisibleGoals" $ \g c -> do
+metasOf = goalArrayOf "invisibleGoals" metaEntryOf
+
+metaEntryOf :: Value -> Maybe LaneMeta
+metaEntryOf = splitEntry $ \g c -> do
   n <- textField "name" c
   pure (LaneMeta n (rangeField c) (fromMaybe "" (textField "type" g)))
+
+-- | splitEntry: hand a reader the two objects a goal entry is split across,
+-- the entry itself (which carries @type@) and its @constraintObj@ (the
+-- identity and the range).
+splitEntry
+  :: (KM.KeyMap Value -> KM.KeyMap Value -> Maybe a) -> Value -> Maybe a
+splitEntry reader (Object g) = case KM.lookup "constraintObj" g of
+  Just (Object c) -> reader g c
+  _               -> Nothing
+splitEntry _ _ = Nothing
 
 -- | goalArrayOf: one goal array of the /last/ @AllGoalsWarnings@ in a
 -- collection, read by the given entry reader.
@@ -347,21 +372,32 @@ metasOf = goalArrayOf "invisibleGoals" $ \g c -> do
 -- rather than the whole list.  The last such response wins: a collection can
 -- hold the load's own plus a later command's, and the latest describes the
 -- current state.
-goalArrayOf
-  :: Text
-  -> (KM.KeyMap Value -> KM.KeyMap Value -> Maybe a)
-  -> [IResponse] -> [a]
-goalArrayOf field reader rs =
+goalArrayOf :: Text -> (Value -> Maybe a) -> [IResponse] -> [a]
+goalArrayOf field reader = mapMaybe reader . fromMaybe [] . goalArrayValues field
+
+-- | goalArrayValues: the raw elements of one array field of the /last/
+-- @AllGoalsWarnings@ in a collection.  'Nothing' when there is no such
+-- response, when the field is absent, or when it is not an array; the three
+-- cases the total reading above cannot tell apart from an empty array and
+-- 'goalArrayStrict' must.
+goalArrayValues :: Text -> [IResponse] -> Maybe [Value]
+goalArrayValues field rs =
   case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
-    [] -> []
+    [] -> Nothing
     os -> case KM.lookup (Key.fromText field) (last os) of
-      Just (Array a) -> mapMaybe entry (V.toList a)
-      _              -> []
-  where
-    entry (Object g) = case KM.lookup "constraintObj" g of
-      Just (Object c) -> reader g c
-      _               -> Nothing
-    entry _ = Nothing
+      Just (Array a) -> Just (V.toList a)
+      _              -> Nothing
+
+-- | goalArrayStrict: the same field read by the same reader, but 'Nothing'
+-- whenever the total reading would have had to /drop/ something: the field
+-- absent or mistyped, or any single entry the reader declines.
+--
+-- This is what an @ok@ may rest on and the total reading is not.  An empty
+-- list from 'goalArrayOf' means \"no errors\" and \"Agda did not tell me\"
+-- indistinguishably, and reading the second as the first is a false green
+-- (a Copilot review catch on PR 174).
+goalArrayStrict :: Text -> (Value -> Maybe a) -> [IResponse] -> Maybe [a]
+goalArrayStrict field reader rs = goalArrayValues field rs >>= traverse reader
 
 -- | goalInfoOf: the @goalInfo@ object of a @GoalSpecific@ response; this is where
 -- goal-scoped answers (inferred types, goal contexts) live.
@@ -1434,7 +1470,11 @@ data GiveReading = GiveReading
                              -- the give, when it announced any; @Just []@ is
                              -- a file with none left, 'Nothing' a give that
                              -- announced no point list at all.
-  , grGoals  :: Bool         -- ^ An @AllGoalsWarnings@ arrived.
+  , grGoals  :: Bool         -- ^ An @AllGoalsWarnings@ arrived.  Weaker than
+                             -- 'grReport' on purpose: it says Agda answered,
+                             -- not that the answer could be read.
+  , grReport :: ReportCheck  -- ^ Whether that report can be relied on for an
+                             -- @ok@; this is the conjunct, 'grGoals' is not.
   , grMetas  :: [LaneMeta]   -- ^ Invisible goals left behind.
   , grErrors :: [Text]       -- ^ Every error message, command's own first.
   , grCodes  :: [Text]       -- ^ Agda's bracketed codes for those messages.
@@ -1449,17 +1489,45 @@ data GiveReading = GiveReading
 -- constraint behind reports it.  The two never both appear in the probes, but
 -- nothing in the protocol promises that, so both are read.
 giveErrorsOf :: [IResponse] -> [Text]
-giveErrorsOf rs = mapMaybe errorMessageOf rs <> allGoalsErrors
-  where
-    allGoalsErrors =
-      case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
-        [] -> []
-        os -> case KM.lookup "errors" (last os) of
-          Just (Array a) -> mapMaybe messageOf (V.toList a)
-          _              -> []
-    messageOf (Object e) = textField "message" e
-    messageOf (String t) = Just t
-    messageOf _          = Nothing
+giveErrorsOf rs =
+  mapMaybe errorMessageOf rs <> goalArrayOf "errors" errorEntryOf rs
+
+-- | errorEntryOf: one entry of a report's @errors@ array.  An object carrying a
+-- @message@, or a bare string.
+errorEntryOf :: Value -> Maybe Text
+errorEntryOf (Object e) = textField "message" e
+errorEntryOf (String t) = Just t
+errorEntryOf _          = Nothing
+
+-- | ReportCheck: can the give's own @AllGoalsWarnings@ be relied on for an
+-- @ok@?
+--
+-- The class 'readGive' assigns reads exactly two fields of that report, its
+-- @errors@ and its @invisibleGoals@, and an absent, mistyped, or partly
+-- unreadable field would make both look empty, which is the shape of a false
+-- green.  So the report is checked before it is believed, and the defect is
+-- named rather than folded into a bare @False@ (a Copilot review catch on
+-- PR 174).
+--
+-- @visibleGoals@ is deliberately not checked: the reading tolerates whatever
+-- visible goals a give leaves, /whatever they are/, so nothing an @ok@ rests
+-- on can be lost by failing to read them.
+data ReportCheck
+  = ReportMissing          -- ^ No @AllGoalsWarnings@ arrived at all.
+  | ReportMalformed Text   -- ^ One arrived, and a field the class reads is not
+                           --   something the class may read.
+  | ReportComplete         -- ^ Both fields present, arrays, fully readable.
+  deriving (Eq, Show)
+
+-- | giveReportCheck: 'ReportCheck' for a give's collected responses.
+giveReportCheck :: [IResponse] -> ReportCheck
+giveReportCheck rs
+  | null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs] = ReportMissing
+  | Nothing <- goalArrayStrict "errors" errorEntryOf rs =
+      ReportMalformed "the report's `errors` is absent, is not an array, or holds an entry with no message"
+  | Nothing <- goalArrayStrict "invisibleGoals" metaEntryOf rs =
+      ReportMalformed "the report's `invisibleGoals` is absent, is not an array, or holds an entry with no meta name"
+  | otherwise = ReportComplete
 
 -- | readGive: classify one @Cmd_give@'s responses, given the interaction point
 -- the give was aimed at.
@@ -1477,7 +1545,12 @@ giveErrorsOf rs = mapMaybe errorMessageOf rs <> allGoalsErrors
 --
 -- * The report never arrived.  A collection holding a @GiveAction@ and nothing
 --   else has no error and no invisible goal for the trivial reason that Agda
---   never said what state the give left.  'grGoals' is the conjunct.
+--   never said what state the give left.
+-- * The report arrived and could not be read: a field the class reads absent,
+--   mistyped, or holding one entry the reader declines.  Every one of those
+--   makes an error list and a meta list look empty, so the same @ok@ would
+--   come out of a report that said nothing at all.  Those two shapes are one
+--   conjunct, 'grReport'; 'grGoals' stays the weaker \"Agda answered\".
 -- * The @GiveAction@ did not say which point it consumed, or said a different
 --   one.  "Agda accepted the candidate" is only an answer about the hole that
 --   was asked about, so the id has to have parsed and to match; 'grHere' is
@@ -1490,7 +1563,8 @@ giveErrorsOf rs = mapMaybe errorMessageOf rs <> allGoalsErrors
 --   rather than a source of false type errors.
 readGive :: Int -> [IResponse] -> GiveReading
 readGive expected rs = GiveReading
-  { grClass  = if here && goalsSeen && null unreadable && null errs && null metas
+  { grClass  = if here && report == ReportComplete
+                    && null unreadable && null errs && null metas
                  then GiveClassOk else GiveClassTypeError
   , grGiven  = given
   , grText   = listToMaybe [t | IGiveAction _ (Just t) <- rs]
@@ -1499,6 +1573,7 @@ readGive expected rs = GiveReading
   , grUnreadable = unreadable
   , grPoints = interactionPointsOf rs
   , grGoals  = goalsSeen
+  , grReport = report
   , grMetas  = metas
   , grErrors = errs
   , grCodes  = mapMaybe errorCodeOf errs
@@ -1508,6 +1583,7 @@ readGive expected rs = GiveReading
     point      = listToMaybe [i | IGiveAction (Just i) _ <- rs]
     here       = point == Just expected
     goalsSeen  = not (null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs])
+    report     = giveReportCheck rs
     unreadable = [t | IUnreadable t <- rs]
     metas      = metasOf rs
     errs       = giveErrorsOf rs

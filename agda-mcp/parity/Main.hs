@@ -68,6 +68,7 @@ import Data.Aeson
   ( FromJSON (..), Value (..), (.:), (.:?), (.!=), (.=)
   , encode, object, withObject )
 import qualified Data.Aeson as Aeson
+import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString as BS
@@ -93,6 +94,7 @@ import AgdaMCP.Diagnostics (parseDiagnostics)
 import AgdaMCP.Holes (HoleRef (..))
 import AgdaMCP.Interaction
   ( GiveClass (..), GiveForce (..), GiveOutcome (..), GiveReading (..)
+  , ReportCheck (..)
   , InteractionLanes, IPoint (..), LaneFailure (..), LoadReport (..)
   , IRange (..), LaneHandle, LoadedInfo (..), LaneMeta (..), ensureLoaded
   , giveCandidate, newInteractionLanes, shutdownLanes, withLane )
@@ -199,7 +201,7 @@ instance FromJSON Case where
     src <- o .:? "source" .!= "deliberate"
     bench <- o .:? "benchmarkId" .!= T.pack (takeFileName obl)
     hole <- o .:? "holeIndex" .!= 0
-    force <- o .:? "force" .!= ("WithoutForce" :: Text)
+    force <- o .:? "force" .!= ("WithoutForce" :: Text) >>= forceOf
     note <- o .:? "note"
     pure Case
       { caseSource = src
@@ -208,11 +210,23 @@ instance FromJSON Case where
       , caseTier = tierOf obl
       , caseCand = cand
       , caseHole = hole
-      , caseForce = if force == "WithForce" then WithForce else WithoutForce
+      , caseForce = force
       , caseArch = []
       , caseRuns = []
       , caseNote = note
       }
+
+-- | forceOf: the force flag a case file names, or a parse failure.
+--
+-- Not a defaulting read.  An @if force == "WithForce"@ sends the other wire
+-- command for every spelling but that one, so a typo would change the
+-- experiment while the row still reported a valid @force@, in a harness that
+-- otherwise stops on a malformed input (a Copilot review catch on PR 174).
+forceOf :: Text -> Parser GiveForce
+forceOf "WithoutForce" = pure WithoutForce
+forceOf "WithForce"    = pure WithForce
+forceOf other          = fail $
+  "force must be \"WithoutForce\" or \"WithForce\", not " <> show (T.unpack other)
 
 -- | tierOf: which benchmark tier a repository-relative obligation path is in.
 -- A path outside @data/benchmarks/@ (a deliberate case's own fixture) is
@@ -540,6 +554,9 @@ row c loadMs before mPoint lane batch = object $
           -- which is what makes them safe conjuncts.
         , "laneHere"      .= grHere r
         , "laneUnreadable" .= length (grUnreadable r)
+          -- Whether the give's own report could be relied on at all: the third
+          -- fail-closed conjunct, carried so a reader can see it held.
+        , "laneReport"     .= reportText (grReport r)
         , "laneText"      .= grText r
         , "lanePoint"     .= grPoint r
           -- Every interaction point Agda announced AFTER the give, which is
@@ -612,6 +629,12 @@ rangeOf :: IPoint -> [Int]
 rangeOf p = case ipRange p of
   Nothing -> []
   Just r  -> [irLine r, irCol r, irEndLine r, irEndCol r]
+
+-- | reportText: 'ReportCheck' as the row spells it.
+reportText :: ReportCheck -> Text
+reportText ReportComplete       = "complete"
+reportText ReportMissing        = "missing"
+reportText (ReportMalformed wh) = "malformed: " <> wh
 
 classText :: GiveClass -> Text
 classText GiveClassOk        = "ok"
