@@ -21,7 +21,7 @@ Usage
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from scripts.python.site.check_requirements_pins import Pin, check_pins, main, parse_pins
 

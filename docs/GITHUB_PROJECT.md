@@ -1028,6 +1028,41 @@ That is a different defect from an id collision, so it is recorded here rather t
 [#96]: https://github.com/formalverification/agda-native-air/issues/96
 [#166]: https://github.com/formalverification/agda-native-air/pull/166
 
+---
+
+### Issue M0-15: ci.yml: pull-request lanes receive the write-capable Cachix token (#187)
+
+**Labels:** `ci`, `infrastructure`
+
+# Context
+
+The Copilot review of PR [#181] found that `pages.yml` handed the write-capable Cachix token (`CACHIX_AUTH_TOKEN`) to the `cachix-action` step of a job that goes on to run pull-request-controlled code (`make`, `pytest`).  A token the action installs is readable by every step after it, so a same-repository pull request could push arbitrary store paths to the `formalverification` cache or exfiltrate the token.  [#181] fixed `pages.yml` by withholding the token on `pull_request` events (`authToken: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}`, plus `skipPush` on pull requests), so a pull request pulls from the cache and never pushes.
+
+`ci.yml` has the same shape, and it predates [#181]: it runs on `push` and on `pull_request`, and these lanes pass the token unconditionally before running repository code:
+
++  `Haskell • agda-strux tests` (job `haskell-backend-jsonl:`)
++  `Agda • proof-completion smoke` (job `agda-dojang-eval:`)
++  `Benchmark • gold verification smoke` (job `benchmark-gold:`)
++  `Haskell • agda-mcp build & tests` (job `agda-mcp:`)
+
+# Work
+
++  Apply the `pages.yml` pattern to each lane: the token only on a push to `main` (or a manual run), `skipPush` on pull requests.  A pull request that changes a pin then builds the affected shell on the runner without publishing it; the next push to `main` publishes it.
++  Verify on a pull request that the Cachix post step reports nothing pushed and that the lanes still resolve their shells from the cache, and on a push to `main` that the push still happens.
++  Say in `ci.yml`'s header what the trust boundary is, the way `pages.yml`'s header does.
+
+# Done
+
+No job that runs pull-request-controlled code holds a write-capable Cachix token on a `pull_request` event; the lanes are green on a pull request and on `main`; the header records the rule.
+
+# Relations
+
++  Found by the Copilot review of PR [#181], where the same defect in `pages.yml` was fixed.
++  Same family as the per-job Pages permissions fix of PR [#166].
+
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#181]: https://github.com/formalverification/agda-native-air/pull/181
+
 <!-- END GENERATED: milestone-0 -->
 
 ---
@@ -3622,6 +3657,97 @@ Related: [#113] carries the loop record and the cost measurement this attacks; [
 [#136]: https://github.com/formalverification/agda-native-air/issues/136
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#164]: https://github.com/formalverification/agda-native-air/issues/164
+
+---
+
+### Issue M5-12: agda-mcp: tool answers carry echo and boilerplate that dwarf their payload; a lean default, and the re-run that tests it (#184)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+The three arms of [#162] (PR [#175]) recorded what the model read as well as what it solved.  The model **wrote** the same amount in every arm (output tokens 70,403 shell, 76,732 mcp, 67,269 both), and the `mcp` arm still cost 83% more than the `shell` arm (USD 5.28 against 2.88) with more turns (342 against 308) and more calls (287 against 253).  The whole difference is what the model read, and the archive says what that was.
+
+Bytes returned to the model by tool results, summed over each arm's 55 transcripts (`reports/agent-bench/arm162-*/subjects/*/transcript.jsonl`):
+
+| arm | tool calls | bytes returned | avg per call |
+|---|---|---|---|
+| `mcp` | 287 | **929,386** | 3,238 |
+| `shell` | 253 | **259,520** | 1,026 |
+
+Per tool in the `mcp` arm:
+
+| tool | calls | bytes | avg per call |
+|---|---|---|---|
+| `exports_of` | 11 | 256,114 | **23,283** |
+| `check_file` | 56 | 188,084 | 3,358 |
+| `search_by_name` | 18 | 124,755 | 6,930 |
+| `type_of` | 34 | 107,522 | 3,162 |
+| `definition_of` | 19 | 82,224 | 4,327 |
+| `fill_hole` | 11 | 31,790 | 2,890 |
+
+A Bash call in the shell arm (an `agda` run, a `grep`) averaged 1,323 bytes.  The tools returned 3.6 times the bytes the shell did, and the payload of most answers is a fraction of that: a `type_of` answer whose type is one line is 3 KB because every answer carries the `lane.iotcm` echo, the `command` block, the `project` block, and, on the verdict tools, the `verdict.meaning` and `verdict.equivalentTo` prose, repeated identically on every call.  `exports_of` returns a module's whole surface.
+
+This is a defect in the answers, not in the idea, and it is the most likely reason the knowledge tools were abandoned in the `both` arm ([#162]: `definition_of` 19 calls to 0, `search_by_name` 18 to 1, `exports_of` 11 to 2): they flood the context.  Until it is fixed, every cost comparison is a comparison against the tools as shipped, not as designed.
+
+# Work
+
++  **A lean default answer.**  Drop the per-call echo (`lane.iotcm`, `command`, `project`) and the `verdict.meaning` / `equivalentTo` prose from the default response of every tool; keep the verdict fields themselves (`success`, `exitCode`, `status`, `holes`, `diagnostics`).  Offer the full echo behind a `verbose: true` argument, and state the meaning prose once, in the tool description, where the client reads it once per session rather than once per call.
++  **Bound `exports_of`.**  A `limit` with a continuation, or signatures only by default with bodies on request; 23 KB per answer is a page of the module, not an answer.
++  **Measure it the same way.**  Re-run the `mcp` and `both` arms with lean answers (`AGENT_BENCH_ARM=mcp|both`, Sonnet 5, about USD 9 together, the `running-proof-search-sweeps` procedure § 6 and § 7), and compare against `arm162-mcp-1` and `arm162-both-1` on cost, turns, bytes returned, and the per-tool counts.  The question the re-run answers: **with the pollution removed, does the model use the knowledge tools, and does the server arm's cost converge on the shell arm's?**  Either answer is a result.
+
+# Acceptance
+
++  Every tool's default answer carries no `iotcm`, `command`, or `project` echo and no repeated meaning prose; `verbose: true` restores them; the wire tests are updated to the lean shape and a test pins that a verdict field is never dropped.
++  Bytes returned per call, measured over a re-run arm, fall by at least half for `type_of`, `check_file`, and `fill_hole`.
++  The re-run arms are archived under `reports/agent-bench/` and their table posted here beside the `arm162` rows, with the per-tool counts.
+
+# Relations
+
++  [#162] / PR [#175] is the measurement; [#145] is one symptom of the same verbosity (`UnsolvedConstraints` restating the whole meta dump).
++  The sibling issue, `definition_of` returning what a definition says rather than where it is, is filed alongside this one; the two are separate variables and should be re-run separately first.
+
+[#145]: https://github.com/formalverification/agda-native-air/issues/145
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
+
+---
+
+### Issue M5-13: `definition_of` should return what a definition says, not only where it is (#185)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+`definition_of` answers **where** a definition is: "the defining file and position of every candidate, chased through barrels to the origin" (`agda-mcp/README.md`).  The three arms of [#162] measured what that is worth to a model that can also read files.  Offered both the server and a shell, the subject called `definition_of` **0 times** (19 in the server-only arm) and read library sources through Bash 65 times; the shell-only arm consulted sources 82 times against the server arm's 13.  PR [#175]'s reading: `grep` over a tree needs no prior knowledge of where a thing is, while `definition_of` answers where a definition is and not what it says, leaving Read to be pointed at a file the subject must already have named.
+
+The consequence sits in the restated column.  A subject that reads a lemma's source writes a construction; one that learns its name cites it: on `algebras-homs-mon-to-hom` the server arms wrote `mon→hom′ m = mon→hom _ _ m` (restated) and the shell arm wrote `mon→hom′ m = IsMon.HomReduct (proj₂ m)` (solved).  The server arms restated 6 and 8 rows; the shell arm restated none.
+
+The server already resolves the file and the position.  The step it does not take is the one the model wants.
+
+# Work
+
++  **Return the definition's text.**  For each candidate, alongside the location, the source span of the declaration and its body (the signature and clauses, bounded; a `where` block included; a long body truncated with the truncation stated and the remainder available on request).  The file is on disk and the position is known, so this is a read, not a query.
++  **The same for `exports_of`, compactly**: each exported name with its signature is what the model reads a module's surface for; make that the default shape and keep the full dump behind a flag (the sibling issue on lean answers bounds the size).
++  **Say what was read.**  The answer names the file and the line range it quotes, so a reader can check the quotation against the tree, the same rule `check_file` follows for its verdict.
+
+# What it does not do
+
+It does not elaborate: the text is the source as written, not Agda's internal term.  The elaborated body, the enumerated scope, and the other two questions the interaction protocol cannot answer are [#164], Agda as a library, and this issue is deliberately the short road that needs no new architecture.
+
+# Acceptance
+
++  `definition_of` on a benchmark fixture's lemma returns the lemma's signature and body text with its file and line range, pinned by a test on a committed fixture.
++  In a re-run `both` arm (after the lean-answer issue lands, so the two variables are not confounded), `definition_of` is called and the Bash library-source reads fall; report the counts beside `arm162-both-1`'s.
+
+# Relations
+
++  [#162] / PR [#175]: the measurement.  [#164]: the long road.  [#165]: `search_in_scope`'s recall gap, a different tool with the same "where, not what" shape.
+
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#164]: https://github.com/formalverification/agda-native-air/issues/164
+[#165]: https://github.com/formalverification/agda-native-air/issues/165
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
 
 <!-- END GENERATED: milestone-5 -->
 

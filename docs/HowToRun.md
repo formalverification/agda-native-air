@@ -1220,10 +1220,12 @@ nix develop .#site
 ```
 
 From inside another Nix shell, prefix the call, because the other shells
-export an `LD_LIBRARY_PATH` that breaks the profile `nix`:
+export an `LD_LIBRARY_PATH` that breaks the profile `nix`; both loader
+variables are cleared, which is the Makefile's own `NIX_CLEAN_ENV`
+convention for nested Nix calls (the second matters on macOS):
 
 ```sh
-env -u LD_LIBRARY_PATH nix develop .#site
+env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH nix develop .#site
 ```
 
 The shell pins `mkdocs` 1.6.1 and `mkdocs-material` 9.5.49 (the versions
