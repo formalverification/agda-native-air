@@ -16,6 +16,8 @@ An index of this directory and a reading order for a new collaborator.  The repo
 
 ## Top-level documents
 
+One file here is not for a contributor: [`index.md`](index.md) is the landing page of the project site ([#169]), which MkDocs builds from a curated allowlist of this directory (`exclude_docs` in the repository's `mkdocs.yml`; `make site`).  Nothing else in `docs/` is published unless that allowlist names it, and this file is not.
+
 The vision and plan documents are as follows:
 
 +  [`MANIFESTO.md`](MANIFESTO.md): motivation and vision.
@@ -32,7 +34,7 @@ The contract documents are as follows:
 
 The operating guides are as follows:
 
-+  [`HowToRun.md`](HowToRun.md): the copy-and-paste developer guide, end to end; § 13 configures agda-mcp against an external Agda project.
++  [`HowToRun.md`](HowToRun.md): the copy-and-paste developer guide, end to end; § 13 configures agda-mcp against an external Agda project, and § 16 builds, serves, and checks the project site.
 +  [`WORKFLOW.md`](WORKFLOW.md) and [`WORKFLOW-Cheatsheet.md`](WORKFLOW-Cheatsheet.md): the issue, branch, and worktree workflow, in full and condensed.
 +  [`branch-protection-setup.md`](branch-protection-setup.md): the admin runbook for the repository's merge settings.
 +  [`public-history.md`](public-history.md): notes on the migration that made the repository public.
@@ -53,5 +55,6 @@ The evidence record is as follows:
 
 <!-- GitHub references -->
 [#68]: https://github.com/formalverification/agda-native-air/issues/68
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
 [#167]: https://github.com/formalverification/agda-native-air/issues/167
 [#168]: https://github.com/formalverification/agda-native-air/issues/168

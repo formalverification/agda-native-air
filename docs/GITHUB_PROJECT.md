@@ -146,6 +146,8 @@ Make the work legible to people who did not build it.  Everything through Milest
 
 Its first three issues are the site itself, and they inherit a rule from [M1-8] (#85) that the rest of the milestone should keep: what the site shows is *generated from committed artifacts*, and the build refuses to publish when a figure disagrees with the record it came from.  The demo page's benchmark table is regenerated from each run's `report.json` and compared cell by cell with ADR 0001 § 9, so a number that drifts fails the build rather than reaching a reader.  That is why the site lives in this repository rather than in a site repository of its own: the artifacts it must not contradict are here.
 
+The site's work is tracked by [M6-6] ([#180](https://github.com/formalverification/agda-native-air/issues/180)): the three issues above, then the custom domain cutover, [M6-7] ([#177](https://github.com/formalverification/agda-native-air/issues/177)), the link from `formalverification.io`, [M6-8] ([#178](https://github.com/formalverification/agda-native-air/issues/178)), and a demo comparing the arms, batch type-checking alone against `agda-mcp` without and with the agda-algebras corpus, [M6-9] ([#179](https://github.com/formalverification/agda-native-air/issues/179)).  The domain, when there is one, is the front door and not the archive: anything meant to be cited is cited by its GitHub URL or a Zenodo DOI.
+
 The publication targets already filed under other milestones belong to this one in spirit, and can be moved here when convenient rather than as a separate exercise: the tech report (#86) and the `paper` label's issues are the obvious candidates.
 
 **Exit criterion:**
@@ -1025,6 +1027,41 @@ That is a different defect from an id collision, so it is recorded here rather t
 [#57]: https://github.com/formalverification/agda-native-air/issues/57
 [#96]: https://github.com/formalverification/agda-native-air/issues/96
 [#166]: https://github.com/formalverification/agda-native-air/pull/166
+
+---
+
+### Issue M0-15: ci.yml: pull-request lanes receive the write-capable Cachix token (#187)
+
+**Labels:** `ci`, `infrastructure`
+
+# Context
+
+The Copilot review of PR [#181] found that `pages.yml` handed the write-capable Cachix token (`CACHIX_AUTH_TOKEN`) to the `cachix-action` step of a job that goes on to run pull-request-controlled code (`make`, `pytest`).  A token the action installs is readable by every step after it, so a same-repository pull request could push arbitrary store paths to the `formalverification` cache or exfiltrate the token.  [#181] fixed `pages.yml` by withholding the token on `pull_request` events (`authToken: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}`, plus `skipPush` on pull requests), so a pull request pulls from the cache and never pushes.
+
+`ci.yml` has the same shape, and it predates [#181]: it runs on `push` and on `pull_request`, and these lanes pass the token unconditionally before running repository code:
+
++  `Haskell • agda-strux tests` (job `haskell-backend-jsonl:`)
++  `Agda • proof-completion smoke` (job `agda-dojang-eval:`)
++  `Benchmark • gold verification smoke` (job `benchmark-gold:`)
++  `Haskell • agda-mcp build & tests` (job `agda-mcp:`)
+
+# Work
+
++  Apply the `pages.yml` pattern to each lane: the token only on a push to `main` (or a manual run), `skipPush` on pull requests.  A pull request that changes a pin then builds the affected shell on the runner without publishing it; the next push to `main` publishes it.
++  Verify on a pull request that the Cachix post step reports nothing pushed and that the lanes still resolve their shells from the cache, and on a push to `main` that the push still happens.
++  Say in `ci.yml`'s header what the trust boundary is, the way `pages.yml`'s header does.
+
+# Done
+
+No job that runs pull-request-controlled code holds a write-capable Cachix token on a `pull_request` event; the lanes are green on a pull request and on `main`; the header records the rule.
+
+# Relations
+
++  Found by the Copilot review of PR [#181], where the same defect in `pages.yml` was fixed.
++  Same family as the per-job Pages permissions fix of PR [#166].
+
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#181]: https://github.com/formalverification/agda-native-air/pull/181
 
 <!-- END GENERATED: milestone-0 -->
 
@@ -2302,7 +2339,7 @@ Worth being blunt about what is *not* worth carrying: `propose_terms` and `propo
 
 ---
 
-### Issue M1-38: agent bench: a shell-only control arm and a both-tools arm, the attribution measurement for the server (#162)
+### Issue M1-38: agent bench: a shell-only control arm and a both-tools arm, the attribution measurement for the server (#162, closed)
 
 **Labels:** `agda-mcp`, `eval`, `M1: agda-dojang/mcp`
 
@@ -3621,6 +3658,97 @@ Related: [#113] carries the loop record and the cost measurement this attacks; [
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#164]: https://github.com/formalverification/agda-native-air/issues/164
 
+---
+
+### Issue M5-12: agda-mcp: tool answers carry echo and boilerplate that dwarf their payload; a lean default, and the re-run that tests it (#184)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+The three arms of [#162] (PR [#175]) recorded what the model read as well as what it solved.  The model **wrote** the same amount in every arm (output tokens 70,403 shell, 76,732 mcp, 67,269 both), and the `mcp` arm still cost 83% more than the `shell` arm (USD 5.28 against 2.88) with more turns (342 against 308) and more calls (287 against 253).  The whole difference is what the model read, and the archive says what that was.
+
+Bytes returned to the model by tool results, summed over each arm's 55 transcripts (`reports/agent-bench/arm162-*/subjects/*/transcript.jsonl`):
+
+| arm | tool calls | bytes returned | avg per call |
+|---|---|---|---|
+| `mcp` | 287 | **929,386** | 3,238 |
+| `shell` | 253 | **259,520** | 1,026 |
+
+Per tool in the `mcp` arm:
+
+| tool | calls | bytes | avg per call |
+|---|---|---|---|
+| `exports_of` | 11 | 256,114 | **23,283** |
+| `check_file` | 56 | 188,084 | 3,358 |
+| `search_by_name` | 18 | 124,755 | 6,930 |
+| `type_of` | 34 | 107,522 | 3,162 |
+| `definition_of` | 19 | 82,224 | 4,327 |
+| `fill_hole` | 11 | 31,790 | 2,890 |
+
+A Bash call in the shell arm (an `agda` run, a `grep`) averaged 1,323 bytes.  The tools returned 3.6 times the bytes the shell did, and the payload of most answers is a fraction of that: a `type_of` answer whose type is one line is 3 KB because every answer carries the `lane.iotcm` echo, the `command` block, the `project` block, and, on the verdict tools, the `verdict.meaning` and `verdict.equivalentTo` prose, repeated identically on every call.  `exports_of` returns a module's whole surface.
+
+This is a defect in the answers, not in the idea, and it is the most likely reason the knowledge tools were abandoned in the `both` arm ([#162]: `definition_of` 19 calls to 0, `search_by_name` 18 to 1, `exports_of` 11 to 2): they flood the context.  Until it is fixed, every cost comparison is a comparison against the tools as shipped, not as designed.
+
+# Work
+
++  **A lean default answer.**  Drop the per-call echo (`lane.iotcm`, `command`, `project`) and the `verdict.meaning` / `equivalentTo` prose from the default response of every tool; keep the verdict fields themselves (`success`, `exitCode`, `status`, `holes`, `diagnostics`).  Offer the full echo behind a `verbose: true` argument, and state the meaning prose once, in the tool description, where the client reads it once per session rather than once per call.
++  **Bound `exports_of`.**  A `limit` with a continuation, or signatures only by default with bodies on request; 23 KB per answer is a page of the module, not an answer.
++  **Measure it the same way.**  Re-run the `mcp` and `both` arms with lean answers (`AGENT_BENCH_ARM=mcp|both`, Sonnet 5, about USD 9 together, the `running-proof-search-sweeps` procedure § 6 and § 7), and compare against `arm162-mcp-1` and `arm162-both-1` on cost, turns, bytes returned, and the per-tool counts.  The question the re-run answers: **with the pollution removed, does the model use the knowledge tools, and does the server arm's cost converge on the shell arm's?**  Either answer is a result.
+
+# Acceptance
+
++  Every tool's default answer carries no `iotcm`, `command`, or `project` echo and no repeated meaning prose; `verbose: true` restores them; the wire tests are updated to the lean shape and a test pins that a verdict field is never dropped.
++  Bytes returned per call, measured over a re-run arm, fall by at least half for `type_of`, `check_file`, and `fill_hole`.
++  The re-run arms are archived under `reports/agent-bench/` and their table posted here beside the `arm162` rows, with the per-tool counts.
+
+# Relations
+
++  [#162] / PR [#175] is the measurement; [#145] is one symptom of the same verbosity (`UnsolvedConstraints` restating the whole meta dump).
++  The sibling issue, `definition_of` returning what a definition says rather than where it is, is filed alongside this one; the two are separate variables and should be re-run separately first.
+
+[#145]: https://github.com/formalverification/agda-native-air/issues/145
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
+
+---
+
+### Issue M5-13: `definition_of` should return what a definition says, not only where it is (#185)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+`definition_of` answers **where** a definition is: "the defining file and position of every candidate, chased through barrels to the origin" (`agda-mcp/README.md`).  The three arms of [#162] measured what that is worth to a model that can also read files.  Offered both the server and a shell, the subject called `definition_of` **0 times** (19 in the server-only arm) and read library sources through Bash 65 times; the shell-only arm consulted sources 82 times against the server arm's 13.  PR [#175]'s reading: `grep` over a tree needs no prior knowledge of where a thing is, while `definition_of` answers where a definition is and not what it says, leaving Read to be pointed at a file the subject must already have named.
+
+The consequence sits in the restated column.  A subject that reads a lemma's source writes a construction; one that learns its name cites it: on `algebras-homs-mon-to-hom` the server arms wrote `mon→hom′ m = mon→hom _ _ m` (restated) and the shell arm wrote `mon→hom′ m = IsMon.HomReduct (proj₂ m)` (solved).  The server arms restated 6 and 8 rows; the shell arm restated none.
+
+The server already resolves the file and the position.  The step it does not take is the one the model wants.
+
+# Work
+
++  **Return the definition's text.**  For each candidate, alongside the location, the source span of the declaration and its body (the signature and clauses, bounded; a `where` block included; a long body truncated with the truncation stated and the remainder available on request).  The file is on disk and the position is known, so this is a read, not a query.
++  **The same for `exports_of`, compactly**: each exported name with its signature is what the model reads a module's surface for; make that the default shape and keep the full dump behind a flag (the sibling issue on lean answers bounds the size).
++  **Say what was read.**  The answer names the file and the line range it quotes, so a reader can check the quotation against the tree, the same rule `check_file` follows for its verdict.
+
+# What it does not do
+
+It does not elaborate: the text is the source as written, not Agda's internal term.  The elaborated body, the enumerated scope, and the other two questions the interaction protocol cannot answer are [#164], Agda as a library, and this issue is deliberately the short road that needs no new architecture.
+
+# Acceptance
+
++  `definition_of` on a benchmark fixture's lemma returns the lemma's signature and body text with its file and line range, pinned by a test on a committed fixture.
++  In a re-run `both` arm (after the lean-answer issue lands, so the two variables are not confounded), `definition_of` is called and the Bash library-source reads fall; report the counts beside `arm162-both-1`'s.
+
+# Relations
+
++  [#162] / PR [#175]: the measurement.  [#164]: the long road.  [#165]: `search_in_scope`'s recall gap, a different tool with the same "where, not what" shape.
+
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#164]: https://github.com/formalverification/agda-native-air/issues/164
+[#165]: https://github.com/formalverification/agda-native-air/issues/165
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
+
 <!-- END GENERATED: milestone-5 -->
 
 ---
@@ -3764,7 +3892,7 @@ A stranger can land on the site and, within one screen, learn what the project i
 
 ---
 
-### Issue M6-4: Benchmark obligations import 5.9 MB of interfaces for _≡_ and refl (#167)
+### Issue M6-4: Benchmark obligations import 5.9 MB of interfaces for _≡_ and refl (#167, closed)
 
 **Labels:** `agda-dojang`, `cleanup`, `M6: docs + dissemination`
 
@@ -3943,6 +4071,203 @@ It was found while measuring whether a browser-hosted Agda could check this proj
 [#144]: https://github.com/williamdemeo/website/issues/144
 [#103]: https://github.com/williamdemeo/website/issues/103
 [#167]: https://github.com/formalverification/agda-native-air/issues/167
+
+---
+
+### Issue M6-6: site: the agda-native-air project site (tracking) (#180)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+Everything through Milestone 5 is measured and recorded for someone who is already inside the project.  This issue tracks the work that builds the surface for a stranger: the project site, generated from the committed artifacts of this repository and deployed from `main` by `.github/workflows/pages.yml`.  When it was filed the repository published exactly one page, the session replay from [#85] (PR [#166]).
+
+# The decision, and its trigger for revisiting
+
+Taken 2026-09-20: **the site lives in this repository**, not in a site repository of its own and not folded into `formalverification.io`.
+
++  The demo page's value is that it is generated from committed artifacts here, and that the build refuses to publish when they disagree.  `scripts/python/demo/` reads `reports/agent-bench/`, embeds the obligations under `data/benchmarks/`, and regenerates the table of ADR 0001 § 9, comparing it cell by cell; a mismatch fails the build.  A separate repository would reach across a boundary for all of that, by submodule, cross-repository checkout, or a published artifact, and each of those weakens the property that makes the page worth trusting.
++  `formalverification.io` is a MkDocs site with a different audience and its own release cadence; coupling to it buys nothing.
++  So the ordinary shape holds: the org site links to the project site, and the project site lives with its code.
++  Revisit when the site's non-generated content (tutorials, papers, posts) clearly outweighs its generated content.  Splitting later is easy; un-splitting is not.  If it is ever split, publish the demo's generated JSON (`data/demo/`, about 230 KB) as a release asset consumed by digest rather than as a submodule, and keep the ADR-agreement check on the producing side, where it can still fail a build.
+
+# The rule every site issue inherits
+
+Nothing generated is committed; what the site shows is generated from committed artifacts; and the build refuses to publish a figure that disagrees with the record it came from.  This is [#85]'s rule, and Milestone 6's.
+
+# The domain is the front door, not the archive
+
+Whatever address the site ends up at, anything meant to be cited (the benchmark, the corpora, the ADRs, the agent-bench archive) is cited by its GitHub URL or a Zenodo DOI, never by a domain whose renewal is one person's calendar reminder.  [#177] puts this where a future author will read it.
+
+# The issues
+
+1.  [#169] `[M6-1]`: the MkDocs Material skeleton, styled like williamdemeo.org, and one build, `make site`.
+2.  [#170] `[M6-2]`: the demo page carried in as the standalone document it is, and the two palettes reconciled.
+3.  [#171] `[M6-3]`: the landing page, and a curated nav over `docs/`.
+4.  [#177] `[M6-7]`: the custom domain cutover, if the domain is bought.
+5.  [#178] `[M6-8]`: a link from `formalverification.io`.
+6.  [#179] `[M6-9]`: a demo comparing the arms, batch type-checking alone against `agda-mcp` without and with the agda-algebras corpus.
+
+# Done
+
+Every issue above is closed; a stranger can reach the site cold, learn what the project is within one screen, watch a real agent session, and find the artifacts behind any claim; the site is served at its final address; and `git status` is clean after `make site` on a fresh checkout.
+
+# Relations
+
++  Milestone 6, whose description in `docs/GITHUB_PROJECT.md` carries the same decision.
++  The brief for the first three issues is `~/claude-kickoff-prompts/kickoff-39-air-project-site.md` (source: `claude-tooling/docs/kickoffs/air-project-site.md`).
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#171]: https://github.com/formalverification/agda-native-air/issues/171
+[#177]: https://github.com/formalverification/agda-native-air/issues/177
+[#178]: https://github.com/formalverification/agda-native-air/issues/178
+[#179]: https://github.com/formalverification/agda-native-air/issues/179
+
+---
+
+### Issue M6-7: site: the custom domain cutover, if the domain is bought (#177)
+
+**Labels:** `docs`, `infrastructure`, `M6: docs + dissemination`
+
+# Context
+
+The site is served at `https://formalverification.github.io/agda-native-air/`, built by `.github/workflows/pages.yml` with the repository's Pages source set to "GitHub Actions".  No custom domain is configured: `gh api repos/formalverification/agda-native-air/pages --jq .cname` returns `null` as of 2026-09-21.  William is considering `agda-native.ai` (AIR expands to Agda Native AI Reasoning); whether to buy it is his call, and this issue waits on that decision.
+
+# Work, once the domain exists
+
+The cutover is small, reversible, and well understood.  The order matters.
+
++  **`CNAME` in the uploaded artifact**, not only in the repository root.  When Pages is built by a workflow, GitHub reads the domain from the artifact that `upload-pages-artifact` uploads; a `CNAME` that is not in it is silently ignored and the domain reverts at the next deploy.  So `make site` has to write the one-line `CNAME` into the published tree, and a test has to assert it is there.
++  **DNS**: an `ALIAS` or `ANAME` record at the apex, or `A` records to GitHub Pages' four addresses, plus a `CNAME` record on `www` pointing at `formalverification.github.io`.  Then register the domain on the repository (`gh api -X PUT repos/formalverification/agda-native-air/pages -f cname=...`), wait for the certificate to be issued, and turn on "Enforce HTTPS".  The `deploying-to-cloudflare-pages` skill records the cutover order and the rollback even though the host here is GitHub.
++  **`site_url` in `mkdocs.yml`** moves to the new address.  It is not cosmetic: the canonical links, the sitemap, and Material's instant navigation (which decides from the sitemap which links it may intercept) all read it.
++  **The addresses that point here** follow: the README's links, the org site's link ([M6-8]), and any document that quotes the Pages address.
++  **Write the front-door rule into the site itself**, where a future author will see it: the domain is the front door, not the archive.  Anything meant to be cited in a paper (the benchmark, the corpora, the ADRs, the agent-bench archive) is cited by its GitHub URL or a Zenodo DOI, never by a domain whose renewal is one person's calendar reminder.
++  **Rollback** is removing the `CNAME` from the build and reverting `site_url`; the `github.io` address never stops working.
+
+# Done
+
+The site is served at the domain over HTTPS, with the certificate issued and HTTPS enforced; the `github.io` address redirects to it; `make site` emits the `CNAME` and a test pins it; `site_url` and the inbound links are updated; the front-door rule is on a published page; and the revert path is written down in the PR.
+
+# Relations
+
++  Depends on [#169], which builds the artifact, and on the purchase decision.
++  Tracked by [M6-6] ([#180]).
+
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+
+---
+
+### Issue M6-8: site: a link from formalverification.io (#178)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+The decision recorded in [M6-6] ([#180]): the org site links to the project site, and the project site lives with its code.  `formalverification/formalverification.io` is a MkDocs site with a different audience and its own release cadence, so this is one link, not an integration.
+
+# Work
+
++  A pull request on `formalverification/formalverification.io` adding the project site wherever that site lists projects (its nav or a projects page), with one sentence saying what `agda-native-air` is, pointing at the site's final address: the custom domain if [M6-7] lands first, otherwise `https://formalverification.github.io/agda-native-air/`, revisited when the domain does.
++  A link back from the project site's footer or landing page to the org site, so each is reachable from the other.
+
+# Done
+
+The link is live on `formalverification.io` and resolves; the return link is live here.
+
+# Relations
+
++  After [#171], so there is a landing page to link to; best after [M6-7].
++  Tracked by [M6-6] ([#180]).
+
+[#171]: https://github.com/formalverification/agda-native-air/issues/171
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+
+---
+
+### Issue M6-9: site: a demo comparing the arms: batch type-checking alone, agda-mcp without a corpus, agda-mcp with the agda-algebras corpus (#179)
+
+**Labels:** `eval`, `docs`, `M6: docs + dissemination`
+
+# Context
+
+The strongest thing the site could show a stranger is one obligation attempted three ways by the same frontier model: with the pinned `agda` on a shell and nothing else (batch type-checking), with `agda-mcp` started without a corpus (the proof-state and live-query tools, no search), and with `agda-mcp` started with the real agda-algebras corpus loaded (all fourteen tools).  Watching where each one reaches for what is the argument for the instrument, made by a session that happened rather than by prose.  William proposed the comparison in the session that filed this issue (2026-09-21).
+
+Two of the three arms already exist in the committed archive.  ADR 0001 § 9, "The attribution arms", records the `shell`, `mcp`, and `both` arms of [#162] (runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1`, all three with the two corpora loaded), and the [#154] runs the demo page replays today are `mcp` arms with the corpora.  The arm that does not exist is **`agda-mcp` without a corpus**: the server started with no `--corpus`, so the four corpus-backed tools are not registered.
+
+# Work
+
++  **The measurement first, and not on this issue.**  An agent-bench arm with the server started without a corpus, on the same 55 rows, prompts, caps, and judge as [#162], archived under `reports/agent-bench/` like the others.  It is a research measurement and belongs beside [#162] under Milestone 1; file it there if the comparison is wanted.  This issue depends on it.
++  **Then the page.**  For a small set of obligations, one panel per arm on the same row, replayed from the archive by the mechanism [#85] built (`scripts/python/demo/`), with each arm's totals read from its run's `report.json` and checked against ADR 0001 § 9 the way `numbers.py` checks the table today.  A row is chosen because the arms differ on it, and the page says so.
++  The page keeps the demo's rules: complete without JavaScript, every tool answer on the page in full, nothing fetched off the origin, no absolute path from the sweep machine.
+
+# One thing to be careful about
+
+The committed `.mcp.json` starts the server with `agda-mcp/test/resources/corpus-fixture.jsonl`, a fixture, not the published corpus.  A page that claims "the real corpus loaded" has to be generated from a run whose own archived `mcp.json` names the agda-algebras corpus (`corpus.jsonl` from the `agda-algebras-corpus-v0.1` release), and the page should print which corpus the server carried, read from that file rather than asserted.
+
+# Done
+
+A published page with three arms on the same obligations, generated from the archive, naming the corpus each server carried, with every total checked against the ADR; the 74 demo tests and any new ones pass.
+
+# Relations
+
++  Depends on [#169] and [#170], and on the no-corpus measurement to be filed under Milestone 1.
++  Builds on [#85], [#154], and [#162].
++  Tracked by [M6-6] ([#180]).
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+
+---
+
+### Issue M6-10: site: an ADR for the project site, and its companion note under docs/ (#182)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+[#169] (PR [#181]) took a run of decisions that are written beside the keys and rules that carry them (`mkdocs.yml`, `flake.nix`, the Makefile's site section, the hook's header) and in the PR description, and nowhere else.  William asked for a decision record on 2026-09-21, after reviewing what the branch shipped: "we should probably have an adr about the site".  This issue is that record, and the companion note the record links to.
+
+# Work
+
++  **`docs/adr/0003-project-site.md`**, in the shape the repository's ADRs already have (see ADR 0002): a plain title, the `File:` line, Status, Date, Tracking, Ancestry; an executive summary; one section per decision area with Decision, Evidence, and Status; a numbered decision log; References with reference-style links for every issue, PR, and document.  Define every term on first use.
++  **A companion note, `docs/site/overview.md`**, which explains the component rather than deciding it: what the site is made of, how `make site` assembles it, how a page gets published, how the demo rides in, and how the gates fail.  The how-to that PR [#181]'s follow-up added to `docs/HowToRun.md` is the seed; the note can absorb it or link it, but there should be one canonical copy of each instruction.
++  Link both from `docs/README.md` (the ADR list and the subdirectory list).
+
+# The decision areas the record has to cover
+
++  **Where the site lives.**  In this repository, because the demo is generated from committed artifacts here and the build refuses to publish when they disagree; the alternatives considered (a separate site repository, folding into `formalverification.io`); the trigger for revisiting (non-generated content outweighing generated).  The tracking issue [#180] carries the text.
++  **The rule every page inherits.**  Nothing generated is committed; what the site shows is generated from committed artifacts; a figure that disagrees with its record fails the build.
++  **Two output directories.**  `site/` for the demo page alone and `public/` for the whole tree, because MkDocs' default output directory collides with the demo's.
++  **The demo as a standalone document.**  Not re-rendered as Markdown; registered with MkDocs from where the demo build wrote it (`File.generated`); the Demo link appended in `on_nav` after MkDocs' validation; kept out of the sitemap so Material's instant navigation does not intercept it.  The palette reconciliation of [#170] joins this section when it lands.
++  **Publishing by allowlist.**  `exclude_docs` excludes everything and re-includes named files; `validation.omitted_files: warn` under `--strict`; the curation of [#171] is the evidence.
++  **The toolchain.**  mkdocs 1.6.1 and mkdocs-material 9.5.49 (williamdemeo.org's pins); the site's Python from the flake's nixos-unstable pin because nixos-24.05 ships mkdocs 1.5.3; the override from the PyPI sdist; `requirements.txt` as the pip fallback and the pins check that holds the two together.
++  **The gates.**  The four targets the Pages workflow runs inside `nix develop .#site`; the off-origin scan's two refinements over the grep it replaced (stylesheets scanned, `rel` understood); the link check over the theme's markup.
++  **The look.**  Inherited from williamdemeo.org: `font: false` with self-hosted faces (load-bearing), dark first, the Constellation tokens; the repository chip kept, its API fetch removed; what was left and why (Meridian, KaTeX, the PNG favicons).
++  **The address.**  The domain is the front door, not the archive: cite by GitHub URL or DOI ([#177]).
+
+# Done
+
+The ADR and the companion note are merged and linked from `docs/README.md`; every decision above has a Decision, Evidence, and Status entry; the decision log is numbered; and `git grep` finds no site decision recorded only in a PR description.
+
+# Relations
+
++  Records [#169] (PR [#181]); should absorb [#170] and [#171] as they land.
++  Tracked by [M6-6] ([#180]).
+
+[#169]: https://github.com/formalverification/agda-native-air/issues/169
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#171]: https://github.com/formalverification/agda-native-air/issues/171
+[#177]: https://github.com/formalverification/agda-native-air/issues/177
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+[#181]: https://github.com/formalverification/agda-native-air/pull/181
 
 <!-- END GENERATED: milestone-6 -->
 

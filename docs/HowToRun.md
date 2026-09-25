@@ -52,6 +52,7 @@ make eval-proof-completion-smoke
 - [13.  agda-mcp: AI-assisted proof development ](#13--agda-mcp-ai-assisted-proof-development)
 - [14.  Known good sequences](#14--known-good-sequences)
 - [15.  Cleaning](#15--cleaning)
+- [16.  The project site](#16--the-project-site)
 
 <!-- markdown-toc end -->
 
@@ -685,6 +686,16 @@ is its dataset card under `docs/corpora/`.
 * Models: `ml-pipeline/models/model.pt`  (legacy)
 * Finetune dataset: `data/finetune.jsonl`  (legacy)
 
+### 11.4.  Site outputs (§ 16)
+
+* Demo data: `data/demo/` (`make demo-data`)
+* The demo page alone: `site/index.html` and `site/assets/` (`make demo-site`)
+* The whole site: `public/`, with the demo copied under `public/demo/`
+  (`make site`)
+
+All three are gitignored; the committed inputs are `reports/agent-bench/`,
+`data/benchmarks/`, `docs/`, `web/`, and `mkdocs.yml`.
+
 ---
 
 ## 12.  Debugging playbook
@@ -1181,10 +1192,144 @@ make eval-proof-completion-smoke-retrieval
 ## 15.  Cleaning
 
 ```sh
-make clean   # remove a few generated files
-make wipe    # remove generated artifacts (features/models/etc.)
-make tree    # repo tree, excluding build dirs
+make clean       # remove a few generated files
+make wipe        # remove generated artifacts (features/models/etc.)
+make demo-clean  # remove data/demo/ and site/ (the demo page)
+make site-clean  # remove public/ (the whole site)
+make tree        # repo tree, excluding build dirs
 ```
+
+---
+
+## 16.  The project site
+
+The project site is MkDocs Material over a curated allowlist of `docs/`, with
+the demo page of issue #85 carried in as the standalone document it is, at
+`demo/`.  It is published at
+<https://formalverification.github.io/agda-native-air/> by
+`.github/workflows/pages.yml` on every push to `main`, from the same Makefile
+targets described here; nothing generated is committed.  The build was set up
+under issue #169; the decision record is issue #182's.
+
+### 16.1.  The toolchain
+
+The site has its own shell, and it is the only shell that carries `mkdocs`:
+
+```sh
+nix develop .#site
+```
+
+From inside another Nix shell, prefix the call, because the other shells
+export an `LD_LIBRARY_PATH` that breaks the profile `nix`; both loader
+variables are cleared, which is the Makefile's own `NIX_CLEAN_ENV`
+convention for nested Nix calls (the second matters on macOS):
+
+```sh
+env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH nix develop .#site
+```
+
+The shell pins `mkdocs` 1.6.1 and `mkdocs-material` 9.5.49 (the versions
+williamdemeo.org pins, so the two sites render from the same theme release)
+plus `pytest`; no Agda, no Scala.  The first entry builds the theme override
+once, about a minute; later entries take seconds.
+
+Without Nix, `requirements.txt` at the repository root is the supported
+fallback: the same two pins, installed into a virtual environment that
+`.gitignore` already covers.
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+export PATH="$PWD/.venv/bin:$PATH"
+make site-pins-check      # confirms the environment matches requirements.txt
+```
+
+`make site-pins-check` is also what keeps the two paths honest inside the Nix
+shell, and `nix flake check` runs the same comparison as
+`checks.site-requirements-pins`.
+
+### 16.2.  Build it
+
+```sh
+make site
+```
+
+This runs `make demo` (the archive under `reports/agent-bench/` to
+`data/demo/`, then the demo page to `site/`) and then
+`mkdocs build --strict` into `public/`, copying the demo under
+`public/demo/`.  It takes about a second after the first run.  The demo build
+refuses to write a page whose benchmark table disagrees with ADR 0001 § 9,
+the MkDocs hook refuses a site without a built demo, and `--strict` refuses a
+broken link or a published page missing from the nav; each failure names
+what to fix.  `make demo-data` and `make demo-site` still work on their own.
+
+### 16.3.  Serve it locally
+
+```sh
+make site-serve                  # or: make site-serve SITE_PORT=8001
+```
+
+Then open <http://127.0.0.1:8000/agda-native-air/>.  The path prefix is not
+optional: the dev server mounts the site where `site_url` says it lives, so
+that links and the 404 page behave as they will when deployed, and the bare
+root redirects there.  Edits to a page under `docs/`, to `mkdocs.yml`, or to
+the stylesheets reload the browser; the demo is built once when the server
+starts, so after editing `web/assets/` or the archive, stop the server
+(Ctrl-C) and start it again.  A wrong URL under the dev server renders the
+site's own 404 page, an Agda goal that cannot be filled.
+
+### 16.4.  Check and test it
+
+```sh
+make site-check        # public/: nothing fetched off-origin, every link resolves
+make site-test         # the demo's 74 tests and the site's 37
+make site-pins-check   # requirements.txt against this Python environment
+```
+
+`make site-check` walks every page and stylesheet of `public/` and refuses an
+asset loaded from another origin (a Google Fonts link, say, which default
+Material emits and `font: false` in `mkdocs.yml` removes) or a link that
+resolves to nothing.  `make site-test` builds the whole site into a temporary
+directory and checks it, so it never touches `public/`; its whole-site test
+skips when `mkdocs` is not on `PATH`, which is why the pip lane of `ci.yml`
+passes without it.  The Pages workflow runs these three and `make site`
+inside `nix develop .#site` on every pull request that touches the site, and
+deploys only from `main`.
+
+### 16.5.  Publish a page
+
+`docs/` is written for contributors, so the site publishes nothing from it
+that `mkdocs.yml` does not name.  To publish a page, do the following:
+
+1.  Add a `!path/to/page.md` line to `exclude_docs` in `mkdocs.yml` (the
+    first pattern there excludes everything; each `!` line re-includes one
+    thing).
+2.  Add the page to `nav:`.  A published page missing from the nav is a
+    `--strict` failure, on purpose.
+3.  Fix the page's relative links: a link to a file that is not published
+    fails `--strict` too.  Point it at the file on GitHub, drop it, or publish
+    the target as well.
+4.  Run `make site` and `make site-check`.
+
+Non-Markdown files under `docs/` (images, stylesheets) follow the same
+allowlist; the `!assets/**` and `!stylesheets/**` lines are what publish the
+theme's own.
+
+### 16.6.  If something goes wrong
+
++  `error: mkdocs not found on PATH`: enter `nix develop .#site`, or activate
+   the `.venv` from § 16.1.
++  `no built demo at .../site/index.html; run make demo first`: `make site`
+   runs the demo build itself; this appears only when `mkdocs build` is run
+   by hand.
++  `--strict` reports a page "not included in the nav" or a link whose
+   "target is not found": the allowlist, the nav, and the page's links are
+   out of step; see § 16.5.
++  `Address already in use` on serve: pick another port,
+   `make site-serve SITE_PORT=8001`.
++  The site looks unstyled or fonts fall back: the stylesheets load in a fixed
+   order (`fonts.css`, `tokens.css`, `extra.css` under `docs/`); check the
+   browser's network panel for a 404 among them.
 
 ---
 

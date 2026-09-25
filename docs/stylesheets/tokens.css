@@ -1,0 +1,124 @@
+/* File: docs/stylesheets/tokens.css
+
+   Design tokens for the agda-native-air site (issue #169): the one place
+   color, type, and spacing are decided.  extra.css consumes these and
+   defines no raw values of its own, so a change here moves the whole site
+   and nothing else has to know.
+
+   The system is Constellation, inherited from williamdemeo.org (the
+   williamdemeo/website repository, docs/stylesheets/tokens.css at fcb6bf0,
+   2026-09-20), which took it in turn from the agda-algebras documentation
+   site: indigo primary, coral for hover, Space Grotesk for display over
+   Inter for body, JuliaMono for code, over a blue-tinted neutral ramp.  The
+   three sites link to one another, and looking like siblings is worth more
+   than a separate voice.
+
+   Left behind on purpose, because this site has no use for them: the
+   Meridian alternative and the [data-system] switch that rendered both
+   systems on one comparison page; the home-page hero, lattice, and motion
+   tokens; and the KaTeX scale, since no published page here sets
+   mathematics in LaTeX (the ADRs write their notation in Unicode).  Add a
+   token here, visibly, when a page needs one.
+
+   Three of the agda-algebras values were adjusted upstream because they
+   fail WCAG AA as text, and this file carries the adjusted values:
+   --c-fg-faint (light #818bab to #626b88, dark #6a7197 to #8189af) and the
+   light-mode --c-accent-hover (#fb6a00 to #b34b00).  The coral survives
+   unchanged in dark, where it measures 7.34:1.
+
+   Units: Material sets `html { font-size: 125% }`, so 1rem is 20px, and
+   `.md-typeset` sizes in em relative to its own base.  The scale below
+   follows that convention rather than fighting it. */
+
+/* == scale, spacing, and shape ==============================================
+   A 1.25 modular scale, tightened at the display sizes where a straight
+   geometric progression gets shouty, and a 4px spacing grid. */
+
+:root {
+  /* Type scale, em-relative to the typeset base.  h1 lands at 38px, body
+     at 17px. */
+  --type-base: 0.85rem;
+  --type-h1: 2.25em;
+  --type-h2: 1.5em;
+  --type-h3: 1.1875em;
+  --type-h4: 1em;
+  --type-small: 0.8125em;
+  --type-code: 0.875em;
+  /* Interface chrome sizes in rem, not em: the nav and the table of
+     contents sit outside .md-typeset, so an em there resolves against the
+     root and compounds down the tree. */
+  --type-ui: 0.7rem;
+  --type-ui-small: 0.62rem;
+
+  --leading-body: 1.7;
+  --leading-heading: 1.25;
+  --tracking-display: -0.02em;   /* large type needs to be pulled in */
+  --tracking-body: 0;
+  --tracking-caps: 0.06em;
+
+  /* Line length.  Prose is capped; code blocks, tables, and figures are
+     not, because an 80-column Agda block that wraps is worse than a wide
+     one. */
+  --measure: 33rem;              /* about 74 characters at the body size */
+  --measure-heading: 38rem;
+
+  /* 4px grid at a 20px root. */
+  --space-1: 0.2rem;
+  --space-2: 0.4rem;
+  --space-3: 0.6rem;
+  --space-4: 0.8rem;
+  --space-6: 1.2rem;
+  --space-8: 1.6rem;
+  --space-12: 2.4rem;
+  --space-16: 3.2rem;
+  --space-24: 4.8rem;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --border-width: 1px;
+
+  /* The faces, declared in ../assets/fonts/fonts.css.  Material appends its
+     own system fallbacks after whatever these name. */
+  --font-body: "Inter";
+  --font-display: "Space Grotesk";
+  --font-mono: "JuliaMono";
+  --display-weight: 600;
+  --strong-weight: 600;
+}
+
+/* == color ==================================================================
+   Two schemes, one per Material palette entry.  The attribute lives on
+   <body>, which is why extra.css maps Material's variables on
+   [data-md-color-scheme] rather than on :root. */
+
+[data-md-color-scheme="default"] {
+  --c-bg: #fbfcff;
+  --c-bg-raised: #f2f5fb;
+  --c-bg-sunken: #eef0fc;
+  --c-fg: #181c2c;
+  --c-fg-muted: #535d75;
+  --c-fg-faint: #626b88;
+  --c-line: #e2e4f6;
+  --c-line-strong: #ccd0ec;
+  --c-accent: #5b54e6;
+  --c-accent-hover: #b34b00;
+  --c-accent-wash: #ecebfd;
+  --c-on-accent: #ffffff;
+  --c-error: #b3261e;
+}
+
+[data-md-color-scheme="slate"] {
+  --c-bg: #0c0e1d;
+  --c-bg-raised: #15172e;
+  --c-bg-sunken: #08091a;
+  --c-fg: #c3c8de;
+  --c-fg-muted: #9197b6;
+  --c-fg-faint: #8189af;
+  --c-line: #22253f;
+  --c-line-strong: #333757;
+  --c-accent: #8b88ff;
+  --c-accent-hover: #ff7a1a;
+  --c-accent-wash: #16183a;
+  --c-on-accent: #0c0e1d;
+  --c-error: #ff8a80;
+}

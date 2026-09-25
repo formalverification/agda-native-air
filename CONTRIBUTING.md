@@ -89,6 +89,12 @@ make check           # build + test all components
 For `agda-mcp` specifically (build, run, connect Claude Code), see
 [HowToRun §13](docs/HowToRun.md#13--agda-mcp-ai-assisted-proof-development).
 
+For the project site (build it, serve it locally, run its checks), see
+[HowToRun §16](docs/HowToRun.md#16--the-project-site).  It has its own
+shell, `nix develop .#site`, and a pip fallback in `requirements.txt`; the
+pages under `docs/` are published by allowlist, so a new page is not on the
+site until `mkdocs.yml` names it.
+
 If a workflow depends on the Nix shell, please say so in docs and PR
 descriptions.
 

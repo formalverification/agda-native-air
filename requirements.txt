@@ -1,0 +1,31 @@
+# File: requirements.txt
+#
+# The project site's pinned build dependencies (issue #169): MkDocs and the
+# Material theme, at the versions williamdemeo.org pins, so the two sites
+# render from the same theme release.  The ML pipeline's Python dependencies
+# are a different file, ml-pipeline/python/requirements.txt.
+#
+# This is the supported path for a machine without Nix.  It is not the
+# primary one: `nix develop .#site` is, and the Pages workflow uses the
+# flake.  But `make site` works from this file alone, and that is
+# deliberate; the project should not be hostile to a checkout on a machine
+# that has never heard of Nix.
+#
+#     python3 -m venv .venv
+#     .venv/bin/pip install -r requirements.txt
+#     PATH="$PWD/.venv/bin:$PATH" make site
+#
+# Exact pins on the direct dependencies only, not the transitive closure and
+# not Python itself; flake.lock pins all of those, which is why the flake is
+# the primary path.  The [imaging] extra brings Pillow and CairoSVG, which
+# Material's social-card plugin would need; no page uses it yet, and the
+# extra is pinned now so the two paths already agree when one does.
+#
+# Keep in step with flake.nix: `nix flake check` runs the
+# site-requirements-pins check, and `make site-pins-check` runs the same
+# script inside the site shell; either fails if a version here does not
+# match the Nix environment, or if an extra named here is not satisfied
+# there.
+
+mkdocs==1.6.1
+mkdocs-material[imaging]==9.5.49

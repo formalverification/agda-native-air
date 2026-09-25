@@ -1,35 +1,54 @@
 ## =============================================================================
-#  pages.yml - build and publish the demo site (issue #85)
+#  pages.yml - build and publish the project site (issues #85, #169)
 #  -----------------------------------------------------------------------------
 #
 #  File: .github/workflows/pages.yml
 #
 #  Description:
-#    Builds the demo site with the same two Makefile targets a developer runs
-#    (`make demo-data` then `make demo-site`) and deploys the result to GitHub
-#    Pages.  Nothing generated is committed: the page is rebuilt here from
-#    `reports/agent-bench/`, which is.
+#    Builds the project site with the same Makefile target a developer runs
+#    (`make site`: the demo page from the committed archive, then MkDocs
+#    Material around it) and deploys the result to GitHub Pages.  Nothing
+#    generated is committed: the tree is rebuilt here from `reports/agent-bench/`
+#    and `docs/`, which are.
 #
-#    The build needs Python and nothing else.  It runs no Agda, starts no
-#    server, and makes no network request of its own: every input is a file in
-#    this repository.  `make demo-data` refuses to write if the table it
-#    regenerates from each arm's `report.json` disagrees with ADR 0001 § 9, or
-#    if an absolute path from the machine the sweep ran on survived
-#    normalization, so a page that cannot be trusted fails this workflow rather
-#    than being published.
+#    The toolchain comes from the flake, `nix develop .#site`, which pins
+#    mkdocs and mkdocs-material at the versions requirements.txt pins; the
+#    Cachix cache makes the shell resolve in seconds once it has been built
+#    from `main` once.  The build runs no Agda, starts no server, and makes no
+#    network request of its own beyond fetching the toolchain: every input to
+#    the site is a file in this repository.
 #
-#    The `verify` job is the gate.  It runs the generator's own test suite
-#    (`scripts/python/tests/test_demo_*.py`), which builds the page into a
-#    temporary directory and asserts the markup contract `web/assets/replay.js`
-#    depends on, that every tool answer is on the page in full, and that
-#    nothing is fetched from off the origin at page load.  `deploy` runs only
-#    if it passes.
+#    The `verify` job is the gate, in four steps that each refuse rather than
+#    publish something wrong:
+#
+#      make site-test        the demo's 74 tests (the markup contract
+#                            `web/assets/replay.js` depends on, every tool
+#                            answer on the page in full, WCAG AA contrast, no
+#                            absolute path from the sweep machine) and the
+#                            site's own, which build the whole site into a
+#                            temporary tree and check it;
+#      make site             the real build: `make demo-data` refuses to write
+#                            if the table it regenerates from each arm's
+#                            `report.json` disagrees with ADR 0001 § 9, the
+#                            MkDocs hook refuses a site without a built demo,
+#                            and `--strict` refuses a broken link or a page
+#                            missing from the nav;
+#      make site-check       the off-origin gate over every page and
+#                            stylesheet of the uploaded tree, not the demo
+#                            page alone as it was before #169 (a theme upgrade
+#                            that reintroduced a Google Fonts link would
+#                            otherwise ship unnoticed), and every link
+#                            resolving;
+#      make site-pins-check  requirements.txt and the Nix environment agree.
+#
+#    `deploy` runs only if `verify` passes, and uploads `public/`, the whole
+#    tree: the landing page, the demo under `demo/`, the 404, and the assets.
 #
 #    This workflow does not touch `ci.yml`'s lanes and is not part of its
 #    `all-green` gate: a page that fails to build should not block a code
-#    change, and a code change that breaks the page is caught by the same
-#    tests inside `ci.yml`'s `python-agda-dojang` lane, which already runs
-#    `scripts/python/tests`.
+#    change, and a code change that breaks the demo is caught by the same
+#    demo tests inside `ci.yml`'s `python-agda-dojang` lane (the site tests
+#    skip there, where mkdocs is absent, and run here, where it is not).
 #
 #    Two jobs, two capabilities.  `verify` runs code the pull request
 #    controls and holds `contents: read` and nothing else; `deploy` runs no
@@ -47,45 +66,48 @@
 #    affected: this workflow is not part of `ci.yml`'s `all-green` gate.
 #
 ## =============================================================================
-name: Demo site
+name: Project site
 
 on:
-  # No paths filter here, on purpose.  The page embeds content from several
+  # No paths filter here, on purpose.  The site embeds content from several
   # trees (the archive, the obligation files the index names, the ADR's
-  # table, the assets), and an allowlist of them is a second copy of that
-  # list which drifts: this one already missed
-  # `data/benchmarks/**/obligations/*.agda`, whose text is rendered into
-  # every replay, so editing an obligation would have left the published
-  # page quoting the old one.  A rebuild takes under a minute; a stale
-  # published page is a page that lies.  Main rebuilds on every push.
+  # table, the assets, the pages under docs/), and an allowlist of them is a
+  # second copy of that list which drifts: the demo's filter already missed
+  # `data/benchmarks/**/obligations/*.agda` once, whose text is rendered into
+  # every replay.  A rebuild takes a few minutes; a stale published page is a
+  # page that lies.  Main rebuilds on every push.
   push:
     branches: [ main ]
   # A filter is fine here, where it only decides whether this extra check
-  # runs on a pull request: `ci.yml` runs the same tests unconditionally in
-  # its `scripts/python/tests` lane, so nothing goes unverified either way.
+  # runs on a pull request: `ci.yml` runs the demo tests unconditionally in
+  # its `scripts/python/tests` lane, so the demo goes unverified either way
+  # only if the site build itself is what broke, and that is what these
+  # paths name.
   pull_request:
     branches: [ main ]
     paths:
       - 'reports/agent-bench/**'
       - 'data/benchmarks/**'
       - 'scripts/python/demo/**'
+      - 'scripts/python/site/**'
       - 'scripts/python/tests/test_demo_*.py'
+      - 'scripts/python/tests/test_site_*.py'
       - 'scripts/python/utils/**'
       - 'web/**'
-      - 'docs/adr/0001-proof-search-on-agda-mcp.md'
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements.txt'
+      - 'flake.nix'
+      - 'flake.lock'
       - '.github/workflows/pages.yml'
       - 'Makefile'
-  # So the page can be republished without a commit.
+  # So the site can be republished without a commit.
   workflow_dispatch:
 
 # Least privilege, and granted per job below rather than here.  `verify`
 # checks out and runs code the pull request controls (pytest, make), so it
 # gets `contents: read` and nothing else; only `deploy`, which runs no
-# repository code at all, holds the tokens that can publish.  Declared
-# workflow-wide, they handed `pages: write` to the job running PR-authored
-# code, which on a same-repository branch is a real capability: GitHub's own
-# job log for the previous revision printed "Pages: write" under the verify
-# job's GITHUB_TOKEN permissions.
+# repository code at all, holds the tokens that can publish.
 permissions:
   contents: read
 
@@ -100,9 +122,9 @@ env:
 
 jobs:
   verify:
-    name: Demo site • build and test
+    name: Project site • build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     # Runs pull-request-controlled code, so it may read the repository and
     # nothing more.  The Pages artifact it uploads needs no permission of
     # its own: an artifact is scoped to the workflow run that made it.
@@ -112,47 +134,68 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v6
+      # The same Nix and Cachix steps as ci.yml's lanes, with one difference
+      # the Copilot review of #181 asked for, in two rounds: the
+      # write-capable Cachix token is handed to the action only when the
+      # checked-out code is `main`, and the cache is read-only otherwise.
+      # The `make` and `pytest` that follow run whatever was checked out,
+      # and a token installed for the action is readable by everything
+      # after it; a pull request from a same-repository branch, or a manual
+      # run that a maintainer pointed at an untrusted branch, would
+      # otherwise get the keys to the cache this job claims to trust only
+      # for reading.  The condition is the ref, not the event, so a manual
+      # run of `main` still pushes and a manual run of anything else does
+      # not; it is the same condition the deploy job gates on.  The site
+      # shell is a Python environment with mkdocs-material rebuilt at the
+      # pinned version: the first push to `main` builds it and pushes it,
+      # every other run pulls it, and one that changes the pin builds it on
+      # the runner (about a minute) without publishing the result.
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v16
         with:
-          python-version: '3.12'
+          name: formalverification
+          authToken: ${{ github.ref == 'refs/heads/main' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Install pytest
-        run: pip install pytest
-
-      # The suite builds the page into a temporary directory of its own, so
-      # this proves the build before the build below writes anything.
-      - name: Test the generator and the page it produces
-        run: PYTHONPATH=. python3 -m pytest -q scripts/python/tests/test_demo_*.py
-
-      - name: Build the site
-        run: make demo
-
-      # A published page must not reach off its own origin at load.  The test
-      # suite asserts this on the page it built; this repeats it on the
-      # artifact that is actually uploaded, which is the thing being shipped.
-      - name: Check the uploaded page fetches nothing off-origin
+      # Four gates, in the order the header describes.  `set -e` inside the
+      # shell string, so the first failing target ends the step.
+      - name: Test, build, and check the site
         run: |
           set -euo pipefail
-          test -f site/index.html
-          test -f site/assets/demo.css
-          test -f site/assets/replay.js
-          if grep -nE '<(script|link|img|iframe)[^>]+(src|href)="(https?:)?//' site/index.html; then
-            echo "::error::the built page loads an off-origin asset"
-            exit 1
-          fi
-          echo "the page loads only its own assets"
+          nix develop .#site --command bash -c '
+            set -euo pipefail
+            echo "mkdocs: $(mkdocs --version)"
+            make site-test
+            make site
+            make site-check
+            make site-pins-check
+          '
+
+      # What is uploaded is what was checked: the same tree, and nothing that
+      # was not written by `make site`.
+      - name: Inventory the tree being uploaded
+        run: |
+          set -euo pipefail
+          test -f public/index.html
+          test -f public/404.html
+          test -f public/demo/index.html
+          test -f public/demo/assets/demo.css
+          test -f public/demo/assets/replay.js
+          find public -name '*.html' | sort
 
       - name: Upload the site as a Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: site
+          path: public
 
   deploy:
-    name: Demo site • deploy
+    name: Project site • deploy
     needs: verify
     # Only from the default branch, and only on a push or a manual run: a
-    # pull request builds the page and stops there.
+    # pull request builds the site and stops there.
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10

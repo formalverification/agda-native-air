@@ -81,6 +81,7 @@
 #   nix develop .#all      — monolithic: everything including Spark
 #   nix develop .#proofParser — minimal Scala/sbt/JDK
 #   nix develop .#mlPipeline  — Scala + Python (CPU), no Agda
+#   nix develop .#site        (MkDocs Material for the project site, issue #169; no Agda)
 #   nix develop .#gpu      — native Nix CUDA build (Linux only, slow first build)
 # =============================================================================
 {
@@ -427,6 +428,33 @@
       pkgs.openssl
     ];
 
+    # ---- Helper: the project site's Python (issue #169) -----------------------
+    # MkDocs Material at the versions requirements.txt pins (mkdocs 1.6.1,
+    # mkdocs-material 9.5.49, the versions williamdemeo.org pins), so the Nix
+    # path and the pip path build the same site; plus pytest for the site's
+    # tests.  Built from pkgsAgda (nixos-unstable) rather than pkgsStable:
+    # nixos-24.05 ships mkdocs 1.5.3, and the pinned Material needs the 1.6
+    # line.  nixpkgs' mkdocs-material is overridden to 9.5.49 from the PyPI
+    # sdist, as williamdemeo/website's flake does; the [imaging] extra
+    # (Pillow, CairoSVG) rides along so the two paths agree on it too.
+    # checks.site-requirements-pins fails `nix flake check` if requirements.txt
+    # and this environment ever disagree.
+    mkSitePython = pkgs:
+      let
+        ps = pkgs.python3Packages;
+        mkdocs-material = ps.mkdocs-material.overridePythonAttrs (_: rec {
+          version = "9.5.49";
+          src = ps.fetchPypi {
+            pname = "mkdocs_material";
+            inherit version;
+            hash = "sha256-NnG7KCtPU6HHLgitvgTSSBqY+F/tOSUwBR+A/5SpYh0=";
+          };
+        });
+      in
+      pkgs.python3.withPackages (p:
+        [ p.mkdocs mkdocs-material p.pytest ]
+        ++ mkdocs-material.optional-dependencies.imaging);
+
   in {
     formatter = forAllSystems ({ pkgsStable, ... }: pkgsStable.nixpkgs-fmt);
 
@@ -446,6 +474,20 @@
       nixpkgs.lib.mapAttrs'
         (name: app: nixpkgs.lib.nameValuePair "ghproject-${name}" app)
         github-project.apps.${system});
+
+    # requirements.txt is the supported non-Nix path for the site's toolchain
+    # (issue #169); two dependency sets are only safe while they agree, so
+    # this fails `nix flake check` when they do not.  `make site-pins-check`
+    # inside `nix develop .#site` runs the same script.
+    checks = forAllSystems ({ pkgsAgda, ... }: {
+      site-requirements-pins = pkgsAgda.runCommandLocal "check-site-requirements-pins"
+        { nativeBuildInputs = [ (mkSitePython pkgsAgda) ]; }
+        ''
+          cd ${self}
+          PYTHONPATH=${self} python3 -m scripts.python.site.check_requirements_pins requirements.txt
+          touch "$out"
+        '';
+    });
 
     # ---- Dev Shells -----------------------------------------------------------
     devShells = forAllSystems ({ pkgsStable, pkgsAgda, ... }:
@@ -663,6 +705,26 @@ PY
             ${exportJavaHome}
             ${exportLibPath}
             echo "🧪 ml-pipeline shell — try: cd ml-pipeline && sbt -batch \"project etl\" test"
+          '';
+        };
+
+        # -----------------------------------------------------------------------
+        # site: MkDocs Material for the project site (issue #169), no Agda
+        #   - `make site`, `make site-serve`, `make site-check`, `make site-test`
+        #   - Python (with mkdocs, mkdocs-material 9.5.49, pytest) from pkgsAgda;
+        #     see mkSitePython for why not pkgsStable
+        #   - no LD_LIBRARY_PATH export: nothing here loads a pip wheel, and the
+        #     export is what breaks the profile `nix` inside the other shells
+        # -----------------------------------------------------------------------
+        site = pkgsAgda.mkShell {
+          name = "agda-native-air-site";
+          packages = [ (mkSitePython pkgsAgda) ] ++ commonTools;
+
+          LANG = "C.UTF-8";
+          LC_ALL = "C.UTF-8";
+
+          shellHook = ''
+            echo "🌐 site shell: mkdocs $(mkdocs --version | cut -d' ' -f3); try: make site && make site-check"
           '';
         };
 

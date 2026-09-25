@@ -331,6 +331,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  extract-algebras-legacy extract-lib-old clean wipe tree probe-all \
                  eval-proof-completion eval-proof-completion-smoke demo-proof-completion \
                  demo demo-data demo-site demo-clean \
+                 site site-serve site-check site-test site-pins-check site-clean _check-mkdocs \
                  test-agda-dojang-integration \
                  project-lint project-update project-update-check _check-ghproject
 
@@ -460,6 +461,12 @@ help:
 	@echo "  make demo-data                   - Demo site: archive -> $(DEMO_DATA_DIR) (checks the table against ADR 0001 section 9)"
 	@echo "  make demo-site                   - Demo site: $(DEMO_DATA_DIR) + web/assets -> $(DEMO_SITE_DIR)/index.html"
 	@echo "  make demo-clean                  - Remove $(DEMO_DATA_DIR) and $(DEMO_SITE_DIR)"
+	@echo "  make site                        - Build the project site (issue 169): demo, then MkDocs --strict -> $(SITE_OUT_DIR)/ (needs mkdocs: nix develop .#site)"
+	@echo "  make site-serve                  - Serve the site locally with live reload (mkdocs serve on 127.0.0.1:$(SITE_PORT))"
+	@echo "  make site-check                  - Check $(SITE_OUT_DIR)/: nothing fetched off-origin on any page, every link resolves"
+	@echo "  make site-test                   - Run the demo and site test suites (scripts/python/tests/test_demo_*.py, test_site_*.py)"
+	@echo "  make site-pins-check             - Check requirements.txt against this Python environment (run inside nix develop .#site)"
+	@echo "  make site-clean                  - Remove $(SITE_OUT_DIR)"
 	@echo "  make tree                        - Pretty tree view"
 	@echo "  make wipe                        - Remove generated artifacts"
 	@echo ""
@@ -1973,6 +1980,69 @@ demo-site:
 demo-clean:
 	@echo ">> [demo-clean] removing $(DEMO_DATA_DIR) and $(DEMO_SITE_DIR)"
 	@rm -rf "$(DEMO_DATA_DIR)" "$(DEMO_SITE_DIR)"
+
+# ------------------------------------------------------------------------------
+# 10.6) The project site (issue 169)
+#
+# MkDocs Material over a curated subset of docs/, with the demo page carried
+# in as the standalone document it is.  Two output directories, deliberately
+# distinct: `site/` (DEMO_SITE_DIR) is the demo page alone, as `make demo-site`
+# has always written it, and `public/` (SITE_OUT_DIR) is the whole published
+# tree, with the demo copied under public/demo/ by scripts/python/site/
+# demo_hook.py.  MkDocs' own default output directory is also `site/`, which
+# is why the whole site does not use it.  Both are gitignored; nothing
+# generated is committed.
+#
+# `mkdocs` comes from `nix develop .#site` (the primary path; pinned in
+# flake.nix) or from `pip install -r requirements.txt` (the fallback); the
+# site-pins-check target and the flake's site-requirements-pins check keep
+# the two on the same versions.  `make demo-data` and `make demo-site` keep
+# working on their own; they are what the demo tests drive.
+.PHONY: site site-serve site-check site-test site-pins-check site-clean _check-mkdocs
+
+SITE_OUT_DIR      ?= public
+MKDOCS            ?= mkdocs
+SITE_PORT         ?= 8000
+SITE_REQS         ?= requirements.txt
+# The path the site is served under, for the link check's root-absolute
+# links (the 404 page's).  Mirrors site_url in mkdocs.yml; the custom-domain
+# cutover (issue 177) moves both to "/".
+SITE_URL_PATH     ?= /agda-native-air/
+
+_check-mkdocs:
+	@command -v "$(MKDOCS)" >/dev/null 2>&1 || { \
+	  echo "error: $(MKDOCS) not found on PATH"; \
+	  echo "       enter the site shell:  nix develop .#site"; \
+	  echo "       or install the pinned fallback:  python3 -m venv .venv && .venv/bin/pip install -r $(SITE_REQS), then put .venv/bin on PATH"; \
+	  exit 1; }
+
+# Sequenced through recursive make, like `demo`: the MkDocs build reads the
+# demo's output, so the two must not run in parallel.
+# SOURCE_DATE_EPOCH is unset for the MkDocs run: a Nix shell sets it to
+# 1980-01-01, and MkDocs would stamp that date into every <lastmod> of the
+# sitemap, which tells a crawler the site has not changed in decades.  With
+# it unset the sitemap carries the build's own date, as it does outside Nix.
+site: _check-mkdocs
+	@$(MAKE) demo
+	@echo ">> [site] docs/ + $(DEMO_SITE_DIR)/ -> $(SITE_OUT_DIR)/"
+	@env -u SOURCE_DATE_EPOCH AIR_DEMO_DIR="$(DEMO_SITE_DIR)" $(MKDOCS) build --strict --site-dir "$(SITE_OUT_DIR)"
+
+site-serve: _check-mkdocs
+	@$(MAKE) demo
+	@env -u SOURCE_DATE_EPOCH AIR_DEMO_DIR="$(DEMO_SITE_DIR)" $(MKDOCS) serve --dev-addr 127.0.0.1:$(SITE_PORT)
+
+site-check:
+	@$(CORPUS_PY) -m scripts.python.site.check_site "$(SITE_OUT_DIR)" --site-prefix "$(SITE_URL_PATH)"
+
+site-test:
+	@$(CORPUS_PY) -m pytest -q scripts/python/tests/test_demo_*.py scripts/python/tests/test_site_*.py
+
+site-pins-check:
+	@$(CORPUS_PY) -m scripts.python.site.check_requirements_pins "$(SITE_REQS)"
+
+site-clean:
+	@echo ">> [site-clean] removing $(SITE_OUT_DIR)"
+	@rm -rf "$(SITE_OUT_DIR)"
 
 # ------------------------------------------------------------------------------
 # 11) Utility: tree
