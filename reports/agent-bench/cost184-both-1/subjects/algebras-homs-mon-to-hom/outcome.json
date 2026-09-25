@@ -1,0 +1,96 @@
+{
+  "benchmarkId" : "algebras-homs-mon-to-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.mon→hom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.HomReduct"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "mon→hom′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → hom 𝑨 𝑩",
+  "solved" : false,
+  "restated" : true,
+  "restatementEvidence" : [
+    "ref Setoid.Homomorphisms.Basic.mon→hom"
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 4,
+    "Edit" : 2,
+    "mcp__agda__type_of" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 42633,
+  "costUsd" : 0.1382232,
+  "tokens" : {
+    "input" : 22,
+    "output" : 2796,
+    "cacheRead" : 310256,
+    "cacheCreation" : 12042
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 4
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 4872,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-mon-to-hom/transcript.jsonl",
+  "lastWords" : "The file now type-checks with success: the final file's verdict is success (exit code 0, no diagnostics, no holes).",
+  "rateLimit" : {
+    "maxUtilization" : 0.97,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

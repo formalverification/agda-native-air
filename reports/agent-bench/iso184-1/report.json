@@ -1,0 +1,312 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "iso184-1",
+  "timestamp" : "2026-09-25T05:00:48.794263382Z",
+  "rejudged" : false,
+  "config" : {
+    "arm" : "mcp",
+    "parallelism" : 3,
+    "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
+    "resume" : false,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "model" : "claude-sonnet-5",
+    "maxTurns" : 30,
+    "wallCapSec" : 900,
+    "maxBudgetUsd" : 3.00,
+    "safe" : true,
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "claudeVersion" : "2.1.282 (Claude Code)",
+    "claudeFlags" : [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--max-turns",
+      "30",
+      "--max-budget-usd",
+      "3.00",
+      "--strict-mcp-config",
+      "--tools",
+      "Edit,Read",
+      "--allowedTools",
+      "mcp__agda",
+      "--permission-mode",
+      "acceptEdits",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--restricted",
+      "--add-dir",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda"
+    ],
+    "envAdded" : {
+      "MCP_TIMEOUT" : "120000",
+      "ENABLE_TOOL_SEARCH" : "false"
+    },
+    "envRemovedPrefix" : "CLAUDE",
+    "tools" : [
+      "Edit",
+      "Read",
+      "mcp__agda__get_goal",
+      "mcp__agda__fill_hole",
+      "mcp__agda__check_file",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__check_project",
+      "mcp__agda__type_of",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__get_dependencies"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda"
+    ],
+    "persistSessions" : true,
+    "inputs" : {
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "ace10e29ef3def5af879e1ff57989242267fa4b1ce74a6124d7405ddb9e75719"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-mcp/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-mcp-0.2.0/x/agda-mcp/build/agda-mcp/agda-mcp",
+        "sha256" : "7bd7cd5c75bc3578d45e1f28c975b33a0e5c23cdf06fbb332ec56ee40361d20c"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-strux/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-json-0.1.0.0/x/agda-json/build/agda-json/agda-json",
+        "sha256" : "5b5027204817d5eb7d0d94ca154293b826e0d8ff921904c9173b6b14ad96a2f9"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "5dae33ff049a7dd63db838731b854389f962b28285f6f38dbcd6ff5a8aba7c91"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "obligations" : 1,
+  "totals" : {
+    "total" : 1,
+    "solved" : 1,
+    "restated" : 0,
+    "gates" : {
+      
+    },
+    "anomalies" : 0,
+    "turns" : 4,
+    "toolCalls" : 3,
+    "wallMs" : 26379,
+    "costUsd" : 0.112
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : 0.000
+    },
+    "compositional" : {
+      "total" : 1,
+      "solved" : 1,
+      "restated" : 0,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 4,
+      "toolCalls" : 3,
+      "wallMs" : 26379,
+      "costUsd" : 0.112
+    },
+    "non-obvious" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : 0.000
+    }
+  },
+  "perStratum" : {
+    "agda-stdlib" : {
+      "total" : 1,
+      "solved" : 1,
+      "restated" : 0,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 4,
+      "toolCalls" : 3,
+      "wallMs" : 26379,
+      "costUsd" : 0.112
+    }
+  },
+  "perTool" : {
+    "Edit" : 1,
+    "Read" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "perShell" : {
+    
+  },
+  "perVia" : {
+    "mcp" : 1
+  },
+  "perVerdictVia" : {
+    "mcp" : 1
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "stdlib-nat-plus-comm",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-comm",
+      "goal" : "∀ (m n : ℕ) → m + n ≡ n + m",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "addedImports" : [
+        "open import Relation.Binary.PropositionalEquality using ( trans )"
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 26379,
+      "costUsd" : 0.11207439999999999,
+      "tokens" : {
+        "input" : 8,
+        "output" : 1107,
+        "cacheRead" : 62402,
+        "cacheCreation" : 22127
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1819,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m + n ≡ n + m",
+        "final" : "(m n : ℕ) → m + n ≡ n + m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
+      "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.96,
+        "statuses" : [
+          "allowed_warning"
+        ]
+      }
+    }
+  ]
+}

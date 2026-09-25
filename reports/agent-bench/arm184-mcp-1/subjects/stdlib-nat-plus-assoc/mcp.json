@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/corpora/agda-stdlib/v0/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/benchmarks/reports/agent-bench/arm184-mcp-1/work/stdlib-nat-plus-assoc /home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/benchmarks/reports/agent-bench/arm184-mcp-1/work/stdlib-nat-plus-assoc/Nat-plus-assoc.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/agda-mcp/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-mcp-0.2.0/x/agda-mcp/build/agda-mcp/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}

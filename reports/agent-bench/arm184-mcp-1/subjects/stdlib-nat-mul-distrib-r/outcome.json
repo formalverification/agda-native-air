@@ -1,0 +1,91 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-distrib-r",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-distribʳ-+",
+  "goal" : "∀ (m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 36972,
+  "costUsd" : 0.0691832,
+  "tokens" : {
+    "input" : 8,
+    "output" : 3043,
+    "cacheRead" : 82966,
+    "cacheCreation" : 5536
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1881,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+    "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-distrib-r/final/Nat-mul-distribR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-distrib-r/transcript.jsonl",
+  "lastWords" : "check_file reports success:true (exit code 0, no diagnostics, no holes), so the file now type-checks.",
+  "rateLimit" : {
+    "maxUtilization" : 0.01,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
