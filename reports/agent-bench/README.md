@@ -157,6 +157,11 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 | `arm162-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-21 | 55 | 50 | 0 | 0 | 308 | 253 | 2.88 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
 | `arm162-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-21 | 55 | 47 | 6 | 0 | 342 | 287 | 5.28 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
 | `arm162-both-1` | `both` | `claude-sonnet-5` | 2026-09-21 | 55 | 51 | 2 | 0 | 327 | 272 | 4.25 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `iso184-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 1 | 1 | 0 | 0 | 4 | 3 | 0.11 | the isolation check for client 2.1.282 on [#184] |
+| `cost184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | 0 | 10 | 8 | 0.12 | the cost pair on [#184] |
+| `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
+| `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 55 | 46 | 8 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
+| `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 55 | 49 | 2 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
 
 Per stratum, solved and restated (first arms), beside the loop's fixed space
 and retrieval under exclusion on `main`:
@@ -230,6 +235,81 @@ Two things no subject did, in either shell-bearing arm: drive
 (class count 0).  The extracted corpus is a retrieval substrate, not something
 an agent reads.
 
+## The lean-answer arms (2026-09-25, [#184])
+
+The `mcp` and `both` arms of [#162], run again with one change to the
+server (PR [#190]): its default answer is lean, keeping only
+`verdict.exitCode`, `project.root` and `project.rootSource`, and `lane.load`
+from the old echo, with the rest on `verbose: true`; and `exports_of` answers
+a page of 20 typed members with the rest named.  Everything else is the [#162] protocol: the
+prompts' digests, the index's and the corpora's digests, the caps, and the
+read roots are identical.  Two things differ besides the server: the client
+(2.1.282 against 2.1.261; `iso184-1` checked it with a persisted session and
+found nothing deferred), and the day.  Zero anomalies; USD 8.63 together.
+
+| | `shell` #162 | `mcp` #162 | `mcp` #184 | `both` #162 | `both` #184 |
+|---|---:|---:|---:|---:|---:|
+| solved | 50 | 47 | 46 | 51 | 49 |
+| restated | 0 | 6 | 8 | 2 | 2 |
+| lost to a gate | 5 | 2 | 1 | 2 | 4 |
+| turns | 308 | 342 | 359 | 327 | 318 |
+| tool calls | 253 | 287 | 304 | 272 | 263 |
+| USD | 2.88 | 5.28 | 4.63 | 4.25 | 4.00 |
+| output tokens | 70,403 | 76,732 | 82,831 | 67,269 | 66,634 |
+| cached tokens read per turn | 10,060 | 21,289 | 22,407 | 24,485 | 25,331 |
+| characters the tools returned | 259,520 | 929,386 | 534,272 | 474,562 | 223,797 |
+| per call | 1,025 | 3,238 | 1,757 | 1,744 | 850 |
+
+Per tool, calls and characters per call:
+
+| tool | `mcp` #162 | `mcp` #184 | `both` #162 | `both` #184 |
+|---|---:|---:|---:|---:|
+| `check_file` | 56 × 3,358 | 59 × 485 | 57 × 3,384 | 56 × 418 |
+| `type_of` | 34 × 3,162 | 15 × 677 | 11 × 3,405 | 11 × 594 |
+| `fill_hole` | 11 × 2,890 | 15 × 532 | 9 × 3,396 | 6 × 718 |
+| `definition_of` | 19 × 4,327 | 15 × 602 | 0 | 0 |
+| `get_goal` | 7 × 2,268 | 4 × 689 | 4 × 2,574 | 1 × 707 |
+| `exports_of` | 11 × 23,283 | 17 × 10,219 | 2 × 15,673 | 2 × 764 |
+| `search_by_name` | 18 × 6,930 | 31 × 5,099 | 1 × 2,155 | 1 × 2,155 |
+| `search_by_type` | 2 × 9,382 | 3 × 10,132 | 0 | 0 |
+| `get_dependencies` | 3 × 1,049 | 12 × 643 | 0 | 0 |
+| `Bash` | 0 | 0 | 65 × 1,231 | 69 × 1,444 |
+
+The answers shrank as designed and nothing else followed.  Offered a shell
+too, the subject called the knowledge tools exactly as rarely as before
+(`definition_of` 0, `search_by_name` 1, `exports_of` 2, `type_of` 11) and
+again took all 55 verdicts from `check_file`, so the flooding was not why
+[#162]'s `both` arm abandoned them.  Given the server alone, it shifted its
+mix rather than its volume (87 knowledge calls to 93: `search_by_name` and
+`get_dependencies` up, `type_of` down).  Cost fell 12 % and 6 %, not toward
+the shell arm's USD 2.88, because a server arm pays for context on every
+turn, not for its answers: about 22 to 25 thousand cached tokens a turn
+against the shell arm's 10 thousand.  The difference is the fourteen tools'
+descriptions and schemas, 68,391 characters before PR [#190] and 77,603
+after it, which every turn re-reads.
+
+Three things to read beside the table.
+
++  **`exports_of`'s page is opted out of**.  Six calls narrowed with
+   `pattern` and cost 1.2 to 8.2 thousand characters each; four asked for
+   `limit: 0` with no pattern and took the whole surface, 24 to 39 thousand
+   each and 112 thousand together, 65 % of the tool's total.  The description
+   offers that ("limit 0 returns every member typed"), and the subject took
+   the offer.
++  **The solves did not move beyond run-to-run variance**.  On the 34 rows
+   with no original to copy, 34 and 31 solved against [#162]'s 33 and 32.
+   On the 21 agda-algebras rows the original lemma's proof was in view (the
+   reading of [the results guide](../../docs/reading-the-results.md) § 4.3,
+   by one script over every arm) for 5
+   of `mcp` #184's 12 solves and 15 of `both` #184's 18, against 5 of 14 and
+   16 of 19 in [#162].  The script reads `arm162-mcp-1` as 5 where the guide
+   reports 6, and matches its other counts.
++  **Four `both` rows lost a verdict to a gate and type-check** with their
+   statements preserved: three preservation-gate rows (`stdlib-nat-mul-*`,
+   the edited `using` list the protocol refuses) and one isolation row
+   (`algebras-kernels-ker-con`, whose subject ran `find /`).  The `mcp` arm's
+   one gate row (`algebras-homs-mon-to-intohom`) left a hole.
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -291,3 +371,5 @@ new run gets a new run id.
 [#154]: https://github.com/formalverification/agda-native-air/issues/154
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#190]: https://github.com/formalverification/agda-native-air/pull/190

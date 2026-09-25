@@ -44,6 +44,12 @@
 --   each re-resolved for their full provenance chains.  The response's
 --   @recovered@ field names the route taken, so a client can tell a first-class
 --   answer from a reconstructed one.
+--
+--   exports_of answers one page of a module's surface ('pageExports', issue
+--   #184): a bounded number of members with their types, the names of the
+--   rest, and the count, because a library module's surface printed whole was
+--   23 KB an answer in the #162 arms.  The page is cut from Agda's full answer
+--   after the query, so paging changes what is sent, never what Agda was asked.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -72,6 +78,7 @@ module AgdaMCP.Tools.LiveQueries
     -- * Exposed for testing
   , candidateFrom
   , defSiteFrom
+  , pageExports
   ) where
 
 import Control.Exception (IOException, catch)
@@ -623,7 +630,8 @@ handleDefinitionOf lanes cfg0 p =
 
 -- | handleExportsOf: a module's public surface, from a file whose scope can
 -- name it (probed: the module must be in scope there; the empty string names
--- the file's own top-level module).
+-- the file's own top-level module).  Agda answers with the whole surface;
+-- the answer carries one page of it ('pageExports', issue #184).
 handleExportsOf
   :: InteractionLanes -> AgdaConfig -> ExportsOfParams
   -> IO (Either ToolFailure ExportsOfResult)
@@ -633,19 +641,45 @@ handleExportsOf lanes cfg0 p =
       Left loadMsg -> do
         meta <- liveMeta ctx
         pure . Right $ ExportsOfResult (eopModule p)
-          Nothing Nothing Nothing (Just (loadError loadMsg)) meta
+          Nothing Nothing Nothing Nothing (Just (loadError loadMsg)) meta
       Right _ ->
         runShaped ctx (cmdModuleContentsToplevel (eopModule p)) $ \resps -> do
           meta <- liveMeta ctx
           let surface = moduleSurfaceOf resps
+              paged   = (\(es, ms, _) -> pageExports (eopPage p) es ms) <$> surface
           pure . Right $ ExportsOfResult
             { exrModule    = eopModule p
-            , exrExports   = (\(es, _, _) -> es) <$> surface
-            , exrModules   = (\(_, ms, _) -> ms) <$> surface
+            , exrExports   = (\(es, _, _) -> es) <$> paged
+            , exrModules   = (\(_, ms, _) -> ms) <$> paged
             , exrTelescope = (\(_, _, tv) -> tv) =<< surface
+            , exrSlice     = (\(_, _, sl) -> sl) <$> paged
             , exrError     = case surface of
                 Just _  -> Nothing
                 Nothing -> Just . fromMaybe (opaqueAnswer "module" resps) $
                   queryError "module" resps
             , exrMeta      = meta
             }
+
+-- | pageExports: one page of a module's surface, and what the page leaves out.
+--
+-- The pattern is a case-insensitive substring of a member's name, as in
+-- @search_by_name@, and applies to both member kinds; the page (offset, then
+-- limit) applies to the value members only, since nested modules are names
+-- alone.  The slice counts the value members that match and names the ones
+-- after the page, so the answer at offset 0 is the whole matching surface by
+-- name, with the first page's types.
+pageExports
+  :: ExportsPage -> [ExportEntry] -> [Text] -> ([ExportEntry], [Text], ExportsSlice)
+pageExports pg entries modules = (page, filter matches modules, slice)
+  where
+    matches name = maybe True (\pat -> T.toLower pat `T.isInfixOf` T.toLower name)
+                         (epPattern pg)
+    kept         = filter (matches . exName) entries
+    fromOffset   = drop (epOffset pg) kept
+    (page, rest) = maybe (fromOffset, []) (`splitAt` fromOffset) (epLimit pg)
+    slice        = ExportsSlice
+      { esTotal      = length kept
+      , esNextOffset = if null rest then Nothing
+                       else Just (epOffset pg + length page)
+      , esRemaining  = map exName rest
+      }

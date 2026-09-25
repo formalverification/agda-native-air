@@ -48,6 +48,17 @@
 --   'FailPath' from issue #101) are new kinds rather than changed ones — so the
 --   schema version is unchanged.
 --
+--   Since issue #184 an answer carries that echo only on request.  The records
+--   below still hold all of it, and their 'ToJSON' instances still write all
+--   of it; what reaches the client is 'answerAt' of that JSON, which by
+--   default ('Lean') keeps the fields an answer is about and the two strings
+--   that name the tree it was answered in (@project.root@,
+--   @project.rootSource@), and drops the rest of the echo, which repeated
+--   itself identically on every call.  A @verbose: true@ argument
+--   ('Verbose') returns the JSON unchanged, so the full echo is exactly what
+--   it was before the cut, and a lean answer is a restriction of the verbose
+--   one by construction: no field is renamed or moved, only left out.
+--
 --   'CheckProjectResult' (issue #78) is the whole-project gate's response.  It
 --   carries the same @verdict@ / @command@ / @project@ echo as the per-file
 --   tools, plus what only a project run has to say: which gate was chosen and
@@ -95,6 +106,14 @@ module AgdaMCP.Types
   , ProjectContext (..)
   , ProjectMismatch (..)
   , mismatchMessage
+    -- * The lean answer (issue #184)
+  , Verbosity (..)
+  , answerAt
+  , leanAnswer
+  , echoOnlyKeys
+  , leanVerdictKeys
+  , leanProjectKeys
+  , leanLaneKeys
     -- * Requested-path failures (issue #101)
   , PathProblem (..)
   , PathFailure (..)
@@ -138,6 +157,9 @@ module AgdaMCP.Types
   , ResolveNameParams (..)
   , DefinitionOfParams (..)
   , ExportsOfParams (..)
+  , ExportsPage (..)
+  , defaultExportsLimit
+  , defaultExportsPage
     -- * Tool results (outbound) — live queries (issue #75)
   , LaneEcho (..)
   , LiveMeta (..)
@@ -146,6 +168,7 @@ module AgdaMCP.Types
   , ProvenanceEcho (..)
   , NameCandidate (..)
   , ExportEntry (..)
+  , ExportsSlice (..)
   , TypeOfResult (..)
   , NormalizeResult (..)
   , ResolveNameResult (..)
@@ -170,8 +193,11 @@ import Data.Aeson
   ( FromJSON (..), ToJSON (..), Value (..), (.:), (.:?), (.!=), (.=)
   , object, withObject, withText
   )
+import Data.Aeson.Key (Key)
+import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types (Object, Pair, Parser)
 import Data.Map.Strict (Map)
+import Data.Maybe (isJust)
 import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -555,6 +581,95 @@ instance ToJSON ProjectMismatch where
         , "librariesFile"  .= pmLibrariesFile m
         ]
     ]
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § The lean answer (issue #184)
+--
+-- The echo above was written into every answer, identically on every call:
+-- the #162 arms measured the server-only arm reading 3.6 times the bytes the
+-- shell-only arm read, with the output tokens within 9 % of each other, and
+-- most of a small answer was the echo (a one-line type_of answer was 3 KB).
+-- So by default an answer keeps what it is about and what names its tree, and
+-- the rest of the echo is sent only to a caller that asks for it.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | Verbosity: how much of the response echo an answer carries.  'Lean' is
+-- the default; 'Verbose' is a call's @verbose: true@.
+data Verbosity = Lean | Verbose
+  deriving (Eq, Show)
+
+-- | answerAt: a successful answer's JSON, at the requested verbosity.
+--
+-- Applied once, where the server writes an answer out, to every tool's
+-- answer; never to an @isError@ payload (a timeout, a wrong-tree refusal, a
+-- path refusal, a lane failure), where the echo is the diagnosis and the
+-- call is rare.  'Verbose' is the identity, which is what makes
+-- @verbose: true@ restore the full echo field for field.
+answerAt :: Verbosity -> Value -> Value
+answerAt Verbose = id
+answerAt Lean    = leanAnswer
+
+-- | leanAnswer: the answer without the echo it repeats on every call.
+--
+-- It works on the encoded answer rather than on each record, so that one rule
+-- covers every response type at once: a record that gains an echo key later is
+-- trimmed by the same rule, and no sibling can keep a field its sibling drops.
+-- Only top-level keys are touched, and only these:
+--
+--   * 'echoOnlyKeys' (@command@) is dropped: the resolved binary, argument
+--     vector, and working directory, which a client re-reads only when it
+--     doubts the call, and can then ask for.
+--   * @verdict@ keeps 'leanVerdictKeys': the exit code the verdict is derived
+--     from.  @equivalentTo@ (the command line again, as a string) and
+--     @meaning@ (one fixed sentence per tool, now stated once, in the tool's
+--     description) go.
+--   * @project@ keeps 'leanProjectKeys': the tree the answer was computed in
+--     and how it was decided, which is ADR 0002 decision 10's promise that
+--     every answer names its tree, plus @librariesFileMissing@, which appears
+--     only when the wrong-tree check could not run and is a finding when it
+--     does.  The registry's contents, the effective libraries and include
+--     paths, and the file's own library entry go.
+--   * @lane@ keeps 'leanLaneKeys': why this call did or did not re-load, and
+--     what the load cost.  The root (the same directory @project.root@
+--     names), the process id, the spawn flag, Agda's version, and the IOTCM
+--     wire lines go.
+--
+-- Everything else an answer carries is its payload or its verdict and is kept
+-- untouched: @success@, @status@, @exitCode@, @holes@, @diagnostics@,
+-- @timedOut@, @elapsedMs@, @checkedFromSource@, and every tool's own fields.
+-- A value that is not an object (the two corpus searches answer with a bare
+-- array) is returned as it is.
+leanAnswer :: Value -> Value
+leanAnswer (Object o) = Object (KM.mapMaybeWithKey trim o)
+  where
+    trim k v
+      | k `elem` echoOnlyKeys = Nothing
+      | otherwise             = Just (maybe v (`keepOnly` v) (lookup k kept))
+    kept =
+      [ ("verdict", leanVerdictKeys)
+      , ("project", leanProjectKeys)
+      , ("lane",    leanLaneKeys)
+      ]
+    keepOnly ks (Object inner) = Object (KM.filterWithKey (\k _ -> k `elem` ks) inner)
+    keepOnly _  v              = v
+leanAnswer v = v
+
+-- | The top-level echo keys a lean answer drops whole.
+echoOnlyKeys :: [Key]
+echoOnlyKeys = ["command"]
+
+-- | What a lean answer keeps of @verdict@.
+leanVerdictKeys :: [Key]
+leanVerdictKeys = ["exitCode"]
+
+-- | What a lean answer keeps of @project@.
+leanProjectKeys :: [Key]
+leanProjectKeys = ["root", "rootSource", "librariesFileMissing"]
+
+-- | What a lean answer keeps of @lane@.
+leanLaneKeys :: [Key]
+leanLaneKeys = ["load", "loadElapsedMs"]
 
 
 -- | PathProblem: why a path the client sent could not be used.
@@ -1626,12 +1741,61 @@ data ExportsOfParams = ExportsOfParams
   { eopFilePath :: FilePath
   , eopModule   :: Text
   , eopReload   :: Bool
+  , eopPage     :: ExportsPage  -- ^ Which members, and how many with types (#184).
   } deriving (Eq, Show)
 
 instance FromJSON ExportsOfParams where
   parseJSON = withObject "ExportsOfParams" $ \o ->
     ExportsOfParams <$> o .: "filePath" <*> o .: "module"
                     <*> (o .:? "reload" .!= False)
+                    <*> exportsPageOf o
+
+-- | ExportsPage: which slice of a module's value members an @exports_of@
+-- answer carries, with their types (issue #184).
+--
+-- A module's surface is a page of a library: the #162 arms' 13 calls listed
+-- 51 to 125 names each at about 250 characters of printed type per name,
+-- 23 KB an answer on average.  So the answer carries 'epLimit' members with
+-- their types and names the rest bare ('ExportsSlice'), the first page is the
+-- whole surface by name, and 'epPattern' narrows it to what the caller is
+-- looking for.  Nested modules are names only, and are filtered by the same
+-- pattern but never paged.
+data ExportsPage = ExportsPage
+  { epPattern :: Maybe Text  -- ^ Keep only the members whose name contains
+                             --   this, ignoring case (search_by_name's rule).
+  , epOffset  :: Int         -- ^ 0-based, into the members that match.
+  , epLimit   :: Maybe Int   -- ^ Members returned with their types;
+                             --   'Nothing' means every one.
+  } deriving (Eq, Show)
+
+-- | The members an @exports_of@ answer types by default.  Chosen from the
+-- #162 archive: 20 typed members and the rest by name average 6.0 K over
+-- those 13 answers, against 19.3 K for the whole surface.
+defaultExportsLimit :: Int
+defaultExportsLimit = 20
+
+-- | defaultExportsPage: the page a call that names none gets: every member,
+-- the first 'defaultExportsLimit' of them typed.
+defaultExportsPage :: ExportsPage
+defaultExportsPage = ExportsPage
+  { epPattern = Nothing, epOffset = 0, epLimit = Just defaultExportsLimit }
+
+-- | exportsPageOf: the page arguments, with their defaults.  An absent
+-- @limit@ is 'defaultExportsLimit' and a non-positive one means no limit,
+-- the spelling @maxDiagnostics@ uses; a negative @offset@ counts as 0.
+exportsPageOf :: Object -> Parser ExportsPage
+exportsPageOf o = do
+  pat <- o .:? "pattern"
+  off <- o .:? "offset" .!= 0
+  lim <- o .:? "limit"
+  pure defaultExportsPage
+    { epPattern = pat
+    , epOffset  = max 0 off
+    , epLimit   = case lim of
+        Nothing            -> epLimit defaultExportsPage
+        Just n | n <= 0    -> Nothing
+               | otherwise -> Just n
+    }
 
 -- | LaneEcho: what the interaction lane did to answer this call (issue #75's
 -- analogue of the batch lane's verdict/command echo, issue #72).
@@ -1768,6 +1932,14 @@ data ExportEntry = ExportEntry
 instance ToJSON ExportEntry where
   toJSON e = object ["name" .= exName e, "type" .= exTerm e]
 
+-- | ExportsSlice: what one @exports_of@ page leaves out, counted and named
+-- (issue #184), so a bounded answer is never mistaken for a short surface.
+data ExportsSlice = ExportsSlice
+  { esTotal      :: Int        -- ^ Value members matching the pattern, before the page.
+  , esNextOffset :: Maybe Int  -- ^ Where the next page starts, when members remain.
+  , esRemaining  :: [Text]     -- ^ The names of the members after this page, in order.
+  } deriving (Eq, Show)
+
 -- | Result of @type_of@.  Exactly one of @type@ / @error@ is present.
 data TypeOfResult = TypeOfResult
   { torExpr  :: Text
@@ -1867,11 +2039,17 @@ instance ToJSON DefinitionOfResult where
 -- in every probed shape — a parameterized module's binders arrive folded
 -- into each member's printed type instead — so it is passed through
 -- verbatim only if some future shape populates it, never dropped.
+--
+-- Since issue #184 @exports@ is one page of the surface ('ExportsPage'), and
+-- 'exrSlice' says what the page left out: @total@ and @truncated@ on every
+-- answer that has a surface, and @nextOffset@ with the @remaining@ names when
+-- members lie beyond the page.
 data ExportsOfResult = ExportsOfResult
   { exrModule    :: Text
   , exrExports   :: Maybe [ExportEntry]
   , exrModules   :: Maybe [Text]
   , exrTelescope :: Maybe Value
+  , exrSlice     :: Maybe ExportsSlice
   , exrError     :: Maybe LiveError
   , exrMeta      :: LiveMeta
   } deriving (Eq, Show)
@@ -1882,8 +2060,16 @@ instance ToJSON ExportsOfResult where
     <> maybe [] (\es -> ["exports"   .= es]) (exrExports r)
     <> maybe [] (\ms -> ["modules"   .= ms]) (exrModules r)
     <> maybe [] (\tv -> ["telescope" .= tv]) (exrTelescope r)
+    <> maybe [] slicePairs (exrSlice r)
     <> maybe [] (\e  -> ["error"     .= e]) (exrError r)
     <> liveMetaPairs (exrMeta r)
+    where
+      slicePairs s =
+        [ "total"     .= esTotal s
+        , "truncated" .= isJust (esNextOffset s)
+        ]
+        <> maybe [] (\n -> [ "nextOffset" .= n, "remaining" .= esRemaining s ])
+                 (esNextOffset s)
 
 -- | InteractionFailure: the interaction lane's process failed this call — it
 -- could not be spawned, it hit the timeout and was killed by the group

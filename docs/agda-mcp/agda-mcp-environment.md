@@ -94,7 +94,7 @@ The server now resolves the library context per call, in [`agda-mcp/src/AgdaMCP/
     +  the registry has **never heard of** the library — proceed, adding the library's own `include:` directories with `-i` so the file resolves in its own tree;
     +  there is **no `*.agda-lib`** above the file — proceed on the server-start configuration, and report `rootSource: "server-config"` so the caller knows that is what happened.
 
-Every response carries the outcome under `project`, and the refusal in case 3 looks like this — a structured `rootMismatch` object alongside the prose:
+Every response carries the outcome under `project` (its `root` and `rootSource`; since issue #184 the registry it was compared against, the libraries, and the include paths only on a call that passes `verbose: true`), and the refusal in case 3 looks like this, a structured `rootMismatch` object alongside the prose:
 
 ```
 agda-mcp: refusing to check /home/w/git/ualib/agda-algebras/branch-B/src/FLRP/Bridge.lagda.md

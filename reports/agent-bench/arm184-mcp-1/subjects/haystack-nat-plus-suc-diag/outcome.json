@@ -1,0 +1,91 @@
+{
+  "benchmarkId" : "haystack-nat-plus-suc-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-suc-diag",
+  "goal" : "∀ (m : ℕ) → m + suc m ≡ suc (m + m)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 22357,
+  "costUsd" : 0.0372356,
+  "tokens" : {
+    "input" : 8,
+    "output" : 773,
+    "cacheRead" : 80708,
+    "cacheCreation" : 3337
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1812,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics) on the final file, so the module type-checks with the hole filled by `Data.Nat.Properties.+-suc m m`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.05,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
