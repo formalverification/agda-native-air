@@ -154,9 +154,13 @@ GitHub Pages is not) and not a design one.
 
 Keep the batch lane too.  ADR 0002's two-lane policy exists because
 interaction mode is tolerant of open holes where batch Agda exits 42.  In the
-browser both lanes are available: the language server for interaction, and
-the plain `agda-opt.wasm` (31,524,760 bytes, 9,732,314 gzipped; no isolation
-needed; instantiated per check, about 40 ms) for the verdict of record.  With
+browser both lanes are available, from two builds: the language server for
+interaction, which is what the forked runtime ships (`als-2.8ext.wasm`, its
+`compiler/build-agda-wasm.sh` builds `exe:als` and nothing else), and for
+the verdict of record the plain `agda-opt.wasm` from `agda-web/agda-wasm-dist`
+(release `v2.8.0-ghc9.10.3-r0`; 31,524,760 bytes, 9,732,314 gzipped; no
+isolation needed; instantiated per check, about 40 ms), a second artifact
+the fork has to carry beside the first and does not have today.  With
 [#163]'s parity on the record (80 of 80 committed candidates; two constructed
 disagreements, a `where`-shaped candidate the lane refuses and a partial fill
 the two lanes read differently), the batch lane stays the authority for
@@ -174,8 +178,8 @@ and every one of them has a browser-side equivalent in the forked runtime:
 | `get_goal` | `Cmd_goal_type_context` on the lane |
 | `type_of`, `normalize` | `Cmd_infer`, `Cmd_compute` on the lane |
 | `resolve_name`, `exports_of` | `Cmd_why_in_scope`, `Cmd_show_module_contents` |
-| `fill_hole` | `Cmd_give` with the reload, parity per [#163]; batch for the record |
-| `check_file`, `get_diagnostics` | `Cmd_load` and its diagnostics; batch `agda` for the exit code |
+| `fill_hole` | `Cmd_give` with the reload, parity per [#163]; the batch wasm (the second build, § 1) for the record |
+| `check_file`, `get_diagnostics` | `Cmd_load` and its diagnostics; the batch wasm (the second build, § 1) for the exit code |
 | `search_by_name`, `search_by_type` | queries over a mounted corpus JSONL |
 | `search_in_scope` | the corpus query, then the file's import surface and `Cmd_infer` on the lane to type each accepted rendering in that scope, the three steps the native tool takes; the corpus alone answers neither what the file can name nor what Agda says its type is |
 | `get_dependencies` | the row's `dependencies` (and the one-hop neighborhood with `expand`) over the mounted corpus JSONL, heuristic as the corpus cards say; exact body references are a separate field the published corpora do not carry (§ 4) |
