@@ -157,8 +157,12 @@ interaction mode is tolerant of open holes where batch Agda exits 42.  In the
 browser both lanes are available: the language server for interaction, and
 the plain `agda-opt.wasm` (31,524,760 bytes, 9,732,314 gzipped; no isolation
 needed; instantiated per check, about 40 ms) for the verdict of record.  With
-[#163]'s parity on the record, the batch lane is for commits and claims, and
-the lane judges everything in between.
+[#163]'s parity on the record (80 of 80 committed candidates; two constructed
+disagreements, a `where`-shaped candidate the lane refuses and a partial fill
+the two lanes read differently), the batch lane stays the authority for
+commits and claims, and the lane's answer is exploratory: it steers the next
+edit, and a `where`-shaped candidate or a partial fill goes to batch before
+anything is claimed.
 
 ### 2.  The browser is the tool server
 
@@ -173,6 +177,7 @@ and every one of them has a browser-side equivalent in the forked runtime:
 | `fill_hole` | `Cmd_give` with the reload, parity per [#163]; batch for the record |
 | `check_file`, `get_diagnostics` | `Cmd_load` and its diagnostics; batch `agda` for the exit code |
 | `search_by_name`, `search_by_type`, `search_in_scope` | queries over a mounted corpus JSONL |
+| `get_dependencies` | the row's `bodyRefs` and `dependencies` over the mounted corpus JSONL, with the corpus cards' caveat that the tokens are heuristic |
 | `definition_of` | `Cmd_why_in_scope`, then **the source itself**, which is mounted |
 
 The last row is the one [#162] decided.  The measured gap in the native tool,
@@ -190,10 +195,16 @@ client-side, with no backend.
 
 ### 3.  The model, and the rule that does not change
 
-+  **Default**: a frontier model through the user's own key, called from the
-   page, behind a consent gate that says exactly what leaves the browser and
-   when.  This is the one place source leaves the tab, and it is the
-   configuration the agent-in-the-loop measurements were made with.
++  **Default**: a frontier model through the user's own key, behind a consent
+   gate that says exactly what leaves the browser and when.  The key is a
+   secret inside a page that also loads plugins, so it never lives in the
+   page's own JavaScript realm: a provider frame on its own origin (or, where
+   a local process is acceptable, a bridge outside the browser) holds it and
+   forwards requests and answers; plugins run in sandboxed frames or workers
+   with no path to it; and the threat, a script on the workbench's origin
+   reading or reusing the key, is stated in the gate's own words.  This is
+   the one place source leaves the tab, and it is the configuration the
+   agent-in-the-loop measurements were made with.
 +  **Optional**: a local model in the browser, as a plugin, labeled
    unmeasured.  The evidence for the tool contract is for frontier models
    only; Milestone 4's local-model work ([#27], [#28], [#29]) is the
@@ -215,17 +226,29 @@ rather than an analogy.  Under propositions-as-types, a natural-deduction
 derivation *is* the elaborated proof term: an application is an elimination,
 a lambda is an introduction, a constructor is an introduction, a case split
 is the elimination of an inductive type, and an open hole is an open leaf.
-`agda-json` already exports that term, with the type at every node.  So a
-Gentzen-style diagram of an Agda proof is a rendering of the checked term with
-the judgment at each node, and it cannot drift from the proof, because it is
-generated from it.
+`agda-json` exports the definition's type as a structural AST (`typeAst`),
+the proof term only as printed text (`body`), and the names the term refers
+to (`bodyRefs`); no proof-term AST and no type at each node exist today.  So
+the proof view has a prerequisite: the clause bodies exported through the
+encoder the type already uses, and a typing pass that records the judgment
+at each node, which agda-strux can produce because it links Agda as a
+library.  With that export, a Gentzen-style diagram of an Agda proof is a
+rendering of the checked term with the judgment at each node, and it cannot
+drift from the proof, because it is generated from it; without it, the
+judgments exist only at open leaves, where the interaction protocol reports
+the goal.
 
 Two levels, one source:
 
-+  **The theory**.  Nodes are definitions, edges are "uses", read off
-   `bodyRefs` and the corpus `dependencies`; theories are the module graph.
-   This is the view that lets one mind hold a development of many lemmas.  It
-   needs no Agda to draw: the corpora carry it for 68,699 definitions today.
++  **The theory**.  Nodes are definitions; edges are "uses", of three
+   provenances the view labels: exact, from `bodyRefs` (read from internal
+   terms); approximate, from the corpus `dependencies` (tokens of the printed
+   type, unresolved tokens and name collisions included, the caveat every
+   corpus card states); and module edges from Agda's `--dependency-graph`,
+   which is a load-order graph rather than the import relation.  This is the
+   view that lets one mind hold a development of many lemmas.  It needs no
+   Agda to draw: the corpora carry it for 68,699 definitions today, the exact
+   edges included.
 +  **The proof**.  One definition's term as a derivation tree, types at the
    nodes, holes as open leaves.  A reference to a lemma is a leaf that links
    back out to that lemma's node in the theory view, and, because [#162] says
@@ -292,8 +315,9 @@ dependency index are the template:
 +  **pins**: the Agda version, the library commit, the digest; exactly what
    the dataset cards and the agent-bench `protocol.json` record today;
 +  **what it mounts**: library ZIPs in the archive format the runtime defines,
-   with a per-closure split chosen by the dependency graph so a visitor
-   fetches only what the open module needs;
+   with a per-closure split chosen by a verified closure index (the
+   per-root node set, below under "What is hard"), never by the corpus
+   module graph, so a visitor fetches only what the open module needs;
 +  **what it registers**: tools and search indices;
 +  **what it costs**: bytes, so the consent gate can say "install
    agda-algebras: N MB, from this origin" and mean it.
@@ -308,9 +332,15 @@ corpus.
 ## What is hard
 
 +  **Interfaces at scale**.  Per-closure archives are the only known answer,
-   and they need the dependency graph the corpus already has.  Measure before
-   promising: the closure of one benchmark obligation is 5.9 MB gzipped after
-   the prelude fix ([#168]), and agda-algebras is larger by an order.
+   and the corpus's module graph is not the index for them: it is a
+   load-order graph whose edges under-count imports, so a closure traversed
+   from it can miss an interface.  The index is per root: the node set
+   `agda --dependency-graph` writes for that root (complete for what Agda
+   loaded; the method [`docs/import-closure.md`] records), or the import
+   lists the interfaces themselves carry, verified by a cold check that
+   mounts only the archive.  Measure before promising: the closure of one
+   benchmark obligation is 5.9 MB gzipped after the prelude fix ([#168]), and
+   agda-algebras is larger by an order.
 +  **Rendering a real term**.  Elision and folding are a research-grade
    interface problem.  Start read-only and small.
 +  **Source leaving the tab**.  Only to the model provider, only by consent,
