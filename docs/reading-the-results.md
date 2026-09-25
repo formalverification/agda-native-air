@@ -17,8 +17,11 @@
 
 ## 1.  The four instruments
 
-Everything measured here comes from one of four instruments.  The first has no
-model in it at all; the other three are one model under three configurations.
+Every solve count in this repository comes from one of four instruments.  The
+first has no model in it at all; the other three are one model under three
+configurations.  Two auxiliary instruments measure parts and never solves: the
+recall instrument (§ 4.1), which scores a ranker against known targets, and
+the lane parity replay (§ 4.4), which compares two judgments of one candidate.
 
 ### 1.1  The loop
 
@@ -63,13 +66,20 @@ This is the control: the tools' absence.
 Both instruments at once.  It answers a question the other two cannot: offered
 a choice, which does the model reach for, and for what.
 
-### 1.5  One judge for all four
+### 1.5  One judge for the three arms, and the loop's own
 
-Every verdict about a final file, on every instrument, is the same batch
-`agda` invocation (`GoldVerifier.agdaCommand`, with `--safe`), plus the
-`agda-strux` extractor for the statement and the references.  So "batch
-`agda`" appears in two roles: it is always the **judge**, and in the shell
-arms it is also the model's **tool**.  The judge favors no arm.
+Every verdict about an agent's final file, on all three arms, is the same
+batch `agda` invocation (`GoldVerifier.agdaCommand`, with `--safe`), plus the
+`agda-strux` extractor for the statement and the references.  The loop's
+claim is its own: solved means the obligation set is empty *and* a final
+batch `check_file` through the server passed, under the loop's server flags
+rather than the judge's, with the target exclusion (§ 2) standing where the
+restated rule stands for the agents, and with no statement gate because the
+loop can only ever edit the hole ([ADR 0001] § 3).  So "batch `agda`" appears
+in two roles: it is always the **judge**, and in the shell arms it is also
+the model's **tool**.  The judge favors no arm; and the loop's numbers and
+the agents' are not judged alike, one more reason the first is no baseline
+for the second.
 
 ## 2.  Vocabulary
 
@@ -123,15 +133,16 @@ arms it is also the model's **tool**.  The judge favors no arm.
 `agda-mcp` offers fourteen tools ([`agda-mcp/README.md`]).  For reading
 results, what matters is what each one runs and what it returns.
 
-**Verdict tools** run a batch `agda` process and answer with its exit code.
-They are the only tools whose answer is a verdict about a file.
+**Verdict tools** run a batch process (`agda`, or for `check_project` the
+project's own gate) and answer from its exit code.  They are the only tools
+whose answer is a verdict about a file or a project.
 
 | tool | runs | returns |
 |---|---|---|
 | `check_file` | batch `agda` on the file | `success` iff exit 0, diagnostics, holes |
-| `fill_hole` | batch `agda` on a copy with the candidate spliced in | `status` ok / type_error / timeout / crash |
+| `fill_hole` | batch `agda` on the file with the candidate spliced over the hole, patched in place and restored afterwards | `status` ok / type_error / timeout / crash |
 | `get_diagnostics` | the same batch check, summarized | counts and hole positions |
-| `check_project` | the project's own gate | its exit code, unaltered |
+| `check_project` | the project's gate: a named `make` target, `--check-command`, the nearest Makefile's `check`, or `agda` on `Everything` | `success` iff exit 0 *and* inside the bound *and* no failure evidence in the output (`maskedFailure`); the exit code echoed, never reinterpreted |
 
 **Knowledge tools** answer questions and produce no verdict.  Two kinds, by
 what answers them:
@@ -319,20 +330,22 @@ a `transcribed` gate is the fix, § 6.)
 
 +  **Solved, tools against no tools: a loss on the count; not on
    construction**.  50 with a shell, 47 with the server.  Three rows, on one
-   seed of one model, which is within the run-to-run variance the two Opus
-   seeds showed (0 rows, 13 turns); and on the agda-algebras rows, where the
-   whole difference sits, the `shell` arm had the original's proof in view
-   for 16 of its 18 solves.
+   seed of one model.  The archive's only variance measurement is two Opus
+   seeds, which differed by 0 rows and 13 turns; there is no Sonnet variance
+   measurement, so nothing bounds a three-row difference on one seed.  And
+   on the agda-algebras rows, where the whole difference sits, the `shell`
+   arm had the original's proof in view for 16 of its 18 solves.
 +  **Restated, tools against no tools: not a loss; a loophole**.  0 with a
    shell, 6 with the server, 8 in the archive.  The zero is transcription,
    not construction: the rows the archive cited, the `shell` arm copied,
    which the rule cannot see.  The honest comparison for this column is
    between arms that cannot read the original, and [#162] has none.
 +  **Cost, tools against no tools: a loss, diagnosed**.  USD 5.28 against
-   2.88 with **equal output tokens**: the model wrote the same amount and
-   read 3.6 times more, because the tools' answers carry echo and boilerplate
-   (a `type_of` answer is 3 KB for one line of type; `exports_of` averages
-   23 KB).  Tracked as [#184]; a lean re-run is the test.
+   2.88 with output tokens within 9 % (76,732 against 70,403) and **3.6 times
+   the bytes read from tool results** (929,386 against 259,520), because the
+   tools' answers carry echo and boilerplate (a `type_of` answer is 3 KB for
+   one line of type; `exports_of` averages 23 KB).  Tracked as [#184]; a lean
+   re-run is the test.
 +  **The verdict tool: a win, by revealed preference**.  Offered both, the
    model took **every one of its 55 verdicts from `check_file`** and never
    ran `agda` by hand.
@@ -347,8 +360,13 @@ a `transcribed` gate is the fix, § 6.)
 batch `fill_hole`, over 80 distinct (obligation, candidate) pairs drawn from
 the archived agent probes and the golds, with and without `--safe`:
 **0 disagreements**; 2 on the 19 deliberate cases, both explained; rows under
-[`reports/lane-give-parity/`], which land with PR [#174].  A give answers in 1.4 to 4.6 ms and the reload
-that puts the hole back in about 220 ms, against 2.6 s for a batch judgment.
+[`reports/lane-give-parity/`], which land with PR [#174].  In that run's
+own session a give is 1.6 ms on a stdlib file and 9.7 ms on an agda-algebras
+file; a give plus the reload an accepted candidate owes is 103 ms and 402 ms,
+against 648 ms and 4,873 ms for the batch `fill_hole` on the same files: 6×
+and 12× for an accepted candidate, 328× and 1,419× for a refused one, which
+owes no reload.  The issue's earlier figures (1.4 to 4.6 ms, about 220 ms,
+2.6 s) predate PR [#173]'s cut of the import closure, which moved both sides.
 This measures the server's own machinery; it says nothing about agents, and
 it is a win for a lane judgment on the record.  One fact from it to carry:
 for 16 of the 55 obligations the committed gold is a multi-clause strategy,
@@ -428,6 +446,7 @@ not a term, so no hole-filling judgment of any kind can express it.
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#163]: https://github.com/formalverification/agda-native-air/issues/163
+[#173]: https://github.com/formalverification/agda-native-air/pull/173
 [#174]: https://github.com/formalverification/agda-native-air/pull/174
 [#175]: https://github.com/formalverification/agda-native-air/pull/175
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
