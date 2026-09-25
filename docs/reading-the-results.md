@@ -108,6 +108,13 @@ for the second.
    the loop's target exclusion.  The rule reads the body's *references*, so
    it catches a body that cites the lemma and not one that transcribes the
    lemma's own proof; § 4.3 measures how often that happened.
++  **Original in view**: on a row whose index entry names the library lemma
+   it restates (every agda-algebras row), a line of that lemma's own proof
+   came back in one of the subject's tool answers before its last edit of
+   the work file.  A call that names the lemma's file without showing its
+   proof does not count.  The judge reports it per row (the `original` block
+   of `outcome.json`, `null` on a row with no original) and per slice
+   (`solvedOriginalInView`), and no verdict depends on it ([#188]).
 +  **Gate**: one of the judge's named refusals (`preservation`, `escape`,
    `holes`, `typecheck`, `isolation`); a row that fails one is neither solved
    nor restated, and the outcome names the gate.
@@ -303,30 +310,44 @@ one a library-source read; `agda` run on the shell: **never**.
 **What the readable sources did**.  Every agda-algebras obligation restates
 a lemma the library already proves, and [#162] made the libraries' sources
 readable on every arm so that the arms would be comparable.  The archived
-arms had refused those reads as a confinement side effect.  Reading each
-transcript for the original's defining file (a read of it that succeeded, or
-a line of its proof in any tool's result) before the subject's last edit of
-the work file gives the following, over the 21 agda-algebras rows:
+arms had refused those reads as a confinement side effect.  The judge's
+`original` column (§ 2, [#188]) reads each transcript for the lemma's own
+proof: whether a line of it came back in one of the subject's tool answers
+before its last edit of the work file.  Over the 21 agda-algebras rows:
 
-| arm | run id | solved | restated | original's proof in view before the last edit | reads refused |
+| arm | run id | solved | restated | solved with the original's proof in view | reads of the original refused |
 |---|---|---|---|---|---|
 | archive `mcp`, Sonnet | `agent-sonnet5-1` | 13 | 8 | **0** | 2 |
 | archive `mcp`, Opus | `agent-opus5-1` | 20 | 1 | **0** | 2 |
 | archive `mcp`, Opus | `agent-opus5-2` | 20 | 1 | **0** | 4 |
-| `shell` | `arm162-shell-1` | 18 | 0 | **16** | 0 |
-| `mcp` | `arm162-mcp-1` | 14 | 6 | 6 | 0 |
+| `shell` | `arm162-shell-1` | 18 | 0 | **15** | 0 |
+| `mcp` | `arm162-mcp-1` | 14 | 6 | 4 | 0 |
 | `both` | `arm162-both-1` | 19 | 2 | **16** | 0 |
+| `mcp`, lean answers | `arm184-mcp-1` | 12 | 8 | 3 | 0 |
+| `both`, lean answers | `arm184-both-1` | 18 | 2 | **14** | 0 |
 
 Six of the eight rows the archive restated are `shell` solves written with
-the original in view, and seven `shell` bodies are the library's own after
-renaming the lemma (two of them one-line proofs every arm writes the same
-way).  The `mon→hom` example below is one: `IsMon.HomReduct (proj₂ m)` is
-the library's `IsMon.HomReduct (proj₂ h)`.  The restated rule reads
-references, so a transcribed proof passes it.  The archived arms are
+the original in view.  The `shell` arm's three solves without it are the
+three one-line proofs every arm writes the same way (`lift∼lower = refl`,
+`lower∼lift = refl`, `π i = λ x → x i`); among the fifteen with it,
+`⊙-hom′` and the two lines of `≤-trans-≅′` are the library's own bodies but
+for the prime on the name, and `mon→hom′ m = IsMon.HomReduct (proj₂ m)` is
+the library's `mon→hom h = IsMon.HomReduct (proj₂ h)`.  The restated rule
+reads references, so a transcribed proof passes it.  The archived arms are
 therefore the only construction measurements on these rows, and [#162]'s
-agda-algebras columns measure, in part, access to the disk.  (The
-transcript reading is a script over the archive, not part of the judge;
-a `transcribed` gate is the fix, § 6.)
+agda-algebras columns measure, in part, access to the disk.
+
+The column counts the proof shown, not the file opened.  A call that names
+the original's file without showing the proof does not count: a
+`definition_of` answer, which says where and not what; a Read of a range
+that stops short of the proof; a grep for another name in the file.  That
+is why the counts sit below the script readings they replace (16, 6, and 16
+on the three [#162] arms, 5 and 15 on the two [#184] arms).  Six solves
+differ, one `definition_of` answer on `arm162-mcp-1` and five reads that
+stopped short of the proof, and each of the six bodies is either
+`π i = λ x → x i` or built from the names the fixture's `using` list
+supplies.  Whether a solve with the original in view should count as solved
+at all is a decision not yet taken (§ 6).
 
 **Reading this, number by number**.
 
@@ -336,7 +357,7 @@ a `transcribed` gate is the fix, § 6.)
    seeds, which differed by 0 rows and 13 turns; there is no Sonnet variance
    measurement, so nothing bounds a three-row difference on one seed.  And
    on the agda-algebras rows, where the whole difference sits, the `shell`
-   arm had the original's proof in view for 16 of its 18 solves.
+   arm had the original's proof in view for 15 of its 18 solves.
 +  **Restated, tools against no tools: not a loss; a loophole**.  0 with a
    shell, 6 with the server, 8 in the archive.  The zero is transcription,
    not construction: the rows the archive cited, the `shell` arm copied,
@@ -359,10 +380,10 @@ a `transcribed` gate is the fix, § 6.)
    arm re-reads 22 to 25 thousand cached tokens a turn against the shell
    arm's 10 thousand, which is the fourteen tools' descriptions and schemas
    (68,391 characters before [#190], 77,603 after).  The tool surface is
-   the next variable, with its own re-run.  The re-run arms read 5 of 12 and
-   15 of 18 agda-algebras solves with the original in view by the PR's own
-   script, which agrees with the table above on every arm but
-   `arm162-mcp-1` (5 against 6); [#188] reconciles the two.
+   the next variable, with its own re-run.  The judge's `original` column
+   has the original in view for 3 of the `mcp` re-run's 12 agda-algebras
+   solves and 14 of the `both` re-run's 18, against 4 of 14 and 16 of 19 in
+   [#162].
 +  **The verdict tool: a win, by revealed preference**.  Offered both, the
    model took **every one of its 55 verdicts from `check_file`** and never
    ran `agda` by hand.
@@ -420,9 +441,11 @@ not a term, so no hole-filling judgment of any kind can express it.
    the tools with their absence on rows the subject cannot copy.  The
    control is a re-run with the originals' defining modules hidden from
    every arm, on the file system rather than by the client's permission
-   rules (a shell reads anything), and a judge gate that reads the transcript
-   for the original's proof and names the row `transcribed`.  A hard tier
-   whose statements have no proof on disk needs neither.
+   rules (a shell reads anything).  Until then the judge's `original` column
+   says which solves had the original's proof in view (§ 4.3), and a
+   `transcribed` gate that refused them is a decision not yet taken
+   ([#188]).  A hard tier whose statements have no proof on disk needs
+   neither.
 +  **Small and local models** ([#27], [#28], [#29]), where a shell is least
    usable and structured verdicts plausibly matter most.
 +  **Opus with a shell**.  The control was run on Sonnet only.

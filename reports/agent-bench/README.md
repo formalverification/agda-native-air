@@ -79,11 +79,15 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    gate but whose definition refers to the library's own lemma for the
    statement is *restated*, in its own column, never solved; the reference is
    the extractor's `bodyRefs` (Agda's internal terms, closed over the file's
-   own helpers) and the original is the index row's `restates:` tag.  The
-   server's interaction lane plays no part in the judge: a printed type is
-   not a statement.  The arms were first judged by a textual reading and
-   re-judged under these gates to the same verdict on every row; the
-   archived reports and per-subject outcomes are the re-judge's.
+   own helpers) and the original is the index row's `restates:` tag.  Beside
+   the verdict, and changing none, the judge reports whether that original's
+   own proof was in view before the subject's last edit (the `original`
+   column, [#188]), since a body that transcribes the proof cites nothing the
+   restated rule can see.  The server's interaction lane plays no part in
+   the judge: a printed type is not a statement.  The arms were first judged
+   by a textual reading and re-judged under these gates to the same verdict
+   on every row; the archived reports and per-subject outcomes are the
+   re-judge's.
    `JudgeSpec` and `AgentBenchIntegrationSpec` pin the rules and the live
    gates.
 +  **Isolation, verified per subject**.  From each transcript: the server
@@ -127,13 +131,13 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 
 | path | contents |
 |---|---|
-| `report.json` | the run: `config` (model, caps, every client flag, the prompts' digests, the client version), `corpora` (paths and digests), `totals`, `perTier`, `perStratum`, `perTool`, and one `outcomes[]` entry per obligation (`solved`, `restated`, `gate`, `restatementEvidence`, `addedImports`, `terminal`, `turns`, `toolCalls`, `wallMs`, `costUsd`, `tokens`, `isolation`, `agdaExit`) |
+| `report.json` | the run: `config` (model, caps, every client flag, the prompts' digests, the client version), `corpora` (paths and digests), `totals`, `perTier`, `perStratum` (each with `solved`, `restated`, and `solvedOriginalInView`, which is `null` on a slice with no original), `perTool`, and one `outcomes[]` entry per obligation (`solved`, `restated`, `gate`, `restatementEvidence`, `original`, `addedImports`, `terminal`, `turns`, `toolCalls`, `wallMs`, `costUsd`, `tokens`, `isolation`, `agdaExit`) |
 | `results.jsonl` | one `eval-proof-completion.v0` attempt row per `fill_hole` the subject probed |
 | `fixtures.jsonl` | one `eval-proof-completion.v0` fixture row per obligation, plus `restated`, `gate`, and `terminal` |
 | `prompts/` | the system prompt and the user-prompt template, verbatim |
 | `subjects/<id>/transcript.jsonl` | the client's `stream-json` output: every tool call with its result, the model's text, the init and result records |
 | `subjects/<id>/final/<Stem>.agda` | the file as the subject left it, which is what was judged |
-| `subjects/<id>/outcome.json` | the judge's verdict and the transcript audit for that row |
+| `subjects/<id>/outcome.json` | the judge's verdict and the transcript audit for that row, with its `original` block: the restated lemma's file, whether its proof was in view before the last edit (`inView`, `how`, `at`, the call's index from 0), and the successful and refused calls that named the file (`reads`, `refusedReads`); `null` on a row with no original |
 | `subjects/<id>/subject.json` | the arm the subject ran under and the roots its tools and commands were allowed, which is what a re-judge audits against |
 | `subjects/<id>/mcp.json`, `prompt.txt`, `system-prompt.txt`, `run.json` | the subject's server configuration (an arm with the server), its two rendered prompts, and how its process ended |
 | `subjects/<id>/stderr.log` | the client's standard error, archived when it is not empty; this is what an anomaly message means by "see stderr.log" |
@@ -146,22 +150,32 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 
 ## The runs
 
-| run id | arm | model | date | obligations | solved | restated | anomalies | turns | tool calls | cost (USD, list) | quoted in |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `smoke-haiku-1` | `mcp` | `claude-haiku-4-5-20251001` | 2026-09-15 | 1 | 1 | 0 | 0 | 4 | 3 | 0.04 | the isolation verification on [#154] |
-| `cost-sonnet-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | 2 | 1 | 1 | 0 | 10 | 8 | 0.28 | the cost estimate on [#154] |
-| `cost-opus-1` | `mcp` | `claude-opus-5` | 2026-09-15 | 2 | 2 | 0 | 0 | 12 | 10 | 0.47 | the cost estimate on [#154] |
-| `agent-sonnet5-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | 55 | 46 | 8 | 0 | 327 | 272 | 4.62 | ADR 0001 § 9, README, [#154] |
-| `agent-opus5-1` | `mcp` | `claude-opus-5` | 2026-09-15 | 55 | 54 | 1 | 0 | 325 | 270 | 9.14 | ADR 0001 § 9, README, [#154] |
-| `agent-opus5-2` | `mcp` | `claude-opus-5` (second seed) | 2026-09-15 | 55 | 54 | 1 | 0 | 338 | 283 | 9.46 | ADR 0001 § 9, [#154] |
-| `arm162-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-21 | 55 | 50 | 0 | 0 | 308 | 253 | 2.88 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
-| `arm162-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-21 | 55 | 47 | 6 | 0 | 342 | 287 | 5.28 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
-| `arm162-both-1` | `both` | `claude-sonnet-5` | 2026-09-21 | 55 | 51 | 2 | 0 | 327 | 272 | 4.25 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
-| `iso184-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 1 | 1 | 0 | 0 | 4 | 3 | 0.11 | the isolation check for client 2.1.282 on [#184] |
-| `cost184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | 0 | 10 | 8 | 0.12 | the cost pair on [#184] |
-| `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
-| `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 55 | 46 | 8 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
-| `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 55 | 49 | 2 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
+| run id | arm | model | date | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `smoke-haiku-1` | `mcp` | `claude-haiku-4-5-20251001` | 2026-09-15 | 1 | 1 | 0 | not re-judged | 0 | 4 | 3 | 0.04 | the isolation verification on [#154] |
+| `cost-sonnet-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | 2 | 1 | 1 | not re-judged | 0 | 10 | 8 | 0.28 | the cost estimate on [#154] |
+| `cost-opus-1` | `mcp` | `claude-opus-5` | 2026-09-15 | 2 | 2 | 0 | not re-judged | 0 | 12 | 10 | 0.47 | the cost estimate on [#154] |
+| `agent-sonnet5-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | 55 | 46 | 8 | 0 of 13 | 0 | 327 | 272 | 4.62 | ADR 0001 § 9, README, [#154] |
+| `agent-opus5-1` | `mcp` | `claude-opus-5` | 2026-09-15 | 55 | 54 | 1 | 0 of 20 | 0 | 325 | 270 | 9.14 | ADR 0001 § 9, README, [#154] |
+| `agent-opus5-2` | `mcp` | `claude-opus-5` (second seed) | 2026-09-15 | 55 | 54 | 1 | 0 of 20 | 0 | 338 | 283 | 9.46 | ADR 0001 § 9, [#154] |
+| `arm162-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-21 | 55 | 50 | 0 | 15 of 18 | 0 | 308 | 253 | 2.88 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `arm162-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-21 | 55 | 47 | 6 | 4 of 14 | 0 | 342 | 287 | 5.28 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `arm162-both-1` | `both` | `claude-sonnet-5` | 2026-09-21 | 55 | 51 | 2 | 16 of 19 | 0 | 327 | 272 | 4.25 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `iso184-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 1 | 1 | 0 | not re-judged | 0 | 4 | 3 | 0.11 | the isolation check for client 2.1.282 on [#184] |
+| `cost184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | not re-judged | 0 | 10 | 8 | 0.12 | the cost pair on [#184] |
+| `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | not re-judged | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
+| `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 55 | 46 | 8 | 3 of 12 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
+| `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 55 | 49 | 2 | 14 of 18 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
+
+The column "original in view" is the judge's `original` reading ([#188]):
+of the run's agda-algebras solves, the number whose restated lemma's own
+proof came back in one of the subject's tool answers before its last edit of
+the work file (a call that names the lemma's file without showing its proof
+does not count).  It is a column, not a gate: no verdict depends on it.  The
+eight full arms were re-judged on copies to add it, with every verdict as
+archived; the six subset runs were not, since three of them predate the
+judge's Agda-based gates and a re-judge would rewrite more than this column,
+and none has more than one agda-algebras row.
 
 Per stratum, solved and restated (first arms), beside the loop's fixed space
 and retrieval under exclusion on `main`:
@@ -207,8 +221,14 @@ the `mcp` arm and 0 in the `both` arm; `search_by_name` 18 and 1; `type_of` 34
 and 11), and `check_file` does not move (56 and 57).  The restated column
 follows: the `shell` arm consulted library sources 82 times against the `mcp`
 arm's 13, because `grep` over a tree needs no prior knowledge of where a thing
-is, and a subject that reads the source writes the construction where one that
-queries the name cites the name.
+is, and a subject that reads the source copies the proof where one that
+queries the name cites the name.  The judge's `original` column ([#188]) has
+the restated lemma's own proof in view before the last edit for 15 of the
+`shell` arm's 18 agda-algebras solves, 4 of the `mcp` arm's 14, and 16 of the
+`both` arm's 19, against none of the archived arms', whose reads of the
+library were refused; `⊙-hom′` and the two lines of `≤-trans-≅′` are the
+library's own bodies but for the prime on the name.  The restated rule reads
+references, so it refuses the citation and passes the copy.
 
 Three protocol differences from the archived arms, all recorded and none of
 them measurable in the verdicts: the server presents fourteen tools rather
@@ -299,11 +319,10 @@ Three things to read beside the table.
 +  **The solves did not move beyond run-to-run variance**.  On the 34 rows
    with no original to copy, 34 and 31 solved against [#162]'s 33 and 32.
    On the 21 agda-algebras rows the original lemma's proof was in view (the
-   reading of [the results guide](../../docs/reading-the-results.md) § 4.3,
-   by one script over every arm) for 5
-   of `mcp` #184's 12 solves and 15 of `both` #184's 18, against 5 of 14 and
-   16 of 19 in [#162].  The script reads `arm162-mcp-1` as 5 where the guide
-   reports 6, and matches its other counts.
+   judge's `original` column, [#188], read in
+   [the results guide](../../docs/reading-the-results.md) § 4.3) for 3 of
+   the [#184] `mcp` arm's 12 solves and 14 of its `both` arm's 18, against 4
+   of 14 and 16 of 19 in [#162].
 +  **Four `both` rows lost a verdict to a gate and type-check** with their
    statements preserved: three preservation-gate rows (`stdlib-nat-mul-*`,
    the edited `using` list the protocol refuses) and one isolation row
@@ -347,11 +366,13 @@ A re-judge does not need `AGENT_BENCH_ARM`: each subject's `subject.json`
 names the arm it ran under and the roots it was given, so the audit is the
 run's own (verified on a copy of `arm162-shell-1`, re-judged with the flag at
 its `mcp` default: 50 solved, 0 restated, four isolation and one preservation
-gate, and all 55 rows identical including the `via` columns).  An archive made
-before that record existed is the `mcp` arm confined to the work directory its
-server config names, which is what those runs were; a copy of
-`agent-sonnet5-1` re-judges to 46 solved, 8 restated, 0 anomalies, 327 turns
-and 272 tool calls, every per-row verdict as archived.
+gate, and all 55 rows identical including the `via` columns).  The report
+keeps the run's own arm in its `config` too; until [#188] a re-judge stamped
+the operator's there, which relabeled a shell arm `mcp` though no row changed.
+An archive made before that record existed is the `mcp` arm confined to the
+work directory its server config names, which is what those runs were; a copy
+of `agent-sonnet5-1` re-judges to 46 solved, 8 restated, 0 anomalies, 327
+turns and 272 tool calls, every per-row verdict as archived.
 
 `make agent-bench-rejudge AGENT_BENCH_RUN_ID=<run-id>` judges an archived run
 again from its final files and its own archived prompts without a model call
@@ -372,4 +393,5 @@ new run gets a new run id.
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
