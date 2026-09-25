@@ -193,8 +193,10 @@ are what a client re-reads only when it doubts a call, and can then ask for.
 +  **A failure keeps its whole echo**.  An error response (a timeout, a
    wrong-tree refusal, a path refusal, a lane failure) carries its full echo
    whatever was asked, since there the echo is the diagnosis.
-+  **A `verbose` that is not a boolean is refused by name**, rather than
-   quietly answered lean.
++  **A `verbose` that is neither a boolean nor null is refused by name**,
+   rather than quietly answered lean.  Null means absent, as it does for
+   every optional argument this server takes (`reload`, `limit`,
+   `maxDiagnostics`).
 
 Two properties are contractual, not incidental.
 

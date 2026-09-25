@@ -238,10 +238,10 @@ an agent reads.
 ## The lean-answer arms (2026-09-25, [#184])
 
 The `mcp` and `both` arms of [#162], run again with one change to the
-server (PR [#190]): its default answer is lean, carrying of the old echo only
-`verdict.exitCode`, `project.root` and `project.rootSource`, and `lane.load`,
-with the rest on `verbose: true`; and `exports_of` answers a page of 20 typed
-members with the rest named.  Everything else is the [#162] protocol: the
+server (PR [#190]): its default answer is lean, keeping only
+`verdict.exitCode`, `project.root` and `project.rootSource`, and `lane.load`
+from the old echo, with the rest on `verbose: true`; and `exports_of` answers
+a page of 20 typed members with the rest named.  Everything else is the [#162] protocol: the
 prompts' digests, the index's and the corpora's digests, the caps, and the
 read roots are identical.  Two things differ besides the server: the client
 (2.1.282 against 2.1.261; `iso184-1` checked it with a persisted session and

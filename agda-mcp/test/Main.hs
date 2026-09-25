@@ -4544,6 +4544,7 @@ leanProcessTests exe = do
         , call 5 "type_of" [("expr", "two"), verbose]
         , call 6 "exports_of" [("module", ""), ("limit", Aeson.toJSON (1 :: Int))]
         , call 7 "check_file" [("verbose", "yes")]
+        , call 8 "check_file" [("verbose", Aeson.Null)]
         ]
   (code, out, err) <- readProcessWithExitCode exe ["--cwd", client, "--timeout", "120"] reqs
   let pairOf lean full k = case (answerOf lean out, answerOf full out) of
@@ -4598,6 +4599,19 @@ leanProcessTests exe = do
                 (Just (Aeson.Number t), Just (Aeson.Array rs)) -> length rs + 1 == round t && t >= 2
                 _                                              -> False
             ]
+
+    , -- Null is absent here, as for every optional argument the server
+      -- parses with .:? (reload, limit, maxDiagnostics): a client that
+      -- serializes an unset field as null gets the default, not an error.
+      runTest "wire: verbose null is the default, lean" $
+        pairOf 8 3 $ \lean full -> allOf
+          [ assertEqual "resultOf 8 is not an error" Nothing
+              (resultOf 8 out >>= KM.lookup "isError")
+          , assertEqual "echo present in the null answer" []
+              [ p | p <- batchEcho, isJust (valueAt p lean) ]
+          , assertEqual "the null answer is the lean one"
+              (steady (leanAnswer full)) (steady lean)
+          ]
 
     , runTest "wire: a verbose that is not a boolean is refused by name" $
         case resultOf 7 out of
