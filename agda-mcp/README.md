@@ -125,7 +125,7 @@ These answer read-only questions from a persistent `agda --interaction-json` chi
 | `normalize`     | Evaluate an expression to normal form in a file's scope (Agda's `C-c C-n`). |
 | `resolve_name`  | Every candidate a name resolves to, with provenance chains — the `AmbiguousName` answer, through re-exports and module applications grep cannot see. |
 | `definition_of` | The defining file and position of every candidate, chased through barrels to the origin. |
-| `exports_of`    | A module's public surface — every exported name with its type; `""` names the file's own top-level module. |
+| `exports_of`    | A module's public surface, one page at a time: the first `limit` members (default 20) with their types, the names of the rest, and the total; `pattern` narrows it by name, and `""` names the file's own top-level module. |
 
 An optional `line` argument scopes the question to the goal whose range contains it, which makes local variables visible and, on a hole-free file, recovers opened names the completed top-level scope loses.  `scope_at` — the sixth query the issue proposed — has no interaction-protocol backing (no command enumerates the names in scope) and is deliberately not approximated with grep; the finding is recorded on issue #75.
 
@@ -158,13 +158,43 @@ This replaces the failure issue #101 was filed over: the read was unguarded, so 
 
 ### The response echo: verdict, command, project (issues #72 and #76)
 
-Every proof-state response — success, timeout, or refusal — carries three keys that say what ran, what its answer means, and which tree it ran against.  They exist because a verdict an agent cannot check costs more than no verdict: § 2 of [the field report](../docs/feedback/flrp-agda-mcp-improvements.md) records a session in which the server was configured, listed, and never called, because nothing said whether green here meant the build passed.
+Every proof-state tool can say, in three keys, what ran, what its answer
+means, and which tree it ran against.  They exist because a verdict an agent
+cannot check costs more than no verdict: § 2 of [the field
+report](../docs/feedback/flrp-agda-mcp-improvements.md) records a session in
+which the server was configured, listed, and never called, because nothing
+said whether green here meant the build passed.
 
-| Key | Contents |
-|-----|----------|
-| `verdict` | `equivalentTo` — the exact `agda` command this call is equivalent to, prefixed `equivalent-to:`; `meaning` — one sentence saying what the tool's verdict field means; `exitCode` — Agda's own exit status, which the verdict is derived from. |
-| `command` | `binary` (resolved against `PATH`, so you can see *which* `agda` ran), `args` (the full argument vector, ending in the file path), and `cwd`. |
-| `project` | `rootSource` (`nearest-agda-lib` or `server-config`), `root`, the file's own `library`, the `librariesFile` consulted — echoed whether or not it exists, with `librariesFileMissing` when it does not — and what that registry declares (`registeredLibraries`) next to the libraries and include paths `agda` finally received (`selectedLibraries`, `includePaths`) — the *effective* set, including whatever resolution added, so `project` and `command.args` never disagree. |
+Since issue #184 a successful answer carries only the part of the echo it
+cannot do without, and a call that passes `verbose: true` gets all of it.
+
+| Key | With `verbose: true` | In the default (lean) answer |
+|-----|----------------------|------------------------------|
+| `verdict` | `equivalentTo`: the exact `agda` command this call is equivalent to, prefixed `equivalent-to:`; `meaning`: one sentence saying what the tool's verdict field means; `exitCode`: Agda's own exit status, which the verdict is derived from. | `exitCode` alone. |
+| `command` | `binary` (resolved against `PATH`, so you can see *which* `agda` ran), `args` (the full argument vector, ending in the file path), and `cwd`. | Absent. |
+| `project` | `rootSource` (`nearest-agda-lib` or `server-config`), `root`, the file's own `library`, the `librariesFile` consulted (echoed whether or not it exists, with `librariesFileMissing` when it does not), and what that registry declares (`registeredLibraries`) next to the libraries and include paths `agda` finally received (`selectedLibraries`, `includePaths`): the *effective* set, including whatever resolution added, so `project` and `command.args` never disagree. | `root` and `rootSource`, and `librariesFileMissing` when it is true. |
+
+**Why lean is the default**.  The echo was written into every answer,
+identically on every call, and it was most of a small one: a `type_of` whose
+type is one line was 3.3 KB, of which the type was 35 characters.  Over the
+server-only arm of the #162 agent benchmark the tools returned 3.6 times the
+bytes the shell-only arm's commands did, and the model wrote about as much in
+both.  The `meaning` sentence is stated once, in each tool's description,
+where a client reads it once per session; the command line and the registry
+are what a client re-reads only when it doubts a call, and can then ask for.
+
++  **A lean answer is a restriction of the verbose one**.  Fields are left
+   out, never renamed or moved: a client reading `verdict.exitCode` or
+   `project.root` reads the same path in either answer, and `verbose: true`
+   returns every field exactly as it was before #184.
++  **Every answer still names its tree**.  `project.root` and
+   `project.rootSource` are in every answer, which is what [ADR
+   0002](../docs/adr/0002-agda-mcp.md) § 5 promises.
++  **A failure keeps its whole echo**.  An error response (a timeout, a
+   wrong-tree refusal, a path refusal, a lane failure) carries its full echo
+   whatever was asked, since there the echo is the diagnosis.
++  **A `verbose` that is not a boolean is refused by name**, rather than
+   quietly answered lean.
 
 Two properties are contractual, not incidental.
 
@@ -234,7 +264,22 @@ The regression suite under `test/resources/diagnostics/` has one fixture per err
 
 The five query tools of the Tool Surface section share one implementation spine (`AgdaMCP.Tools.LiveQueries` over `AgdaMCP.Interaction`): resolve and read the requested path exactly as the batch tools do (issue #101), resolve the library context and refuse a wrong-checkout call (issue #76), then ask the root's persistent `agda --interaction-json` child, loading the file with the same effective flag list a batch check would run with — so both lanes resolve one file against one tree by construction.  The wire protocol, its probed gotchas, the process lifecycle (per-root children, evidence-gated re-loads, the #77 kill ladder on a hung command, idle reaping, crash restart), and the measured economics all live in [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md).
 
-Every response carries the lane's own echo alongside the usual `command`/`project` pair: `lane {root, pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm}`, where `load` says why this call did or did not re-load (`reused`/`first`/`switch`/`changed`/`retry`) and `iotcm` is the exact wire lines sent, so a call can be replayed by hand.  `checkedFromSource` means on this lane what it means in the batch tools, read from the load's own progress lines: `false` for a reused load (no load ran, so nothing was checked), and absent when its evidence could not arrive — a per-load argv carrying `--trace-imports=0`, which silences those lines (issue #114), or a load that failed before Agda announced the file, which establishes no interface reuse either.  Process-level failures (spawn, timeout, crash) are structured `isError` payloads naming the event, root, wire lines, and the child's last stderr lines — never a bare `-32603` (issue #101's rule).
+Every answer carries the lane's own echo in brief, `lane {load,
+loadElapsedMs?}`, where `load` says why this call did or did not re-load
+(`reused`/`first`/`switch`/`changed`/`forced`/`retry`) and `loadElapsedMs`
+what that load cost, beside `project {root, rootSource}`.  With `verbose:
+true` it carries the whole of it alongside the usual `command`/`project` pair
+(issue #184): `lane {root, pid, spawned, load, loadElapsedMs?, agdaVersion,
+iotcm}`, where `iotcm` is the exact wire lines sent, so a call can be replayed
+by hand.  `checkedFromSource` means on this lane what it means in the batch
+tools, read from the load's own progress lines: `false` for a reused load (no
+load ran, so nothing was checked), and absent when its evidence could not
+arrive: a per-load argv carrying `--trace-imports=0`, which silences those
+lines (issue #114), or a load that failed before Agda announced the file,
+which establishes no interface reuse either.  Process-level failures (spawn,
+timeout, crash) are structured `isError` payloads naming the event, root, wire
+lines, and the child's last stderr lines, never a bare `-32603` (issue #101's
+rule), and they carry their whole echo whether or not the call asked for it.
 
 ### Corpus-backed search tools (Milestone 1 [M1-3])
 
@@ -421,9 +466,16 @@ Given a file path and hole address, return the hole's expected type and its loca
   "module": "Fixture01",
   "elapsedMs": 1720,
   "checkedFromSource": true,
-  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+  "source": "injected-macro",
+  "verdict": {"exitCode": 42},
+  "project": {"root": "/path/to", "rootSource": "server-config"}
 }
 ```
+
+That is the default (lean) answer; `verbose: true` adds the rest of the
+[response echo](#the-response-echo-verdict-command-project-issues-72-and-76).
+A lane-sourced answer (`source: "interaction-lane"`) carries `lane {load,
+loadElapsedMs?}` in place of `verdict`.
 
 `module` is the name **Agda** resolved for this file, read from the `Checking M (path).` line of the very run this call made.  That is the name an `import` of the file must use and the name Agda's own messages print: `Proofs.Use` for a module embedded at `src/Proofs/Use.agda`, and `AnonModule` for a file whose header reads `module _ where`, which no reading of the source could supply.  When the goal comes back and Agda named no module — a client whose `--agda-flags` include `--trace-imports=0` silences the progress line — the field falls back to the name the source *declares*, scanned off the code-only view so that neither prose nor a comment can supply it.  The other ways Agda can decline to say do not reach this field: a parse error, a header that disagrees with its file name, or a timeout ends the call as a failure response, which carries no `module` at all — for a mismatched header the failure's text is Agda's own message, which names both the module it found and the file it expected (issue #100).
 
@@ -455,7 +507,9 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
   "elapsedMs": 1840,
-  "checkedFromSource": true
+  "checkedFromSource": true,
+  "verdict": {"exitCode": 0},
+  "project": {"root": "/path/to", "rootSource": "server-config"}
 }
 ```
 
@@ -468,7 +522,9 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
   "elapsedMs": 1795,
-  "checkedFromSource": true
+  "checkedFromSource": true,
+  "verdict": {"exitCode": 42},
+  "project": {"…": "…"}
 }
 ```
 
@@ -481,7 +537,9 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
   "elapsedMs": 300262,
-  "checkedFromSource": true
+  "checkedFromSource": true,
+  "verdict": {"exitCode": -1},
+  "project": {"…": "…"}
 }
 ```
 
@@ -513,7 +571,9 @@ Load or reload an Agda file and return all diagnostics (errors, warnings, unsolv
 }
 ```
 
-**Output**.  The `verdict` / `command` / `project` block below is the [response echo](#the-response-echo-verdict-command-project-issues-72-and-76); every proof-state tool carries it, and it is shown in full only here.
+**Output**.  The default (lean) answer; its `verdict` and `project` blocks are
+what every answer keeps of the [response
+echo](#the-response-echo-verdict-command-project-issues-72-and-76).
 
 ```json
 {
@@ -540,6 +600,18 @@ Load or reload an Agda file and return all diagnostics (errors, warnings, unsolv
   "timedOut": false,
   "elapsedMs": 2140,
   "checkedFromSource": true,
+  "verdict": {"exitCode": 42},
+  "project": {"root": "/abs/agda-native-air/agda-dojang", "rootSource": "nearest-agda-lib"}
+}
+```
+
+**Output with `verbose: true`**.  The same answer with the whole echo, which
+every proof-state tool adds on request; it is shown in full only here.
+
+```json
+{
+  "success": false,
+  "…": "…",
   "verdict": {
     "equivalentTo": "equivalent-to: /nix/store/…/bin/agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library /abs/Fixture01.agda",
     "meaning": "success is true if and only if that command exited 0, so it means exactly what green means in a batch build. …",
@@ -575,7 +647,8 @@ Load or reload an Agda file and return all diagnostics (errors, warnings, unsolv
   "timedOut": true,
   "elapsedMs": 300251,
   "checkedFromSource": true,
-  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+  "verdict": {"exitCode": -1},
+  "project": {"…": "…"}
 }
 ```
 
@@ -631,7 +704,8 @@ Retrieve the current diagnostic state without reloading: error count, warning co
   "timedOut": false,
   "elapsedMs": 1980,
   "checkedFromSource": false,
-  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+  "verdict": {"exitCode": 0},
+  "project": {"…": "…"}
 }
  ```
 
@@ -711,6 +785,16 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence i
   "failingFile": "/abs/agda-algebras/src/Base/Structures/Basic.lagda.md",
   "modulesChecked": 143,
   "outputTail": "… 218 earlier lines elided …\nmake: *** [Makefile:31: check] Error 42\ngate finished",
+  "verdict": {"exitCode": 0},
+  "project": {"root": "/abs/agda-algebras", "rootSource": "nearest-agda-lib"}
+}
+```
+
+With `verbose: true` the same answer adds the rest of the echo:
+
+```json
+{
+  "…": "…",
   "verdict": {
     "equivalentTo": "equivalent-to: (cd /abs/agda-algebras && make check)",
     "meaning": "success is true if and only if that command exited 0, finished inside the --check-timeout bound, and printed no failure evidence. …",
@@ -747,7 +831,8 @@ success  ⟺  exit 0  ∧  finished inside the bound  ∧  no failure evidence i
   "failingModule": "Base.Structures.Basic",
   "modulesChecked": 143,
   "outputTail": "…",
-  "verdict": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+  "verdict": {"exitCode": -1},
+  "project": {"…": "…"}
 }
 ```
 
@@ -865,7 +950,7 @@ opened).  The lane echo (`lane`, `command`, `project`, `elapsedMs`,
     "accepted": 5, "truncated": false, "stoppedBy": "exhausted"
   },
   "timing": { "poolMs": 0, "laneMs": 8 },
-  "elapsedMs": 68, "lane": {"…": "…"}, "command": {"…": "…"}, "project": {"…": "…"}
+  "elapsedMs": 68, "lane": {"…": "…"}, "project": {"…": "…"}
 }
 ```
 

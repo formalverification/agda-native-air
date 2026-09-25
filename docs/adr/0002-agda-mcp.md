@@ -147,7 +147,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Evidence**.  The § 7 verification of the field report is the record of what an untrustworthy verdict costs, and the consumer-side document written after the RP-3 session ([`feedback/agent-case-for-corpus-proof-search.md`] § 1) names the discipline's effect: it "removes an agent's ability to talk itself into 'probably green'".  The 2026-08-21 field report used the `verdict` echo to quote a check in a PR body "as a checkable claim rather than an assertion".
 
-**Status**.  Adopted (PRs [#81], [#95], [#98]).  No open follow-up.
+**Status**.  Adopted (PRs [#81], [#95], [#98]).  Since [#184] the default answer carries `verdict.exitCode` alone, and a call that passes `verbose: true` gets `equivalentTo`, `meaning`, and `command` back field for field; the meaning sentence is stated in each tool's description instead, and an error response keeps the whole echo.  No open follow-up.
 
 ---
 
@@ -182,7 +182,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Evidence**.  The 2026-08-21 report: `rootSource: "nearest-agda-lib"` picked up the worktree's own `.agda-lib` while the server's cwd was another repository, "precisely the failure mode agda-algebras' `CLAUDE.md` warns about for the `nix develop` `agda` wrapper", and "the echo makes it verifiable rather than hoped-for".  The 2026-09-01 fls report: both subprojects (`formal-ledger` and the Hydra-only `formal-ledger-test`) resolved with zero configuration, where the CLI equivalent is hand-assembled `-i` flags.  The 2026-09-01 agda-algebras report: a `LibraryError` on first contact was a ten-second read from `command`, `project.registeredLibraries`, and `rootSource`.  Eight of the nine reports name the per-call resolution or its echo as the reason a cross-worktree verdict could be trusted.
 
-**Status**.  Adopted (PRs [#95], [#102], [#104]).  Open: the registry's one-absolute-path-per-library shape goes stale under worktree churn (three sessions in two weeks hit it), and [#137] ([M5-4]) chooses between a parent-directory registration and lazy resolution.
+**Status**.  Adopted (PRs [#95], [#102], [#104]).  Since [#184] the echo is in full only on request: the default answer carries `project.root` and `project.rootSource` (and `librariesFileMissing` when it is true), so every answer still names its tree, and `verbose: true` restores the rest of the block field for field; the wrong-tree refusal is unchanged.  Open: the registry's one-absolute-path-per-library shape goes stale under worktree churn (three sessions in two weeks hit it), and [#137] ([M5-4]) chooses between a parent-directory registration and lazy resolution.
 
 ---
 
@@ -335,12 +335,12 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 2 | `get_goal` answers from the lane first, with injection as the stated fallback and the only path reporting binder visibility | Adopted ([#108], PR [#110]) | Byte-identical goals on the fixture matrix; no file mutation on the happy path |
 | 3 | A batch tool may peek at a warm lane's stored load, never call it; a cold or stale lane leaves the response byte-identical | Adopted ([#108], [#115]) | Enrichment tests pin both shapes |
 | 4 | `scope_at` omitted rather than approximated with grep | Adopted ([#75]) | No protocol command enumerates a scope |
-| 5 | For the per-file tools, `success` is a function of the exit code alone; every batch verdict carries `verdict`, `command`, `project` | Adopted ([#72], [#76], PR [#95]) | Stand-in binary test; field report § 2 and § 6 |
+| 5 | For the per-file tools, `success` is a function of the exit code alone; every batch verdict carries `verdict`, `command`, `project` | Adopted ([#72], [#76], PR [#95]); in full on request since [#184] | Stand-in binary test; field report § 2 and § 6 |
 | 6 | `fill_hole` tolerates only other open holes' `[UnsolvedInteractionMetas]` | Adopted ([#69], PR [#81]) | Verification fixture: `ok` on content `agda` rejects with exit 42 |
 | 7 | `check_project` may turn a green gate red on failure evidence, never a red gate green | Adopted ([#78], PR [#98]) | The wrapper-ending-in-`echo` trap of § 3.5 |
 | 8 | `answer = whatAgdaSaid <|> whatWeDerived`; the rule lives in the README's architecture notes | Adopted ([#100], [#106]; PRs [#105], [#116]) | Four module-name shapes; the audit's inventory |
 | 9 | Structured diagnostics stay parsed from prose; the protocol retires segmentation, not extraction | Adopted ([#106], Measurement 1) | Six-class table: five prose-only, one surplus ([#115]) |
-| 10 | Project resolution stays local, per call, echoed; a wrong tree is a refusal before spawn | Adopted ([#76], PR [#95]) | No Agda query exists; the environment note's reproduction |
+| 10 | Project resolution stays local, per call, echoed; a wrong tree is a refusal before spawn | Adopted ([#76], PR [#95]); root and rootSource by default, the rest on request, since [#184] | No Agda query exists; the environment note's reproduction |
 | 11 | Relative paths resolve against the server's cwd, refused by name when they miss, never guessed | Adopted ([#101], PR [#102]) | The [#83] `-32603` datum; § 3.6's "worse than an error" |
 | 12 | Foreign toolchains via `--agda-bin` and `--cwd`; registrations anchored per worktree | Adopted ([#103], [#133]) | fls modules resolve and write interfaces as the project's own `agda` does |
 | 13 | Diagnostics as data: code, range, bounded full message, `involved`, root-cause order, capped with the total | Adopted ([#74], PR [#94]) | One fixture per § 5 class; field reports of 2026-08-29 and 2026-09-02 |
@@ -452,6 +452,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#147]: https://github.com/formalverification/agda-native-air/issues/147
 [#154]: https://github.com/formalverification/agda-native-air/issues/154
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
 
