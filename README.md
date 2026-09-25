@@ -165,7 +165,14 @@ As of September 2026 the following are built, measured, and in use.
    a frontier model driving the server over the same 55 obligations, one
    fresh session per obligation with the thirteen tools and the one file,
    judged by the gold verifier's own `agda` invocation.  Sonnet 5 solves 46
-   of 55 and Opus 5 solves 54 of 55, against the search's 8 and 14; a file
+   of 55 and Opus 5 solves 54 of 55 with the server; with a shell holding the
+   same `agda` and no server, Sonnet 5 solves 50 and restates none, and given
+   both it takes every verdict from `check_file` and never runs `agda` itself
+   ([#162](https://github.com/formalverification/agda-native-air/issues/162)).
+   The search's 8 and 14 are a different instrument, not a baseline for the
+   agents; which instrument produced every number in this section, and how to
+   tell a win from a loss, is
+   [`docs/reading-the-results.md`](docs/reading-the-results.md).  A file
    that names the library's own lemma for the statement is reported
    *restated*, never solved (8 rows for Sonnet, 1 for Opus, all on the
    agda-algebras tier), and the standard-library rows, which every model has
