@@ -291,7 +291,9 @@ arm.  Three Sonnet arms cost USD 12.41 together.
 |---|---|---|---|---|---|---|
 | `shell` | `arm162-shell-1` | 308 | 253 | **2.88** | 70,403 | 259,520 |
 | `mcp` | `arm162-mcp-1` | 342 | 287 | 5.28 | 76,732 | **929,386** |
-| `both` | `arm162-both-1` | 327 | 272 | 4.25 | 67,269 | |
+| `both` | `arm162-both-1` | 327 | 272 | 4.25 | 67,269 | 474,562 |
+| `mcp`, lean answers | `arm184-mcp-1` | 359 | 304 | 4.63 | 82,831 | 534,272 |
+| `both`, lean answers | `arm184-both-1` | 318 | 263 | 4.00 | 66,634 | 223,797 |
 
 The `both` arm's per-tool counts against the `mcp` arm's: `check_file` 57
 and 56; `type_of` 11 and 34; `definition_of` **0** and 19; `search_by_name`
@@ -344,8 +346,23 @@ a `transcribed` gate is the fix, § 6.)
    2.88 with output tokens within 9 % (76,732 against 70,403) and **3.6 times
    the bytes read from tool results** (929,386 against 259,520), because the
    tools' answers carry echo and boilerplate (a `type_of` answer is 3 KB for
-   one line of type; `exports_of` averages 23 KB).  Tracked as [#184]; a lean
-   re-run is the test.
+   one line of type; `exports_of` averages 23 KB).  Tracked as [#184]; the
+   re-run is the next bullet.
++  **The lean re-run: answer size was not the cause** ([#184], PR [#190],
+   `arm184-mcp-1` and `arm184-both-1`, Sonnet 5 at the same protocol).  With
+   the echo cut, characters per call fell 46 % and 51 % and cost fell 12 %
+   and 6 % (USD 4.63 and 4.00 against the shell's 2.88); beside a shell the
+   knowledge tools stayed exactly as unused (`definition_of` 0,
+   `search_by_name` 1, `exports_of` 2), every verdict again came from
+   `check_file`, and solves stayed within variance (46 and 8 restated; 49
+   and 2).  The cost that remains is per turn, not per answer: every server
+   arm re-reads 22 to 25 thousand cached tokens a turn against the shell
+   arm's 10 thousand, which is the fourteen tools' descriptions and schemas
+   (68,391 characters before [#190], 77,603 after).  The tool surface is
+   the next variable, with its own re-run.  The re-run arms read 5 of 12 and
+   15 of 18 agda-algebras solves with the original in view by the PR's own
+   script, which agrees with the table above on every arm but
+   `arm162-mcp-1` (5 against 6); [#188] reconciles the two.
 +  **The verdict tool: a win, by revealed preference**.  Offered both, the
    model took **every one of its 55 verdicts from `check_file`** and never
    ran `agda` by hand.
@@ -378,7 +395,7 @@ not a term, so no hole-filling judgment of any kind can express it.
 |---|---|---|
 | Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals**. |
 | Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero is transcription**. |
-| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no; cause measured, [#184]**. |
+| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no; answer size was not the cause (PR [#190]); the per-turn tool surface is, unmeasured**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
 | Is the loop a baseline for the agents? | nothing | **never**; a different instrument |
@@ -392,9 +409,12 @@ not a term, so no hole-filling judgment of any kind can express it.
    tool's upside on hard, novel, multi-lemma work.  That is the original
    question, and it is untested: the composition tier ([#160]) and the
    agda-algebras case study ([#23]) are the instruments.
-+  **The tools with lean answers** ([#184]) and **knowledge tools that return
-   content** ([#185]): the two measured defects, each with a re-run that
-   settles it.
++  **Knowledge tools that return content** ([#185]): the one measured defect
+   still without its re-run.  Lean answers ([#184]) were measured by PR
+   [#190] and were not the cause (§ 4.3).
++  **The tool surface as the cost**: fourteen descriptions and schemas re-read
+   every turn, 68 to 78 thousand characters; no arm has yet run with a
+   shorter surface or fewer tools.
 +  **Construction, tools against no tools**.  The archived arms could not
    read the originals and the [#162] arms could (§ 4.3), so no run compares
    the tools with their absence on rows the subject cannot copy.  The
@@ -451,3 +471,5 @@ not a term, so no hole-filling judgment of any kind can express it.
 [#175]: https://github.com/formalverification/agda-native-air/pull/175
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#185]: https://github.com/formalverification/agda-native-air/issues/185
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
+[#190]: https://github.com/formalverification/agda-native-air/pull/190
