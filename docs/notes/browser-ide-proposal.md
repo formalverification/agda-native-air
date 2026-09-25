@@ -176,9 +176,11 @@ and every one of them has a browser-side equivalent in the forked runtime:
 | `resolve_name`, `exports_of` | `Cmd_why_in_scope`, `Cmd_show_module_contents` |
 | `fill_hole` | `Cmd_give` with the reload, parity per [#163]; batch for the record |
 | `check_file`, `get_diagnostics` | `Cmd_load` and its diagnostics; batch `agda` for the exit code |
-| `search_by_name`, `search_by_type`, `search_in_scope` | queries over a mounted corpus JSONL |
-| `get_dependencies` | the row's `bodyRefs` and `dependencies` over the mounted corpus JSONL, with the corpus cards' caveat that the tokens are heuristic |
+| `search_by_name`, `search_by_type` | queries over a mounted corpus JSONL |
+| `search_in_scope` | the corpus query, then the file's import surface and `Cmd_infer` on the lane to type each accepted rendering in that scope, the three steps the native tool takes; the corpus alone answers neither what the file can name nor what Agda says its type is |
+| `get_dependencies` | the row's `dependencies` (and the one-hop neighborhood with `expand`) over the mounted corpus JSONL, heuristic as the corpus cards say; exact body references are a separate field the published corpora do not carry (§ 4) |
 | `definition_of` | `Cmd_why_in_scope`, then **the source itself**, which is mounted |
+| `check_project` | **unsupported** until the multi-file item under "What is hard" lands: a project gate needs a mounted `.agda-lib` and every module's interface, and `Cmd_load` on one file is not that gate |
 
 The last row is the one [#162] decided.  The measured gap in the native tool,
 that it answers where a definition is and not what it says, closes in a
@@ -247,8 +249,12 @@ Two levels, one source:
    corpus card states); and module edges from Agda's `--dependency-graph`,
    which is a load-order graph rather than the import relation.  This is the
    view that lets one mind hold a development of many lemmas.  It needs no
-   Agda to draw: the corpora carry it for 68,699 definitions today, the exact
-   edges included.
+   Agda to draw, but only the approximate edges are on disk today: the
+   published corpora (v0, v0.1) carry `dependencies` and the module graph for
+   68,699 definitions and no body-level field at all (their cards say so;
+   issue [#15]).  The extractor now emits `bodyRefs`, so the exact edges
+   need a corpus cut made with it, which is a prerequisite of this view and
+   not a property of the corpora as released.
 +  **The proof**.  One definition's term as a derivation tree, types at the
    nodes, holes as open leaves.  A reference to a lemma is a leaf that links
    back out to that lemma's node in the theory view, and, because [#162] says
@@ -364,14 +370,19 @@ thing that stands on its own:
 1.  **The theory view, read-only, from the corpus alone**.  The agda-algebras
     definition graph in the browser: no Agda, pure data, and a natural demo
     for the project site.
-2.  **The proof view of one checked gold**, from `agda-json`'s exported term.
-    Settle the elision rules on the 55.
-3.  **Fork the runtime and add the tool surface**, checked against the
+2.  **The proof-term export**, the prerequisite § 4 names: the clause bodies
+    through the encoder `typeAst` already uses, and the typing pass that
+    records the judgment at each node; then a corpus cut that carries
+    `bodyRefs`, for the theory view's exact edges.  Nothing in the proof
+    view exists before this.
+3.  **The proof view of one checked gold**, from that export.  Settle the
+    elision rules on the 55.
+4.  **Fork the runtime and add the tool surface**, checked against the
     archived sessions the way [#163] checked the lane: replay the archived
     calls through the browser surface and compare answers.
-4.  **The model behind the consent gate**, sessions rendered in the demo's
+5.  **The model behind the consent gate**, sessions rendered in the demo's
     replay format.
-5.  **Editing in the diagram**, starting with `Cmd_refine` and `Cmd_give` at
+6.  **Editing in the diagram**, starting with `Cmd_refine` and `Cmd_give` at
     a leaf, then `Cmd_make_case`.
 
 Two rules to write down before step 1 and never relax: the diagram renders only
@@ -399,6 +410,7 @@ states about itself comes from an archive, the way the demo page's do.
 [ADR 0001]: ../adr/0001-proof-search-on-agda-mcp.md
 [ADR 0002]: ../adr/0002-agda-mcp.md
 [`docs/import-closure.md`]: ../import-closure.md
+[#15]: https://github.com/formalverification/agda-native-air/issues/15
 [#27]: https://github.com/formalverification/agda-native-air/issues/27
 [#28]: https://github.com/formalverification/agda-native-air/issues/28
 [#29]: https://github.com/formalverification/agda-native-air/issues/29
