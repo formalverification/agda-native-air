@@ -16,6 +16,14 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 6,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -74,7 +82,7 @@
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 5471,
+  "agdaMs" : 5592,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

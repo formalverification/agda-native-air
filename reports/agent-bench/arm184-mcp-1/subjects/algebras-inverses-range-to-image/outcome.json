@@ -16,6 +16,14 @@
   "restatementEvidence" : [
     "ref Setoid.Functions.Inverses.IsInRange→IsInImage"
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 7,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -78,7 +86,7 @@
   "via" : "mcp",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 2530,
+  "agdaMs" : 2693,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

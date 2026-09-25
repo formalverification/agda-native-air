@@ -1,10 +1,12 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "arm184-both-1",
-  "timestamp" : "2026-09-25T06:17:54.380998614Z",
-  "rejudged" : false,
+  "timestamp" : "2026-09-25T21:08:51.272203339Z",
+  "rejudged" : true,
   "config" : {
     "arm" : "both",
+    "safe" : true,
+    "rejudgedAt" : "2026-09-25T21:08:51.270947338Z",
     "parallelism" : 3,
     "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
     "resume" : false,
@@ -19,7 +21,6 @@
     "maxTurns" : 30,
     "wallCapSec" : 900,
     "maxBudgetUsd" : 3.00,
-    "safe" : true,
     "serverTimeout" : 600,
     "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
     "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
@@ -139,6 +140,7 @@
     "total" : 55,
     "solved" : 49,
     "restated" : 2,
+    "solvedOriginalInView" : 14,
     "gates" : {
       "isolation" : 1,
       "preservation" : 3
@@ -154,6 +156,7 @@
       "total" : 16,
       "solved" : 16,
       "restated" : 0,
+      "solvedOriginalInView" : 3,
       "gates" : {
         
       },
@@ -167,6 +170,7 @@
       "total" : 25,
       "solved" : 23,
       "restated" : 2,
+      "solvedOriginalInView" : 7,
       "gates" : {
         
       },
@@ -180,6 +184,7 @@
       "total" : 14,
       "solved" : 10,
       "restated" : 0,
+      "solvedOriginalInView" : 4,
       "gates" : {
         "isolation" : 1,
         "preservation" : 3
@@ -196,6 +201,7 @@
       "total" : 22,
       "solved" : 19,
       "restated" : 0,
+      "solvedOriginalInView" : null,
       "gates" : {
         "preservation" : 3
       },
@@ -209,6 +215,7 @@
       "total" : 11,
       "solved" : 10,
       "restated" : 0,
+      "solvedOriginalInView" : 6,
       "gates" : {
         "isolation" : 1
       },
@@ -222,6 +229,7 @@
       "total" : 10,
       "solved" : 8,
       "restated" : 2,
+      "solvedOriginalInView" : 8,
       "gates" : {
         
       },
@@ -235,6 +243,7 @@
       "total" : 12,
       "solved" : 12,
       "restated" : 0,
+      "solvedOriginalInView" : null,
       "gates" : {
         
       },
@@ -281,6 +290,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -337,7 +347,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 830,
+      "agdaMs" : 748,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -371,6 +381,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -427,7 +438,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 985,
+      "agdaMs" : 745,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -462,6 +473,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -518,7 +530,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 176,
+      "agdaMs" : 183,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -553,6 +565,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -609,7 +622,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 168,
+      "agdaMs" : 188,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -643,6 +656,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -699,7 +713,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 777,
+      "agdaMs" : 757,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -734,6 +748,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -790,7 +805,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 845,
+      "agdaMs" : 830,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -824,6 +839,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -880,7 +896,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 262,
+      "agdaMs" : 250,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -914,6 +930,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
         "open import Relation.Binary.PropositionalEquality using ( trans )"
       ],
@@ -971,7 +988,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2056,
+      "agdaMs" : 1906,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1005,6 +1022,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1061,7 +1079,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 638,
+      "agdaMs" : 796,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1095,6 +1113,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1151,7 +1170,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 801,
+      "agdaMs" : 781,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1185,6 +1204,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1241,7 +1261,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 710,
+      "agdaMs" : 779,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1275,6 +1295,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1331,7 +1352,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 835,
+      "agdaMs" : 781,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1365,6 +1386,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1421,7 +1443,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 772,
+      "agdaMs" : 775,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1455,6 +1477,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1511,7 +1534,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 736,
+      "agdaMs" : 812,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1545,6 +1568,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1601,7 +1625,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 986,
+      "agdaMs" : 849,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1635,6 +1659,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1691,7 +1716,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 878,
+      "agdaMs" : 839,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1725,6 +1750,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1781,7 +1807,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 762,
+      "agdaMs" : 834,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1817,6 +1843,7 @@
       "gateDetail" : "import line changed or missing: open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )",
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1873,7 +1900,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1692,
+      "agdaMs" : 1883,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1907,6 +1934,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1963,7 +1991,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1820,
+      "agdaMs" : 1932,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1999,6 +2027,7 @@
       "gateDetail" : "import line changed or missing: open import Relation.Binary.PropositionalEquality using ( _≡_ ; cong₂ )",
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2056,7 +2085,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1680,
+      "agdaMs" : 1924,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2092,6 +2121,7 @@
       "gateDetail" : "import line changed or missing: open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong )",
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2149,7 +2179,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1728,
+      "agdaMs" : 1917,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2183,6 +2213,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2239,7 +2270,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 209,
+      "agdaMs" : 193,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2276,6 +2307,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2332,7 +2371,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1070,
+      "agdaMs" : 799,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2369,6 +2408,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2462,6 +2509,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Operations.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2519,7 +2574,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 180,
+      "agdaMs" : 208,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2557,6 +2612,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Basic.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2614,7 +2677,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2573,
+      "agdaMs" : 2572,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2652,6 +2715,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 3,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2709,7 +2780,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2369,
+      "agdaMs" : 2751,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2746,6 +2817,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 2,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2803,7 +2882,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2596,
+      "agdaMs" : 2767,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2840,6 +2919,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Surjective.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2898,7 +2985,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2585,
+      "agdaMs" : 2741,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2935,6 +3022,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2992,7 +3087,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2238,
+      "agdaMs" : 2798,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3031,6 +3126,14 @@
       "restatementEvidence" : [
         "ref Setoid.Homomorphisms.Basic.𝒾𝒹"
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 1,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3088,7 +3191,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4995,
+      "agdaMs" : 5322,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3126,6 +3229,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Properties.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 3,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3184,7 +3295,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4983,
+      "agdaMs" : 5409,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3222,6 +3333,14 @@
       "restatementEvidence" : [
         "ref Setoid.Homomorphisms.Basic.mon→hom"
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 3,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3282,7 +3401,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5062,
+      "agdaMs" : 5356,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3320,6 +3439,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 3,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3377,7 +3504,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2496,
+      "agdaMs" : 2782,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3416,6 +3543,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 1,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3473,7 +3608,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5392,
+      "agdaMs" : 5576,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3510,6 +3645,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 2,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3567,7 +3710,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5572,
+      "agdaMs" : 5918,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3605,6 +3748,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3662,7 +3813,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4398,
+      "agdaMs" : 5466,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3700,6 +3851,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 3,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3757,7 +3916,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5232,
+      "agdaMs" : 5396,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3795,6 +3954,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3854,7 +4021,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5167,
+      "agdaMs" : 5801,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3892,6 +4059,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3949,7 +4124,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5564,
+      "agdaMs" : 5926,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3988,6 +4163,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4045,7 +4228,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 6325,
+      "agdaMs" : 6008,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4087,6 +4270,14 @@
       "gateDetail" : "Bash reads outside the arm's roots (/): find / -path /proc -prune -o -iname \"Congruences.agda\" -print 2>/dev/null | grep -i setoid; find / -path /proc -prune -o -iname \"Homomorphisms.agda\" -print 2>/dev/null | grep -i setoid; find / -pat...; Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -iname \"Congruences.agda\" -print 2>/dev/null | grep -i setoid; find / -path /proc -prune -o -iname \"Homomorphisms.agda\" -print 2>/dev/null | grep -i setoid; find / -pat...; Bash a parameter expansion: AA=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src ; find \"$AA\" -iname \"Congruences.agda\" ; echo \"---\" ; find \"$AA\" -iname \"Homomorphisms.agda\" -o -iname \"Kernels....; Bash a parameter expansion: AA=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src ; find \"$AA\" -iname \"Congruences*\" ; echo \"---\" ; find \"$AA\" -path \"*Setoid/Homomorphisms*\" ; echo \"---\" ; find ...",
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4150,7 +4341,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5114,
+      "agdaMs" : 5376,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4187,6 +4378,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 1,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4244,7 +4443,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5920,
+      "agdaMs" : 5396,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4279,6 +4478,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4335,7 +4535,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1627,
+      "agdaMs" : 1930,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4370,6 +4570,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4426,7 +4627,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1898,
+      "agdaMs" : 1951,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4461,6 +4662,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4517,7 +4719,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1848,
+      "agdaMs" : 1957,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4552,6 +4754,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4608,7 +4811,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2044,
+      "agdaMs" : 1948,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4643,6 +4846,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4700,7 +4904,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1737,
+      "agdaMs" : 1919,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4735,6 +4939,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4792,7 +4997,7 @@
       "via" : "both",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1966,
+      "agdaMs" : 1959,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4827,6 +5032,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4883,7 +5089,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1867,
+      "agdaMs" : 1951,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4918,6 +5124,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4974,7 +5181,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2334,
+      "agdaMs" : 2788,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -5009,6 +5216,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -5065,7 +5273,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2944,
+      "agdaMs" : 2795,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -5100,6 +5308,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -5156,7 +5365,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2725,
+      "agdaMs" : 2750,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -5191,6 +5400,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -5247,7 +5457,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1068,
+      "agdaMs" : 1256,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -5282,6 +5492,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -5338,7 +5549,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 1140,
+      "agdaMs" : 1244,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [

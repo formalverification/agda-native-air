@@ -15,6 +15,14 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Properties.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -75,7 +83,7 @@
   "via" : "mcp",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 5048,
+  "agdaMs" : 5312,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

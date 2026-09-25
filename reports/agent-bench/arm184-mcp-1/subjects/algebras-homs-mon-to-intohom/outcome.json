@@ -17,6 +17,14 @@
   "gateDetail" : "1 hole(s) remain",
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -74,8 +82,8 @@
   "via" : "mcp",
   "verdictVia" : "none",
   "agdaExit" : 42,
-  "agdaMs" : 5067,
-  "agdaTail" : "Checking Homs-mon-to-intohom (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/benchmarks/reports/agent-bench/arm184-mcp-1/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda).\n/home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/benchmarks/reports/agent-bench/arm184-mcp-1/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda:26.18-22: error: [UnsolvedInteractionMetas]\nUnsolved interaction metas at the following locations:\n  /home/williamdemeo/git/formalverification/agda-native-air/worktrees/184-m5-12-agda-mcp-boilerplate-overload/data/benchmarks/reports/agent-bench/arm184-mcp-1/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda:26.18-22",
+  "agdaMs" : 5390,
+  "agdaTail" : "Checking Homs-mon-to-intohom (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/188-m1-39-agent-bench/data/benchmarks/reports/agent-bench/arm184-mcp-1/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda).\n/home/williamdemeo/git/formalverification/agda-native-air/worktrees/188-m1-39-agent-bench/data/benchmarks/reports/agent-bench/arm184-mcp-1/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda:26.18-22: error: [UnsolvedInteractionMetas]\nUnsolved interaction metas at the following locations:\n  /home/williamdemeo/git/formalverification/agda-native-air/worktrees/188-m1-39-agent-bench/data/benchmarks/reports/agent-bench/arm184-mcp-1/subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda:26.18-22",
   "checkExit" : 42,
   "checkCodes" : [
     "UnsolvedInteractionMetas"

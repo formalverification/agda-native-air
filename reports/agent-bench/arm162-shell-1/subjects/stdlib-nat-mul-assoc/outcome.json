@@ -13,6 +13,7 @@
   "gateDetail" : "Bash reads outside the arm's roots (/): find / -xdev -iname \"Nat.agda\" -path \"*Builtin*\" 2>/dev/null; find / -xdev -iname \"*.agda\" -path \"*Builtin*Nat*\" 2>/dev/null",
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
     "open import Relation.Binary.PropositionalEquality using ( trans )"
   ],
@@ -59,7 +60,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 1593,
+  "agdaMs" : 1877,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

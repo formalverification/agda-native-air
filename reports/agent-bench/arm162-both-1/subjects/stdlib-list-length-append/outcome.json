@@ -11,6 +11,7 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -67,7 +68,7 @@
   "via" : "mcp",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 877,
+  "agdaMs" : 808,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

@@ -11,6 +11,7 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
     "open import Relation.Binary.PropositionalEquality using ( trans )"
   ],
@@ -69,7 +70,7 @@
   "via" : "mcp",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 1781,
+  "agdaMs" : 1967,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

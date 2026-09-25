@@ -13,6 +13,14 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Operations.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -70,7 +78,7 @@
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 180,
+  "agdaMs" : 208,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

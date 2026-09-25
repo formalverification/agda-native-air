@@ -1,11 +1,12 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "agent-opus5-1",
-  "timestamp" : "2026-09-16T01:38:47.819480469Z",
+  "timestamp" : "2026-09-25T20:36:09.464219909Z",
   "rejudged" : true,
   "config" : {
+    "arm" : "mcp",
     "safe" : true,
-    "rejudgedAt" : "2026-09-16T01:38:47.818425190Z",
+    "rejudgedAt" : "2026-09-25T20:36:09.463139250Z",
     "model" : "claude-opus-5",
     "maxTurns" : 30,
     "wallCapSec" : 900,
@@ -278,6 +279,7 @@
     "total" : 55,
     "solved" : 54,
     "restated" : 1,
+    "solvedOriginalInView" : 0,
     "gates" : {
       
     },
@@ -292,6 +294,7 @@
       "total" : 16,
       "solved" : 16,
       "restated" : 0,
+      "solvedOriginalInView" : 0,
       "gates" : {
         
       },
@@ -305,6 +308,7 @@
       "total" : 25,
       "solved" : 24,
       "restated" : 1,
+      "solvedOriginalInView" : 0,
       "gates" : {
         
       },
@@ -318,6 +322,7 @@
       "total" : 14,
       "solved" : 14,
       "restated" : 0,
+      "solvedOriginalInView" : 0,
       "gates" : {
         
       },
@@ -333,6 +338,7 @@
       "total" : 22,
       "solved" : 22,
       "restated" : 0,
+      "solvedOriginalInView" : null,
       "gates" : {
         
       },
@@ -346,6 +352,7 @@
       "total" : 11,
       "solved" : 11,
       "restated" : 0,
+      "solvedOriginalInView" : 0,
       "gates" : {
         
       },
@@ -359,6 +366,7 @@
       "total" : 10,
       "solved" : 9,
       "restated" : 1,
+      "solvedOriginalInView" : 0,
       "gates" : {
         
       },
@@ -372,6 +380,7 @@
       "total" : 12,
       "solved" : 12,
       "restated" : 0,
+      "solvedOriginalInView" : null,
       "gates" : {
         
       },
@@ -397,6 +406,15 @@
     "mcp__agda__resolve_name" : 1,
     "mcp__agda__search_by_type" : 1
   },
+  "perShell" : {
+    
+  },
+  "perVia" : {
+    "mcp" : 55
+  },
+  "perVerdictVia" : {
+    "mcp" : 55
+  },
   "outcomes" : [
     {
       "benchmarkId" : "stdlib-nat-plus-identity-l",
@@ -411,6 +429,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -432,7 +451,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -443,10 +478,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 2898,
+      "agdaMs" : 749,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -480,6 +520,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -500,7 +541,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -511,10 +568,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3036,
+      "agdaMs" : 757,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -549,6 +611,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -569,7 +632,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -580,10 +659,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3038,
+      "agdaMs" : 189,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -618,6 +702,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -638,7 +723,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -649,10 +750,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3042,
+      "agdaMs" : 201,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -686,6 +792,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -706,7 +813,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -717,10 +840,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3100,
+      "agdaMs" : 746,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -755,6 +883,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -776,7 +905,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -787,10 +932,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3212,
+      "agdaMs" : 848,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -824,6 +974,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -845,7 +996,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -856,10 +1023,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3307,
+      "agdaMs" : 247,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -893,6 +1065,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
         "open import Relation.Binary.PropositionalEquality using ( trans )"
       ],
@@ -914,7 +1087,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -925,10 +1114,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3210,
+      "agdaMs" : 1880,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -962,6 +1156,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -982,7 +1177,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -993,10 +1204,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3104,
+      "agdaMs" : 762,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1030,6 +1246,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1050,7 +1267,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1061,10 +1294,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3118,
+      "agdaMs" : 776,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1098,6 +1336,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1118,7 +1357,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1129,10 +1384,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3048,
+      "agdaMs" : 795,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1166,6 +1426,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1186,7 +1447,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1197,10 +1474,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3102,
+      "agdaMs" : 797,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1234,6 +1516,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1254,7 +1537,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1265,10 +1564,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3068,
+      "agdaMs" : 764,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1302,6 +1606,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1322,7 +1627,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1333,10 +1654,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3227,
+      "agdaMs" : 850,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1370,6 +1696,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1390,7 +1717,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1401,10 +1744,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3173,
+      "agdaMs" : 855,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1438,6 +1786,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1458,7 +1807,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1469,10 +1834,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3239,
+      "agdaMs" : 851,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1506,6 +1876,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1526,7 +1897,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1537,10 +1924,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3375,
+      "agdaMs" : 826,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1574,6 +1966,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
         "open import Relation.Binary.PropositionalEquality using ( trans )"
       ],
@@ -1595,7 +1988,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1606,10 +2015,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3167,
+      "agdaMs" : 1882,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1643,6 +2057,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
         "open import Relation.Binary.PropositionalEquality using ( trans )"
       ],
@@ -1664,7 +2079,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1675,10 +2106,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3339,
+      "agdaMs" : 1938,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1712,6 +2148,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
         "open import Relation.Binary.PropositionalEquality using ( trans )"
       ],
@@ -1733,7 +2170,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1744,10 +2197,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3393,
+      "agdaMs" : 1993,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1781,6 +2239,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
         "open import Relation.Binary.PropositionalEquality using ( trans )"
       ],
@@ -1802,7 +2261,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1813,10 +2288,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3087,
+      "agdaMs" : 1941,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1850,6 +2330,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1870,7 +2351,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1881,10 +2378,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3140,
+      "agdaMs" : 197,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1921,6 +2423,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -1942,7 +2452,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -1953,10 +2479,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3129,
+      "agdaMs" : 803,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1993,6 +2524,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2014,7 +2553,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2025,10 +2580,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3288,
+      "agdaMs" : 820,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2064,6 +2624,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Operations.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2085,7 +2653,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2096,10 +2680,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3222,
+      "agdaMs" : 211,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2137,6 +2726,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2159,7 +2756,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2170,10 +2783,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3508,
+      "agdaMs" : 2581,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2211,6 +2829,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 1
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2237,7 +2863,23 @@
       },
       "permissionDenials" : 1,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2249,10 +2891,15 @@
         ],
         "deniedPaths" : [
           "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md"
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3484,
+      "agdaMs" : 2737,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2289,6 +2936,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2311,7 +2966,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2322,10 +2993,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3388,
+      "agdaMs" : 2714,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2362,6 +3038,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Surjective.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2384,7 +3068,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2395,10 +3095,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3400,
+      "agdaMs" : 2733,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2435,6 +3140,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2458,7 +3171,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2469,10 +3198,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3415,
+      "agdaMs" : 2768,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2510,6 +3244,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2535,7 +3277,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2546,10 +3304,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5522,
+      "agdaMs" : 5417,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2587,6 +3350,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2609,7 +3380,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2620,10 +3407,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5595,
+      "agdaMs" : 5407,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2661,6 +3453,14 @@
       "restatementEvidence" : [
         "ref Setoid.Homomorphisms.Basic.mon→hom"
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2684,7 +3484,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2695,10 +3511,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5634,
+      "agdaMs" : 5426,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2736,6 +3557,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2760,7 +3589,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2771,10 +3616,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3488,
+      "agdaMs" : 2731,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2813,6 +3663,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2835,7 +3693,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2846,10 +3720,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 6002,
+      "agdaMs" : 6045,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2886,6 +3765,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2909,7 +3796,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2920,10 +3823,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 6247,
+      "agdaMs" : 6025,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -2961,6 +3869,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -2985,7 +3901,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -2996,10 +3928,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5652,
+      "agdaMs" : 5512,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3037,6 +3974,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3060,7 +4005,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3071,10 +4032,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5781,
+      "agdaMs" : 5549,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3112,6 +4078,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3136,7 +4110,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3147,10 +4137,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 6269,
+      "agdaMs" : 5986,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3188,6 +4183,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3212,7 +4215,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3223,10 +4242,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 6382,
+      "agdaMs" : 6059,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3265,6 +4289,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 1
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3293,7 +4325,23 @@
       },
       "permissionDenials" : 1,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3305,10 +4353,15 @@
         ],
         "deniedPaths" : [
           "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md"
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 6316,
+      "agdaMs" : 5969,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3348,6 +4401,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3371,7 +4432,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3382,10 +4459,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5884,
+      "agdaMs" : 5548,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3422,6 +4504,14 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3444,7 +4534,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3455,10 +4561,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5769,
+      "agdaMs" : 5712,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3493,6 +4604,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3513,7 +4625,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3524,10 +4652,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3254,
+      "agdaMs" : 2073,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3562,6 +4695,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3583,7 +4717,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3594,10 +4744,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3315,
+      "agdaMs" : 2001,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3632,6 +4787,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3653,7 +4809,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3664,10 +4836,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3226,
+      "agdaMs" : 2042,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3702,6 +4879,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3722,7 +4900,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3733,10 +4927,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3331,
+      "agdaMs" : 1874,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3771,6 +4970,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3792,7 +4992,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3803,10 +5019,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3202,
+      "agdaMs" : 1946,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3841,6 +5062,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3862,7 +5084,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3873,10 +5111,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3251,
+      "agdaMs" : 1972,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3911,6 +5154,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -3932,7 +5176,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -3943,10 +5203,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3268,
+      "agdaMs" : 1987,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -3981,6 +5246,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4001,7 +5267,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -4012,10 +5294,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3332,
+      "agdaMs" : 2792,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4050,6 +5337,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4070,7 +5358,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -4081,10 +5385,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3360,
+      "agdaMs" : 2781,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4119,6 +5428,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4140,7 +5450,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -4151,10 +5477,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3313,
+      "agdaMs" : 2819,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4189,6 +5520,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4209,7 +5541,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -4220,10 +5568,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3108,
+      "agdaMs" : 1232,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -4258,6 +5611,7 @@
       "restated" : false,
       "restatementEvidence" : [
       ],
+      "original" : null,
       "addedImports" : [
       ],
       "terminal" : "completed",
@@ -4279,7 +5633,23 @@
       },
       "permissionDenials" : 0,
       "isolation" : {
+        "arm" : "mcp",
         "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
         "missingAgdaTools" : [
         ],
         "extraTools" : [
@@ -4290,10 +5660,15 @@
         "violations" : [
         ],
         "deniedPaths" : [
-        ]
+        ],
+        "shellClasses" : {
+          
+        }
       },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 3279,
+      "agdaMs" : 1256,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
