@@ -169,6 +169,8 @@ As of September 2026 the following are built, measured, and in use.
    same `agda` and no server, Sonnet 5 solves 50 and restates none, and given
    both it takes every verdict from `check_file` and never runs `agda` itself
    ([#162](https://github.com/formalverification/agda-native-air/issues/162)).
+   That zero is not construction: the shell arm could read the library, and
+   had the original's proof in view for 16 of its 18 agda-algebras solves.
    The search's 8 and 14 are a different instrument, not a baseline for the
    agents; which instrument produced every number in this section, and how to
    tell a win from a loss, is

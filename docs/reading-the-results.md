@@ -95,7 +95,9 @@ arms it is also the model's **tool**.  The judge favors no arm.
    library's own lemma for the statement it was asked to prove
    (`kercon′ h = kercon h`).  It type-checks and proves nothing new.  **Never
    counted as solved**; reported in its own column.  The agent-side twin of
-   the loop's target exclusion.
+   the loop's target exclusion.  The rule reads the body's *references*, so
+   it catches a body that cites the lemma and not one that transcribes the
+   lemma's own proof; § 4.3 measures how often that happened.
 +  **Gate**: one of the judge's named refusals (`preservation`, `escape`,
    `holes`, `typecheck`, `isolation`); a row that fails one is neither solved
    nor restated, and the outcome names the gate.
@@ -285,17 +287,47 @@ and 56; `type_of` 11 and 34; `definition_of` **0** and 19; `search_by_name`
 **1** and 18; `exports_of` 2 and 11.  Bash in the `both` arm: 65 calls, every
 one a library-source read; `agda` run on the shell: **never**.
 
+**What the readable sources did**.  Every agda-algebras obligation restates
+a lemma the library already proves, and [#162] made the libraries' sources
+readable on every arm so that the arms would be comparable.  The archived
+arms had refused those reads as a confinement side effect.  Reading each
+transcript for the original's defining file (a read of it that succeeded, or
+a line of its proof in any tool's result) before the subject's last edit of
+the work file gives the following, over the 21 agda-algebras rows:
+
+| arm | run id | solved | restated | original's proof in view before the last edit | reads refused |
+|---|---|---|---|---|---|
+| archive `mcp`, Sonnet | `agent-sonnet5-1` | 13 | 8 | **0** | 2 |
+| archive `mcp`, Opus | `agent-opus5-1` | 20 | 1 | **0** | 2 |
+| archive `mcp`, Opus | `agent-opus5-2` | 20 | 1 | **0** | 4 |
+| `shell` | `arm162-shell-1` | 18 | 0 | **16** | 0 |
+| `mcp` | `arm162-mcp-1` | 14 | 6 | 6 | 0 |
+| `both` | `arm162-both-1` | 19 | 2 | **16** | 0 |
+
+Six of the eight rows the archive restated are `shell` solves written with
+the original in view, and seven `shell` bodies are the library's own after
+renaming the lemma (two of them one-line proofs every arm writes the same
+way).  The `mon→hom` example below is one: `IsMon.HomReduct (proj₂ m)` is
+the library's `IsMon.HomReduct (proj₂ h)`.  The restated rule reads
+references, so a transcribed proof passes it.  The archived arms are
+therefore the only construction measurements on these rows, and [#162]'s
+agda-algebras columns measure, in part, access to the disk.  (The
+transcript reading is a script over the archive, not part of the judge;
+a `transcribed` gate is the fix, § 6.)
+
 **Reading this, number by number**.
 
-+  **Solved, tools against no tools: a loss**.  50 with a shell, 47 with the
-   server.  Three rows, on one seed of one model, which is within the
-   run-to-run variance the two Opus seeds showed (0 rows, 13 turns); the
-   direction is credible because the mechanism is identified below, but the
-   magnitude is not.
-+  **Restated, tools against no tools: a loss, and the robust one**.  0 with a
-   shell, 6 with the server, 8 in the archive.  A subject that reads a
-   lemma's source writes the construction (`IsMon.HomReduct (proj₂ m)`); one
-   that learns its name from a tool cites it (`mon→hom _ _ m`).
++  **Solved, tools against no tools: a loss on the count; not on
+   construction**.  50 with a shell, 47 with the server.  Three rows, on one
+   seed of one model, which is within the run-to-run variance the two Opus
+   seeds showed (0 rows, 13 turns); and on the agda-algebras rows, where the
+   whole difference sits, the `shell` arm had the original's proof in view
+   for 16 of its 18 solves.
++  **Restated, tools against no tools: not a loss; a loophole**.  0 with a
+   shell, 6 with the server, 8 in the archive.  The zero is transcription,
+   not construction: the rows the archive cited, the `shell` arm copied,
+   which the rule cannot see.  The honest comparison for this column is
+   between arms that cannot read the original, and [#162] has none.
 +  **Cost, tools against no tools: a loss, diagnosed**.  USD 5.28 against
    2.88 with **equal output tokens**: the model wrote the same amount and
    read 3.6 times more, because the tools' answers carry echo and boilerplate
@@ -326,8 +358,8 @@ not a term, so no hole-filling judgment of any kind can express it.
 
 | question | look at | it is a win for the tools when |
 |---|---|---|
-| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise.  **Today: no**. |
-| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer.  **Today: the reverse**. |
+| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals**. |
+| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero is transcription**. |
 | Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no; cause measured, [#184]**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
@@ -345,6 +377,14 @@ not a term, so no hole-filling judgment of any kind can express it.
 +  **The tools with lean answers** ([#184]) and **knowledge tools that return
    content** ([#185]): the two measured defects, each with a re-run that
    settles it.
++  **Construction, tools against no tools**.  The archived arms could not
+   read the originals and the [#162] arms could (§ 4.3), so no run compares
+   the tools with their absence on rows the subject cannot copy.  The
+   control is a re-run with the originals' defining modules hidden from
+   every arm, on the file system rather than by the client's permission
+   rules (a shell reads anything), and a judge gate that reads the transcript
+   for the original's proof and names the row `transcribed`.  A hard tier
+   whose statements have no proof on disk needs neither.
 +  **Small and local models** ([#27], [#28], [#29]), where a shell is least
    usable and structured verdicts plausibly matter most.
 +  **Opus with a shell**.  The control was run on Sonnet only.
