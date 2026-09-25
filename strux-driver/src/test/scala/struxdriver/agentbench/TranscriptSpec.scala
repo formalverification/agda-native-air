@@ -67,6 +67,10 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     r.tokens.hcursor.get[Long]("cacheRead").toOption shouldBe Some(39316L)
     t.filePaths(Subject.fileTools).map(_._3).forall(_.startsWith(workDir.toString)) shouldBe true
     t.resultOf(t.usesOf("mcp__agda__check_file").head).flatMap(_.body).flatMap(_.hcursor.get[Boolean]("success").toOption) shouldBe Some(true)
+    // Every call and result keeps its stream record: calls in order, each result after its call (issue #188).
+    t.uses.map(_.record) shouldBe t.uses.map(_.record).sorted
+    t.uses.forall(u => t.resultOf(u).exists(_.record > u.record)) shouldBe true
+    t.uses.map(_.record).last should be < t.records
   }
 
   test("captured transcript: the audit finds the instrument in hand and nothing outside the protocol") {

@@ -27,6 +27,12 @@
   *    (the same double encoding McpClient unwraps), read here with cursors
   *    rather than the strict Wire decoders, since a refused call's text is
   *    prose and must still be counted.
+  *  - Every call and every result keeps the index of the stream record that
+  *    carried it (`record`), because the order of calls is not the order in
+  *    which the subject saw their answers: a model may issue several calls in
+  *    one turn, and none of their results is in its context until all of them
+  *    were made.  "Seen before the last edit" (OriginalInView.scala, issue
+  *    #188) is a comparison of records, never of call indices.
   *
   *  ============================================================================
   */
@@ -37,14 +43,16 @@ import io.circe.parser.parse
 
 import struxdriver.search.ToolReply
 
-/** A tool call the model made: the block id (pairs it with its result), the tool name, the arguments. */
-final case class ToolUse(id: String, name: String, input: Json) {
+/** A tool call the model made: the block id (pairs it with its result), the
+  * tool name, the arguments, and the index of the stream record it came in.
+  */
+final case class ToolUse(id: String, name: String, input: Json, record: Int) {
   def str(field: String): Option[String] = input.hcursor.get[String](field).toOption
   def int(field: String): Option[Int]    = input.hcursor.get[Int](field).toOption
 }
 
-/** What came back for one tool call. */
-final case class ToolResult(toolUseId: String, isError: Boolean, text: String) {
+/** What came back for one tool call, and the index of the stream record it came in. */
+final case class ToolResult(toolUseId: String, isError: Boolean, text: String, record: Int) {
   /** The MCP body as JSON, when the text is JSON. */
   def body: Option[Json] = parse(text).toOption
   /** The same reply as the search's client sees it, for the strict Wire decoders. */
@@ -154,7 +162,7 @@ object Transcript {
                 val bc = b.hcursor
                 if (bc.get[String]("type").toOption.contains("tool_use"))
                   for { id <- bc.get[String]("id").toOption; name <- bc.get[String]("name").toOption }
-                    yield ToolUse(id, name, bc.downField("input").focus.getOrElse(Json.obj()))
+                    yield ToolUse(id, name, bc.downField("input").focus.getOrElse(Json.obj()), acc.records)
                 else None
               }
               val texts = blocks.flatMap(b => if (b.hcursor.get[String]("type").toOption.contains("text")) b.hcursor.get[String]("text").toOption else None)
@@ -166,7 +174,7 @@ object Transcript {
                 val bc = b.hcursor
                 if (bc.get[String]("type").toOption.contains("tool_result"))
                   bc.get[String]("tool_use_id").toOption.map(id =>
-                    id -> ToolResult(id, bc.get[Boolean]("is_error").getOrElse(false), textOf(bc.downField("content"))))
+                    id -> ToolResult(id, bc.get[Boolean]("is_error").getOrElse(false), textOf(bc.downField("content")), acc.records))
                 else None
               }
               val texts =

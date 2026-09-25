@@ -75,9 +75,11 @@ final case class GateFailure(gate: String, detail: String)
   * a lemma the index files elsewhere), and when a tag's bare name differs
   * from the hole's, where it widens the exact name to a re-export.  It is not
   * when a tag names the hole's own name, where any same-named lemma anywhere
-  * would match an exactly known original.
+  * would match an exactly known original.  `tagged` says the index named it,
+  * which is when there is a proof on disk the subject could have read
+  * (OriginalInView.scala, issue #188); an untagged row's guess names none.
   */
-final case class Original(qualified: Option[String], bare: String, bareIsEvidence: Boolean)
+final case class Original(qualified: Option[String], bare: String, bareIsEvidence: Boolean, tagged: Boolean)
 
 /** The statement in both files, as Agda printed the elaborated types (for the
   * ledger), and whether the two type ASTs are equal.
@@ -148,7 +150,7 @@ object Gates {
   def originalOf(module: String, hole: String, tags: Vector[String]): Original = {
     val tagged = tags.collectFirst { case t if t.startsWith("restates:") => t.stripPrefix("restates:") }
     val bare   = tagged.map(_.split('.').last).getOrElse(hole.stripSuffix("′"))
-    Original(tagged.orElse(Some(s"$module.$bare")), bare, tagged.isEmpty || bare != hole)
+    Original(tagged.orElse(Some(s"$module.$bare")), bare, tagged.isEmpty || bare != hole, tagged.isDefined)
   }
 
   /** The names the definition's body refers to, closed over the file's own
