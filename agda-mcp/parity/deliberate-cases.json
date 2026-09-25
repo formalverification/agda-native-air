@@ -1,0 +1,126 @@
+[
+ {
+  "benchmarkId": "force-blocked",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-comm.agda",
+  "candidate": "(+-comm _ _)",
+  "force": "WithForce",
+  "note": "WithForce against the WithoutForce probe row: a give Agda accepted but could not solve the constraints of"
+ },
+ {
+  "benchmarkId": "force-refused",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-comm.agda",
+  "candidate": "+-comm",
+  "force": "WithForce",
+  "note": "WithForce against the WithoutForce probe row: a give Agda refused outright ([UnequalTerms])"
+ },
+ {
+  "benchmarkId": "sub-hole-only",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-zero-lt-suc.agda",
+  "candidate": "s≤s {!!}",
+  "note": "the issue's core candidate shape: one sub-hole left and nothing else, the [UnsolvedInteractionMetas] class fill_hole tolerates"
+ },
+ {
+  "benchmarkId": "candidate-is-a-hole",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-zero-lt-suc.agda",
+  "candidate": "{!!}",
+  "note": "the degenerate sub-hole: a candidate that is itself a hole"
+ },
+ {
+  "benchmarkId": "two-holes-first",
+  "obligation": "agda-mcp/test/resources/TwoHoles.agda",
+  "holeIndex": 0,
+  "candidate": "zero",
+  "note": "a file with two holes: fill the first, the other stays open"
+ },
+ {
+  "benchmarkId": "two-holes-second",
+  "obligation": "agda-mcp/test/resources/TwoHoles.agda",
+  "holeIndex": 1,
+  "candidate": "zero",
+  "note": "the same file addressed at hole index 1: does the tool's index and the lane's interaction point agree past the first hole"
+ },
+ {
+  "benchmarkId": "two-holes-sub-hole",
+  "obligation": "agda-mcp/test/resources/TwoHoles.agda",
+  "holeIndex": 0,
+  "candidate": "suc {!!}",
+  "note": "a sub-hole inside the candidate AND another open hole in the file: two sources of [UnsolvedInteractionMetas] at once"
+ },
+ {
+  "benchmarkId": "unsolved-meta",
+  "obligation": "agda-mcp/test/resources/TwoHoles.agda",
+  "holeIndex": 0,
+  "candidate": "implicitOnly",
+  "note": "issue #69's pattern: the clause typechecks and leaves an unsolved meta, which is NOT the tolerated class"
+ },
+ {
+  "benchmarkId": "where-clause",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "helper where helper : 0 + n ≡ n ; helper = refl",
+  "note": "a candidate that is a clause tail rather than an expression: the batch splice accepts it (verified by hand, exit 0), and Cmd_give parses an expression"
+ },
+ {
+  "benchmarkId": "multi-line-let",
+  "obligation": "data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-identityL.agda",
+  "candidate": "(let x = refl\n                     in x)",
+  "note": "a multi-line candidate whose continuation line is indented for the file's layout; the batch splice accepts it (verified by hand, exit 0)"
+ },
+ {
+  "benchmarkId": "later-use-right",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "1",
+  "note": "a hole constrained by a definition that comes after it, filled with the one value that satisfies it"
+ },
+ {
+  "benchmarkId": "later-use-wrong",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "0",
+  "note": "the same hole filled with a value the later definition refutes: batch re-checks the module top down, the lane discharges a constraint blocked on the meta"
+ },
+ {
+  "benchmarkId": "later-use-hole",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "suc {!!}",
+  "note": "a partial fill whose remaining hole IS constrained by the later definition, and which CAN be completed (suc 0 typechecks, verified by hand): the two lanes answer different questions here"
+ },
+ {
+  "benchmarkId": "extended-lambda",
+  "obligation": "agda-mcp/parity/fixtures/Shapes.agda",
+  "holeIndex": 0,
+  "candidate": "λ { true → false ; false → true }",
+  "note": "an extended lambda, the candidate shape most likely to meet the same interaction-protocol refusal a where clause does"
+ },
+ {
+  "benchmarkId": "plain-lambda",
+  "obligation": "agda-mcp/parity/fixtures/Shapes.agda",
+  "holeIndex": 0,
+  "candidate": "λ x → x",
+  "note": "the control for the extended lambda: an ordinary lambda at the same hole"
+ },
+ {
+  "benchmarkId": "string-with-quote",
+  "obligation": "agda-mcp/parity/fixtures/Shapes.agda",
+  "holeIndex": 1,
+  "candidate": "\"a \\\"quoted\\\" b\"",
+  "note": "a quote inside a string literal: it must survive JSON, the IOTCM line's Haskell string literal, Agda's lexer, and the batch splice"
+ },
+ {
+  "benchmarkId": "string-non-ascii",
+  "obligation": "agda-mcp/parity/fixtures/Shapes.agda",
+  "holeIndex": 1,
+  "candidate": "\"λ → ∀\"",
+  "note": "non-ASCII inside a string literal, which hsShow ships as decimal escapes"
+ },
+ {
+  "benchmarkId": "later-use-hole-dead",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "suc (suc {!!})",
+  "note": "the discriminator: a partial fill NO completion can satisfy (suc (suc x) never equals 1, verified by hand for several x).  If the lane blessed sub-holes blindly it would say ok here"
+ },
+ {
+  "benchmarkId": "later-use-hole-dead-deeper",
+  "obligation": "agda-mcp/parity/fixtures/LaterUse.agda",
+  "candidate": "suc (suc (suc {!!}))",
+  "note": "the same dead end one level deeper, so the refusal is not an artifact of the first one"
+ }
+]

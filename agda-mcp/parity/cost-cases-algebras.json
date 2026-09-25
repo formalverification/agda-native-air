@@ -1,0 +1,44 @@
+[
+ {
+  "benchmarkId": "cost-algebras-accepted",
+  "obligation": "data/benchmarks/agda-algebras-v0/obligations/Homs-comp-hom.agda",
+  "candidate": "proj₁ g ⊙ proj₁ f , ⊙-is-hom (proj₂ f) (proj₂ g)",
+  "source": "cost",
+  "note": "accepted: the give consumes the hole, so a reload is owed"
+ },
+ {
+  "benchmarkId": "cost-algebras-accepted",
+  "obligation": "data/benchmarks/agda-algebras-v0/obligations/Homs-comp-hom.agda",
+  "candidate": "proj₁ g ⊙ proj₁ f , ⊙-is-hom (proj₂ f) (proj₂ g)",
+  "source": "cost",
+  "note": "accepted: the give consumes the hole, so a reload is owed"
+ },
+ {
+  "benchmarkId": "cost-algebras-accepted",
+  "obligation": "data/benchmarks/agda-algebras-v0/obligations/Homs-comp-hom.agda",
+  "candidate": "proj₁ g ⊙ proj₁ f , ⊙-is-hom (proj₂ f) (proj₂ g)",
+  "source": "cost",
+  "note": "accepted: the give consumes the hole, so a reload is owed"
+ },
+ {
+  "benchmarkId": "cost-algebras-refused",
+  "obligation": "data/benchmarks/agda-algebras-v0/obligations/Homs-comp-hom.agda",
+  "candidate": "tt",
+  "source": "cost",
+  "note": "refused: the hole survives, so no reload is owed"
+ },
+ {
+  "benchmarkId": "cost-algebras-refused",
+  "obligation": "data/benchmarks/agda-algebras-v0/obligations/Homs-comp-hom.agda",
+  "candidate": "tt",
+  "source": "cost",
+  "note": "refused: the hole survives, so no reload is owed"
+ },
+ {
+  "benchmarkId": "cost-algebras-refused",
+  "obligation": "data/benchmarks/agda-algebras-v0/obligations/Homs-comp-hom.agda",
+  "candidate": "tt",
+  "source": "cost",
+  "note": "refused: the hole survives, so no reload is owed"
+ }
+]

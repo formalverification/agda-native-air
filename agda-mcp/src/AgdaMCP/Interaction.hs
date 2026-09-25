@@ -22,6 +22,15 @@
 --   tools built on this lane say in their descriptions that they inform and never
 --   decide.
 --
+--   One function here does change the child's state and reads its answer in
+--   fill_hole's vocabulary: 'giveCandidate', the @Cmd_give@ of issue #163.
+--   It is reachable from no tool and from no handler; it exists so that the
+--   lane's reading of a candidate can be measured against the batch verdict
+--   for the same candidate (the harness is @agda-mcp/parity/Main.hs@), and
+--   its 'GiveClass' is a reading of what Agda did, never a verdict.  Whether
+--   the lane may judge is a decision for a reader of that measurement, and
+--   until one is taken the policy above is unchanged.
+--
 --   Design notes, briefly (each is probed, none is assumed):
 --
 --   * One child per resolved project root ('AgdaMCP.Project' supplies the root,
@@ -118,6 +127,17 @@ module AgdaMCP.Interaction
   , cmdModuleContentsToplevel
   , cmdGoalTypeContext
   , cmdShowVersion
+  , cmdGive
+  , GiveForce (..)
+    -- * Giving a candidate to a hole (issue #163; no tool registers this)
+  , GiveClass (..)
+  , GiveReading (..)
+  , ReportCheck (..)
+  , giveReportCheck
+  , GiveOutcome (..)
+  , readGive
+  , giveErrorsOf
+  , giveCandidate
     -- * Provenance prose (pure; exposed for testing)
   , SrcLoc (..)
   , ProvenanceStep (..)
@@ -183,6 +203,11 @@ data IResponse
   = IDisplayInfo Text Value   -- ^ @DisplayInfo@: its @info.kind@ and @info@ object.
   | IInteractionPoints [IPoint]
   | IRunningInfo Text         -- ^ Progress prose (@Checking M (path).@).
+  | IGiveAction (Maybe Int) (Maybe Text)
+      -- ^ @GiveAction@: Agda accepted a candidate at an interaction point and
+      -- would write this text into the file.  The fields are the point's id
+      -- and @giveResult.str@; the text is 'Nothing' for the parenthesization
+      -- forms of Agda's @GiveResult@, which carry no string (issue #163).
   | IOther Text Value         -- ^ Any other JSON kind (Status, highlighting, …).
   | IUnreadable Text          -- ^ A line that was not JSON.
   deriving (Eq, Show)
@@ -263,6 +288,9 @@ parseResponseLine raw =
           IInteractionPoints (pointsFrom (KM.lookup "interactionPoints" o))
         Just "RunningInfo" ->
           IRunningInfo (fromMaybe "" (textField "message" o))
+        Just "GiveAction" ->
+          IGiveAction (KM.lookup "interactionPoint" o >>= objectField >>= intField "id")
+                      (KM.lookup "giveResult" o >>= objectField >>= textField "str")
         Just k  -> IOther k v
         Nothing -> IOther "" v
       _ -> IUnreadable line
@@ -296,7 +324,17 @@ interactionPointsOf rs = listToMaybe [ps | IInteractionPoints ps <- rs]
 -- | goalsOf: the visible goals of the last @AllGoalsWarnings@ in a collection;
 -- i.e., each goal's interaction point and printed type.
 goalsOf :: [IResponse] -> [LaneGoal]
-goalsOf = goalArrayOf "visibleGoals" $ \g c -> do
+goalsOf = goalArrayOf "visibleGoals" goalEntryOf
+
+-- | goalEntryOf / metaEntryOf: the per-entry readers of the two goal arrays.
+--
+-- Named rather than inlined so that the total reading ('goalArrayOf', which
+-- drops an entry it cannot read) and the strict check ('goalArrayStrict', which
+-- refuses the whole array) are provably about the same elements read the same
+-- way.  A validator with its own copy of a reader is a validator that can
+-- disagree with what it validates.
+goalEntryOf :: Value -> Maybe LaneGoal
+goalEntryOf = splitEntry $ \g c -> do
   i <- intField "id" c
   pure (LaneGoal i (rangeField c) (fromMaybe "" (textField "type" g)))
 
@@ -307,9 +345,22 @@ goalsOf = goalArrayOf "visibleGoals" $ \g c -> do
 -- these are knowledge and never a verdict: batch @agda@ exits 42 on the same
 -- file, and that exit code stays the only verdict.
 metasOf :: [IResponse] -> [LaneMeta]
-metasOf = goalArrayOf "invisibleGoals" $ \g c -> do
+metasOf = goalArrayOf "invisibleGoals" metaEntryOf
+
+metaEntryOf :: Value -> Maybe LaneMeta
+metaEntryOf = splitEntry $ \g c -> do
   n <- textField "name" c
   pure (LaneMeta n (rangeField c) (fromMaybe "" (textField "type" g)))
+
+-- | splitEntry: hand a reader the two objects a goal entry is split across,
+-- the entry itself (which carries @type@) and its @constraintObj@ (the
+-- identity and the range).
+splitEntry
+  :: (KM.KeyMap Value -> KM.KeyMap Value -> Maybe a) -> Value -> Maybe a
+splitEntry reader (Object g) = case KM.lookup "constraintObj" g of
+  Just (Object c) -> reader g c
+  _               -> Nothing
+splitEntry _ _ = Nothing
 
 -- | goalArrayOf: one goal array of the /last/ @AllGoalsWarnings@ in a
 -- collection, read by the given entry reader.
@@ -321,21 +372,32 @@ metasOf = goalArrayOf "invisibleGoals" $ \g c -> do
 -- rather than the whole list.  The last such response wins: a collection can
 -- hold the load's own plus a later command's, and the latest describes the
 -- current state.
-goalArrayOf
-  :: Text
-  -> (KM.KeyMap Value -> KM.KeyMap Value -> Maybe a)
-  -> [IResponse] -> [a]
-goalArrayOf field reader rs =
+goalArrayOf :: Text -> (Value -> Maybe a) -> [IResponse] -> [a]
+goalArrayOf field reader = mapMaybe reader . fromMaybe [] . goalArrayValues field
+
+-- | goalArrayValues: the raw elements of one array field of the /last/
+-- @AllGoalsWarnings@ in a collection.  'Nothing' when there is no such
+-- response, when the field is absent, or when it is not an array; the three
+-- cases the total reading above cannot tell apart from an empty array and
+-- 'goalArrayStrict' must.
+goalArrayValues :: Text -> [IResponse] -> Maybe [Value]
+goalArrayValues field rs =
   case [io | IDisplayInfo "AllGoalsWarnings" (Object io) <- rs] of
-    [] -> []
+    [] -> Nothing
     os -> case KM.lookup (Key.fromText field) (last os) of
-      Just (Array a) -> mapMaybe entry (V.toList a)
-      _              -> []
-  where
-    entry (Object g) = case KM.lookup "constraintObj" g of
-      Just (Object c) -> reader g c
-      _               -> Nothing
-    entry _ = Nothing
+      Just (Array a) -> Just (V.toList a)
+      _              -> Nothing
+
+-- | goalArrayStrict: the same field read by the same reader, but 'Nothing'
+-- whenever the total reading would have had to /drop/ something: the field
+-- absent or mistyped, or any single entry the reader declines.
+--
+-- This is what an @ok@ may rest on and the total reading is not.  An empty
+-- list from 'goalArrayOf' means \"no errors\" and \"Agda did not tell me\"
+-- indistinguishably, and reading the second as the first is a false green
+-- (a Copilot review catch on PR 174).
+goalArrayStrict :: Text -> (Value -> Maybe a) -> [IResponse] -> Maybe [a]
+goalArrayStrict field reader rs = goalArrayValues field rs >>= traverse reader
 
 -- | goalInfoOf: the @goalInfo@ object of a @GoalSpecific@ response; this is where
 -- goal-scoped answers (inferred types, goal contexts) live.
@@ -404,6 +466,10 @@ pointContaining ln mCol ps = listToMaybe
         (irLine r, irCol r) <= (ln, col) && (ln, col) < (irEndLine r, irEndCol r)
 
 -- Field helpers over Aeson objects.
+
+objectField :: Value -> Maybe (KM.KeyMap Value)
+objectField (Object o) = Just o
+objectField _          = Nothing
 
 textField :: Text -> KM.KeyMap Value -> Maybe Text
 textField k o = case KM.lookup (Key.fromText k) o of
@@ -494,6 +560,36 @@ cmdGoalTypeContext gid =
 -- command's output exactly (design doc § 2.1).
 cmdShowVersion :: Text
 cmdShowVersion = "Cmd_show_version"
+
+-- | GiveForce: Agda's own force flag on @Cmd_give@.  'WithoutForce' is the
+-- editor's ordinary give, which refuses a candidate that does not typecheck;
+-- 'WithForce' is the escape hatch an editor offers for a give Agda would
+-- otherwise decline.  Named here so the two are distinguishable in a
+-- measurement rather than spelled inline (issue #163).
+data GiveForce = WithoutForce | WithForce
+  deriving (Eq, Show)
+
+-- | cmdGive: give a candidate expression to an interaction point.
+--
+-- This is the /only/ command in this module that changes the child's state:
+-- an accepted give consumes the interaction point, and the lane is then
+-- describing a file it no longer matches on disk.  Nothing writes the file
+-- (@Cmd_give@ tells an editor what to write; the lane has no editor), so the
+-- way back is one forced 'ensureLoaded', which is what 'giveCandidate' does
+-- and why callers should prefer it to sending this line themselves.
+--
+-- No tool registers a give.  It exists as a library function so the parity
+-- of a lane reading against a batch @fill_hole@ verdict can be measured
+-- (issue #163); the two-lane policy is unchanged until that measurement is
+-- read.
+cmdGive :: GiveForce -> Int -> Text -> Text
+cmdGive force gid expr =
+  "Cmd_give " <> forceName <> " " <> T.pack (show gid)
+    <> " noRange " <> hsShow expr
+  where
+    forceName = case force of
+      WithoutForce -> "WithoutForce"
+      WithForce    -> "WithForce"
 
 
 -- ---------------------------------------------------------------------------
@@ -1318,6 +1414,240 @@ elapsedMsBetween start end =
 -- implicit re-load with an argv the lane did not choose (design doc § 2.6).
 runQuery :: LaneHandle -> FilePath -> Text -> IO (Either LaneFailure [IResponse])
 runQuery lh path cmd = runCmdOn lh (Just (path, cmd))
+
+
+-- ---------------------------------------------------------------------------
+-- Giving a candidate to a hole (issue #163)
+-- ---------------------------------------------------------------------------
+--
+-- A give is not a verdict and this module does not make it one.  What it is
+-- is a reading of what Agda did with a candidate, in the vocabulary the batch
+-- @fill_hole@ verdict already uses, so that the two can be compared row by
+-- row on real candidates.  The reading rule below is the one issue #163
+-- states; whether it agrees with the batch verdict often enough to be used
+-- for anything is the question the measurement answers, not an assumption
+-- this module makes.
+
+-- | GiveClass: the lane's reading of one give, in @fill_hole@'s vocabulary.
+--
+-- 'GiveClassOk' is a give Agda accepted whose following @AllGoalsWarnings@
+-- arrived and left nothing unsolved but
+-- interaction points, the class @fill_hole@ tolerates by ADR 0002 § 3
+-- (a sub-hole inside the candidate, or another open hole in the file, is an
+-- @[UnsolvedInteractionMetas]@ and not a type error).  Everything else is
+-- 'GiveClassTypeError': a refusal with no give at all, and equally a give
+-- Agda accepted that left an invisible goal or a blocked constraint behind,
+-- which is the @[UnsolvedMetaVariables]@ / @[UnsolvedConstraints]@ class
+-- issue #69 put outside the tolerance.
+data GiveClass = GiveClassOk | GiveClassTypeError
+  deriving (Eq, Show)
+
+-- | GiveReading: everything one @Cmd_give@ said, read as data.
+--
+-- 'grClass' is the projection to compare with a batch status; every other
+-- field is the evidence behind it, kept so a disagreement can be explained
+-- rather than only counted.  Note 'grGoals': a give that produced no
+-- @AllGoalsWarnings@ at all is not the same event as one that produced a
+-- clean one, and only this field tells them apart; without it an empty
+-- error list would read as "nothing wrong" whether or not Agda ever
+-- reported on the state it left.
+data GiveReading = GiveReading
+  { grClass  :: GiveClass
+  , grGiven  :: Bool         -- ^ A @GiveAction@ arrived: /some/ point was
+                             -- consumed.  This drives the reset, and it is
+                             -- deliberately weaker than the class: a give that
+                             -- landed somewhere unexpected still consumed a
+                             -- hole, so the reload is still owed.
+  , grText   :: Maybe Text   -- ^ What Agda would write into the file.
+  , grPoint  :: Maybe Int    -- ^ The point the give consumed, when the wire
+                             -- carried an id that parsed.
+  , grHere   :: Bool         -- ^ The give landed on the point it was aimed at.
+  , grUnreadable :: [Text]   -- ^ Lines in this command's window that were not
+                             -- JSON at all (Agda's @cannot read:@ reply, or
+                             -- anything else the reader could not classify).
+  , grPoints :: Maybe [IPoint]
+                             -- ^ The interaction points Agda announced after
+                             -- the give, when it announced any; @Just []@ is
+                             -- a file with none left, 'Nothing' a give that
+                             -- announced no point list at all.
+  , grGoals  :: Bool         -- ^ An @AllGoalsWarnings@ arrived.  Weaker than
+                             -- 'grReport' on purpose: it says Agda answered,
+                             -- not that the answer could be read.
+  , grReport :: ReportCheck  -- ^ Whether that report can be relied on for an
+                             -- @ok@; this is the conjunct, 'grGoals' is not.
+  , grMetas  :: [LaneMeta]   -- ^ Invisible goals left behind.
+  , grErrors :: [Text]       -- ^ Every error message, command's own first.
+  , grCodes  :: [Text]       -- ^ Agda's bracketed codes for those messages.
+  } deriving (Eq, Show)
+
+-- | giveErrorsOf: every error a give's responses carry, in two groups.
+--
+-- First the command's own @DisplayInfo@/@Error@, which is how a refused give
+-- reports itself, with the positions in the /expression's/ coordinates rather
+-- than the file's.  Then the @errors@ array of the @AllGoalsWarnings@ that follows
+-- an accepted give, which is where a give that typechecked but left a blocked
+-- constraint behind reports it.  The two never both appear in the probes, but
+-- nothing in the protocol promises that, so both are read.
+giveErrorsOf :: [IResponse] -> [Text]
+giveErrorsOf rs =
+  mapMaybe errorMessageOf rs <> goalArrayOf "errors" errorEntryOf rs
+
+-- | errorEntryOf: one entry of a report's @errors@ array.  An object carrying a
+-- @message@, or a bare string.
+errorEntryOf :: Value -> Maybe Text
+errorEntryOf (Object e) = textField "message" e
+errorEntryOf (String t) = Just t
+errorEntryOf _          = Nothing
+
+-- | ReportCheck: can the give's own @AllGoalsWarnings@ be relied on for an
+-- @ok@?
+--
+-- The class 'readGive' assigns reads exactly two fields of that report, its
+-- @errors@ and its @invisibleGoals@, and an absent, mistyped, or partly
+-- unreadable field would make both look empty, which is the shape of a false
+-- green.  So the report is checked before it is believed, and the defect is
+-- named rather than folded into a bare @False@ (a Copilot review catch on
+-- PR 174).
+--
+-- @visibleGoals@ is deliberately not checked: the reading tolerates whatever
+-- visible goals a give leaves, /whatever they are/, so nothing an @ok@ rests
+-- on can be lost by failing to read them.
+data ReportCheck
+  = ReportMissing          -- ^ No @AllGoalsWarnings@ arrived at all.
+  | ReportMalformed Text   -- ^ One arrived, and a field the class reads is not
+                           --   something the class may read.
+  | ReportComplete         -- ^ Both fields present, arrays, fully readable.
+  deriving (Eq, Show)
+
+-- | giveReportCheck: 'ReportCheck' for a give's collected responses.
+giveReportCheck :: [IResponse] -> ReportCheck
+giveReportCheck rs
+  | null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs] = ReportMissing
+  | Nothing <- goalArrayStrict "errors" errorEntryOf rs =
+      ReportMalformed "the report's `errors` is absent, is not an array, or holds an entry with no message"
+  | Nothing <- goalArrayStrict "invisibleGoals" metaEntryOf rs =
+      ReportMalformed "the report's `invisibleGoals` is absent, is not an array, or holds an entry with no meta name"
+  | otherwise = ReportComplete
+
+-- | readGive: classify one @Cmd_give@'s responses, given the interaction point
+-- the give was aimed at.
+--
+-- The rule, stated in issue #163 and applied here unchanged: a @GiveAction@
+-- whose following @AllGoalsWarnings@ carries no error and no invisible goal
+-- is @ok@, /whatever new visible goals it lists/, since a sub-hole is the
+-- @[UnsolvedInteractionMetas]@ class @fill_hole@ already tolerates and
+-- @(s≤s {!!})@ is a core candidate shape; anything else is a type error.
+--
+-- What this adds to that sentence is that every clause of it has to have been
+-- /established/, because the one direction a judgment may not be wrong in is
+-- @ok@.  Three shapes satisfy the sentence vacuously and are read as type
+-- errors here (all three are Copilot review catches on PR 174):
+--
+-- * The report never arrived.  A collection holding a @GiveAction@ and nothing
+--   else has no error and no invisible goal for the trivial reason that Agda
+--   never said what state the give left.
+-- * The report arrived and could not be read: a field the class reads absent,
+--   mistyped, or holding one entry the reader declines.  Every one of those
+--   makes an error list and a meta list look empty, so the same @ok@ would
+--   come out of a report that said nothing at all.  Those two shapes are one
+--   conjunct, 'grReport'; 'grGoals' stays the weaker \"Agda answered\".
+-- * The @GiveAction@ did not say which point it consumed, or said a different
+--   one.  "Agda accepted the candidate" is only an answer about the hole that
+--   was asked about, so the id has to have parsed and to match; 'grHere' is
+--   the conjunct, and it is separate from 'grGiven' because a give that landed
+--   anywhere still consumed a hole and still owes a reload.
+-- * A line in the command's window was not JSON at all.  The reader cannot
+--   vouch for a state it could not read, so 'grUnreadable' being empty is the
+--   third conjunct.  Measured across every give in the parity archive: never
+--   non-empty on a healthy exchange, which is what makes it a safe conjunct
+--   rather than a source of false type errors.
+readGive :: Int -> [IResponse] -> GiveReading
+readGive expected rs = GiveReading
+  { grClass  = if here && report == ReportComplete
+                    && null unreadable && null errs && null metas
+                 then GiveClassOk else GiveClassTypeError
+  , grGiven  = given
+  , grText   = listToMaybe [t | IGiveAction _ (Just t) <- rs]
+  , grPoint  = point
+  , grHere   = here
+  , grUnreadable = unreadable
+  , grPoints = interactionPointsOf rs
+  , grGoals  = goalsSeen
+  , grReport = report
+  , grMetas  = metas
+  , grErrors = errs
+  , grCodes  = mapMaybe errorCodeOf errs
+  }
+  where
+    given      = not (null [() | IGiveAction _ _ <- rs])
+    point      = listToMaybe [i | IGiveAction (Just i) _ <- rs]
+    here       = point == Just expected
+    goalsSeen  = not (null [() | IDisplayInfo "AllGoalsWarnings" _ <- rs])
+    report     = giveReportCheck rs
+    unreadable = [t | IUnreadable t <- rs]
+    metas      = metasOf rs
+    errs       = giveErrorsOf rs
+
+-- | GiveOutcome: one candidate judged on the lane, with what it cost.
+--
+-- The timings are in /microseconds/ deliberately: a give is 1 to 5 ms on the
+-- probes, so the millisecond resolution the rest of this module reports in
+-- would quantize away most of the quantity a cost table exists to show.
+--
+-- 'goReset' is the reload that puts the hole back, and it is 'Nothing'
+-- exactly when the give did not consume the point: a refusal leaves the
+-- file's interaction points where they were and needs no reset, which is
+-- half of why a lane judgment is cheap.
+data GiveOutcome = GiveOutcome
+  { goReading  :: GiveReading
+  , goGiveUs   :: Int
+  , goReset    :: Maybe LoadReport
+  , goResetUs  :: Maybe Int
+  } deriving (Eq, Show)
+
+-- | giveCandidate: send one candidate to an interaction point of the lane's
+-- currently loaded file, read the outcome, and leave the lane describing the
+-- file again.
+--
+-- The caller has already run 'ensureLoaded' (this sends no load of its own
+-- before the give, so that the give is timed against a state the caller
+-- chose).  Afterwards, if and only if the give consumed the point, the file
+-- is re-loaded with @force@: an accepted give leaves the child holding a
+-- module whose hole is gone while the bytes on disk still have it, and every
+-- other reader of this lane (the next give, and the stamp-gated peek
+-- 'peekLoadedGoals' that fills the batch tools' goal fields) would otherwise
+-- be answered from that state without any evidence that it had changed,
+-- since the file itself never did.
+giveCandidate
+  :: LaneHandle
+  -> FilePath    -- ^ The loaded file; the IOTCM names it.
+  -> [String]    -- ^ The effective flags of that load, for the reset.
+  -> Int         -- ^ The interaction point to give to.
+  -> GiveForce
+  -> Text        -- ^ The candidate expression.
+  -> IO (Either LaneFailure GiveOutcome)
+giveCandidate lh path flags gid force expr = do
+  t0   <- getMonotonicTimeNSec
+  sent <- runQuery lh path (cmdGive force gid expr)
+  t1   <- getMonotonicTimeNSec
+  case sent of
+    Left lf  -> pure (Left lf)
+    Right rs -> do
+      let reading = readGive gid rs
+          giveUs  = elapsedUsBetween t0 t1
+      if not (grGiven reading)
+        then pure . Right $ GiveOutcome reading giveUs Nothing Nothing
+        else do
+          reset <- ensureLoaded lh True path flags
+          t2    <- getMonotonicTimeNSec
+          case reset of
+            Left lf  -> pure (Left lf)
+            Right lr -> pure . Right $
+              GiveOutcome reading giveUs (Just lr) (Just (elapsedUsBetween t1 t2))
+
+elapsedUsBetween :: Word64 -> Word64 -> Int
+elapsedUsBetween start end =
+  fromIntegral ((end - start) `div` 1_000)
 
 
 -- ---------------------------------------------------------------------------

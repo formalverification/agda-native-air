@@ -321,6 +321,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  test-scripts-python \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
                  agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-serve agda-mcp-clean \
+                 lane-give-parity \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
                  etl-agda-algebras-smoke train-retrieval-smoke eval-proof-completion-smoke-retrieval \
@@ -439,6 +440,7 @@ help:
 	@echo "  make agda-mcp-smoke              - Build agda-mcp + JSON-RPC round-trip sanity (fast)"
 	@echo "  make agda-mcp-test               - Full agda-mcp cabal test (unit + corpus + Agda integration)"
 	@echo "  make agda-mcp-build / -serve / -clean - Build / launch / clean the agda-mcp server"
+	@echo "  make lane-give-parity            - Replay committed candidates through both lanes (issue #163)"
 	@echo "  make project-update              - Refresh docs/GITHUB_PROJECT.md generated regions from GitHub"
 	@echo "  make project-update-check        - Report whether docs/GITHUB_PROJECT.md is stale (no write)"
 	@echo "  make project-lint                - Validate docs/GITHUB_PROJECT.md structure (offline)"
@@ -775,6 +777,31 @@ agda-mcp-serve:
 agda-mcp-clean:
 	@echo ">> [agda-mcp-clean] clean agda-mcp build artifacts (cabal)"
 	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal clean)
+
+# The issue-#163 measurement harness: replay every candidate this repository
+# commits (the archived agent-bench fill_hole probes and the benchmark golds)
+# through the batch fill_hole handler AND the interaction lane's Cmd_give, and
+# write one row per candidate with both answers.  Not a server target, not run
+# by CI, and it changes nothing: fill_hole restores the file it patched, and
+# the lane reloads after every give that consumed a hole.
+#
+# Takes a few minutes: the batch side is a cold agda per candidate (about 5 s
+# on the agda-algebras tier).  Override LANE_PARITY_CASES to replay a JSON case
+# list instead of the built-in one (parity/probe-cases.json reproduces the
+# issue's probe table; parity/deliberate-cases.json is the constructed set),
+# and LANE_PARITY_FLAGS to change the flag set both lanes run with.
+LANE_PARITY_OUT   ?= $(PROJECT_ROOT)/reports/lane-give-parity/parity-rows.jsonl
+LANE_PARITY_FLAGS ?= -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras
+LANE_PARITY_CASES ?=
+
+lane-give-parity:
+	@echo ">> [lane-give-parity] replay committed candidates through both lanes (issue #163)"
+	@mkdir -p "$$(dirname "$(LANE_PARITY_OUT)")"
+	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:lane-give-parity && \
+	  BIN=$$(cabal list-bin exe:lane-give-parity) && \
+	  "$$BIN" --root "$(PROJECT_ROOT)" --agda-flags "$(LANE_PARITY_FLAGS)" \
+	    $(if $(LANE_PARITY_CASES),--cases "$(LANE_PARITY_CASES)",) \
+	    --out "$(LANE_PARITY_OUT)")
 #
 #
 # -------------------------------------------------------------------------------
