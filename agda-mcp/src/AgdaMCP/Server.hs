@@ -35,6 +35,18 @@
 --     blocks for the duration of the gate: this transport is a synchronous line
 --     loop with no progress-notification plumbing, so streaming progress is
 --     follow-on scope rather than something the framing already supports.
+--
+-- Issue #184 addition:
+--   * Lean answers by default.  Every successful answer is written out through
+--     'okToMcp' at the call's verbosity ('AgdaMCP.Types.answerAt'): without the
+--     @command@ block and without the parts of @verdict@, @project@, and @lane@
+--     that every answer repeated, unless the call passes @verbose: true@.  The
+--     eleven tools whose answers carry an echo declare @verbose@ in their input
+--     schemas, and their descriptions say what the lean answer keeps and what
+--     the full echo adds.
+--   * exports_of answers one page of a module's surface: @limit@, @offset@,
+--     and @pattern@ in its schema, @total@ / @truncated@ / @nextOffset@ /
+--     @remaining@ in its answer.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -76,7 +88,8 @@ import AgdaMCP.Tools.LiveQueries
 import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope)
-import AgdaMCP.Types (CorpusIndex, ToolFailure (..))
+import AgdaMCP.Types
+  (CorpusIndex, ToolFailure (..), Verbosity (..), answerAt, defaultExportsLimit)
 
 -- ---------------------------------------------------------------------------
 -- Configuration
@@ -168,7 +181,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
            \one check_file; re-loaded on the live tools' evidence — a change \
            \on disk, changed flags, a failed previous load, or reload:true). \
            \This shape \
-           \carries lane {root, pid, spawned, load, iotcm, ...} and NO \
+           \carries lane {load, loadElapsedMs?} and NO \
            \verdict — there is no batch run to have one; context entries \
            \carry name and type (shadowed outers appear under their primed \
            \display names). FALLBACK, source='injected-macro', used when the \
@@ -199,6 +212,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "col"       "integer" colDoc
           , prop "holeIndex" "integer" holeIndexDoc
           , prop "reload"    "boolean" liveReloadDoc
+          , prop "verbose"   "boolean" verboseDoc
           ]
           ["filePath"]
           [addressAlternatives]
@@ -237,6 +251,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "col"       "integer" colDoc
           , prop "holeIndex" "integer" holeIndexDoc
           , prop "candidate" "string"  "The candidate proof term to try."
+          , prop "verbose"   "boolean" verboseDoc
           ]
           ["filePath", "candidate"]
           [addressAlternatives]
@@ -260,6 +275,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
            <> holeModel)
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
+          , prop "verbose"        "boolean" verboseDoc
           ]
           ["filePath"]
 
@@ -286,6 +302,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
            <> holeModel)
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
+          , prop "verbose"        "boolean" verboseDoc
           ]
           ["filePath"]
 
@@ -313,6 +330,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
               \is an error naming the path as resolved and that working \
               \directory."
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
+          , prop "verbose"        "boolean" verboseDoc
           ]
           []
        ]
@@ -337,6 +355,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "column"   "integer" liveColumnDoc
           , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
+          , prop "verbose"  "boolean" verboseDoc
           ]
           ["filePath", "expr"]
 
@@ -353,6 +372,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "column"   "integer" liveColumnDoc
           , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
+          , prop "verbose"  "boolean" verboseDoc
           ]
           ["filePath", "expr"]
 
@@ -377,6 +397,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "column"   "integer" liveColumnDoc
           , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
+          , prop "verbose"  "boolean" verboseDoc
           ]
           ["filePath", "name"]
 
@@ -395,6 +416,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           , prop "column"   "integer" liveColumnDoc
           , prop "col"      "integer" liveColDoc
           , prop "reload"   "boolean" liveReloadDoc
+          , prop "verbose"  "boolean" verboseDoc
           ]
           ["filePath", "name"]
 
@@ -409,13 +431,29 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
            \(imported directly or through re-exports); a module the file's \
            \scope cannot name answers with an in-band NotInScope error. The \
            \empty string names the file's own top-level module and lists its \
-           \definitions. "
+           \definitions. PAGED, because a library module's surface printed \
+           \whole runs to tens of kilobytes: exports carries at most limit \
+           \members with their types (default "
+           <> T.pack (show defaultExportsLimit)
+           <> ", in Agda's order, from offset), total counts the value members \
+              \that match, and truncated says whether any lie beyond this page; \
+              \when they do, nextOffset is the offset for the next page and \
+              \remaining lists their NAMES, so the first answer already names \
+              \the whole surface. To read a member you found in remaining, pass \
+              \its name as pattern. pattern keeps only the members whose name \
+              \contains it, ignoring case, in exports and modules alike; \
+              \modules is never paged. limit 0 returns every member typed, the \
+              \whole surface in one answer. "
            <> liveLaneNote)
           [ prop "filePath" "string"  liveFilePathDoc
           , prop "module"   "string"  "The module whose exports to list, as \
               \nameable in filePath's scope; \"\" for the file's own \
               \top-level module."
+          , prop "limit"    "integer" exportsLimitDoc
+          , prop "offset"   "integer" exportsOffsetDoc
+          , prop "pattern"  "string"  exportsPatternDoc
           , prop "reload"   "boolean" liveReloadDoc
+          , prop "verbose"  "boolean" verboseDoc
           ]
           ["filePath", "module"]
       ]
@@ -473,6 +511,7 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
                       \the accepted rendering."
                   ]
               , prop "reload"    "boolean" liveReloadDoc
+              , prop "verbose"   "boolean" verboseDoc
               ]
               ["filePath"]
           ]
@@ -613,8 +652,8 @@ gateModel =
   \repository boundary. If none of those exists the call FAILS, naming every \
   \directory it searched and what to configure — it never reports a check that \
   \did not happen. gate {source, target?, makefile?, entry?, searchedFrom} in \
-  \the response says which one ran and on what evidence, and command echoes the \
-  \exact argument vector and working directory."
+  \the response says which one ran and on what evidence, and with verbose:true \
+  \command echoes the exact argument vector and working directory."
 
 -- | projectHonestyNote: the one thing the tool exists for, said where a client
 -- reads it.
@@ -678,12 +717,14 @@ projectTimingNote =
 -- of one agda call (issues #72, #76).
 projectEchoNote :: Text
 projectEchoNote =
-  "EVERY response carries the echo: verdict {equivalentTo, meaning, exitCode} — \
-  \the exact command this call is equivalent to, including the directory it runs \
-  \in, what success means, and the gate's own exit code; command {binary, args, \
-  \cwd}; and project {rootSource, root, library, librariesFile, \
-  \registeredLibraries, selectedLibraries, includePaths} — the tree the gate ran \
-  \in, resolved from the anchor exactly as check_file resolves it from a file. \
+  "EVERY answer carries verdict {exitCode}, the gate's own exit code, and \
+  \project {root, rootSource}, the tree the gate ran in, resolved from the \
+  \anchor exactly as check_file resolves it from a file. Pass verbose:true for \
+  \the full echo as well: verdict {equivalentTo, meaning}, the exact command \
+  \this call is equivalent to, including the directory it runs in, and what \
+  \success means; command {binary, args, cwd}; and the rest of project \
+  \{library, librariesFile, registeredLibraries, selectedLibraries, \
+  \includePaths}. \
   \One difference worth knowing: for a make or --check-command gate, \
   \selectedLibraries and includePaths are this server's own configuration and \
   \not a claim about the flags the gate passed agda, since the gate chooses \
@@ -706,27 +747,35 @@ maxDiagnosticsDoc =
 -- The § 6 meta-suggestion of the field report is that an agent picks a tool by
 -- reading its description and nothing else, and that the shipped descriptions
 -- did not say the one thing that decides whether the tool is worth calling:
--- whether a green result means the build passes.  These three sentences say it,
--- and say where in the response to check it.
+-- whether a green result means the build passes.  These sentences say it, and
+-- say where in the response to check it.
+--
+-- Since issue #184 they also say what the answer leaves out by default and
+-- how to ask for it: the echo was written into every answer and was most of a
+-- small one, so the answer keeps the exit code and the tree, and the command
+-- line and the registry come back on @verbose: true@.
 verdictNote :: Text
 verdictNote =
-  "EVERY response carries the echo: verdict {equivalentTo, meaning, exitCode} —"
-  <> " the exact agda command this call is equivalent to, what its verdict field"
-  <> " means, and agda's own exit code, which the verdict is derived from and"
-  <> " never from parsing Agda's message text; command {binary, args, cwd} — the"
-  <> " resolved command line; and project {rootSource, root, library,"
-  <> " librariesFile, registeredLibraries, selectedLibraries, includePaths} — the"
-  <> " tree that was actually checked, with selectedLibraries and includePaths as"
-  <> " agda finally received them, so project and command.args never disagree."
-  <> " rootSource is \"nearest-agda-lib\" when the"
-  <> " requested file's own *.agda-lib decided the context and \"server-config\""
-  <> " when the flags fixed at server start did. If the file belongs to a"
-  <> " different checkout of a library this server has registered elsewhere, the"
-  <> " call FAILS with a rootMismatch object naming both roots rather than"
-  <> " quietly checking the other tree — with one limit worth knowing: that"
-  <> " detection compares against the libraries registry, so if the configured"
-  <> " one is missing there is nothing to compare against and no mismatch can be"
-  <> " found. The response says so as project.librariesFileMissing."
+  "EVERY answer names how the check came out and which tree it checked:"
+  <> " verdict {exitCode} is agda's own exit code, which the verdict is derived"
+  <> " from and never from parsing Agda's message text, and project {root,"
+  <> " rootSource} is the tree that was actually checked. rootSource is"
+  <> " \"nearest-agda-lib\" when the requested file's own *.agda-lib decided the"
+  <> " context and \"server-config\" when the flags fixed at server start did."
+  <> " Pass verbose:true for the full echo as well: verdict.equivalentTo, the"
+  <> " exact agda command this call is equivalent to; verdict.meaning, one"
+  <> " sentence on what the verdict field means (stated here too); command"
+  <> " {binary, args, cwd}, the resolved command line; and the rest of project"
+  <> " {library, librariesFile, registeredLibraries, selectedLibraries,"
+  <> " includePaths}, with selectedLibraries and includePaths as agda finally"
+  <> " received them, so project and command.args never disagree. If the file"
+  <> " belongs to a different checkout of a library this server has registered"
+  <> " elsewhere, the call FAILS with a rootMismatch object naming both roots"
+  <> " rather than quietly checking the other tree, with one limit worth"
+  <> " knowing: that detection compares against the libraries registry, so if"
+  <> " the configured one is missing there is nothing to compare against and no"
+  <> " mismatch can be found. The answer then carries"
+  <> " project.librariesFileMissing:true, verbose or not."
 
 -- | goalEchoNote: get_goal's two-shape echo contract (#108) — the one tool
 -- whose response echo depends on which mechanism answered, so 'verdictNote'
@@ -734,15 +783,17 @@ verdictNote =
 -- shape (a Copilot catch on the #108 review).
 goalEchoNote :: Text
 goalEchoNote =
-  "THE ECHO, by path: every response carries command {binary, args, cwd} and"
-  <> " project {rootSource, root, library, librariesFile, registeredLibraries,"
-  <> " selectedLibraries, includePaths} — the tree that was actually consulted,"
-  <> " with the same wrong-checkout refusal as every file-taking tool. A"
-  <> " lane-sourced response (source='interaction-lane') carries lane {root,"
-  <> " pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm} and NO verdict."
-  <> " A fallback response (source='injected-macro') carries verdict"
-  <> " {equivalentTo, meaning, exitCode} — derived from agda's exit code, never"
-  <> " from its prose — and no lane block."
+  "THE ECHO, by path: every answer carries project {root, rootSource}, the"
+  <> " tree that was actually consulted, with the same wrong-checkout refusal as"
+  <> " every file-taking tool. A lane-sourced answer"
+  <> " (source='interaction-lane') carries lane {load, loadElapsedMs?} and NO"
+  <> " verdict. A fallback answer (source='injected-macro') carries verdict"
+  <> " {exitCode}, derived from agda's exit code and never from its prose, and"
+  <> " no lane block. Pass verbose:true for the full echo as well: command"
+  <> " {binary, args, cwd}; the rest of project {library, librariesFile,"
+  <> " registeredLibraries, selectedLibraries, includePaths}; on the lane path"
+  <> " the rest of lane {root, pid, spawned, agdaVersion, iotcm}; and on the"
+  <> " fallback path verdict.equivalentTo and verdict.meaning."
 
 -- | batchNote: what success means for the two whole-file tools.
 --
@@ -804,15 +855,20 @@ liveLaneNote =
   \(the same --timeout bound as the batch tools; the child is killed and \
   \respawned on next use), crash, or could-not-start — is an isError result \
   \whose text is a JSON object naming the event, the root, the exact IOTCM \
-  \lines sent, and agda's last stderr lines. EVERY response echoes: lane \
-  \{root, pid, spawned, load, loadElapsedMs?, agdaVersion, iotcm}, command \
-  \{binary, args, cwd} (the persistent child; per-file flags ride the \
-  \Cmd_load line visible in lane.iotcm), project {the same block the batch \
-  \tools report}, elapsedMs, and checkedFromSource (whether this call \
-  \re-typechecked the file from source — omitted, as in the batch tools, when \
-  \the evidence could not arrive: the flags carry --trace-imports=0, which \
-  \silences the progress lines it is read from, or the load failed before agda \
-  \announced this file, which establishes no reuse either). Pass reload:true to force a fresh \
+  \lines sent, and agda's last stderr lines. EVERY answer carries elapsedMs, \
+  \lane {load, loadElapsedMs?} (why this call did or did not re-load, and what \
+  \the load cost), project {root, rootSource} (the tree the answer was \
+  \computed in, as the batch tools report it), and checkedFromSource (whether \
+  \this call re-typechecked the file from source; omitted, as in the batch \
+  \tools, when the evidence could not arrive: the flags carry \
+  \--trace-imports=0, which silences the progress lines it is read from, or \
+  \the load failed before agda announced this file, which establishes no \
+  \reuse either). Pass verbose:true for the full echo as well: the rest of \
+  \lane {root, pid, spawned, agdaVersion, iotcm}, iotcm being the exact wire \
+  \lines this call sent, so it can be replayed by hand; command {binary, args, \
+  \cwd} (the persistent child; per-file flags ride the Cmd_load line visible \
+  \in lane.iotcm); and the rest of project {the same block the batch tools \
+  \report}. Pass reload:true to force a fresh \
   \load first — the escape hatch for a changed DEPENDENCY, which no stamp \
   \on the queried file can see; the response echoes lane.load='forced'."
 
@@ -860,6 +916,39 @@ liveColDoc =
   "The same thing as column, accepted because the hole listings spell it \
   \col — so a goal entry from check_file or get_diagnostics can be passed \
   \back without renaming. Requires line. Give this or column, not both."
+
+-- | verboseDoc: the @verbose@ property's contract (issue #184), declared on
+-- every tool whose answer carries an echo, since a client that validates its
+-- arguments sends only what the schema declares.
+verboseDoc :: Text
+verboseDoc =
+  "Optional; default false. true adds the full response echo to the answer: \
+  \the command line, the libraries registry and include paths, and (on the \
+  \live queries) the lane's process details and exact wire lines, which every \
+  \answer used to repeat. Leave it off unless you are checking what ran: \
+  \every answer names its tree (project.root, project.rootSource) either way, \
+  \and a failed call (isError) always carries its full echo."
+
+-- | exportsLimitDoc / exportsOffsetDoc / exportsPatternDoc: the @exports_of@
+-- page (issue #184).
+exportsLimitDoc :: Text
+exportsLimitDoc =
+  "Optional; default " <> T.pack (show defaultExportsLimit) <> ". How many \
+  \members to return with their types; the rest of the matching members are \
+  \named in remaining. 0 (or any non-positive value) returns every matching \
+  \member typed."
+
+exportsOffsetDoc :: Text
+exportsOffsetDoc =
+  "Optional; default 0. The 0-based position, among the members that match \
+  \pattern, of the first member to return. Pass the previous answer's \
+  \nextOffset to continue."
+
+exportsPatternDoc :: Text
+exportsPatternDoc =
+  "Optional. Keep only the members whose name contains this, ignoring case \
+  \(the rule search_by_name uses), in exports and modules alike; total and \
+  \remaining then count and name only the members that match."
 
 -- | liveReloadDoc: the @reload@ property's contract.
 liveReloadDoc :: Text
@@ -1214,7 +1303,7 @@ handleRequest _ _lanes req =
 dispatchToolGuarded
   :: ServerConfig -> InteractionLanes -> Text -> Value -> IO Value
 dispatchToolGuarded cfg lanes name args = do
-  outcome <- try (dispatchTool cfg lanes name args >>= forceResponse)
+  outcome <- try (dispatch >>= forceResponse)
   case outcome of
     Right value -> pure value
     Left (e :: SomeException) -> case fromException e of
@@ -1237,6 +1326,29 @@ dispatchToolGuarded cfg lanes name args = do
           \Treat what the call had already done as unknown: it may have run agda, \
           \or a project gate, before failing. What went wrong: "
           <> T.pack (show e)
+  where
+    -- The @verbose@ argument is read here, once for every tool (issue #184).
+    dispatch = case verbosityOf args of
+      Left msg        -> pure $ toolError ("Invalid arguments: " <> msg)
+      Right verbosity -> dispatchTool cfg lanes verbosity name args
+
+-- | verbosityOf: a call's @verbose@ argument (issue #184), read here once for
+-- every tool rather than by each tool's parameter parser, because what it
+-- selects is how the answer is written out and not what the tool does.
+--
+-- Absent, null, or false is 'Lean', and true is 'Verbose'.  Anything else is
+-- refused by name: a client that sent the string @"true"@ asked for the full
+-- echo, and handing it the lean answer would leave it wondering where the echo
+-- went.
+verbosityOf :: Value -> Either Text Verbosity
+verbosityOf (Object o) = case KM.lookup "verbose" o of
+  Nothing           -> Right Lean
+  Just Null         -> Right Lean
+  Just (Bool False) -> Right Lean
+  Just (Bool True)  -> Right Verbose
+  Just other        -> Left $
+    "verbose must be true or false, not " <> decodeUtf8 (LBS.toStrict (encode other))
+verbosityOf _ = Right Lean
 
 -- | forceResponse: force a response value's JSON encoding, and hand the value
 -- back once nothing lazy is left in it.
@@ -1259,101 +1371,102 @@ forceResponse value = do
 --
 -- Proof-state tools delegate to AgdaMCP.Tools.ProofState (IO, calls Agda).
 -- Search tools delegate to AgdaMCP.Tools.Search (pure, uses CorpusIndex).
-dispatchTool :: ServerConfig -> InteractionLanes -> Text -> Value -> IO Value
+dispatchTool
+  :: ServerConfig -> InteractionLanes -> Verbosity -> Text -> Value -> IO Value
 
 -- Proof-state tools (existing M1-2)
-dispatchTool cfg lanes "get_goal" args =
+dispatchTool cfg lanes v "get_goal" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleGetGoal lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleGetGoal lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg _lanes "fill_hole" args =
+dispatchTool cfg _lanes v "fill_hole" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleFillHole (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleFillHole (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg lanes "check_file" args =
+dispatchTool cfg lanes v "check_file" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleCheckFile lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleCheckFile lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg lanes "get_diagnostics" args =
+dispatchTool cfg lanes v "get_diagnostics" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleGetDiagnostics lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleGetDiagnostics lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Whole-project gate (M1-5, issue #78).  The one tool that takes the gate
 -- configuration as well as the Agda one.
-dispatchTool cfg _lanes "check_project" args =
+dispatchTool cfg _lanes v "check_project" args =
   case Aeson.fromJSON args of
     Aeson.Success p ->
-      failureToMcp <$> handleCheckProject (scAgdaConfig cfg) (scGateConfig cfg) p
+      failureToMcp v <$> handleCheckProject (scAgdaConfig cfg) (scGateConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Search tools (new M1-3)
-dispatchTool cfg _lanes "search_by_name" args =
+dispatchTool cfg _lanes v "search_by_name" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
       case Aeson.fromJSON args of
-        Aeson.Success p -> pure . eitherToMcp $ handleSearchByName idx p
+        Aeson.Success p -> pure . eitherToMcp v $ handleSearchByName idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg _lanes "search_by_type" args =
+dispatchTool cfg _lanes v "search_by_type" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
       case Aeson.fromJSON args of
-        Aeson.Success p -> pure . eitherToMcp $ handleSearchByType idx p
+        Aeson.Success p -> pure . eitherToMcp v $ handleSearchByType idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg _lanes "get_dependencies" args =
+dispatchTool cfg _lanes v "get_dependencies" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
       case Aeson.fromJSON args of
-        Aeson.Success p -> pure . eitherToMcp $ handleGetDependencies idx p
+        Aeson.Success p -> pure . eitherToMcp v $ handleGetDependencies idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Scope-aware retrieval (issue #17): the one corpus tool that also takes the
 -- lanes, since every rendering it returns is typed there.
-dispatchTool cfg lanes "search_in_scope" args =
+dispatchTool cfg lanes v "search_in_scope" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
       case Aeson.fromJSON args of
         Aeson.Success p ->
-          failureToMcp <$> handleSearchInScope lanes (scAgdaConfig cfg) idx p
+          failureToMcp v <$> handleSearchInScope lanes (scAgdaConfig cfg) idx p
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Live-query tools (issue #75): the interaction lane.
-dispatchTool cfg lanes "type_of" args =
+dispatchTool cfg lanes v "type_of" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleTypeOf lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleTypeOf lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg lanes "normalize" args =
+dispatchTool cfg lanes v "normalize" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleNormalize lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleNormalize lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg lanes "resolve_name" args =
+dispatchTool cfg lanes v "resolve_name" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleResolveName lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleResolveName lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg lanes "definition_of" args =
+dispatchTool cfg lanes v "definition_of" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleDefinitionOf lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleDefinitionOf lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
-dispatchTool cfg lanes "exports_of" args =
+dispatchTool cfg lanes v "exports_of" args =
   case Aeson.fromJSON args of
-    Aeson.Success p -> failureToMcp <$> handleExportsOf lanes (scAgdaConfig cfg) p
+    Aeson.Success p -> failureToMcp v <$> handleExportsOf lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Unknown tool
-dispatchTool _ _ name _ =
+dispatchTool _ _ _ name _ =
   pure $ toolError ("Unknown tool: " <> name)
 
 
@@ -1362,8 +1475,8 @@ dispatchTool _ _ name _ =
 -- ---------------------------------------------------------------------------
 
 -- | Wrap an IO-based tool handler result (Either Text a) as an MCP content response.
-eitherToMcp :: ToJSON a => Either Text a -> Value
-eitherToMcp = either toolError okToMcp
+eitherToMcp :: ToJSON a => Verbosity -> Either Text a -> Value
+eitherToMcp v = either toolError (okToMcp v)
 
 -- | As 'eitherToMcp', for handlers whose failures are structured 'ToolFailure's
 -- — which, since issue #76, is all four proof-state tools.
@@ -1381,8 +1494,13 @@ eitherToMcp = either toolError okToMcp
 -- content the client shows its model, while a JSON-RPC error is a transport
 -- fault, and @-32603 Internal error@ is what an agent reasonably reads as
 -- "this server is broken".
-failureToMcp :: ToJSON a => Either ToolFailure a -> Value
-failureToMcp = either render okToMcp
+--
+-- The verbosity (issue #184) reaches the success shape only.  A failure's
+-- payload keeps its whole echo whatever was asked: it is rare, and there the
+-- echo (the command that timed out, the two roots that disagree, the wire
+-- lines a crashed lane was sent) is the diagnosis.
+failureToMcp :: ToJSON a => Verbosity -> Either ToolFailure a -> Value
+failureToMcp v = either render (okToMcp v)
   where
     render (FailMessage msg)     = toolError msg
     render (FailTimeout tf)      = structuredError (toJSON tf)
@@ -1398,11 +1516,13 @@ failureToMcp = either render okToMcp
       ]
 
 -- | The success shape shared by every tool: one text content item holding the
--- result's JSON.
-okToMcp :: ToJSON a => a -> Value
-okToMcp a = object
+-- result's JSON, at the call's verbosity ('AgdaMCP.Types.answerAt', issue
+-- #184).  This is the one place a successful answer is written out, which is
+-- what lets one rule decide the lean shape of every tool's answer.
+okToMcp :: ToJSON a => Verbosity -> a -> Value
+okToMcp v a = object
   [ "content" .= [ object [ "type" .= ("text" :: Text)
-                           , "text" .= decodeUtf8 (LBS.toStrict (encode (toJSON a)))
+                           , "text" .= decodeUtf8 (LBS.toStrict (encode (answerAt v (toJSON a))))
                            ] ]
   ]
 

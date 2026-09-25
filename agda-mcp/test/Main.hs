@@ -135,7 +135,7 @@ import AgdaMCP.Tools.ProofState
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
 import AgdaMCP.Tools.LiveQueries
   ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
-  , handleTypeOf )
+  , handleTypeOf, pageExports )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies )
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope, needsIdentityCheck, probeBudget)
@@ -2349,7 +2349,7 @@ scopeRetrievalTests = do
         ]
     , runTest "search_in_scope schema: every accepted argument is a declared property" $ allOf
         [ assertEqual "properties"
-            ["col", "column", "exclude", "filePath", "limit", "line", "maxProbes", "query", "reload"]
+            ["col", "column", "exclude", "filePath", "limit", "line", "maxProbes", "query", "reload", "verbose"]
             (sort (schemaProperties "search_in_scope" corpusTools))
         , assertEqual "query" ["name", "tokens"] (subProperties "search_in_scope" "query" corpusTools)
         , assertEqual "exclude" ["names", "statement"] (subProperties "search_in_scope" "exclude" corpusTools)
@@ -2751,6 +2751,9 @@ echoTests = do
       red      <- withFakeExit 42 $ handleCheckFile injLanes echoCfg (CheckFileParams timeoutFixturePath Nothing)
       redDiags <- withFakeExit 42 $ handleGetDiagnostics injLanes echoCfg (GetDiagnosticsParams timeoutFixturePath Nothing)
       green    <- withFakeExit 0  $ handleCheckFile injLanes echoCfg (CheckFileParams timeoutFixturePath Nothing)
+      -- A fill the stand-in accepts, for the lean-answer rules (#184).
+      okFill   <- withFakeExit 0  $ handleFillHole echoCfg FillHoleParams
+        { fhFilePath = timeoutFixturePath, fhHole = ByIndex 0, fhCandidate = "zero" }
 
       shape <- sequence
         [ runTest "check_file: success is read from the exit code, not from Agda's prose" $
@@ -2802,18 +2805,44 @@ echoTests = do
                 (T.pack absFixture `T.isInfixOf` vEquivalentTo (fcrVerdict r)
                  && "fake-slow-agda.sh" `T.isInfixOf` vEquivalentTo (fcrVerdict r))
 
-        , runTest "check_file: the response wire shape carries verdict, command, project" $
+        , runTest "check_file: the verbose wire shape carries verdict, command, project" $
             -- Asserted on the encoded JSON, because these key names are the
             -- client-visible contract the tool descriptions advertise; a
             -- refactor that renamed a field would otherwise pass silently.
+            -- The record's own encoding is what verbose:true sends (#184).
             withRight red $ \r -> do
-              let wire = encodeText r
+              let wire = encodeText (answerAt Verbose (Aeson.toJSON r))
                   want = [ "\"verdict\":", "\"equivalent-to: ", "\"meaning\":"
                          , "\"exitCode\":42", "\"command\":", "\"binary\":"
                          , "\"args\":", "\"cwd\":", "\"project\":"
                          , "\"rootSource\":", "\"root\":", "\"success\":false" ]
                   missing = [k | k <- want, not (k `T.isInfixOf` wire)]
               assert ("missing from the response: " <> show missing) (null missing)
+
+        , -- The default answer (#184): the exit code and the tree, and none of
+          -- the echo every answer used to repeat.
+          runTest "check_file: the lean wire shape keeps the exit code and the tree, and no other echo" $
+            withRight red $ \r -> do
+              let wire = encodeText (answerAt Lean (Aeson.toJSON r))
+                  want = [ "\"verdict\":{\"exitCode\":42}", "\"rootSource\":"
+                         , "\"root\":", "\"success\":false", "\"diagnostics\":"
+                         , "\"holes\":", "\"timedOut\":", "\"elapsedMs\":" ]
+                  gone = [ "\"command\":", "\"equivalent-to: ", "\"meaning\":"
+                         , "\"binary\":", "\"args\":", "\"registeredLibraries\":"
+                         , "\"selectedLibraries\":", "\"includePaths\":"
+                         , "\"librariesFile\":" ]
+              allOf
+                [ assertEqual "missing from the lean answer" []
+                    [k | k <- want, not (k `T.isInfixOf` wire)]
+                , assertEqual "echo left in the lean answer" []
+                    [k | k <- gone, k `T.isInfixOf` wire]
+                ]
+
+        , runTest "lean answers: no verdict field is ever dropped (check_file, get_diagnostics, fill_hole)" $
+            withRight red $ \c -> withRight green $ \g ->
+            withRight redDiags $ \d -> withRight okFill $ \f -> allOf
+              [ leanRules (Aeson.toJSON c), leanRules (Aeson.toJSON g)
+              , leanRules (Aeson.toJSON d), leanRules (Aeson.toJSON f) ]
         ]
 
       -- Root resolution: two checkouts of one library, a registry naming only
@@ -3046,6 +3075,199 @@ withRight (Right a)  k = k a
 -- | encodeText: a value's JSON serialization, as Text, for wire-shape assertions.
 encodeText :: Aeson.ToJSON a => a -> Text
 encodeText = TE.decodeUtf8 . LBS.toStrict . Aeson.encode . Aeson.toJSON
+
+-- | valueAt: the JSON value at a path of object keys, when every step exists.
+valueAt :: [Text] -> Aeson.Value -> Maybe Aeson.Value
+valueAt []       v                = Just v
+valueAt (k : ks) (Aeson.Object o) = KM.lookup (Key.fromText k) o >>= valueAt ks
+valueAt _        _                = Nothing
+
+-- | keysAt: the keys of the object at a path, sorted; none when there is no
+-- object there.
+keysAt :: [Text] -> Aeson.Value -> [Text]
+keysAt p v = case valueAt p v of
+  Just (Aeson.Object o) -> sort (map Key.toText (KM.keys o))
+  _                     -> []
+
+-- | leafPaths: every path from a JSON value's root to a value that is not an
+-- object (arrays are leaves: a lean answer never trims inside a list).
+leafPaths :: Aeson.Value -> [([Text], Aeson.Value)]
+leafPaths (Aeson.Object o) =
+  [ (Key.toText k : p, x) | (k, v) <- KM.toList o, (p, x) <- leafPaths v ]
+leafPaths v = [([], v)]
+
+-- | isRestrictionOf: every leaf of the first value is a leaf of the second, at
+-- the same path and with the same value.  What a lean answer must be of the
+-- full one (issue #184): fields left out, never renamed, moved, or changed.
+isRestrictionOf :: Aeson.Value -> Aeson.Value -> Bool
+isRestrictionOf part whole =
+  all (\(p, x) -> valueAt p whole == Just x) (leafPaths part)
+
+-- | neverDropped: the fields a lean answer may never drop (issue #184): the
+-- verdict, what the answer is about, and the tree it names.  Each one the full
+-- answer carries must be in the lean answer, with the same value.
+neverDropped :: [[Text]]
+neverDropped =
+  [ ["success"], ["status"], ["verdict", "exitCode"], ["timedOut"], ["maskedFailure"]
+  , ["holes"], ["holesCount"], ["remainingHoles"], ["diagnostics"], ["diagnosticsTotal"]
+  , ["errors"], ["warnings"], ["message"], ["candidate"], ["elapsedMs"]
+  , ["checkedFromSource"], ["gate"], ["source"], ["goal"], ["context"], ["type"]
+  , ["project", "root"], ["project", "rootSource"], ["project", "librariesFileMissing"]
+  , ["lane", "load"], ["lane", "loadElapsedMs"]
+  ]
+
+-- | echoPaths: the echo a lean answer leaves out, and a verbose one restores
+-- (issue #184).
+echoPaths :: [[Text]]
+echoPaths =
+  [ ["command"], ["verdict", "equivalentTo"], ["verdict", "meaning"]
+  , ["project", "library"], ["project", "librariesFile"]
+  , ["project", "registeredLibraries"], ["project", "selectedLibraries"]
+  , ["project", "includePaths"]
+  , ["lane", "root"], ["lane", "pid"], ["lane", "spawned"], ["lane", "agdaVersion"]
+  , ["lane", "iotcm"]
+  ]
+
+-- | leanRules: the lean answer's contract, checked on one full answer.
+leanRules :: Aeson.Value -> IO TestResult
+leanRules full = allOf
+  [ assert "the full answer carries an echo to cut (a vacuous check otherwise)"
+      (isJust (valueAt ["command"] full))
+  , assert "the lean answer is a restriction of the full one" (isRestrictionOf lean full)
+  , assertEqual "fields the lean answer dropped that it must keep" []
+      [ p | p <- neverDropped, isJust (valueAt p full), valueAt p lean /= valueAt p full ]
+  , assertEqual "echo the lean answer still carries" []
+      [ p | p <- echoPaths, isJust (valueAt p lean) ]
+  , assert "the lean answer names its tree"
+      (all (\p -> isJust (valueAt p lean)) [["project", "root"], ["project", "rootSource"]])
+  , assertEqual "verbose is the full answer, unchanged" full (answerAt Verbose full)
+  ]
+  where lean = leanAnswer full
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 1j: the lean answer and the exports_of page (issue #184), no Agda
+--
+-- The rule itself on shapes the real answers do not happen to produce, the
+-- page as a pure function, the page's defaults as the wire parser reads them,
+-- and the input schemas as tools/list serializes them.  The rule on real
+-- answers is pinned where those answers are made: tier 1d (the batch tools,
+-- against the stand-in agda), tier 3 (the lane), and tier 2h (the wire).
+-- ---------------------------------------------------------------------------
+
+-- | The tools whose answers carry an echo, and so declare @verbose@.
+echoTools :: [Text]
+echoTools =
+  [ "get_goal", "fill_hole", "check_file", "get_diagnostics", "check_project"
+  , "type_of", "normalize", "resolve_name", "definition_of", "exports_of"
+  , "search_in_scope" ]
+
+-- | propertyType: the declared JSON type of one input property.
+propertyType :: Text -> Text -> Aeson.Value -> Maybe Aeson.Value
+propertyType tool name v =
+  valueAt ["properties", name, "type"] (Aeson.Object (inputSchemaOf tool v))
+
+leanAnswerTests :: IO [Bool]
+leanAnswerTests = do
+  hPutStrLn stderr "\n── The lean answer and the exports_of page (tier 1j: no Agda, #184) ──"
+  let entry n = ExportEntry n ("T" <> n)
+      surface = map entry ["alpha", "Beta", "gamma", "delta", "alphabet"]
+      page p  = pageExports p surface ["AlphaMod", "Other"]
+      parsePage :: LBS.ByteString -> Maybe ExportsPage
+      parsePage = fmap eopPage . Aeson.decode
+  sequence
+    [ runTest "leanAnswer: a value that is not an object is returned as it is" $
+        -- search_by_name and search_by_type answer with a bare array.
+        let arr = Aeson.toJSON [Aeson.object ["command" Aeson..= ("kept" :: Text)]]
+        in  assertEqual "array" arr (leanAnswer arr)
+
+    , runTest "leanAnswer: only top-level echo keys are trimmed, never a payload's own" $
+        let v = Aeson.object
+              [ "command" Aeson..= Aeson.object ["binary" Aeson..= ("agda" :: Text)]
+              , "gate"    Aeson..= Aeson.object ["command" Aeson..= ("make check" :: Text)]
+              , "results" Aeson..= [Aeson.object ["project" Aeson..= ("p" :: Text)]]
+              ]
+        in  allOf
+              [ assertEqual "top-level command dropped" Nothing (valueAt ["command"] (leanAnswer v))
+              , assertEqual "a payload's nested command kept"
+                  (valueAt ["gate"] v) (valueAt ["gate"] (leanAnswer v))
+              , assertEqual "a list is never trimmed inside"
+                  (valueAt ["results"] v) (valueAt ["results"] (leanAnswer v))
+              ]
+
+    , runTest "leanAnswer: project keeps root, rootSource, and librariesFileMissing when it is a finding" $
+        let v = Aeson.object
+              [ "project" Aeson..= Aeson.object
+                  [ "root" Aeson..= ("/r" :: Text), "rootSource" Aeson..= ("server-config" :: Text)
+                  , "librariesFileMissing" Aeson..= True, "librariesFile" Aeson..= ("/r/libs" :: Text)
+                  , "registeredLibraries" Aeson..= ([] :: [Text]) ] ]
+        in  assertEqual "project keys" ["librariesFileMissing", "root", "rootSource"]
+              (keysAt ["project"] (leanAnswer v))
+
+    , runTest "pageExports: the default page types the first members and names the rest" $
+        let (es, ms, sl) = page defaultExportsPage { epLimit = Just 2 }
+        in  allOf
+              [ assertEqual "typed" ["alpha", "Beta"] (map exName es)
+              , assertEqual "slice" (ExportsSlice 5 (Just 2) ["gamma", "delta", "alphabet"]) sl
+              , assertEqual "modules are never paged" ["AlphaMod", "Other"] ms
+              ]
+
+    , runTest "pageExports: an offset continues where nextOffset said, and the last page is not truncated" $
+        let (es, _, sl) = page defaultExportsPage { epLimit = Just 2, epOffset = 4 }
+        in  allOf
+              [ assertEqual "typed" ["alphabet"] (map exName es)
+              , assertEqual "slice" (ExportsSlice 5 Nothing []) sl
+              ]
+
+    , runTest "pageExports: an offset past the end is an empty page, never an error" $
+        let (es, _, sl) = page defaultExportsPage { epOffset = 9 }
+        in  allOf [ assertEqual "typed" [] (map exName es)
+                  , assertEqual "slice" (ExportsSlice 5 Nothing []) sl ]
+
+    , runTest "pageExports: a pattern filters both member kinds by name, ignoring case" $
+        let (es, ms, sl) = page defaultExportsPage { epPattern = Just "ALPHA", epLimit = Just 1 }
+        in  allOf
+              [ assertEqual "typed" ["alpha"] (map exName es)
+              , assertEqual "slice counts only the matches" (ExportsSlice 2 (Just 1) ["alphabet"]) sl
+              , assertEqual "modules" ["AlphaMod"] ms
+              ]
+
+    , runTest "pageExports: no limit types the whole surface" $
+        let (es, _, sl) = page defaultExportsPage { epLimit = Nothing }
+        in  allOf [ assertEqual "typed" 5 (length es)
+                  , assertEqual "slice" (ExportsSlice 5 Nothing []) sl ]
+
+    , runTest "exports_of arguments: the page's defaults and spellings, as the wire parser reads them" $ allOf
+        [ assertEqual "no page arguments" (Just defaultExportsPage)
+            (parsePage "{\"filePath\":\"F.agda\",\"module\":\"M\"}")
+        , assertEqual "the default limit" (Just (Just 20)) (epLimit <$> parsePage "{\"filePath\":\"F.agda\",\"module\":\"M\"}")
+        , assertEqual "limit 0 is no limit" (Just Nothing)
+            (epLimit <$> parsePage "{\"filePath\":\"F.agda\",\"module\":\"M\",\"limit\":0}")
+        , assertEqual "a negative limit is no limit" (Just Nothing)
+            (epLimit <$> parsePage "{\"filePath\":\"F.agda\",\"module\":\"M\",\"limit\":-3}")
+        , assertEqual "a negative offset counts as 0" (Just 0)
+            (epOffset <$> parsePage "{\"filePath\":\"F.agda\",\"module\":\"M\",\"offset\":-2}")
+        , assertEqual "pattern" (Just (Just "hom"))
+            (epPattern <$> parsePage "{\"filePath\":\"F.agda\",\"module\":\"M\",\"pattern\":\"hom\"}")
+        ]
+
+    , runTest "schema: every tool whose answer carries an echo declares verbose, a boolean" $
+        let tools = advertisedTools
+            corpus = corpusTools
+            typeOf t = propertyType t "verbose" (if t == "search_in_scope" then corpus else tools)
+        in  assertEqual "tools without a boolean verbose" []
+              [ t | t <- echoTools, typeOf t /= Just (Aeson.String "boolean") ]
+
+    , runTest "schema: the corpus lookups, whose answers carry no echo, do not declare verbose" $
+        assertEqual "lookups declaring verbose" []
+          [ t | t <- ["search_by_name", "search_by_type", "get_dependencies"]
+              , "verbose" `elem` schemaProperties t corpusTools ]
+
+    , runTest "exports_of schema: every accepted argument is a declared property" $
+        assertEqual "properties"
+          ["filePath", "limit", "module", "offset", "pattern", "reload", "verbose"]
+          (sort (schemaProperties "exports_of" advertisedTools))
+    ]
 
 
 -- ---------------------------------------------------------------------------
@@ -4246,6 +4468,145 @@ cwdProcessTests exe = do
           , assert "the failing path is named"
               ((client </> "no-such-dir") `isInfixOf` badErr)
           ]
+    ]
+  nuke
+  pure results
+
+
+-- | resultOf: the @result@ object of one JSON-RPC response line, by id.
+resultOf :: Int -> String -> Maybe Aeson.Object
+resultOf wanted out = listToMaybe
+  [ res
+  | l <- lines out
+  , Just (Aeson.Object o)   <- [Aeson.decodeStrict (TE.encodeUtf8 (T.pack l))]
+  , Just (Aeson.Number n)   <- [KM.lookup "id" o]
+  , n == fromIntegral wanted
+  , Just (Aeson.Object res) <- [KM.lookup "result" o]
+  ]
+
+-- | answerOf: one response's answer, decoded from its double-encoded text.
+answerOf :: Int -> String -> Maybe Aeson.Value
+answerOf wanted out =
+  innerText wanted out >>= Aeson.decodeStrict . TE.encodeUtf8
+
+-- | withoutKeys: an answer with the given top-level keys removed, and the
+-- given keys of its @lane@ object: the fields that differ between two calls
+-- of one tool for reasons that are not the call's verbosity (timing, and
+-- whether this call or the previous one paid the load).
+withoutKeys :: [Text] -> [Text] -> Aeson.Value -> Aeson.Value
+withoutKeys top laneKeys (Aeson.Object o) =
+  Aeson.Object (KM.mapMaybeWithKey trimLane (KM.filterWithKey (\k _ -> Key.toText k `notElem` top) o))
+  where
+    trimLane k (Aeson.Object l) | k == "lane" =
+      Just (Aeson.Object (KM.filterWithKey (\j _ -> Key.toText j `notElem` laneKeys) l))
+    trimLane _ v = Just v
+withoutKeys _ _ v = v
+
+-- | leanProcessTests: the lean answer on the wire (issue #184), through the
+-- real executable.  One client project, as tier 2g builds it, and one server
+-- session that asks each question twice, lean and then verbose, so the test
+-- sees exactly what a client sees: the server applies the rule itself, the
+-- verbose answer carries the whole echo, and a malformed verbose is refused.
+--
+--   <tmp>/agda-mcp-lean-client/.git/
+--   <tmp>/agda-mcp-lean-client/lean-client.agda-lib   (include: src)
+--   <tmp>/agda-mcp-lean-client/src/Lean.agda          (module Lean: a Nat and two numbers)
+leanProcessTests :: FilePath -> IO [Bool]
+leanProcessTests exe = do
+  hPutStrLn stderr "\n── Process tests (tier 2h: lean answers on the wire, #184) ──"
+  tmp <- getTemporaryDirectory
+  let raw  = tmp </> "agda-mcp-lean-client"
+      nuke = do e <- doesDirectoryExist raw
+                if e then removeDirectoryRecursive raw else pure ()
+  nuke
+  createDirectoryIfMissing True (raw </> "src")
+  createDirectoryIfMissing True (raw </> ".git")
+  writeFile (raw </> "lean-client.agda-lib") "name: lean-client\ninclude: src\n"
+  writeFile (raw </> "src" </> "Lean.agda") $ unlines
+    [ "module Lean where", ""
+    , "data Nat : Set where", "  zero : Nat", "  suc  : Nat -> Nat", ""
+    , "one : Nat", "one = suc zero", ""
+    , "two : Nat", "two = suc one" ]
+  client <- canonicalizePath raw
+  let file = client </> "src" </> "Lean.agda"
+      call :: Int -> Text -> [(Aeson.Key, Aeson.Value)] -> String
+      call i tool args = T.unpack . TE.decodeUtf8 . LBS.toStrict . Aeson.encode $ Aeson.object
+        [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= i, "method" Aeson..= ("tools/call" :: Text)
+        , "params" Aeson..= Aeson.object
+            [ "name" Aeson..= tool
+            , "arguments" Aeson..= Aeson.object (("filePath", Aeson.toJSON file) : args) ] ]
+      verbose = ("verbose", Aeson.Bool True)
+      reqs = unlines
+        [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+        , call 2 "check_file" []
+        , call 3 "check_file" [verbose]
+        , call 4 "type_of" [("expr", "two")]
+        , call 5 "type_of" [("expr", "two"), verbose]
+        , call 6 "exports_of" [("module", ""), ("limit", Aeson.toJSON (1 :: Int))]
+        , call 7 "check_file" [("verbose", "yes")]
+        ]
+  (code, out, err) <- readProcessWithExitCode exe ["--cwd", client, "--timeout", "120"] reqs
+  let pairOf lean full k = case (answerOf lean out, answerOf full out) of
+        (Just l, Just f) -> k l f
+        _ -> pure (Fail ("no answer for ids " <> show (lean, full) <> "; stderr:\n" <> take 600 err))
+      -- What differs between two calls of one tool for reasons other than
+      -- verbosity: timing, the cache evidence, and which call paid the load.
+      steady = withoutKeys ["elapsedMs", "checkedFromSource"] ["load", "loadElapsedMs"]
+      batchEcho = [ ["command"], ["verdict", "equivalentTo"], ["verdict", "meaning"]
+                  , ["project", "library"], ["project", "registeredLibraries"]
+                  , ["project", "selectedLibraries"], ["project", "includePaths"] ]
+      laneEcho  = [ ["command"], ["lane", "root"], ["lane", "spawned"], ["lane", "iotcm"]
+                  , ["project", "library"], ["project", "registeredLibraries"] ]
+      theRule lean full echo = allOf
+        [ assertEqual "echo missing from the verbose answer" []
+            [ p | p <- echo, isNothing (valueAt p full) ]
+        , assertEqual "echo present in the lean answer" []
+            [ p | p <- echo, isJust (valueAt p lean) ]
+        , assertEqual "the lean answer is the rule applied to the verbose one"
+            (steady (leanAnswer full)) (steady lean)
+        , assertEqual "the tree is named, the same either way"
+            (valueAt ["project", "root"] full) (valueAt ["project", "root"] lean)
+        ]
+  results <- sequence
+    [ runTest "wire: the session ran and exited cleanly" $
+        assertEqual ("exit (stderr: " <> take 300 err <> ")") ExitSuccess code
+
+    , runTest "wire: check_file answers lean by default, and verbose:true restores the whole echo" $
+        pairOf 2 3 $ \lean full -> allOf
+          [ theRule lean full batchEcho
+          , assertEqual "success" (Just (Aeson.Bool True)) (valueAt ["success"] lean)
+          , assertEqual "verdict" ["exitCode"] (keysAt ["verdict"] lean)
+          ]
+
+    , runTest "wire: type_of answers lean by default, and verbose:true restores the lane's echo" $
+        pairOf 4 5 $ \lean full -> allOf
+          [ theRule lean full laneEcho
+          , assertEqual "type" (Just (Aeson.String "Lean.Nat")) (valueAt ["type"] lean)
+          ]
+
+    , runTest "wire: exports_of answers one page, with the total and the rest by name" $
+        case answerOf 6 out of
+          Nothing -> pure (Fail "no answer for id 6")
+          Just a  -> allOf
+            [ assertEqual "one member typed" (Just 1)
+                (case valueAt ["exports"] a of
+                   Just (Aeson.Array xs) -> Just (length xs)
+                   _                     -> Nothing)
+            , assertEqual "truncated" (Just (Aeson.Bool True)) (valueAt ["truncated"] a)
+            , assertEqual "nextOffset" (Just (Aeson.Number 1)) (valueAt ["nextOffset"] a)
+            , assert "remaining names the rest" $ case (valueAt ["total"] a, valueAt ["remaining"] a) of
+                (Just (Aeson.Number t), Just (Aeson.Array rs)) -> length rs + 1 == round t && t >= 2
+                _                                              -> False
+            ]
+
+    , runTest "wire: a verbose that is not a boolean is refused by name" $
+        case resultOf 7 out of
+          Nothing  -> pure (Fail "no response for id 7")
+          Just res -> allOf
+            [ assertEqual "isError" (Just (Aeson.Bool True)) (KM.lookup "isError" res)
+            , assert ("text was: " <> maybe "" T.unpack (innerText 7 out))
+                (maybe False ("verbose must be true or false" `T.isInfixOf`) (innerText 7 out))
+            ]
     ]
   nuke
   pure results
@@ -5909,13 +6270,15 @@ interactionLaneTests cfg repoRoot = do
 
     , runTest "exports_of: the barrel's surface, and \"\" for the file's own module" $ do
         r1 <- handleExportsOf lanes cfg ExportsOfParams
-                { eopFilePath = fx "ReexportUse.agda", eopModule = "ReexportBarrel", eopReload = False }
+                { eopFilePath = fx "ReexportUse.agda", eopModule = "ReexportBarrel"
+                , eopReload = False, eopPage = defaultExportsPage }
         a <- case r1 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "barrel exports"
             (Just [ExportEntry "originalName" "Nat"]) (exrExports res)
         r2 <- handleExportsOf lanes cfg ExportsOfParams
-                { eopFilePath = fx "TwoHoles.agda", eopModule = "", eopReload = False }
+                { eopFilePath = fx "TwoHoles.agda", eopModule = ""
+                , eopReload = False, eopPage = defaultExportsPage }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "own module"
@@ -5930,7 +6293,7 @@ interactionLaneTests cfg repoRoot = do
       runTest "exports_of: nested modules and folded-in binders are both reported" $ do
         r1 <- handleExportsOf lanes cfg ExportsOfParams
                 { eopFilePath = fx "ExportSurfaces.agda", eopModule = "Inner"
-                , eopReload = False }
+                , eopReload = False, eopPage = defaultExportsPage }
         a <- case r1 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -5940,7 +6303,7 @@ interactionLaneTests cfg repoRoot = do
             pure (firstFailure [x, y])
         r2 <- handleExportsOf lanes cfg ExportsOfParams
                 { eopFilePath = fx "ExportSurfaces.agda", eopModule = "Param"
-                , eopReload = False }
+                , eopReload = False, eopPage = defaultExportsPage }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -5954,7 +6317,8 @@ interactionLaneTests cfg repoRoot = do
 
     , runTest "exports_of: a module the file's scope cannot name errors in band" $ do
         r <- handleExportsOf lanes cfg ExportsOfParams
-               { eopFilePath = fx "ReexportUse.agda", eopModule = "Agda.Builtin.Bool", eopReload = False }
+               { eopFilePath = fx "ReexportUse.agda", eopModule = "Agda.Builtin.Bool"
+               , eopReload = False, eopPage = defaultExportsPage }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -5962,7 +6326,52 @@ interactionLaneTests cfg repoRoot = do
             r2 <- assertEqual "stage" (Just "module") (lveStage <$> exrError res)
             r3 <- assertEqual "code" (Just (Just "NotInScope"))
                     (lveCode <$> exrError res)
-            pure (firstFailure [r1, r2, r3])
+            r4 <- assert "no page is claimed for a surface that was not read"
+                    (isNothing (exrSlice res))
+            pure (firstFailure [r1, r2, r3, r4])
+
+    , -- The page (#184), on a surface whose members are known: TwoHoles.agda's
+      -- own module defines g, h, and implicitOnly, in that order.
+      runTest "exports_of: a page carries its members typed, the rest by name, and the total" $ do
+        let own page = handleExportsOf lanes cfg ExportsOfParams
+              { eopFilePath = fx "TwoHoles.agda", eopModule = ""
+              , eopReload = False, eopPage = page }
+            names res = map exName <$> exrExports res
+        first <- own defaultExportsPage { epLimit = Just 1 }
+        next  <- own defaultExportsPage { epLimit = Just 1, epOffset = 1 }
+        match <- own defaultExportsPage { epPattern = Just "IMPLICIT" }
+        whole <- own defaultExportsPage { epLimit = Nothing }
+        withRight first $ \a -> withRight next $ \b ->
+          withRight match $ \c -> withRight whole $ \d -> allOf
+            [ assertEqual "first page" (Just ["g"]) (names a)
+            , assertEqual "first page's slice" (Just (ExportsSlice 3 (Just 1) ["h", "implicitOnly"]))
+                (exrSlice a)
+            , assertEqual "second page" (Just ["h"]) (names b)
+            , assertEqual "second page's slice" (Just (ExportsSlice 3 (Just 2) ["implicitOnly"]))
+                (exrSlice b)
+            , assertEqual "pattern, ignoring case" (Just ["implicitOnly"]) (names c)
+            , assertEqual "pattern's slice" (Just (ExportsSlice 1 Nothing [])) (exrSlice c)
+            , assertEqual "no limit" (Just ["g", "h", "implicitOnly"]) (names d)
+            , assert "each typed member carries its type"
+                (maybe False (all (not . T.null . exTerm)) (exrExports a))
+            ]
+
+    , -- The lane's echo under the lean rule (#184): lane keeps load and
+      -- loadElapsedMs, and loses root, pid, spawned, agdaVersion, and iotcm.
+      runTest "lean answers: type_of keeps its type, lane.load, and the tree, and drops the lane's wire lines" $ do
+        r <- handleTypeOf lanes cfg TypeOfParams
+               { topFilePath = fx "TwoHoles.agda", topExpr = "implicitOnly {3}"
+               , topLine = Nothing, topColumn = Nothing, topReload = True }
+        withRight r $ \res -> do
+          let full = Aeson.toJSON res
+          allOf
+            [ leanRules full
+            , assert "the full answer carries lane.iotcm" (isJust (valueAt ["lane", "iotcm"] full))
+            , assertEqual "lean lane.load" (Just (Aeson.String "forced"))
+                (valueAt ["lane", "load"] (leanAnswer full))
+            , assertEqual "lean lane keys" ["load", "loadElapsedMs"]
+                (keysAt ["lane"] (leanAnswer full))
+            ]
 
     , runTest "type_of: an ill-typed expression errors in band, lane healthy after" $ do
         r <- handleTypeOf lanes cfg TypeOfParams
@@ -7058,6 +7467,8 @@ main = do
   wireResults <- interactionWireTests
   -- Tier 1i: scope-aware retrieval, the pure half (#17).
   scopeResults <- scopeRetrievalTests
+  -- Tier 1j: the lean answer's rule and the exports_of page (#184).
+  leanResults <- leanAnswerTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -7077,6 +7488,13 @@ main = do
         "\n── Process tests (tier 2g: --cwd, #103): SKIPPED (executable not built or cabal absent) ──"
       pure []
     Just exe -> cwdProcessTests exe
+  -- Tier 2h: the lean answer on the wire (#184), same gate as tier 2g.
+  leanWireResults <- case mExe of
+    Nothing -> do
+      hPutStrLn stderr
+        "\n── Process tests (tier 2h: lean answers, #184): SKIPPED (executable not built or cabal absent) ──"
+      pure []
+    Just exe -> leanProcessTests exe
   -- Tier 3: the interaction lane (#75) — same gate as tier 2.
   laneResults <- case mEnv of
     Nothing -> do
@@ -7093,8 +7511,8 @@ main = do
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
-          <> pathResults <> wireResults <> scopeResults <> integrationResults
-          <> cwdResults <> laneResults <> scopeLaneResults
+          <> pathResults <> wireResults <> scopeResults <> leanResults <> integrationResults
+          <> cwdResults <> leanWireResults <> laneResults <> scopeLaneResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed
