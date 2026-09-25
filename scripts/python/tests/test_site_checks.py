@@ -182,6 +182,22 @@ def test_a_link_that_climbs_out_of_the_root_is_a_finding_even_if_the_file_exists
     assert unresolved_links('<a href="a/../b/">b</a><a href="a/..">root</a>', page, root) == ()
 
 
+def test_every_srcset_candidate_must_resolve(tmp_path: Path) -> None:
+    # Copilot's second round on PR #181: `srcset` was split for the
+    # off-origin check and never resolved, so a missing 2x asset passed.
+    root = _tree(tmp_path)
+    (root / "assets" / "ok.png").write_bytes(b"png")
+    page = root / "index.html"
+    found = unresolved_links(
+        '<img src="assets/ok.png" srcset="assets/ok.png 1x, assets/missing.png 2x">'
+        '<picture><source srcset="assets/missing.webp 1x, assets/ok.png 2x" type="image/webp"></picture>',
+        page, root)
+    assert [(f.tag, f.attr, f.value) for f in found] == [
+        ("img", "srcset", "assets/missing.png"),
+        ("source", "srcset", "assets/missing.webp"),
+    ]
+
+
 def test_inline_css_targets_are_resolved_against_the_page(tmp_path: Path) -> None:
     root = _tree(tmp_path)
     (root / "assets" / "bg.png").write_bytes(b"png")

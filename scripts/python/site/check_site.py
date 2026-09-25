@@ -149,10 +149,13 @@ class _Refs(HTMLParser):
                 self.fetched.extend((tag, attr, url) for url in _candidates(attr, value))
         if tag == "link" and found.get("href") is not None and _link_fetches(found.get("rel")):
             self.fetched.append((tag, "href", found["href"] or ""))
-        for attr in ("href", "src", "data", "poster"):
+        # Every reference a page makes, for resolution: the four plain
+        # attributes, and each candidate of a `srcset`, which names one
+        # asset per density and has to resolve one by one.
+        for attr in ("href", "src", "data", "poster", "srcset"):
             value = found.get(attr)
             if value is not None and (tag, attr) != ("a", "src"):
-                self.linked.append((tag, attr, value))
+                self.linked.extend((tag, attr, url) for url in _candidates(attr, value))
         if found.get("style"):
             self.css.append((STYLE_ATTRIBUTE, found["style"] or ""))
         if tag == "style":
@@ -278,8 +281,9 @@ def unresolved_links(html: str, page: Path, root: Path,
     """Every link or reference of a page that names no file in the tree.
 
     Markup and inline CSS alike: the elements' `href`, `src`, `data`, and
-    `poster`, and every same-origin `url()` or `@import` in a `<style>`
-    element or a `style` attribute, resolved against the page.
+    `poster`, each candidate of a `srcset`, and every same-origin `url()` or
+    `@import` in a `<style>` element or a `style` attribute, resolved
+    against the page.
     """
     refs = _refs(html)
     rel = str(page.relative_to(root))
