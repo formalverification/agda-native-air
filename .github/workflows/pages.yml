@@ -135,17 +135,21 @@ jobs:
         uses: actions/checkout@v6
 
       # The same Nix and Cachix steps as ci.yml's lanes, with one difference
-      # the Copilot review of #181 asked for: the write-capable Cachix token
-      # is handed to the action only on a push to `main` or a manual run.
-      # On a pull request the cache is read-only, because the `make` and
-      # `pytest` that follow are pull-request-controlled code, and a token
-      # installed for the action is readable by everything after it; a
-      # same-repository branch would otherwise get the keys to the cache
-      # this job claims to trust only for reading.  The site shell is a
-      # Python environment with mkdocs-material rebuilt at the pinned
-      # version: the first push to `main` builds it and pushes it, pull
-      # requests pull it, and a pull request that changes the pin builds it
-      # on the runner (about a minute) without publishing the result.
+      # the Copilot review of #181 asked for, in two rounds: the
+      # write-capable Cachix token is handed to the action only when the
+      # checked-out code is `main`, and the cache is read-only otherwise.
+      # The `make` and `pytest` that follow run whatever was checked out,
+      # and a token installed for the action is readable by everything
+      # after it; a pull request from a same-repository branch, or a manual
+      # run that a maintainer pointed at an untrusted branch, would
+      # otherwise get the keys to the cache this job claims to trust only
+      # for reading.  The condition is the ref, not the event, so a manual
+      # run of `main` still pushes and a manual run of anything else does
+      # not; it is the same condition the deploy job gates on.  The site
+      # shell is a Python environment with mkdocs-material rebuilt at the
+      # pinned version: the first push to `main` builds it and pushes it,
+      # every other run pulls it, and one that changes the pin builds it on
+      # the runner (about a minute) without publishing the result.
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
@@ -153,8 +157,8 @@ jobs:
         uses: cachix/cachix-action@v16
         with:
           name: formalverification
-          authToken: ${{ github.event_name != 'pull_request' && secrets.CACHIX_AUTH_TOKEN || '' }}
-          skipPush: ${{ github.event_name == 'pull_request' }}
+          authToken: ${{ github.ref == 'refs/heads/main' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ github.ref != 'refs/heads/main' }}
 
       # Four gates, in the order the header describes.  `set -e` inside the
       # shell string, so the first failing target ends the step.
