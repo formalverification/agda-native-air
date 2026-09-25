@@ -132,6 +132,7 @@ The same suite has now been measured with a frontier model in the loop's place (
 
 ## 10.  Where to read more
 
++  [`docs/reading-the-results.md`]: the reader's guide to every measured number in the repository, this loop's included; which instrument produced each, what "6/22" and "under exclusion" mean, and how to tell a win from a loss.
 +  [ADR 0001](../adr/0001-proof-search-on-agda-mcp.md): the decisions, their evidence, and the measured record.
 +  [ADR 0002](../adr/0002-agda-mcp.md): the server the search drives, and why its verdicts can be trusted.
 +  Issue [#113]: the tracking issue; its comments hold every measurement in full, with the run identifiers.
@@ -146,3 +147,4 @@ The same suite has now been measured with a frontier model in the loop's place (
 [#129]: https://github.com/formalverification/agda-native-air/issues/129
 [#154]: https://github.com/formalverification/agda-native-air/issues/154
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
+[`docs/reading-the-results.md`]: ../reading-the-results.md

@@ -15,6 +15,8 @@ explanatory note is [`docs/proof-search/overview.md`](../../docs/proof-search/ov
 the harness is `struxdriver.agentbench` in `strux-driver/`, run by
 `make agent-bench`.  Each run directory is written by `make agent-bench-archive`
 from the harness's own output and never edited by hand.
+How to read the numbers a run reports, beside every other measurement in the
+repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md).
 
 ## The protocol, fixed for every run below
 

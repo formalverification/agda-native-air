@@ -167,6 +167,8 @@ Two ledger conventions keep the split honest: a memo hit is a row with `cached: 
 
 ## 9.  Where it stands: the numbers
 
+A reader's guide to the tables in this section, naming which instrument produced each number, defining the words the tables use, and stating for each number what it is a win or a loss for, is [`docs/reading-the-results.md`]; the loop's columns in the agent table below are a different instrument from the agents', not their baseline, and that guide is where the distinction is drawn.
+
 Every sweep below used the same knobs (beam 4, depth 6, probe budget 60, dedup by script), ran serially against one server on an otherwise quiet machine, and reported zero anomalies; run identifiers and the full tables are in [#113]'s comments.
 
 **P0** ([#113], the measurement that settled the fork).  180 oracle calls per pass at 2.6–2.9 s each; 99.79 % of oracle time in the `agda` subprocess, 0.21 % transport; proposal 2.3 ms in total; 4 of 22 solved by the six-candidate stub.
@@ -403,3 +405,4 @@ Two qualifications the numbers carry.  Five rows across the two shell-bearing ar
 [`corpora/agda-algebras-v0.1.md`]: ../corpora/agda-algebras-v0.1.md
 [`docs/mcp-field-reports.md`]: ../mcp-field-reports.md
 [`reports/agent-bench/README.md`]: ../../reports/agent-bench/README.md
+[`docs/reading-the-results.md`]: ../reading-the-results.md
