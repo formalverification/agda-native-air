@@ -1,0 +1,23 @@
+{
+  "arm" : "mcp",
+  "workDir" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/data/benchmarks/reports/agent-bench/arm-verdict-mcp-1/work/haystack-nat-plus-mono-diag",
+  "readRoots" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/agda-dojang",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/agda-dojang/agda",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/agda"
+  ],
+  "corpora" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/data/corpora/agda-stdlib/v0/corpus.jsonl",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/129-m2-11-benchmarks-obligations-with-imports/data/corpora/agda-stdlib/v0/corpus.jsonl"
+  ],
+  "expose" : [
+    "check_file",
+    "fill_hole",
+    "get_goal",
+    "type_of"
+  ]
+}

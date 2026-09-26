@@ -166,6 +166,12 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 | `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | not re-judged | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
 | `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 55 | 46 | 8 | 3 of 12 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
 | `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 55 | 49 | 2 | 14 of 18 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
+| `cost-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | 2 | 0 | 1 | 0 of 0 | 0 | 11 | 9 | 0.15 | the cost pairs on [#191] |
+| `cost-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | 2 | 1 | 1 | 0 of 0 | 0 | 14 | 12 | 0.23 | the cost pairs on [#191] |
+| `cost-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 2 | 0 | 1 | 0 of 0 | 0 | 17 | 15 | 0.16 | the cost pairs on [#191] |
+| `arm-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | 55 | 48 | 7 | 6 of 14 | 0 | 345 | 290 | 3.83 | [#191], PR [#193] |
+| `arm-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | 55 | 46 | 4 | 8 of 14 | 0 | 318 | 263 | 3.55 | [#191], PR [#193] |
+| `arm-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 55 | 52 | 1 | 9 of 20 | 0 | 458 | 403 | 3.78 | [#191], PR [#193] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -173,9 +179,10 @@ proof came back in one of the subject's tool answers before its last edit of
 the work file (a call that names the lemma's file without showing its proof
 does not count).  It is a column, not a gate: no verdict depends on it.  The
 eight full arms were re-judged on copies to add it, with every verdict as
-archived; the six subset runs were not, since three of them predate the
-judge's Agda-based gates and a re-judge would rewrite more than this column,
-and none has more than one agda-algebras row.
+archived; the six subset runs made before it were not, since three of them
+predate the judge's Agda-based gates and a re-judge would rewrite more than
+this column, and none has more than one agda-algebras row.  The [#191] runs
+were judged with it.
 
 Per stratum, solved and restated (first arms), beside the loop's fixed space
 and retrieval under exclusion on `main`:
@@ -332,6 +339,93 @@ Three things to read beside the table.
    (`algebras-kernels-ker-con`, whose subject ran `find /`).  The `mcp` arm's
    one gate row (`algebras-homs-mon-to-intohom`) left a hole.
 
+## The tool-surface arms (2026-09-26, [#191])
+
+The server's tool surface, cut to a contract stated once (PR [#193]), and a
+second variable beside it: how many tools an arm is given.  What every tool
+shares now travels once, in the server's `initialize` instructions, and each
+description carries its own tool's contract under the 2,048 characters at
+which Claude Code 2.1.282 truncates one; before, eleven of the fourteen
+descriptions were cut there, so part of the contract never reached a subject.
+`tools/list` fell from 77,603 characters to 24,094, plus 1,989 of
+instructions.  `arm-surface-mcp-1` and `arm-surface-both-1` are the `mcp` and
+`both` arms on that surface; `arm-verdict-mcp-1` is the `mcp` arm with only
+`check_file`, `fill_hole`, `get_goal`, and `type_of` exposed (`--expose`), the
+four tools the earlier arms took their verdicts and goals from.  Everything
+else is the [#184] protocol: the prompts', index's, and corpora's digests, the
+caps, the read roots, and the client (2.1.282) are identical; the extractor
+the judge runs is a fresh build of unchanged source.  Zero anomalies; USD
+11.16 for the three arms.
+
+| | `shell` #162 | `mcp` #184 | `mcp` #191 | `both` #184 | `both` #191 | `mcp`, four tools |
+|---|---:|---:|---:|---:|---:|---:|
+| solved | 50 | 46 | 48 | 49 | 46 | 52 |
+| restated | 0 | 8 | 7 | 2 | 4 | 1 |
+| lost to a gate | 5 | 1 | 0 | 4 | 5 | 2 |
+| agda-algebras solves, original in view | 15 of 18 | 3 of 12 | 6 of 14 | 14 of 18 | 8 of 14 | 9 of 20 |
+| turns | 308 | 359 | 345 | 318 | 318 | 458 |
+| tool calls | 253 | 304 | 290 | 263 | 263 | 403 |
+| USD | 2.88 | 4.63 | 3.83 | 4.00 | 3.55 | 3.78 |
+| output tokens | 70,403 | 82,831 | 76,583 | 66,634 | 70,780 | 118,006 |
+| first-turn context (median) | 8,263 | 20,016 | 13,037 | 24,866 | 17,915 | 7,405 |
+| cached tokens read per turn | 10,060 | 22,407 | 15,503 | 25,331 | 18,838 | 9,649 |
+| characters returned per call | 1,025 | 1,757 | 1,504 | 850 | 846 | 722 |
+
+Per tool, calls and characters per call ("not exposed" where the arm's
+protocol did not give the tool, never 0):
+
+| tool | `mcp` #184 | `mcp` #191 | `both` #184 | `both` #191 | `mcp`, four tools |
+|---|---:|---:|---:|---:|---:|
+| `check_file` | 59 × 485 | 58 × 474 | 56 × 418 | 57 × 444 | 55 × 415 |
+| `type_of` | 15 × 677 | 18 × 735 | 11 × 594 | 13 × 655 | 60 × 663 |
+| `get_goal` | 4 × 689 | 4 × 836 | 1 × 707 | 1 × 718 | 23 × 893 |
+| `fill_hole` | 15 × 532 | 10 × 491 | 6 × 718 | 11 × 512 | 20 × 538 |
+| `exports_of` | 17 × 10,219 | 23 × 4,368 | 2 × 764 | 2 × 1,541 | not exposed |
+| `search_by_name` | 31 × 5,099 | 23 × 6,260 | 1 × 2,155 | 0 | not exposed |
+| `search_by_type` | 3 × 10,132 | 3 × 5,067 | 0 | 0 | not exposed |
+| `definition_of` | 15 × 602 | 16 × 924 | 0 | 0 | not exposed |
+| `get_dependencies` | 12 × 643 | 8 × 721 | 0 | 0 | not exposed |
+| `Read` | 71 × 1,211 | 68 × 1,285 | 59 × 1,136 | 63 × 1,343 | 187 × 953 |
+| `Bash` | 0 | 0 | 69 × 1,444 | 58 × 1,301 | 0 |
+
+**The smaller surface closed the per-turn gap, and not the cost gap**.  A
+server arm's context is what it pays for on every turn, and the trim took a
+third of it away (a first turn of 20,016 tokens down to 13,037; 22,407 cached
+tokens a turn down to 15,503), which cut cost 17 % and 11 % (USD 4.63 to
+3.83, 4.00 to 3.55).  With four tools the context fell below the shell arm's
+(7,405 against 8,263 on the first turn, 9,649 against 10,060 a turn), yet the
+arm cost USD 3.78 against 2.88, because it worked longer: 458 turns against
+308 and 118 thousand output tokens against 70.
+
+**The trimmed surface left the tool mix where it was; the smaller one changed
+what the model did**.  Given all fourteen tools, the subject called the
+corpus and navigation tools (`exports_of`, the two searches, `definition_of`,
+`get_dependencies`) about as often as before (73 calls against 78) and,
+beside a shell, as rarely (2 against 3); every verdict of both `both` arms
+came from `check_file`.  One description change did move behavior: the four
+`limit: 0` calls of #184, which took `exports_of`'s whole surface, fell to
+none once that offer was stated only on the `limit` property, and the tool's
+answers fell from 10,219 characters a call to 4,368.  Given four tools, the subject read the files more (187 reads against
+68), asked Agda more (`type_of` 60 against 18, `get_goal` 23 against 4), and
+restated a library lemma once instead of seven times: on the 21 agda-algebras
+rows it solved 20 (14 in the full-surface arm), 9 of them with the original's
+proof in view.  On the 34 rows with no original to find, every arm solves 31
+to 34.
+
+Two things to read beside the table.
+
++  **Lost verdicts are a lower bound on the solves**.  Every gate row of the
+   three arms type-checks with its statement preserved: four are the
+   preservation gate refusing an edited `using` list (`stdlib-nat-plus-comm`,
+   `stdlib-nat-mul-distrib-l`), two are subjects that ran `find /`
+   (`algebras-subalgebras-sub-trans`, and `algebras-kernels-ker-con`, which
+   did the same on [#184]), and one is the audit not modeling `xargs` over a
+   path inside the roots (`algebras-homs-id-hom`).  The audit was not changed
+   while the comparison ran.
++  **The full-surface arms change two things at once**: fewer tokens a turn,
+   and a contract that now arrives whole.  The subset arm is the cleaner
+   reading of the surface as a variable, and it is one seed.
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -398,3 +492,5 @@ new run gets a new run id.
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#193]: https://github.com/formalverification/agda-native-air/pull/193

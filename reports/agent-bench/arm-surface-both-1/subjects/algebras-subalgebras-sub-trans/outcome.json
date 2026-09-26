@@ -1,0 +1,110 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sub-trans",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Subalgebras.Properties.≤-trans",
+    "target:Setoid.Homomorphisms.Properties.⊙-hom",
+    "target:Setoid.Functions.Injective.⊙-injective"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "≤-trans′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -path /proc -prune -o -iname \"Properties.agda\" -path \"*Subalgebras*\" -print 2>/dev/null; Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -iname \"Properties.agda\" -path \"*Subalgebras*\" -print 2>/dev/null; Bash reads outside the arm's roots (/): find / -path /proc -prune -o -ipath \"*Setoid/Subalgebras*\" -print 2>/dev/null; Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -ipath \"*Setoid/Subalgebras*\" -print 2>/dev/null",
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 4,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 4,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 84828,
+  "costUsd" : 0.14930179999999998,
+  "tokens" : {
+    "input" : 16,
+    "output" : 2350,
+    "cacheRead" : 202009,
+    "cacheCreation" : 21342
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find / -path /proc -prune -o -iname \"Properties.agda\" -path \"*Subalgebras*\" -print 2>/dev/null",
+      "Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -iname \"Properties.agda\" -path \"*Subalgebras*\" -print 2>/dev/null",
+      "Bash reads outside the arm's roots (/): find / -path /proc -prune -o -ipath \"*Setoid/Subalgebras*\" -print 2>/dev/null",
+      "Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -ipath \"*Setoid/Subalgebras*\" -print 2>/dev/null"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 2,
+      "other" : 2
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5540,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-subalgebras-sub-trans/final/Subalgebras-sub-trans.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sub-trans/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully — the batch verdict is success (exit code 0, no diagnostics, no holes).",
+  "rateLimit" : {
+    "maxUtilization" : 0.52,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

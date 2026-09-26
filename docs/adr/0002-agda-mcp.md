@@ -156,7 +156,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 +  **The README** carries the mechanism a model does not need in order to use a tool correctly (`search_in_scope`'s rendering ladder and rank formula, the lane's re-load vocabulary).
 +  **`--expose NAME,...`** presents a subset: `tools/list` and the instructions name those tools alone, and a call to any other registered tool is refused by name before it runs.
 
-`tools/list` fell from 77,603 characters to 24,094 (plus 1,989 of instructions), and the surface as delivered to Sonnet 5, the first-turn difference against a one-tool probe server, from 16,230 tokens a turn to 9,217, or 3,583 with the four verdict tools alone exposed.
+`tools/list` fell from 77,603 characters to 24,094 (plus 1,989 of instructions), and the surface as delivered to Sonnet 5, the first-turn difference against a one-tool probe server, from 16,230 tokens a turn to 9,217, or 3,583 with the four verdict tools alone exposed.  On three Sonnet 5 arms at the [#162] caps (runs `arm-surface-mcp-1`, `arm-surface-both-1`, `arm-verdict-mcp-1`, 2026-09-26, zero anomalies; [`reports/agent-bench/README.md`]) the trim cut a server arm's cached tokens a turn by about 30 % and its cost by 17 % and 11 %, and left the tool mix as it was; with the four verdict tools alone the per-turn context fell below the shell arm's (9,649 cached tokens a turn against 10,060), the subject solved 52 and restated 1 against the full surface's 48 and 7, and the arm still cost USD 3.78 against the shell's 2.88, because it took 458 turns against 308.
 
 ---
 
@@ -359,7 +359,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 17 | Timeouts enforced by killing the process group; timeouts are values; defaults 300 s and 1800 s | Adopted ([#77], PR [#89]) | `FillTimeout` was unreachable; restore pinned on the timeout path |
 | 18 | Corpus tools are pure in-memory lookups, registered only with `--corpus` | Adopted ([#11], PR [#44]) | 1.4 s load, 308 MB resident at library scale |
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
-| 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5 (§ 3) |
+| 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5; arms cost 17 % and 11 % less, and four tools alone solved 52 with 1 restated (§ 3) |
 
 ---
 
