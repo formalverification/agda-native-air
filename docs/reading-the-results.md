@@ -359,10 +359,11 @@ at all is a decision not yet taken (§ 6).
    on the agda-algebras rows, where the whole difference sits, the `shell`
    arm had the original's proof in view for 15 of its 18 solves.
 +  **Restated, tools against no tools: not a loss; a loophole**.  0 with a
-   shell, 6 with the server, 8 in the archive.  The zero is transcription,
-   not construction: the rows the archive cited, the `shell` arm copied,
-   which the rule cannot see.  The honest comparison for this column is
-   between arms that cannot read the original, and [#162] has none.
+   shell, 6 with the server, 8 in the archive.  The zero is no evidence of
+   construction: six of the rows the archive cited, the `shell` arm solved
+   with the original's proof in view, and the rule cannot see a
+   transcription.  The honest comparison for this column is between arms
+   that cannot read the original, and [#162] has none.
 +  **Cost, tools against no tools: a loss, diagnosed**.  USD 5.28 against
    2.88 with output tokens within 9 % (76,732 against 70,403) and **3.6 times
    the bytes read from tool results** (929,386 against 259,520), because the
@@ -415,7 +416,7 @@ not a term, so no hole-filling judgment of any kind can express it.
 | question | look at | it is a win for the tools when |
 |---|---|---|
 | Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals**. |
-| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero is transcription**. |
+| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero came with the original in view**. |
 | Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no; answer size was not the cause (PR [#190]); the per-turn tool surface is, unmeasured**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |

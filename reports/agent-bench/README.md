@@ -221,14 +221,17 @@ the `mcp` arm and 0 in the `both` arm; `search_by_name` 18 and 1; `type_of` 34
 and 11), and `check_file` does not move (56 and 57).  The restated column
 follows: the `shell` arm consulted library sources 82 times against the `mcp`
 arm's 13, because `grep` over a tree needs no prior knowledge of where a thing
-is, and a subject that reads the source copies the proof where one that
-queries the name cites the name.  The judge's `original` column ([#188]) has
-the restated lemma's own proof in view before the last edit for 15 of the
+is.  What that reading put in view is the judge's `original` column ([#188]):
+the restated lemma's own proof came back before the last edit for 15 of the
 `shell` arm's 18 agda-algebras solves, 4 of the `mcp` arm's 14, and 16 of the
-`both` arm's 19, against none of the archived arms', whose reads of the
-library were refused; `⊙-hom′` and the two lines of `≤-trans-≅′` are the
-library's own bodies but for the prime on the name.  The restated rule reads
-references, so it refuses the citation and passes the copy.
+`both` arm's 19, and for none of the archived arms', whose reads of the
+library were refused.  The column records what was shown, not what was
+written from it.  Some bodies are the library's own (`⊙-hom′` and the two
+lines of `≤-trans-≅′` differ from it only by the prime on the name), but an
+identical body proves no copying either: Opus wrote the library's
+`mon→hom` term in the [#154] cost pair with no read of the library at all.
+The restated rule reads references, so it refuses a citation and cannot see
+a transcription.
 
 Three protocol differences from the archived arms, all recorded and none of
 them measurable in the verdicts: the server presents fourteen tools rather
