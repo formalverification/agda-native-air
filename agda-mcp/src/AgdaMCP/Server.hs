@@ -47,6 +47,15 @@
 --   * exports_of answers one page of a module's surface: @limit@, @offset@,
 --     and @pattern@ in its schema, @total@ / @truncated@ / @nextOffset@ /
 --     @remaining@ in its answer.
+--
+-- Issue #191 additions:
+--   * A smaller tool surface.  What every tool shares is stated once, as the
+--     @instructions@ of the @initialize@ answer ('serverInstructions'), and
+--     each description carries only its own tool's contract, under the 2,048
+--     characters at which Claude Code cuts a description (and instructions).
+--   * @--expose NAME,...@ ('scExpose'): present only the named tools.
+--     tools/list lists those alone, the instructions name those alone, and a
+--     call to a registered tool that was not exposed is refused by name.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -55,6 +64,8 @@ module AgdaMCP.Server
   , ServerConfig (..)
     -- * Exposed for testing
   , toolDefinitions
+  , registeredToolNames
+  , serverInstructions
   , forceResponse
   ) where
 
@@ -110,6 +121,10 @@ data ServerConfig = ServerConfig
   , scCorpusIndex :: Maybe CorpusIndex
     -- ^ In-memory corpus index, loaded at startup via @--corpus@.
     --   When 'Nothing', search tools are not registered.
+  , scExpose      :: Maybe [Text]
+    -- ^ The tools to present (@--expose@, issue #191); 'Nothing' presents
+    --   every registered tool.  Main refuses a name this configuration does
+    --   not register, so every name here is one 'registeredToolNames' lists.
   } deriving (Show)
 
 
@@ -152,60 +167,65 @@ mkError reqId code msg = object
 -- Tool definitions (JSON Schema for tools/list)
 -- ---------------------------------------------------------------------------
 
--- | Build the tool definitions list.
---
--- Proof-state and live-query tools are always available.
--- Search tools are only registered when a corpus is loaded.
+-- | The tool definitions a client receives: the tools this configuration
+-- registers ('registeredTools'), narrowed to the ones @--expose@ names (issue
+-- #191), in registration order.
 toolDefinitions :: ServerConfig -> Value
-toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
-  where
-    -- The hole model shared by all four tool descriptions (issues #71/#73):
-    -- every Agda hole syntax is enumerated, comments and prose never count,
-    -- and positions/indices are coordinates in the file as written.
-    holeModel =
-      "FILE FLAVOURS AND HOLES: plain .agda plus every literate flavour Agda \
-      \2.8 supports (.lagda, .lagda.tex, .lagda.md, .lagda.typ, .lagda.rst, \
-      \.lagda.org, .lagda.tree), recognized by extension and scanned in their \
-      \code regions only, with positions reported in literate-file \
-      \coordinates. Holes are enumerated in source order across every Agda \
-      \hole syntax ({!!}, {! ... !} with nesting, and standalone ?); tokens \
-      \inside comments, string literals, or literate prose are never holes."
+toolDefinitions cfg = toJSON (map snd (exposedTools cfg))
 
+-- | The names this configuration registers, exposed or not: what @--expose@
+-- may name.  The corpus tools are among them only when a corpus is loaded.
+registeredToolNames :: ServerConfig -> [Text]
+registeredToolNames = map fst . registeredTools
+
+-- | The registered tools a client is shown and may call.
+exposedTools :: ServerConfig -> [(Text, Value)]
+exposedTools cfg = filter (isExposed cfg . fst) (registeredTools cfg)
+
+-- | isExposed: whether this server presents (and answers) the named tool.
+-- Without @--expose@ every registered tool is exposed.
+isExposed :: ServerConfig -> Text -> Bool
+isExposed cfg name = maybe True (name `elem`) (scExpose cfg)
+
+-- | Every tool this configuration registers, as (name, definition).
+--
+-- Proof-state and live-query tools are always registered; the corpus tools
+-- only when a corpus is loaded.
+--
+-- How the text is laid out (issue #191).  A client puts every tool's
+-- description and schema in its model's context on EVERY turn, so a sentence
+-- repeated on six tools is paid for six times a turn; and Claude Code (from
+-- 2.1.282 at the latest, measured) cuts each description, and the server's
+-- instructions, at 2,048 characters, so a sentence past that point is never
+-- read at all.  Hence three rules.  What every tool shares is stated once, in
+-- 'serverInstructions', which a client places in its system prompt.  Each
+-- description states its own tool's contract and nothing else, and stays well
+-- under the cap (the suite asserts it).  Mechanism a model does not need in
+-- order to use a tool correctly (the rendering ladder, the rank formula, the
+-- lane's re-load vocabulary) lives in the README, for people.  The PR for
+-- issue #191 lists which sentence went where.
+registeredTools :: ServerConfig -> [(Text, Value)]
+registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
+  where
     proofStateTools =
       [ toolDefWith "get_goal"
-          ("Inspect the goal type and local context at a hole. The response's \
-           \source field says which of two mechanisms answered. PREFERRED, \
-           \source='interaction-lane': the persistent per-root agda process \
-           \answers from Agda's own goal display — no file mutation, and \
-           \millisecond-warm once the file is loaded (one load first, like \
-           \one check_file; re-loaded on the live tools' evidence — a change \
-           \on disk, changed flags, a failed previous load, or reload:true). \
-           \This shape \
-           \carries lane {load, loadElapsedMs?} and NO \
-           \verdict — there is no batch run to have one; context entries \
-           \carry name and type (shadowed outers appear under their primed \
-           \display names). FALLBACK, source='injected-macro', used when the \
-           \lane cannot serve (its process crashed or could not start, the \
-           \file does not load there, or the server is shutting down): \
-           \injects a reporting macro over the addressed hole, typechecks the \
-           \patched file in place, reads the goal back, and restores the file \
-           \byte for byte — the one path whose context entries carry \
-           \visibility (visible/hidden). A lane TIMEOUT is surfaced as the \
-           \structured lane failure rather than silently running the fallback \
-           \behind it, which would double the bound. "
-           <> holeAddressing
-           <> " "
-           <> goalEchoNote
-           <> " On the fallback path verdict.exitCode is normally NON-ZERO \
-              \even when the goal is correct, because the injected macro \
-              \leaves an interaction point behind: it is evidence about the \
-              \introspection run, not a judgement on your file — use \
-              \check_file for that."
-           <> " Returns elapsedMs and checkedFromSource; on the fallback path, " <> latencyNote
-           <> " On a fallback-path timeout this returns an error whose text is a JSON object —"
-           <> " {error, timedOut: true, elapsedMs, checkedFromSource?, verdict,"
-           <> " command, project} — naming the bound, since no goal was reported. "
-           <> holeModel)
+          ("The goal type and local context at a hole. " <> holeAddressing
+           <> " source says which of two mechanisms answered. \
+              \'interaction-lane' (preferred): Agda's own goal display from \
+              \the live lane, with no file edit; the answer carries lane \
+              \{load, loadElapsedMs?} and NO verdict, and its context entries \
+              \are {name, type}, shadowed outer names primed. \
+              \'injected-macro' (the fallback, when the lane cannot serve the \
+              \file): injects a reporting macro over the hole, typechecks the \
+              \patched file in place with batch agda, and restores it byte for \
+              \byte; the one path whose context entries carry visibility \
+              \(visible/hidden), with verdict {exitCode} and no lane block. Its \
+              \exitCode is normally NON-ZERO even when the goal is right, because the macro leaves an interaction \
+              \point behind: it judges the introspection run, not your file \
+              \(use check_file for that). A lane timeout is reported as the \
+              \lane's failure, never re-run on the fallback path, which would \
+              \double the bound; a fallback timeout is an isError whose text \
+              \is a JSON object naming the bound.")
           [ prop "filePath"  "string"  filePathDoc
           , prop "line"      "integer" lineDoc
           , prop "column"    "integer" columnDoc
@@ -218,33 +238,23 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           [addressAlternatives]
 
       , toolDefWith "fill_hole"
-          ("Substitute a candidate term into a hole (replacing the hole's \
-           \actual span), typecheck the patched file in place, and restore it \
-           \byte for byte. "
-           <> holeAddressing
-           <> " "
-           <> verdictNote
-           <> " status is \"ok\" if and only if that command exits 0, or fails \
-              \with nothing but [UnsolvedInteractionMetas] — holes still open \
-              \in the file, including any new sub-hole inside the candidate, \
-              \which is a successful refinement. EVERY other failure is \
-              \\"type_error\", including [UnsolvedMetaVariables] and \
-              \[UnsolvedConstraints]: a candidate that leaves a meta unsolved \
-              \does not pass the build and is not ok here either. A run killed \
-              \by --timeout is \"timeout\" (the candidate was never judged, and \
-              \the file is still restored); an agda binary that could not be \
-              \started is \"crash\"."
-           <> " EVERY response carries holes: the full hole list of the file AS \
-              \THIS CANDIDATE LEAVES IT — [{index, line, col, goal}], one entry \
-              \per remaining hole, remainingHoles being its length — so you \
-              \re-anchor on the next hole's position without a second call. \
-              \Because the file on disk is restored, those coordinates are the \
-              \ones you get once you write the candidate back; until you do, \
-              \the file still has the holes it started with. The hole address, \
-              \holes, and remainingHoles all cover every hole syntax."
-           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
-           <> " "
-           <> holeModel)
+          ("Try a candidate term in a hole: splice it over the hole's span, \
+           \typecheck the patched file in place with batch agda, and restore \
+           \the file byte for byte, so a candidate you keep you write back \
+           \yourself. " <> holeAddressing
+           <> " status is \"ok\" if and only if agda exits 0, or fails with \
+              \nothing but [UnsolvedInteractionMetas]: holes still open in the \
+              \file, including a new sub-hole inside the candidate, which is a \
+              \successful refinement. EVERY other failure is \"type_error\", \
+              \including [UnsolvedMetaVariables] and [UnsolvedConstraints]: a \
+              \candidate that leaves a meta unsolved does not pass the build \
+              \and is not ok here either. \"timeout\" means the candidate was \
+              \never judged (the file is still restored); \"crash\" means agda \
+              \could not start. verdict {exitCode} is agda's own. EVERY answer \
+              \carries holes [{index, line, col, goal}] and remainingHoles: \
+              \the file's holes AS THIS CANDIDATE LEAVES IT, so once you write \
+              \the candidate back you re-anchor on the next hole without a \
+              \second call; until you do, the file keeps the holes it had.")
           [ prop "filePath"  "string"  filePathDoc
           , prop "line"      "integer" lineDoc
           , prop "column"    "integer" columnDoc
@@ -257,22 +267,15 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           [addressAlternatives]
 
       , toolDef "check_file"
-          ("Typecheck one Agda file and return all diagnostics. "
-           <> verdictNote
-           <> " " <> batchNote
-           <> " " <> diagnosticModel
+          ("Typecheck one Agda file with batch agda and return its \
+           \diagnostics. " <> batchNote <> " " <> diagnosticModel
            <> " holes lists every open hole as {index, line, col, goal} \
-              \(holesCount is its length); (line, col) is the address to pass \
-              \back to get_goal and fill_hole, and this is the listing to take \
-              \it from. goal is each hole's goal type WHEN the root's \
-              \interaction lane already holds a matching load of this exact \
-              \file state (warmed by the live-query tools or get_goal — a \
-              \free peek, never a lane call), and the placeholder '?' \
-              \otherwise. That same peek is where an unsolved-meta \
-              \diagnostic's involved.metas comes from."
-           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
-           <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
-           <> holeModel)
+              \(holesCount is its length): (line, col) is the address to pass \
+              \to get_goal and fill_hole, and goal is the hole's type when the \
+              \root's live lane already holds a load of this exact file state \
+              \(a free peek, never a lane call), '?' otherwise. A timeout \
+              \answers success:false, timedOut:true, and a timeout \
+              \diagnostic.")
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
@@ -280,26 +283,15 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           ["filePath"]
 
       , toolDef "get_diagnostics"
-          ("Typecheck one Agda file and return a summary: error/warning counts, \
-           \the diagnostics behind them, and each open hole's index, \
-           \(line, col) position — that (line, col) being the address to pass \
-           \back to get_goal and fill_hole — and goal type when the root's \
-           \interaction lane already holds a matching load of this exact file \
-           \state (a free peek; '?' otherwise, and the same peek fills \
-           \involved.metas). "
-           <> verdictNote
-           <> " " <> batchNote
-           <> " success and verdict are the same fields check_file returns, with \
-              \the same meaning; the two tools differ in what they summarize, \
-              \never in what green means. The counts come from parsing Agda's \
-              \prose and can drift with its message format, which is precisely \
-              \why success is not read from them."
-           <> " " <> diagnosticModel
-           <> " The errors and warnings counts are over every diagnostic found, \
-              \not over the (capped) diagnostics list."
-           <> " Returns elapsedMs and checkedFromSource; " <> latencyNote
-           <> " On timeout it returns success:false with timedOut:true and an \"agda timed out after Ns\" error diagnostic. "
-           <> holeModel)
+          "check_file's check, summarized: errors and warnings counts, the \
+          \diagnostics behind them (check_file's shape, root cause first, \
+          \capped by maxDiagnostics), and the open holes as check_file lists \
+          \them. success and verdict are check_file's fields with the same \
+          \meaning: the two tools differ in what they summarize, never in what \
+          \green means. The counts cover every diagnostic found, not only the \
+          \capped list, and are parsed from Agda's prose, so they can drift \
+          \with its format; that is why success is never read from them. A \
+          \timeout answers as check_file's does."
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
@@ -307,148 +299,97 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           ["filePath"]
 
       , toolDef "check_project"
-          ("Run the WHOLE PROJECT's own acceptance gate — the check a human runs \
-           \before calling the work done — and report its verdict. Use this \
-           \instead of running the gate from a shell. "
-           <> gateModel
-           <> " " <> projectHonestyNote
-           <> " " <> projectPayloadNote
-           <> " " <> diagnosticModel
-           <> " " <> projectTimingNote
-           <> " " <> projectEchoNote)
+          ("Run the WHOLE PROJECT's own acceptance gate, the check a human \
+           \runs before calling the work done, and report its verdict; use \
+           \this instead of running the gate from a shell. " <> gateModel
+           <> " " <> projectHonestyNote <> " " <> projectPayloadNote
+           <> " With verbose:true, a make or command gate's selectedLibraries \
+              \and includePaths are this server's configuration, not the flags \
+              \the gate passed agda.")
           [ prop "target" "string"
-              "A make target to run instead of the default 'check'. It is \
-              \resolved against the nearest Makefile up from the anchor that \
-              \declares it; naming one selects the Makefile gate even when the \
-              \server has a --check-command configured. If no Makefile declares \
-              \it, the call fails rather than running something else."
+              "A make target to run instead of check, from the nearest \
+              \Makefile above the anchor that declares it; naming one selects \
+              \the Makefile gate even over --check-command. If no Makefile \
+              \declares it, the call fails rather than running something else."
           , prop "projectPath" "string"
-              "A file or directory inside the project to check (default: the \
-              \server's working directory). A file anchors its own directory. \
-              \PASS AN ABSOLUTE PATH: a relative one is resolved against THIS \
-              \SERVER'S working directory, not yours. A path that does not exist \
-              \is an error naming the path as resolved and that working \
-              \directory."
+              "A file or directory inside the project (default: this server's \
+              \working directory; a file anchors its own directory). PASS AN \
+              \ABSOLUTE PATH: a relative one resolves against THIS SERVER'S \
+              \working directory, not yours."
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
           ]
           []
-       ]
-    -- The interaction-lane tools (issue #75).  Their descriptions carry the
-    -- two-lane boundary — these inform and never decide a build verdict —
-    -- because an agent picks a tool by reading its description and nothing
-    -- else (the § 6 meta-suggestion of the feedback document).
+      ]
+
+    -- The live queries (issue #75).  What they share (the lane, its
+    -- latency, that they inform and never decide, reload) is stated once in
+    -- 'serverInstructions'; each description says what its tool answers.
     liveQueryTools =
       [ toolDef "type_of"
-          ("Infer the type of an Agda expression IN A FILE'S SCOPE, without \
-           \editing the file — the expression need not appear in it (Agda's \
-           \C-c C-d). Answers {expr, scope, type} on success and {expr, \
-           \scope, error: {stage, code?, message}} when the expression does \
-           \not typecheck there — that negative is an answer, not a tool \
-           \failure. "
-           <> liveLineNote <> " " <> liveLaneNote)
-          [ prop "filePath" "string"  liveFilePathDoc
-          , prop "expr"     "string"  "The Agda expression to type. It is sent \
-              \verbatim (any syntax a hole would accept); it does not have to \
-              \occur in the file."
-          , prop "line"     "integer" liveLineDoc
-          , prop "column"   "integer" liveColumnDoc
-          , prop "col"      "integer" liveColDoc
-          , prop "reload"   "boolean" liveReloadDoc
-          , prop "verbose"  "boolean" verboseDoc
-          ]
+          "Infer the type of an Agda expression IN A FILE'S SCOPE, without \
+          \editing the file; the expression need not occur in it (Agda's \
+          \C-c C-d). Answers {expr, scope, type}, or {expr, scope, error: \
+          \{stage, code?, message}} when it does not typecheck there, which is \
+          \an answer, not a tool failure."
+          (liveProps "The Agda expression to type, sent verbatim (any syntax \
+                     \a hole would accept).")
           ["filePath", "expr"]
 
       , toolDef "normalize"
-          ("Evaluate an Agda expression to normal form IN A FILE'S SCOPE, \
-           \without editing the file (Agda's C-c C-n). Answers {expr, scope, \
-           \normalForm} on success and an in-band error object when the \
-           \expression does not typecheck there. "
-           <> liveLineNote <> " " <> liveLaneNote)
-          [ prop "filePath" "string"  liveFilePathDoc
-          , prop "expr"     "string"  "The Agda expression to evaluate, sent \
-              \verbatim; it does not have to occur in the file."
-          , prop "line"     "integer" liveLineDoc
-          , prop "column"   "integer" liveColumnDoc
-          , prop "col"      "integer" liveColDoc
-          , prop "reload"   "boolean" liveReloadDoc
-          , prop "verbose"  "boolean" verboseDoc
-          ]
+          "Evaluate an Agda expression to normal form IN A FILE'S SCOPE, \
+          \without editing the file (Agda's C-c C-n). Answers {expr, scope, \
+          \normalForm}, or an in-band error object when it does not typecheck \
+          \there."
+          (liveProps "The Agda expression to evaluate, sent verbatim.")
           ["filePath", "expr"]
 
       , toolDef "resolve_name"
-          ("What does this name resolve to here, and why? Answers every \
-           \candidate with its provenance chain — {description, qualified, \
-           \provenance: [{step, site?}], definition?} — resolving re-exports \
-           \and module applications that grep cannot see; an AmbiguousName \
-           \situation returns EVERY candidate. inScope is Agda's verdict on \
-           \the name as written; when it is false the tool still recovers \
-           \candidates where it can (recovered says how: \
-           \'ambiguous-name-error' — the name is in scope ambiguously or \
-           \invisible to the completed top-level scope — or 'did-you-mean', \
-           \Agda's own suggestions, each re-resolved for its chain). An empty \
-           \candidates list with inScope:false means the name really is \
-           \unknown there. "
-           <> liveLineNote <> " " <> liveLaneNote)
-          [ prop "filePath" "string"  liveFilePathDoc
-          , prop "name"     "string"  "The name to resolve, qualified or not, \
-              \exactly as it would appear in the file."
-          , prop "line"     "integer" liveLineDoc
-          , prop "column"   "integer" liveColumnDoc
-          , prop "col"      "integer" liveColDoc
-          , prop "reload"   "boolean" liveReloadDoc
-          , prop "verbose"  "boolean" verboseDoc
-          ]
+          "What does this name resolve to here, and why? Answers every \
+          \candidate with its provenance chain, {description, qualified, \
+          \provenance: [{step, site?}], definition?}, through re-exports and \
+          \module applications that grep cannot see; an AmbiguousName situation \
+          \returns EVERY candidate. inScope is Agda's verdict on the name as \
+          \written; when it is false the tool still recovers candidates where \
+          \it can (recovered says how: 'ambiguous-name-error', the name is in \
+          \scope ambiguously or invisible to the completed top-level scope, or \
+          \'did-you-mean', Agda's own suggestions, each re-resolved). An empty \
+          \candidates list with inScope:false means the name really is unknown \
+          \there."
+          (nameProps "The name to resolve, qualified or not, exactly as it \
+                     \would appear in the file.")
           ["filePath", "name"]
 
       , toolDef "definition_of"
-          ("Where is this name defined? Answers {definitions: [{qualified, \
-           \file, line, col, endLine, endCol}]} — the defining file and \
-           \position of every candidate the name resolves to, chased through \
-           \re-exports and barrel modules to the original definition (the \
-           \single most common grep, answered by the type-checker instead). \
-           \unlocated lists candidates whose site Agda's answer did not \
-           \carry, so a partial answer is never mistaken for a total one. "
-           <> liveLineNote <> " " <> liveLaneNote)
-          [ prop "filePath" "string"  liveFilePathDoc
-          , prop "name"     "string"  "The name to locate, qualified or not."
-          , prop "line"     "integer" liveLineDoc
-          , prop "column"   "integer" liveColumnDoc
-          , prop "col"      "integer" liveColDoc
-          , prop "reload"   "boolean" liveReloadDoc
-          , prop "verbose"  "boolean" verboseDoc
-          ]
+          "Where is this name defined? Answers {definitions: [{qualified, file, \
+          \line, col, endLine, endCol}]}, the defining file and position of \
+          \every candidate the name resolves to, chased through re-exports and \
+          \barrel modules to the original definition. unlocated lists \
+          \candidates whose site Agda's answer did not carry, so a partial \
+          \answer is never mistaken for a total one."
+          (nameProps "The name to locate, qualified or not.")
           ["filePath", "name"]
 
       , toolDef "exports_of"
-          ("The public surface of a module, both member kinds: exports \
-           \[{name, type}] lists the value members (a parameterized module's \
-           \types carry its binders folded in), and modules [name] lists the \
-           \exported nested modules — a datatype or record induces one — so \
-           \a barrel omission of either kind is caught before compiling \
-           \against it. The module is named FROM A \
-           \FILE'S SCOPE: pass the module name as that file can write it \
-           \(imported directly or through re-exports); a module the file's \
-           \scope cannot name answers with an in-band NotInScope error. The \
-           \empty string names the file's own top-level module and lists its \
-           \definitions. PAGED, because a library module's surface printed \
-           \whole runs to tens of kilobytes: exports carries at most limit \
-           \members with their types (default "
+          ("The public surface of a module: exports [{name, type}], the value \
+           \members (a parameterized module's types carry its binders), and \
+           \modules [name], the exported nested modules (a datatype or record \
+           \induces one), so a barrel omission of either kind shows before you \
+           \compile against it. Name the module as filePath's scope can write \
+           \it (imported directly or through re-exports); \"\" names the \
+           \file's own top-level module; a module the scope cannot name \
+           \answers an in-band NotInScope error. PAGED: exports holds at most \
+           \limit members with their types (default "
            <> T.pack (show defaultExportsLimit)
-           <> ", in Agda's order, from offset), total counts the value members \
-              \that match, and truncated says whether any lie beyond this page; \
-              \when they do, nextOffset is the offset for the next page and \
-              \remaining lists their NAMES, so the first answer already names \
-              \the whole surface. To read a member you found in remaining, pass \
-              \its name as pattern. pattern keeps only the members whose name \
-              \contains it, ignoring case, in exports and modules alike; \
-              \modules is never paged. limit 0 returns every member typed, the \
-              \whole surface in one answer. "
-           <> liveLaneNote)
+           <> ", from offset, in Agda's order); total counts the matching \
+              \members and truncated says whether more lie beyond, when \
+              \nextOffset continues and remaining NAMES them, so the first \
+              \answer names the whole surface; to read one of them, pass its \
+              \name as pattern. pattern keeps the members whose name contains \
+              \it, ignoring case; modules is never paged.")
           [ prop "filePath" "string"  liveFilePathDoc
-          , prop "module"   "string"  "The module whose exports to list, as \
-              \nameable in filePath's scope; \"\" for the file's own \
-              \top-level module."
+          , prop "module"   "string"  "The module, as nameable in filePath's \
+              \scope; \"\" for the file's own top-level module."
           , prop "limit"    "integer" exportsLimitDoc
           , prop "offset"   "integer" exportsOffsetDoc
           , prop "pattern"  "string"  exportsPatternDoc
@@ -481,14 +422,12 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
               ]
               ["name"]
 
-          -- The scope-aware retrieval tool (issue #17, phase 1).  Its
-          -- description carries the whole client-visible contract agreed on
-          -- the issue, because an agent picks a tool by reading the
-          -- description and nothing else; and every argument the handler
-          -- accepts is a declared property, since a client that validates
-          -- its arguments sees only what the schema declares.
+          -- The scope-aware retrieval tool (issue #17, phase 1).  Every
+          -- argument the handler accepts is a declared property, since a
+          -- client that validates its arguments sees only what the schema
+          -- declares.
           , toolDef "search_in_scope"
-              (searchInScopeNote <> " " <> liveLaneNote)
+              searchInScopeNote
               [ prop "filePath" "string"  liveFilePathDoc
               , prop "line"     "integer" searchLineDoc
               , prop "column"   "integer" liveColumnDoc
@@ -497,18 +436,16 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
                   [ prop "name"   "string" "A case-insensitive substring of the \
                       \definition's qualified or unqualified name."
                   , propArray "tokens" "string" "Type tokens as a goal display \
-                      \spells them (+, ≡, Commutative, hom), matched against the \
-                      \row's type and name after the corpus's qualified tokens are \
-                      \reduced to bare ones (Agda.Builtin.Nat._+_ meets +)."
+                      \spells them (+, ≡, Commutative, hom); names on both sides \
+                      \are reduced to bare ones, so _+_ and Agda.Builtin.Nat._+_ \
+                      \meet +."
                   ]
               , prop "limit"     "integer" searchLimitDoc
               , prop "maxProbes" "integer" searchMaxProbesDoc
               , propObject "exclude" searchExcludeDoc
                   [ propArray "names" "string" "Bare (unqualified) names to set aside."
-                  , prop "statement" "string" "A type; rows whose type normalizes \
-                      \to it (whitespace, ∀ sugar, binder names) are set aside, \
-                      \checked on the corpus text and again on Agda's printing of \
-                      \the accepted rendering."
+                  , prop "statement" "string" "A type; rows whose type \
+                      \normalizes to it are set aside."
                   ]
               , prop "reload"    "boolean" liveReloadDoc
               , prop "verbose"   "boolean" verboseDoc
@@ -517,575 +454,342 @@ toolDefinitions cfg = toJSON $ proofStateTools <> liveQueryTools <> searchTools
           ]
       | otherwise = []
 
+    -- The four properties every scope query takes, around its one question
+    -- property: an expression (type_of, normalize) or a name (resolve_name,
+    -- definition_of).
+    liveProps exprDoc = scopeProps ("expr", exprDoc)
+    nameProps nameDoc = scopeProps ("name", nameDoc)
+    scopeProps (key, doc) =
+      [ prop "filePath" "string"  liveFilePathDoc
+      , prop key        "string"  doc
+      , prop "line"     "integer" liveLineDoc
+      , prop "column"   "integer" liveColumnDoc
+      , prop "col"      "integer" liveColDoc
+      , prop "reload"   "boolean" liveReloadDoc
+      , prop "verbose"  "boolean" verboseDoc
+      ]
+
+-- | serverInstructions: what every tool shares, stated once (issue #191).
+--
+-- Sent as @instructions@ in the @initialize@ answer, which a client places in
+-- its model's system prompt once rather than once per tool.  It names only the
+-- tools this server exposes, so a server started with @--expose@ never points
+-- a model at a tool it cannot call, and a paragraph whose tools are all hidden
+-- is left out.  Claude Code cuts instructions at 2,048 characters, as it cuts
+-- descriptions, and the suite asserts that the whole text fits.
+--
+-- What it carries, each item moved here from the descriptions that repeated
+-- it: the two-lane rule and each lane's cost (from 'batchNote',
+-- 'latencyNote', and 'liveLaneNote' as they stood before #191), the path rule
+-- ('filePathDoc'), the echo and the wrong-tree refusal ('verdictNote'),
+-- @verbose@ ('verboseDoc'), @reload@ ('liveReloadDoc'), and the hole
+-- coordinates ('holeModel').
+serverInstructions :: ServerConfig -> Text
+serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
+  where
+    shown       = map fst (exposedTools cfg)
+    among names = filter (`elem` shown) names
+    listed      = T.intercalate ", " . among
+    batch       = among ["check_file", "get_diagnostics", "fill_hole", "get_goal"]
+    lane        = among ["type_of", "normalize", "resolve_name", "definition_of", "exports_of", "search_in_scope", "get_goal"]
+    fileTools   = filter (`notElem` ["search_by_name", "search_by_type", "get_dependencies"]) shown
+    holeTools   = among ["check_file", "get_diagnostics", "fill_hole", "get_goal"]
+    listers     = among ["check_file", "get_diagnostics", "fill_hole"]
+    -- get_goal runs batch agda only on its fallback path, and says so.
+    batchRunners = filter (/= "get_goal") batch <> ["get_goal's fallback" | "get_goal" `elem` batch]
+    unless' c t = if c then t else ""
+    paragraphs =
+      [ unless' (not (null batch) || "check_project" `elem` shown) $
+          "VERDICTS come only from the exit code of a batch process run per \
+          \call, never from its message text"
+          <> unless' (not (null batch))
+               (": " <> T.intercalate ", " batchRunners
+                <> (if length batchRunners == 1 then " runs" else " run") <> " agda on the file")
+          <> unless' ("check_project" `elem` shown) "; check_project runs the project's own gate"
+          <> ". Each is a cold agda; a first check of a large library can take \
+             \minutes (it builds .agdai interfaces that later calls reuse)."
+      , unless' (not (null lane)) $
+          "KNOWLEDGE comes from one persistent agda --interaction-json process \
+          \per project root (" <> listed lane <> "): a first question about a \
+          \file costs one load (seconds); further questions about the \
+          \unchanged file take milliseconds; another file \
+          \re-loads (lane.load says why). These answers inform and NEVER \
+          \decide a verdict, so they carry no success field, and an \
+          \Agda-level negative is an in-band error {stage, code?, message} \
+          \(stage 'load': the file does not load). Pass reload:true after \
+          \editing a DEPENDENCY of the file, which the lane cannot see."
+      , unless' (not (null fileTools)) $
+          "A path naming nothing readable is refused, naming the path as \
+          \resolved against this server's working directory. EVERY answer \
+          \names the tree it used, project {root, rootSource}; a file in \
+          \another checkout of a library registered elsewhere is refused with \
+          \a rootMismatch naming both roots (unless the registry is missing: \
+          \project.librariesFileMissing:true). \
+          \verbose:true adds the full echo (command, registry, the lane's \
+          \process and wire lines); leave it off unless checking what ran. A \
+          \failed call (isError) always carries it, and a process failure or \
+          \lane timeout (--timeout) is an isError whose text is a JSON object. \
+          \checkedFromSource says whether a call re-typechecked its file \
+          \(absent: unknown, never a guess)."
+      , unless' (not (null holeTools)) $
+          "HOLES: every Agda hole syntax ({!!}, {! e !}, ?) in .agda and every \
+          \literate flavour Agda 2.8 supports, never inside comments, strings, \
+          \or literate prose; positions are 1-based (line, col) in the file as \
+          \written"
+          <> unless' (not (null listers))
+               ("; " <> T.intercalate ", " listers
+                <> (if length listers == 1 then " lists" else " list")
+                <> " them, and the next address comes from the latest list")
+          <> "."
+      ]
+
 -- | holeAddressing: how to name the hole you mean, in the two tools that take
 -- one (issue #79).
 --
--- The description is where the contract lives (the § 6 meta-suggestion of the
--- feedback document), and the contract worth stating here is not "two
--- parameters are available" but which one to hold across calls, and how long it
--- stays good.  An agent that reads only this must come away addressing holes by
--- position and re-anchoring from each response; § 3.8 records what the other
--- habit costs, and verification found it costs more than stated, since a
--- miscounted decoy could put "the first hole" inside a comment.
---
--- The stability sentence is deliberately narrow.  A position is not stable under
--- arbitrary edits — a candidate that differs in length or line count from the
--- hole it replaced moves everything after it — and promising otherwise would
--- hand a client the same wrong-hole answer by a different route (a Copilot
--- review catch on PR #99).  What is true, and enough, is that a position moves
--- only when the text before it moves, whereas an index is renumbered by any
--- fill at all.
+-- The contract worth stating is not "two parameters are available" but which
+-- one to hold across calls, and how long it stays good: a position moves only
+-- when the text before it moves, whereas an index is renumbered by any fill at
+-- all (the § 3.8 cost the field report records; the stability sentence stays
+-- deliberately narrow, a Copilot catch on PR #99).  Since issue #191 the
+-- detail of which listings report positions, and the literate-coordinate
+-- rule, are said once in 'serverInstructions'.
 holeAddressing :: Text
 holeAddressing =
-  "ADDRESSING A HOLE: pass EITHER (line, column) — 1-based coordinates in the \
-  \file as written, literate-file coordinates for a literate source, exactly \
-  \what get_diagnostics.holes, check_file.holes, and every fill_hole response's \
-  \holes list report — OR holeIndex. PREFER THE POSITION, AND RE-ANCHOR IT FROM \
-  \EACH RESPONSE. A position names the hole where it sits, so a fill later in \
-  \the file never disturbs it, and a fill earlier in the file disturbs it only \
-  \if the candidate differs in length or line count from the hole token it \
-  \replaced. holeIndex is a 0-based index into the source-order hole list, so \
-  \EVERY hole after a filled one is renumbered whether or not any text moved. \
-  \Neither survives an arbitrary edit: after a fill you keep, take the next \
-  \address from that response's holes list rather than reusing coordinates from \
-  \before it. A position addresses the hole whose span contains it (a position \
-  \at its first character counts); a position inside no hole is an error \
-  \listing the file's nearest holes, never a guess. Give one spelling or the \
-  \other — a request carrying both is rejected, because the two can disagree — \
-  \and see the schema's oneOf for the three shapes a legal request has."
+  "ADDRESSING: pass EITHER (line, column), from the latest hole list, OR \
+  \holeIndex, never both (the schema's oneOf gives the three legal shapes). \
+  \PREFER THE POSITION: it moves only if a fill before it changes the text's \
+  \length or line count, while holeIndex (0-based, source order) is \
+  \renumbered by every fill. A position inside no hole is an error listing \
+  \the nearest holes, never a guess."
 
 -- | filePathDoc: the resolution rule, at the property that carries the path.
 --
--- The four file-taking tools used to say "absolute or relative to cwd" without
--- saying /whose/ cwd, and for any client outside this repository the honest
--- answer — the server's own working directory — was never the one meant.  The
--- #83 field test measured the cost: an agent sent the relative path natural in
--- its own project, the server resolved it against its own checkout, the file
--- was not there, and the client never called the server again (issue #101).
--- Saying it plainly here is half the repair; the other half is that a path
--- resolving to nothing now fails by name rather than silently or opaquely.
+-- The #83 field test measured what an unstated rule costs: an agent sent the
+-- relative path natural in its own project, the server resolved it against
+-- its own checkout, and the client never called it again (issue #101).  The
+-- property keeps the rule's two load-bearing words because a client decides
+-- what to send by reading it; the refusal's shape is said once in
+-- 'serverInstructions' (issue #191).
 filePathDoc :: Text
 filePathDoc =
-  "Path to the Agda file. PASS AN ABSOLUTE PATH. A relative path is resolved \
-  \against THIS SERVER'S working directory — the server is a separate process, \
-  \normally started in its own checkout rather than in your project, so a path \
-  \relative to your project does not name your file here. A path that resolves \
-  \to no readable file is refused with an error naming the path AS RESOLVED and \
-  \this server's working directory; it is never quietly checked somewhere else, \
-  \and it is never an opaque internal error."
+  "ABSOLUTE path to the Agda file (a relative one resolves against this \
+  \server's working directory, not yours)."
 
--- | lineDoc / columnDoc / colDoc / holeIndexDoc: the same contract at the input
+-- | lineDoc / columnDoc / colDoc / holeIndexDoc: the address at the input
 -- properties, where a client decides what to send.
 --
--- @col@ is declared as a property of its own rather than merely mentioned in
--- @columnDoc@, because a client that validates its arguments against the schema
--- sees only what the schema declares: an accepted key the schema omits is one a
--- careful client will refuse to send (a Copilot review catch on PR #99).
+-- @col@ is declared as a property of its own because a client that validates
+-- its arguments against the schema sees only what the schema declares (a
+-- Copilot review catch on PR #99).
 lineDoc :: Text
-lineDoc =
-  "1-based line of the hole, in the file as written (literate-file coordinates \
-  \for literate sources). Requires column (or col). The address to prefer: it \
-  \moves only when a fill above it moves the text, whereas holeIndex is \
-  \renumbered by any fill at all. Re-anchor it from each response's holes list."
+lineDoc = "1-based line of the hole; needs column (or col). Preferred over holeIndex."
 
 columnDoc :: Text
-columnDoc =
-  "1-based column of the hole, in the file as written. Requires line. Give this \
-  \or col, not both."
+columnDoc = "1-based column of the hole; needs line; not with col."
 
 colDoc :: Text
 colDoc =
-  "The same thing as column, accepted because that is how the hole listings \
-  \spell it — so a hole entry from get_diagnostics, check_file, or a fill_hole \
-  \response can be passed back without renaming anything (its other keys, index \
-  \and goal, are ignored). Requires line. Give this or column, not both."
+  "column, spelled as the hole lists spell it, so a hole entry passes back \
+  \as it is (its index and goal are ignored)."
 
 holeIndexDoc :: Text
 holeIndexDoc =
-  "0-based index of the hole, in source order (any hole syntax). Accepted for \
-  \backward compatibility and SHIFT-PRONE: filling any hole renumbers every \
-  \hole after it — even a fill that moves no text — so an index from an earlier \
-  \call may now name a different hole. Prefer (line, column). Give one or the \
-  \other, never both."
+  "0-based, in source order; SHIFT-PRONE: every fill renumbers the holes \
+  \after it."
 
 -- | diagnosticModel: the shape of a diagnostic, stated where the client reads
--- it (issue #74).
---
--- An agent decides whether to parse prose or branch on a field by reading the
--- tool's description and nothing else — the § 6 meta-suggestion of the feedback
--- document — so a @code@ and a @range@ the description does not mention may as
--- well not exist.
+-- it (issue #74), once, on check_file (issue #191); get_diagnostics and
+-- check_project refer to it.  The root-cause ordering in full is in the
+-- README.
 diagnosticModel :: Text
 diagnosticModel =
-  "Each diagnostic is structured: severity, code (Agda's own name, e.g. \
-  \NotInScope / AmbiguousName / UnsolvedMetaVariables — branch on this rather \
-  \than matching prose), file, range {startLine, startCol, endLine, endCol} in \
-  \1-based coordinates of the file as written, the bounded full message body, \
-  \and involved {expected?, actual?, candidates?, metaTypes?, metas?} naming \
-  \what the message is about (the mismatched types, the \"did you mean\" or \
-  \ambiguity candidates, the missing exports, the origin of a clashing \
-  \definition, or one entry per unsolved meta or constraint). metaTypes is \
-  \always what Agda's prose said; metas is the unsolved metas as data — {name, \
-  \type, range} each, which the prose never prints — and check_file and \
-  \get_diagnostics carry it only when a warm interaction lane already held this \
-  \file's load. line and col are kept as aliases of the range start. \
-  \Diagnostics are ordered most-likely-root-cause first — \
-  \unresolvable-file errors, then scope warnings that precede a hard error \
-  \(e.g. ModuleDoesntExport before the NotInScope it causes), then scope \
-  \errors, type errors, and unsolved metas — and identical repeats are \
-  \collapsed."
+  "Each diagnostic has severity, code (Agda's own name, e.g. NotInScope, \
+  \AmbiguousName, UnsolvedMetaVariables: branch on it, not on the prose), \
+  \file, range {startLine, startCol, endLine, endCol} (1-based, as written; \
+  \line and col alias the start), the bounded message, and involved \
+  \{expected?, actual?, candidates?, metaTypes?, metas?}, where metas (each \
+  \unsolved meta's name, type, and range) comes only from a warm lane already \
+  \holding this file's load. Ordered most-likely root cause first, repeats \
+  \collapsed, and capped by maxDiagnostics, with diagnosticsTotal counting \
+  \all."
 
 -- | gateModel: which command @check_project@ runs, and how it decided (issue
--- #78).
---
--- An agent that cannot predict what the tool will run has to run the gate
--- itself to be sure — the whole failure this tool exists to end — so the
--- resolution order belongs in the description, not only in the response.
+-- #78).  An agent that cannot predict what the tool will run has to run the
+-- gate itself to be sure, the whole failure this tool exists to end.
 gateModel :: Text
 gateModel =
-  "THE GATE: chosen in this order — the make target named by `target` (the \
-  \nearest Makefile above the anchor that declares it, run in that Makefile's \
-  \own directory); else this server's --check-command, if the operator \
-  \configured one (run directly, never through a shell); else the nearest \
-  \Makefile's `check` target; else agda on the project's Everything module \
-  \(Everything.agda or a literate flavour). The upward search stops at the \
-  \repository boundary. If none of those exists the call FAILS, naming every \
-  \directory it searched and what to configure — it never reports a check that \
-  \did not happen. gate {source, target?, makefile?, entry?, searchedFrom} in \
-  \the response says which one ran and on what evidence, and with verbose:true \
-  \command echoes the exact argument vector and working directory."
+  "THE GATE, in order: the make target named by target (the nearest Makefile \
+  \above the anchor that declares it, run in its directory); else this \
+  \server's --check-command (run directly, no shell); else the nearest \
+  \Makefile's check target; else agda on the project's Everything module. The \
+  \search stops at the repository boundary; finding none, the call FAILS, \
+  \naming what it searched, and never reports a check that did not happen. \
+  \gate {source, target?, makefile?, entry?, searchedFrom} says which ran."
 
--- | projectHonestyNote: the one thing the tool exists for, said where a client
--- reads it.
+-- | projectHonestyNote: the one thing the tool exists for, said where a
+-- client reads it.
 projectHonestyNote :: Text
 projectHonestyNote =
-  "success is true if and only if the gate exited 0, finished inside the bound, \
-  \AND its output carried no failure evidence — an Agda error diagnostic, or the \
-  \gate's own failure line (make reporting a recipe that died). exitCode is the \
-  \gate's own status whenever the gate produced one, echoed verbatim and never \
-  \reinterpreted, so a failing gate can never be reported green; the two runs \
-  \with no status of their own — a gate that could not be started, and one \
-  \killed at the bound — report -1, and timedOut tells them apart. The reverse \
-  \is deliberate: a gate that exits 0 \
-  \with such evidence in its output is reported as success:false with \
-  \maskedFailure:true — a wrapper script whose last command is an echo exits 0 \
-  \whatever make did, which is the trap that forces agents to grep build logs \
-  \for 'error:'. Read success; you do not have to grep the log. Those two \
-  \recognizers are a list, not a theory of failure: a mask that prints neither \
-  \is reported as a pass, which is why outputTail comes back whatever the \
-  \verdict — the response never claims a pass while withholding the output that \
-  \could contradict it."
+  "success is true if and only if the gate exited 0, finished inside the \
+  \bound, AND its output carried no failure evidence (an Agda error, or \
+  \make's own failure line); one that exits 0 with such evidence is \
+  \success:false with maskedFailure:true. verdict.exitCode is the gate's own \
+  \status, never reinterpreted (-1 when it had none: not started, or killed \
+  \at the bound, which timedOut tells apart). Read success; you need not grep \
+  \the log. The recognizers are a list, not a theory, so outputTail, the \
+  \bounded tail of the gate's output, comes back whatever the verdict."
 
--- | projectPayloadNote: what a project response carries beyond the diagnostics
--- list, and what each field is for.
+-- | projectPayloadNote: what a project answer carries beyond the verdict,
+-- and the call's cost (issue #78).
 projectPayloadNote :: Text
 projectPayloadNote =
-  "firstError is the first error-severity diagnostic, lifted out so you need \
-  \not scan the (capped) diagnostics list. failingModule and failingFile name \
-  \the module the gate stopped in, and appear only on a check that did not \
-  \pass: the one carrying that error, or — when the gate failed without a \
-  \located error, a timeout included — the last module agda started. \
-  \modulesChecked counts the distinct \
-  \modules agda re-typechecked from source, so it says how much of the project \
-  \was actually rebuilt and, on a timeout, how far the run got; it is ABSENT \
-  \when the gate is the Everything module and the agda command this server \
-  \assembled for it carries --trace-imports=0, which silences those lines, \
-  \since what could still be counted then is a floor and not a total. A make \
-  \or --check-command gate is opaque (its agda call lives inside a recipe or \
-  \script), so there the count is a best-effort read of whatever the gate \
-  \printed. outputTail is \
-  \the bounded tail of the gate's stdout and stderr, returned whatever the \
-  \verdict and absent only when the gate printed nothing, because a gate can \
-  \fail for reasons agda never printed (no such target, a missing tool, a killed \
-  \build) and an unrecognized mask is reported as a pass."
-
--- | projectTimingNote: the cost model of a whole-project check, including the
--- fact that this call blocks.
-projectTimingNote :: Text
-projectTimingNote =
-  "COST: this call BLOCKS for the whole gate and does not stream progress; a \
-  \large library's gate running for 10-20 minutes is ordinary, and elapsedMs \
-  \reports the wall-clock time at the end. It is bounded by the server's \
-  \--check-timeout (default 1800s), which is a SEPARATE bound from the per-file \
-  \--timeout; timeoutSeconds echoes the bound that was in effect. On expiry the \
-  \gate's whole process group is killed — make and every agda under it — and the \
-  \response is success:false with timedOut:true and a timeout error diagnostic, \
-  \still carrying elapsedMs, modulesChecked, and failingModule so you can see \
-  \where it reached."
-
--- | projectEchoNote: the response echo, in the vocabulary of a gate rather than
--- of one agda call (issues #72, #76).
-projectEchoNote :: Text
-projectEchoNote =
-  "EVERY answer carries verdict {exitCode}, the gate's own exit code, and \
-  \project {root, rootSource}, the tree the gate ran in, resolved from the \
-  \anchor exactly as check_file resolves it from a file. Pass verbose:true for \
-  \the full echo as well: verdict {equivalentTo, meaning}, the exact command \
-  \this call is equivalent to, including the directory it runs in, and what \
-  \success means; command {binary, args, cwd}; and the rest of project \
-  \{library, librariesFile, registeredLibraries, selectedLibraries, \
-  \includePaths}. \
-  \One difference worth knowing: for a make or --check-command gate, \
-  \selectedLibraries and includePaths are this server's own configuration and \
-  \not a claim about the flags the gate passed agda, since the gate chooses \
-  \those itself; for the Everything gate they are what agda finally received. If \
-  \the anchor belongs to a different checkout of a library this server has \
-  \registered elsewhere, the call FAILS with a rootMismatch object naming both \
-  \roots rather than running a gate against the other tree."
+  "firstError is the first error diagnostic (check_file's shape); \
+  \failingModule and failingFile name where a failed gate stopped; \
+  \modulesChecked counts modules re-typechecked from source (absent when \
+  \--trace-imports=0 silences it; best effort for a make or command gate). \
+  \The call BLOCKS for the whole gate (10-20 minutes is ordinary) up to \
+  \--check-timeout (default 1800s, apart from --timeout); on expiry the \
+  \gate's process group is killed and the answer is success:false, \
+  \timedOut:true, still with elapsedMs, modulesChecked, and failingModule; \
+  \timeoutSeconds echoes the bound."
 
 -- | maxDiagnosticsDoc: the cap's contract, in the input schema where a client
 -- decides what to pass.
 maxDiagnosticsDoc :: Text
 maxDiagnosticsDoc =
-  "Maximum diagnostics to return (default 10; 0 means no limit). \
-  \diagnosticsTotal always reports how many were found before the cap, so a \
-  \truncated list is never mistaken for a short one."
+  "Default 10; 0 means no limit. diagnosticsTotal counts every one found."
 
--- | verdictNote: the response-echo contract, stated in every proof-state tool
--- description (issues #72 and #76).
---
--- The § 6 meta-suggestion of the field report is that an agent picks a tool by
--- reading its description and nothing else, and that the shipped descriptions
--- did not say the one thing that decides whether the tool is worth calling:
--- whether a green result means the build passes.  These sentences say it, and
--- say where in the response to check it.
---
--- Since issue #184 they also say what the answer leaves out by default and
--- how to ask for it: the echo was written into every answer and was most of a
--- small one, so the answer keeps the exit code and the tree, and the command
--- line and the registry come back on @verbose: true@.
-verdictNote :: Text
-verdictNote =
-  "EVERY answer names how the check came out and which tree it checked:"
-  <> " verdict {exitCode} is agda's own exit code, which the verdict is derived"
-  <> " from and never from parsing Agda's message text, and project {root,"
-  <> " rootSource} is the tree that was actually checked. rootSource is"
-  <> " \"nearest-agda-lib\" when the requested file's own *.agda-lib decided the"
-  <> " context and \"server-config\" when the flags fixed at server start did."
-  <> " Pass verbose:true for the full echo as well: verdict.equivalentTo, the"
-  <> " exact agda command this call is equivalent to; verdict.meaning, one"
-  <> " sentence on what the verdict field means (stated here too); command"
-  <> " {binary, args, cwd}, the resolved command line; and the rest of project"
-  <> " {library, librariesFile, registeredLibraries, selectedLibraries,"
-  <> " includePaths}, with selectedLibraries and includePaths as agda finally"
-  <> " received them, so project and command.args never disagree. If the file"
-  <> " belongs to a different checkout of a library this server has registered"
-  <> " elsewhere, the call FAILS with a rootMismatch object naming both roots"
-  <> " rather than quietly checking the other tree, with one limit worth"
-  <> " knowing: that detection compares against the libraries registry, so if"
-  <> " the configured one is missing there is nothing to compare against and no"
-  <> " mismatch can be found. The answer then carries"
-  <> " project.librariesFileMissing:true, verbose or not."
-
--- | goalEchoNote: get_goal's two-shape echo contract (#108) — the one tool
--- whose response echo depends on which mechanism answered, so 'verdictNote'
--- (which promises a verdict on EVERY response) would contradict the lane
--- shape (a Copilot catch on the #108 review).
-goalEchoNote :: Text
-goalEchoNote =
-  "THE ECHO, by path: every answer carries project {root, rootSource}, the"
-  <> " tree that was actually consulted, with the same wrong-checkout refusal as"
-  <> " every file-taking tool. A lane-sourced answer"
-  <> " (source='interaction-lane') carries lane {load, loadElapsedMs?} and NO"
-  <> " verdict. A fallback answer (source='injected-macro') carries verdict"
-  <> " {exitCode}, derived from agda's exit code and never from its prose, and"
-  <> " no lane block. Pass verbose:true for the full echo as well: command"
-  <> " {binary, args, cwd}; the rest of project {library, librariesFile,"
-  <> " registeredLibraries, selectedLibraries, includePaths}; on the lane path"
-  <> " the rest of lane {root, pid, spawned, agdaVersion, iotcm}; and on the"
-  <> " fallback path verdict.equivalentTo and verdict.meaning."
-
--- | batchNote: what success means for the two whole-file tools.
---
--- Stated once, verbatim from 'AgdaMCP.Tools.ProofState.batchVerdictMeaning' in
--- substance: this server shells out to batch @agda@ per call, and its verdict is
--- that command's verdict.
+-- | batchNote: what success means for the two whole-file tools (issue #72),
+-- stated on check_file; get_diagnostics names it as check_file's.
 batchNote :: Text
 batchNote =
-  "success is true if and only if that agda command exits 0, so it means exactly"
-  <> " what green means in a batch build: unsolved metavariables, unsolved"
-  <> " constraints, and open holes all make agda exit non-zero and so make"
-  <> " success false. The interaction lane NEVER participates in this verdict —"
-  <> " it is tolerant by design and only ever enriches informational fields,"
-  <> " such as the hole listing's goal types — and there is no --safe-style"
-  <> " leniency to opt into: the default already is the strict gate."
+  "success is true if and only if agda exits 0, which is exactly what green \
+  \means in a batch build: unsolved metavariables, unsolved constraints, and \
+  \open holes all make it false, and there is no leniency to opt into. \
+  \verdict {exitCode} is agda's own; the live lane never takes part in the \
+  \verdict and only fills informational fields."
 
--- | latencyNote: the shared latency/timeout sentence appended to every
--- proof-state tool description.
---
--- Agents plan around a tool's advertised cost, so the cold-subprocess model has
--- to be stated where they will read it: each call is a fresh @agda@ process, and
--- the only warmth available comes from Agda's own @.agdai@ interface files, not
--- from any caching in this server.  @checkedFromSource@ in the response says
--- which of the two happened on that call.
-latencyNote :: Text
-latencyNote =
-  "each call spawns a cold agda subprocess (no warm session), so a first check of a"
-  <> " large library builds its .agdai interfaces and can take minutes, while later"
-  <> " calls that reuse those interfaces are far faster."
-  <> " Calls are bounded by the server's --timeout (default 300s)."
-  <> " checkedFromSource is omitted when the run died before producing evidence"
-  <> " either way (e.g. a startup failure, or a timeout before any output), and"
-  <> " when the flags this server runs with carry --trace-imports=0, which"
-  <> " silences the agda progress lines the field is read from: an absent field"
-  <> " means unknown, never a guess."
-
--- | liveLaneNote: the interaction-lane contract, stated in every live-query
--- tool description (issue #75): the process model and its latency, the
--- verdict boundary, the in-band error model, and the response echo.
-liveLaneNote :: Text
-liveLaneNote =
-  "LIVE QUERY (interaction lane): answered by a persistent agda \
-  \--interaction-json process this server keeps per project root, holding \
-  \ONE current file at a time. The current file is re-loaded only when it \
-  \changes on disk or its flags change, and switching to another file under \
-  \the same root re-loads the switched-to file (lane.load in the response \
-  \says what happened: reused, first, switch, changed, forced, or retry). So \
-  \the first question about a file costs one load — seconds, comparable to \
-  \one check_file — every further CONSECUTIVE question about it while \
-  \unchanged is milliseconds, and alternating between files pays the \
-  \switched-to file's load each time (a full re-typecheck for a file with \
-  \holes, which writes no interface). Editing a dependency is picked up \
-  \when this file itself is next re-loaded. THIS TOOL INFORMS AND NEVER \
-  \DECIDES A BUILD VERDICT: interaction-mode agda is tolerant (it loads \
-  \files with open holes), so there is no success or verdict field here; \
-  \check_file, check_project, and fill_hole remain the only verdict sources. \
-  \A file that does not load answers with error.stage='load' carrying Agda's \
-  \message, and the query is not run. A process-level failure — timeout \
-  \(the same --timeout bound as the batch tools; the child is killed and \
-  \respawned on next use), crash, or could-not-start — is an isError result \
-  \whose text is a JSON object naming the event, the root, the exact IOTCM \
-  \lines sent, and agda's last stderr lines. EVERY answer carries elapsedMs, \
-  \lane {load, loadElapsedMs?} (why this call did or did not re-load, and what \
-  \the load cost), project {root, rootSource} (the tree the answer was \
-  \computed in, as the batch tools report it), and checkedFromSource (whether \
-  \this call re-typechecked the file from source; omitted, as in the batch \
-  \tools, when the evidence could not arrive: the flags carry \
-  \--trace-imports=0, which silences the progress lines it is read from, or \
-  \the load failed before agda announced this file, which establishes no \
-  \reuse either). Pass verbose:true for the full echo as well: the rest of \
-  \lane {root, pid, spawned, agdaVersion, iotcm}, iotcm being the exact wire \
-  \lines this call sent, so it can be replayed by hand; command {binary, args, \
-  \cwd} (the persistent child; per-file flags ride the Cmd_load line visible \
-  \in lane.iotcm); and the rest of project {the same block the batch tools \
-  \report}. Pass reload:true to force a fresh \
-  \load first — the escape hatch for a changed DEPENDENCY, which no stamp \
-  \on the queried file can see; the response echoes lane.load='forced'."
-
--- | liveLineNote: what the optional @line@ argument selects, and why it
--- matters for scope questions (the probed § 2.6 degradation).
-liveLineNote :: Text
-liveLineNote =
-  "SCOPE: if line falls inside a hole, the query runs in that goal's scope — \
-  \local variables become visible, and names opened from file-local modules \
-  \resolve that the completed top-level scope of a hole-free file loses. \
-  \Otherwise it runs against the file's top-level scope. Two holes can share \
-  \a line with different scopes; add column (or col) to pick one, else the \
-  \earliest hole on the line answers. The response's scope field says which \
-  \happened."
-
--- | liveFilePathDoc: the path rule for live-query tools — the batch tools'
--- resolution rule (issue #101), plus what the file means to a scope query.
+-- | liveFilePathDoc: the path rule for the live queries, plus what the file
+-- means to a scope query.
 liveFilePathDoc :: Text
 liveFilePathDoc =
-  "The Agda file whose scope answers the question. PASS AN ABSOLUTE PATH; a \
-  \relative one is resolved against THIS SERVER'S working directory, and a \
-  \path naming no readable file is refused with an error naming the path as \
-  \resolved. Every literate flavour Agda 2.8 supports is accepted, with all \
-  \positions in literate-file coordinates."
+  "ABSOLUTE path to the Agda file whose scope answers (a relative one \
+  \resolves against this server's working directory, not yours)."
 
--- | liveLineDoc: the @line@ property's contract.
+-- | liveLineDoc: the @line@ property's contract, which is also where the scope
+-- rule is stated (issue #191 folded 'liveLineNote' into it).
 liveLineDoc :: Text
 liveLineDoc =
-  "Optional 1-based line in the file as written. Inside a hole: the query \
-  \runs in that goal's scope (locals visible). Elsewhere or omitted: the \
-  \file's top-level scope. When two holes share the line, the earliest \
-  \answers unless column (or col) picks one."
+  "Optional 1-based line: inside a hole, that goal's scope (locals and \
+  \file-local opens visible, which a hole-free file's top-level scope \
+  \loses); else the top-level scope. scope says which."
 
 -- | liveColumnDoc / liveColDoc: the optional column that sharpens @line@ into
 -- a position, deciding between goals that share a line.
 liveColumnDoc :: Text
 liveColumnDoc =
-  "Optional 1-based column sharpening line into a position; the query runs \
-  \in the scope of the hole whose span contains it. Needed only when two \
-  \holes share the line (their scopes can differ). Requires line. Give this \
-  \or col, not both."
+  "Optional 1-based column: picks the hole when two share the line (else the \
+  \earliest). Needs line; not with col."
 
 liveColDoc :: Text
-liveColDoc =
-  "The same thing as column, accepted because the hole listings spell it \
-  \col — so a goal entry from check_file or get_diagnostics can be passed \
-  \back without renaming. Requires line. Give this or column, not both."
+liveColDoc = "column, spelled as the hole lists spell it."
 
--- | verboseDoc: the @verbose@ property's contract (issue #184), declared on
--- every tool whose answer carries an echo, since a client that validates its
--- arguments sends only what the schema declares.
+-- | verboseDoc: the @verbose@ property (issue #184), declared on every tool
+-- whose answer carries an echo, since a client that validates its arguments
+-- sends only what the schema declares.  What the lean answer keeps, and when
+-- to ask for more, is said once in 'serverInstructions'.
 verboseDoc :: Text
-verboseDoc =
-  "Optional; default false. true adds the full response echo to the answer: \
-  \the command line, the libraries registry and include paths, and (on the \
-  \live queries) the lane's process details and exact wire lines, which every \
-  \answer used to repeat. Leave it off unless you are checking what ran: \
-  \every answer names its tree (project.root, project.rootSource) either way, \
-  \and a failed call (isError) always carries its full echo."
+verboseDoc = "Default false; true adds the full echo."
 
 -- | exportsLimitDoc / exportsOffsetDoc / exportsPatternDoc: the @exports_of@
 -- page (issue #184).
 exportsLimitDoc :: Text
 exportsLimitDoc =
-  "Optional; default " <> T.pack (show defaultExportsLimit) <> ". How many \
-  \members to return with their types; the rest of the matching members are \
-  \named in remaining. 0 (or any non-positive value) returns every matching \
-  \member typed."
+  "Default " <> T.pack (show defaultExportsLimit) <> ": how many members to \
+  \return with their types; remaining names the rest. 0 or less returns every \
+  \matching member typed."
 
 exportsOffsetDoc :: Text
 exportsOffsetDoc =
-  "Optional; default 0. The 0-based position, among the members that match \
-  \pattern, of the first member to return. Pass the previous answer's \
-  \nextOffset to continue."
+  "Default 0: where the page starts among the matching members; pass the \
+  \previous answer's nextOffset to continue."
 
 exportsPatternDoc :: Text
 exportsPatternDoc =
-  "Optional. Keep only the members whose name contains this, ignoring case \
-  \(the rule search_by_name uses), in exports and modules alike; total and \
-  \remaining then count and name only the members that match."
+  "Keep only members whose name contains this, ignoring case, in exports and \
+  \modules alike; total and remaining then count and name only those."
 
--- | liveReloadDoc: the @reload@ property's contract.
+-- | liveReloadDoc: the @reload@ property.  Why it exists (a changed
+-- dependency, which no stamp on the queried file can see) is said once in
+-- 'serverInstructions'.
 liveReloadDoc :: Text
-liveReloadDoc =
-  "Optional; default false. Force a fresh Cmd_load before answering, even \
-  \though this file's stamp is unchanged — the escape hatch after editing a \
-  \DEPENDENCY of this file, which the lane's own change detection cannot \
-  \see. Agda re-examines the dependencies on that load and re-checks what \
-  \changed; checkedFromSource reports whether this file itself was \
-  \re-typechecked. The response echoes lane.load='forced'."
+liveReloadDoc = "Default false; true re-loads the file first (lane.load: 'forced')."
 
 -- | searchInScopeNote: the contract of search_in_scope (issue #17), stated
--- where the client reads it.  In order: the question the tool answers; that
--- it informs and never decides; that every rendering was typed by Agda here
--- and @type@ is Agda's printing; the query and its goal-derived default; the
--- derived-scope caveat and its subordination to the lane; the ranking and
--- the two bounds; that exclusion is the caller's policy and is named; the
--- ledger, field by field, and what an empty result means; the timing split;
--- and the two in-band errors.
+-- where the client reads it and cut to what a caller needs (issue #191): the
+-- question; that it informs and never decides; that every rendering was
+-- typed by Agda here; the query; that scope is derived, and what that costs;
+-- the two bounds; that exclusion is the caller's policy; the ledger and what
+-- an empty answer means; the in-band errors.  The rendering ladder, the rank
+-- formula, and the exclusion's two statement checks are in the README.
 searchInScopeNote :: Text
 searchInScopeNote =
-  "Corpus-backed retrieval IN A FILE'S SCOPE: of the corpus rows that match \
-  \the query, which ones can filePath actually name, and what does Agda say \
-  \each one's type is? Answers results [{prettyQname, rendering, type, via \
-  \{module, rung}, module, defKind, hasBody, corpusType, score}] in rank \
-  \order, where EVERY rendering was typed by this server through the \
-  \interaction lane in filePath's scope (goal-scoped when line/column \
-  \addresses a hole, top-level otherwise; the response's scope field says \
-  \which) and type is Agda's own printing of it, not the corpus's. A row the \
-  \lane cannot type under any spelling is not returned; it is named in \
-  \ledger.laneRejected with the spellings tried. THIS TOOL INFORMS AND NEVER \
-  \DECIDES: there is no success or verdict field, and a returned rendering \
-  \typechecks as an expression here, which says nothing about whether it \
-  \fills any hole (fill_hole judges that). QUERY: query {name?, tokens?} is \
-  \a case-insensitive substring over names and/or type tokens as a goal \
-  \display spells them; when both are given a row must satisfy both. Both \
-  \sides are reduced the same way (a name's outer underscores stripped, so \
-  \`_+_` meets `+`), and a query whose tokens all reduce to nothing with no \
-  \name beside them selects nothing rather than everything: it answers \
-  \error.stage='query'. Omit \
-  \query when line/column addresses a hole: the tokens are then derived from \
-  \that goal's own displayed type (context names, metas, numerals, and \
-  \structural tokens dropped), and the response's query.source says 'given' \
-  \or 'goal'. SCOPE: the file's import statements (import and open import, \
-  \with using, hiding, renaming, as, and public) are read off the source's \
-  \code-only view and echoed as imports; a row is in scope iff its module \
-  \equals an imported module or extends one at a dot boundary, and a \
-  \whole-module open import admits all of it bare. That rule is a name \
-  \prefix over THIS file's import lines, so a row that another file \
-  \re-exports into an imported module from outside that prefix is reported \
-  \in ledger.outOfScope even though you could name it: the miss costs \
-  \recall, never correctness. That import surface is \
-  \DERIVED from source text, because no Agda command enumerates a scope, \
-  \which is exactly why every rendering is validated by the lane before it \
-  \is returned: a misread import costs a rendering or a count, never a name \
-  \the file cannot write. The rendering ladder, tried in order: the bare \
-  \name when the import opens it (rung 'bare'), the row's prettyQname \
-  \('qualified', valid for rows nested inside an imported module), the \
-  \importing module qualifying the tail of the row's module path \
-  \('re-export', how a record field defined in a file the imported module \
-  \re-exports is named), and the importing module qualifying the bare name \
-  \alone ('importing-module', valid for re-exports whose defining module is \
-  \not itself imported); via.rung says which was accepted. A spelling that \
-  \types is ALSO checked to denote the row (Agda's WhyInScope) unless it is \
-  \the row's own qualified name, so a local binder or file-local definition \
-  \of the same name cannot stand in for a corpus row, and a re-exported \
-  \spelling that resolves to a different definition is refused. RANK: twice \
-  \the overlap between the query tokens and the row's bare type tokens, plus \
-  \a name bonus capped at one, minus one per pure-symbol operator the query \
-  \never mentions; ties break cheap-before-expensive on approximate arity, \
-  \then by name. limit (default 8) bounds ACCEPTED rows and is cut AFTER \
-  \validation, so a rejected rendering never consumes a slot; maxProbes \
-  \(default 4 x limit) bounds how many ranked rows are sent to the lane \
-  \before the walk gives up on filling limit. Only defKind 'function' rows \
-  \are ranked (constructors, records, and data types are counted in \
-  \ledger.nonFunction). EXCLUSION is your policy, never this server's: \
-  \exclude {names?, statement?} sets aside rows whose bare name is listed or \
-  \whose type normalizes to the statement (on the corpus text, and again on \
-  \Agda's printing of the accepted rendering), and every exclusion is NAMED \
-  \in ledger.excluded with its reason: name, statement, or lane-statement. \
-  \THE LEDGER: every response carries ledger {hits (rows matching the query \
-  \corpus-wide, BEFORE scope), inScope, outOfScope, excluded [{prettyQname, \
-  \reason}], nonFunction, ranked, probed, laneCalls (type_of calls plus \
-  \identity checks; the goal read of a derived query is timed but not \
-  \counted), laneRejected \
-  \[{prettyQname, tried}], accepted, truncated, stoppedBy ('limit', \
-  \'maxProbes', or 'exhausted')}, so an EMPTY results list always states its \
-  \bounds: hits > 0 with inScope = 0 means the definition exists in the \
-  \corpus and this file does not import its module; ranked > 0 with accepted \
-  \= 0 and laneRejected naming them means the corpus and the loaded library \
-  \disagree. timing {poolMs, laneMs} reports the corpus half of the latency \
-  \apart from the lane half. A file that does not load answers \
-  \error.stage='load' with Agda's message and runs no query; no query with \
-  \no goal at the anchor, or with a goal whose display yields no tokens, \
-  \answers error.stage='query'. Registered only when the server was started \
-  \with --corpus."
+  "Corpus rows that filePath can actually name, and what Agda says each one's \
+  \type is: results [{prettyQname, rendering, type, via {module, rung}, \
+  \module, defKind, hasBody, corpusType, score}] in rank order, where EVERY \
+  \rendering was typed by this server through the live lane in filePath's \
+  \scope (the hole's scope when line/column addresses one), and checked to \
+  \denote its row, and type is Agda's printing, not the corpus's. THIS TOOL \
+  \INFORMS AND NEVER DECIDES: a rendering that types says nothing about \
+  \whether it fills a hole (fill_hole judges that). query {name?, tokens?} \
+  \matches case-insensitive substrings of names and of type tokens as a goal \
+  \display spells them (both, when both are given); omit it at a hole to take \
+  \the tokens from the goal's type (query.source says 'given' or 'goal'). \
+  \SCOPE is DERIVED from source text, the file's import lines, so a row \
+  \re-exported from outside them can be reported out of scope though \
+  \nameable: it costs recall, never a name the file cannot write. Only \
+  \function rows are ranked, by type-token overlap with the query; limit \
+  \counts ACCEPTED rows, cut after validation, and maxProbes bounds the rows \
+  \sent to the lane. EXCLUSION is your policy: exclude {names?, statement?}, \
+  \every exclusion named in ledger.excluded with its reason. EVERY answer \
+  \carries ledger {hits (corpus-wide, before scope), inScope, outOfScope, \
+  \excluded, nonFunction, ranked, probed, laneCalls, laneRejected \
+  \[{prettyQname, tried}], accepted, truncated, stoppedBy}, so an empty \
+  \result states its bounds: hits > 0 with inScope 0 means the file does not \
+  \import the module; accepted 0 with laneRejected naming rows means the \
+  \corpus and the library disagree. timing {poolMs, laneMs}. In-band errors: \
+  \error.stage 'load' (the file does not load) or 'query' (no usable query)."
 
--- | searchLineDoc: the anchor's contract for search_in_scope; the live-query
--- line contract, restated for a tool whose scope decides the validation.
+-- | searchLineDoc: the anchor's contract for search_in_scope.
 searchLineDoc :: Text
 searchLineDoc =
-  "Optional 1-based line in the file as written. Inside a hole: every \
-  \rendering is validated in that goal's scope (locals visible, file-local \
-  \opens live), and with no query the goal's own type supplies the tokens. \
-  \Elsewhere or omitted: the file's top-level scope, and a query is \
-  \required. When two holes share the line, the earliest answers unless \
-  \column (or col) picks one."
+  "Optional 1-based line. Inside a hole: renderings are typed in that goal's \
+  \scope, and with no query the goal's type supplies the tokens. Elsewhere or \
+  \omitted: the top-level scope, and a query is required."
 
 searchQueryDoc :: Text
 searchQueryDoc =
-  "What to search for: {name?: string, tokens?: [string]}. Optional when \
-  \line/column addresses a hole (the goal's type supplies the tokens); \
-  \required otherwise. When both name and tokens are given a row must \
-  \satisfy both."
+  "{name?, tokens?}; optional when line/column addresses a hole, required \
+  \otherwise."
 
 searchLimitDoc :: Text
 searchLimitDoc =
-  "Maximum ACCEPTED rows to return (default 8; a non-positive value means 1). \
-  \The cut is taken after lane validation, so a rejected rendering never \
-  \consumes a slot; ledger.truncated says whether ranked rows remained."
+  "Maximum ACCEPTED rows (default 8; a non-positive value means 1); \
+  \ledger.truncated says whether ranked rows remained."
 
 searchMaxProbesDoc :: Text
 searchMaxProbesDoc =
-  "Maximum ranked rows to send to the lane before giving up on filling limit \
-  \(default 4 x limit; never below limit). ledger.probed reports how many \
-  \were sent and ledger.stoppedBy whether this bound ended the walk."
+  "Maximum ranked rows sent to the lane before giving up on filling limit \
+  \(default 4 x limit, never below limit)."
 
 searchExcludeDoc :: Text
 searchExcludeDoc =
-  "Your exclusion policy: {names?: [string], statement?: string}. The server \
-  \excludes only what you pass here, and names every exclusion in \
-  \ledger.excluded with its reason. Typical use: the name and stated type of \
+  "Rows to set aside, and only these: typically the name and stated type of \
   \the definition you are proving, so the answer cannot be the definition \
   \itself."
 
--- | Build a tool definition object (MCP tools/list schema).
-toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> Value
+-- | Build a tool definition (MCP tools/list schema), paired with its name.
+toolDef :: Text -> Text -> [(Text, Value)] -> [Text] -> (Text, Value)
 toolDef name desc props required = toolDefWith name desc props required []
 
 -- | As 'toolDef', with extra JSON Schema keywords merged into the input schema.
@@ -1097,8 +801,8 @@ toolDef name desc props required = toolDefWith name desc props required []
 -- a complete call, which the wire parser rejects (a Copilot review catch on PR
 -- #99).  A client that ignores @oneOf@ is no worse off than before; one that
 -- honours it now agrees with the parser about what a legal request is.
-toolDefWith :: Text -> Text -> [(Text, Value)] -> [Text] -> [(Text, Value)] -> Value
-toolDefWith name desc props required extra = object
+toolDefWith :: Text -> Text -> [(Text, Value)] -> [Text] -> [(Text, Value)] -> (Text, Value)
+toolDefWith name desc props required extra = (,) name $ object
   [ "name"        .= name
   , "description" .= desc
   , "inputSchema" .= object
@@ -1239,6 +943,9 @@ handleRequest cfg _lanes req | rpcMethod req == "initialize" = do
             [ "name"    .= scServerName cfg
             , "version" .= scVersion cfg
             ]
+          -- What every tool shares, once (issue #191): a client puts it in
+          -- its model's system prompt rather than repeating it per tool.
+        , "instructions" .= serverInstructions cfg
         ]
   pure . Just $ mkResult (rpcId req) result
 
@@ -1327,10 +1034,19 @@ dispatchToolGuarded cfg lanes name args = do
           \or a project gate, before failing. What went wrong: "
           <> T.pack (show e)
   where
-    -- The @verbose@ argument is read here, once for every tool (issue #184).
-    dispatch = case verbosityOf args of
-      Left msg        -> pure $ toolError ("Invalid arguments: " <> msg)
-      Right verbosity -> dispatchTool cfg lanes verbosity name args
+    -- A registered tool that @--expose@ left out is refused here, before its
+    -- handler can run, so a subset server answers exactly the tools it
+    -- presents (issue #191).  The @verbose@ argument is read here too, once
+    -- for every tool (issue #184).
+    dispatch
+      | name `elem` registeredToolNames cfg && not (isExposed cfg name) =
+          pure . toolError $
+            "agda-mcp: the " <> name <> " tool is not exposed by this server, \
+            \which was started with --expose " <> maybe "" (T.intercalate ",") (scExpose cfg)
+            <> " and presents only those tools."
+      | otherwise = case verbosityOf args of
+          Left msg        -> pure $ toolError ("Invalid arguments: " <> msg)
+          Right verbosity -> dispatchTool cfg lanes verbosity name args
 
 -- | verbosityOf: a call's @verbose@ argument (issue #184), read here once for
 -- every tool rather than by each tool's parameter parser, because what it

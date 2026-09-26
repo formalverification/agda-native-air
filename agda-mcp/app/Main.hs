@@ -24,19 +24,28 @@
 --   agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 --            [--corpus PATH]  [--timeout N] [--verbose]
 --            [--check-command "CMD ARGS ..."] [--check-timeout N]
+--            [--expose NAME,NAME,...]
 --
 -- M1-3 additions:
 --   --corpus PATH   Load agda-strux JSONL corpus for search tools.
 --                   Without this flag, search tools are not registered.
 --                   Since issue #17 the flag also registers search_in_scope,
 --                   the scope-aware retrieval tool over the same index.
+--
+-- Issue #191 addition:
+--   --expose NAMES  Present only the named tools (comma-separated): tools/list
+--                   lists them alone and a call to any other registered tool
+--                   is refused.  A name this configuration does not register
+--                   (a typo, or a corpus tool without --corpus) is a fatal
+--                   configuration error, never a silently smaller surface.
 
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
 import Control.Exception (IOException, try)
-import Control.Monad (when)
+import Control.Monad (unless, when)
+import qualified Data.Text as T
 import System.Directory (getCurrentDirectory, setCurrentDirectory)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -47,7 +56,7 @@ import AgdaMCP.Agda (AgdaConfig (..), defaultConfig, defaultTimeoutSeconds)
 import AgdaMCP.Corpus (loadCorpus)
 import AgdaMCP.Gate
   (GateConfig (..), defaultCheckTimeoutSeconds, defaultGateConfig)
-import AgdaMCP.Server (ServerConfig (..), runServer)
+import AgdaMCP.Server (ServerConfig (..), registeredToolNames, runServer)
 
 -- | Parsed CLI options.  Separates Agda config from corpus path since
 -- corpus loading happens before the server loop starts.
@@ -56,6 +65,7 @@ data CliOpts = CliOpts
   , cliGateConfig :: GateConfig
   , cliCorpusPath :: Maybe FilePath
   , cliCwd        :: Maybe FilePath
+  , cliExpose     :: Maybe [String]
   } deriving (Show)
 
 defaultCliOpts :: CliOpts
@@ -64,6 +74,7 @@ defaultCliOpts = CliOpts
   , cliGateConfig = defaultGateConfig
   , cliCorpusPath = Nothing
   , cliCwd        = Nothing
+  , cliExpose     = Nothing
   }
 
 
@@ -115,7 +126,25 @@ main = do
         , scServerName  = "agda-mcp"
         , scVersion     = "0.2.0"
         , scCorpusIndex = corpusIdx
+        , scExpose      = map T.pack <$> cliExpose opts
         }
+  -- --expose names tools of THIS configuration (issue #191): a name it does
+  -- not register would otherwise present a smaller surface than asked for,
+  -- and nothing downstream would notice.
+  case scExpose serverCfg of
+    Nothing    -> pure ()
+    Just names -> do
+      let registered = registeredToolNames serverCfg
+          unknown    = filter (`notElem` registered) names
+      when (null names) $ do
+        hPutStrLn stderr "agda-mcp: --expose names no tool."
+        exitFailure
+      unless (null unknown) $ do
+        hPutStrLn stderr $ "agda-mcp: --expose names tools this server does not register: "
+          <> T.unpack (T.intercalate ", " unknown)
+          <> " (registered: " <> T.unpack (T.intercalate ", " registered)
+          <> "; the corpus tools need --corpus)."
+        exitFailure
 
   cwdNow <- getCurrentDirectory
   hPutStrLn stderr $ "agda-mcp v0.2.0 starting (agda-bin: " <> agdaBin cfg <> ")"
@@ -131,6 +160,7 @@ main = do
     Just n | n > 0 -> show n <> "s per project check"
     _              -> "(none)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
+  hPutStrLn stderr $ "  exposed: " <> maybe "(every registered tool)" (T.unpack . T.intercalate ",") (scExpose serverCfg)
   hPutStrLn stderr   "  transport: stdio"
   hPutStrLn stderr   "  Waiting for MCP client..."
   runServer serverCfg
@@ -146,6 +176,7 @@ main = do
 --   --timeout N           Per-typecheck timeout in seconds (default: 300; 0 = none).
 --   --check-command "..." The project gate check_project runs (no shell).
 --   --check-timeout N     Per-project-check timeout in seconds (default: 1800; 0 = none).
+--   --expose NAMES        Present only these tools, comma-separated (issue #191).
 --   --verbose             Emit debug output to stderr.
 --   --help                Print usage and exit.
 parseArgs :: [String] -> CliOpts -> CliOpts
@@ -170,6 +201,10 @@ parseArgs ("--check-command" : cmd : rest) opts =
 parseArgs ("--check-timeout" : n : rest) opts = case readMaybe n of
   Just secs -> parseArgs rest opts { cliGateConfig = (cliGateConfig opts) { gcTimeout = Just secs } }
   Nothing   -> parseArgs rest opts
+-- The tools to present (issue #191), comma-separated; validated in main,
+-- where the registered names are known.
+parseArgs ("--expose" : names : rest) opts =
+  parseArgs rest opts { cliExpose = Just (filter (not . null) (map T.unpack (map T.strip (T.splitOn "," (T.pack names))))) }
 parseArgs ("--verbose" : rest) opts =
   parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaVerbose = True } }
 parseArgs (_ : rest) opts = parseArgs rest opts
@@ -216,6 +251,11 @@ usage = unlines
                              <> "; 0 = no limit).  Separate from --timeout,"
   , "                        because a whole-project gate legitimately runs for"
   , "                        tens of minutes."
+  , "  --expose NAMES       Present only these tools (comma-separated names):"
+  , "                        tools/list lists them alone, the initialize"
+  , "                        instructions name them alone, and a call to any"
+  , "                        other registered tool is refused.  A name this"
+  , "                        configuration does not register is an error."
   , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""

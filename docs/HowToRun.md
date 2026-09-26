@@ -773,8 +773,9 @@ The server exposes **fourteen tools**:
    the interaction lane; all four are registered only when you start the server
    with `--corpus PATH` (an agda-strux JSONL corpus).
 
-For the full command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`,
-`--corpus`, `--timeout`, `--check-command`, `--check-timeout`, `--verbose`), see
+`--expose NAME,...` presents a subset of them (issue #191).  For the full
+command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`, `--corpus`,
+`--timeout`, `--check-command`, `--check-timeout`, `--expose`, `--verbose`), see
 [`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
 
 `check_project` runs the project's own acceptance gate (the nearest Makefile's
