@@ -149,7 +149,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Status**.  Adopted (PRs [#81], [#95], [#98]).  Since [#184] (PR [#190]) the default answer carries `verdict.exitCode` alone, and a call that passes `verbose: true` gets `equivalentTo`, `meaning`, and `command` back field for field; the meaning sentence is stated in each tool's description instead, and an error response keeps the whole echo.  No open follow-up.
 
-**Where the contract is stated ([#191])**.  A client puts every tool's description and schema, and the server's `initialize` instructions, in its model's context on every turn, and Claude Code 2.1.282 cuts each description, and the instructions, at 2,048 characters.  Measured before [#191]: eleven of the fourteen descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of contract never reached a model, `fill_hole`'s `status` rule, `check_file`'s hole listing, and the wrong-tree refusal on two tools among them; and about 37,500 of the 77,603 characters of `tools/list` repeated text stated elsewhere in the same list.  So the contract is now split by who shares it and stated once.
+**Where the contract is stated ([#191], PR [#193])**.  A client puts every tool's description and schema, and the server's `initialize` instructions, in its model's context on every turn, and Claude Code 2.1.282 cuts each description, and the instructions, at 2,048 characters.  Measured before [#191]: eleven of the fourteen descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of contract never reached a model, `fill_hole`'s `status` rule, `check_file`'s hole listing, and the wrong-tree refusal on two tools among them; and about 37,500 of the 77,603 characters of `tools/list` repeated text stated elsewhere in the same list.  So the contract is now split by who shares it and stated once.
 
 +  **The instructions** (1,989 characters) carry what every tool shares: the two lanes and each one's cost, `reload`, the path refusal, the tree every answer names and the wrong-tree refusal with its registry limit, `verbose`, how failures arrive, `checkedFromSource`, and the hole model's coordinates; they name only the tools the server exposes.
 +  **Each description** carries its own tool's contract and nothing else, every one under the cap (the longest, `check_project`'s, is 1,960 characters), and the suite asserts that every description and the instructions fit.
@@ -359,7 +359,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 17 | Timeouts enforced by killing the process group; timeouts are values; defaults 300 s and 1800 s | Adopted ([#77], PR [#89]) | `FillTimeout` was unreachable; restore pinned on the timeout path |
 | 18 | Corpus tools are pure in-memory lookups, registered only with `--corpus` | Adopted ([#11], PR [#44]) | 1.4 s load, 308 MB resident at library scale |
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
-| 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5 (§ 3) |
+| 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5 (§ 3) |
 
 ---
 
@@ -466,6 +466,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
 
