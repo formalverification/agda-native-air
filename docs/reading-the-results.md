@@ -391,8 +391,9 @@ at all is a decision not yet taken (§ 6).
    arm re-reads 22 to 25 thousand cached tokens a turn against the shell
    arm's 10 thousand, which is the fourteen tools' descriptions and schemas
    (68,391 characters before [#190], 77,603 after).  The tool surface was
-   the next variable; its re-run is the next two bullets.  The judge's `original` column
-   has the original in view for 3 of the `mcp` re-run's 12 agda-algebras
+   the next variable; its re-run is the next two bullets.  The judge's
+   `original` column has the original in view for 3 of the `mcp` re-run's
+   12 agda-algebras
    solves and 14 of the `both` re-run's 18, against 4 of 14 and 16 of 19 in
    [#162].
 +  **The tool surface: a third of the context, and a truncation nobody
