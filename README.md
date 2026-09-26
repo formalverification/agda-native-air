@@ -170,7 +170,13 @@ As of September 2026 the following are built, measured, and in use.
    both it takes every verdict from `check_file` and never runs `agda` itself
    ([#162](https://github.com/formalverification/agda-native-air/issues/162)).
    That zero is not construction: the shell arm could read the library, and
-   had the original's proof in view for 16 of its 18 agda-algebras solves.
+   had the original's proof in view for 15 of its 18 agda-algebras solves
+   ([#188](https://github.com/formalverification/agda-native-air/issues/188)).
+   The tools' descriptions had been cut by the client at 2,048 characters in
+   every earlier arm; trimmed to their contracts
+   ([#191](https://github.com/formalverification/agda-native-air/issues/191)),
+   a server arm's per-turn context fell by a third and its cost by 17 to
+   19 %, with no change in what the model does with the tools.
    The search's 8 and 14 are a different instrument, not a baseline for the
    agents; which instrument produced every number in this section, and how to
    tell a win from a loss, is
