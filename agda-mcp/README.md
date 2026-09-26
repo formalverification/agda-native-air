@@ -106,8 +106,9 @@ model's context on every turn: each tool's description and input schema
 Claude Code places in the system prompt.  So the client-visible contract is
 split by who shares it, and each part is stated once.
 
-+  **The instructions** carry what every tool shares: that verdicts come from a
-   batch process's exit code and the live lane informs and never decides, each
++  **The instructions** carry what every tool shares: that the file tools'
+   verdicts come from a batch process's exit code (`check_project`'s gate can
+   also be turned red by its output) and the live lane informs and never decides, each
    lane's cost, `reload`, the path refusal, the tree every answer names and the
    wrong-tree refusal, `verbose`, how failures arrive, `checkedFromSource`, and
    the hole model's coordinates.  They name only the tools the server exposes
@@ -127,8 +128,9 @@ descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of their
 contract, `fill_hole`'s `status` rule among them, never reached a model).  The
 suite asserts that every description and the instructions fit.  Before #191
 the surface was 77,603 characters of `tools/list`, about 16,300 tokens a turn
-as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,997
-of instructions.
+as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,994
+of instructions (the #191 arms ran on a 1,989-character version, before a
+review fix scoped the exit-code rule to the file tools).
 
 **Fewer tools**.  `--expose NAME,...` presents a subset: `tools/list` lists
 those tools alone, the instructions name those alone, and a call to any other

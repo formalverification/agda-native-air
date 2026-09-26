@@ -202,7 +202,12 @@ parseArgs ("--check-timeout" : n : rest) opts = case readMaybe n of
   Just secs -> parseArgs rest opts { cliGateConfig = (cliGateConfig opts) { gcTimeout = Just secs } }
   Nothing   -> parseArgs rest opts
 -- The tools to present (issue #191), comma-separated; validated in main,
--- where the registered names are known.
+-- where the registered names are known.  A trailing --expose with no value is
+-- an empty list, which main refuses, rather than an unknown flag skipped: the
+-- lenient skip would start the FULL surface for a caller who asked for a
+-- subset (a Copilot catch on PR #193).
+parseArgs ["--expose"] opts =
+  opts { cliExpose = Just [] }
 parseArgs ("--expose" : names : rest) opts =
   parseArgs rest opts { cliExpose = Just (filter (not . null) (map T.unpack (map T.strip (T.splitOn "," (T.pack names))))) }
 parseArgs ("--verbose" : rest) opts =

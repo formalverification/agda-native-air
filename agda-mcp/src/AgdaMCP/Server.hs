@@ -497,17 +497,27 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
     listers     = among ["check_file", "get_diagnostics", "fill_hole"]
     -- get_goal runs batch agda only on its fallback path, and says so.
     batchRunners = filter (/= "get_goal") batch <> ["get_goal's fallback" | "get_goal" `elem` batch]
+    one xs       = length xs == 1
     unless' c t = if c then t else ""
     paragraphs =
+      -- The exit-code rule and the cold-agda cost belong to the file-level
+      -- tools alone: check_project runs make or a configured command, and its
+      -- output's failure evidence can turn a green exit red (maskedFailure),
+      -- so it is named apart, pointing at its own description (a Copilot
+      -- catch on PR #193).
       [ unless' (not (null batch) || "check_project" `elem` shown) $
-          "VERDICTS come only from the exit code of a batch process run per \
-          \call, never from its message text"
+          "VERDICTS come from a batch process run per call"
           <> unless' (not (null batch))
                (": " <> T.intercalate ", " batchRunners
-                <> (if length batchRunners == 1 then " runs" else " run") <> " agda on the file")
-          <> unless' ("check_project" `elem` shown) "; check_project runs the project's own gate"
-          <> ". Each is a cold agda; a first check of a large library can take \
-             \minutes (it builds .agdai interfaces that later calls reuse)."
+                <> (if one batchRunners then " runs" else " run")
+                <> " a cold agda on the file (a large library's first check \
+                   \builds .agdai interfaces and can take minutes) and"
+                <> (if one batchRunners then " judges" else " judge")
+                <> " by its exit code alone, never its message text")
+          <> unless' ("check_project" `elem` shown)
+               "; check_project runs the project's own gate, which failure \
+               \evidence in its output can also turn red"
+          <> "."
       , unless' (not (null lane)) $
           "KNOWLEDGE comes from one persistent agda --interaction-json process \
           \per project root (" <> listed lane <> "): a first question about a \
@@ -525,10 +535,10 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \another checkout of a library registered elsewhere is refused with \
           \a rootMismatch naming both roots (unless the registry is missing: \
           \project.librariesFileMissing:true). \
-          \verbose:true adds the full echo (command, registry, the lane's \
-          \process and wire lines); leave it off unless checking what ran. A \
-          \failed call (isError) always carries it, and a process failure or \
-          \lane timeout (--timeout) is an isError whose text is a JSON object. \
+          \verbose:true adds the full echo (command, registry, lane process \
+          \and wire lines); leave it off unless checking what ran. A failed \
+          \call (isError) always carries it; a process failure or lane timeout \
+          \(--timeout) is one whose text is a JSON object. \
           \checkedFromSource says whether a call re-typechecked its file \
           \(absent: unknown, never a guess)."
       , unless' (not (null holeTools)) $
@@ -538,7 +548,7 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \written"
           <> unless' (not (null listers))
                ("; " <> T.intercalate ", " listers
-                <> (if length listers == 1 then " lists" else " list")
+                <> (if one listers then " lists" else " list")
                 <> " them, and the next address comes from the latest list")
           <> "."
       ]

@@ -3368,6 +3368,22 @@ surfaceTests = do
             (let t = serverInstructions (exposing ["check_file"])
              in  "VERDICTS" `T.isInfixOf` t && not ("KNOWLEDGE" `T.isInfixOf` t))
         ]
+
+    , -- check_project runs make or a configured command, and failure
+      -- evidence in its output can turn a green exit red (maskedFailure), so
+      -- the file tools' exit-code rule and cold-agda cost must never be
+      -- stated of it (a Copilot catch on PR #193).
+      runTest "instructions: check_project is not called a cold agda or judged by exit code alone" $
+        let alone = serverInstructions (exposing ["check_project"])
+            both  = serverInstructions (exposing ["check_file", "check_project"])
+        in  allOf
+              [ assertEqual "file-tool claims in a check_project-only paragraph" []
+                  [ c | c <- ["cold agda", "exit code alone", ".agdai"], c `T.isInfixOf` alone ]
+              , assert "check_project named with its failure evidence"
+                  ("check_project runs the project's own gate, which failure evidence" `T.isInfixOf` alone)
+              , assert "one file tool agrees in number"
+                  ("check_file runs a cold agda" `T.isInfixOf` both && " judges by its exit code" `T.isInfixOf` both)
+              ]
     ]
 
 -- ---------------------------------------------------------------------------
@@ -4743,6 +4759,7 @@ exposeProcessTests exe = do
   (code, out, err) <- readProcessWithExitCode exe
     ["--corpus", corpusFixturePath, "--expose", "check_file,type_of"] reqs
   (badCode, _, badErr) <- readProcessWithExitCode exe ["--expose", "check_file,search_by_name"] ""
+  (bareCode, bareOut, bareErr) <- readProcessWithExitCode exe ["--expose"] reqs
   let instr = resultOf 1 out >>= KM.lookup "instructions"
       names = case resultOf 2 out >>= KM.lookup "tools" of
         Just ts -> toolNamesOf ts
@@ -4773,6 +4790,15 @@ exposeProcessTests exe = do
 
     , runTest "wire: an unregistered name is still an unknown tool" $
         assert "Unknown tool" (maybe False ("Unknown tool: no_such_tool" `T.isInfixOf`) (innerText 4 out))
+
+    , -- A trailing --expose with no value used to fall through to the
+      -- lenient unknown-flag skip and start the whole surface (a Copilot
+      -- catch on PR #193).
+      runTest "wire: a trailing --expose with no value refuses to start, never serving the full surface" $ allOf
+        [ assert "exits non-zero" (bareCode /= ExitSuccess)
+        , assert ("stderr was: " <> take 300 bareErr) ("--expose names no tool" `isInfixOf` bareErr)
+        , assertEqual "no answer on stdout" "" bareOut
+        ]
 
     , runTest "wire: --expose naming a tool this configuration does not register refuses to start" $ allOf
         [ assert "exits non-zero" (badCode /= ExitSuccess)
