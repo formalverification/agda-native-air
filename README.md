@@ -176,7 +176,7 @@ As of September 2026 the following are built, measured, and in use.
    every earlier arm; trimmed to their contracts
    ([#191](https://github.com/formalverification/agda-native-air/issues/191)),
    a server arm's per-turn context fell by a third and its cost by 17 to
-   19 %, with no change in what the model does with the tools.
+   19 %, with the same tool mix within the run-to-run spread.
    The search's 8 and 14 are a different instrument, not a baseline for the
    agents; which instrument produced every number in this section, and how to
    tell a win from a loss, is

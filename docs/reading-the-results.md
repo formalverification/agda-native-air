@@ -408,10 +408,13 @@ at all is a decision not yet taken (§ 6).
    (plus 1,989 of instructions) and a server arm's per-turn context down by
    a third (22,407 cached tokens a turn to 15,503 and 14,293; the first
    turn 20,016 tokens to 13,037), and cost by 17 % and 19 % (USD 3.83 and
-   3.74 against 4.63; `both` 3.55 against 4.00).  What the model did with
-   the tools did not change: the corpus and navigation tools 73 and 55
-   calls against 53 and 78 before, restated 7 and 8 against 6 and 8, and
-   beside a shell those tools still unused (2 calls).  The gap to the
+   3.74 against 4.63; `both` 3.55 against 4.00).  The tool mix stayed
+   within the spread of the untrimmed runs, though the counts moved: the
+   corpus and navigation tools 73 and 55 calls against 53 and 78 before
+   (`search_by_name` 23 and 23 against 31; `exports_of` 20 and 12 against
+   17), restated 7 and 8 against 6 and 8, and beside a shell those tools
+   still unused (2 calls).  Two seeds are not enough to call a shift of
+   that size a change in behavior, or to rule one out.  The gap to the
    shell's USD 2.88 did not close, and the trim is kept for what it repairs
    as much as for what it saves.
 +  **Four tools: the count moves the route, not the proving** ([#191],
@@ -483,10 +486,11 @@ not a term, so no hole-filling judgment of any kind can express it.
 +  **Knowledge tools that return content** ([#185]): the one measured defect
    still without its re-run.  Lean answers ([#184]) were measured by PR
    [#190] and were not the cause (§ 4.3).
-+  **The tool surface on rows with nothing to find**: [#191] compared the
-   surfaces on the mined rows, where the count measures citing against
-   copying; the hard tier ([#189]) is where the fourteen tools, the four,
-   and the shell can be told apart on proving.
++  **The tool surface on the hard tier**: [#191] compared the surfaces on
+   the mined rows, where an answer exists in the library to be found and
+   the count measures citing against copying; only on rows with nothing to
+   find ([#189]) can the fourteen tools, the four, and the shell be told
+   apart on proving, and no such run exists yet.
 +  **A cheap way to find a definition's source**: the four-tool arm's 111
    and 97 failed library reads are the measured cost of not having one, and
    no arm has run with it ([#185]).
