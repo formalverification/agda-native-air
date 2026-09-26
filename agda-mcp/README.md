@@ -525,6 +525,7 @@ loadElapsedMs?}` in place of `verdict`.
 
 **How it works**.  Ensures `AgdaDojang.Debug` is imported (injecting the import transiently if the file does not already import it), replaces the hole with the `reportGoalCtx` macro, typechecks the file **in place**, and parses the `AGDADOJANG_REQ_BEGIN/END` marker block.  Checking at the file's real path (rather than a scratch copy) lets hierarchically-named modules embedded in a library resolve normally; the original source is restored after the call.
 
+**A fallback-path timeout** is an `isError` result whose text is a JSON object, `{error, timedOut: true, elapsedMs, checkedFromSource?, verdict, command, project}`, naming the bound, since no goal was reported.  A lane timeout is reported as the lane's own structured failure and is never re-run on the fallback path, which would double the bound.
 
 #### `fill_hole`
 
