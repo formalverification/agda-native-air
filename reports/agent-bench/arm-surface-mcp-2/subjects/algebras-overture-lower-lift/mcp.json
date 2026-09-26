@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/data/benchmarks/reports/agent-bench/arm-surface-mcp-2/work/algebras-overture-lower-lift /home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/data/benchmarks/reports/agent-bench/arm-surface-mcp-2/work/algebras-overture-lower-lift/Overture-lower-lift.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/191-m5-14-agda-mcp-the-tool-surface-is-the-cost/data/benchmarks/reports/agent-bench/.bin-191/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}
