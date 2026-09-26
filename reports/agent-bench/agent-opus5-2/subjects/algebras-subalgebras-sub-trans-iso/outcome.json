@@ -16,6 +16,14 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 1
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -42,7 +50,23 @@
   },
   "permissionDenials" : 1,
   "isolation" : {
+    "arm" : "mcp",
     "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
     "missingAgdaTools" : [
     ],
     "extraTools" : [
@@ -54,10 +78,15 @@
     ],
     "deniedPaths" : [
       "Read /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md"
-    ]
+    ],
+    "shellClasses" : {
+      
+    }
   },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 6914,
+  "agdaMs" : 6019,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

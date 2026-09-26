@@ -101,7 +101,7 @@ object AgentBench extends IOApp {
                     corpus     = None)
       extractor = Extractor(cfg.agdaJsonBin.getOrElse(throw new IllegalStateException("agda-json-bin required")), includes, agdaDir, cfg.serverTimeout.seconds)
       driven   <- McpClient.resource(server).use { client =>
-                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor)
+                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor, readRoots)
                     else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots)
                   }
       corpora   = previous.flatMap(_.hcursor.downField("corpora").focus).getOrElse(fresh)

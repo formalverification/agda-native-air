@@ -11,6 +11,7 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
     "open import Function using (_∘_)"
   ],
@@ -54,7 +55,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 386,
+  "agdaMs" : 474,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

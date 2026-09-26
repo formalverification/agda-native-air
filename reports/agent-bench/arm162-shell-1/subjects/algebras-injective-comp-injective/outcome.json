@@ -14,6 +14,14 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 1,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -57,7 +65,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 2568,
+  "agdaMs" : 2699,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

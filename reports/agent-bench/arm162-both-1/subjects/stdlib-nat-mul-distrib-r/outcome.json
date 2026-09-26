@@ -13,6 +13,7 @@
   "gateDetail" : "Bash reads outside the arm's roots (/): grep -n \"_\\*_\\|_+_\" /nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src/Agda/Builtin/Nat.agda 2>/dev/null; find / -name \"Nat.agda\" -path \"*Builtin*\" 2>/dev/null; Bash reads outside the arm's roots (/home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda): grep -n \"_+_\\|_\\*_\" /home/williamdemeo/.config/agda/share/2.8.0/lib/prim/Agda/Builtin/Nat.agda",
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
     "open import Relation.Binary.PropositionalEquality using ( trans )"
   ],
@@ -75,7 +76,7 @@
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 1798,
+  "agdaMs" : 1916,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

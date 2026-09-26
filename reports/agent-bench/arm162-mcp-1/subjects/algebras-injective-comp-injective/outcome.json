@@ -15,6 +15,14 @@
   "restatementEvidence" : [
     "ref Setoid.Functions.Injective.⊙-injective"
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
   "addedImports" : [
     "open import Setoid.Functions.Injective using () renaming ( ⊙-injective to ⊙-injective-lib )"
   ],
@@ -73,7 +81,7 @@
   "via" : "mcp",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 2530,
+  "agdaMs" : 2745,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

@@ -16,6 +16,14 @@
   "restatementEvidence" : [
     "ref Setoid.Subalgebras.Properties.≤-trans"
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
   "addedImports" : [
     "open import Setoid.Subalgebras    using ( ≤-trans )"
   ],
@@ -77,7 +85,7 @@
   "via" : "mcp",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 5467,
+  "agdaMs" : 5849,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

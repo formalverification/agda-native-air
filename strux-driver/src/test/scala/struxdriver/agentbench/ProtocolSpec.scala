@@ -128,6 +128,17 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
       .map(_.takeWhile(_ != ':')) should contain ("addDirs")
   }
 
+  test("a re-judge keeps the run's own arm in the report's config; only an archive with none takes the operator's") {
+    val rejudge = Cli.parse(base ++ List("--rejudge")).getOrElse(fail("parse"))   // --arm left at its default, mcp
+    val shellRun = Json.obj("arm" -> "shell".asJson, "safe" -> Json.True, "model" -> "claude-sonnet-5".asJson)
+    val kept     = Report.rejudgedConfig(shellRun, rejudge, "2026-09-25T00:00:00Z")
+    kept.hcursor.get[String]("arm").toOption shouldBe Some("shell")
+    kept.hcursor.get[String]("rejudgedAt").toOption shouldBe Some("2026-09-25T00:00:00Z")
+    kept.hcursor.get[String]("model").toOption shouldBe Some("claude-sonnet-5")
+    // An archive made before the arm existed records none, and was the mcp arm.
+    Report.rejudgedConfig(Json.obj("model" -> "claude-opus-5".asJson), rejudge, "t").hcursor.get[String]("arm").toOption shouldBe Some("mcp")
+  }
+
   test("a subject's own record carries the arm and the roots, and survives the round trip") {
     val roots = ShellRoots(Paths.get("/w/work/x"), Vector(Paths.get("/nix/store/x/src")), Vector(Paths.get("/c/corpus.jsonl")))
     val rec   = SubjectRecord(Arm.Both, roots)

@@ -12,6 +12,7 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -54,7 +55,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 2613,
+  "agdaMs" : 2840,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

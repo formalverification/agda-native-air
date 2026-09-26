@@ -13,6 +13,7 @@
   "gateDetail" : "import line changed or missing: open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong )",
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -70,7 +71,7 @@
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 1728,
+  "agdaMs" : 1917,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

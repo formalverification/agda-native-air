@@ -311,7 +311,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 +  **The rest of the surface is worse than a shell here, not merely reproducible by one.**  The knowledge tools collapse when a shell is beside them (`definition_of` 19 calls in the server-only arm and 0 in the both arm, `search_by_name` 18 and 1, `exports_of` 11 and 2, `type_of` 34 and 11), and the server-only arm restates six library lemmas that the shell-only arm proves.
 +  **The missing capability is searching sources, not reading them.**  Both arms could read the libraries; the shell arm consulted them 82 times and the server arm 13, because `grep` over a tree needs no prior knowledge of where a thing is while `definition_of` answers where a definition is and not what it says.
 
-**Evidence**.  Runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1`, 2026-09-21, `claude-sonnet-5`, zero anomalies, USD 12.41: 50 solved and 0 restated on the shell arm, 47 and 6 on the server arm, 51 and 2 on both; 308, 342 and 327 turns.  The full table, the per-tool shift, the two qualifications the isolation gate imposes, and the reproduction of the archived arm are in [ADR 0001](0001-proof-search-on-agda-mcp.md) § 9 and in [`reports/agent-bench/README.md`].  Neither shell-bearing arm used `agda --interaction-json` once, though both prompts name it, and neither grepped its row's corpus, though both prompts give its path.
+**Evidence**.  Runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1`, 2026-09-21, `claude-sonnet-5`, zero anomalies, USD 12.41: 50 solved and 0 restated on the shell arm, 47 and 6 on the server arm, 51 and 2 on both; 308, 342 and 327 turns.  On the agda-algebras rows those counts measure access to the library's text as well as the instrument: the judge's `original` column ([#188]) has the restated lemma's own proof in view before the last edit for 15 of the shell arm's 18 solves there, 4 of the server arm's 14, and 16 of the both arm's 19.  The full table, the per-tool shift, the two qualifications the isolation gate imposes, and the reproduction of the archived arm are in [ADR 0001](0001-proof-search-on-agda-mcp.md) § 9 and in [`reports/agent-bench/README.md`].  Neither shell-bearing arm used `agda --interaction-json` once, though both prompts name it, and neither grepped its row's corpus, though both prompts give its path.
 
 **Status**.  Adopted ([#162]).  § 13's ordering is unchanged but its first item is now earned rather than assumed: [#17], retrieval as server tools, whose first rung is what a shell does best and this server cannot do at all, searching the library's own sources.  The Milestone 5 items that make the verdict cheaper keep their place, since the verdict is what the measurement says the server is for.
 
@@ -453,6 +453,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#154]: https://github.com/formalverification/agda-native-air/issues/154
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
 [#161]: https://github.com/formalverification/agda-native-air/pull/161

@@ -19,6 +19,14 @@
   "gateDetail" : "Bash a command substitution: grep -n \"record Func\" -A 20 $(find / -path \"*/standard-library-2.3/src/Function/Bundles.agda\" 2>/dev/null | head -1)",
   "restatementEvidence" : [
   ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 6,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -64,7 +72,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 5054,
+  "agdaMs" : 5379,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

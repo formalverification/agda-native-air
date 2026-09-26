@@ -12,6 +12,7 @@
   "restated" : false,
   "restatementEvidence" : [
   ],
+  "original" : null,
   "addedImports" : [
   ],
   "terminal" : "completed",
@@ -69,7 +70,7 @@
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 1966,
+  "agdaMs" : 1959,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

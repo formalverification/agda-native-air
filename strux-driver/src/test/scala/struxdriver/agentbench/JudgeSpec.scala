@@ -143,16 +143,17 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Gates.holes(Checked(success = true, timedOut = false, Some(0), 0, Vector.empty, Map.empty, 1)) shouldBe Right(())
   }
 
-  test("original: the restates: tag first, else the index module and the prime-stripped name") {
+  test("original: the restates: tag first, else the index module and the prime-stripped name; tagged says which") {
     Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector("stratum:wholesale", "restates:Setoid.Functions.Basic.lift∼lower")) shouldBe
-      Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
-    Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector.empty) shouldBe Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true)
+      Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true, tagged = true)
+    Gates.originalOf("Setoid.Functions.Basic", "lift∼lower′", Vector.empty) shouldBe
+      Original(Some("Setoid.Functions.Basic.lift∼lower"), "lift∼lower", true, tagged = false)
     // Untagged: the qualified name is a guess, so the bare name is evidence even when it is the hole's.
-    Gates.originalOf("Data.Nat.Properties", "+-comm", Vector.empty) shouldBe Original(Some("Data.Nat.Properties.+-comm"), "+-comm", true)
+    Gates.originalOf("Data.Nat.Properties", "+-comm", Vector.empty) shouldBe Original(Some("Data.Nat.Properties.+-comm"), "+-comm", true, tagged = false)
     // Tagged with the hole's own name: the original is known exactly, so the bare name alone is not evidence.
     Gates.originalOf("Overture.Operations", "π", Vector("restates:Overture.Operations.π")) shouldBe
-      Original(Some("Overture.Operations.π"), "π", false)
-    Gates.originalOf("M", "foo′", Vector("restates:Some.Where.bar")) shouldBe Original(Some("Some.Where.bar"), "bar", true)
+      Original(Some("Overture.Operations.π"), "π", false, tagged = true)
+    Gates.originalOf("M", "foo′", Vector("restates:Some.Where.bar")) shouldBe Original(Some("Some.Where.bar"), "bar", true, tagged = true)
   }
 
   // Extractor rows captured from `agda-json` on archived final files (2026-09-15).

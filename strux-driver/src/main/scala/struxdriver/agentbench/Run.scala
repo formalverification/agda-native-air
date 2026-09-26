@@ -55,7 +55,7 @@ object Run {
                    Oracle.create(client, timings).flatMap { oracle =>
                      val agda = new ServerAgda(oracle, extractor, e.id)
                      archivedClean(cfg, e).flatMap {
-                       case true  => IO.println(s">> ${e.id} resume: archived subject kept, re-judged") *> Outcomes.judgeOne(cfg, e, agda)
+                       case true  => IO.println(s">> ${e.id} resume: archived subject kept, re-judged") *> Outcomes.judgeOne(cfg, e, agda, addDirs)
                        case false => driveOne(cfg, subject, oracle, agda, e)
                      }
                    }.handleErrorWith { err =>
@@ -132,19 +132,24 @@ object Run {
             _   <- IO.blocking { Files.createDirectories(finalFile.getParent); Files.copy(st.workFile, finalFile, StandardCopyOption.REPLACE_EXISTING); () }
             _   <- TextIO.write(subj.runRecord, run.toJson.spaces2)
             _   <- IO.println(f">> ${entry.id}%-36s subject exit=${run.exitCode.map(_.toString).getOrElse("killed")} wall=${run.wallMs / 1000}s")
-            j   <- Outcomes.judgeOne(cfg, entry, agda)
+            j   <- Outcomes.judgeOne(cfg, entry, agda, subject.addDirs)
           } yield j
       }
     } yield out
   }
 
-  /** Every archived subject judged again, `cfg.parallelism` at a time; a missing archive is that row's anomaly. */
-  def rejudgeAll(cfg: AgentBenchConfig, entries: Vector[IndexEntry], client: McpClient, extractor: Extractor): IO[Vector[Judged]] =
+  /** Every archived subject judged again, `cfg.parallelism` at a time; a
+    * missing archive is that row's anomaly.  `libraryRoots` are the harness's
+    * read roots, which an archive made before subjects recorded their own is
+    * read under (Outcomes.judgeOne).
+    */
+  def rejudgeAll(cfg: AgentBenchConfig, entries: Vector[IndexEntry], client: McpClient, extractor: Extractor,
+                 libraryRoots: Vector[Path]): IO[Vector[Judged]] =
     IO.println(s">> agent-bench: re-judging ${entries.size} obligation(s) under ${cfg.layout.runRoot}") *>
       Ref.of[IO, Vector[TimingRow]](Vector.empty).flatMap { timings =>
         entries.parTraverseN(cfg.parallelism) { e =>
           IO.blocking(Files.isRegularFile(cfg.layout.subject(e.id).finalFile(Scaffold.fixtureStem(e)))).flatMap {
-            case true  => Oracle.create(client, timings).flatMap(o => Outcomes.judgeOne(cfg, e, new ServerAgda(o, extractor, e.id)))
+            case true  => Oracle.create(client, timings).flatMap(o => Outcomes.judgeOne(cfg, e, new ServerAgda(o, extractor, e.id), libraryRoots))
             case false => IO.pure(Outcomes.anomaly(cfg.layout, e, "no archived subject to judge"))
           }.handleErrorWith { err =>
             IO.println(s">> ${e.id} FAILED: ${err.getMessage}") *> IO.pure(Outcomes.anomaly(cfg.layout, e, err.getMessage))

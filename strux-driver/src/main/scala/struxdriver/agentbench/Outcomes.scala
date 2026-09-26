@@ -22,6 +22,14 @@
   *  instrument the subject actually used, and which it took its last verdict
   *  from, which is the whole result of the `both` arm.
   *
+  *  The `original` column (issue #188) says, for a row whose index entry names
+  *  the library lemma it restates, whether that lemma's proof was in the
+  *  subject's view before its last edit (OriginalInView.scala), and is `null`
+  *  on a row that names none.  It is read under the subject's own read roots,
+  *  or, for an archive made before `subject.json` recorded them, under the
+  *  harness's, which are the libraries the judge checks the file against.  It
+  *  is a column, not a gate: `solved`, `restated`, and `gate` never read it.
+  *
   *  Anomaly rules
   *  -------------
   *  A row is an anomaly, not a result, when the subject never had the
@@ -49,7 +57,7 @@ package struxdriver.agentbench
 import cats.effect.IO
 import io.circe.Json
 import io.circe.syntax._
-import java.nio.file.{Files, StandardCopyOption}
+import java.nio.file.{Files, Path, StandardCopyOption}
 import scala.concurrent.duration._
 
 import struxdriver.benchmark.{Obligation => IndexEntry}
@@ -85,11 +93,16 @@ final case class Outcome(
   finalPath:         Option[String],
   transcriptPath:    Option[String],
   lastWords:         String,
-  rateLimit:         Option[Json] = None
+  rateLimit:         Option[Json],
+  original:          Option[OriginalReading]
 ) {
   def stratum: String = LoopOutcome.stratumOf(entry.source, entry.tags)
   def toolCallsTotal: Int = toolCalls.map(_._2).sum
-  def toJson: Json = Json.obj(
+  /** Solved with the original's proof in view before the last edit (issue #188). */
+  def solvedOriginalInView: Boolean = solved && original.exists(_.seen)
+  // An absent value is dropped, except `original`, whose null states that the
+  // row names no original (issue #188), which is not the same as `false`.
+  def toJson: Json = Json.fromFields(Vector(
     "benchmarkId"         -> entry.id.asJson,
     "difficulty"          -> entry.difficulty.tag.asJson,
     "source"              -> entry.source.asJson,
@@ -102,6 +115,7 @@ final case class Outcome(
     "gate"                -> gate.map(_.gate).asJson,
     "gateDetail"          -> gate.map(_.detail).asJson,
     "restatementEvidence" -> evidence.asJson,
+    "original"            -> original.map(_.toJson).asJson,
     "addedImports"        -> addedImports.asJson,
     "terminal"            -> terminal.asJson,
     "turns"               -> turns.asJson,
@@ -127,14 +141,18 @@ final case class Outcome(
     "transcriptPath"      -> transcriptPath.asJson,
     "lastWords"           -> lastWords.asJson,
     "rateLimit"           -> rateLimit.asJson
-  ).dropNullValues
+  ).filter { case (k, v) => k == "original" || !v.isNull })
 }
 
 object Outcome {
+  /** A row the harness could not judge at all: nothing was read, so a row
+    * with an original carries a block whose reading was never made.
+    */
   def anomaly(entry: IndexEntry, msg: String, wallMs: Long): Outcome =
     Outcome(entry, solved = false, restated = false, None, Vector.empty, Vector.empty, "anomaly", 0, Vector.empty,
       wallMs, 0.0, Json.obj(), 0, None, "none", "none", None, None, None, None, Vector.empty, None,
-      "unavailable: anomaly", Some(msg), None, None, "")
+      "unavailable: anomaly", Some(msg), None, None, "", None,
+      if (Gates.originalOf(entry.module, entry.hole, entry.tags).tagged) Some(OriginalReading.unread(None)) else None)
 }
 
 /** One obligation's three outputs: the report outcome, the fixtures.jsonl row, the results.jsonl rows. */
@@ -211,8 +229,26 @@ object Outcomes {
       .lastOption.fold("none")(u => if (u.name == Arm.bash) "shell" else "mcp")
   }
 
-  /** Judge one archived subject: transcript, isolation, gates, outcome. */
-  def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry, agda: Agda): IO[Judged] = {
+  /** The `original` column of one row (issue #188): None when the index names
+    * no original; a reading that could not be made when no root holds the
+    * original's module or there is no transcript; else the reading itself.
+    * The source is looked for under the subject's own read roots, or under
+    * `libraryRoots` for an archive whose record names none.
+    */
+  def originalReading(entry: IndexEntry, t: Transcript, roots: ShellRoots, libraryRoots: Vector[Path]): IO[Option[OriginalReading]] = {
+    val original = Gates.originalOf(entry.module, entry.hole, entry.tags)
+    if (!original.tagged) IO.pure(None)
+    else OriginalInView.locate(original, if (roots.readRoots.nonEmpty) roots.readRoots else libraryRoots).map {
+      case Some(s) if t.records > 0 => Some(OriginalInView.of(t, s, roots.workDir.resolve(s"${Scaffold.fixtureStem(entry)}.agda")))
+      case other                    => Some(OriginalReading.unread(other.map(_.file.toString)))
+    }
+  }
+
+  /** Judge one archived subject: transcript, isolation, gates, outcome, and
+    * the original in view.  `libraryRoots` are the harness's own read roots,
+    * used only for an archive whose record names none.
+    */
+  def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry, agda: Agda, libraryRoots: Vector[Path]): IO[Judged] = {
     val layout    = cfg.layout
     val subj      = layout.subject(entry.id)
     val stem      = Scaffold.fixtureStem(entry)
@@ -247,6 +283,7 @@ object Outcomes {
       // the file itself earned.
       solved      = anomaly.isEmpty && gate.isEmpty && verdict.solved
       restated    = anomaly.isEmpty && gate.isEmpty && verdict.restated
+      reading    <- originalReading(entry, t, roots, libraryRoots)
       outcome     = Outcome(
         entry             = entry,
         solved            = solved,
@@ -277,14 +314,20 @@ object Outcomes {
         lastWords         = t.result.map(_.text.take(600)).getOrElse(""),
         rateLimit         = t.rateLimitMax.map(u => Json.obj(
                               "maxUtilization" -> u.asJson,
-                              "statuses"       -> t.rateLimits.map(_._1).distinct.asJson))
+                              "statuses"       -> t.rateLimits.map(_._1).distinct.asJson)),
+        original          = reading
       )
       _          <- if (solved) IO.blocking {
                       Files.createDirectories(layout.solved)
                       Files.copy(finalFile, layout.solved.resolve(s"$stem.agda"), StandardCopyOption.REPLACE_EXISTING); ()
                     } else IO.unit
       _          <- TextIO.write(subj.outcome, outcome.toJson.spaces2)
-      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}${anomaly.fold("")(a => s"  ANOMALY: $a")}")
+      seen        = reading.fold("")(r => " original=" + (r.inView match {
+                      case Some(true)  => s"${r.how.getOrElse("?")}@${r.at.getOrElse(-1)}"
+                      case Some(false) => "unseen"
+                      case None        => "unread"
+                    }))
+      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}")
     } yield judged(layout, outcome, Audit.attemptRows(entry, workDir.resolve(s"$stem.agda"), t, subj.transcriptRel))
   }
 }

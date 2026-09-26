@@ -13,7 +13,10 @@
   *  fail preservation (the first by Agda's elaborated type differing from the
   *  gold's, the second by the diff); a postulate fails escape by `SafeFlagPostulate`; a
   *  wrong proof fails typecheck; a proof by the library's own lemma is
-  *  restated by its `bodyRefs`.  Needs AGDA_MCP_BIN, AGDA_JSON_BIN, and
+  *  restated by its `bodyRefs`.  Two archived subjects judged again end to
+  *  end: a stdlib row, whose `original` column is null (issue #188), and an
+  *  agda-algebras row of the shell arm, whose column names the library file
+  *  it read before its last edit.  Needs AGDA_MCP_BIN, AGDA_JSON_BIN, and
   *  AGDA_NATIVE_AIR_ROOT inside `nix develop .#backend` (the agent-bench-it
   *  Make target sets them); without them the suite is cancelled.
   *
@@ -31,6 +34,7 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 import struxdriver.benchmark.GoldVerifier
+import struxdriver.io.TextIO
 import struxdriver.search.{McpClient, Oracle, Scaffold, ServerConfig}
 
 final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
@@ -72,7 +76,7 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
       for {
         oracle   <- Oracle.create(client)
         includes <- Extractor.includesFromRegistry(Paths.get(agdaDir).resolve("libraries"))
-        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id))
+        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id), includes)
       } yield judged.outcome
     }.unsafeRunSync()
 
@@ -81,6 +85,9 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     intact.gate    shouldBe None
     intact.solved  shouldBe true
     intact.terminal shouldBe "completed"
+    // A stdlib row names no original: the column is null, not false.
+    intact.original shouldBe None
+    intact.toJson.hcursor.downField("original").focus shouldBe Some(io.circe.Json.Null)
 
     val transcript = dst.resolve("transcript.jsonl")
     val kept = new String(Files.readAllBytes(transcript), StandardCharsets.UTF_8)
@@ -93,6 +100,51 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     crashed.gate     shouldBe None            // the file itself still passes every gate
     crashed.solved   shouldBe false           // and is still not published as a solve
     crashed.restated shouldBe false
+  }
+
+  test("an archived agda-algebras solve of the shell arm carries the original it read, and its verdict is unchanged") {
+    val root = rootEnv.getOrElse(cancel("AGDA_NATIVE_AIR_ROOT not set; skipping the judge's live test"))
+    val bin  = binEnv.getOrElse(cancel("AGDA_MCP_BIN not set; skipping the judge's live test"))
+    val json = jsonEnv.getOrElse(cancel("AGDA_JSON_BIN not set; skipping the judge's live test"))
+    assume(sys.env.contains("AGDA_DIR"), "AGDA_DIR not set: run inside nix develop .#backend")
+    assume(Files.isRegularFile(bin) && Files.isRegularFile(json), "the server or the extractor binary is missing")
+    val id       = "algebras-homs-mon-to-hom"
+    val archived = root.resolve(s"reports/agent-bench/arm162-shell-1/subjects/$id")
+    assume(Files.isDirectory(archived), "the archived shell subject is missing")
+    val record = TextIO.readJson(archived.resolve("subject.json")).unsafeRunSync().flatMap(SubjectRecord.fromJson)
+    assume(record.exists(_.roots.readRoots.exists(Files.isDirectory(_))), "the subject's read roots are not on this machine")
+
+    // A copy of the archived subject, re-judged as `make agent-bench-rejudge` would.
+    val out = Files.createTempDirectory(Paths.get("target").toAbsolutePath, "agentbench-original-")
+    val dst = out.resolve(s"it-original/subjects/$id")
+    Files.createDirectories(dst.resolve("final"))
+    Files.list(archived).forEach { p => if (Files.isRegularFile(p)) Files.copy(p, dst.resolve(p.getFileName)) }
+    Files.list(archived.resolve("final")).forEach { p => Files.copy(p, dst.resolve("final").resolve(p.getFileName)) }
+    val cfg = Cli.parse(List("--rejudge", "--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString,
+      "--all", "--out-dir", out.toString, "--run-id", "it-original", "--project-root", root.toString,
+      "--server-bin", bin.toString, "--agda-json-bin", json.toString)).getOrElse(fail("cli"))
+    val e       = entry(root, id)
+    val server  = ServerConfig(bin, Scaffold.defaultAgdaFlags + " --safe", 600, root, out.resolve("server-stderr.log"), None)
+    val agdaDir = GoldVerifier.agdaDirOf(root)
+    val o = McpClient.resource(server).use { client =>
+      for {
+        oracle   <- Oracle.create(client)
+        includes <- Extractor.includesFromRegistry(Paths.get(agdaDir).resolve("libraries"))
+        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id), includes)
+      } yield judged.outcome
+    }.unsafeRunSync()
+
+    o.anomaly  shouldBe None
+    o.solved   shouldBe true                     // as archived: the column moves no verdict
+    o.restated shouldBe false
+    val r = o.original.getOrElse(fail("a row with a restates: tag has an original block"))
+    r.inView shouldBe Some(true)
+    r.how.isDefined shouldBe true
+    r.at.exists(i => i >= 0 && i < o.toolCallsTotal) shouldBe true
+    r.file.exists(_.endsWith("/src/Setoid/Homomorphisms/Basic.lagda.md")) shouldBe true
+    r.file.exists(f => record.get.roots.readRoots.exists(root => Paths.get(f).startsWith(root))) shouldBe true
+    o.solvedOriginalInView shouldBe true
+    o.toJson.hcursor.downField("original").downField("inView").as[Boolean] shouldBe Right(true)
   }
 
   test("the judge, through the server, agda, and the extractor, names every gate and the restatement") {
