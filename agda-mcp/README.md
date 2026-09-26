@@ -133,7 +133,7 @@ descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of their
 contract, `fill_hole`'s `status` rule among them, never reached a model).  The
 suite asserts that every description and the instructions fit.  Before #191
 the surface was 77,603 characters of `tools/list`, about 16,300 tokens a turn
-as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,982
+as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,981
 of instructions (the #191 arms ran the same `tools/list` and a 1,989-character
 version of the instructions, before review fixes scoped their exit-code rule
 to `success` and named `fill_hole`'s tolerance).

@@ -359,7 +359,7 @@ description carries its own tool's contract under the 2,048 characters at
 which Claude Code 2.1.282 truncates one; before, eleven of the fourteen
 descriptions were cut there, so part of the contract never reached a subject.
 `tools/list` fell from 77,603 characters to 24,094, plus 1,989 of
-instructions (1,982 in the PR's final build, whose `tools/list` is the same,
+instructions (1,981 in the PR's final build, whose `tools/list` is the same,
 after review fixes scoped their exit-code rule to `success`; the arms ran
 the 1,989).  `arm-surface-mcp-*` and `arm-surface-both-1` are the `mcp` and
 `both` arms on that surface; `arm-verdict-mcp-*` is the `mcp` arm with only

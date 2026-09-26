@@ -565,13 +565,13 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \editing a DEPENDENCY of the file, which the lane cannot see."
       , unless' (not (null fileTools)) $
           "A path naming nothing readable is refused, naming the path as \
-          \resolved against this server's working directory. EVERY answer \
+          \resolved. EVERY answer \
           \names the tree it used, project {root, rootSource}; a file in \
           \another checkout of a library registered elsewhere is refused with \
           \a rootMismatch naming both roots (unless the registry is missing: \
           \project.librariesFileMissing:true). \
           \verbose:true adds the full echo (command, registry, lane process \
-          \and wire lines). A failed \
+          \and wire lines); leave it off unless checking what ran. A failed \
           \call (isError) always carries it; a process failure or lane timeout \
           \(--timeout) is one whose text is a JSON object. \
           \checkedFromSource says whether a call re-typechecked its file \
