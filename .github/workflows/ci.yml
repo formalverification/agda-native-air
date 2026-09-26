@@ -59,6 +59,18 @@
 #         conditional jobs (e.g. lane 6 when no agda-dojang/ changes)
 #         don't block the gate.  Fails on `failure` or `cancelled`.
 #
+#  Trust boundary (issue #187, the rule pages.yml adopted on #181):
+#    Lanes 5 to 8 run code the pull request controls (`make`, `cabal test`,
+#    `pytest`) after cachix-action has installed its token, and a token the
+#    action installs is readable by every step after it.  So the
+#    write-capable CACHIX_AUTH_TOKEN reaches the action only when the
+#    checked-out ref is `main`, and every other run (a pull request, or a
+#    manual run pointed at another branch) pulls from the public cache with
+#    `skipPush` set and pushes nothing.  A pull request that changes a pin
+#    therefore builds the affected shell on the runner without publishing it,
+#    and the next push to `main` publishes it.  The condition is the ref, not
+#    the event, the same condition pages.yml gates its deploy on.
+#
 #  Notes:
 #    - We intentionally do NOT invoke Agda or long training in PR CI.
 #    - Add a separate nightly workflow for heavy jobs if desired.
@@ -295,7 +307,8 @@ jobs:
         uses: cachix/cachix-action@v16
         with:
           name: formalverification
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ github.ref == 'refs/heads/main' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ github.ref != 'refs/heads/main' }}
 
       - name: backend-test
         run: |
@@ -364,17 +377,16 @@ jobs:
       # Cachix provides a shared binary cache for Nix store paths.
       # On cache hit, `nix develop` resolves in seconds instead of
       # building Agda + stdlib from source (~12 min).
-      # If CACHIX_AUTH_TOKEN is missing, this step is a no-op read-only
-      # pull from the public cache (safe for external contributor PRs).
+      # The write-capable token is handed to the action only when the
+      # checked-out code is `main` (see the trust boundary in the header);
+      # every other run pulls from the public cache and pushes nothing.
       - name: Set up Cachix
-
         if: steps.changes.outputs.run == 'true'
         uses: cachix/cachix-action@v16
         with:
           name: formalverification
-          # Push built paths so future runs are fast.  Falls back to
-          # read-only if the secret is not set (e.g. external forks).
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ github.ref == 'refs/heads/main' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ github.ref != 'refs/heads/main' }}
 
       # -- Smoke test --
       - name: Run eval-proof-completion-smoke
@@ -474,7 +486,8 @@ jobs:
         uses: cachix/cachix-action@v16
         with:
           name: formalverification
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ github.ref == 'refs/heads/main' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Run eval-benchmark-smoke
         if: steps.changes.outputs.run == 'true'
@@ -545,7 +558,8 @@ jobs:
         uses: cachix/cachix-action@v16
         with:
           name: formalverification
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: ${{ github.ref == 'refs/heads/main' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Build & test agda-mcp
         if: steps.changes.outputs.run == 'true'
