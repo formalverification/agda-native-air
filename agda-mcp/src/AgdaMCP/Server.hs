@@ -490,13 +490,16 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
     shown       = map fst (exposedTools cfg)
     among names = filter (`elem` shown) names
     listed      = T.intercalate ", " . among
-    batch       = among ["check_file", "get_diagnostics", "fill_hole", "get_goal"]
+    -- The file tools whose answer is a verdict.  get_goal's fallback runs
+    -- batch agda too, but its exitCode is normally non-zero on a correct goal
+    -- (the injected macro leaves an interaction point) and judges nothing, as
+    -- its own description says, so it is not listed here (a Copilot catch on
+    -- PR #193).
+    batch       = among ["check_file", "get_diagnostics", "fill_hole"]
     lane        = among ["type_of", "normalize", "resolve_name", "definition_of", "exports_of", "search_in_scope", "get_goal"]
     fileTools   = filter (`notElem` ["search_by_name", "search_by_type", "get_dependencies"]) shown
     holeTools   = among ["check_file", "get_diagnostics", "fill_hole", "get_goal"]
     listers     = among ["check_file", "get_diagnostics", "fill_hole"]
-    -- get_goal runs batch agda only on its fallback path, and says so.
-    batchRunners = filter (/= "get_goal") batch <> ["get_goal's fallback" | "get_goal" `elem` batch]
     one xs       = length xs == 1
     unless' c t = if c then t else ""
     paragraphs =
@@ -508,11 +511,11 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
       [ unless' (not (null batch) || "check_project" `elem` shown) $
           "VERDICTS come from a batch process run per call"
           <> unless' (not (null batch))
-               (": " <> T.intercalate ", " batchRunners
-                <> (if one batchRunners then " runs" else " run")
+               (": " <> T.intercalate ", " batch
+                <> (if one batch then " runs" else " run")
                 <> " a cold agda on the file (a large library's first check \
                    \builds .agdai interfaces and can take minutes) and"
-                <> (if one batchRunners then " judges" else " judge")
+                <> (if one batch then " judges" else " judge")
                 <> " by its exit code alone, never its message text")
           <> unless' ("check_project" `elem` shown)
                "; check_project runs the project's own gate, which failure \

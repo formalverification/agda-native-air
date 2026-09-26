@@ -348,8 +348,9 @@ description carries its own tool's contract under the 2,048 characters at
 which Claude Code 2.1.282 truncates one; before, eleven of the fourteen
 descriptions were cut there, so part of the contract never reached a subject.
 `tools/list` fell from 77,603 characters to 24,094, plus 1,989 of
-instructions (1,994 in the PR's final build, after a review fix scoped their
-exit-code rule to the file tools; the arms ran the 1,989).  `arm-surface-mcp-1` and `arm-surface-both-1` are the `mcp` and
+instructions (1,973 in the PR's final build, after two review fixes scoped
+their exit-code rule to the file tools that return a verdict; the arms ran
+the 1,989).  `arm-surface-mcp-1` and `arm-surface-both-1` are the `mcp` and
 `both` arms on that surface; `arm-verdict-mcp-1` is the `mcp` arm with only
 `check_file`, `fill_hole`, `get_goal`, and `type_of` exposed (`--expose`), the
 four tools the earlier arms took their verdicts and goals from.  Everything

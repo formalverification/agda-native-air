@@ -3383,7 +3383,19 @@ surfaceTests = do
                   ("check_project runs the project's own gate, which failure evidence" `T.isInfixOf` alone)
               , assert "one file tool agrees in number"
                   ("check_file runs a cold agda" `T.isInfixOf` both && " judges by its exit code" `T.isInfixOf` both)
-              ]
+                ]
+
+    , -- get_goal's fallback runs batch agda, but its exitCode is normally
+      -- non-zero on a correct goal and judges nothing, as its description
+      -- says; the shared verdict rule must not claim it (a Copilot catch on
+      -- PR #193).
+      runTest "instructions: get_goal's fallback is never put under the exit-code verdict rule" $ allOf
+        [ assert "not named in the full instructions" (not ("fallback" `T.isInfixOf` serverInstructions corpusConfig))
+        , assert "get_goal alone: no verdict paragraph"
+            (not ("VERDICTS" `T.isInfixOf` serverInstructions (exposing ["get_goal"])))
+        , assert "get_goal still named, among the live queries"
+            ("get_goal" `T.isInfixOf` serverInstructions (exposing ["get_goal"]))
+        ]
     ]
 
 -- ---------------------------------------------------------------------------

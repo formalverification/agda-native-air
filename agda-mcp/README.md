@@ -128,9 +128,10 @@ descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of their
 contract, `fill_hole`'s `status` rule among them, never reached a model).  The
 suite asserts that every description and the instructions fit.  Before #191
 the surface was 77,603 characters of `tools/list`, about 16,300 tokens a turn
-as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,994
-of instructions (the #191 arms ran on a 1,989-character version, before a
-review fix scoped the exit-code rule to the file tools).
+as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,973
+of instructions (the #191 arms ran on a 1,989-character version, before two
+review fixes scoped the exit-code rule to the three file tools that return a
+verdict).
 
 **Fewer tools**.  `--expose NAME,...` presents a subset: `tools/list` lists
 those tools alone, the instructions name those alone, and a call to any other
