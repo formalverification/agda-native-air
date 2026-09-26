@@ -26,6 +26,10 @@
   *    #161, issue #17).  `Subject.agdaToolsRequired` is the floor every such
   *    arm must have; what was actually presented is recorded per subject, so
   *    the report says which surface a run measured instead of assuming one.
+  *  - A run with `--expose` (issue #191) presents a subset, and then the
+  *    subset is the exact expectation both ways: every exposed tool must
+  *    arrive, and an agda tool outside it is as foreign as Bash on the mcp
+  *    arm.
   *
   *  ============================================================================
   */
@@ -43,8 +47,12 @@ sealed abstract class Arm(val name: String, val hasServer: Boolean, val hasShell
   def allowedTools: Vector[String] =
     (if (hasServer) Vector("mcp__agda") else Vector.empty) ++ (if (hasShell) Vector(Arm.bash) else Vector.empty)
 
-  /** May a subject of this arm be presented this tool? */
-  def presents(tool: String): Boolean = builtinTools(tool) || (hasServer && tool.startsWith(Arm.agdaPrefix))
+  /** May a subject of this arm be presented this tool?  Under `--expose`
+    * only the exposed agda tools qualify (issue #191).
+    */
+  def presents(tool: String, expose: Option[Vector[String]] = None): Boolean =
+    builtinTools(tool) ||
+      (hasServer && tool.startsWith(Arm.agdaPrefix) && expose.forall(_.contains(tool.stripPrefix(Arm.agdaPrefix))))
 }
 
 object Arm {

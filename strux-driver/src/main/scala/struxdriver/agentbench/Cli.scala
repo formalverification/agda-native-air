@@ -9,7 +9,8 @@
   *  -------
   *  The agent bench's configuration and its argument parser (issue #154):
   *  the caps, the paths, the model, the corpora, the arm (issue #162: which
-  *  instrument the subjects get), and the two modes that need less
+  *  instrument the subjects get), the tools the server exposes (issue #191:
+  *  `--expose`, a subset of the server's surface), and the two modes that need less
   *  (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
   *  in the LoopHarness style: unknown flags are refused by name, exactly one
   *  of `--ids` and `--all` is required, and an `--ids` that names nothing is
@@ -28,6 +29,7 @@ final case class AgentBenchConfig(
   index:           Path,
   ids:             Option[Set[String]],
   arm:             Arm,
+  expose:          Option[Vector[String]],
   outDir:          Path,
   runId:           String,
   projectRoot:     Path,
@@ -68,6 +70,7 @@ object Cli {
       |    --out-dir PATH            run roots land here
       |    --run-id STR              the run directory name (a new protocol is a new run id)
       |    [--arm shell|mcp|both]    which instrument the subjects get (default mcp: the archived protocol)
+      |    [--expose t1,t2,...]      the agda tools the subjects' servers present (default: all); an arm with the server only
       |    --project-root PATH       repo root: the server's cwd; index paths resolve here
       |    --server-bin PATH         the agda-mcp binary (the subjects' servers, and the harness's own that stages and judges)
       |    --agda-json-bin PATH      the agda-strux extractor, for the judge's body references
@@ -89,7 +92,7 @@ object Cli {
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
     "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
-    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm")
+    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm", "expose")
 
   def parse(args: List[String]): Either[String, AgentBenchConfig] = {
     @annotation.tailrec
@@ -147,10 +150,12 @@ object Cli {
       persist <- onOff(m, "persist-sessions", false)
       resume  <- onOff(m, "resume", false)
       arm     <- m.get("arm").fold[Either[String, Arm]](Right(Arm.default))(Arm.parse)
+      expose  <- m.get("expose").fold[Either[String, Option[Vector[String]]]](Right(None))(s => exposeOf(s, arm).map(Some(_)))
     } yield AgentBenchConfig(
       index           = abs(ix),
       ids             = ids,
       arm             = arm,
+      expose          = expose,
       outDir          = Paths.get(out).toAbsolutePath.normalize,
       runId           = runId,
       projectRoot     = rootAbs,
@@ -171,5 +176,19 @@ object Cli {
       rejudge         = rejudge,
       resume          = resume
     )
+  }
+
+  /** The `--expose` list (issue #191): bare tool names, each one the server
+    * registers with a corpus, on an arm that has the server.  Refused by name
+    * otherwise, since a typo would run an arm on a surface nobody asked for
+    * (the server refuses it too, but only once a subject has spawned).
+    */
+  private def exposeOf(s: String, arm: Arm): Either[String, Vector[String]] = {
+    val names   = s.split(",").map(_.trim).filter(_.nonEmpty).toVector.distinct
+    val unknown = names.filterNot(Subject.serverTools.contains)
+    if (!arm.hasServer) Left(s"--expose needs an arm with the server, not ${arm.name}")
+    else if (names.isEmpty) Left("--expose names no tool")
+    else if (unknown.nonEmpty) Left(s"--expose names tools the server does not have: ${unknown.mkString(", ")}")
+    else Right(names)
   }
 }

@@ -267,12 +267,16 @@ object Outcomes {
       rec        <- TextIO.readJson(subj.record).map(_.flatMap(SubjectRecord.fromJson))
       legacyWork <- TextIO.readJson(subj.mcpConfig).map(_.flatMap(Audit.workDirOf).getOrElse(layout.workDir(entry.id)))
       arm         = rec.map(_.arm).getOrElse(cfg.arm)
+      // The subset a subject was shown is its own record's (issue #191): a
+      // record without one saw every tool; only an archive with no record at
+      // all takes the operator's.
+      expose      = rec.map(_.expose).getOrElse(cfg.expose)
       roots       = rec.map(_.roots).getOrElse(ShellRoots(legacyWork, Vector.empty, Vector.empty))
       workDir     = roots.workDir
       t           = Transcript.parse(stream)
       killed      = record.exists(_.killed)
       wallMs      = record.map(_.wallMs).getOrElse(t.result.map(_.durationMs).getOrElse(0L))
-      iso         = Audit.isolation(t, arm, roots)
+      iso         = Audit.isolation(t, arm, roots, expose)
       terminal    = Audit.terminalOf(killed, t.result)
       verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))

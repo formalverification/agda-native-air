@@ -19,7 +19,9 @@
   *  The arm cases (issue #162) are at the end: the same audit read under each
   *  arm, so that a shell arm is not failed for having no server, an mcp arm is
   *  still failed for being handed Bash, and the `via` columns say which
-  *  instrument a row used and which gave it its last verdict.
+  *  instrument a row used and which gave it its last verdict; and that under
+  *  `--expose` (issue #191) the exposed tools are the whole agda expectation,
+  *  both the floor and the ceiling.
   *
   *  ============================================================================
   */
@@ -211,6 +213,46 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     // An Edit is confined to the work directory even when a read root would allow it.
     val edited = Transcript.parse(resource("transcript-synthetic.jsonl").replace("\"Read\"", "\"Edit\""))
     Audit.isolation(edited, Arm.Mcp, withLib).violations shouldBe Vector("Edit /w/gold/X.agda")
+  }
+
+  // ------------------------------------------------------------ --expose (#191)
+
+  private val verdictSubset = Vector("check_file", "fill_hole", "get_goal", "type_of")
+
+  /** A subject shown Read, Edit, and the four exposed tools, which calls the
+    * given agda tools once each.
+    */
+  private def subsetRun(calls: String*): Transcript = Transcript.parse(
+    (s"""{"type":"system","subtype":"init","tools":["Edit","Read",${verdictSubset.map(t => s"\"mcp__agda__$t\"").mkString(",")}],"mcp_servers":[{"name":"agda","status":"connected"}]}""" +:
+      calls.zipWithIndex.map { case (c, i) =>
+        s"""{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t$i","name":"mcp__agda__$c","input":{}}]}}""" }
+    ).mkString("\n"))
+
+  test("under --expose the exposed tools are the floor: a subset subject is complete, and would not be without the flag") {
+    val t   = subsetRun("check_file", "type_of")
+    val iso = Audit.isolation(t, Arm.Mcp, onlyWork(synthWork), Some(verdictSubset))
+    iso.missingAgdaTools shouldBe Vector.empty
+    iso.extraTools shouldBe Vector.empty
+    iso.foreignToolUses shouldBe Vector.empty
+    iso.instrumentOk shouldBe true
+    iso.exposed shouldBe Some(verdictSubset)
+    iso.toJson.hcursor.get[Vector[String]]("exposed").toOption shouldBe Some(verdictSubset)
+    // Audited as a full-surface run, the same subject misses nine tools.
+    Audit.isolation(t, Arm.Mcp, onlyWork(synthWork)).missingAgdaTools.size shouldBe 9
+    // A full-surface audit keeps its old shape: no exposed key at all.
+    Audit.isolation(t, Arm.Mcp, onlyWork(synthWork)).toJson.hcursor.downField("exposed").focus shouldBe None
+  }
+
+  test("under --expose the exposed tools are the ceiling: a tool beyond them presented or used is outside the protocol") {
+    val haiku = Transcript.parse(resource("transcript-smoke-haiku.jsonl"))    // all thirteen presented
+    val iso   = Audit.isolation(haiku, Arm.Mcp, onlyWork(workDir), Some(verdictSubset))
+    iso.extraTools.size shouldBe 9
+    iso.extraTools should contain ("mcp__agda__search_by_name")
+    iso.extraTools should not contain ("mcp__agda__check_file")
+    // A use of an unexposed tool is foreign, and fails the isolation gate.
+    val used = Audit.isolation(subsetRun("check_file", "normalize"), Arm.Mcp, onlyWork(synthWork), Some(verdictSubset))
+    used.foreignToolUses shouldBe Vector("mcp__agda__normalize")
+    used.confined shouldBe false
   }
 
   test("via says which instruments a row used; verdictVia says which gave it its last verdict") {

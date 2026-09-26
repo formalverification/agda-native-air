@@ -84,7 +84,8 @@ final case class SubjectConfig(
   systemPrompt:    String,
   userTemplate:    String,
   arm:             Arm,
-  addDirs:         Vector[Path]
+  addDirs:         Vector[Path],
+  expose:          Option[Vector[String]] = None
 ) {
   def runServer: Path = projectRoot.resolve("scripts/run-server.sh")
 }
@@ -108,7 +109,8 @@ object SubjectConfig {
       systemPrompt    = systemPrompt.trim,
       userTemplate    = userTemplate,
       arm             = cfg.arm,
-      addDirs         = addDirs
+      addDirs         = addDirs,
+      expose          = cfg.expose
     )
 }
 
@@ -138,24 +140,42 @@ object Subject {
     "search_by_name", "search_by_type", "get_dependencies"
   ).map(t => s"mcp__agda__$t")
 
+  /** Every tool the server registers with a corpus, as it names them, in its
+    * own order: the fourteen of issue #191's surface, and what `--expose` may
+    * name.
+    */
+  val serverTools: Vector[String] = Vector(
+    "get_goal", "fill_hole", "check_file", "get_diagnostics", "check_project",
+    "type_of", "normalize", "resolve_name", "definition_of", "exports_of",
+    "search_by_name", "search_by_type", "get_dependencies", "search_in_scope"
+  )
+
+  /** The agda tools a subject must be presented, as the client names them:
+    * exactly the exposed ones under `--expose` (issue #191), else the
+    * thirteen-tool floor.
+    */
+  def requiredAgdaTools(expose: Option[Vector[String]]): Vector[String] =
+    expose.fold(agdaToolsRequired)(_.map(t => s"${Arm.agdaPrefix}$t"))
+
   /** The file tools every arm is given. */
   val fileTools: Set[String] = Set("Read", "Edit")
 
   /** The per-subject MCP config: the committed launcher, anchored at the
-    * repository root, with the committed flag set, the row's corpus, and a
+    * repository root, with the committed flag set, the row's corpus, a
     * `check_project` gate that is the batch check of the one staged file (so
-    * the whole-project tool cannot run this repository's own gate).
+    * the whole-project tool cannot run this repository's own gate), and the
+    * run's `--expose` list when it has one (issue #191).
     */
   def mcpConfig(cfg: SubjectConfig, workDir: Path, workFile: Path, corpus: Path): Json =
     Json.obj("mcpServers" -> Json.obj("agda" -> Json.obj(
       "command" -> cfg.runServer.toString.asJson,
-      "args" -> Vector(
+      "args" -> (Vector(
         "--cwd", cfg.projectRoot.toString,
         "--agda-flags", cfg.agdaFlags,
         "--timeout", cfg.serverTimeout.toString,
         "--corpus", corpus.toString,
         "--check-command", s"agda ${cfg.agdaFlags} -i $workDir $workFile"
-      ).asJson,
+      ) ++ cfg.expose.toVector.flatMap(ts => Vector("--expose", ts.mkString(",")))).asJson,
       "env" -> Json.obj("AGDA_MCP_BIN" -> cfg.serverBin.toString.asJson),
       "alwaysLoad" -> Json.True
     )))

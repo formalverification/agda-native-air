@@ -53,6 +53,24 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     c.corpusStdlib.map(_.toString)   shouldBe Some("/repo/data/s.jsonl")
   }
 
+  test("--expose names server tools on an arm with the server, and is refused by name otherwise (#191)") {
+    Cli.parse(base ++ List("--all")).map(_.expose) shouldBe Right(None)
+    Cli.parse(base ++ List("--all", "--expose", "check_file, type_of,")).map(_.expose) shouldBe Right(Some(Vector("check_file", "type_of")))
+    Cli.parse(base ++ List("--all", "--arm", "both", "--expose", "check_file")).map(_.expose) shouldBe Right(Some(Vector("check_file")))
+    Cli.parse(base ++ List("--all", "--expose", "check_file,chek_file")) shouldBe Left("--expose names tools the server does not have: chek_file")
+    Cli.parse(base ++ List("--all", "--expose", " , ")) shouldBe Left("--expose names no tool")
+    Cli.parse(base ++ List("--all", "--arm", "shell", "--expose", "check_file")) shouldBe Left("--expose needs an arm with the server, not shell")
+    // The subjects' server is started with the same list.
+    val c    = Cli.parse(base ++ List("--all", "--expose", "check_file,type_of")).getOrElse(fail("parse"))
+    val args = Subject.mcpConfig(SubjectConfig.of(c, "s", "u"), java.nio.file.Paths.get("/w"), java.nio.file.Paths.get("/w/F.agda"), java.nio.file.Paths.get("/c.jsonl"))
+      .hcursor.downField("mcpServers").downField("agda").get[Vector[String]]("args").getOrElse(Vector.empty)
+    args.sliding(2).collectFirst { case Vector("--expose", v) => v } shouldBe Some("check_file,type_of")
+    val none = Subject.mcpConfig(SubjectConfig.of(Cli.parse(base ++ List("--all")).getOrElse(fail("parse")), "s", "u"),
+      java.nio.file.Paths.get("/w"), java.nio.file.Paths.get("/w/F.agda"), java.nio.file.Paths.get("/c.jsonl"))
+      .hcursor.downField("mcpServers").downField("agda").get[Vector[String]]("args").getOrElse(Vector.empty)
+    none should not contain ("--expose")
+  }
+
   test("--arm names the instrument, defaults to the archived protocol's, and is refused by name otherwise") {
     Cli.parse(base ++ List("--all")).map(_.arm)                      shouldBe Right(Arm.Mcp)
     Cli.parse(base ++ List("--all", "--arm", "shell")).map(_.arm)     shouldBe Right(Arm.Shell)
