@@ -301,6 +301,11 @@ arm.  Three Sonnet arms cost USD 12.41 together.
 | `both` | `arm162-both-1` | 327 | 272 | 4.25 | 67,269 | 474,562 |
 | `mcp`, lean answers | `arm184-mcp-1` | 359 | 304 | 4.63 | 82,831 | 534,272 |
 | `both`, lean answers | `arm184-both-1` | 318 | 263 | 4.00 | 66,634 | 223,797 |
+| `mcp`, trimmed surface | `arm-surface-mcp-1` | 345 | 290 | 3.83 | 76,583 | 436,247 |
+| `mcp`, trimmed surface, second seed | `arm-surface-mcp-2` | 349 | 294 | 3.74 | 82,054 | 365,278 |
+| `both`, trimmed surface | `arm-surface-both-1` | 318 | 263 | 3.55 | 70,780 | 222,638 |
+| `mcp`, four tools exposed | `arm-verdict-mcp-1` | 458 | 403 | 3.78 | 118,006 | 291,366 |
+| `mcp`, four tools, second seed | `arm-verdict-mcp-2` | 461 | 406 | 3.84 | 114,237 | 314,694 |
 
 The `both` arm's per-tool counts against the `mcp` arm's: `check_file` 57
 and 56; `type_of` 11 and 34; `definition_of` **0** and 19; `search_by_name`
@@ -325,6 +330,11 @@ before its last edit of the work file.  Over the 21 agda-algebras rows:
 | `both` | `arm162-both-1` | 19 | 2 | **16** | 0 |
 | `mcp`, lean answers | `arm184-mcp-1` | 12 | 8 | 3 | 0 |
 | `both`, lean answers | `arm184-both-1` | 18 | 2 | **14** | 0 |
+| `mcp`, trimmed surface | `arm-surface-mcp-1` | 14 | 7 | 6 | 0 |
+| `mcp`, trimmed surface, second seed | `arm-surface-mcp-2` | 13 | 8 | 2 | 0 |
+| `both`, trimmed surface | `arm-surface-both-1` | 14 | 4 | 8 | 0 |
+| `mcp`, four tools exposed | `arm-verdict-mcp-1` | 20 | 1 | **9** | 0 |
+| `mcp`, four tools, second seed | `arm-verdict-mcp-2` | 19 | 2 | 6 | 0 |
 
 Six of the eight rows the archive restated are `shell` solves written with
 the original in view.  The `shell` arm's three solves without it are the
@@ -380,11 +390,53 @@ at all is a decision not yet taken (§ 6).
    and 2).  The cost that remains is per turn, not per answer: every server
    arm re-reads 22 to 25 thousand cached tokens a turn against the shell
    arm's 10 thousand, which is the fourteen tools' descriptions and schemas
-   (68,391 characters before [#190], 77,603 after).  The tool surface is
-   the next variable, with its own re-run.  The judge's `original` column
-   has the original in view for 3 of the `mcp` re-run's 12 agda-algebras
+   (68,391 characters before [#190], 77,603 after).  The tool surface was
+   the next variable; its re-run is the next two bullets.  The judge's
+   `original` column has the original in view for 3 of the `mcp` re-run's
+   12 agda-algebras
    solves and 14 of the `both` re-run's 18, against 4 of 14 and 16 of 19 in
    [#162].
++  **The tool surface: a third of the context, and a truncation nobody
+   knew about** ([#191], PR [#193], `arm-surface-mcp-1` and `-2`,
+   `arm-surface-both-1`, Sonnet 5 at the same protocol).  Claude Code cuts
+   every MCP tool description at 2,048 characters, so eleven of the fourteen
+   contracts never fully reached a model in any earlier arm (27,808
+   characters of them: `fill_hole`'s status rule, `check_file`'s hole
+   listing, the wrong-tree refusal).  Stating what the tools share once, in
+   the server's `initialize` instructions, and cutting each description to
+   its own contract took `tools/list` from 77,603 characters to 24,094
+   (plus 1,989 of instructions) and a server arm's per-turn context down by
+   a third (22,407 cached tokens a turn to 15,503 and 14,293; the first
+   turn 20,016 tokens to 13,037), and cost by 17 % and 19 % (USD 3.83 and
+   3.74 against 4.63; `both` 3.55 against 4.00).  The tool mix stayed
+   within the spread of the untrimmed runs, though the counts moved: the
+   corpus and navigation tools 73 and 55 calls against 53 and 78 before
+   (`search_by_name` 23 and 23 against 31; `exports_of` 20 and 12 against
+   17), restated 7 and 8 against 6 and 8, and beside a shell those tools
+   still unused (2 calls).  Two seeds are not enough to call a shift of
+   that size a change in behavior, or to rule one out.  The gap to the
+   shell's USD 2.88 did not close, and the trim is kept for what it repairs
+   as much as for what it saves.
++  **Four tools: the count moves the route, not the proving** ([#191],
+   `arm-verdict-mcp-1` and `-2`, only `check_file`, `fill_hole`, `get_goal`,
+   and `type_of` exposed).  The context went below the shell arm's (7,405
+   first-turn tokens against 8,263; about 9,600 cached a turn against
+   10,060) and the arm still cost USD 3.78 and 3.84, because the subject
+   spent 150 more turns (458 and 461 against 308) and 116 thousand output
+   tokens against 70: without a search tool it guessed library paths, and
+   111 and 97 of its 131 and 125 library reads failed.  It solved 52 and 53
+   and restated 1 and 2, against 48 and 45 and 7 and 8 with the fourteen,
+   and the five rows that flip in both seeds are rows where, with search
+   tools, the subject finds the lemma by name and cites it (restated), and
+   without them opens modules until it reaches the original and writes the
+   proof out (solved; the original in view for 7 of those 10 subjects, 5 of
+   the 10 proofs the library's verbatim).  On the 34 rows with no original
+   every arm of every kind solves 31 to 34.  So on the mined rows the
+   instrument decides whether a found answer is cited or copied, and the
+   count cannot tell a better instrument from easier access; the comparison
+   that can is the hard tier ([#189]).  The next cost lever is turns: a
+   cheap way to find a definition's source ([#185]'s territory) would remove
+   most of those failed reads.
 +  **The verdict tool: a win, by revealed preference**.  Offered both, the
    model took **every one of its 55 verdicts from `check_file`** and never
    ran `agda` by hand.
@@ -417,7 +469,7 @@ not a term, so no hole-filling judgment of any kind can express it.
 |---|---|---|
 | Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals**. |
 | Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero came with the original in view**. |
-| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no; answer size was not the cause (PR [#190]); the per-turn tool surface is, unmeasured**. |
+| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
 | Is the loop a baseline for the agents? | nothing | **never**; a different instrument |
@@ -434,9 +486,18 @@ not a term, so no hole-filling judgment of any kind can express it.
 +  **Knowledge tools that return content** ([#185]): the one measured defect
    still without its re-run.  Lean answers ([#184]) were measured by PR
    [#190] and were not the cause (§ 4.3).
-+  **The tool surface as the cost**: fourteen descriptions and schemas re-read
-   every turn, 68 to 78 thousand characters; no arm has yet run with a
-   shorter surface or fewer tools.
++  **The tool surface on the hard tier**: [#191] compared the surfaces on
+   the mined rows, where an answer exists in the library to be found and
+   the count measures citing against copying; only on rows with nothing to
+   find ([#189]) can the fourteen tools, the four, and the shell be told
+   apart on proving, and no such run exists yet.
++  **A locator beside the four tools, and a `definition_of` that returns
+   the text**.  The four-tool arm's 111 and 97 failed library reads are
+   what a subject does without `definition_of`, which the fourteen-tool
+   arms had and used (16 and 12 calls) and which answers where a definition
+   is and not what it says.  No arm has run the subset with a locator added
+   to it, and none has run with the content-returning `definition_of` of
+   [#185]; the two are separate variables.
 +  **Construction, tools against no tools**.  The archived arms could not
    read the originals and the [#162] arms could (§ 4.3), so no run compares
    the tools with their absence on rows the subject cannot copy.  The
@@ -497,3 +558,6 @@ not a term, so no hole-filling judgment of any kind can express it.
 [#185]: https://github.com/formalverification/agda-native-air/issues/185
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#193]: https://github.com/formalverification/agda-native-air/pull/193
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
