@@ -107,15 +107,20 @@ Claude Code places in the system prompt.  So the client-visible contract is
 split by who shares it, and each part is stated once.
 
 +  **The instructions** carry what every tool shares: that the file tools'
-   verdicts come from a batch process's exit code (`check_project`'s gate can
-   also be turned red by its output) and the live lane informs and never decides, each
+   verdicts come from a batch process's exit code (`fill_hole`'s status also
+   tolerates open holes, and `check_project`'s gate can be turned red by its
+   output) and the live lane informs and never decides, each
    lane's cost, `reload`, the path refusal, the tree every answer names and the
    wrong-tree refusal, `verbose`, how failures arrive, `checkedFromSource`, and
    the hole model's coordinates.  They name only the tools the server exposes
    (see `--expose` below).
 +  **Each description** carries its own tool's contract and nothing else (what
    it answers, what its verdict or its answer's fields mean, and its own
-   failure modes), and each input property says what to send.
+   failure modes), and each input property says what to send.  A description
+   names another tool only when that tool is exposed: a subset that hides
+   `check_file` gets `get_diagnostics`' whole contract, and `check_project`'s
+   diagnostic shape inline, since a hidden tool's description never reaches
+   the client.
 +  **This README** carries the mechanism a model does not need in order to use
    a tool correctly: `search_in_scope`'s rendering ladder and rank formula, the
    lane's re-load vocabulary and lifecycle, the response echo field by field.
@@ -128,10 +133,10 @@ descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of their
 contract, `fill_hole`'s `status` rule among them, never reached a model).  The
 suite asserts that every description and the instructions fit.  Before #191
 the surface was 77,603 characters of `tools/list`, about 16,300 tokens a turn
-as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,973
-of instructions (the #191 arms ran on a 1,989-character version, before two
-review fixes scoped the exit-code rule to the three file tools that return a
-verdict).
+as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,982
+of instructions (the #191 arms ran the same `tools/list` and a 1,989-character
+version of the instructions, before review fixes scoped their exit-code rule
+to `success` and named `fill_hole`'s tolerance).
 
 **Fewer tools**.  `--expose NAME,...` presents a subset: `tools/list` lists
 those tools alone, the instructions name those alone, and a call to any other

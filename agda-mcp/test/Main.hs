@@ -55,7 +55,7 @@ import Control.Exception (bracket_, catch, try, SomeException)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
-import Data.Char (isDigit)
+import Data.Char (isAlphaNum, isDigit)
 import Data.Either (isLeft)
 import Data.List (find, isInfixOf, nub, sort, sortOn)
 import qualified Data.Map.Strict as Map
@@ -3306,6 +3306,12 @@ verdictSubset = ["check_file", "fill_hole", "get_goal", "type_of"]
 exposing :: [Text] -> ServerConfig
 exposing names = corpusConfig { scExpose = Just names }
 
+-- | toolEntries: the tool objects of a tools/list value.
+toolEntries :: Aeson.Value -> [Aeson.Object]
+toolEntries v = case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
+  Aeson.Success ts -> ts
+  Aeson.Error _    -> []
+
 -- | descriptionsOf: every tool's (name, description) in a tools/list value.
 descriptionsOf :: Aeson.Value -> [(Text, Text)]
 descriptionsOf v = [ (n, descriptionOf n v) | n <- toolNamesOf v ]
@@ -3381,9 +3387,55 @@ surfaceTests = do
                   [ c | c <- ["cold agda", "exit code alone", ".agdai"], c `T.isInfixOf` alone ]
               , assert "check_project named with its failure evidence"
                   ("check_project runs the project's own gate, which failure evidence" `T.isInfixOf` alone)
-              , assert "one file tool agrees in number"
-                  ("check_file runs a cold agda" `T.isInfixOf` both && " judges by its exit code" `T.isInfixOf` both)
+              , assert "one file tool agrees in number, and success is its exit code"
+                  ("check_file runs a cold agda" `T.isInfixOf` both
+                   && "success is that exit code alone" `T.isInfixOf` both)
                 ]
+
+    , -- fill_hole's status is ok on a non-zero exit whose only errors are
+      -- open holes, read from Agda's diagnostic codes, so the exit-code-alone
+      -- rule is stated of success and fill_hole's tolerance is named (a
+      -- Copilot catch on PR #193).
+      runTest "instructions: fill_hole is never held to the exit-code-alone rule" $
+        let alone = serverInstructions (exposing ["fill_hole"])
+            full  = serverInstructions corpusConfig
+        in  allOf
+              [ assert "fill_hole alone: its tolerance, and no success rule"
+                  ("fill_hole's status also tolerates open holes" `T.isInfixOf` alone
+                   && not ("exit code alone" `T.isInfixOf` alone))
+              , assert "the full surface: both, stated apart"
+                  ("success is that exit code alone" `T.isInfixOf` full
+                   && "fill_hole's status also tolerates open holes" `T.isInfixOf` full)
+              ]
+
+    , -- A hidden tool's description never reaches the client, so no exposed
+      -- description or property may delegate a contract to one or point at
+      -- one (a Copilot catch on PR #193).  Checked for every single-tool
+      -- subset and for the verdict arm's.
+      runTest "expose: no exposed tool's description or schema names a tool the subset hides" $
+        let text t v = T.concat [ encodeText d | d <- toolEntries v, KM.lookup "name" d == Just (Aeson.String t) ]
+            subsets  = map (: []) allNames <> [verdictSubset, ["get_diagnostics", "check_project"]]
+        in  assertEqual "(subset, tool, hidden tool it names)" []
+              [ (sub, t, h)
+              | sub <- subsets
+              , let v = toolDefinitions (exposing sub)
+              , t <- toolNamesOf v
+              , h <- allNames, h `notElem` sub
+                -- whole identifiers only: "normalizes" is not normalize
+              , h `elem` T.split (\c -> not (isAlphaNum c || c == '_')) (text t v) ]
+
+    , runTest "expose: without check_file, get_diagnostics and check_project carry the contract they refer to" $
+        let d = descriptionOf "get_diagnostics" (toolDefinitions (exposing ["get_diagnostics"]))
+            g = descriptionOf "check_project" (toolDefinitions (exposing ["check_project"]))
+        in  allOf
+              [ assertEqual "get_diagnostics' own contract, missing pieces" []
+                  [ c | c <- [ "success is true if and only if agda exits 0", "Each diagnostic has severity"
+                             , "holes lists every open hole", "A timeout answers success:false" ]
+                      , not (c `T.isInfixOf` d) ]
+              , assert "check_project states the diagnostic shape inline"
+                  ("{severity, code, file, range, message, involved}" `T.isInfixOf` g)
+              , assert "both under the cap" (T.length d <= clientCap && T.length g <= clientCap)
+              ]
 
     , -- get_goal's fallback runs batch agda, but its exitCode is normally
       -- non-zero on a correct goal and judges nothing, as its description

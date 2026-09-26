@@ -20,7 +20,9 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 
 ## The protocol, fixed for every run below
 
-+  **Subject**.  One `claude -p` session per obligation (Claude Code 2.1.261),
++  **Subject**.  One `claude -p` session per obligation (Claude Code 2.1.261
+   through the [#162] arms, 2.1.282 from [#184] on; each run's
+   `protocol.json` records its own),
    with its working directory a staged copy of the one obligation file and
    nothing else; its tools are the arm's, plus Read and Edit on that file; no
    settings, no CLAUDE.md, no skills, no memory; the tools presented eagerly
@@ -40,8 +42,12 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    the extractor by SHA-256) in `protocol.json`, written before the first
    subject spawns, the arm named there and in each subject's own
    `subject.json` together with the roots it was given.
-+  **The arms** ([#162]).  `--arm` is the only knob that differs between them,
-   and it decides two client values and one file: the built-in tools
++  **The arms** ([#162]).  `--arm` decides the instrument, and within a
+   comparison it is the only knob that differs, except where a run's section
+   says the server itself changed ([#184], [#191]) or that the arm exposed
+   only some of the server's tools (`--expose`, [#191], recorded as `expose`
+   in `protocol.json` and each `subject.json`).  The arm decides two client
+   values and one file: the built-in tools
    (`Edit,Read` for `mcp`, `Bash,Edit,Read` for `shell` and `both`), the
    pre-approvals (`mcp__agda`, `Bash`, or both), and whether a
    `--mcp-config` is passed at all.  `--restricted` is on for every arm: on
@@ -91,11 +97,14 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    `JudgeSpec` and `AgentBenchIntegrationSpec` pin the rules and the live
    gates.
 +  **Isolation, verified per subject**.  From each transcript: the server
-   connected; the tools presented exactly Read, Edit, and the thirteen, and
-   not deferred; no tool used beyond them; and no Read or Edit outside the
+   connected; the tools presented Read, Edit, and the server's tools, not
+   deferred: at least the thirteen the first arms had (fourteen since
+   `search_in_scope`, PR [#161], and any agda tool admitted), or under
+   `--expose` exactly the exposed ones and no other; no tool used beyond
+   them; and no Read or Edit outside the
    work directory that succeeded (refused attempts are counted separately).
    A subject that never had that instrument (the first two, a tool presented
-   beyond the fifteen included, used or not) is an anomaly, not a row, as is
+   beyond that set included, used or not) is an anomaly, not a row, as is
    one whose process ended with no result record at all (a crash; a wall-cap
    kill is a stated cap) and one whose file left the judge without an answer
    it should have (a `check_file` that timed out or gave no usable verdict, a
@@ -103,7 +112,7 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    extractor could not read).  An anomalous row is never counted a solve or a
    restatement, whatever its file earned, so the measured columns and the
    anomaly count never describe the same row.  A subject that used a tool
-   beyond the fifteen or left the work directory fails the isolation gate.
+   beyond that set or left the work directory fails the isolation gate.
 +  **Isolation on an arm with a shell**, which the client cannot enforce.
    `--restricted` confines Read and Edit; nothing confines a pre-approved
    Bash, so the shell arms' confinement is an audit over the paths each
@@ -350,8 +359,8 @@ description carries its own tool's contract under the 2,048 characters at
 which Claude Code 2.1.282 truncates one; before, eleven of the fourteen
 descriptions were cut there, so part of the contract never reached a subject.
 `tools/list` fell from 77,603 characters to 24,094, plus 1,989 of
-instructions (1,973 in the PR's final build, after two review fixes scoped
-their exit-code rule to the file tools that return a verdict; the arms ran
+instructions (1,982 in the PR's final build, whose `tools/list` is the same,
+after review fixes scoped their exit-code rule to `success`; the arms ran
 the 1,989).  `arm-surface-mcp-*` and `arm-surface-both-1` are the `mcp` and
 `both` arms on that surface; `arm-verdict-mcp-*` is the `mcp` arm with only
 `check_file`, `fill_hole`, `get_goal`, and `type_of` exposed (`--expose`),

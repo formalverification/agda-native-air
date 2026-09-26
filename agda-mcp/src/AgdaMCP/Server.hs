@@ -221,8 +221,9 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
               \byte; the one path whose context entries carry visibility \
               \(visible/hidden), with verdict {exitCode} and no lane block. Its \
               \exitCode is normally NON-ZERO even when the goal is right, because the macro leaves an interaction \
-              \point behind: it judges the introspection run, not your file \
-              \(use check_file for that). A lane timeout is reported as the \
+              \point behind: it judges the introspection run, not your file"
+           <> (if shown "check_file" then " (use check_file for that)" else "")
+           <> ". A lane timeout is reported as the \
               \lane's failure, never re-run on the fallback path, which would \
               \double the bound; a fallback timeout is an isError whose text \
               \is a JSON object naming the bound.")
@@ -269,29 +270,30 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
       , toolDef "check_file"
           ("Typecheck one Agda file with batch agda and return its \
            \diagnostics. " <> batchNote <> " " <> diagnosticModel
-           <> " holes lists every open hole as {index, line, col, goal} \
-              \(holesCount is its length): (line, col) is the address to pass \
-              \to get_goal and fill_hole, and goal is the hole's type when the \
-              \root's live lane already holds a load of this exact file state \
-              \(a free peek, never a lane call), '?' otherwise. A timeout \
-              \answers success:false, timedOut:true, and a timeout \
-              \diagnostic.")
+           <> " " <> holeListing True <> " " <> batchTimeout)
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
           ]
           ["filePath"]
 
+      -- Beside check_file it refers to check_file's contract; a subset that
+      -- hides check_file gets the whole contract here instead, since a
+      -- hidden tool's description never reaches the client (a Copilot catch
+      -- on PR #193).
       , toolDef "get_diagnostics"
-          "check_file's check, summarized: errors and warnings counts, the \
-          \diagnostics behind them (check_file's shape, root cause first, \
-          \capped by maxDiagnostics), and the open holes as check_file lists \
-          \them. success and verdict are check_file's fields with the same \
-          \meaning: the two tools differ in what they summarize, never in what \
-          \green means. The counts cover every diagnostic found, not only the \
-          \capped list, and are parsed from Agda's prose, so they can drift \
-          \with its format; that is why success is never read from them. A \
-          \timeout answers as check_file's does."
+          (if shown "check_file"
+             then "check_file's check, summarized: errors and warnings counts, \
+                  \the diagnostics behind them (check_file's shape, root cause \
+                  \first, capped by maxDiagnostics), and the open holes as \
+                  \check_file lists them. success and verdict are check_file's \
+                  \fields with the same meaning: the two tools differ in what \
+                  \they summarize, never in what green means. " <> countsNote
+                  <> " A timeout answers as check_file's does."
+             else "Typecheck one Agda file with batch agda and summarize it: \
+                  \errors and warnings counts and the diagnostics behind them. "
+                  <> batchNote <> " " <> diagnosticModel <> " "
+                  <> holeListing False <> " " <> countsNote <> " " <> batchTimeout)
           [ prop "filePath" "string" filePathDoc
           , prop "maxDiagnostics" "integer" maxDiagnosticsDoc
           , prop "verbose"        "boolean" verboseDoc
@@ -302,7 +304,7 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
           ("Run the WHOLE PROJECT's own acceptance gate, the check a human \
            \runs before calling the work done, and report its verdict; use \
            \this instead of running the gate from a shell. " <> gateModel
-           <> " " <> projectHonestyNote <> " " <> projectPayloadNote
+           <> " " <> projectHonestyNote <> " " <> projectPayloadNote (shown "check_file")
            <> " With verbose:true, a make or command gate's selectedLibraries \
               \and includePaths are this server's configuration, not the flags \
               \the gate passed agda.")
@@ -427,7 +429,7 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
           -- client that validates its arguments sees only what the schema
           -- declares.
           , toolDef "search_in_scope"
-              searchInScopeNote
+              (searchInScopeNote (shown "fill_hole"))
               [ prop "filePath" "string"  liveFilePathDoc
               , prop "line"     "integer" searchLineDoc
               , prop "column"   "integer" liveColumnDoc
@@ -453,6 +455,30 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
               ["filePath"]
           ]
       | otherwise = []
+
+    -- Whether a tool is shown, for the cross-references a description makes:
+    -- a subset never delegates a contract to, or points at, a tool it hides
+    -- (a Copilot catch on PR #193).
+    shown = isExposed cfg
+
+    -- The hole listing check_file and get_diagnostics both answer with
+    -- (only check_file also counts it), naming whichever address-taking
+    -- tools are shown.
+    holeListing withCount =
+      "holes lists every open hole as {index, line, col, goal}"
+      <> (if withCount then " (holesCount is its length)" else "")
+      <> (case filter shown ["get_goal", "fill_hole"] of
+            [] -> ": (line, col) is the hole's address"
+            ts -> ": (line, col) is the address to pass to " <> T.intercalate " and " ts)
+      <> ", and goal is the hole's type when the root's live lane already \
+         \holds a load of this exact file state (a free peek, never a lane \
+         \call), '?' otherwise."
+    batchTimeout = "A timeout answers success:false, timedOut:true, and a \
+                   \timeout diagnostic."
+    countsNote = "The counts cover every diagnostic found, not only the \
+                 \capped list, and are parsed from Agda's prose, so they can \
+                 \drift with its format; that is why success is never read \
+                 \from them."
 
     -- The four properties every scope query takes, around its one question
     -- property: an expression (type_of, normalize) or a name (resolve_name,
@@ -513,10 +539,16 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           <> unless' (not (null batch))
                (": " <> T.intercalate ", " batch
                 <> (if one batch then " runs" else " run")
-                <> " a cold agda on the file (a large library's first check \
-                   \builds .agdai interfaces and can take minutes) and"
-                <> (if one batch then " judges" else " judge")
-                <> " by its exit code alone, never its message text")
+                <> " a cold agda on the file (minutes, on a large library's \
+                   \first check), and verdict.exitCode is agda's own"
+                -- success (check_file, get_diagnostics) is the exit code
+                -- alone; fill_hole's status tolerates open holes, which it
+                -- reads from Agda's diagnostic codes (a Copilot catch on
+                -- PR #193), so the rule is stated of success only.
+                <> unless' (any (`elem` batch) ["check_file", "get_diagnostics"])
+                     "; success is that exit code alone, never the message text"
+                <> unless' ("fill_hole" `elem` batch)
+                     "; fill_hole's status also tolerates open holes")
           <> unless' ("check_project" `elem` shown)
                "; check_project runs the project's own gate, which failure \
                \evidence in its output can also turn red"
@@ -539,7 +571,7 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \a rootMismatch naming both roots (unless the registry is missing: \
           \project.librariesFileMissing:true). \
           \verbose:true adds the full echo (command, registry, lane process \
-          \and wire lines); leave it off unless checking what ran. A failed \
+          \and wire lines). A failed \
           \call (isError) always carries it; a process failure or lane timeout \
           \(--timeout) is one whose text is a JSON object. \
           \checkedFromSource says whether a call re-typechecked its file \
@@ -654,9 +686,12 @@ projectHonestyNote =
 
 -- | projectPayloadNote: what a project answer carries beyond the verdict,
 -- and the call's cost (issue #78).
-projectPayloadNote :: Text
-projectPayloadNote =
-  "firstError is the first error diagnostic (check_file's shape); \
+projectPayloadNote :: Bool -> Text
+projectPayloadNote checkFileShown =
+  "firstError is the first error diagnostic "
+  <> (if checkFileShown then "(check_file's shape)"
+      else "({severity, code, file, range, message, involved}; code is Agda's own name)")
+  <> "; \
   \failingModule and failingFile name where a failed gate stopped; \
   \modulesChecked counts modules re-typechecked from source (absent when \
   \--trace-imports=0 silences it; best effort for a make or command gate). \
@@ -745,8 +780,8 @@ liveReloadDoc = "Default false; true re-loads the file first (lane.load: 'forced
 -- the two bounds; that exclusion is the caller's policy; the ledger and what
 -- an empty answer means; the in-band errors.  The rendering ladder, the rank
 -- formula, and the exclusion's two statement checks are in the README.
-searchInScopeNote :: Text
-searchInScopeNote =
+searchInScopeNote :: Bool -> Text
+searchInScopeNote fillHoleShown =
   "Corpus rows that filePath can actually name, and what Agda says each one's \
   \type is: results [{prettyQname, rendering, type, via {module, rung}, \
   \module, defKind, hasBody, corpusType, score}] in rank order, where EVERY \
@@ -754,7 +789,9 @@ searchInScopeNote =
   \scope (the hole's scope when line/column addresses one), and checked to \
   \denote its row, and type is Agda's printing, not the corpus's. THIS TOOL \
   \INFORMS AND NEVER DECIDES: a rendering that types says nothing about \
-  \whether it fills a hole (fill_hole judges that). query {name?, tokens?} \
+  \whether it fills a hole"
+  <> (if fillHoleShown then " (fill_hole judges that)" else "")
+  <> ". query {name?, tokens?} \
   \matches case-insensitive substrings of names and of type tokens as a goal \
   \display spells them (both, when both are given); omit it at a hole to take \
   \the tokens from the goal's type (query.source says 'given' or 'goal'). \
