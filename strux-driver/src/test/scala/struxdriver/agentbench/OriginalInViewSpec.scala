@@ -224,7 +224,18 @@ final class OriginalInViewSpec extends AnyFunSuite with Matchers {
       "cp /w/work/x/draft.txt Foo.agda",
       "tee Foo.agda < draft.txt",
       "python3 fix.py Foo.agda",
-      "echo $(cat Foo.agda)"
+      "echo $(cat Foo.agda)",
+      // Copilot on PR #192: every destination writer the audit knows
+      // (ShellAudit.writesLast), and the programs the audit allows that
+      // write a file an option or an operand names.
+      "ln -f draft.agda Foo.agda",
+      "ln -sf /w/work/x/draft.agda /w/work/x/Foo.agda",
+      "sort -o Foo.agda Foo.agda",
+      "sort --output=Foo.agda draft.txt",
+      "sort -oFoo.agda draft.txt",
+      "uniq draft.txt Foo.agda",
+      "awk -i inplace '{print}' Foo.agda",
+      "gawk --include=inplace '{print}' Foo.agda"
     ).foreach(c => withClue(c)(OriginalInView.bashWrites(c, w) shouldBe true))
     Vector(
       "agda --safe -i . /w/work/x/Foo.agda 2>&1 | tail -5",
@@ -232,8 +243,23 @@ final class OriginalInViewSpec extends AnyFunSuite with Matchers {
       "cat Foo.agda",
       "sed -n '1,5p' Foo.agda",
       "cp Foo.agda /w/work/x/backup.agda",
-      "sed -i 's/a/b/' Other.agda"
+      "sed -i 's/a/b/' Other.agda",
+      // The work file as a source, or read by a writer that writes elsewhere.
+      "ln -s Foo.agda link.agda",
+      "sort Foo.agda",
+      "sort -o sorted.txt Foo.agda",
+      "uniq Foo.agda",
+      "uniq Foo.agda out.txt",
+      "awk '{print $1}' Foo.agda",
+      // The audit counts these as writes; they change no content.
+      "touch Foo.agda",
+      "chmod 644 Foo.agda"
     ).foreach(c => withClue(c)(OriginalInView.bashWrites(c, w) shouldBe false))
+  }
+
+  test("a hard link over the work file is its last edit (Copilot on PR #192)") {
+    val linked = replacing("t6", use("t6", "Bash", """{"command":"ln -f draft.agda Foo.agda"}"""), result("t6", ""))
+    reading(linked).inView shouldBe Some(true)          // the grep (t5) precedes the link, now the last edit
   }
 
   // ----------------------------------------------------------- the archive

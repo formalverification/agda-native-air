@@ -108,10 +108,12 @@ object ShellAudit {
   )
 
   /** Programs whose path arguments are write targets: all of them, or (for the
-    * copiers) the last one, which is the destination.
+    * copiers) the last one, which is the destination.  OriginalInView reads
+    * `writesLast` too, so a copier the audit knows is also an edit of the
+    * work file when it is the destination (issue #188).
     */
   private val writesAll:  Set[String] = Set("rm", "rmdir", "mkdir", "touch", "tee", "truncate", "chmod")
-  private val writesLast: Set[String] = Set("cp", "mv", "ln")
+  private[agentbench] val writesLast: Set[String] = Set("cp", "mv", "ln")
 
   /** `find` actions that run a program or write a file: outside what this reader models. */
   private val findActions: Set[String] = Set("-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprintf", "-fls")

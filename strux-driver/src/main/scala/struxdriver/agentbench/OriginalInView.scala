@@ -214,14 +214,49 @@ object OriginalInView {
   private def sedInPlace(args: Vector[String]): Boolean =
     args.exists(a => a.startsWith("-i") || a.startsWith("--in-place") || (a.matches("-[A-Za-z]+") && a.contains('i')))
 
+  /** gawk's in-place extension, which rewrites every input file. */
+  private def awkInPlace(args: Vector[String]): Boolean = {
+    val inplace = (w: String) => w == "inplace" || w == "inplace.awk"
+    args.zip(args.drop(1)).exists { case (a, b) => (a == "-i" || a == "--include") && inplace(b) } ||
+      args.exists(a => (a.startsWith("-i") && inplace(a.drop(2))) || (a.startsWith("--include=") && inplace(a.stripPrefix("--include="))))
+  }
+
+  /** The file `sort` writes: its `-o` or `--output` argument, in any spelling. */
+  private def sortOutput(args: Vector[String]): Option[String] =
+    args.zip(args.drop(1).map(Option(_)) :+ None).collectFirst {
+      case ("-o" | "--output", Some(f))                  => f
+      case (a, _) if a.startsWith("--output=")           => a.stripPrefix("--output=")
+      case (a, _) if a.startsWith("-o") && a.length > 2  => a.drop(2)
+    }
+
+  /** The file `uniq` writes: its second operand (`uniq [OPTION]... [INPUT
+    * [OUTPUT]]`), past the options that take an argument of their own.
+    */
+  private def uniqOutput(args: Vector[String]): Option[String] = {
+    val withArgument = Set("-f", "-s", "-w", "--skip-fields", "--skip-chars", "--check-chars")
+    @annotation.tailrec
+    def operands(rest: List[String], acc: Vector[String]): Vector[String] = rest match {
+      case Nil                                        => acc
+      case "--" :: tail                               => acc ++ tail
+      case o :: _ :: tail if withArgument(o)          => operands(tail, acc)
+      case o :: tail if o.startsWith("-") && o != "-" => operands(tail, acc)
+      case w :: tail                                  => operands(tail, acc :+ w)
+    }
+    operands(args.toList, Vector.empty).lift(1)
+  }
+
   /** Does a shell command write the work file?  Read with the audit's own
     * lexer (ShellAudit.lex): a redirection into it (`>`, `>>`, `&>`; not a
     * duplication such as `2>&1`, so a check whose output is redirected is not
-    * an edit), a writer among the words (`tee`, `truncate`, `sed -i`, the
-    * destination of `cp` or `mv`), or an interpreter run by a command that
-    * names the file's stem.  A command the lexer cannot see through counts
-    * when it names the stem: the reading must not end the subject's writing
-    * too early.
+    * an edit); a writer among the words, which is `tee` or `truncate` on it,
+    * the destination of a copier the audit knows (ShellAudit.writesLast:
+    * `cp`, `mv`, `ln`), or an allowed text tool told to write it (`sed -i`,
+    * gawk's `-i inplace`, `sort -o`, `uniq`'s output operand); or an
+    * interpreter run by a command that names the file's stem.  The audit's
+    * other writers (`touch`, `chmod`, `rm`, `mkdir`, `rmdir`) change no
+    * content, so they are not edits.  A command the lexer cannot see through
+    * counts when it names the stem: the reading must not end the subject's
+    * writing too early.
     */
   private[agentbench] def bashWrites(command: String, workFile: Path): Boolean = {
     val file = workFile.getFileName.toString
@@ -246,11 +281,14 @@ object OriginalInView {
         redirected || simple.exists { ws =>
           val args = ws.drop(1)
           ws.headOption.map(basename).getOrElse("") match {
-            case p if interpreters(p) => true
-            case "tee" | "truncate"   => args.exists(isWork)
-            case "sed"                => sedInPlace(args) && args.exists(isWork)
-            case "cp" | "mv"          => args.lastOption.exists(isWork)
-            case _                    => false
+            case p if interpreters(p)          => true
+            case p if ShellAudit.writesLast(p) => args.lastOption.exists(isWork)
+            case "tee" | "truncate"            => args.exists(isWork)
+            case "sed"                         => sedInPlace(args) && args.exists(isWork)
+            case "awk" | "gawk"                => awkInPlace(args) && args.exists(isWork)
+            case "sort"                        => sortOutput(args).exists(isWork)
+            case "uniq"                        => uniqOutput(args).exists(isWork)
+            case _                             => false
           }
         }
       }
