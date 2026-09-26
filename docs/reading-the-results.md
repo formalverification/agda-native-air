@@ -491,9 +491,13 @@ not a term, so no hole-filling judgment of any kind can express it.
    the count measures citing against copying; only on rows with nothing to
    find ([#189]) can the fourteen tools, the four, and the shell be told
    apart on proving, and no such run exists yet.
-+  **A cheap way to find a definition's source**: the four-tool arm's 111
-   and 97 failed library reads are the measured cost of not having one, and
-   no arm has run with it ([#185]).
++  **A locator beside the four tools, and a `definition_of` that returns
+   the text**.  The four-tool arm's 111 and 97 failed library reads are
+   what a subject does without `definition_of`, which the fourteen-tool
+   arms had and used (16 and 12 calls) and which answers where a definition
+   is and not what it says.  No arm has run the subset with a locator added
+   to it, and none has run with the content-returning `definition_of` of
+   [#185]; the two are separate variables.
 +  **Construction, tools against no tools**.  The archived arms could not
    read the originals and the [#162] arms could (§ 4.3), so no run compares
    the tools with their absence on rows the subject cannot copy.  The
