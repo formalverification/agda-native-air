@@ -1,0 +1,89 @@
+{
+  "benchmarkId" : "haystack-list-length-append-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "length-++-diag",
+  "goal" : "∀ {A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 29,
+  "toolCalls" : {
+    "Read" : 6,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 20,
+    "mcp__agda__type_of" : 1
+  },
+  "toolCallsTotal" : 28,
+  "wallMs" : 88301,
+  "costUsd" : 0.2019792,
+  "tokens" : {
+    "input" : 58,
+    "output" : 5738,
+    "cacheRead" : 406316,
+    "cacheCreation" : 15805
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_goal",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    },
+    "exposed" : [
+      "check_file",
+      "fill_hole",
+      "get_goal",
+      "type_of"
+    ]
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3255,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
+  "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
+  "lastWords" : "I edited the hole to `Data.List.Properties.length-++ xs`, which by inspection of the stdlib source (`length-++ : ∀ (xs : List A) {ys} → length (xs ++ ys) ≡ length xs + length ys`) exactly matches the goal `length (xs ++ xs) ≡ length xs + length xs` with the implicit `ys` unified to `xs`, and the qualified reference is valid since `Data.List.Properties` is imported (its `using` clause only restricts unqualified names, not the qualified path); however, the `agda` MCP server was persistently disconnected throughout this session so I could not obtain a `check_file` verdict to confirm this before s",
+  "rateLimit" : {
+    "maxUtilization" : 0.14,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -9,9 +9,10 @@
   *  -------
   *  The protocol of a run (issue #154): every knob that decides what a
   *  subject sees and how its file is judged (the arm, the model, the caps, the
-  *  client's flags and version, the tools, the directories the file tools may
-  *  read, the servers' Agda flags, the prompts by digest, the index and the
-  *  corpora by path).  A run id is one arm (issue #162): the three attribution
+  *  client's flags and version, the tools, the subset of the server's tools
+  *  the subjects are shown (`expose`, issue #191, absent when they see all),
+  *  the directories the file tools may read, the servers' Agda flags, the
+  *  prompts by digest, the index and the corpora by path).  A run id is one arm (issue #162): the three attribution
   *  arms are three run ids, and `arm` is the field that says which.  A fresh run
   *  writes it to `protocol.json` before any subject spawns, and the report's
   *  config block is this record plus the run's own knobs.  A run id is one
@@ -83,11 +84,15 @@ object Protocol {
       "envAdded"         -> Subject.envAdded.asJson,
       "envRemovedPrefix" -> Subject.envRemovedPrefix.asJson,
       // The tools a subject of this arm is given: its built-ins, and the agda
-      // tools an arm with the server must have.  What the server actually
-      // presented is recorded per subject (Isolation.agdaToolsPresented),
-      // because that surface grows between runs.
+      // tools an arm with the server must have (exactly the exposed ones under
+      // --expose, issue #191).  What the server actually presented is recorded
+      // per subject (Isolation.agdaToolsPresented), because the full surface
+      // grows between runs.
       "tools"            -> (cfg.arm.builtinTools.toVector.sorted ++
-                             (if (cfg.arm.hasServer) Subject.agdaToolsRequired else Vector.empty)).asJson,
+                             (if (cfg.arm.hasServer) Subject.requiredAgdaTools(cfg.expose) else Vector.empty)).asJson,
+      // Absent (null, dropped below) when the server presents every tool, so
+      // a protocol recorded before --expose existed is still this one.
+      "expose"           -> cfg.expose.asJson,
       "addDirs"          -> addDirs.map(_.toString).asJson,
       "persistSessions"  -> cfg.persistSessions.asJson,
       "inputs"           -> inputs,

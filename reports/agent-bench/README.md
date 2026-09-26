@@ -20,7 +20,9 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 
 ## The protocol, fixed for every run below
 
-+  **Subject**.  One `claude -p` session per obligation (Claude Code 2.1.261),
++  **Subject**.  One `claude -p` session per obligation (Claude Code 2.1.261
+   through the [#162] arms, 2.1.282 from [#184] on; each run's
+   `protocol.json` records its own),
    with its working directory a staged copy of the one obligation file and
    nothing else; its tools are the arm's, plus Read and Edit on that file; no
    settings, no CLAUDE.md, no skills, no memory; the tools presented eagerly
@@ -40,8 +42,12 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    the extractor by SHA-256) in `protocol.json`, written before the first
    subject spawns, the arm named there and in each subject's own
    `subject.json` together with the roots it was given.
-+  **The arms** ([#162]).  `--arm` is the only knob that differs between them,
-   and it decides two client values and one file: the built-in tools
++  **The arms** ([#162]).  `--arm` decides the instrument, and within a
+   comparison it is the only knob that differs, except where a run's section
+   says the server itself changed ([#184], [#191]) or that the arm exposed
+   only some of the server's tools (`--expose`, [#191], recorded as `expose`
+   in `protocol.json` and each `subject.json`).  The arm decides two client
+   values and one file: the built-in tools
    (`Edit,Read` for `mcp`, `Bash,Edit,Read` for `shell` and `both`), the
    pre-approvals (`mcp__agda`, `Bash`, or both), and whether a
    `--mcp-config` is passed at all.  `--restricted` is on for every arm: on
@@ -91,11 +97,14 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    `JudgeSpec` and `AgentBenchIntegrationSpec` pin the rules and the live
    gates.
 +  **Isolation, verified per subject**.  From each transcript: the server
-   connected; the tools presented exactly Read, Edit, and the thirteen, and
-   not deferred; no tool used beyond them; and no Read or Edit outside the
+   connected; the tools presented Read, Edit, and the server's tools, not
+   deferred: at least the thirteen the first arms had (fourteen since
+   `search_in_scope`, PR [#161], and any agda tool admitted), or under
+   `--expose` exactly the exposed ones and no other; no tool used beyond
+   them; and no Read or Edit outside the
    work directory that succeeded (refused attempts are counted separately).
    A subject that never had that instrument (the first two, a tool presented
-   beyond the fifteen included, used or not) is an anomaly, not a row, as is
+   beyond that set included, used or not) is an anomaly, not a row, as is
    one whose process ended with no result record at all (a crash; a wall-cap
    kill is a stated cap) and one whose file left the judge without an answer
    it should have (a `check_file` that timed out or gave no usable verdict, a
@@ -103,7 +112,7 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    extractor could not read).  An anomalous row is never counted a solve or a
    restatement, whatever its file earned, so the measured columns and the
    anomaly count never describe the same row.  A subject that used a tool
-   beyond the fifteen or left the work directory fails the isolation gate.
+   beyond that set or left the work directory fails the isolation gate.
 +  **Isolation on an arm with a shell**, which the client cannot enforce.
    `--restricted` confines Read and Edit; nothing confines a pre-approved
    Bash, so the shell arms' confinement is an audit over the paths each
@@ -166,6 +175,14 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 | `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | not re-judged | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
 | `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 55 | 46 | 8 | 3 of 12 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
 | `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 55 | 49 | 2 | 14 of 18 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
+| `cost-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | 2 | 0 | 1 | 0 of 0 | 0 | 11 | 9 | 0.15 | the cost pairs on [#191] |
+| `cost-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | 2 | 1 | 1 | 0 of 0 | 0 | 14 | 12 | 0.23 | the cost pairs on [#191] |
+| `cost-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 2 | 0 | 1 | 0 of 0 | 0 | 17 | 15 | 0.16 | the cost pairs on [#191] |
+| `arm-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | 55 | 48 | 7 | 6 of 14 | 0 | 345 | 290 | 3.83 | [#191], PR [#193] |
+| `arm-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | 55 | 46 | 4 | 8 of 14 | 0 | 318 | 263 | 3.55 | [#191], PR [#193] |
+| `arm-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 55 | 52 | 1 | 9 of 20 | 0 | 458 | 403 | 3.78 | [#191], PR [#193] |
+| `arm-verdict-mcp-2` | `mcp`, four tools exposed (second seed) | `claude-sonnet-5` | 2026-09-26 | 55 | 53 | 2 | 6 of 19 | 0 | 461 | 406 | 3.84 | [#191], PR [#193] |
+| `arm-surface-mcp-2` | `mcp` (second seed) | `claude-sonnet-5` | 2026-09-26 | 55 | 45 | 8 | 2 of 13 | 0 | 349 | 294 | 3.74 | [#191], PR [#193] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -173,9 +190,10 @@ proof came back in one of the subject's tool answers before its last edit of
 the work file (a call that names the lemma's file without showing its proof
 does not count).  It is a column, not a gate: no verdict depends on it.  The
 eight full arms were re-judged on copies to add it, with every verdict as
-archived; the six subset runs were not, since three of them predate the
-judge's Agda-based gates and a re-judge would rewrite more than this column,
-and none has more than one agda-algebras row.
+archived; the six subset runs made before it were not, since three of them
+predate the judge's Agda-based gates and a re-judge would rewrite more than
+this column, and none has more than one agda-algebras row.  The [#191] runs
+were judged with it.
 
 Per stratum, solved and restated (first arms), beside the loop's fixed space
 and retrieval under exclusion on `main`:
@@ -332,6 +350,137 @@ Three things to read beside the table.
    (`algebras-kernels-ker-con`, whose subject ran `find /`).  The `mcp` arm's
    one gate row (`algebras-homs-mon-to-intohom`) left a hole.
 
+## The tool-surface arms (2026-09-26, [#191])
+
+The server's tool surface, cut to a contract stated once (PR [#193]), and a
+second variable beside it: how many tools an arm is given.  What every tool
+shares now travels once, in the server's `initialize` instructions, and each
+description carries its own tool's contract under the 2,048 characters at
+which Claude Code 2.1.282 truncates one; before, eleven of the fourteen
+descriptions were cut there, so part of the contract never reached a subject.
+`tools/list` fell from 77,603 characters to 24,094, plus 1,989 of
+instructions (1,981 in the PR's final build, whose `tools/list` is the same,
+after review fixes scoped their exit-code rule to `success`; the arms ran
+the 1,989).  `arm-surface-mcp-*` and `arm-surface-both-1` are the `mcp` and
+`both` arms on that surface; `arm-verdict-mcp-*` is the `mcp` arm with only
+`check_file`, `fill_hole`, `get_goal`, and `type_of` exposed (`--expose`),
+the four tools the earlier arms took their verdicts and goals from.  The two
+`mcp` configurations ran twice each.  Everything else is the [#184]
+protocol: the prompts', index's, and corpora's digests, the caps, the read
+roots, and the client (2.1.282) are identical; the extractor the judge runs
+is a fresh build of unchanged source.  Zero anomalies in the published rows.
+
+| | `shell` #162 | `mcp` #184 | `mcp` #191 (two seeds) | `both` #184 | `both` #191 | four tools (two seeds) |
+|---|---:|---:|---:|---:|---:|---:|
+| solved | 50 | 46 | 48, 45 | 49 | 46 | 52, 53 |
+| restated | 0 | 8 | 7, 8 | 2 | 4 | 1, 2 |
+| lost to a gate | 5 | 1 | 0, 2 | 4 | 5 | 2, 0 |
+| solved, the 34 rows with no original | 32 | 34 | 34, 32 | 31 | 32 | 32, 34 |
+| agda-algebras solved (of 21) | 18 | 12 | 14, 13 | 18 | 14 | 20, 19 |
+| of those, the library's proof verbatim | 14 | 9 | 11, 8 | 14 | 11 | 13, 13 |
+| of those, original in view (the judge) | 15 | 3 | 6, 2 | 14 | 8 | 9, 6 |
+| turns | 308 | 359 | 345, 349 | 318 | 318 | 458, 461 |
+| tool calls | 253 | 304 | 290, 294 | 263 | 263 | 403, 406 |
+| USD | 2.88 | 4.63 | 3.83, 3.74 | 4.00 | 3.55 | 3.78, 3.84 |
+| output tokens | 70,403 | 82,831 | 76,583, 82,054 | 66,634 | 70,780 | 118,006, 114,237 |
+| first-turn context (median) | 8,263 | 20,016 | 13,037, 13,037 | 24,866 | 17,915 | 7,405, 7,405 |
+| cached tokens read per turn | 10,060 | 22,407 | 15,503, 14,293 | 25,331 | 18,838 | 9,649, 9,524 |
+
+"The library's proof verbatim" is the gold term (the index's `goldTerm`,
+which is the library's own proof) appearing in the final file's definition
+of the hole after whitespace is normalized; a short gold (`refl`,
+`Setoid.refl 𝑨`) is easily found without reading anything, so the column
+means reproduction only together with the judge's in-view column.
+
+Per tool, calls and characters per call ("not exposed" where the arm's
+protocol did not give the tool, never 0):
+
+| tool | `mcp` #184 | `mcp` #191, seed 1 | seed 2 | four tools, seed 1 | seed 2 |
+|---|---:|---:|---:|---:|---:|
+| `check_file` | 59 × 485 | 58 × 474 | 58 × 462 | 55 × 415 | 75 × 322 |
+| `type_of` | 15 × 677 | 18 × 735 | 27 × 679 | 60 × 663 | 54 × 649 |
+| `get_goal` | 4 × 689 | 4 × 836 | 10 × 718 | 23 × 893 | 14 × 760 |
+| `fill_hole` | 15 × 532 | 10 × 491 | 15 × 540 | 20 × 538 | 20 × 542 |
+| `exports_of` | 17 × 10,219 | 23 × 4,368 | 12 × 6,505 | not exposed | not exposed |
+| `search_by_name` | 31 × 5,099 | 23 × 6,260 | 20 × 4,952 | not exposed | not exposed |
+| `search_by_type` | 3 × 10,132 | 3 × 5,067 | 2 × 5,336 | not exposed | not exposed |
+| `definition_of` | 15 × 602 | 16 × 924 | 12 × 737 | not exposed | not exposed |
+| `get_dependencies` | 12 × 643 | 8 × 721 | 6 × 613 | not exposed | not exposed |
+| `resolve_name` | 0 | 0 | 3 × 1,399 | not exposed | not exposed |
+| `Read`, the work file | 56 | 55 | 56 | 56 | 57 |
+| `Read`, the library (failed) | 15 (4) | 13 (1) | 11 (1) | 131 (111) | 125 (97) |
+
+Where each arm's dollars went, by token kind, at prices implied by the
+reports themselves (a least-squares fit of every subject's `costUsd` on its
+four token counts, exact to a tenth of a cent per subject):
+
+| | `shell` #162 | `mcp` #184 | `mcp` #191 (two seeds) | four tools (two seeds) |
+|---|---:|---:|---:|---:|
+| cache reads (the context, re-read each turn) | 0.61 | 1.59 | 1.05, 0.98 | 0.87, 0.87 |
+| cache writes (each turn's new content) | 1.50 | 2.20 | 2.00, 1.92 | 1.72, 1.83 |
+| output | 0.70 | 0.82 | 0.76, 0.82 | 1.17, 1.14 |
+| total | 2.88 | 4.63 | 3.83, 3.74 | 3.78, 3.84 |
+
+**The smaller surface closed the per-turn gap, and not the cost gap**.  The
+trim took a third of a server arm's context away (a first turn of 20,016
+tokens down to 13,037; 22,407 cached tokens a turn down to 15,503 and
+14,293) and cut its cost by 17 % and 19 %, about 70 % of the saving in cache
+reads and the rest in cache writes.  With four tools the context fell below
+the shell arm's (7,405 against 8,263 on the first turn, about 9,600 against
+10,060 a turn), yet the arm cost USD 3.78 and 3.84 against 2.88: half the
+difference is output (116 thousand tokens against 70) and the rest is 150
+more turns, most of them spent reading the library by trial, 131 and 125
+reads of which 111 and 97 failed (a directory, or a path guessed with the
+wrong extension).
+
+**The trimmed text left the tool mix where it was; the smaller tool set
+changed the route, and the route is what the agda-algebras rows measure**.
+Given all fourteen tools, the subject used the corpus and navigation tools
+73 and 55 times, inside the range of the untrimmed runs (53 on [#162], 78
+on [#184]), restated as often (7 and 8 against 6 and 8), and beside a shell
+used them as rarely as before; every verdict of both `both` arms came from
+`check_file`.  One description change did move behavior: the four
+`limit: 0` calls of #184, which took `exports_of`'s whole surface, fell to
+none once that offer was stated only on the `limit` property.  Given four
+tools, the subject restated once and twice instead of seven and eight
+times, in both seeds: five agda-algebras rows were restated in both seeds of
+the full surface and solved in both seeds of the subset
+(`homs-id-hom`, `homs-mon-to-intohom`, `inverses-inv-inverse-l`,
+`inverses-range-to-image`, `subalgebras-sub-reflexive`).  The transcripts
+say why.  With the search tools the subject found the library's lemma by
+name (`search_by_name`, `exports_of`) and cited it in four to six calls.
+Without them it opened the library's modules until it reached the one
+holding the original, and wrote the proof out: on those five rows the
+original's proof was in view in 7 of the 10 subset subjects, and 5 of the
+10 final proofs are the library's verbatim (`homs-mon-to-intohom`'s are the
+same proof with the pair pattern-matched).  The judge counts that as
+solved, because the restated gate catches naming the lemma and not copying
+its proof ([#188] records the same for the shell arm).  So the higher solve
+count is not better proving: on the 34 rows with no original to find, every
+arm solves 31 to 34, and the subset arm's two seeds solve 32 and 34.
+
+Three things to read beside the tables.
+
++  **The seeds agree**.  Five full-surface server-only runs now exist (three
+   on the untrimmed surface, two trimmed): they solve 45 to 48 and restate 6
+   to 8.  The subset's two seeds solve 52 and 53 and restate 1 and 2.
++  **Lost verdicts are a lower bound on the solves**.  Every gate row of
+   the [#191] arms type-checks with its statement preserved: the
+   preservation gate refusing an edited `using` list
+   (`stdlib-nat-plus-comm`, `stdlib-nat-mul-distrib-l`), two subjects that
+   ran `find /` (`algebras-subalgebras-sub-trans`, and
+   `algebras-kernels-ker-con`, which did the same on [#184]), and the audit
+   not modeling `xargs` over a path inside the roots
+   (`algebras-homs-id-hom`).  The audit was not changed while the
+   comparison ran.
++  **Two subjects of `arm-verdict-mcp-2` were run twice**.  Their servers
+   failed to start (status `failed`, empty stderr) when processes on the
+   machine were killed by hand at 11:27 UTC; the harness flagged them as
+   anomalies, and `--resume on` under the same protocol re-ran just those
+   two (both solved) and re-judged the other 53 to their archived verdicts.
+   The discarded attempts cost USD 0.12, outside the totals above.  A scan
+   of both seed-2 arms for tool results from a killed process found none.
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -398,3 +547,5 @@ new run gets a new run id.
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#193]: https://github.com/formalverification/agda-native-air/pull/193

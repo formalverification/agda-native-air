@@ -20,7 +20,9 @@
   *  The arm decides what "inside the protocol" means (issue #162), so every
   *  expectation below is read off it rather than fixed: a shell arm has no
   *  server to connect and no agda tools to miss, and its Bash calls are
-  *  audited by ShellAudit, which is the only confinement Bash has.
+  *  audited by ShellAudit, which is the only confinement Bash has.  A run
+  *  with `--expose` (issue #191) narrows the agda half of the expectation to
+  *  the exposed tools, both ways: each must arrive, and no other may.
   *
   *  Design notes
   *  ------------
@@ -54,7 +56,8 @@ final case class Isolation(
   foreignToolUses:    Vector[String],
   violations:         Vector[String],
   deniedPaths:        Vector[String],
-  shellClasses:       Vector[(String, Int)] = Vector.empty
+  shellClasses:       Vector[(String, Int)] = Vector.empty,
+  exposed:            Option[Vector[String]] = None
 ) {
   /** The instrument was in the subject's hands: for an arm with the server,
     * that it connected and every required tool arrived eagerly; for a shell
@@ -78,25 +81,29 @@ final case class Isolation(
     "foreignToolUses"    -> foreignToolUses.asJson,
     "violations"         -> violations.asJson,
     "deniedPaths"        -> deniedPaths.asJson,
-    "shellClasses"       -> Json.obj(shellClasses.map { case (c, k) => c -> k.asJson }: _*)
-  )
+    "shellClasses"       -> Json.obj(shellClasses.map { case (c, k) => c -> k.asJson }: _*),
+    // Only under --expose, so the audit of a full-surface run keeps its shape.
+    "exposed"            -> exposed.asJson
+  ).dropNullValues
 }
 
-/** What a run gave one subject: the arm, and the roots its tools and commands
-  * were allowed (issue #162).  Written beside the subject before it spawns and
+/** What a run gave one subject: the arm, the roots its tools and commands
+  * were allowed (issue #162), and the server tools it was shown when the run
+  * exposed a subset (issue #191).  Written beside the subject before it spawns and
   * read back by the judge, so a re-judge audits a run under the arm and the
   * roots it actually had -- not the operator's current `--arm`, and not
   * today's nix store paths, which a toolchain bump would move.  An archive
   * without one is the server-only arm confined to its work directory, which is
   * what the runs made before this record existed were.
   */
-final case class SubjectRecord(arm: Arm, roots: ShellRoots) {
+final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None) {
   def toJson: Json = Json.obj(
     "arm"       -> arm.name.asJson,
     "workDir"   -> roots.workDir.toString.asJson,
     "readRoots" -> roots.readRoots.map(_.toString).asJson,
-    "corpora"   -> roots.corpora.map(_.toString).asJson
-  )
+    "corpora"   -> roots.corpora.map(_.toString).asJson,
+    "expose"    -> expose.asJson
+  ).dropNullValues
 }
 
 object SubjectRecord {
@@ -108,7 +115,8 @@ object SubjectRecord {
     } yield SubjectRecord(arm, ShellRoots(
       workDir   = work,
       readRoots = c.get[Vector[String]]("readRoots").getOrElse(Vector.empty).map(Paths.get(_)),
-      corpora   = c.get[Vector[String]]("corpora").getOrElse(Vector.empty).map(Paths.get(_))))
+      corpora   = c.get[Vector[String]]("corpora").getOrElse(Vector.empty).map(Paths.get(_))),
+      expose    = c.get[Vector[String]]("expose").toOption)
   }
 }
 
@@ -146,8 +154,10 @@ object Audit {
     * that subject.  A Read may name any of the arm's read roots (the work
     * directory, the libraries' sources, the row's corpus); an Edit only the
     * work directory, since the libraries are not the subject's to change.
+    * Under `expose` (issue #191) the exposed agda tools are both the floor
+    * and the ceiling.
     */
-  def isolation(t: Transcript, arm: Arm, roots: ShellRoots): Isolation = {
+  def isolation(t: Transcript, arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None): Isolation = {
     val init  = t.init
     val tools = init.map(_.tools).getOrElse(Vector.empty)
     val work  = roots.workDir.toAbsolutePath.normalize
@@ -165,13 +175,14 @@ object Audit {
       arm                = arm,
       mcpConnected       = init.exists(_.mcpServers.contains(("agda", "connected"))),
       agdaToolsPresented = tools.filter(_.startsWith(Arm.agdaPrefix)),
-      missingAgdaTools   = if (arm.hasServer) Subject.agdaToolsRequired.filterNot(tools.contains) else Vector.empty,
-      extraTools         = tools.filterNot(arm.presents),
+      missingAgdaTools   = if (arm.hasServer) Subject.requiredAgdaTools(expose).filterNot(tools.contains) else Vector.empty,
+      extraTools         = tools.filterNot(arm.presents(_, expose)),
       toolsDeferred      = t.toolsDeferred,
-      foreignToolUses    = t.uses.map(_.name).filterNot(arm.presents).distinct,
+      foreignToolUses    = t.uses.map(_.name).filterNot(arm.presents(_, expose)).distinct,
       violations         = outside.collect { case (u, r, p) if !r.exists(_.isError) => s"${u.name} $p" } ++ shellViolations,
       deniedPaths        = outside.collect { case (u, r, p) if r.exists(_.isError) => s"${u.name} $p" },
-      shellClasses       = shellClasses
+      shellClasses       = shellClasses,
+      exposed            = expose
     )
   }
 

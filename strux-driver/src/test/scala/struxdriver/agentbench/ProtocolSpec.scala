@@ -128,6 +128,17 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
       .map(_.takeWhile(_ != ':')) should contain ("addDirs")
   }
 
+  test("--expose is recorded: the subset, and the tools a subject must be shown; a run without it has no expose key") {
+    val sub = Protocol.of(cfg("--expose", "check_file,fill_hole,get_goal,type_of"), "v", "s", "u", someInputs())
+    sub.hcursor.get[Vector[String]]("expose").toOption shouldBe Some(Vector("check_file", "fill_hole", "get_goal", "type_of"))
+    sub.hcursor.get[Vector[String]]("tools").toOption shouldBe
+      Some(Vector("Edit", "Read", "mcp__agda__check_file", "mcp__agda__fill_hole", "mcp__agda__get_goal", "mcp__agda__type_of"))
+    val all = Protocol.of(cfg(), "v", "s", "u", someInputs())
+    all.hcursor.downField("expose").focus shouldBe None
+    // So a subset run and a full one are two protocols, named by the field.
+    Protocol.differences(all, sub).map(_.takeWhile(_ != ':')) should contain allOf ("expose", "tools")
+  }
+
   test("a re-judge keeps the run's own arm in the report's config; only an archive with none takes the operator's") {
     val rejudge = Cli.parse(base ++ List("--rejudge")).getOrElse(fail("parse"))   // --arm left at its default, mcp
     val shellRun = Json.obj("arm" -> "shell".asJson, "safe" -> Json.True, "model" -> "claude-sonnet-5".asJson)
@@ -143,6 +154,11 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     val roots = ShellRoots(Paths.get("/w/work/x"), Vector(Paths.get("/nix/store/x/src")), Vector(Paths.get("/c/corpus.jsonl")))
     val rec   = SubjectRecord(Arm.Both, roots)
     SubjectRecord.fromJson(rec.toJson) shouldBe Some(rec)
+    // The exposed subset rides along when a run has one (issue #191), and a
+    // record without it (every archive before #191) reads as the full surface.
+    val subset = SubjectRecord(Arm.Mcp, roots, Some(Vector("check_file", "type_of")))
+    SubjectRecord.fromJson(subset.toJson) shouldBe Some(subset)
+    rec.toJson.hcursor.downField("expose").focus shouldBe None
     SubjectRecord.fromJson(Json.obj()) shouldBe None
     SubjectRecord.fromJson(Json.obj("arm" -> "nope".asJson, "workDir" -> "/w".asJson)) shouldBe None
     // An archive written before the record existed has none, and the judge

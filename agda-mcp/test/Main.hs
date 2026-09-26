@@ -55,7 +55,7 @@ import Control.Exception (bracket_, catch, try, SomeException)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
-import Data.Char (isDigit)
+import Data.Char (isAlphaNum, isDigit)
 import Data.Either (isLeft)
 import Data.List (find, isInfixOf, nub, sort, sortOn)
 import qualified Data.Map.Strict as Map
@@ -126,7 +126,8 @@ import AgdaMCP.Interaction
   , ScopeCandidate (..), SrcLoc (..)
   , errorCodeOf
   )
-import AgdaMCP.Server (ServerConfig (..), forceResponse, toolDefinitions)
+import AgdaMCP.Server
+  (ServerConfig (..), forceResponse, registeredToolNames, serverInstructions, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf )
@@ -1655,6 +1656,7 @@ advertisedTools = toolDefinitions ServerConfig
   , scServerName  = "agda-mcp-test"
   , scVersion     = "0"
   , scCorpusIndex = Nothing
+  , scExpose      = Nothing
   }
 
 holeAddressingTests :: IO [Bool]
@@ -2079,12 +2081,18 @@ indexOf es = corpusIndexOf (Map.fromList [ (cePrettyQname e, e) | e <- es ])
 -- | corpusTools: the tool definitions a client receives WITH a corpus loaded
 -- (the empty index is enough: registration keys on presence).
 corpusTools :: Aeson.Value
-corpusTools = toolDefinitions ServerConfig
+corpusTools = toolDefinitions corpusConfig
+
+-- | corpusConfig: a server with a corpus loaded and every tool exposed, the
+-- configuration the agent bench's subjects are given.
+corpusConfig :: ServerConfig
+corpusConfig = ServerConfig
   { scAgdaConfig  = defaultConfig
   , scGateConfig  = defaultGateConfig
   , scServerName  = "agda-mcp-test"
   , scVersion     = "0"
   , scCorpusIndex = Just (indexOf [])
+  , scExpose      = Nothing
   }
 
 -- | toolNamesOf: the names a tools/list value advertises, in order.
@@ -2364,8 +2372,13 @@ scopeRetrievalTests = do
           , assert "the ledger" ("ledger {hits" `T.isInfixOf` d)
           , assert "exclusion is the caller's" ("EXCLUSION is your policy" `T.isInfixOf` d)
           , assert "derived scope" ("DERIVED from source text" `T.isInfixOf` d)
-          , assert "the lane note" ("LIVE QUERY (interaction lane)" `T.isInfixOf` d)
-          , assert "registered with --corpus" ("--corpus" `T.isInfixOf` d)
+          -- Since #191 the lane contract is stated once, in the instructions,
+          -- which name this tool among the live queries; that it is
+          -- registered only with --corpus is the README's, since a client
+          -- that sees the tool already has it.
+          , assert "the lane note, in the instructions"
+              ("--interaction-json process per project root (" `T.isInfixOf` serverInstructions corpusConfig
+               && "search_in_scope" `T.isInfixOf` serverInstructions corpusConfig)
           ]
     , runTest "SearchInScopeParams: an empty query is refused; both column spellings are refused" $ allOf
         [ assert "empty query" (isLeft (decodeScopeParams "{\"filePath\":\"f\",\"query\":{}}"))
@@ -3269,6 +3282,173 @@ leanAnswerTests = do
           (sort (schemaProperties "exports_of" advertisedTools))
     ]
 
+
+-- ---------------------------------------------------------------------------
+-- Tier 1k: the tool surface and --expose (issue #191; no Agda)
+--
+-- A client puts every description and schema in its model's context on every
+-- turn, and Claude Code cuts each description, and the server's instructions,
+-- at 2,048 characters (measured on 2.1.282), so a sentence past that point is
+-- a promise never made.  These pin the cap, the size of the whole, that what
+-- every tool shares is stated once (in the instructions) rather than per
+-- tool, and that a subset server presents and names only its subset.
+-- ---------------------------------------------------------------------------
+
+-- | The characters a client reads of one description or of the instructions.
+clientCap :: Int
+clientCap = 2048
+
+-- | The subset the #191 verdict arm exposes.
+verdictSubset :: [Text]
+verdictSubset = ["check_file", "fill_hole", "get_goal", "type_of"]
+
+-- | exposing: the corpus configuration with only the named tools exposed.
+exposing :: [Text] -> ServerConfig
+exposing names = corpusConfig { scExpose = Just names }
+
+-- | toolEntries: the tool objects of a tools/list value.
+toolEntries :: Aeson.Value -> [Aeson.Object]
+toolEntries v = case Aeson.fromJSON v :: Aeson.Result [Aeson.Object] of
+  Aeson.Success ts -> ts
+  Aeson.Error _    -> []
+
+-- | descriptionsOf: every tool's (name, description) in a tools/list value.
+descriptionsOf :: Aeson.Value -> [(Text, Text)]
+descriptionsOf v = [ (n, descriptionOf n v) | n <- toolNamesOf v ]
+
+surfaceTests :: IO [Bool]
+surfaceTests = do
+  hPutStrLn stderr "\n── The tool surface and --expose (tier 1k: no Agda, #191) ──"
+  let full      = corpusTools
+      instr     = serverInstructions corpusConfig
+      subset    = exposing verdictSubset
+      allNames  = registeredToolNames corpusConfig
+      chars     = T.length . TE.decodeUtf8 . LBS.toStrict . Aeson.encode
+  sequence
+    [ runTest "surface: no description is longer than the 2,048 characters a client reads" $
+        assertEqual "descriptions over the cap (name, length)" []
+          [ (n, T.length d) | (n, d) <- descriptionsOf full, T.length d > clientCap ]
+
+    , runTest "surface: the instructions fit in the 2,048 characters a client reads, full and subset" $
+        assertEqual "instruction lengths over the cap" []
+          [ l | c <- [corpusConfig, subset], let l = T.length (serverInstructions c), l > clientCap ]
+
+    , runTest "surface: tools/list and the instructions together are under half the 77,603 characters before #191" $
+        let total = chars full + T.length instr
+        in  assert ("tools/list " <> show (chars full) <> " + instructions " <> show (T.length instr))
+              (2 * total < 77603)
+
+    , -- The shared contract lives in one place: the instructions carry it, and
+      -- no description repeats it.
+      runTest "surface: what every tool shares is stated in the instructions, not per tool" $
+        let shared = [ "--interaction-json", "rootMismatch", "librariesFileMissing"
+                     , "reload:true", "naming the path as resolved" ]
+        in  allOf
+              [ assertEqual "shared sentences missing from the instructions" []
+                  [ p | p <- shared, not (p `T.isInfixOf` instr) ]
+              , assertEqual "descriptions repeating a shared sentence (tool, sentence)" []
+                  [ (n, p) | (n, d) <- descriptionsOf full, p <- shared, p `T.isInfixOf` d ]
+              ]
+
+    , runTest "expose: tools/list lists exactly the exposed tools, in registration order" $
+        assertEqual "names" (filter (`elem` verdictSubset) allNames)
+          (toolNamesOf (toolDefinitions subset))
+
+    , runTest "expose: the instructions name no tool the server does not expose" $
+        let text = serverInstructions subset
+        in  allOf
+              [ assertEqual "unexposed tools named" []
+                  [ n | n <- allNames, n `notElem` verdictSubset, n `T.isInfixOf` text ]
+              , assertEqual "exposed tools the instructions should name" []
+                  [ n | n <- verdictSubset, not (n `T.isInfixOf` text) ]
+              ]
+
+    , runTest "expose: a paragraph whose tools are all hidden is left out" $ allOf
+        [ assertEqual "corpus lookups alone: no instructions" ""
+            (serverInstructions (exposing ["search_by_name"]))
+        , assert "type_of alone: no verdict or hole paragraph"
+            (let t = serverInstructions (exposing ["type_of"])
+             in  "KNOWLEDGE" `T.isInfixOf` t && not ("VERDICTS" `T.isInfixOf` t)
+                 && not ("HOLES" `T.isInfixOf` t))
+        , assert "check_file alone: no lane paragraph"
+            (let t = serverInstructions (exposing ["check_file"])
+             in  "VERDICTS" `T.isInfixOf` t && not ("KNOWLEDGE" `T.isInfixOf` t))
+        ]
+
+    , -- check_project runs make or a configured command, and failure
+      -- evidence in its output can turn a green exit red (maskedFailure), so
+      -- the file tools' exit-code rule and cold-agda cost must never be
+      -- stated of it (a Copilot catch on PR #193).
+      runTest "instructions: check_project is not called a cold agda or judged by exit code alone" $
+        let alone = serverInstructions (exposing ["check_project"])
+            both  = serverInstructions (exposing ["check_file", "check_project"])
+        in  allOf
+              [ assertEqual "file-tool claims in a check_project-only paragraph" []
+                  [ c | c <- ["cold agda", "exit code alone", ".agdai"], c `T.isInfixOf` alone ]
+              , assert "check_project named with its failure evidence"
+                  ("check_project runs the project's own gate, which failure evidence" `T.isInfixOf` alone)
+              , assert "one file tool agrees in number, and success is its exit code"
+                  ("check_file runs a cold agda" `T.isInfixOf` both
+                   && "success is that exit code alone" `T.isInfixOf` both)
+                ]
+
+    , -- fill_hole's status is ok on a non-zero exit whose only errors are
+      -- open holes, read from Agda's diagnostic codes, so the exit-code-alone
+      -- rule is stated of success and fill_hole's tolerance is named (a
+      -- Copilot catch on PR #193).
+      runTest "instructions: fill_hole is never held to the exit-code-alone rule" $
+        let alone = serverInstructions (exposing ["fill_hole"])
+            full  = serverInstructions corpusConfig
+        in  allOf
+              [ assert "fill_hole alone: its tolerance, and no success rule"
+                  ("fill_hole's status also tolerates open holes" `T.isInfixOf` alone
+                   && not ("exit code alone" `T.isInfixOf` alone))
+              , assert "the full surface: both, stated apart"
+                  ("success is that exit code alone" `T.isInfixOf` full
+                   && "fill_hole's status also tolerates open holes" `T.isInfixOf` full)
+              ]
+
+    , -- A hidden tool's description never reaches the client, so no exposed
+      -- description or property may delegate a contract to one or point at
+      -- one (a Copilot catch on PR #193).  Checked for every single-tool
+      -- subset and for the verdict arm's.
+      runTest "expose: no exposed tool's description or schema names a tool the subset hides" $
+        let text t v = T.concat [ encodeText d | d <- toolEntries v, KM.lookup "name" d == Just (Aeson.String t) ]
+            subsets  = map (: []) allNames <> [verdictSubset, ["get_diagnostics", "check_project"]]
+        in  assertEqual "(subset, tool, hidden tool it names)" []
+              [ (sub, t, h)
+              | sub <- subsets
+              , let v = toolDefinitions (exposing sub)
+              , t <- toolNamesOf v
+              , h <- allNames, h `notElem` sub
+                -- whole identifiers only: "normalizes" is not normalize
+              , h `elem` T.split (\c -> not (isAlphaNum c || c == '_')) (text t v) ]
+
+    , runTest "expose: without check_file, get_diagnostics and check_project carry the contract they refer to" $
+        let d = descriptionOf "get_diagnostics" (toolDefinitions (exposing ["get_diagnostics"]))
+            g = descriptionOf "check_project" (toolDefinitions (exposing ["check_project"]))
+        in  allOf
+              [ assertEqual "get_diagnostics' own contract, missing pieces" []
+                  [ c | c <- [ "success is true if and only if agda exits 0", "Each diagnostic has severity"
+                             , "holes lists every open hole", "A timeout answers success:false" ]
+                      , not (c `T.isInfixOf` d) ]
+              , assert "check_project states the diagnostic shape inline"
+                  ("{severity, code, file, range, message, involved}" `T.isInfixOf` g)
+              , assert "both under the cap" (T.length d <= clientCap && T.length g <= clientCap)
+              ]
+
+    , -- get_goal's fallback runs batch agda, but its exitCode is normally
+      -- non-zero on a correct goal and judges nothing, as its description
+      -- says; the shared verdict rule must not claim it (a Copilot catch on
+      -- PR #193).
+      runTest "instructions: get_goal's fallback is never put under the exit-code verdict rule" $ allOf
+        [ assert "not named in the full instructions" (not ("fallback" `T.isInfixOf` serverInstructions corpusConfig))
+        , assert "get_goal alone: no verdict paragraph"
+            (not ("VERDICTS" `T.isInfixOf` serverInstructions (exposing ["get_goal"])))
+        , assert "get_goal still named, among the live queries"
+            ("get_goal" `T.isInfixOf` serverInstructions (exposing ["get_goal"]))
+        ]
+    ]
 
 -- ---------------------------------------------------------------------------
 -- Tier 1f: the whole-project gate — check_project (issue #78)
@@ -4624,6 +4804,72 @@ leanProcessTests exe = do
     ]
   nuke
   pure results
+
+
+-- | exposeProcessTests: --expose through the real executable (issue #191).
+-- One session with a corpus and two tools exposed asks what a client asks
+-- (initialize, tools/list) and calls a registered tool it was not given; a
+-- second start names a tool this configuration does not register, which must
+-- refuse to start.  Nothing here spawns agda.
+exposeProcessTests :: FilePath -> IO [Bool]
+exposeProcessTests exe = do
+  hPutStrLn stderr "\n── Process tests (tier 2i: --expose on the wire, #191) ──"
+  let reqs = unlines
+        [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"normalize\",\"arguments\":{\"filePath\":\"/nonexistent/X.agda\",\"expr\":\"x\"}}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"no_such_tool\",\"arguments\":{}}}"
+        ]
+  (code, out, err) <- readProcessWithExitCode exe
+    ["--corpus", corpusFixturePath, "--expose", "check_file,type_of"] reqs
+  (badCode, _, badErr) <- readProcessWithExitCode exe ["--expose", "check_file,search_by_name"] ""
+  (bareCode, bareOut, bareErr) <- readProcessWithExitCode exe ["--expose"] reqs
+  let instr = resultOf 1 out >>= KM.lookup "instructions"
+      names = case resultOf 2 out >>= KM.lookup "tools" of
+        Just ts -> toolNamesOf ts
+        Nothing -> []
+  sequence
+    [ runTest "wire: the session ran and exited cleanly" $
+        assertEqual ("exit (stderr: " <> take 300 err <> ")") ExitSuccess code
+
+    , runTest "wire: tools/list presents exactly the exposed tools" $
+        assertEqual "names" ["check_file", "type_of"] names
+
+    , runTest "wire: initialize carries instructions naming the exposed tools alone" $
+        case instr of
+          Just (Aeson.String t) -> allOf
+            [ assert "names check_file and type_of" ("check_file" `T.isInfixOf` t && "type_of" `T.isInfixOf` t)
+            , assert "names no hidden tool" (not (any (`T.isInfixOf` t) ["normalize", "fill_hole", "get_goal", "search_in_scope"]))
+            ]
+          other -> pure (Fail ("instructions were " <> show other))
+
+    , runTest "wire: a registered tool that was not exposed is refused by name, before it runs" $
+        case (resultOf 3 out, innerText 3 out) of
+          (Just res, Just t) -> allOf
+            [ assertEqual "isError" (Just (Aeson.Bool True)) (KM.lookup "isError" res)
+            , assert ("text was: " <> T.unpack t) ("normalize tool is not exposed" `T.isInfixOf` t)
+            , assert "names the exposed set" ("--expose check_file,type_of" `T.isInfixOf` t)
+            ]
+          _ -> pure (Fail "no response for id 3")
+
+    , runTest "wire: an unregistered name is still an unknown tool" $
+        assert "Unknown tool" (maybe False ("Unknown tool: no_such_tool" `T.isInfixOf`) (innerText 4 out))
+
+    , -- A trailing --expose with no value used to fall through to the
+      -- lenient unknown-flag skip and start the whole surface (a Copilot
+      -- catch on PR #193).
+      runTest "wire: a trailing --expose with no value refuses to start, never serving the full surface" $ allOf
+        [ assert "exits non-zero" (bareCode /= ExitSuccess)
+        , assert ("stderr was: " <> take 300 bareErr) ("--expose names no tool" `isInfixOf` bareErr)
+        , assertEqual "no answer on stdout" "" bareOut
+        ]
+
+    , runTest "wire: --expose naming a tool this configuration does not register refuses to start" $ allOf
+        [ assert "exits non-zero" (badCode /= ExitSuccess)
+        , assert ("stderr was: " <> take 300 badErr)
+            ("does not register: search_by_name" `isInfixOf` badErr && "--corpus" `isInfixOf` badErr)
+        ]
+    ]
 
 
 probeAgdaEnv :: IO (Maybe (AgdaConfig, FilePath, FilePath))
@@ -7483,6 +7729,8 @@ main = do
   scopeResults <- scopeRetrievalTests
   -- Tier 1j: the lean answer's rule and the exports_of page (#184).
   leanResults <- leanAnswerTests
+  -- Tier 1k: the tool surface and --expose (#191).
+  surfaceResults <- surfaceTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -7509,6 +7757,13 @@ main = do
         "\n── Process tests (tier 2h: lean answers, #184): SKIPPED (executable not built or cabal absent) ──"
       pure []
     Just exe -> leanProcessTests exe
+  -- Tier 2i: --expose on the wire (#191), same gate as tier 2g.
+  exposeWireResults <- case mExe of
+    Nothing -> do
+      hPutStrLn stderr
+        "\n── Process tests (tier 2i: --expose, #191): SKIPPED (executable not built or cabal absent) ──"
+      pure []
+    Just exe -> exposeProcessTests exe
   -- Tier 3: the interaction lane (#75) — same gate as tier 2.
   laneResults <- case mEnv of
     Nothing -> do
@@ -7525,8 +7780,9 @@ main = do
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
-          <> pathResults <> wireResults <> scopeResults <> leanResults <> integrationResults
-          <> cwdResults <> leanWireResults <> laneResults <> scopeLaneResults
+          <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
+          <> integrationResults <> cwdResults <> leanWireResults <> exposeWireResults
+          <> laneResults <> scopeLaneResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

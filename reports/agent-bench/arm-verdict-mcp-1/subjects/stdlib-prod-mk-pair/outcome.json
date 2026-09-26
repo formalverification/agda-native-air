@@ -1,0 +1,88 @@
+{
+  "benchmarkId" : "stdlib-prod-mk-pair",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "mk-pair",
+  "goal" : "{A B : Set} → A → B → A × B",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 17758,
+  "costUsd" : 0.0260922,
+  "tokens" : {
+    "input" : 8,
+    "output" : 595,
+    "cacheRead" : 28931,
+    "cacheCreation" : 3585
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_goal",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    },
+    "exposed" : [
+      "check_file",
+      "fill_hole",
+      "get_goal",
+      "type_of"
+    ]
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 171,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A B : Set} → A → B → A × B",
+    "final" : "{A B : Set} → A → B → A × B",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
+  "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.53,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

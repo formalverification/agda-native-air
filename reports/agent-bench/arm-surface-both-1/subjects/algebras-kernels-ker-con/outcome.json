@@ -1,0 +1,110 @@
+{
+  "benchmarkId" : "algebras-kernels-ker-con",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Homomorphisms.Kernels.kercon",
+    "target:Overture.Relations.kerRel",
+    "target:Overture.Relations.kerRelOfEquiv",
+    "target:Setoid.Homomorphisms.Kernels.HomKerComp",
+    "target:Setoid.Congruences.Basic.mkcon"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "kercon′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) →  Con 𝑨 ρᵇ",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash a command substitution: grep -n \"record Func\" -A15 $(find / -path \"*/standard-library*/src/Function/Bundles.agda\" 2>/dev/null | head -1)",
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 2,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 16,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 7,
+    "mcp__agda__type_of" : 4,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 15,
+  "wallMs" : 66948,
+  "costUsd" : 0.196155,
+  "tokens" : {
+    "input" : 26,
+    "output" : 4210,
+    "cacheRead" : 335355,
+    "cacheCreation" : 21733
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash a command substitution: grep -n \"record Func\" -A15 $(find / -path \"*/standard-library*/src/Function/Bundles.agda\" 2>/dev/null | head -1)"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 6,
+      "other" : 1
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5650,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-kernels-ker-con/final/Kernels-ker-con.agda",
+  "transcriptPath" : "subjects/algebras-kernels-ker-con/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully: the verdict is success.",
+  "rateLimit" : {
+    "maxUtilization" : 0.52,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

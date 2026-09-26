@@ -98,6 +98,51 @@ scope-aware retrieval tool `search_in_scope` (issue #17, phase 1).
 Navigation tools and neural premise selection are planned for later
 milestones; see [GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
 
+### Where the contract lives (issue #191)
+
+A client reads three things this server sends, and puts all of them in its
+model's context on every turn: each tool's description and input schema
+(`tools/list`), and the `instructions` of the `initialize` answer, which
+Claude Code places in the system prompt.  So the client-visible contract is
+split by who shares it, and each part is stated once.
+
++  **The instructions** carry what every tool shares: that the file tools'
+   verdicts come from a batch process's exit code (`fill_hole`'s status also
+   tolerates open holes, and `check_project`'s gate can be turned red by its
+   output) and the live lane informs and never decides, each
+   lane's cost, `reload`, the path refusal, the tree every answer names and the
+   wrong-tree refusal, `verbose`, how failures arrive, `checkedFromSource`, and
+   the hole model's coordinates.  They name only the tools the server exposes
+   (see `--expose` below).
++  **Each description** carries its own tool's contract and nothing else (what
+   it answers, what its verdict or its answer's fields mean, and its own
+   failure modes), and each input property says what to send.  A description
+   names another tool only when that tool is exposed: a subset that hides
+   `check_file` gets `get_diagnostics`' whole contract, and `check_project`'s
+   diagnostic shape inline, since a hidden tool's description never reaches
+   the client.
++  **This README** carries the mechanism a model does not need in order to use
+   a tool correctly: `search_in_scope`'s rendering ladder and rank formula, the
+   lane's re-load vocabulary and lifecycle, the response echo field by field.
+
+**Both are cut at 2,048 characters**.  Claude Code 2.1.282 truncates every MCP
+tool description, and a server's instructions, at 2,048 characters and appends
+`… [truncated]` (measured on issue #191 with a probe server whose texts are
+numbered sequences, and on this server: before #191 eleven of the fourteen
+descriptions ran to 3,193 to 7,648 characters, so 27,808 characters of their
+contract, `fill_hole`'s `status` rule among them, never reached a model).  The
+suite asserts that every description and the instructions fit.  Before #191
+the surface was 77,603 characters of `tools/list`, about 16,300 tokens a turn
+as delivered to Sonnet 5; after it, 24,094 characters of `tools/list` and 1,981
+of instructions (the #191 arms ran the same `tools/list` and a 1,989-character
+version of the instructions, before review fixes scoped their exit-code rule
+to `success` and named `fill_hole`'s tolerance).
+
+**Fewer tools**.  `--expose NAME,...` presents a subset: `tools/list` lists
+those tools alone, the instructions name those alone, and a call to any other
+registered tool is refused by name before it runs.  The agent benchmark uses it
+to measure what a smaller surface changes (issue #191's `arm-verdict-mcp-1`).
+
 ### Core proof-state tools (Milestone 1 — [M1-2])
 
 This is the minimum tooling required for an agent to do interactive proof development.
@@ -117,7 +162,7 @@ This is the minimum tooling required for an agent to do interactive proof develo
 
 ### Live scope, type, and definition queries (issue #75)
 
-These answer read-only questions from a persistent `agda --interaction-json` child kept per project root — the second lane of the server, designed in [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md).  The child holds one current file at a time, re-loaded only when it changes (or when the client passes `reload: true`); the first question about a file costs one load, every further consecutive question about it is milliseconds, and switching files under a root re-loads the switched-to file.  They inform and never decide a build verdict: interaction-mode Agda is tolerant (it loads files with open holes), so `success`/`verdict` remain exclusively the batch tools' fields, and an Agda-level negative — the file does not load, the expression does not typecheck, the module is not in scope — arrives *in band* as an `error: {stage, code?, message}` object, because for a check-a-term-without-committing tool the negative answer is a product.
+These answer read-only questions from a persistent `agda --interaction-json` child kept per project root (the second lane of the server, designed in [`docs/agda-mcp/agda-mcp-interaction-lane.md`](../docs/agda-mcp/agda-mcp-interaction-lane.md)).  The child holds one current file at a time, re-loaded only when it changes (or when the client passes `reload: true`); the first question about a file costs one load, every further consecutive question about it is milliseconds, and switching files under a root re-loads the switched-to file (for a file with open holes a full re-typecheck, since such a file writes no interface).  An edit to a *dependency* is picked up when the queried file is next re-loaded, or at once with `reload: true`, since no stamp on the queried file can see it.  They inform and never decide a build verdict: interaction-mode Agda is tolerant (it loads files with open holes), so `success`/`verdict` remain exclusively the batch tools' fields, and an Agda-level negative (the file does not load, the expression does not typecheck, the module is not in scope) arrives *in band* as an `error: {stage, code?, message}` object, because for a check-a-term-without-committing tool the negative answer is a product.
 
 | Tool | Description |
 |------|-------------|
@@ -179,9 +224,10 @@ identically on every call, and it was most of a small one: a `type_of` whose
 type is one line was 3.3 KB, of which the type was 35 characters.  Over the
 server-only arm of the #162 agent benchmark the tools returned 3.6 times the
 bytes the shell-only arm's commands did, and the model wrote about as much in
-both.  The `meaning` sentence is stated once, in each tool's description,
-where a client reads it once per session; the command line and the registry
-are what a client re-reads only when it doubts a call, and can then ask for.
+both.  What the verdict means is stated in the tool descriptions and the
+server's instructions (issue #191), which a client already carries; the
+command line and the registry are what a client re-reads only when it doubts
+a call, and can then ask for.
 
 +  **A lean answer is a restriction of the verbose one**.  Fields are left
    out, never renamed or moved: a client reading `verdict.exitCode` or
@@ -339,6 +385,7 @@ import, which is [issue #165](https://github.com/formalverification/agda-native-
 agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
          [--corpus PATH]  [--timeout N] [--verbose]
          [--check-command "CMD ARGS ..."] [--check-timeout N]
+         [--expose NAME,NAME,...]
 ```
 
 | Flag | Description |
@@ -350,6 +397,7 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--timeout N`        | Per-typecheck timeout in seconds (default: 300; `0` means no limit).  Enforced: on expiry the `agda` process group is killed and the tool reports a timeout.  Size it for a *cold* first check; see below. |
 | `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect, and nothing this server puts around your gate can mask its exit code.  (A wrapper *script* you name here can still lie about its own; that is what `maskedFailure` catches.)  Without it, `check_project` discovers the gate (see below). |
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
+| `--expose NAMES`     | Present only these tools (comma-separated, issue #191): `tools/list` lists them alone, the `initialize` instructions name them alone, and a call to any other registered tool is refused by name.  A name this configuration does not register (a typo, or a corpus tool without `--corpus`) is a fatal startup error, never a silently smaller surface. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
 
@@ -485,6 +533,7 @@ loadElapsedMs?}` in place of `verdict`.
 
 **How it works**.  Ensures `AgdaDojang.Debug` is imported (injecting the import transiently if the file does not already import it), replaces the hole with the `reportGoalCtx` macro, typechecks the file **in place**, and parses the `AGDADOJANG_REQ_BEGIN/END` marker block.  Checking at the file's real path (rather than a scratch copy) lets hierarchically-named modules embedded in a library resolve normally; the original source is restored after the call.
 
+**A fallback-path timeout** is an `isError` result whose text is a JSON object, `{error, timedOut: true, elapsedMs, checkedFromSource?, verdict, command, project}`, naming the bound, since no goal was reported.  A lane timeout is reported as the lane's own structured failure and is never re-run on the fallback path, which would double the bound.
 
 #### `fill_hole`
 
@@ -890,8 +939,10 @@ and what does Agda say each one's type is?  The pool is the corpus index; the
 scope is the file's import surface; and the validation is the interaction lane,
 which types every candidate rendering in the file's scope (goal-scoped when the
 anchor addresses a hole) before it is returned.  The contract was agreed on
-issue #17 before the tool was built, and the description a client receives
-carries it in full.
+issue #17 before the tool was built.  Since issue #191 the description a
+client receives carries what a caller needs (the question, that every
+rendering was typed here, the query, the bounds, the exclusion, the ledger);
+the ladder and the rank below are documented here, for people.
 
 **Input**.  Only `filePath` is required.  `query` may be omitted when
 `line`/`column` addresses a hole: the tokens are then derived from that goal's
@@ -961,6 +1012,16 @@ Three things are contractual.
 +  **Every `rendering` was typed by Agda in this file's scope, and `type` is Agda's printing**.  Typing alone is not identity, though: a pattern variable named like a `using`-listed import shadows it inside a hole, and a re-exported spelling resolves to whatever the importing module exports under that name, so every accepted spelling other than the row's own qualified name is also asked Agda's `WhyInScope` and kept only if a candidate's defined name is the row's (the `shadow` hole of the fixture pins the local case: `twice` types there as `Nat`, is refused, and the row renders as `ScopeSearchLib.twice`).  Three of the ladder's four rungs are visible above: `twice` is `using`-listed and renders bare; the nested rows render by their own qualified name; and `quad`, defined in `ScopeSearchBarrel.Core` and re-exported by the barrel this file imports, renders as `ScopeSearchBarrel.quad` because the lane refused `ScopeSearchBarrel.Core.quad` (that module is not in the file's scope).  The fourth, `re-export`, is the importing module qualifying the tail of the row's module path, which is how a record field defined in a file that an imported module re-exports is named (`Setoid.Homomorphisms.IsHom.compatible` for the agda-algebras row `Setoid.Homomorphisms.Basic.IsHom.compatible`); the first measurement on that corpus found those rows refused under every other spelling, and the ladder grew the rung.  `ScopeSearchLib.ghost`, a row the corpus carries and the library no longer defines, is not returned; it is named in `laneRejected` with the spelling that was tried.
 +  **An empty result states its bounds**.  `hits` counts the query's matches over the whole corpus, before scope, so `hits: 12, inScope: 0` reads as "the lemma exists and this file does not import its module"; `excluded` names every row your own `exclude` set aside and why (`name`, `statement`, or `lane-statement`); `laneRejected` names every row the loaded library disagreed with; `laneCalls` counts the lane calls spent validating (a `type_of` per rung tried, plus one identity check per accepted spelling other than the row's own qualified name; the goal read of a derived query is timed, not counted); and `stoppedBy` says whether the walk ended because `limit` was filled, `maxProbes` was spent, or the ranked list ran out.
 +  **No verdict**.  A file that does not load answers `error.stage: "load"` with Agda's message and runs no query; no `query` with no goal at the anchor, or with a goal whose display yields no tokens (a goal that is only a context variable), answers `error.stage: "query"` rather than searching the whole corpus.  Process-level lane failures and path refusals are the same structured `isError` payloads the live-query tools raise.
+
+**The rank**.  Only rows of `defKind` `function` are ranked (constructors,
+records, and data types are counted in `ledger.nonFunction`).  A row scores
+twice the overlap between the query's tokens and its own bare type tokens,
+plus a name bonus capped at one, minus one per pure-symbol operator in its
+type that the query never mentions; ties break cheap before expensive on
+approximate arity, then by name.  Both sides are reduced the same way (a
+name's outer underscores stripped, so `_+_` meets `+`), and a query whose
+tokens all reduce to nothing, with no `name` beside them, selects nothing
+rather than everything: it answers `error.stage: "query"`.
 
 `timing.poolMs` is the corpus half (query, scope, exclusion, rank over the whole
 index) and `timing.laneMs` the lane half (every `type_of`, plus the goal read

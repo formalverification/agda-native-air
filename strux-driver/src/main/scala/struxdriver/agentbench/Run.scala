@@ -48,7 +48,7 @@ object Run {
     val layout  = cfg.layout
     val subject = SubjectConfig.of(cfg, sysP, userT, addDirs)
     for {
-      _       <- IO.println(s">> agent-bench: ${entries.size} obligation(s), arm=${cfg.arm.name} model=${subject.model} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} parallelism=${cfg.parallelism} safe=${cfg.safe}")
+      _       <- IO.println(s">> agent-bench: ${entries.size} obligation(s), arm=${cfg.arm.name}${cfg.expose.fold("")(ts => s" expose=${ts.mkString(",")}")} model=${subject.model} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} parallelism=${cfg.parallelism} safe=${cfg.safe}")
       _       <- IO.println(s">> run root: ${layout.runRoot}")
       timings <- Ref.of[IO, Vector[TimingRow]](Vector.empty)
       driven  <- entries.parTraverseN(cfg.parallelism) { e =>
@@ -123,7 +123,7 @@ object Run {
           val finalFile = subj.finalFile(stem)
           val mcpCfg    = if (cfg.arm.hasServer) Some(subj.mcpConfig) else None
           for {
-            _   <- TextIO.write(subj.record, SubjectRecord(cfg.arm, roots).toJson.spaces2)
+            _   <- TextIO.write(subj.record, SubjectRecord(cfg.arm, roots, cfg.expose).toJson.spaces2)
             _   <- mcpCfg.fold(IO.unit)(p => TextIO.write(p, Subject.mcpConfig(perRow, workDir, st.workFile, corpus).spaces2))
             _   <- TextIO.write(subj.prompt, prompt + "\n")
             _   <- TextIO.write(subj.sysPrompt, sysPrompt + "\n")
