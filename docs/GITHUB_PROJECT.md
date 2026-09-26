@@ -844,78 +844,6 @@ We should probably have a PR template that guides/encourages contributors to pro
 
 ---
 
-### Issue M0-13: flake shellHook: unguarded variable reads put cwd on `LD_LIBRARY_PATH` (#96)
-
-**Labels:** `bug`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
-
-## Context
-
-Found while landing #72 / #76 (PR #95); a Copilot review of that PR raised the `set -u` half of it, and testing the claim turned up a larger, unconditional defect underneath.  PR #95 guarded the one variable it introduced (`AGDA_NATIVE_AIR_ROOT`) and deliberately went no further, since auditing every shell is separate work.  This issue is that work.
-
-The flake's shell snippets read several environment variables without a default expansion.  That has two distinct consequences, and the first one bites in ordinary use, not only under unusual shell options.
-
-## 1.  Every shell puts the current directory on the dynamic-linker search path
-
-`exportLibPath` (flake.nix:390) is used by *every* devShell — `default`, `backend`, `proofParser`, `mlPipeline`, `all`, and both `gpu` variants:
-
-```nix
-# Prepend Nix-provided runtime libs; keep existing LD_LIBRARY_PATH only if it exists.
-exportLibPath = ''
-    export LD_LIBRARY_PATH="${wheelRuntimeLibPath}:$LD_LIBRARY_PATH"
-'';
-```
-
-The comment states the intent exactly; the code does not implement it.  `$LD_LIBRARY_PATH` is read unconditionally, so when it is unset — the common case on a clean login shell — the result ends in a trailing colon:
-
-```
-$ env -u LD_LIBRARY_PATH nix develop .#backend --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'
-…/p8hw2h465g0byxwpamnk6gv6mp5gnqn2-openssl-3.0.14/lib:
-```
-
-An empty entry in `LD_LIBRARY_PATH` is the current directory as far as glibc's loader is concerned, so every such shell silently searches the directory it was launched from for shared objects.  That is a reproducibility hazard on its own — a shell's linking behaviour should not depend on where it was entered — and it is worth fixing independently of anything below.
-
-## 2.  An inherited `set -u` aborts the shell before it starts
-
-This one is narrower than § 1 and worth calibrating before spending time on it.  A parent script's own `set -u` does *not* reach the shell `nix develop` runs — bash does not export `SHELLOPTS` by default, so `scripts/run-server.sh`'s `set -euo pipefail` is harmless here (checked: a child bash under such a parent reports options `hBc`, no `u`).  It bites only when a caller *exports* `SHELLOPTS` with `nounset` in it, which some CI harnesses do.  When that happens it kills the hook on the same line as § 1:
-
-```
-$ env SHELLOPTS=nounset nix develop .#backend --command bash -c 'echo "$AGDA_DIR"'
-/tmp/nix-shell.XXXXXX/nix-shell.H5XHIB: line 2119: LD_LIBRARY_PATH: unbound variable
-```
-
-Nothing after that point runs, so no amount of guarding further down helps until this line is fixed.
-
-## 3.  `backend` reports a variable it never sets
-
-Its banner echoes `WHEEL_LD_LIBRARY_PATH` (flake.nix:528), but `exportWheelRuntimeLibs` — the only thing that sets it — is used by `default`, `mlPipeline`, and `all`, never by `backend`.  The line therefore always prints empty there, and is a third unguarded read under `set -u`.
-
-## Inventory
-
-+  `exportLibPath` (flake.nix:390-392) reads `$LD_LIBRARY_PATH`; used by every shell, and the cause of both § 1 and § 2.
-+  Banner lines read `$LD_LIBRARY_PATH`, `$WHEEL_LD_LIBRARY_PATH`, and `$JAVA_HOME` at flake.nix:436-438 (`default`), 527-528 (`backend`), 556 (`proofParser`), and 629-630 (`all`).
-+  `mkAgdaShellSetup` reads the optional external-library roots unguarded — `$AGDA_ALGEBRAS_ROOT`, `$AGDA_CATEGORIES_ROOT`, `$AGDA_TYPETOPOLOGY_ROOT` at flake.nix:279-281 and again in the summary at flake.nix:306-321.  These are optional by design, so they are the most likely of all to be unset.
-+  `$AGDA_NATIVE_AIR_ROOT` in `mkAgdaShellSetup` is already guarded (PR #95); it is listed here only so the audit is complete.
-
-## Proposal
-
-+  Give every optional read a default expansion (`"${VAR:-}"`), which for `exportLibPath` also makes the code do what its comment already promises.
-+  Build `LD_LIBRARY_PATH` so that no empty entry is ever produced — append the inherited value only when it is non-empty, rather than always interpolating it.
-+  Either set `WHEEL_LD_LIBRARY_PATH` in `backend` or drop it from that shell's banner, so the report matches the shell.
-+  Consider adding a smoke check that enters each shell with `SHELLOPTS=nounset` and with the relevant variables unset, so a future unguarded read is caught rather than rediscovered.
-
-## Acceptance
-
-+  `env -u LD_LIBRARY_PATH nix develop .#<shell> --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'` prints no trailing colon and no empty entry, for every shell.
-+  `env SHELLOPTS=nounset nix develop .#<shell> --command true` succeeds for every shell, with the external-library roots unset.
-+  The `backend` banner does not report a variable that shell does not set.
-
-## Relations
-
-+  #76 (closed by PR #95) is where this surfaced; that PR fixed the stray-`agda/` half of the environment problem and guarded only its own new variable.
-+  #54 and #55 (Agda-Nix Phases 3 and 4) concern *which* libraries the shells provision and how they are pinned; this is about the shell snippets' own hygiene, so it is deliberately filed separately rather than folded into either.
-
----
-
 ### Issue M0-13: Add Claude Code config (CLAUDE.md, SessionStart Nix hook, skills) (#57, closed)
 
 **Labels:** `infrastructure`, `M0: migration + infrastructure`
@@ -1062,6 +990,78 @@ No job that runs pull-request-controlled code holds a write-capable Cachix token
 
 [#166]: https://github.com/formalverification/agda-native-air/pull/166
 [#181]: https://github.com/formalverification/agda-native-air/pull/181
+
+---
+
+### Issue M0-16: flake shellHook: unguarded variable reads put cwd on `LD_LIBRARY_PATH` (#96)
+
+**Labels:** `bug`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
+
+## Context
+
+Found while landing #72 / #76 (PR #95); a Copilot review of that PR raised the `set -u` half of it, and testing the claim turned up a larger, unconditional defect underneath.  PR #95 guarded the one variable it introduced (`AGDA_NATIVE_AIR_ROOT`) and deliberately went no further, since auditing every shell is separate work.  This issue is that work.
+
+The flake's shell snippets read several environment variables without a default expansion.  That has two distinct consequences, and the first one bites in ordinary use, not only under unusual shell options.
+
+## 1.  Every shell puts the current directory on the dynamic-linker search path
+
+`exportLibPath` (flake.nix:390) is used by *every* devShell — `default`, `backend`, `proofParser`, `mlPipeline`, `all`, and both `gpu` variants:
+
+```nix
+# Prepend Nix-provided runtime libs; keep existing LD_LIBRARY_PATH only if it exists.
+exportLibPath = ''
+    export LD_LIBRARY_PATH="${wheelRuntimeLibPath}:$LD_LIBRARY_PATH"
+'';
+```
+
+The comment states the intent exactly; the code does not implement it.  `$LD_LIBRARY_PATH` is read unconditionally, so when it is unset — the common case on a clean login shell — the result ends in a trailing colon:
+
+```
+$ env -u LD_LIBRARY_PATH nix develop .#backend --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'
+…/p8hw2h465g0byxwpamnk6gv6mp5gnqn2-openssl-3.0.14/lib:
+```
+
+An empty entry in `LD_LIBRARY_PATH` is the current directory as far as glibc's loader is concerned, so every such shell silently searches the directory it was launched from for shared objects.  That is a reproducibility hazard on its own — a shell's linking behaviour should not depend on where it was entered — and it is worth fixing independently of anything below.
+
+## 2.  An inherited `set -u` aborts the shell before it starts
+
+This one is narrower than § 1 and worth calibrating before spending time on it.  A parent script's own `set -u` does *not* reach the shell `nix develop` runs — bash does not export `SHELLOPTS` by default, so `scripts/run-server.sh`'s `set -euo pipefail` is harmless here (checked: a child bash under such a parent reports options `hBc`, no `u`).  It bites only when a caller *exports* `SHELLOPTS` with `nounset` in it, which some CI harnesses do.  When that happens it kills the hook on the same line as § 1:
+
+```
+$ env SHELLOPTS=nounset nix develop .#backend --command bash -c 'echo "$AGDA_DIR"'
+/tmp/nix-shell.XXXXXX/nix-shell.H5XHIB: line 2119: LD_LIBRARY_PATH: unbound variable
+```
+
+Nothing after that point runs, so no amount of guarding further down helps until this line is fixed.
+
+## 3.  `backend` reports a variable it never sets
+
+Its banner echoes `WHEEL_LD_LIBRARY_PATH` (flake.nix:528), but `exportWheelRuntimeLibs` — the only thing that sets it — is used by `default`, `mlPipeline`, and `all`, never by `backend`.  The line therefore always prints empty there, and is a third unguarded read under `set -u`.
+
+## Inventory
+
++  `exportLibPath` (flake.nix:390-392) reads `$LD_LIBRARY_PATH`; used by every shell, and the cause of both § 1 and § 2.
++  Banner lines read `$LD_LIBRARY_PATH`, `$WHEEL_LD_LIBRARY_PATH`, and `$JAVA_HOME` at flake.nix:436-438 (`default`), 527-528 (`backend`), 556 (`proofParser`), and 629-630 (`all`).
++  `mkAgdaShellSetup` reads the optional external-library roots unguarded — `$AGDA_ALGEBRAS_ROOT`, `$AGDA_CATEGORIES_ROOT`, `$AGDA_TYPETOPOLOGY_ROOT` at flake.nix:279-281 and again in the summary at flake.nix:306-321.  These are optional by design, so they are the most likely of all to be unset.
++  `$AGDA_NATIVE_AIR_ROOT` in `mkAgdaShellSetup` is already guarded (PR #95); it is listed here only so the audit is complete.
+
+## Proposal
+
++  Give every optional read a default expansion (`"${VAR:-}"`), which for `exportLibPath` also makes the code do what its comment already promises.
++  Build `LD_LIBRARY_PATH` so that no empty entry is ever produced — append the inherited value only when it is non-empty, rather than always interpolating it.
++  Either set `WHEEL_LD_LIBRARY_PATH` in `backend` or drop it from that shell's banner, so the report matches the shell.
++  Consider adding a smoke check that enters each shell with `SHELLOPTS=nounset` and with the relevant variables unset, so a future unguarded read is caught rather than rediscovered.
+
+## Acceptance
+
++  `env -u LD_LIBRARY_PATH nix develop .#<shell> --command bash -c 'printf "%s\n" "$LD_LIBRARY_PATH"'` prints no trailing colon and no empty entry, for every shell.
++  `env SHELLOPTS=nounset nix develop .#<shell> --command true` succeeds for every shell, with the external-library roots unset.
++  The `backend` banner does not report a variable that shell does not set.
+
+## Relations
+
++  #76 (closed by PR #95) is where this surfaced; that PR fixed the stray-`agda/` half of the environment problem and guarded only its own new variable.
++  #54 and #55 (Agda-Nix Phases 3 and 4) concern *which* libraries the shells provision and how they are pinned; this is about the shell snippets' own hygiene, so it is deliberately filed separately rather than folded into either.
 
 <!-- END GENERATED: milestone-0 -->
 
@@ -2392,6 +2392,98 @@ Related: [#154] is the measurement this controls; [#83] is the field test whose 
 [#163]: https://github.com/formalverification/agda-native-air/issues/163
 [#164]: https://github.com/formalverification/agda-native-air/issues/164
 
+---
+
+### Issue M1-39: agent-bench: the original in view, a column for every solved row (#188, closed)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+# Context
+
+Every agda-algebras obligation in the benchmark restates a lemma the library already proves, tagged `restates:<Module.name>` in `benchmark-index.jsonl`.  The judge's restated rule reads the final definition's references (`agda-strux`'s `bodyRefs`) and names the row restated when the body *cites* the original.  It cannot see a body that *transcribes* the original's proof.
+
+On 2026-09-24 a script over the archive established that this happened, and how often.  With the libraries' sources readable on every arm ([#162], PR [#175]), the `shell` arm had the original's proof in view before its last edit of the work file for 16 of its 18 agda-algebras solves, the `both` arm 16 of 19, the `mcp` arm 6 of 14, while every such read in the three archived arms was refused by the client's confinement.  Six of the eight rows the archived Sonnet run restated are `shell` solves written with the original in view, and seven `shell` bodies are the library's own after renaming (two of them one-line proofs every arm writes the same way).  The guide (`docs/reading-the-results.md` § 4.3, PR [#186]) carries the table and the reading; the reading is a script over the archive, not part of the judge.
+
+| arm | run id | solved (of 21) | restated | original's proof in view before the last edit | reads refused |
+|---|---|---|---|---|---|
+| archive `mcp`, Sonnet | `agent-sonnet5-1` | 13 | 8 | 0 | 2 |
+| archive `mcp`, Opus | `agent-opus5-1` | 20 | 1 | 0 | 2 |
+| archive `mcp`, Opus | `agent-opus5-2` | 20 | 1 | 0 | 4 |
+| `shell` | `arm162-shell-1` | 18 | 0 | 16 | 0 |
+| `mcp` | `arm162-mcp-1` | 14 | 6 | 6 | 0 |
+| `both` | `arm162-both-1` | 19 | 2 | 16 | 0 |
+
+On the 34 rows with no original to copy (stdlib and haystack) the arms are within one row of each other (archive 33, `shell` 32, `mcp` 33, `both` 32), so the whole of [#162]'s "50 against 47" sits on copyable rows, and its "0 restated against 6" is transcription.  Until the judge carries this, every quoted agda-algebras number needs the caveat by hand.
+
+# Work
+
++  **The reading, as a pure function** in `struxdriver.agentbench` over a `Transcript`, the row's `Original` (the `restates:` tag, already parsed in `Judge.scala`), the subject's roots, and the work file.  The original's file is `<library source root>/<Module/Path>.lagda.md` or `.agda` under the read roots; its body is the definition's clauses.  The original was in view iff, before the subject's last edit of the work file (an `Edit` or `Write` naming it, or a `Bash` whose command names its stem and carries a redirection, `sed -i`, `tee`, or an interpreter), either a tool use whose input names the file returned a result that is not an error, or any tool result contains a line of the body longer than twelve characters.  Three edge cases the reading must get right: a `definition_of` answer names the file in its result without showing the proof, so a file name in a result does not count; a refused read (the archived Sonnet arm's two, answered "is outside") does not count; a read after the last edit does not count.
++  **The column.**  `outcome.json` gains an `original` block on every row with a `restates:` tag (`file`, `inView`, `how`, `at`, `refusedReads`) and `null` on rows without one; `report.json` and the per-stratum summary gain `solvedOriginalInView`; the archive README's run table gains the column.  Nothing about `solved`, `restated`, or `gate` changes.
++  **Re-judge the six archived arms** on copies (the archive is frozen; `make agent-bench-rejudge` on a copy, then re-archive the outcomes), with the verdict columns byte-identical to before and the reference table above reproduced or every disagreement explained.
++  **The prose.**  The run table and the [#162] section of `reports/agent-bench/README.md` (its sentence "a subject that reads the source writes the construction" is replaced by what the column shows), the guide's § 4.3 (the judge's numbers replace the script's), and one sentence each in ADR 0001 § 9 and ADR 0002 § 12 where 50/0 is quoted against 47/6.
++  **Reported, not gated.**  Whether an in-view solve should be neither solved nor restated is a decision for William; the PR states both options with the counts each produces on every arm and takes neither.
+
+# Acceptance
+
++  A spec on a synthetic transcript covering the three edge cases and the ordering, in the shape of `TranscriptSpec`.
++  The six archived arms re-judged with every verdict column identical and the table above reproduced (or its disagreements explained on this issue).
++  `null` on every row without a `restates:` tag; never `false`.
++  The four prose surfaces say what the column shows.
+
+# Relations
+
++  [#162] and PR [#175] are the measurement this reads; PR [#186] is the guide that carries the caveat by hand until this lands.
++  [#184]'s re-run reports its agda-algebras solves split by this column (or by the script's criteria if this has not merged).
++  The sibling issue [#189], a hard tier whose statements have no proof on disk, sidesteps the loophole by construction; hiding the originals from the mined tiers on the file system (a stubbed library copy, since a shell reads anything and `agda` needs the sources to check imports) is a separate follow-up, not this.
++  Kick-off: `~/claude-kickoff-prompts/kickoff-45-air-agent-bench-original-in-view.md`.
+
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#186]: https://github.com/formalverification/agda-native-air/pull/186
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+
+---
+
+### Issue M1-40: benchmarks: a hard tier with no proof on disk, and its first run (#189)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+# Context
+
+Every published agent number is on obligations mined from a library.  The results guide (`docs/reading-the-results.md`, PR [#186]) records what that measures: with the library's sources readable, a frontier model reads the original's proof and copies it (the `shell` arm of [#162] had it in view for 16 of its 18 agda-algebras solves), and with the sources hidden it solves 13 to 20 of the 21 and cites for the rest; on the 34 standard-library rows every arm is within one row of ceiling.  So the suite cannot answer the question the project exists for, whether a tool helps a model prove something it could not prove alone; the guide's § 6 lists that as unmeasured, with the composition tier ([#160]) and the agda-algebras case study ([#23]) as the planned instruments.
+
+This is the shortest instrument: a small tier of statements that have no proof on disk, so that every solve on it is construction by design, and one run of the frontier model on it with and without the server.
+
+# Work
+
++  **The statements**, eight to twelve, posted on this issue in a comment titled "Statements": each an Agda type signature in the vocabulary of agda-algebras, with the imports it needs and the name it should carry, or a ready obligation file.  They are the tier; the session invents none.
++  **The novelty check, per statement, recorded** in the tier's README before it becomes a fixture: `search_by_type` over the agda-algebras corpus with the statement's type and with its conclusion alone; `search_by_name` with the natural names; `grep -rn` over the library's `src/` for the conclusion's head symbols together; and one sentence naming the nearest existing lemma and why it is not this statement.  A statement with a match is reported and dropped.  agda-algebras states many things twice (`Base` and `Setoid`); both are searched.
++  **The fixtures**, under `data/benchmarks/agda-algebras-hard-v0/`, in the fixture convention: `source: "agda-algebras"`, tag `stratum:novel` (reported as `agda-algebras/novel` by `IndexEntry.stratumOf` with no code change), no `restates:` tag (the restated rule never fires, by construction, as on the haystack tier of [#129]), difficulty `non-obvious` unless a statement plainly is not; each type-checks with exactly one unsolved interaction meta under the pinned toolchain.
++  **The gold question, verified first.**  The judge's statement gate reads the statement to preserve from the gold's `typeAst`, and `make eval-benchmark` type-checks every gold under `--safe`; a hard row may have no proof.  In order: (a) a supplied proof is a real gold; (b) if `agda-json` extracts `typeAst` for a definition whose body is a hole, the gate reads the statement from the obligation when the index row carries `"gold": null` (the decoder accepts it, `eval-benchmark` skips such rows, `JudgeSpec` pins the path); (c) otherwise the row waits for a proof.  A gold whose hole is filled by a `postulate` is not an option.
++  **The run.**  Opus 5, `both` and `shell` arms, one seed each, caps doubled for a hard row (60 turns, 1,800 s, USD 6.00 per subject), parallelism 2, run ids `hard-opus5-both-1` and `hard-opus5-shell-1`, the cost pair on each arm first and the `both` pair's isolation gate read before the arm; about USD 100 for both; a Sonnet pair after if the window allows.  Every arm archived under `reports/agent-bench/` with its rows in the run table.
++  **The write-up.**  The guide gains § 4.5 "The hard tier" (n, the count per arm with run ids, the sentence that says n is small); the top-level README status paragraph gains one sentence; this issue gets, for every row, one sentence on what the model tried, which tools it used, whether it read library sources, and where it stopped.  On a hard tier the transcripts are the finding as much as the count.
+
+# Acceptance
+
++  Every fixture type-checks with exactly one hole; the novelty table is in the tier's README; `make eval-benchmark-smoke` stays green.
++  The gold status of every row is stated, and the gold-less statement gate, if needed, is pinned by a spec.
++  Two archived Opus arms with rows in the run table; the per-row account on this issue; § 4.5 of the guide.
++  No statement weakened to make it check: a statement that does not type-check as given is reported with the smallest change that would fix it, for William to decide.
+
+# Relations
+
++  [#162] and PR [#186] § 4.3 and § 6 are why the mined tiers cannot answer this; [#160] and [#23] are the larger instruments this one precedes.
++  The sibling issue [#188] makes copying visible on the mined tiers; this tier makes it impossible.
++  Kick-off: `~/claude-kickoff-prompts/kickoff-46-air-hard-tier-v0.md`.
+
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
+[#23]: https://github.com/formalverification/agda-native-air/issues/23
+[#129]: https://github.com/formalverification/agda-native-air/issues/129
+[#160]: https://github.com/formalverification/agda-native-air/issues/160
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#186]: https://github.com/formalverification/agda-native-air/pull/186
+
 <!-- END GENERATED: milestone-1 -->
 
 ---
@@ -3597,7 +3689,7 @@ The flake's `exportLibPath` prepends Nix runtime libraries, openssl 3.0.14 among
 
 ---
 
-### Issue M5-11: `fill_hole` on interaction lane: judge a candidate by `Cmd_give` in ms (#163)
+### Issue M5-11: `fill_hole` on interaction lane: judge a candidate by `Cmd_give` in ms (#163, closed)
 
 **Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
 
@@ -3660,7 +3752,7 @@ Related: [#113] carries the loop record and the cost measurement this attacks; [
 
 ---
 
-### Issue M5-12: agda-mcp: tool answers carry echo and boilerplate that dwarf their payload; a lean default, and the re-run that tests it (#184)
+### Issue M5-12: agda-mcp: tool answers carry echo + boilerplate that dwarf payload (#184, closed)
 
 **Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
 
@@ -3749,6 +3841,56 @@ It does not elaborate: the text is the source as written, not Agda's internal te
 [#165]: https://github.com/formalverification/agda-native-air/issues/165
 [#175]: https://github.com/formalverification/agda-native-air/pull/175
 
+---
+
+### Issue M5-14: agda-mcp: the tool surface is the cost (#191, closed)
+
+**Labels:** `agda-mcp`, `eval`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+PR [#190] ([#184]) made every `agda-mcp` answer lean and re-ran the `mcp` and `both` arms of [#162] with nothing else changed.  Characters per answer fell 46 % and 51 %, and cost fell 12 % and 6 % (USD 4.63 and 4.00 against the shell arm's 2.88); beside a shell the knowledge tools stayed exactly as unused (`definition_of` 0, `search_by_name` 1, `exports_of` 2).  The finding that matters is where the cost went.  Every server arm re-reads 22 to 25 thousand cached tokens a turn against the shell arm's 10 thousand, and the difference is the fourteen tools' descriptions and schemas, `tools/list`: 68,391 characters on `main` before [#190] and 77,603 after it (the `verbose` paragraph is repeated on eleven tools, and the `exports_of` paragraph grew).  A server arm pays for its surface on every turn, not for its answers.
+
+| | `shell` #162 | `mcp` #184 | `both` #184 |
+|---|---:|---:|---:|
+| cached tokens read per turn | 10,060 | 22,407 | 25,331 |
+| USD | 2.88 | 4.63 | 4.00 |
+| characters returned per call | 1,025 | 1,757 | 850 |
+
+The full tables are on [#184] and in `reports/agent-bench/README.md`.  The results guide (`docs/reading-the-results.md` § 4.3 and § 6) names the tool surface as the next unmeasured variable.
+
+# Work
+
++  **Measure the surface first.**  Characters of `tools/list` per tool, and the share that is a paragraph repeated on several tools (`batchNote`, `projectHonestyNote`, `verdictNote`, `liveLaneNote`, `gateModel`, `verboseDoc`, the `exports_of` page paragraph, in `agda-mcp/src/AgdaMCP/Server.hs`).  Post the table here as the "before".
++  **Trim to the contract, not past it.**  The descriptions are what ADR 0002 (§ 3, decisions 5 and 10) and eight of nine field reports rest on: `success` iff exit 0, the wrong-tree refusal, `--safe`, the `verbose` contract.  Every promise stays; the repetition goes.  A shared sentence is stated once, in the MCP server's `instructions` (sent at `initialize`, which the client places in the system prompt once rather than once per tool) or in the first tool that needs it, and the PR says which sentence went where.  Measure again; post the "after".
++  **Fewer tools per arm.**  A server flag (`--expose check_file,fill_hole,get_goal,type_of`, say) that filters `toolDefinitions`, refuses a call to a tool it did not expose, and is recorded in `protocol.json` and each subject's `subject.json`; the isolation audit's "exactly Read, Edit, and the thirteen" rule learns the subset, or every row is an anomaly.
++  **The re-run, three Sonnet 5 arms at the [#162] caps** against `arm184-mcp-1` and `arm184-both-1` as the base: `arm-surface-mcp-1` (all fourteen tools, the trimmed surface), `arm-surface-both-1` (the same beside a shell), `arm-verdict-mcp-1` (the trimmed surface with only the four tools the arms actually used exposed).  Cost pair first on each arm; the `both` pair's isolation gate read before the arm.  About USD 13.
++  **Report per arm**: `tools/list` characters, cached tokens read per turn, USD, turns, tool calls per tool (unexposed tools marked as such, never counted as unused), solved and restated, and the agda-algebras solves with the original in view ([#188]'s column if merged, else the script the guide names).
+
+# Acceptance
+
++  `tools/list` well under half its size with every promise kept and every moved sentence accounted for in the PR; the tests that pin description sentences updated on purpose.
++  A subset flag recorded in the protocol and honored by the audit, with a spec.
++  Three archived arms with rows in the run table, and here the before-and-after surface table and the comparison against `arm184-*`: whether the cost gap closed, and whether a smaller surface changed which tools the model used.  Either answer is a result.
+
+# What it does not do
+
+No answer changes shape (`answerAt` and the `exports_of` page are [#190]'s and stay), `definition_of` does not return content ([#185]), and the judge is untouched.
+
+# Relations
+
++  [#184] and PR [#190] are the measurement this follows; [#162] and PR [#175] the arms it compares against.
++  [#185] is the other open variable on the knowledge tools, to be re-run separately, and on the hard tier of [#189] rather than on the 55.
++  Kick-off: `~/claude-kickoff-prompts/kickoff-47-air-tool-surface.md`.
+
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#185]: https://github.com/formalverification/agda-native-air/issues/185
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#190]: https://github.com/formalverification/agda-native-air/pull/190
+
 <!-- END GENERATED: milestone-5 -->
 
 ---
@@ -3757,7 +3899,7 @@ It does not elaborate: the text is the source as written, not Agda's internal te
 
 <!-- BEGIN GENERATED: milestone-6 -->
 
-### Issue M6-1: site: MkDocs Material skeleton, styled like williamdemeo.org, and one build (#169)
+### Issue M6-1: site: MkDocs Material skeleton, styled like williamdemeo.org, and one build (#169, closed)
 
 **Labels:** `docs`, `infrastructure`, `M6: docs + dissemination`
 
