@@ -8,10 +8,8 @@
   "stratum" : "agda-stdlib/novel",
   "hole" : "inversion-homo-iff-commutative",
   "goal" : "(IsGroupHomomorphism _⁻¹ → Commutative _≈_ _∙_) × (Commutative _≈_ _∙_ → IsGroupHomomorphism _⁻¹)",
-  "solved" : false,
+  "solved" : true,
   "restated" : false,
-  "gate" : "isolation",
-  "gateDetail" : "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -65,7 +63,6 @@
     "foreignToolUses" : [
     ],
     "violations" : [
-      "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
     ],
     "deniedPaths" : [
     ],
@@ -77,7 +74,7 @@
   "via" : "both",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 722,
+  "agdaMs" : 710,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

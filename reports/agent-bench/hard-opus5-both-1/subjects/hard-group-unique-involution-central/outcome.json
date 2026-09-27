@@ -78,7 +78,7 @@
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 501,
+  "agdaMs" : 561,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

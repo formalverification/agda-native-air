@@ -1,10 +1,12 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "cost-hard-mcp-1",
-  "timestamp" : "2026-09-27T08:35:46.276806985Z",
-  "rejudged" : false,
+  "timestamp" : "2026-09-27T09:31:17.533515229Z",
+  "rejudged" : true,
   "config" : {
     "arm" : "mcp",
+    "safe" : true,
+    "rejudgedAt" : "2026-09-27T09:31:17.532305643Z",
     "parallelism" : 2,
     "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
     "resume" : false,
@@ -19,7 +21,6 @@
     "maxTurns" : 60,
     "wallCapSec" : 1800,
     "maxBudgetUsd" : 6.00,
-    "safe" : true,
     "serverTimeout" : 600,
     "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
     "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
@@ -317,7 +318,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 533,
+      "agdaMs" : 563,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -421,7 +422,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4844,
+      "agdaMs" : 5313,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [

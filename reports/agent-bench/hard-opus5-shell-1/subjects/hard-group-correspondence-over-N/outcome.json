@@ -11,7 +11,7 @@
   "solved" : false,
   "restated" : false,
   "gate" : "isolation",
-  "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...; Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
+  "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -49,8 +49,7 @@
     "violations" : [
       "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...",
       "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
-      "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...",
-      "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
+      "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null..."
     ],
     "deniedPaths" : [
     ],
@@ -63,7 +62,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 4929,
+  "agdaMs" : 5748,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

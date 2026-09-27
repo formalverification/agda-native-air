@@ -8,10 +8,8 @@
   "stratum" : "agda-algebras/novel",
   "hole" : "second-iso-cosets-agree",
   "goal" : "∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)",
-  "solved" : false,
+  "solved" : true,
   "restated" : false,
-  "gate" : "isolation",
-  "gateDetail" : "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -47,7 +45,6 @@
     "foreignToolUses" : [
     ],
     "violations" : [
-      "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
     ],
     "deniedPaths" : [
     ],
@@ -60,7 +57,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 5272,
+  "agdaMs" : 5707,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

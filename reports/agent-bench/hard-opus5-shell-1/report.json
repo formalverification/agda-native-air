@@ -1,10 +1,12 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "hard-opus5-shell-1",
-  "timestamp" : "2026-09-27T08:56:38.973837249Z",
-  "rejudged" : false,
+  "timestamp" : "2026-09-27T09:33:11.348985604Z",
+  "rejudged" : true,
   "config" : {
     "arm" : "shell",
+    "safe" : true,
+    "rejudgedAt" : "2026-09-27T09:33:11.347899788Z",
     "parallelism" : 2,
     "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
     "resume" : false,
@@ -19,7 +21,6 @@
     "maxTurns" : 60,
     "wallCapSec" : 1800,
     "maxBudgetUsd" : 6.00,
-    "safe" : true,
     "serverTimeout" : 600,
     "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
     "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
@@ -124,11 +125,11 @@
   "obligations" : 14,
   "totals" : {
     "total" : 14,
-    "solved" : 4,
+    "solved" : 8,
     "restated" : 0,
     "solvedOriginalInView" : null,
     "gates" : {
-      "isolation" : 9,
+      "isolation" : 5,
       "preservation" : 1
     },
     "anomalies" : 0,
@@ -154,11 +155,11 @@
     },
     "compositional" : {
       "total" : 7,
-      "solved" : 2,
+      "solved" : 4,
       "restated" : 0,
       "solvedOriginalInView" : null,
       "gates" : {
-        "isolation" : 5
+        "isolation" : 3
       },
       "anomalies" : 0,
       "turns" : 78,
@@ -168,11 +169,11 @@
     },
     "non-obvious" : {
       "total" : 7,
-      "solved" : 2,
+      "solved" : 4,
       "restated" : 0,
       "solvedOriginalInView" : null,
       "gates" : {
-        "isolation" : 4,
+        "isolation" : 2,
         "preservation" : 1
       },
       "anomalies" : 0,
@@ -185,11 +186,11 @@
   "perStratum" : {
     "agda-stdlib/novel" : {
       "total" : 6,
-      "solved" : 3,
+      "solved" : 4,
       "restated" : 0,
       "solvedOriginalInView" : null,
       "gates" : {
-        "isolation" : 2,
+        "isolation" : 1,
         "preservation" : 1
       },
       "anomalies" : 0,
@@ -200,11 +201,11 @@
     },
     "agda-algebras/novel" : {
       "total" : 8,
-      "solved" : 1,
+      "solved" : 4,
       "restated" : 0,
       "solvedOriginalInView" : null,
       "gates" : {
-        "isolation" : 7
+        "isolation" : 4
       },
       "anomalies" : 0,
       "turns" : 125,
@@ -221,8 +222,8 @@
   "perShell" : {
     "agda-batch" : 17,
     "corpus-grep" : 1,
-    "library-read" : 67,
-    "other" : 23
+    "library-read" : 73,
+    "other" : 17
   },
   "perVia" : {
     "shell" : 14
@@ -291,7 +292,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 502,
+      "agdaMs" : 567,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -372,7 +373,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 516,
+      "agdaMs" : 591,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -403,10 +404,8 @@
       "stratum" : "agda-stdlib/novel",
       "hole" : "inverse-homo-commute",
       "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
-      "solved" : false,
+      "solved" : true,
       "restated" : false,
-      "gate" : "isolation",
-      "gateDetail" : "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -444,7 +443,6 @@
         "foreignToolUses" : [
         ],
         "violations" : [
-          "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
         ],
         "deniedPaths" : [
         ],
@@ -456,7 +454,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 529,
+      "agdaMs" : 605,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -490,7 +488,7 @@
       "solved" : false,
       "restated" : false,
       "gate" : "isolation",
-      "gateDetail" : "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda; Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
+      "gateDetail" : "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -530,8 +528,7 @@
         "foreignToolUses" : [
         ],
         "violations" : [
-          "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda",
-          "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
+          "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda"
         ],
         "deniedPaths" : [
         ],
@@ -544,7 +541,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 544,
+      "agdaMs" : 610,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -625,7 +622,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 592,
+      "agdaMs" : 684,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -705,7 +702,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 544,
+      "agdaMs" : 640,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -789,7 +786,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 5115,
+      "agdaMs" : 5382,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -820,10 +817,8 @@
       "stratum" : "agda-algebras/novel",
       "hole" : "second-iso-cosets-agree",
       "goal" : "∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)",
-      "solved" : false,
+      "solved" : true,
       "restated" : false,
-      "gate" : "isolation",
-      "gateDetail" : "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -859,7 +854,6 @@
         "foreignToolUses" : [
         ],
         "violations" : [
-          "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
         ],
         "deniedPaths" : [
         ],
@@ -872,7 +866,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 5272,
+      "agdaMs" : 5707,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -903,10 +897,8 @@
       "stratum" : "agda-algebras/novel",
       "hole" : "second-iso-cosets-onto",
       "goal" : "∀ {x} → x ∈ (H ∙ᶜ K) → Σ[ h ∈ G ] (h ∈ H × x ∼ h)",
-      "solved" : false,
+      "solved" : true,
       "restated" : false,
-      "gate" : "isolation",
-      "gateDetail" : "Bash a parameter expansion: grep -n \"{!\\|?\" /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -945,7 +937,6 @@
         "foreignToolUses" : [
         ],
         "violations" : [
-          "Bash a parameter expansion: grep -n \"{!\\|?\" /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
         ],
         "deniedPaths" : [
         ],
@@ -958,7 +949,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 4868,
+      "agdaMs" : 5791,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1037,7 +1028,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 4999,
+      "agdaMs" : 5754,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1071,7 +1062,7 @@
       "solved" : false,
       "restated" : false,
       "gate" : "isolation",
-      "gateDetail" : "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash a parameter expansion: rm -rf _build && agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --li...",
+      "gateDetail" : "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -1112,8 +1103,7 @@
         ],
         "violations" : [
           "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null",
-          "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
-          "Bash a parameter expansion: rm -rf _build && agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --li..."
+          "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa..."
         ],
         "deniedPaths" : [
         ],
@@ -1126,7 +1116,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 5196,
+      "agdaMs" : 5663,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1160,7 +1150,7 @@
       "solved" : false,
       "restated" : false,
       "gate" : "isolation",
-      "gateDetail" : "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"_∼_\\|module Coset\" $D/Cosets.lagda.md | head -40; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '30,140p' $D/Cosets.lagda.md; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '140,260p' $D/Cosets.lagda.md; Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand...",
+      "gateDetail" : "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -1196,24 +1186,19 @@
         "foreignToolUses" : [
         ],
         "violations" : [
-          "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...",
-          "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"_∼_\\|module Coset\" $D/Cosets.lagda.md | head -40",
-          "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '30,140p' $D/Cosets.lagda.md",
-          "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '140,260p' $D/Cosets.lagda.md",
-          "Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand..."
+          "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ..."
         ],
         "deniedPaths" : [
         ],
         "shellClasses" : {
           "agda-batch" : 1,
-          "library-read" : 6,
-          "other" : 3
+          "library-read" : 9
         }
       },
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 4978,
+      "agdaMs" : 5786,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1247,7 +1232,7 @@
       "solved" : false,
       "restated" : false,
       "gate" : "isolation",
-      "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...; Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
+      "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -1285,8 +1270,7 @@
         "violations" : [
           "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...",
           "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
-          "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...",
-          "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
+          "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null..."
         ],
         "deniedPaths" : [
         ],
@@ -1299,7 +1283,7 @@
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 4929,
+      "agdaMs" : 5748,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1330,10 +1314,8 @@
       "stratum" : "agda-algebras/novel",
       "hole" : "kernel-of-injective-composite",
       "goal" : "IsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
-      "solved" : false,
+      "solved" : true,
       "restated" : false,
-      "gate" : "isolation",
-      "gateDetail" : "Bash a parameter expansion: L=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src; cat $L/Setoid/Homomorphisms/Kernels.agda; echo ====; cat $L/Setoid/Congruences/Lattice.agda; Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; cat $S/Homomorphisms/Kernels.lagda.md; echo =====; cat $S/Congruences/Lattice.lagda.md; Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; grep -n \"⊙-hom\" -A 12 -B 5 $S/Homomorphisms/Properties.lagda.md | head -60; echo ====; grep -rn \"IsInject...",
       "restatementEvidence" : [
       ],
       "original" : null,
@@ -1371,22 +1353,18 @@
         "foreignToolUses" : [
         ],
         "violations" : [
-          "Bash a parameter expansion: L=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src; cat $L/Setoid/Homomorphisms/Kernels.agda; echo ====; cat $L/Setoid/Congruences/Lattice.agda",
-          "Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; cat $S/Homomorphisms/Kernels.lagda.md; echo =====; cat $S/Congruences/Lattice.lagda.md",
-          "Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; grep -n \"⊙-hom\" -A 12 -B 5 $S/Homomorphisms/Properties.lagda.md | head -60; echo ====; grep -rn \"IsInject..."
         ],
         "deniedPaths" : [
         ],
         "shellClasses" : {
           "agda-batch" : 1,
-          "library-read" : 3,
-          "other" : 3
+          "library-read" : 6
         }
       },
       "via" : "shell",
       "verdictVia" : "shell",
       "agdaExit" : 0,
-      "agdaMs" : 4462,
+      "agdaMs" : 5008,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [

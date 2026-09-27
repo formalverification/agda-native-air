@@ -1,10 +1,12 @@
 {
   "schemaVersion" : "agent-bench-report.v0",
   "runId" : "hard-opus5-mcp-1",
-  "timestamp" : "2026-09-27T09:11:17.409735596Z",
-  "rejudged" : false,
+  "timestamp" : "2026-09-27T09:34:36.970804554Z",
+  "rejudged" : true,
   "config" : {
     "arm" : "mcp",
+    "safe" : true,
+    "rejudgedAt" : "2026-09-27T09:34:36.969670806Z",
     "parallelism" : 2,
     "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
     "resume" : false,
@@ -19,7 +21,6 @@
     "maxTurns" : 60,
     "wallCapSec" : 1800,
     "maxBudgetUsd" : 6.00,
-    "safe" : true,
     "serverTimeout" : 600,
     "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
     "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
@@ -317,7 +318,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 460,
+      "agdaMs" : 507,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -410,7 +411,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 508,
+      "agdaMs" : 601,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -504,7 +505,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 530,
+      "agdaMs" : 602,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -602,7 +603,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 572,
+      "agdaMs" : 641,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -698,7 +699,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 601,
+      "agdaMs" : 688,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -793,7 +794,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 590,
+      "agdaMs" : 646,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -887,7 +888,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4937,
+      "agdaMs" : 5435,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -981,7 +982,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5070,
+      "agdaMs" : 5815,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1078,7 +1079,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 5016,
+      "agdaMs" : 5749,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1173,7 +1174,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4754,
+      "agdaMs" : 5773,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1278,7 +1279,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4834,
+      "agdaMs" : 5852,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1372,7 +1373,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4988,
+      "agdaMs" : 5782,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1466,7 +1467,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4842,
+      "agdaMs" : 5849,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [
@@ -1564,7 +1565,7 @@
       "via" : "mcp",
       "verdictVia" : "mcp",
       "agdaExit" : 0,
-      "agdaMs" : 4335,
+      "agdaMs" : 5016,
       "agdaTail" : "",
       "checkExit" : 0,
       "checkCodes" : [

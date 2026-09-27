@@ -11,7 +11,7 @@
   "solved" : false,
   "restated" : false,
   "gate" : "isolation",
-  "gateDetail" : "Bash reads outside the arm's roots (/): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda; echo ---; find / -name \"Complexes.agda\" -path \"*Group*\" 2>...; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"∙ᶜ\\|module Complex\" -A3 -B3 $D/Complexes.lagda.md | head -80; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '1,160p' $D/Cosets.lagda.md; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"module Group-Op\" -A 60 $D/Basic.lagda.md; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '261,340p' $D/Basic.lagda.md; Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
+  "gateDetail" : "Bash reads outside the arm's roots (/): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda; echo ---; find / -name \"Complexes.agda\" -path \"*Group*\" 2>...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -64,25 +64,19 @@
     "foreignToolUses" : [
     ],
     "violations" : [
-      "Bash reads outside the arm's roots (/): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda; echo ---; find / -name \"Complexes.agda\" -path \"*Group*\" 2>...",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"∙ᶜ\\|module Complex\" -A3 -B3 $D/Complexes.lagda.md | head -80",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '1,160p' $D/Cosets.lagda.md",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"module Group-Op\" -A 60 $D/Basic.lagda.md",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '261,340p' $D/Basic.lagda.md",
-      "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
+      "Bash reads outside the arm's roots (/): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda; echo ---; find / -name \"Complexes.agda\" -path \"*Group*\" 2>..."
     ],
     "deniedPaths" : [
     ],
     "shellClasses" : {
       "agda-batch" : 1,
-      "library-read" : 3,
-      "other" : 4
+      "library-read" : 7
     }
   },
   "via" : "both",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 5117,
+  "agdaMs" : 5861,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

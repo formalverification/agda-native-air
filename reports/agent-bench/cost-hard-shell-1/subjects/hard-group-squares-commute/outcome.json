@@ -57,7 +57,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 627,
+  "agdaMs" : 553,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

@@ -11,7 +11,7 @@
   "solved" : false,
   "restated" : false,
   "gate" : "isolation",
-  "gateDetail" : "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash a parameter expansion: rm -rf _build && agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --li...",
+  "gateDetail" : "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -52,8 +52,7 @@
     ],
     "violations" : [
       "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null",
-      "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
-      "Bash a parameter expansion: rm -rf _build && agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --li..."
+      "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa..."
     ],
     "deniedPaths" : [
     ],
@@ -66,7 +65,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 5196,
+  "agdaMs" : 5663,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

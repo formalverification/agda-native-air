@@ -8,10 +8,8 @@
   "stratum" : "agda-stdlib/novel",
   "hole" : "inverse-homo-commute",
   "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
-  "solved" : false,
+  "solved" : true,
   "restated" : false,
-  "gate" : "isolation",
-  "gateDetail" : "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -49,7 +47,6 @@
     "foreignToolUses" : [
     ],
     "violations" : [
-      "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
     ],
     "deniedPaths" : [
     ],
@@ -61,7 +58,7 @@
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 529,
+  "agdaMs" : 605,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

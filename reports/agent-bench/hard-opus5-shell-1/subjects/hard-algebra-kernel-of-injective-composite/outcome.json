@@ -8,10 +8,8 @@
   "stratum" : "agda-algebras/novel",
   "hole" : "kernel-of-injective-composite",
   "goal" : "IsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
-  "solved" : false,
+  "solved" : true,
   "restated" : false,
-  "gate" : "isolation",
-  "gateDetail" : "Bash a parameter expansion: L=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src; cat $L/Setoid/Homomorphisms/Kernels.agda; echo ====; cat $L/Setoid/Congruences/Lattice.agda; Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; cat $S/Homomorphisms/Kernels.lagda.md; echo =====; cat $S/Congruences/Lattice.lagda.md; Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; grep -n \"⊙-hom\" -A 12 -B 5 $S/Homomorphisms/Properties.lagda.md | head -60; echo ====; grep -rn \"IsInject...",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -49,22 +47,18 @@
     "foreignToolUses" : [
     ],
     "violations" : [
-      "Bash a parameter expansion: L=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src; cat $L/Setoid/Homomorphisms/Kernels.agda; echo ====; cat $L/Setoid/Congruences/Lattice.agda",
-      "Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; cat $S/Homomorphisms/Kernels.lagda.md; echo =====; cat $S/Congruences/Lattice.lagda.md",
-      "Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; grep -n \"⊙-hom\" -A 12 -B 5 $S/Homomorphisms/Properties.lagda.md | head -60; echo ====; grep -rn \"IsInject..."
     ],
     "deniedPaths" : [
     ],
     "shellClasses" : {
       "agda-batch" : 1,
-      "library-read" : 3,
-      "other" : 3
+      "library-read" : 6
     }
   },
   "via" : "shell",
   "verdictVia" : "shell",
   "agdaExit" : 0,
-  "agdaMs" : 4462,
+  "agdaMs" : 5008,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [

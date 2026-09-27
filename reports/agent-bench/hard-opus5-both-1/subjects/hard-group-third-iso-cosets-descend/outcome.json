@@ -11,7 +11,7 @@
   "solved" : false,
   "restated" : false,
   "gate" : "isolation",
-  "gateDetail" : "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures/Group*' -name '*.agda' 2>/dev/null | head -50; Bash reads outside the arm's roots (/): find / -name 'Cosets.agda*' 2>/dev/null | head -20; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"module Coset\" -A 60 $D/Cosets.lagda.md | head -100; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '1,60p;118,260p' $D/Cosets.lagda.md; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"record IsSubgroup\" -A 40 $D/Subgroups.lagda.md | head -60; echo ===; grep -n...",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures/Group*' -name '*.agda' 2>/dev/null | head -50; Bash reads outside the arm's roots (/): find / -name 'Cosets.agda*' 2>/dev/null | head -20; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries",
   "restatementEvidence" : [
   ],
   "original" : null,
@@ -64,22 +64,19 @@
     ],
     "violations" : [
       "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures/Group*' -name '*.agda' 2>/dev/null | head -50",
-      "Bash reads outside the arm's roots (/): find / -name 'Cosets.agda*' 2>/dev/null | head -20; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"module Coset\" -A 60 $D/Cosets.lagda.md | head -100",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '1,60p;118,260p' $D/Cosets.lagda.md",
-      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"record IsSubgroup\" -A 40 $D/Subgroups.lagda.md | head -60; echo ===; grep -n..."
+      "Bash reads outside the arm's roots (/): find / -name 'Cosets.agda*' 2>/dev/null | head -20; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries"
     ],
     "deniedPaths" : [
     ],
     "shellClasses" : {
-      "library-read" : 4,
-      "other" : 4
+      "library-read" : 7,
+      "other" : 1
     }
   },
   "via" : "both",
   "verdictVia" : "mcp",
   "agdaExit" : 0,
-  "agdaMs" : 4923,
+  "agdaMs" : 5792,
   "agdaTail" : "",
   "checkExit" : 0,
   "checkCodes" : [
