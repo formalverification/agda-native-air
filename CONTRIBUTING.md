@@ -101,6 +101,112 @@ descriptions.
 
 ---
 
+## Editing Agda in Emacs
+
+Inside `nix develop`, `agda` is a shell function: it runs the pinned Agda 2.8.0
+with `--library-file "$AGDA_DIR/libraries"`, the registry the shell writes at
+the root of each checkout, and that registry is the only place `agda-dojang`,
+the pinned standard library 2.3, and the pinned agda-algebras are registered.
+An Emacs started outside the shell sees none of this, so loading a benchmark
+fixture fails with `Library 'agda-dojang' not found`.  You do not have to start
+Emacs inside the shell; two steps give agda-mode the same Agda and the same
+registry.
+
+### 1. Pin the Agda: `nix build .#agda`
+
+The flake exposes the dev shells' own Agda (Agda 2.8.0 wrapped with the pinned
+standard library) as `packages.agda`, beside the pinned agda-algebras as
+`packages.agda-algebras`.  From any checkout, build both to links under your
+home:
+
+```sh
+nix build .#agda -o ~/.cache/agda-native-air/agda
+nix build .#agda-algebras -o ~/.cache/agda-native-air/agda-algebras
+```
+
+What the two commands give you is as follows:
+
++  `nix build .#agda` builds, or downloads from the project's Cachix cache,
+   exactly the `agda` the Agda-capable dev shells put on `PATH`, so
+   `~/.cache/agda-native-air/agda/bin/agda` is the pinned Agda at a path that
+   does not move, and `~/.cache/agda-native-air/agda/bin/agda-mode` is its
+   agda-mode;
++  each `-o` link is a garbage-collector root, so `nix-collect-garbage` cannot
+   delete the Agda, the standard library it wraps, or the agda-algebras copy the
+   registry names;
++  after `flake.lock` moves, the same two commands, run from a checkout at the
+   new pin, point the links at the new store paths.
+
+The registry itself, `agda/libraries`, is written by the dev shell, so enter a
+checkout's shell once (`nix develop`) before editing there; the registry names
+that checkout's own `agda-dojang`.
+
+### 2. Point agda-mode at it
+
+Add the following to your Emacs configuration (`~/.config/doom/config.el` under
+Doom Emacs, your `init.el` otherwise):
+
+```elisp
+;; agda-native-air: run the repository's pinned Agda with the library registry
+;; its dev shell writes (agda/libraries at the checkout's root) and its AGDA_DIR,
+;; for files in any checkout, without starting Emacs inside `nix develop'.
+;; agda-mode starts Agda from the mode's body, before any hook or directory-local
+;; variable applies, so the settings are bound around `agda2-restart' itself.
+;; One Agda process serves every buffer: after moving between projects, restart
+;; it with C-c C-x C-r.
+(defvar my/air-agda (expand-file-name "~/.cache/agda-native-air/agda/bin/agda")
+  "The pinned Agda 2.8.0 of agda-native-air, kept alive by a GC root.")
+
+(defun my/air-agda-restart (restart &rest args)
+  "Around `agda2-restart': in an agda-native-air checkout, use its Agda and registry."
+  (if-let* ((file (buffer-file-name))
+            (root (locate-dominating-file file "agda-dojang/agda-dojang.agda-lib"))
+            (registry (expand-file-name "agda/libraries" root))
+            ((file-exists-p registry)))
+      (let ((agda2-program-name my/air-agda)
+            (agda2-program-args (list (concat "--library-file=" registry)))
+            (process-environment (cons (concat "AGDA_DIR=" (expand-file-name "agda" root))
+                                       process-environment)))
+        (apply restart args))
+    (apply restart args)))
+
+(with-eval-after-load 'agda2-mode
+  (advice-add 'agda2-restart :around #'my/air-agda-restart))
+```
+
+Then, in a buffer of the checkout, `C-c C-x C-r` restarts Agda and `C-c C-l`
+loads the file.  The snippet is shaped by the following facts:
+
++  agda-mode starts Agda from the major mode's own body, before mode hooks or
+   directory-local variables apply, so a hook or a `.dir-locals.el` would take
+   effect only after a manual restart; the snippet binds its settings around
+   `agda2-restart` instead;
++  it passes only `--library-file`, not the shell function's `--library` flags,
+   because explicit `--library` flags make Agda ignore the file's own
+   `.agda-lib`, and a benchmark fixture then fails with
+   `ModuleNameDoesntMatchFileName`;
++  `AGDA_DIR` points at the checkout's `agda/`, so a file with no `.agda-lib` of
+   its own (the standard-library benchmark tiers, for instance) gets the
+   registry's defaults, `agda-dojang` and `standard-library`;
++  one Agda process serves every buffer, so after moving between checkouts, or
+   between this repository and another project, restart it with `C-c C-x C-r`;
+   files outside a checkout keep whatever Agda your configuration already uses.
+
+agda-mode refuses an Agda whose version differs from its own.  If your Emacs
+has no agda-mode 2.8.0, load the pinned one instead of your own:
+
+```elisp
+(load-file (let ((coding-system-for-read 'utf-8))
+             (shell-command-to-string "~/.cache/agda-native-air/agda/bin/agda-mode locate")))
+```
+
+The same three settings serve any other editor: run
+`~/.cache/agda-native-air/agda/bin/agda` with
+`--library-file=<checkout>/agda/libraries` and `AGDA_DIR=<checkout>/agda`.
+
+
+---
+
 ## Issues, branching, pull requests
 
 ### Issues

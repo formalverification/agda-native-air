@@ -282,9 +282,11 @@ The `depend:` names resolve against the repo registry `agda/libraries`,
 which every dev-shell entry (re)writes.  A gold checks green; an obligation
 checks to exactly one `UnsolvedInteractionMetas` error at its hole — the
 expected outcome for a file whose point is the open hole (in an editor it
-simply loads, hole open).  The harness itself never relies on these project
-files: `EvalBenchmark` and the search loop pass their library flags
-explicitly, so fixture verification is identical with or without them.
+simply loads, hole open).  An editor started outside the dev shell has to be
+given that registry and the pinned Agda: `CONTRIBUTING.md`, "Editing Agda in
+Emacs", shows how.  The harness itself never relies on these project files:
+`EvalBenchmark` and the search loop pass their library flags explicitly, so
+fixture verification is identical with or without them.
 
 ## The agda-algebras library
 
