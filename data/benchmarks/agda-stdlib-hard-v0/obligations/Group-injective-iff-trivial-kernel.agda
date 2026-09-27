@@ -1,6 +1,6 @@
 -- Group-injective-iff-trivial-kernel.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/gold/Group-injective-iff-trivial-kernel.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/obligations/Group-injective-iff-trivial-kernel.agda
 --
 -- Benchmark obligation: hard-group-injective-iff-trivial-kernel
 -- Difficulty: non-obvious
@@ -10,7 +10,6 @@
 --
 -- A group homomorphism is injective if and only if its kernel is trivial.
 --
--- GOLD WANTED
 module Group-injective-iff-trivial-kernel where
 
 open import AgdaDojang.Debug

@@ -1,6 +1,6 @@
 -- Group-inversion-homo-iff-commutative.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/gold/Group-inversion-homo-iff-commutative.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/gold/Group-inversion-homo-iff-commutative.agda
 --
 -- Benchmark obligation: hard-group-inversion-homo-iff-commutative
 -- Difficulty: non-obvious

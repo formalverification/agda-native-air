@@ -1,6 +1,6 @@
 -- Group-surjective-image-commutative.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/obligations/Group-surjective-image-commutative.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/gold/Group-surjective-image-commutative.agda
 --
 -- Benchmark obligation: hard-group-surjective-image-commutative
 -- Difficulty: compositional
@@ -10,6 +10,7 @@
 --
 -- The image of a commutative group under a surjective homomorphism is commutative.
 --
+-- GOLD WANTED
 module Group-surjective-image-commutative where
 
 open import AgdaDojang.Debug

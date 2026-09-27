@@ -1,6 +1,6 @@
 -- Group-conjugation-automorphism.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/gold/Group-conjugation-automorphism.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/obligations/Group-conjugation-automorphism.agda
 --
 -- Benchmark obligation: hard-group-conjugation-automorphism
 -- Difficulty: compositional
@@ -10,7 +10,6 @@
 --
 -- Conjugation by a fixed g is an automorphism of the group.
 --
--- GOLD WANTED
 module Group-conjugation-automorphism where
 
 open import AgdaDojang.Debug

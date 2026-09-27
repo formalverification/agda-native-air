@@ -1,6 +1,6 @@
 -- Group-involutive-commute.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/gold/Group-involutive-commute.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/gold/Group-involutive-commute.agda
 --
 -- Benchmark obligation: hard-group-involutive-commute
 -- Difficulty: compositional
@@ -23,4 +23,14 @@ module _ {c ℓ : Level} (G : Group c ℓ) where
   open Group G
 
   involutive-commute : (∀ x → x ∙ x ≈ ε) → Commutative _≈_ _∙_
-  involutive-commute inv = {!!}
+  involutive-commute inv x y = begin
+    x ∙ y                               ≈˘⟨ {!!} ⟩
+    ε ∙ (x ∙ y)                         ≈˘⟨ {!!} ⟩
+    ε ∙ (x ∙ y) ∙ ε                     ≈˘⟨ {!!} ⟩
+    ε ∙ (x ∙ y) ∙ (x ∙ y)               ≈˘⟨ {!!} ⟩
+    (x ∙ y) ∙ (x ∙ y)                   ≈˘⟨ {!!} ⟩
+    (y ∙ x) ∙ (y ∙ x)                   ≈˘⟨ {!!} ⟩
+    ε                                   ≈˘⟨ {!!} ⟩
+    y ∙ x                               ∎
+    where
+    open import Relation.Binary.Reasoning.Setoid setoid

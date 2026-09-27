@@ -1,6 +1,6 @@
 -- Group-unique-involution-central.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/obligations/Group-unique-involution-central.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/gold/Group-unique-involution-central.agda
 --
 -- Benchmark obligation: hard-group-unique-involution-central
 -- Difficulty: non-obvious
@@ -10,6 +10,7 @@
 --
 -- A unique nontrivial involution is central: if a ∙ a ≈ ε, a is not ε, and every involution is ε or a, then b ∙ a ∙ b ⁻¹ ≈ a for every b.
 --
+-- GOLD WANTED
 module Group-unique-involution-central where
 
 open import AgdaDojang.Debug

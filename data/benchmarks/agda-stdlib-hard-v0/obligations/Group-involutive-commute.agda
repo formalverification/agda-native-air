@@ -1,6 +1,6 @@
 -- Group-involutive-commute.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/obligations/Group-involutive-commute.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/obligations/Group-involutive-commute.agda
 --
 -- Benchmark obligation: hard-group-involutive-commute
 -- Difficulty: compositional

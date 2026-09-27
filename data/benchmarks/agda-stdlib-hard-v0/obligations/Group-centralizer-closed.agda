@@ -1,6 +1,6 @@
 -- Group-centralizer-closed.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/obligations/Group-centralizer-closed.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/obligations/Group-centralizer-closed.agda
 --
 -- Benchmark obligation: hard-group-centralizer-closed
 -- Difficulty: compositional

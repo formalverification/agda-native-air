@@ -1,6 +1,6 @@
 -- Group-squares-commute.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/obligations/Group-squares-commute.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/gold/Group-squares-commute.agda
 --
 -- Benchmark obligation: hard-group-squares-commute
 -- Difficulty: non-obvious
@@ -10,6 +10,7 @@
 --
 -- If (x ∙ y)² ≈ x² ∙ y² for all x and y, the group is commutative.
 --
+-- GOLD WANTED
 module Group-squares-commute where
 
 open import AgdaDojang.Debug

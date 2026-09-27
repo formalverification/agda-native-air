@@ -1,6 +1,6 @@
 -- Group-inverse-homo-commute.agda
 --
--- File: data/benchmarks/agda-algebras-hard-v0/gold/Group-inverse-homo-commute.agda
+-- File: data/benchmarks/agda-stdlib-hard-v0/gold/Group-inverse-homo-commute.agda
 --
 -- Benchmark obligation: hard-group-inverse-homo-commute
 -- Difficulty: compositional
