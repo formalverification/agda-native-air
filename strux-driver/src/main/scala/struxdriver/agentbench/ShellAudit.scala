@@ -27,7 +27,19 @@
   *       unterminated quote.  A path could be hiding in the result, so the
   *       whole command fails and no path check is attempted.  A `$` inside
   *       single quotes is literal and is not an expansion, so an anchored
-  *       grep pattern passes.
+  *       grep pattern passes.  The special parameters that expand to a
+  *       number or to the shell's option letters (`$?`, `$#`, `$$`, `$!`,
+  *       `$-`) name no path, so they are read as literal text: `agda M.agda;
+  *       echo "exit=$?"` is the ordinary way to see a batch verdict (issue
+  *       #189's hard-tier cost pair).  `$@`, `$*`, `$_`, and the positional
+  *       parameters can carry a path and stay violations.  A variable the
+  *       call itself binds to a literal, in a simple command of its own
+  *       (`G=<library>/src/Group; sed -n '1,90p' $G/Basic.lagda.md`), is read
+  *       as that literal wherever the shell would expand it later in the call
+  *       (`bindLiterals`), so its paths are checked like any others; a
+  *       variable used before it is bound, bound in a pipeline stage or as a
+  *       prefix of another command, or bound to a value that itself expands,
+  *       is still unaccountable.
   *    2. A program it does not model (`allowedPrograms`): anything that runs
   *       another program (`bash`, `env`, `xargs`, `eval`, `timeout`), a shell
   *       keyword (`for`, `while`, `if`), an interpreter, or simply a tool that
@@ -185,8 +197,10 @@ object ShellAudit {
   /** Lex one command into words and operators, reporting the first construct
     * that hides a path from the reader instead of guessing past it.
     */
-  private[agentbench] def lex(raw: String): Lexed = {
-    val s = stripHeredocs(raw)
+  private[agentbench] def lex(raw: String): Lexed = lexText(stripHeredocs(raw))
+
+  /** `lex` on a command whose here-doc bodies are already stripped. */
+  private def lexText(s: String): Lexed = {
     @annotation.tailrec
     def go(i: Int, toks: Vector[Tok], cur: Option[String], sq: Boolean): Lexed = {
       val flush: Vector[Tok] = cur.fold(toks)(w => toks :+ Word(w, sq))
@@ -204,6 +218,7 @@ object ShellAudit {
             case Right((t, j))  => go(j, toks, Some(cur.getOrElse("") + t), sq)
           }
         case '`'                                          => Lexed(flush, Some("a command substitution"))
+        case '$' if i + 1 < s.length && numeric(s.charAt(i + 1)) => go(i + 2, toks, Some(cur.getOrElse("") + s.substring(i, i + 2)), sq)
         case '$' if i + 1 < s.length && expands(s.charAt(i + 1)) =>
           Lexed(flush, Some(if (s.charAt(i + 1) == '(') "a command substitution" else "a parameter expansion"))
         case c if c.isWhitespace && c != '\n'              => go(i + 1, flush, None, sq = false)
@@ -221,6 +236,9 @@ object ShellAudit {
 
   private def expands(c: Char): Boolean = c == '(' || c == '{' || c.isLetterOrDigit || c == '_' || "?#*@!$-".contains(c)
 
+  /** The special parameters whose value is a number or option letters, never a path. */
+  private def numeric(c: Char): Boolean = "?#$!-".contains(c)
+
   /** A double-quoted run: expansion inside it is real, so it is reported. */
   private def quoted(s: String, from: Int, q: Char): Either[String, (String, Int)] = {
     @annotation.tailrec
@@ -229,6 +247,7 @@ object ShellAudit {
       else s.charAt(i) match {
         case '\\' if i + 1 < s.length                      => go(i + 2, acc + s.charAt(i + 1))
         case '`'                                           => Left("a command substitution")
+        case '$' if i + 1 < s.length && numeric(s.charAt(i + 1)) => go(i + 2, acc + s.substring(i, i + 2))
         case '$' if i + 1 < s.length && expands(s.charAt(i + 1)) =>
           Left(if (s.charAt(i + 1) == '(') "a command substitution" else "a parameter expansion")
         case c if c == q                                   => Right((acc, i + 1))
@@ -254,6 +273,94 @@ object ShellAudit {
       Some("&" + tail)
     } else None
     (pre + op + dup.getOrElse(""), i + op.length + dup.fold(0)(_.length), fd)
+  }
+
+  // ---------------------------------------------------------- the bindings
+
+  private val nameStart: Char => Boolean = c => c.isLetter && c < 128 || c == '_'
+  private val nameChar: Char => Boolean  = c => c.isLetterOrDigit && c < 128 || c == '_'
+
+  /** A word that assigns a shell variable, `NAME=value`: no program runs. */
+  private[agentbench] def isAssignment(word: String): Boolean =
+    word.indexOf('=') match {
+      case k if k > 0 => nameStart(word.charAt(0)) && word.substring(0, k).forall(nameChar)
+      case _          => false
+    }
+
+  /** Read the literal bindings a call makes and substitute them where the
+    * shell would expand them (issue #189).  A simple command that is nothing
+    * but `NAME=value`, at the start of the call or after `;`, `&&`, `||`, or a
+    * newline, binds NAME when its value, unquoted, is plain path text: no
+    * whitespace, quote, backslash, `$`, backtick, or control operator, so the
+    * substitution can neither hide a path nor invent a command.  Every later
+    * `$NAME` or `${NAME}` outside single quotes is then replaced by the value.
+    * Anything else is left as written, so the lexer still reports it: a use
+    * before the binding, `${NAME:-x}` and the other operator forms, a binding
+    * in a pipeline stage or before `&` (a subshell's), and a prefix
+    * assignment (`NAME=v cmd`, which the shell does not apply to its own
+    * words), which also forgets any earlier binding of NAME.  It reads a
+    * command whose here-doc bodies are already stripped, since a body is data
+    * and its quotes would mislead the quote tracking.
+    */
+  private[agentbench] def bindLiterals(s: String): String = {
+    def nameEnd(from: Int): Int = {
+      @annotation.tailrec def go(j: Int): Int = if (j < s.length && nameChar(s.charAt(j))) go(j + 1) else j
+      if (from < s.length && nameStart(s.charAt(from))) go(from + 1) else from
+    }
+    // An assignment's right-hand side from `from`: its unquoted text, when
+    // that text is plain, and the index after it.
+    def value(from: Int): (Option[String], Int) = {
+      @annotation.tailrec
+      def go(j: Int, acc: String, plain: Boolean): (Option[String], Int) =
+        if (j >= s.length || s.charAt(j).isWhitespace || ";&|<>()".contains(s.charAt(j)))
+          (Option.when(plain && acc.forall(ch => !"'\"\\`$".contains(ch)))(acc), j)
+        else s.charAt(j) match {
+          case q @ ('\'' | '"') => s.indexOf(q, j + 1) match {
+            case -1 => (None, s.length)
+            case k  => val inner = s.substring(j + 1, k); go(k + 1, acc + inner, plain && !inner.exists(_.isWhitespace))
+          }
+          case '\\' | '$' | '`' => go(j + 1, acc, plain = false)
+          case c                 => go(j + 1, acc + c, plain)
+        }
+      go(from, "", plain = true)
+    }
+    // The binding counts only when the simple command ends at the value, at a
+    // separator that keeps the current shell.
+    def endsSimple(from: Int): Boolean = {
+      val j = s.indexWhere(c => !(c.isWhitespace && c != '\n'), from)
+      j < 0 || s.charAt(j) == ';' || s.charAt(j) == '\n' || s.startsWith("&&", j) || s.startsWith("||", j)
+    }
+    @annotation.tailrec
+    def go(i: Int, quote: Char, atStart: Boolean, env: Map[String, String], out: String): String =
+      if (i >= s.length) out
+      else {
+        val c = s.charAt(i)
+        if (quote == '\'') go(i + 1, if (c == '\'') 0.toChar else quote, atStart = false, env, out + c)
+        else if (c == '\\' && i + 1 < s.length) go(i + 2, quote, atStart = false, env, out + c + s.charAt(i + 1))
+        else if (c == '$' && i + 1 < s.length) {
+          val braced = s.charAt(i + 1) == '{'
+          val from   = if (braced) i + 2 else i + 1
+          val end    = nameEnd(from)
+          val close  = if (!braced) end else if (end < s.length && s.charAt(end) == '}') end + 1 else -1
+          env.get(s.substring(from, end)).filter(_ => end > from && close > 0) match {
+            case Some(v) => go(close, quote, atStart = false, env, out + v)
+            case None    => go(i + 1, quote, atStart = false, env, out + c)
+          }
+        }
+        else if (quote == '"') go(i + 1, if (c == '"') 0.toChar else quote, atStart = false, env, out + c)
+        else if (c == '\'' || c == '"') go(i + 1, c, atStart = false, env, out + c)
+        else if (c == ';' || c == '\n') go(i + 1, quote, atStart = true, env, out + c)
+        else if (s.startsWith("&&", i) || s.startsWith("||", i)) go(i + 2, quote, atStart = true, env, out + s.substring(i, i + 2))
+        else if (c.isWhitespace) go(i + 1, quote, atStart, env, out + c)
+        else if (atStart && nameStart(c) && nameEnd(i) < s.length && s.charAt(nameEnd(i)) == '=') {
+          val name       = s.substring(i, nameEnd(i))
+          val (v, after) = value(nameEnd(i) + 1)
+          val env2       = v.filter(_ => endsSimple(after)).fold(env - name)(x => env + (name -> x))
+          go(after, quote, atStart = false, env2, out + s.substring(i, after))
+        }
+        else go(i + 1, quote, atStart = false, env, out + c)
+      }
+    go(0, 0.toChar, atStart = true, Map.empty, "")
   }
 
   // --------------------------------------------------------------- the audit
@@ -332,7 +439,7 @@ object ShellAudit {
     */
   def inspect(command: String, roots: ShellRoots): ShellVerdict = {
     val cmd    = oneLine(command)
-    val lexed  = lex(command)
+    val lexed  = lexText(bindLiterals(stripHeredocs(command)))
     def fail(why: String): Vector[String] = Vector(s"Bash $why: $cmd")
     lexed.opaque match {
       // Unaccountable as a whole: no path check is attempted, because the
@@ -355,7 +462,7 @@ object ShellAudit {
     def fail(why: String): Vector[String] = Vector(s"Bash $why: $cmd")
     val prog = s.words.headOption.map(w => Paths.get(w.text).getFileName.toString).getOrElse("")
     val args = s.words.drop(1)
-    if (prog.isEmpty) (cwd, Vector.empty)
+    if (prog.isEmpty || s.words.forall(w => isAssignment(w.text))) (cwd, Vector.empty)
     else if (prog == "cd") {
       args.map(_.text).find(!_.startsWith("-")).map(t => resolve(cwd, t)) match {
         case Some(Some(p)) if roots.canRead(p) => (p, Vector.empty)

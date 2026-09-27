@@ -123,6 +123,43 @@ final class ShellAuditSpec extends AnyFunSuite with Matchers {
     ok(s"grep 'comm$$' $corpus")
   }
 
+  test("a special parameter that expands to a number names no path, so the exit-status idiom passes") {
+    // Issue #189: the hard tier's first cost pair failed a row that stayed
+    // inside its roots on `echo "exit=$?"` after the judge's own command.
+    ok("agda --safe -i . Nat-plus-comm.agda; echo \"exit=$?\"")
+    ok("agda --safe -i . Nat-plus-comm.agda; echo exit=$?")
+    ok("echo $$ $# $! $-")
+    // The parameters that can carry a path stay violations.
+    bad("cat $1").size should be >= 1
+    bad("cat \"$@\"").size should be >= 1
+    bad("cat $*").size should be >= 1
+    bad("cat $_").size should be >= 1
+    bad("cat $?$HOME").size should be >= 1
+  }
+
+  test("a variable the call binds to a literal is read as that literal, so its paths are checked") {
+    // Issue #189: Opus names a library directory once and reads through it.
+    ok(s"G=$stdlib/Algebra; sed -n '1,90p' $$G/Bundles.agda")
+    ok(s"G=$stdlib && grep -n Group $${G}/Algebra/Bundles.agda | head -40")
+    ok(s"W=$work; agda --safe -i $$W $$W/Nat-plus-comm.agda; echo \"exit=$$?\"")
+    ok(s"G=\"$stdlib\"; cat \"$$G/Algebra.agda\"")
+    cls(s"G=$stdlib/Algebra; sed -n '1,90p' $$G/Bundles.agda") shouldBe "library-read"
+    // The substitution is literal, so a path outside the roots is still found.
+    bad("E=/etc; cat $E/passwd").head should include ("/etc/passwd")
+    bad(s"G=$stdlib; cat $$G/../../../etc/passwd").size shouldBe 1
+    // What the shell would not bind, or what this reader cannot see, stays a violation.
+    bad(s"cat $$G/x; G=$stdlib").size should be >= 1                  // used before it is bound
+    bad(s"G=$stdlib cat $$G/x").size should be >= 1                   // a prefix assignment
+    bad(s"G=$stdlib | cat $$G/x").size should be >= 1                 // a pipeline stage's own
+    bad(s"G=$stdlib; G=/x cat y; cat $$G/z").size should be >= 1      // forgotten by a prefix
+    bad("G=$(pwd); cat $G/x").size should be >= 1                     // a value that expands
+    bad("G=\"/a b\"; cat $G").size should be >= 1                      // not plain path text
+    bad("G=\"'\"; cat $G /etc/passwd $G").size should be >= 1          // a quote in the value
+    bad(s"G=$stdlib; cat $${G:-/etc}/passwd").size should be >= 1     // an operator form
+    // A dollar in single quotes stays literal, bound or not.
+    ok(s"G=$stdlib; grep -n 'x$$G' $$G/Algebra.agda")
+  }
+
   test("every violation names the command, so the report can quote what failed the gate") {
     bad("cat /etc/passwd").head should include ("cat /etc/passwd")
   }
