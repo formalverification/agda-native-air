@@ -131,10 +131,11 @@ As of September 2026 the following are built, measured, and in use.
    [card](docs/corpora/agda-algebras-v0.1.md), published as the
    [`agda-algebras-corpus-v0.1`](https://github.com/formalverification/agda-native-air/releases/tag/agda-algebras-corpus-v0.1)
    release).
-+  **A benchmark of 55 proof obligations** with gold solutions, in three
-   library tiers: 22 from the standard library, 21 mined from agda-algebras at
-   the corpus commit, and 12 standard-library obligations whose proofs need a
-   lemma the fixture imports but never names (the haystack tier).  Every row is
++  **A benchmark of 69 proof obligations** with gold solutions: 22 from the
+   standard library, 21 mined from agda-algebras at the corpus commit, 12
+   standard-library obligations whose proofs need a lemma the fixture imports
+   but never names (the haystack tier), and 14 posed in group theory and
+   universal algebra with no proof on disk (the hard tier).  Every row is
    classified into one of three difficulty tiers.  Every gold type-checks under
    the pinned toolchain, and CI re-verifies a slice whenever the benchmark, the
    Scala driver, or the flake changes.  See
@@ -162,7 +163,7 @@ As of September 2026 the following are built, measured, and in use.
    and numbers are [ADR 0001](docs/adr/0001-proof-search-on-agda-mcp.md).
 +  **An agent in the loop, measured**
    ([#154](https://github.com/formalverification/agda-native-air/issues/154)):
-   a frontier model driving the server over the same 55 obligations, one
+   a frontier model driving the server over the 55 library obligations, one
    fresh session per obligation with the thirteen tools and the one file,
    judged by the gold verifier's own `agda` invocation.  Sonnet 5 solves 46
    of 55 and Opus 5 solves 54 of 55 with the server; with a shell holding the
@@ -177,6 +178,10 @@ As of September 2026 the following are built, measured, and in use.
    ([#191](https://github.com/formalverification/agda-native-air/issues/191)),
    a server arm's per-turn context fell by a third and its cost by 17 to
    19 %, with the same tool mix within the run-to-run spread.
+   On the hard tier, where there is nothing to copy, Opus 5 proves all 14
+   rows with the server, with a shell, and with both, so that tier measures
+   the model's ceiling rather than the tools
+   ([#189](https://github.com/formalverification/agda-native-air/issues/189)).
    The search's 8 and 14 are a different instrument, not a baseline for the
    agents; which instrument produced every number in this section, and how to
    tell a win from a loss, is
