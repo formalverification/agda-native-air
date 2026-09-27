@@ -456,15 +456,18 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     entry.taggedValues("target:").size shouldBe 4
   }
 
-  test("the committed index: every agda-algebras row carries one restates: tag; the frozen stdlib rows carry none") {
+  test("the committed index: every mined agda-algebras row carries one restates: tag; the frozen stdlib rows and the hard tier carry none") {
     val index = Paths.get(sys.props("user.dir")).getParent.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.exists(index), s"index not found at $index")
-    val rows = Scaffold.readIndex(index, None).unsafeRunSync()
-    val alg  = rows.filter(_.source == "agda-algebras")
+    val rows  = Scaffold.readIndex(index, None).unsafeRunSync()
+    val novel = rows.filter(_.stratum == "agda-algebras/novel")
+    val alg   = rows.filter(_.source == "agda-algebras").filterNot(novel.contains)
     alg.size shouldBe 21
     alg.foreach(e => e.taggedValues("restates:").size shouldBe 1)
     alg.count(_.taggedValues("target:").nonEmpty) shouldBe 18
-    rows.filter(_.source == "agda-stdlib").filterNot(_.id.startsWith("haystack-"))
+    // The hard tier (issue #189) has no original by construction, so no ground truth to rank.
+    novel.size should be > 0
+    (rows.filter(_.source == "agda-stdlib").filterNot(_.id.startsWith("haystack-")) ++ novel)
       .foreach(e => e.tags.exists(t => t.startsWith("restates:") || t.startsWith("target:")) shouldBe false)
   }
 }

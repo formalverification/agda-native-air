@@ -5,16 +5,18 @@
 
 The baseline benchmark is a set of Agda proof obligations with committed gold
 solutions, used as the standard evaluation set for subsequent experiments.
-Every gold solution type-checks under the pinned toolchain; type-checking is the
-ground truth for a benchmark entry.
+Every finished gold solution type-checks under the pinned toolchain;
+type-checking is the ground truth for a benchmark entry.  (A gold still wanted
+on the hard tier of issue [#189] is the obligation marked `-- GOLD WANTED`.)
 
 ---
 
 ## Contents (v0)
 
-The current suite has **55 obligations** from two libraries, spanning the three
+The current suite has **73 obligations** from two libraries, spanning the three
 difficulty tiers of `docs/benchmarks/taxonomy.md`: two tiers cut from the Agda
-standard library and one from agda-algebras.
+standard library, one mined from agda-algebras, and one hard tier posed so that
+no proof of it is on disk.
 
 The **`agda-stdlib` tier** (22 obligations) is the original [M1-5] cut and is
 **frozen**: the P1 baseline (issue #113) is quoted against it, so it only ever
@@ -54,6 +56,23 @@ module (the haystack) rather than read it off the fixture:
 
 Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
 (7 obligations), `Data.List.Properties` (3), `Data.Bool.Properties` (2).
+
+The **`agda-algebras-hard` tier** (18 obligations, issue [#189]) is posed
+rather than mined: statements in group theory and universal algebra written
+for the tier, nine in the standard library's `Algebra.Bundles.Group`
+vocabulary and nine in agda-algebras', each under a module telescope, tagged
+`stratum:novel` and so reported as `agda-algebras/novel`.  Its README
+(`agda-algebras-hard-v0/README.md`) records the novelty check row by row and
+each row's gold status; while a gold is wanted, its twin is the obligation with
+the hole still in it and a `-- GOLD WANTED` line, which the CI slice never
+selects.
+
+| Tier            | Count | Examples                                                                   |
+|-----------------|-------|----------------------------------------------------------------------------|
+| `compositional` | 9     | `x ∙ x ≈ ε` for all `x` makes a group abelian, conjugation is an automorphism, `H ∩ K` is normal in `H` |
+| `non-obvious`   | 9     | `(x ∙ y)² ≈ x² ∙ y²` makes a group abelian, a unique involution is central, the commutator subgroup |
+
+Domains: group, algebra.
 
 ### agda-algebras tier: selection criteria and provenance
 
@@ -175,9 +194,13 @@ data/benchmarks/
 ├── agda-algebras-v0/
 │   ├── obligations/                   # 21 modules, one {!!} hole each
 │   └── gold/                          # solved twins
-└── agda-stdlib-haystack-v0/
-    ├── obligations/                   # 12 modules, one {!!} hole each
-    └── gold/                          # solved twins, needle named qualified
+├── agda-stdlib-haystack-v0/
+│   ├── obligations/                   # 12 modules, one {!!} hole each
+│   └── gold/                          # solved twins, needle named qualified
+└── agda-algebras-hard-v0/
+    ├── README.md                      # the novelty check and the gold status
+    ├── obligations/                   # 18 modules, one {!!} hole each
+    └── gold/                          # twins; "-- GOLD WANTED" until filled
 ```
 
 Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
@@ -309,3 +332,5 @@ These fixtures are Agda source written for this repository, so the repository's
 code license applies: [Apache-2.0](../../LICENSE).  They import the Agda standard
 library, which carries its own (MIT) license and is not vendored here.  See the
 "Licensing" section of the top-level `README.md` for the wider policy on data.
+
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
