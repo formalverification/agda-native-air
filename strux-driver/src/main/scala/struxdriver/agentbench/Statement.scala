@@ -7,15 +7,22 @@
   *
   *  Purpose
   *  -------
-  *  The two lines of an obligation that the protocol freezes as TEXT (issue
-  *  #154): the module line and every original import line.  These are the
-  *  scope the statement was posed in, and whether they are still there is a
-  *  diff, not a parse: the final file is compared line for line, with comments
-  *  stripped on both sides so a commented-out copy cannot stand in for the
-  *  real one (Copilot on PR #158).  Everything else the judge wants to know
-  *  about the statement it asks Agda (Judge.scala): what the definition's
-  *  type is, whether the file is safe, whether a hole remains, what the body
-  *  refers to.  Nothing here classifies a signature or a clause.
+  *  The lines of an obligation that the protocol freezes as TEXT (issue
+  *  #154): the module line and every original import line, and (issue #189)
+  *  every other line outside the definition with the hole, the scope lines: a
+  *  module telescope and its opens, and any definition the statement names.
+  *  These are the scope the statement was posed in, and whether they are
+  *  still there is a diff, not a parse: the final file is compared line for
+  *  line, with comments stripped on both sides so a commented-out copy cannot
+  *  stand in for the real one (Copilot on PR #158).  The mined tiers'
+  *  obligations have no scope lines (the module line, the imports, and the
+  *  definition are the whole file), so for them the freeze is the #154 one.
+  *  Everything else the judge wants to know about the statement it asks Agda
+  *  (Judge.scala): what the definition's type is, whether the file is safe,
+  *  whether a hole remains, what the body refers to.  The one reading of
+  *  layout here is where the definition with the hole ends: its declaring
+  *  lines and the lines indented under them, which is Agda's layout rule read
+  *  off the indentation; nothing classifies a signature or a clause.
   *
   *  `Propose.Imports` (search package) also reads import lines, for the fixed
   *  proposer's lemma pool (module and `using` names); this reader only asks
@@ -73,11 +80,37 @@ object Code {
     stripComments(source).split("\n", -1).toVector.map(_.replaceAll("\\s+$", "")).filterNot(_.isEmpty)
 }
 
-/** The frozen text of an obligation: its module line and its import lines. */
-final case class Statement(hole: String, moduleLine: String, importLines: Vector[String])
+/** The frozen text of an obligation: its module line, its import lines, and
+  * its scope lines, every other code line outside the definition with the
+  * hole, in the obligation's order (empty on every mined tier's obligation).
+  */
+final case class Statement(hole: String, moduleLine: String, importLines: Vector[String], scopeLines: Vector[String])
 
 object Statement {
   private val WherePrefix = """^where\s+""".r
+
+  /** A line's indentation, in characters. */
+  def indent(line: String): Int = line.segmentLength(_.isWhitespace)
+
+  /** The line declares `hole`: after its indentation it is the name, alone
+    * (a signature continued on the next line) or followed by whitespace.
+    */
+  def declares(line: String, hole: String): Boolean = {
+    val t = line.dropWhile(_.isWhitespace)
+    t == hole || (t.startsWith(hole) && t.charAt(hole.length).isWhitespace)
+  }
+
+  /** Where the definition with the hole sits among the code lines: from its
+    * first declaring line, through every later line indented deeper (the rest
+    * of a signature, a clause's body, a `where` block) or declaring it again
+    * at the same indentation (a further clause).
+    */
+  private def holeBlock(lines: Vector[String], hole: String): Option[Range] =
+    Some(lines.indexWhere(declares(_, hole))).filter(_ >= 0).map { start =>
+      val column = indent(lines(start))
+      val end    = lines.indexWhere(l => indent(l) < column || (indent(l) == column && !declares(l, hole)), start + 1)
+      start until (if (end < 0) lines.size else end)
+    }
 
   /** The import statement a line carries (`open import M ...` or `import M
     * ...`), with a leading `where` removed (`  where open import M using (x)`),
@@ -91,15 +124,19 @@ object Statement {
   def isImport(line: String): Boolean = importText(line).isDefined
 
   /** Read the frozen text of an obligation; Left when it has no module line or
-    * never mentions the definition it is said to declare.
+    * never declares the definition it is said to declare.  The declaration
+    * may be indented, under a module telescope (issue #189).
     */
   def of(obligation: String, hole: String): Either[String, Statement] = {
-    val lines = Code.keptLines(obligation)
+    val lines    = Code.keptLines(obligation)
+    val topLevel = (l: String) => !l.head.isWhitespace && isImport(l)
     for {
-      moduleLine <- lines.find(l => l.startsWith("module ") && l.endsWith(" where"))
-                      .toRight("obligation has no top-level module line")
-      _          <- if (lines.exists(l => l.startsWith(hole) && l.length > hole.length && l.charAt(hole.length).isWhitespace)) Right(())
-                    else Left(s"obligation never declares `$hole` at column 0")
-    } yield Statement(hole, moduleLine, lines.filter(l => !l.head.isWhitespace && isImport(l)))
+      moduleAt <- Some(lines.indexWhere(l => l.startsWith("module ") && l.endsWith(" where"))).filter(_ >= 0)
+                    .toRight("obligation has no top-level module line")
+      block    <- holeBlock(lines, hole).toRight(s"obligation never declares `$hole`")
+    } yield {
+      val scope = lines.indices.filterNot(i => i == moduleAt || block.contains(i) || topLevel(lines(i))).map(lines).toVector
+      Statement(hole, lines(moduleAt), lines.filter(topLevel), scope)
+    }
   }
 }

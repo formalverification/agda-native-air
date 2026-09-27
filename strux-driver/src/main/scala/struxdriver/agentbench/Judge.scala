@@ -15,7 +15,15 @@
   *
   *    1. preservation: the module line and every original import line are
   *       present (a line diff, comments aside; added import lines allowed and
-  *       reported).
+  *       reported); and every other line outside the definition with the
+  *       hole, the code the statement is posed in (a module telescope, its
+  *       opens, a definition the statement names; issue #189), is present
+  *       too, each declaration's lines as one run with nothing continuing
+  *       it, the runs in the obligation's order.  Lines may be added between
+  *       declarations.  The statement gate below compares the definition's
+  *       type by the names it mentions, so without this a file could keep the
+  *       type and change what a named predicate means.  The mined tiers'
+  *       obligations have no such lines.
   *    2. escape: `check_file` under `--safe`, whose answer must be usable at
   *       all (`Checked.usable`: it did not time out, it carries an exit code,
   *       and the server's own boolean agrees with it; anything else leaves
@@ -105,6 +113,57 @@ object Gates {
         val originals = st.importLines.toSet
         Right(kept.flatMap(Statement.importText).filterNot(originals).distinct)
     }
+  }
+
+  /** Agda's reserved words that can open a line.  A line led by one is not a
+    * definition, so a shared first word never joins it to its neighbour.
+    */
+  private val Keywords: Set[String] = Set("abstract", "constructor", "data", "field", "import", "in", "infix",
+    "infixl", "infixr", "instance", "interleaved", "let", "macro", "module", "mutual", "opaque", "open", "pattern",
+    "postulate", "primitive", "private", "record", "rewrite", "syntax", "unfolding", "variable", "where", "with")
+
+  private def firstWord(line: String): String = line.dropWhile(_.isWhitespace).takeWhile(c => !c.isWhitespace)
+
+  /** `next` continues the declaration `head` begins: it is indented deeper,
+    * or it is another line of the same definition (its signature or a
+    * further clause) at the same indentation.  A `module` line begins
+    * nothing: the lines below it are its body, where a file may add its own.
+    */
+  private def continues(head: String, next: String): Boolean = {
+    val (h, n) = (Statement.indent(head), Statement.indent(next))
+    !head.dropWhile(_.isWhitespace).startsWith("module ") &&
+      (n > h || (n == h && !Keywords(firstWord(head)) && firstWord(next) == firstWord(head)))
+  }
+
+  /** The scope lines grouped into declarations, each a first line and the
+    * lines that continue it.
+    */
+  def declarations(scope: Vector[String]): Vector[Vector[String]] =
+    scope.foldLeft(Vector.empty[Vector[String]]) {
+      case (done :+ last, line) if continues(last.head, line) => done :+ (last :+ line)
+      case (done, line)                                       => done :+ Vector(line)
+    }
+
+  /** Gate 1c.  Every scope line survives: each declaration's lines appear in
+    * the final file (comments stripped) as one run, the runs in the
+    * obligation's order, and the line after a run does not continue it, so
+    * no clause is slipped into a definition and no `where` block is hung off
+    * one.  Right on an obligation with no scope lines, which is every mined
+    * tier's (issue #189).
+    */
+  def scope(st: Statement, finalText: String): Either[GateFailure, Unit] = {
+    val kept = Code.keptLines(finalText)
+    declarations(st.scopeLines).foldLeft[Either[GateFailure, Int]](Right(0)) { (reached, decl) =>
+      reached.flatMap { from =>
+        val at = kept.indexOfSlice(decl, from)
+        if (at < 0) Left(GateFailure("preservation", s"a line the statement is posed in changed, moved, or is missing: ${decl.head.trim}"))
+        else kept.lift(at + decl.size) match {
+          case Some(next) if continues(decl.head, next) =>
+            Left(GateFailure("preservation", s"a declaration the statement is posed in gained a line: `${decl.head.trim}` is continued by `${next.trim}`"))
+          case _ => Right(at + decl.size)
+        }
+      }
+    }.map(_ => ())
   }
 
   /** Binder names are hints, not statement: drop them before comparing. */
@@ -236,6 +295,7 @@ object Judge {
           None, Vector.empty, None, checkUnusable = false, None, None, None))
       case Right(st) =>
         val importsGate = Gates.imports(st, finalText)
+        val scopeGate   = Gates.scope(st, finalText)
         for {
           checked   <- agda.check(finalFile)
           verdict   <- typecheck(entry, finalFile, projectRoot, safe, timeout)
@@ -257,6 +317,7 @@ object Judge {
                             case _                          => None
                           }
           gate      = importsGate.left.toOption
+                        .orElse(scopeGate.left.toOption)
                         .orElse(Gates.escape(checked).left.toOption)
                         .orElse(Gates.holes(checked).left.toOption)
                         .orElse(statementGate.flatMap(_.left.toOption))
