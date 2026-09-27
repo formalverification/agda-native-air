@@ -1,0 +1,87 @@
+{
+  "benchmarkId" : "hard-group-third-iso-cosets-descend",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "third-iso-cosets-descend",
+  "goal" : "(∀ {x y} → x ∼ᴺ y → x ∼ᴹ y) × (∀ {x x' y y'} → x ∼ᴺ x' → y ∼ᴺ y' → x ∼ᴹ y → x' ∼ᴹ y')",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"_∼_\\|module Coset\" $D/Cosets.lagda.md | head -40; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '30,140p' $D/Cosets.lagda.md; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '140,260p' $D/Cosets.lagda.md; Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 13,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 10,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 12,
+  "wallMs" : 79082,
+  "costUsd" : 0.27206,
+  "tokens" : {
+    "input" : 26,
+    "output" : 3399,
+    "cacheRead" : 111470,
+    "cacheCreation" : 13122
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...",
+      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"_∼_\\|module Coset\" $D/Cosets.lagda.md | head -40",
+      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '30,140p' $D/Cosets.lagda.md",
+      "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '140,260p' $D/Cosets.lagda.md",
+      "Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 6,
+      "other" : 3
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4978,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-third-iso-cosets-descend/final/Group-third-iso-cosets-descend.agda",
+  "transcriptPath" : "subjects/hard-group-third-iso-cosets-descend/transcript.jsonl",
+  "lastWords" : "Type-checks cleanly with no errors or warnings.\n\nThe judge command reports success on the final file: the hole is filled by `N⊆M` for the inclusion and, for the two-sided respect, `∼-trans (∼-trans (∼-sym (N⊆M x∼ᴺx')) x∼ᴹy) (N⊆M y∼ᴺy')` using the M-coset equivalence.",
+  "rateLimit" : {
+    "maxUtilization" : 0.01,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

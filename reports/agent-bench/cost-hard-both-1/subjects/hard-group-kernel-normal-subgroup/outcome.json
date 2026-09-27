@@ -1,0 +1,110 @@
+{
+  "benchmarkId" : "hard-group-kernel-normal-subgroup",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "kernel-normal-subgroup",
+  "goal" : "IsSubgroup 𝒢 Ker × Conjugate.IsNormal 𝒢 Ker × (∀ x y → ((x ⁻¹ ∙ y) ∈ Ker → h x ≈ᴴ h y) × (h x ≈ᴴ h y → (x ⁻¹ ∙ y) ∈ Ker))",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda 2>/dev/null; find /home/williamdemeo/git/formalverification...; Bash reads outside the arm's roots (/): find / -path '*Classical/Structures/Group*' -name '*.agda' 2>/dev/null | head -50; Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '190,442p' $G/Basic.lagda.md; Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"IsSubgroup\" -B5 -A40 $G/Subgroups.lagda.md | head -100; Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '79,230p' $G/Subgroups.lagda.md; Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; cat $G/Conjugation.lagda.md; Bash a parameter expansion: A=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms; sed -n '1,140p' $A/Basic.lagda.md; Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Classical.Operations                     using ( pair )",
+    "open import Classical.Signatures.Group               using ( Op-Group ; ar-Group",
+    "open import Classical.Structures.Group.Subgroups     using ( mkIsSubgroup ; interp-tuple-∙",
+    "open import Setoid.Algebras.Basic                    using ( _^_ )",
+    "open import Setoid.Homomorphisms.Basic               using ( IsHom )"
+  ],
+  "terminal" : "completed",
+  "turns" : 23,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 17,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 22,
+  "wallMs" : 363471,
+  "costUsd" : 1.9027914999999997,
+  "tokens" : {
+    "input" : 46,
+    "output" : 23705,
+    "cacheRead" : 983193,
+    "cacheCreation" : 81834
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda 2>/dev/null; find /home/williamdemeo/git/formalverification...",
+      "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures/Group*' -name '*.agda' 2>/dev/null | head -50",
+      "Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '190,442p' $G/Basic.lagda.md",
+      "Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"IsSubgroup\" -B5 -A40 $G/Subgroups.lagda.md | head -100",
+      "Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '79,230p' $G/Subgroups.lagda.md",
+      "Bash a parameter expansion: G=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; cat $G/Conjugation.lagda.md",
+      "Bash a parameter expansion: A=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms; sed -n '1,140p' $A/Basic.lagda.md",
+      "Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 9,
+      "other" : 7
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4844,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+    "final" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-kernel-normal-subgroup/final/Group-kernel-normal-subgroup.agda",
+  "transcriptPath" : "subjects/hard-group-kernel-normal-subgroup/transcript.jsonl",
+  "lastWords" : "The hole is filled (kernel bridges from the homomorphism's tuple-indexed compatibility law, subgroup closure via `mkIsSubgroup`, normality by conjugating `εᴴ`, and the coset equivalence from `h (x ⁻¹ ∙ y) ≈ᴴ (h x)⁻¹ ∙ᴴ h y`), and the verdict on the final file is success (agda exits 0 with no diagnostics and no holes).",
+  "rateLimit" : {
+    "maxUtilization" : 0.61,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

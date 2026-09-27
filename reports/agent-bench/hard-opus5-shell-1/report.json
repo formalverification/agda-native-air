@@ -1,0 +1,1411 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "hard-opus5-shell-1",
+  "timestamp" : "2026-09-27T08:56:38.973837249Z",
+  "rejudged" : false,
+  "config" : {
+    "arm" : "shell",
+    "parallelism" : 2,
+    "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
+    "resume" : false,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "model" : "claude-opus-5",
+    "maxTurns" : 60,
+    "wallCapSec" : 1800,
+    "maxBudgetUsd" : 6.00,
+    "safe" : true,
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "claudeVersion" : "2.1.282 (Claude Code)",
+    "claudeFlags" : [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--max-turns",
+      "60",
+      "--max-budget-usd",
+      "6.00",
+      "--strict-mcp-config",
+      "--tools",
+      "Bash,Edit,Read",
+      "--allowedTools",
+      "Bash",
+      "--permission-mode",
+      "acceptEdits",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--restricted",
+      "--add-dir",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda",
+      "--no-session-persistence"
+    ],
+    "envAdded" : {
+      "MCP_TIMEOUT" : "120000",
+      "ENABLE_TOOL_SEARCH" : "false"
+    },
+    "envRemovedPrefix" : "CLAUDE",
+    "tools" : [
+      "Bash",
+      "Edit",
+      "Read"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda"
+    ],
+    "persistSessions" : false,
+    "inputs" : {
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "af0e7403de38934be526d4f5701d92e5a8e1fbdf65d40b9b16dd74b9923ce806"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/.bin-189/agda-mcp",
+        "sha256" : "fa93bd429fd7f8cfb7cd2c69dbe1db07bddcf7a59e340e92617956a86141d86e"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/.bin-189/agda-json",
+        "sha256" : "d66d9a07ecdd02138354a8650bd69a5eddc756777c40a4b7904d248ce5f155a6"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "dde6d6927859505a166345450ef00640fe1ec8402399d209192cf0bfff96eaf2"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "obligations" : 14,
+  "totals" : {
+    "total" : 14,
+    "solved" : 4,
+    "restated" : 0,
+    "solvedOriginalInView" : null,
+    "gates" : {
+      "isolation" : 9,
+      "preservation" : 1
+    },
+    "anomalies" : 0,
+    "turns" : 174,
+    "toolCalls" : 160,
+    "wallMs" : 1287228,
+    "costUsd" : 6.409
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : 0.000
+    },
+    "compositional" : {
+      "total" : 7,
+      "solved" : 2,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 5
+      },
+      "anomalies" : 0,
+      "turns" : 78,
+      "toolCalls" : 71,
+      "wallMs" : 530552,
+      "costUsd" : 2.409
+    },
+    "non-obvious" : {
+      "total" : 7,
+      "solved" : 2,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 4,
+        "preservation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 96,
+      "toolCalls" : 89,
+      "wallMs" : 756676,
+      "costUsd" : 4.000
+    }
+  },
+  "perStratum" : {
+    "agda-stdlib/novel" : {
+      "total" : 6,
+      "solved" : 3,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 2,
+        "preservation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 49,
+      "toolCalls" : 43,
+      "wallMs" : 346337,
+      "costUsd" : 1.579
+    },
+    "agda-algebras/novel" : {
+      "total" : 8,
+      "solved" : 1,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 7
+      },
+      "anomalies" : 0,
+      "turns" : 125,
+      "toolCalls" : 117,
+      "wallMs" : 940891,
+      "costUsd" : 4.829
+    }
+  },
+  "perTool" : {
+    "Bash" : 108,
+    "Edit" : 29,
+    "Read" : 23
+  },
+  "perShell" : {
+    "agda-batch" : 17,
+    "corpus-grep" : 1,
+    "library-read" : 67,
+    "other" : 23
+  },
+  "perVia" : {
+    "shell" : 14
+  },
+  "perVerdictVia" : {
+    "shell" : 14
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "hard-group-squares-commute",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "squares-commute",
+      "goal" : "(∀ x y → (x ∙ y) ∙ (x ∙ y) ≈ (x ∙ x) ∙ (y ∙ y)) → Commutative _≈_ _∙_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "import Algebra.Properties.Group         as GroupProperties",
+        "import Relation.Binary.Reasoning.Setoid as SetoidReasoning"
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 5,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 59283,
+      "costUsd" : 0.23927700000000002,
+      "tokens" : {
+        "input" : 18,
+        "output" : 4144,
+        "cacheRead" : 68034,
+        "cacheCreation" : 10157
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 4
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 502,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.∙ (G Group.∙ x) y) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.∙ x) x) ((G Group.∙ y) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.∙ (G Group.∙ x) y) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.∙ x) x) ((G Group.∙ y) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-squares-commute/final/Group-squares-commute.agda",
+      "transcriptPath" : "subjects/hard-group-squares-commute/transcript.jsonl",
+      "lastWords" : "It type-checks cleanly. The hole is filled by cancelling `y` on the left and `x` on the right of the hypothesis instance `sq y x`, via `∙-cancelˡ`/`∙-cancelʳ` from `Algebra.Properties.Group`, with a setoid-reasoning chain re-associating `y ∙ ((x ∙ y) ∙ x) ≈ y ∙ ((y ∙ x) ∙ x)`.\n\nYes — the given command reports success on the final file (no errors, no remaining holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.62,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-involutive-commute",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "involutive-commute",
+      "goal" : "(∀ x → x ∙ x ≈ ε) → Commutative _≈_ _∙_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Algebra.Properties.Group G using ( inverseˡ-unique ; ⁻¹-anti-homo-∙ )",
+        "open import Relation.Binary.Reasoning.Setoid setoid"
+      ],
+      "terminal" : "completed",
+      "turns" : 6,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 2,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 5,
+      "wallMs" : 40294,
+      "costUsd" : 0.1649445,
+      "tokens" : {
+        "input" : 12,
+        "output" : 2880,
+        "cacheRead" : 37829,
+        "cacheCreation" : 7397
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 1
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 516,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-involutive-commute/final/Group-involutive-commute.agda",
+      "transcriptPath" : "subjects/hard-group-involutive-commute/transcript.jsonl",
+      "lastWords" : "It type-checks cleanly — the judge command reports success on the final file (proof: each element equals its own inverse via `inverseˡ-unique`, then `x ∙ y ≈ (x ∙ y)⁻¹ ≈ y⁻¹ ∙ x⁻¹ ≈ y ∙ x`).",
+      "rateLimit" : {
+        "maxUtilization" : 0.62,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-inverse-homo-commute",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "inverse-homo-commute",
+      "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.Reasoning.Setoid as SetoidReasoning using ( )",
+        "open import Algebra.Properties.Group G using ( ⁻¹-involutive ; ⁻¹-anti-homo-∙ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 3,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 45598,
+      "costUsd" : 0.19497950000000003,
+      "tokens" : {
+        "input" : 14,
+        "output" : 3550,
+        "cacheRead" : 48559,
+        "cacheCreation" : 8188
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 2,
+          "library-read" : 1
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 529,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-inverse-homo-commute/final/Group-inverse-homo-commute.agda",
+      "transcriptPath" : "subjects/hard-group-inverse-homo-commute/transcript.jsonl",
+      "lastWords" : "The proof uses `⁻¹-anti-homo-∙` with the hypothesis to get `a ⁻¹ ∙ b ⁻¹ ≈ b ⁻¹ ∙ a ⁻¹`, instantiated at `x ⁻¹`, `y ⁻¹` and collapsed with `⁻¹-involutive`.\n\nYes — that exact command reports success (exit 0, no errors) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.62,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-unique-involution-central",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "unique-involution-central",
+      "goal" : "(a : Carrier) → a ∙ a ≈ ε → ¬ (a ≈ ε) → (∀ b → b ∙ b ≈ ε → b ≈ ε ⊎ b ≈ a) → ∀ b → (b ∙ a) ∙ b ⁻¹ ≈ a",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda; Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Empty                using ( ⊥-elim )",
+        "open import Data.Sum.Base             using ( inj₁ ; inj₂ )",
+        "import Algebra.Properties.Group as GroupProperties",
+        "import Relation.Binary.Reasoning.Setoid as SetoidReasoning"
+      ],
+      "terminal" : "completed",
+      "turns" : 12,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 8,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 11,
+      "wallMs" : 88790,
+      "costUsd" : 0.44423999999999997,
+      "tokens" : {
+        "input" : 24,
+        "output" : 7078,
+        "cacheRead" : 146260,
+        "cacheCreation" : 19404
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda",
+          "Bash a parameter expansion: agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standard-li..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 2,
+          "library-read" : 4,
+          "other" : 2
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 544,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-unique-involution-central/final/Group-unique-involution-central.agda",
+      "transcriptPath" : "subjects/hard-group-unique-involution-central/transcript.jsonl",
+      "lastWords" : "The proof conjugates `a` by `b`, shows the conjugate is an involution, and refutes the `≈ ε` case by left-cancelling `b`; the specified command reports success (exit 0, no errors, no holes) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.63,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-inversion-homo-iff-commutative",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "inversion-homo-iff-commutative",
+      "goal" : "(IsGroupHomomorphism _⁻¹ → Commutative _≈_ _∙_) × (Commutative _≈_ _∙_ → IsGroupHomomorphism _⁻¹)",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "preservation",
+      "gateDetail" : "import line changed or missing: open import Data.Product.Base         using ( _×_ )",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 5,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 53473,
+      "costUsd" : 0.3037025,
+      "tokens" : {
+        "input" : 18,
+        "output" : 4882,
+        "cacheRead" : 83925,
+        "cacheCreation" : 13960
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 4
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 592,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-inversion-homo-iff-commutative/final/Group-inversion-homo-iff-commutative.agda",
+      "transcriptPath" : "subjects/hard-group-inversion-homo-iff-commutative/transcript.jsonl",
+      "lastWords" : "It type-checks cleanly on the first try — the command reports success (no errors, no remaining holes) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.63,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-surjective-image-commutative",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "surjective-image-commutative",
+      "goal" : "(f : A → B) → IsGroupHomomorphism f → Surjective _≈₁_ _≈₂_ f → Commutative _≈₁_ _∙₁_ → Commutative _≈₂_ _∙₂_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Product.Base         using ( proj₁ ; proj₂ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 6,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 2,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 5,
+      "wallMs" : 58899,
+      "costUsd" : 0.23235099999999997,
+      "tokens" : {
+        "input" : 12,
+        "output" : 4052,
+        "cacheRead" : 47142,
+        "cacheCreation" : 10742
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 1
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 544,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+        "final" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-surjective-image-commutative/final/Group-surjective-image-commutative.agda",
+      "transcriptPath" : "subjects/hard-group-surjective-image-commutative/transcript.jsonl",
+      "lastWords" : "It type-checks cleanly. The proof pulls `x` and `y` back along the surjection (using `G.refl` to discharge the pointwise-surjectivity hypothesis), transports commutativity through the homomorphism law `homo` and `⟦⟧-cong`, and chains the steps with `H`'s setoid reasoning primitives.\n\nYes — the given command reports success (only the \"Checking ...\" line, no errors) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.64,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-intersection-normal-in-subgroup",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "intersection-normal-in-subgroup",
+      "goal" : "∀ {h x} → h ∈ H → x ∈ H → x ∈ K → ((h ∙ x) ∙ h ⁻¹ ∈ H) × ((h ∙ x) ∙ h ⁻¹ ∈ K)",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures*' -name '*.agda' 2>/dev/null | head -50; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-pr...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 16,
+      "toolCalls" : {
+        "Read" : 3,
+        "Bash" : 11,
+        "Edit" : 1
+      },
+      "toolCallsTotal" : 15,
+      "wallMs" : 96401,
+      "costUsd" : 0.4889855,
+      "tokens" : {
+        "input" : 30,
+        "output" : 5563,
+        "cacheRead" : 169781,
+        "cacheCreation" : 26487
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures*' -name '*.agda' 2>/dev/null | head -50; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-pr..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "corpus-grep" : 1,
+          "library-read" : 7,
+          "other" : 2
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 5115,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+        "final" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-intersection-normal-in-subgroup/final/Group-intersection-normal-in-subgroup.agda",
+      "transcriptPath" : "subjects/hard-group-intersection-normal-in-subgroup/transcript.jsonl",
+      "lastWords" : "Type-checks cleanly on the first attempt.\n\nThe proof: `H ∩ K` normality in `H` splits into the two components of the product —\n- **H-component:** `(h ∙ x) ∙ h ⁻¹ ∈ H` from `H`'s own subgroup closure, `∙-closed (∙-closed h∈H x∈H) (⁻¹-closed h∈H)` (derived fields of `IsSubgroup`).\n- **K-component:** directly `K-normal h x∈K`, since `Conjugate.IsNormal 𝒢 K` unfolds to `∀ g {x} → x ∈ K → (g ∙ x) ∙ g ⁻¹ ∈ K`, matching the goal definitionally.\n\nNaming `h` via `{h}` in the clause was the only restructuring needed, plus a `where open IsSubgroup H-sub`.\n\nYes — the judge command reports success on the ",
+      "rateLimit" : {
+        "maxUtilization" : 0.65,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-second-iso-cosets-agree",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "second-iso-cosets-agree",
+      "goal" : "∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 11,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 7,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 10,
+      "wallMs" : 59412,
+      "costUsd" : 0.3753195,
+      "tokens" : {
+        "input" : 20,
+        "output" : 3707,
+        "cacheRead" : 138469,
+        "cacheCreation" : 21331
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 4,
+          "other" : 2
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 5272,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-second-iso-cosets-agree/final/Group-second-iso-cosets-agree.agda",
+      "transcriptPath" : "subjects/hard-group-second-iso-cosets-agree/transcript.jsonl",
+      "lastWords" : "The hole is filled: the forward direction is `proj₂` (the `K`-component of membership in `H∩K`), and the backward direction pairs the given `K`-membership with `h₁ ⁻¹ ∙ h₂ ∈ H`, obtained from `H`'s closure under inverses and products.\n\nYes — that exact `agda` command reports success (no errors, no remaining holes) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.65,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-second-iso-cosets-onto",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "second-iso-cosets-onto",
+      "goal" : "∀ {x} → x ∈ (H ∙ᶜ K) → Σ[ h ∈ G ] (h ∈ H × x ∼ h)",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash a parameter expansion: grep -n \"{!\\|?\" /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Classical.Bundles.Group                  using ( ⟨_⟩ᵍᵖ )",
+        "import Algebra.Properties.Group as GroupProperties",
+        "import Relation.Binary.Reasoning.Setoid as SetoidReasoning"
+      ],
+      "terminal" : "completed",
+      "turns" : 16,
+      "toolCalls" : {
+        "Read" : 3,
+        "Bash" : 10,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 15,
+      "wallMs" : 89234,
+      "costUsd" : 0.4858835,
+      "tokens" : {
+        "input" : 26,
+        "output" : 5022,
+        "cacheRead" : 207167,
+        "cacheCreation" : 25662
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash a parameter expansion: grep -n \"{!\\|?\" /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 6,
+          "other" : 3
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 4868,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{x : Classical.Structures.Group.Complexes.Complex.G 𝒢} →\nx ∈ (𝒢 Complex.∙ᶜ H) K →\nΣ-syntax\n(Group-second-iso-cosets-onto.G 𝒢 H H-sub K K-sub K-normal)\n(λ h → h ∈ H × (𝒢 Coset.∼ K) K-sub x h)",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{x : Classical.Structures.Group.Complexes.Complex.G 𝒢} →\nx ∈ (𝒢 Complex.∙ᶜ H) K →\nΣ-syntax\n(Group-second-iso-cosets-onto.G 𝒢 H H-sub K K-sub K-normal)\n(λ h → h ∈ H × (𝒢 Coset.∼ K) K-sub x h)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-second-iso-cosets-onto/final/Group-second-iso-cosets-onto.agda",
+      "transcriptPath" : "subjects/hard-group-second-iso-cosets-onto/transcript.jsonl",
+      "lastWords" : "The hole is filled: given `x ≈ h ∙ k` with `h ∈ H`, `k ∈ K`, the witness is `h`, and `x ⁻¹ ∙ h ≈ k ⁻¹ ∈ K` (normality of `K` is not needed).\n\nYes — the given `agda ... --safe` command reports success on the final file with no errors or remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.66,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-normal-product-is-join",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "normal-product-is-join",
+      "goal" : "Conjugate.IsNormal 𝒢 (N ∙ᶜ M) × (N ⊆ (N ∙ᶜ M)) × (M ⊆ (N ∙ᶜ M)) × (∀ {P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} → IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (N ∙ᶜ M) ⊆ P)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 12,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 8,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 11,
+      "wallMs" : 113107,
+      "costUsd" : 0.42210549999999997,
+      "tokens" : {
+        "input" : 20,
+        "output" : 4390,
+        "cacheRead" : 143491,
+        "cacheCreation" : 24051
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 7
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 4999,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+        "final" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-normal-product-is-join/final/Group-normal-product-is-join.agda",
+      "transcriptPath" : "subjects/hard-group-normal-product-is-join/transcript.jsonl",
+      "lastWords" : "Type-checks cleanly: the command above reports success on the final file (no errors, no holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.66,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-kernel-normal-subgroup",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "kernel-normal-subgroup",
+      "goal" : "IsSubgroup 𝒢 Ker × Conjugate.IsNormal 𝒢 Ker × (∀ x y → ((x ⁻¹ ∙ y) ∈ Ker → h x ≈ᴴ h y) × (h x ≈ᴴ h y → (x ⁻¹ ∙ y) ∈ Ker))",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash a parameter expansion: rm -rf _build && agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --li...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Classical.Operations                     using ( pair )",
+        "open import Classical.Signatures.Group               using ( ∙-Op ; ⁻¹-Op )",
+        "open import Classical.Structures.Group.Subgroups     using ( mkIsSubgroup ; interp-tuple-∙",
+        "open import Setoid.Homomorphisms.Basic               using ( IsHom )"
+      ],
+      "terminal" : "completed",
+      "turns" : 27,
+      "toolCalls" : {
+        "Read" : 4,
+        "Bash" : 16,
+        "Edit" : 6
+      },
+      "toolCallsTotal" : 26,
+      "wallMs" : 293377,
+      "costUsd" : 1.7293185000000002,
+      "tokens" : {
+        "input" : 52,
+        "output" : 22734,
+        "cacheRead" : 1067917,
+        "cacheCreation" : 62675
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash reads outside the arm's roots (/): ls; cat libraries 2>/dev/null; find / -name \"Conjugation.agda\" -path \"*Group*\" 2>/dev/null",
+          "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
+          "Bash a parameter expansion: rm -rf _build && agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --li..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 2,
+          "library-read" : 11,
+          "other" : 3
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 5196,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+        "final" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-kernel-normal-subgroup/final/Group-kernel-normal-subgroup.agda",
+      "transcriptPath" : "subjects/hard-group-kernel-normal-subgroup/transcript.jsonl",
+      "lastWords" : "The hole is filled: the kernel predicate is shown to respect ≈ by `cong hmap`, closed under `∙`/`ε`/`⁻¹` via the compatibility field bridged to the curried operations (with `h ε ≈ εᴴ` derived by cancelling the idempotent `h ε`), normal by conjugating, and the coset equivalence by `h (x ⁻¹ ∙ y) ≈ (h x)⁻¹ ∙ h y` plus group cancellation.\n\nYes — the exact judge command reports success (exit 0, no errors or warnings) on the final file.",
+      "rateLimit" : {
+        "maxUtilization" : 0.03,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-third-iso-cosets-descend",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "third-iso-cosets-descend",
+      "goal" : "(∀ {x y} → x ∼ᴺ y → x ∼ᴹ y) × (∀ {x x' y y'} → x ∼ᴺ x' → y ∼ᴺ y' → x ∼ᴹ y → x' ∼ᴹ y')",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"_∼_\\|module Coset\" $D/Cosets.lagda.md | head -40; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '30,140p' $D/Cosets.lagda.md; Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '140,260p' $D/Cosets.lagda.md; Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 13,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 10,
+        "Edit" : 1
+      },
+      "toolCallsTotal" : 12,
+      "wallMs" : 79082,
+      "costUsd" : 0.27206,
+      "tokens" : {
+        "input" : 26,
+        "output" : 3399,
+        "cacheRead" : 111470,
+        "cacheCreation" : 13122
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries; find / -path '*Classical/Structures/Group*' -name '*.agda' ...",
+          "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; grep -n \"_∼_\\|module Coset\" $D/Cosets.lagda.md | head -40",
+          "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '30,140p' $D/Cosets.lagda.md",
+          "Bash a parameter expansion: D=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Classical/Structures/Group; sed -n '140,260p' $D/Cosets.lagda.md",
+          "Bash a parameter expansion: W=/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; agda --no-default-libraries --library-file $W/agda/libraries --library stand..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 6,
+          "other" : 3
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 4978,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-third-iso-cosets-descend/final/Group-third-iso-cosets-descend.agda",
+      "transcriptPath" : "subjects/hard-group-third-iso-cosets-descend/transcript.jsonl",
+      "lastWords" : "Type-checks cleanly with no errors or warnings.\n\nThe judge command reports success on the final file: the hole is filled by `N⊆M` for the inclusion and, for the two-sided respect, `∼-trans (∼-trans (∼-sym (N⊆M x∼ᴺx')) x∼ᴹy) (N⊆M y∼ᴺy')` using the M-coset equivalence.",
+      "rateLimit" : {
+        "maxUtilization" : 0.01,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-correspondence-over-N",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "correspondence-over-N",
+      "goal" : "(N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...; Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 19,
+      "toolCalls" : {
+        "Read" : 3,
+        "Bash" : 14,
+        "Edit" : 1
+      },
+      "toolCallsTotal" : 18,
+      "wallMs" : 132546,
+      "costUsd" : 0.6849715,
+      "tokens" : {
+        "input" : 36,
+        "output" : 8671,
+        "cacheRead" : 283093,
+        "cacheCreation" : 32647
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...",
+          "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
+          "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...",
+          "Bash a parameter expansion: grep -n '{!\\|?' /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/data/benchmarks/reports/agent-bench/hard-opus5-shell-1/work/har..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 8,
+          "other" : 5
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 4929,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-correspondence-over-N/final/Group-correspondence-over-N.agda",
+      "transcriptPath" : "subjects/hard-group-correspondence-over-N/transcript.jsonl",
+      "lastWords" : "No holes remain, no pragmas or postulates were added, and the header/imports/signature are untouched: the judge command reports success on the final file.\n\nThe proof: forward direction rebuilds `y ≈ x ∙ (x ⁻¹ ∙ y)` from `x ∈ H` and `x ⁻¹ ∙ y ∈ N ⊆ H` via `H-∙-closed` plus `H-respects`; backward direction uses `ε ⁻¹ ∙ n ≈ n` (so `ε ∼ n` for `n ∈ N`) together with `ε ∈ H` and the assumed `Respects` to land `n ∈ H`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.03,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-algebra-kernel-of-injective-composite",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "kernel-of-injective-composite",
+      "goal" : "IsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash a parameter expansion: L=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src; cat $L/Setoid/Homomorphisms/Kernels.agda; echo ====; cat $L/Setoid/Congruences/Lattice.agda; Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; cat $S/Homomorphisms/Kernels.lagda.md; echo =====; cat $S/Congruences/Lattice.lagda.md; Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; grep -n \"⊙-hom\" -A 12 -B 5 $S/Homomorphisms/Properties.lagda.md | head -60; echo ====; grep -rn \"IsInject...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Function                                 using ( Func )",
+        "open import Setoid.Congruences.Lattice               using ( _⊆_ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 11,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 7,
+        "Edit" : 2
+      },
+      "toolCallsTotal" : 10,
+      "wallMs" : 77732,
+      "costUsd" : 0.37045799999999995,
+      "tokens" : {
+        "input" : 22,
+        "output" : 4070,
+        "cacheRead" : 123816,
+        "cacheCreation" : 20669
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "shell",
+        "mcpConnected" : false,
+        "agdaToolsPresented" : [
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash a parameter expansion: L=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src; cat $L/Setoid/Homomorphisms/Kernels.agda; echo ====; cat $L/Setoid/Congruences/Lattice.agda",
+          "Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; cat $S/Homomorphisms/Kernels.lagda.md; echo =====; cat $S/Congruences/Lattice.lagda.md",
+          "Bash a parameter expansion: S=/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid; grep -n \"⊙-hom\" -A 12 -B 5 $S/Homomorphisms/Properties.lagda.md | head -60; echo ====; grep -rn \"IsInject..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 3,
+          "other" : 3
+        }
+      },
+      "via" : "shell",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 4462,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 𝑪 : Algebra β ρ} (f : hom 𝑨 𝑩)\n(g : hom 𝑩 𝑪) →\nIsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 𝑪 : Algebra β ρ} (f : hom 𝑨 𝑩)\n(g : hom 𝑩 𝑪) →\nIsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-algebra-kernel-of-injective-composite/final/Algebra-kernel-of-injective-composite.agda",
+      "transcriptPath" : "subjects/hard-algebra-kernel-of-injective-composite/transcript.jsonl",
+      "lastWords" : "It type-checks with no errors on the first try.\n\nYes — the exact judge command reports success (clean type-check, no holes) on the final file, where the hole is filled by `g-inj` for the `kercon (⊙-hom f g) ⊆ kercon f` direction and `Func.cong (proj₁ g)` for the converse.",
+      "rateLimit" : {
+        "maxUtilization" : 0.03,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    }
+  ]
+}
