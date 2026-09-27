@@ -10,7 +10,6 @@
 --
 -- For a subgroup H and a normal subgroup K of G, H ∩ K is normal in H: conjugating an element of H ∩ K by an element of H stays in H ∩ K.
 --
--- GOLD WANTED
 module Group-intersection-normal-in-subgroup where
 
 open import AgdaDojang.Debug
@@ -33,4 +32,7 @@ module _ {α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ)
 
   intersection-normal-in-subgroup
     :  ∀ {h x} → h ∈ H → x ∈ H → x ∈ K → ((h ∙ x) ∙ h ⁻¹ ∈ H) × ((h ∙ x) ∙ h ⁻¹ ∈ K)
-  intersection-normal-in-subgroup h∈H x∈H x∈K = {!!}
+  intersection-normal-in-subgroup {h} h∈H x∈H x∈K =
+    ∙-closed (∙-closed h∈H x∈H) (⁻¹-closed h∈H) , K-normal h x∈K
+    where
+    open IsSubgroup H-sub using ( ∙-closed ; ⁻¹-closed )

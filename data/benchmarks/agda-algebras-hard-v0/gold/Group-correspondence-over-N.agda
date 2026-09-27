@@ -10,7 +10,6 @@
 --
 -- A subgroup H of G contains the normal subgroup N exactly when H respects N-cosets, that is, when H is a subgroup of G/N on the same carrier.
 --
--- GOLD WANTED
 module Group-correspondence-over-N where
 
 open import AgdaDojang.Debug
@@ -34,4 +33,19 @@ module _ {α ρ ℓ : Level} (𝒢 : Group α ρ)
   open Coset 𝒢 N N-sub using ( _∼_ )
 
   correspondence-over-N : (N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)
-  correspondence-over-N = {!!}
+  correspondence-over-N = N⊆H⇒H-resp-∼ , H-resp-∼⇒N⊆H
+    where
+    open import Classical.Bundles.Group using ( ⟨_⟩ᵍᵖ )
+    open import Algebra.Properties.Group ⟨ 𝒢 ⟩ᵍᵖ using ( \\-leftDividesˡ )
+    module N = IsSubgroup N-sub
+    module H = IsSubgroup H-sub
+
+    -- y ≈ x ∙ (x ⁻¹ ∙ y), a product of x ∈ H and x ⁻¹ ∙ y ∈ N ⊆ H.
+    N⊆H⇒H-resp-∼ : N ⊆ H → H Respects _∼_
+    N⊆H⇒H-resp-∼ N⊆H {x} {y} x∼y x∈H =
+      H.respects (\\-leftDividesˡ x y) (H.∙-closed x∈H (N⊆H x∼y))
+
+    -- ε ∼ n, since ε ⁻¹ ∙ n ∈ N by closure of N; and ε ∈ H.
+    H-resp-∼⇒N⊆H : H Respects _∼_ → N ⊆ H
+    H-resp-∼⇒N⊆H H-resp-∼ {n} n∈N =
+      H-resp-∼ (N.∙-closed (N.⁻¹-closed N.ε-closed) n∈N) H.ε-closed

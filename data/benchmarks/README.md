@@ -13,7 +13,7 @@ on the hard tiers of issue [#189] is the obligation marked `-- GOLD WANTED`.)
 
 ## Contents (v0)
 
-The current suite has **73 obligations** from two libraries, spanning the three
+The current suite has **69 obligations** from two libraries, spanning the three
 difficulty tiers of `docs/benchmarks/taxonomy.md`: two tiers cut from the Agda
 standard library, one mined from agda-algebras, and two hard tiers, one in each
 library's vocabulary, posed so that no proof of their statements is on disk.
@@ -57,25 +57,26 @@ module (the haystack) rather than read it off the fixture:
 Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
 (7 obligations), `Data.List.Properties` (3), `Data.Bool.Properties` (2).
 
-The two **hard tiers** (18 obligations, issue [#189]) are posed rather than
+The two **hard tiers** (14 obligations, issue [#189]) are posed rather than
 mined: statements in group theory and universal algebra written for them, each
 under a module telescope and tagged `stratum:novel`.  The **`agda-stdlib-hard`
-tier** (9 obligations) is posed in the standard library's
+tier** (6 obligations) is posed in the standard library's
 `Algebra.Bundles.Group` vocabulary and reports as `agda-stdlib/novel`; the
-**`agda-algebras-hard` tier** (9 obligations) is posed in agda-algebras'
+**`agda-algebras-hard` tier** (8 obligations) is posed in agda-algebras'
 vocabulary and reports as `agda-algebras/novel`.  Each tier's README records
-its rows' novelty checks and gold status; what the two share is under "Hard
-tiers: conventions, golds, and the novelty check" below.
+its rows' novelty checks, their golds, and the rows dropped from the eighteen
+posed; what the two share is under "Hard tiers: conventions, golds, and the
+novelty check" below.
 
 | `agda-stdlib-hard` | Count | Examples                                                                |
 |--------------------|-------|-------------------------------------------------------------------------|
-| `compositional`    | 5     | `x ∙ x ≈ ε` for all `x` makes a group abelian, conjugation is an automorphism |
-| `non-obvious`      | 4     | `(x ∙ y)² ≈ x² ∙ y²` makes a group abelian, a unique involution is central |
+| `compositional`    | 3     | `x ∙ x ≈ ε` for all `x` makes a group abelian, a surjective image of an abelian group is abelian |
+| `non-obvious`      | 3     | `(x ∙ y)² ≈ x² ∙ y²` makes a group abelian, a unique involution is central |
 
 | `agda-algebras-hard` | Count | Examples                                                              |
 |----------------------|-------|-----------------------------------------------------------------------|
 | `compositional`      | 4     | `H ∩ K` is normal in `H`, the third isomorphism theorem on cosets, `kercon (g ⊙ f) ≑ kercon f` |
-| `non-obvious`        | 5     | `HK/K ≅ H/(H ∩ K)` on cosets, the kernel as a normal subgroup, the commutator subgroup |
+| `non-obvious`        | 4     | `HK/K ≅ H/(H ∩ K)` on cosets, the kernel as a normal subgroup, a product of normal subgroups is their join |
 
 Domains: group, algebra.
 
@@ -218,7 +219,7 @@ verdicts, and the search record; what they share is here.
    `stratum:novel` makes every report count the tiers as `agda-stdlib/novel`
    and `agda-algebras/novel`.  No row carries a `restates:` or `target:` tag,
    since no row has an original, and no definition in either corpus or either
-   library's sources carries any of the eighteen hole names, so the
+   library's sources carries any of the fourteen hole names, so the
    restatement rule cannot fire.  `module` names the library module the
    fixture's `Source:` line names first (nothing is proved there); `goldTerm`
    is the fixture's `Strategy:` line, a sketch; `type` is the signature as the
@@ -244,10 +245,13 @@ gold is wanted, the following hold:
 +  the judge cannot judge a row whose gold is wanted, since its statement gate
    reads the statement from the gold's elaborated type and `agda-json` cannot
    extract a holed file: it stops on an internal error of Agda's
-   (`src/full/Agda/TypeChecking/Rules/LHS.hs:751`) on 72 of the 73 committed
+   (`src/full/Agda/TypeChecking/Rules/LHS.hs:751`) on 68 of the 69 committed
    obligations, every one whose hole stays open (the exception is
    `Unit-trivial`, whose hole of type `⊤` Agda fills by eta).  A row without a
    gold waits for one.
+
+Since 2026-09-27 no gold is wanted on either tier, and the full `make
+eval-benchmark` passes all 69 rows.
 
 **Alternative proofs**.  A gold file may keep further proofs of its statement
 after the gold itself, each a definition with the same signature and a name
@@ -286,11 +290,13 @@ The verdicts are defined as follows:
 +  **partly on disk**: some conjuncts are one or two library lemmas away, and
    the rest are absent.
 
-Across both tiers, ten rows are absent (1, 2, 3, 4, 10, 11, 12, 15, 17, 18),
-three are on disk in agda-algebras' vocabulary (5, 8, 9), one is a
-generalization's instance (7), and four are partly on disk (6, 13, 14, 16).
-The check drops nothing; which rows stay is decided while their golds are
-written.
+Across both tiers, the check found ten rows absent (1, 2, 3, 4, 10, 11, 12,
+15, 17, 18), three on disk in agda-algebras' vocabulary (5, 8, 9), one a
+generalization's instance (7), and four partly on disk (6, 13, 14, 16).  The
+three on disk were dropped on 2026-09-27, since a subject with a shell can
+read their proofs, and so was row 15, which is not provable as posed; fourteen
+rows remain.  Each tier's README says why under "Dropped rows" and keeps the
+dropped rows' searches as the record of the check.
 
 ## Directory Layout
 

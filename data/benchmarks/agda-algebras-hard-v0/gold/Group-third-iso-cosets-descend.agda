@@ -10,7 +10,6 @@
 --
 -- For normal subgroups N ⊆ M of G, the M-coset relation descends to G/N: it contains the N-coset relation, and it respects N-cosets in both arguments, which is the statement (G/N)/(M/N) ≅ G/M on the carrier G.
 --
--- GOLD WANTED
 module Group-third-iso-cosets-descend where
 
 open import AgdaDojang.Debug
@@ -38,4 +37,18 @@ module _ {α ρ ℓ : Level} (𝒢 : Group α ρ)
   third-iso-cosets-descend
     :  (∀ {x y} → x ∼ᴺ y → x ∼ᴹ y)
     ×  (∀ {x x' y y'} → x ∼ᴺ x' → y ∼ᴺ y' → x ∼ᴹ y → x' ∼ᴹ y')
-  third-iso-cosets-descend = {!!}
+  third-iso-cosets-descend = ∼ᴺ⇒∼ᴹ , ∼ᴹ-respects-∼ᴺ
+    where
+    open import Relation.Binary.Reasoning.Setoid (Coset.cosetSetoid 𝒢 M M-sub)
+
+    -- x ∼ᴺ y means x ⁻¹ ∙ y ∈ N, so this is N ⊆ M.
+    ∼ᴺ⇒∼ᴹ : ∀ {x y} → x ∼ᴺ y → x ∼ᴹ y
+    ∼ᴺ⇒∼ᴹ = N⊆M
+
+    -- A chain in the coset setoid G/M whose two outer links are N-links.
+    ∼ᴹ-respects-∼ᴺ : ∀ {x x' y y'} → x ∼ᴺ x' → y ∼ᴺ y' → x ∼ᴹ y → x' ∼ᴹ y'
+    ∼ᴹ-respects-∼ᴺ {x} {x'} {y} {y'} x∼ᴺx' y∼ᴺy' x∼ᴹy = begin
+      x'  ≈⟨ ∼ᴺ⇒∼ᴹ x∼ᴺx' ⟨
+      x   ≈⟨ x∼ᴹy ⟩
+      y   ≈⟨ ∼ᴺ⇒∼ᴹ y∼ᴺy' ⟩
+      y'  ∎

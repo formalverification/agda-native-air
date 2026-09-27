@@ -10,7 +10,6 @@
 --
 -- The inclusion H → HK is well defined and injective on cosets: for h₁, h₂ in H, h₁ and h₂ lie in the same coset of H ∩ K exactly when they lie in the same coset of K.  The subgroup H ∩ K is built here so the statement can name its cosets.
 --
--- GOLD WANTED
 module Group-second-iso-cosets-agree where
 
 open import AgdaDojang.Debug
@@ -51,4 +50,7 @@ module _ {α ρ ℓ : Level} (𝒢 : Group α ρ)
 
   second-iso-cosets-agree
     :  ∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)
-  second-iso-cosets-agree h₁∈H h₂∈H = {!!}
+  second-iso-cosets-agree h₁∈H h₂∈H =
+    proj₂ , λ h₁⁻¹h₂∈K → ∙-closed (⁻¹-closed h₁∈H) h₂∈H , h₁⁻¹h₂∈K
+    where
+    open IsSubgroup H-sub using ( ∙-closed ; ⁻¹-closed )

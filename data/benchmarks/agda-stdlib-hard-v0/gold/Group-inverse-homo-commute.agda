@@ -10,7 +10,6 @@
 --
 -- If (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹ for all x and y, the group is commutative.
 --
--- GOLD WANTED
 module Group-inverse-homo-commute where
 
 open import AgdaDojang.Debug
@@ -23,4 +22,12 @@ module _ {c ℓ : Level} (G : Group c ℓ) where
   open Group G
 
   inverse-homo-commute : (∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_
-  inverse-homo-commute ih = {!!}
+  inverse-homo-commute ih x y = begin
+    x ∙ y               ≈⟨ ∙-cong (⁻¹-involutive x) (⁻¹-involutive y) ⟨
+    x ⁻¹ ⁻¹ ∙ y ⁻¹ ⁻¹   ≈⟨ ⁻¹-anti-homo-∙ (y ⁻¹) (x ⁻¹)               ⟨
+    ( y ⁻¹ ∙ x ⁻¹ ) ⁻¹  ≈⟨ ⁻¹-cong (ih y x)                           ⟨
+    ( y ∙ x )⁻¹ ⁻¹      ≈⟨ ⁻¹-involutive (y ∙ x)                      ⟩
+    y ∙ x               ∎
+    where
+    open import Relation.Binary.Reasoning.Setoid setoid
+    open import Algebra.Properties.Group G using ( ⁻¹-involutive ; ⁻¹-anti-homo-∙ )

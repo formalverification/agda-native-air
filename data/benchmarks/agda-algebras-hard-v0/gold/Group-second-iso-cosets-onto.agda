@@ -10,7 +10,6 @@
 --
 -- The inclusion H → HK is onto the cosets of K in HK: every element of the complex product H ∙ᶜ K lies in the K-coset of some element of H.
 --
--- GOLD WANTED
 module Group-second-iso-cosets-onto where
 
 open import AgdaDojang.Debug
@@ -38,4 +37,19 @@ module _ {α ρ ℓ : Level} (𝒢 : Group α ρ)
   open Coset 𝒢 K K-sub using ( _∼_ )
 
   second-iso-cosets-onto : ∀ {x} → x ∈ (H ∙ᶜ K) → Σ[ h ∈ G ] (h ∈ H × x ∼ h)
-  second-iso-cosets-onto x∈HK = {!!}
+  second-iso-cosets-onto {x} (h , k , h∈H , k∈K , x≈hk) =
+    h , h∈H , respects (≈sym x⁻¹∙h≈k⁻¹) (⁻¹-closed k∈K)
+    where
+    open Setoid 𝔻[ 𝑮 ] using ( _≈_ ) renaming ( refl to ≈refl ; sym to ≈sym )
+    open Group-Op 𝒢 using ( _∙_ ; _⁻¹ ; ∙-cong ; ⁻¹-cong )
+    open IsSubgroup K-sub using ( respects ; ⁻¹-closed )
+    open import Classical.Bundles.Group using ( ⟨_⟩ᵍᵖ )
+    open import Algebra.Properties.Group ⟨ 𝒢 ⟩ᵍᵖ using ( ⁻¹-anti-homo-∙ ; //-rightDividesˡ )
+    open import Relation.Binary.Reasoning.Setoid 𝔻[ 𝑮 ]
+
+    x⁻¹∙h≈k⁻¹ : x ⁻¹ ∙ h ≈ k ⁻¹
+    x⁻¹∙h≈k⁻¹ = begin
+      x ⁻¹ ∙ h         ≈⟨ ∙-cong (⁻¹-cong x≈hk) ≈refl ⟩
+      (h ∙ k) ⁻¹ ∙ h   ≈⟨ ∙-cong (⁻¹-anti-homo-∙ h k) ≈refl ⟩
+      k ⁻¹ ∙ h ⁻¹ ∙ h  ≈⟨ //-rightDividesˡ h (k ⁻¹) ⟩
+      k ⁻¹             ∎

@@ -85,8 +85,9 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
   }
 
   // An obligation posed under a module telescope with definitions the
-  // statement names (issue #189: hard-group-commutator-subgroup, trimmed; the
-  // gates below read text, so it need not check).
+  // statement names (issue #189: hard-group-commutator-subgroup, trimmed, a
+  // row since dropped as not provable as posed; the gates below read text, so
+  // it need not check).
   private val telescoped: String =
     """-- Group-commutator-subgroup.agda
       |--

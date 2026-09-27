@@ -2,29 +2,27 @@
 
 File: `data/benchmarks/agda-stdlib-hard-v0/README.md`
 
-This directory is half of the hard tier of issue [#189]: nine statements in
+This directory is half of the hard tier of issue [#189]: six statements in
 group theory, posed by William DeMeo on the issue (rows 1 to 9 of the
-"Statements" comment) in the standard library's `Algebra.Bundles.Group`
-vocabulary, the equational and homomorphism problems of the qualifying-exam
-genre.  The other nine, posed in agda-algebras' vocabulary, are in
-`../agda-algebras-hard-v0/`.  The two halves share their conventions, the rules
-for their golds, and the method of their novelty check; `../README.md` records
-those under "Hard tiers: conventions, golds, and the novelty check", and this
-file holds what is particular to these nine rows.  Row numbers are the issue's.
+"Statements" comment, less the three dropped below) in the standard library's
+`Algebra.Bundles.Group` vocabulary, the equational and homomorphism problems of
+the qualifying-exam genre.  The other eight, posed in agda-algebras'
+vocabulary, are in `../agda-algebras-hard-v0/`.  The two halves share their
+conventions, the rules for their golds, and the method of their novelty check;
+`../README.md` records those under "Hard tiers: conventions, golds, and the
+novelty check", and this file holds what is particular to these rows.  Row
+numbers are the issue's.
 
 ## The rows
 
 | #  | id                                          | difficulty    | novelty               | gold   |
 |----|---------------------------------------------|---------------|-----------------------|--------|
 | 1  | `hard-group-squares-commute`                | non-obvious   | absent                | in     |
-| 2  | `hard-group-involutive-commute`             | compositional | absent                | wanted |
-| 3  | `hard-group-inverse-homo-commute`           | compositional | absent                | wanted |
-| 4  | `hard-group-unique-involution-central`      | non-obvious   | absent                | wanted |
-| 5  | `hard-group-conjugation-automorphism`       | compositional | on disk, other vocab. | wanted |
-| 6  | `hard-group-inversion-homo-iff-commutative` | non-obvious   | partly on disk        | wanted |
-| 7  | `hard-group-surjective-image-commutative`   | compositional | generalization        | wanted |
-| 8  | `hard-group-injective-iff-trivial-kernel`   | non-obvious   | on disk, other vocab. | wanted |
-| 9  | `hard-group-centralizer-closed`             | compositional | on disk, other vocab. | wanted |
+| 2  | `hard-group-involutive-commute`             | compositional | absent                | in     |
+| 3  | `hard-group-inverse-homo-commute`           | compositional | absent                | in     |
+| 4  | `hard-group-unique-involution-central`      | non-obvious   | absent                | in     |
+| 6  | `hard-group-inversion-homo-iff-commutative` | non-obvious   | partly on disk        | in     |
+| 7  | `hard-group-surjective-image-commutative`   | compositional | generalization        | in     |
 
 The rows carry `source: "agda-stdlib"` and the tag `stratum:novel`, so every
 report counts them as `agda-stdlib/novel`, and a subject is given the
@@ -35,16 +33,51 @@ standard-library tiers, the directories carry no `.agda-lib`; outside the dev
 shell an editor finds `agda-dojang` through the registry's defaults, with
 `AGDA_DIR` set to the checkout's `agda/`.
 
-Row 1's gold file also keeps an alternative proof after the gold,
-`squares-commute-by-assoc`, which regroups by associativity alone where the
-gold uses the standard library's `uv∙wx≈u[vw∙x]`; both are two cancellations
-around the same chain, `x(xy)y ≈ x²y² ≈ (xy)² ≈ x(yx)y`.
+## The golds
+
+Every row's gold is in: each checks under the judge's invocation with
+`--safe`, and its definition elaborates to the obligation's statement.  Row
+3's gold is William DeMeo's own, as is row 2's alternative; the others were
+written by Claude on 2026-09-27 and await his review.  The proofs, in brief, are
+as follows:
+
++  **1**.  Two cancellations around the chain `x(xy)y ≈ x²y² ≈ (xy)² ≈
+   x(yx)y`, regrouped by the standard library's `uv∙wx≈u[vw∙x]`; the file also
+   keeps `squares-commute-by-assoc`, the same chain regrouped by associativity
+   alone.
++  **2**.  Each element is its own inverse (`inverseˡ-unique`), so `xy ≈
+   (xy)⁻¹ ≈ y⁻¹x⁻¹ ≈ yx`; the file also keeps `involutive-commute-by-axioms`, a
+   nine-step chain from the group axioms alone.
++  **3**.  `xy ≈ (x⁻¹)⁻¹(y⁻¹)⁻¹ ≈ (y⁻¹x⁻¹)⁻¹ ≈ ((yx)⁻¹)⁻¹ ≈ yx`, by
+   `⁻¹-involutive`, `⁻¹-anti-homo-∙`, and the hypothesis at `y` and `x`.
++  **4**.  The conjugate `aᵇ = (ba)b⁻¹` is an involution, so the hypothesis
+   makes it `ε` or `a`; it is not `ε`, since cancelling `b` would make `a` so.
++  **6**.  If inversion is a homomorphism, `(xy)⁻¹ ≈ y⁻¹x⁻¹ ≈ (yx)⁻¹`, and
+   `⁻¹-injective` finishes; conversely, commutativity turns
+   `⁻¹-anti-homo-∙` into the homomorphism law, and `ε⁻¹≈ε` and `⁻¹-cong`
+   fill the other fields of `IsGroupHomomorphism`.
++  **7**.  Pull `u` and `v` back along the surjection to `a` and `b`; then
+   `uv ≈ f(a)f(b) ≈ f(ab) ≈ f(ba) ≈ f(b)f(a) ≈ vu`.
+
+## Dropped rows
+
+Three of the issue's nine statements were dropped on 2026-09-27: rows 5
+(`hard-group-conjugation-automorphism`), 8
+(`hard-group-injective-iff-trivial-kernel`), and 9
+(`hard-group-centralizer-closed`).  The novelty check below found each one
+proved in agda-algebras' vocabulary, and a subject with a shell can read those
+proofs, since the read roots are every registered library's directory on every
+arm; a solve could then be a translation, not a construction, and the tier
+exists to rule that out.  Their files are in the history (added in commit
+`10bba55`, moved here in `51ab972`), and their searches stay below as the
+record of the check.
 
 ## The novelty check
 
 The four searches and the four verdicts are defined in `../README.md`.  These
 rows were searched in both corpora, since a statement posed in one library's
-vocabulary may be proved in the other's, and three of them are.
+vocabulary may be proved in the other's, and three of them were, which dropped
+them.
 
 | #  | verdict | nearest on disk, and why it is not the statement |
 |----|---------|---------------------------------------------------|
@@ -52,15 +85,15 @@ vocabulary may be proved in the other's, and three of them are.
 | 2  | absent | The same two lemmas; `Examples.Classical.Groups.KleinFourGroup.·-comm` is one group of exponent 2, decided by computation. |
 | 3  | absent | `Algebra.Properties.AbelianGroup.⁻¹-∙-comm` is the converse, and `Algebra.Properties.Group.⁻¹-anti-homo-∙` is the step the proof turns on. |
 | 4  | absent | No lemma on disk concerns an element of order two; `Conjugation.conj-∙-hom` and `conj-ε` make a conjugate of an involution an involution, the first step, and `CoreFreeness.conj-fix→comm` turns the conclusion into commutation. |
-| 5  | on disk, other vocab. | `Classical.Structures.Group.Conjugation` proves that `conj g x = g ∙ x ∙ g ⁻¹`, this row's map, preserves `∙`, `ε`, `⁻¹` and is inverted by conjugation by `g ⁻¹` (`conj-∙-hom`, `conj-ε`, `conj-⁻¹`, `conj-cong`, `conj-conj⁻¹`, `conj⁻¹-conj`): the content of every field of `IsGroupIsomorphism`, for agda-algebras' groups. |
+| 5  | on disk, other vocab.; dropped | `Classical.Structures.Group.Conjugation` proves that `conj g x = g ∙ x ∙ g ⁻¹`, this row's map, preserves `∙`, `ε`, `⁻¹` and is inverted by conjugation by `g ⁻¹` (`conj-∙-hom`, `conj-ε`, `conj-⁻¹`, `conj-cong`, `conj-conj⁻¹`, `conj⁻¹-conj`): the content of every field of `IsGroupIsomorphism`, for agda-algebras' groups. |
 | 6  | partly on disk | The second half's homomorphism law is `Algebra.Properties.AbelianGroup.⁻¹-∙-comm` (for an `AbelianGroup` bundle) with `ε⁻¹≈ε` and `⁻¹-cong`; the first half is row 3. |
 | 7  | generalization | `Setoid.Varieties.Preservation.H-id1`: an identity true in a class holds in its homomorphic images, and commutativity is an identity; stated for agda-algebras' algebras and terms.  The standard library has only the dual, `Algebra.Morphism.MagmaMonomorphism.comm`, pulled back along an injective homomorphism. |
-| 8  | on disk, other vocab. | `Classical.Structures.Group.Congruences.GroupCongruences.con-below-trivial→below-diagonal` and `con-below-diagonal→below-trivial` (a group congruence is below the diagonal exactly when its identity class is trivial) are this statement for the kernel congruence, since `BelowDiagonal (kercon g)` is `IsInjective g` by definition (`Setoid.Subalgebras.Subdirect.Irreducible.injective↔0kernel` records it, by `refl`, for a subdirect product's coordinates). |
-| 9  | on disk, other vocab. | `Classical.Structures.Group.Centralizer.C-isSubgroup` makes the centralizer of any set a subgroup; its where-lemmas `∙-c` and `⁻¹-c` at the set `{a}` are this row's two conjuncts, each equation's sides swapped. |
+| 8  | on disk, other vocab.; dropped | `Classical.Structures.Group.Congruences.GroupCongruences.con-below-trivial→below-diagonal` and `con-below-diagonal→below-trivial` (a group congruence is below the diagonal exactly when its identity class is trivial) are this statement for the kernel congruence, since `BelowDiagonal (kercon g)` is `IsInjective g` by definition (`Setoid.Subalgebras.Subdirect.Irreducible.injective↔0kernel` records it, by `refl`, for a subdirect product's coordinates). |
+| 9  | on disk, other vocab.; dropped | `Classical.Structures.Group.Centralizer.C-isSubgroup` makes the centralizer of any set a subgroup; its where-lemmas `∙-c` and `⁻¹-c` at the set `{a}` are this row's two conjuncts, each equation's sides swapped. |
 
 Summary: rows 1 to 4 are absent; rows 5, 8, and 9 are proved in agda-algebras'
-vocabulary; row 7 is an instance of a theorem on disk; row 6 is partly on
-disk.
+vocabulary, and are dropped; row 7 is an instance of a theorem on disk; row 6
+is partly on disk.
 
 ## The searches, row by row
 
@@ -136,7 +169,7 @@ Counts are hits, from the runs of 2026-09-26.
    files.
 +  `grep` over the agda-algebras sources for `⊎`, `b ∙ b ≈ ε` together: 0 files.
 
-### 5. `hard-group-conjugation-automorphism`
+### 5. `hard-group-conjugation-automorphism` (dropped)
 
 +  agda-algebras corpus: `search_by_type` on the statement, `conj` 150, `IsIso`
    0, `IsGroupIsomorphism` 0; on the conclusion, `IsHom` 84, `IsIso` 0, `≅` 336,
@@ -194,7 +227,7 @@ Counts are hits, from the runs of 2026-09-26.
    together: 2 files, the HSP development (`Examples.Demos.HSP`,
    `Legacy.Base.Varieties.FreeAlgebras`).
 
-### 8. `hard-group-injective-iff-trivial-kernel`
+### 8. `hard-group-injective-iff-trivial-kernel` (dropped)
 
 +  agda-algebras corpus: `search_by_type` on the statement, `IsInjective` 63,
    `kercon` 39, `kerel` 0; on the conclusion, `IsInjective` 63, `0[` 9, `Δ` 47;
@@ -214,7 +247,7 @@ Counts are hits, from the runs of 2026-09-26.
    files, `Setoid.Subalgebras.Subdirect.Irreducible` (`injective↔0kernel`) and
    `Legacy` first-isomorphism files.
 
-### 9. `hard-group-centralizer-closed`
+### 9. `hard-group-centralizer-closed` (dropped)
 
 +  agda-algebras corpus: `search_by_type` on the statement, `Centralizer` 52,
    `C[` 38, `Group-Op.∙ a) x)` 0; on the conclusion, `IsSubgroup` 1169,

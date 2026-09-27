@@ -2,39 +2,91 @@
 
 File: `data/benchmarks/agda-algebras-hard-v0/README.md`
 
-This directory is half of the hard tier of issue [#189]: nine statements in
+This directory is half of the hard tier of issue [#189]: eight statements in
 group theory and universal algebra, posed by William DeMeo on the issue (rows 10
-to 18 of the two "Statements" comments) in agda-algebras' vocabulary
-(`Classical.Structures.Group`, and for row 18 `Setoid.Homomorphisms`): problem 2
-of the 2000 Nov 10 exam and the lemmas that follow it.  The other nine, posed in
-the standard library's vocabulary, are in `../agda-stdlib-hard-v0/`.  The two
-halves share their conventions, the rules for their golds, and the method of
-their novelty check; `../README.md` records those under "Hard tiers:
-conventions, golds, and the novelty check", and this file holds what is
-particular to these nine rows.  Row numbers are the issue's.
+to 18 of the two "Statements" comments, less row 15, dropped below) in
+agda-algebras' vocabulary (`Classical.Structures.Group`, and for row 18
+`Setoid.Homomorphisms`): problem 2 of the 2000 Nov 10 exam and the lemmas that
+follow it.  The other six, posed in the standard library's vocabulary, are in
+`../agda-stdlib-hard-v0/`.  The two halves share their conventions, the rules
+for their golds, and the method of their novelty check; `../README.md` records
+those under "Hard tiers: conventions, golds, and the novelty check", and this
+file holds what is particular to these rows.  Row numbers are the issue's.
 
 ## The rows
 
 | #  | id                                          | difficulty    | novelty               | gold   |
 |----|---------------------------------------------|---------------|-----------------------|--------|
-| 10 | `hard-group-intersection-normal-in-subgroup`| compositional | absent                | wanted |
-| 11 | `hard-group-second-iso-cosets-agree`        | non-obvious   | absent                | wanted |
-| 12 | `hard-group-second-iso-cosets-onto`         | non-obvious   | absent                | wanted |
-| 13 | `hard-group-normal-product-is-join`         | non-obvious   | partly on disk        | wanted |
-| 14 | `hard-group-kernel-normal-subgroup`         | non-obvious   | partly on disk        | wanted |
-| 15 | `hard-group-commutator-subgroup`            | non-obvious   | absent                | wanted |
-| 16 | `hard-group-third-iso-cosets-descend`       | compositional | partly on disk        | wanted |
-| 17 | `hard-group-correspondence-over-N`          | compositional | absent                | wanted |
-| 18 | `hard-algebra-kernel-of-injective-composite`| compositional | absent                | wanted |
+| 10 | `hard-group-intersection-normal-in-subgroup`| compositional | absent                | in     |
+| 11 | `hard-group-second-iso-cosets-agree`        | non-obvious   | absent                | in     |
+| 12 | `hard-group-second-iso-cosets-onto`         | non-obvious   | absent                | in     |
+| 13 | `hard-group-normal-product-is-join`         | non-obvious   | partly on disk        | in     |
+| 14 | `hard-group-kernel-normal-subgroup`         | non-obvious   | partly on disk        | in     |
+| 16 | `hard-group-third-iso-cosets-descend`       | compositional | partly on disk        | in     |
+| 17 | `hard-group-correspondence-over-N`          | compositional | absent                | in     |
+| 18 | `hard-algebra-kernel-of-injective-composite`| compositional | absent                | in     |
 
 The rows carry `source: "agda-algebras"` and the tag `stratum:novel`, so every
 report counts them as `agda-algebras/novel`, and a subject is given the
 agda-algebras corpus.  Each directory has its own `.agda-lib`, as in
-`agda-algebras-v0`, since the twin modules share names.  Rows 11, 12, 14, and
-15 define predicates and abbreviations before the hole (`H∩K` and its subgroup
-proof, `Ker`, `Commutators`, `Derived`, and the private `𝑮`, `G`, `h`), which
-the judge freezes as text with the rest of the obligation outside the holed
-definition.
+`agda-algebras-v0`, since the twin modules share names.  Rows 11, 12, and 14
+define predicates and abbreviations before the hole (`H∩K` and its subgroup
+proof, `Ker`, and the private `𝑮`, `G`, `h`), which the judge freezes as text
+with the rest of the obligation outside the holed definition.
+
+## The golds
+
+Every row's gold is in: each checks under the judge's invocation with
+`--safe`, and its definition elaborates to the obligation's statement.  They
+were written by Claude on 2026-09-27 and await William DeMeo's review.  The
+proofs, in brief, are as follows:
+
++  **10**.  `H`'s closure gives `(h ∙ x) ∙ h ⁻¹ ∈ H`, and the `K` half is the
+   hypothesis `K-normal h x∈K` itself.
++  **11**.  Forward is `proj₂`; backward pairs `h₁ ⁻¹ ∙ h₂ ∈ H`, by closure,
+   with the `K` membership.  `K-normal` is not used.
++  **12**.  Split `x ≈ h ∙ k` and take `h`: `x ⁻¹ ∙ h ≈ (h ∙ k) ⁻¹ ∙ h ≈ k ⁻¹ ∙
+   h ⁻¹ ∙ h ≈ k ⁻¹ ∈ K`, by the standard library's `⁻¹-anti-homo-∙` and
+   `//-rightDividesˡ` at `⟨ 𝒢 ⟩ᵍᵖ`, and `K`'s `respects`.
++  **13**.  A conjugate of `x ≈ n ∙ m` is `n ^ g ∙ m ^ g` (`conj-cong`,
+   `conj-∙-hom`), with its factors in `N` and `M` by normality; the
+   containments are `mem-∙ᶜˡ` and `mem-∙ᶜʳ` at `ε`, and leastness is `∙ᶜ-mono`
+   then `subgroup-∙ᶜ-idem`.  The statement does not ask that `N ∙ᶜ M` be a
+   subgroup, which "join" presumes (`Complements.normal-∙ᶜ-isSubgroup` has it).
++  **14**.  The homomorphism's `compatible` field restated at `∙`, `ε`, and
+   `⁻¹` (agda-algebras has no curried laws for groups), then `mkIsSubgroup`, a
+   four-step conjugation chain for normality, and `inverseˡ-unique` with
+   `⁻¹-injective` for the coset equivalence.
++  **16**.  The first conjunct is `N⊆M` itself; the second is the chain `x' ∼ᴹ
+   x ∼ᴹ y ∼ᴹ y'` in `Coset.cosetSetoid`.  Neither normality hypothesis is used.
++  **17**.  `y ≈ x ∙ (x ⁻¹ ∙ y)` (`\\-leftDividesˡ`) carries `x ∈ H` to `y ∈
+   H`; conversely `ε ∼ n` for `n ∈ N` by closure, and `ε ∈ H`.
++  **18**.  `g-inj , Func.cong (proj₁ g)`: since `⊙-hom f g` computes to `proj₁
+   g ⊙ proj₁ f`, the two containments are `g`'s injectivity and `g`'s
+   congruence.
+
+Rows 10, 11, and 18 are one line each given the library, which bears on their
+difficulty labels (kept as posed) rather than on their novelty.
+
+## Dropped rows
+
+Row 15, `hard-group-commutator-subgroup`, was dropped on 2026-09-27 because it
+is not provable as posed.  Its `Derived` is `Sg 𝑮 Commutators`, and
+agda-algebras' `Sg` (`Setoid.Subalgebras.Subuniverses`) is generated by `var`
+and `app` alone: it is closed under the operations but not under `≈`.  So a
+conjugate `(g ∙ x) ∙ g ⁻¹` is in `Derived` only if it is itself a commutator up
+to `≈` (then `var`), or if `g ∙ x` and `g ⁻¹` are both in `Derived` (then
+`app`).  Take a group whose derived subgroup has an element that is not a
+commutator (the smallest such groups have order 96), represented on a carrier
+of group terms with `≈` the equality of their values.  A product `x` of two
+commutators whose value is not a commutator is in `Derived`, and conjugating it
+by a generator `g` whose value is outside the derived subgroup leaves
+`Derived`, so the normality conjunct fails.  The second conjunct is provable,
+since `(x ∙ y) ⁻¹ ∙ (y ∙ x) ≈ [ y ⁻¹ ⸴ x ⁻¹ ]`, which `var` accepts.  The
+smallest repair is to close `Derived` under `≈`, as `Derived z = Σ[ w ∈ G ] (w
+∈ Sg 𝑮 Commutators × z ≈ w)`; normality then follows by induction on `Sg`,
+with conjugation's homomorphism laws.  The files are in the history (commit
+`10bba55`), and the row's searches stay below as the record of the check.
 
 ## The novelty check
 
@@ -53,14 +105,13 @@ side has.
 | 12 | absent | The nearest is the step `anti` in `Complements.Factors-sym` (from `x ⁻¹ ≈ p ∙ q`, `x ≈ q ⁻¹ ∙ p ⁻¹`), a piece of the computation. |
 | 13 | partly on disk | The containments are `Complements.mem-∙ᶜˡ` and `mem-∙ᶜʳ`; leastness is `Complexes.∙ᶜ-mono` then `subgroup-∙ᶜ-idem`, the body of `Complements.Factors-least`; normality of `N ∙ᶜ M` is absent.  `NormalSubgroupLattice` does have a join, `_∨ⁿ_`, but it is the congruence join carried across, not the complex product, and its leastness ranges over normal subgroups only. |
 | 14 | partly on disk | The subgroup and normality conjuncts are `GroupCongruences.ConNormal.IdentityClass-isSubgroup` and `IdentityClass-normal` at the kernel congruence `kercon`, once `Ker` is identified with the identity class through `h ε ≈ εᴴ`; the coset conjunct is absent. |
-| 15 | absent | `Commutator` has element-level lemmas only, and `NormalClosure` closes one element of a finite group; nothing generates a subgroup from commutators or proves one normal. |
+| 15 | absent; dropped | `Commutator` has element-level lemmas only, and `NormalClosure` closes one element of a finite group; nothing generates a subgroup from commutators or proves one normal. |
 | 16 | partly on disk | The first conjunct is the inclusion `N⊆M` itself (the coset relation is `x ⁻¹ ∙ y ∈ N`), as `FLRP.Bridge`'s `reflx` shows for `H ⊆ K` at level zero; the second is `Coset.∼-sym` and `∼-trans` around it. |
 | 17 | absent | `FLRP.Bridge.H⊆Kθ` has the step `ε ∼ h` from `h ∈ H` that the second half turns on; nothing states the correspondence. |
 | 18 | absent | No lemma on disk concerns the kernel of a composite; the pieces are `Setoid.Congruences.Lattice.⊆-antisym` and the definition of `kercon`, and the nearest statement about kernels and injectivity is `Subdirect.Irreducible.injective↔0kernel`. |
 
 Summary: rows 10, 11, 12, 15, 17, and 18 are absent; rows 13, 14, and 16 are
-partly on disk.  Rows 10 and 18 are a line or two given the library, which
-bears on their difficulty label rather than on their novelty.
+partly on disk.  Row 15 is dropped, as not provable as posed.
 
 ## The searches, row by row
 
@@ -117,7 +168,7 @@ Counts are hits, from the runs of 2026-09-26.
 +  `grep` over the agda-algebras sources for `IsNormal`, `hom`, `ker` together:
    0 files.
 
-### 15. `hard-group-commutator-subgroup`
+### 15. `hard-group-commutator-subgroup` (dropped)
 
 +  agda-algebras corpus: `search_by_type` on the statement, `Commutator.[` 7,
    `Sg` 931; on the conclusion, `IsNormal` 193, `Sg` 931; `search_by_name`,

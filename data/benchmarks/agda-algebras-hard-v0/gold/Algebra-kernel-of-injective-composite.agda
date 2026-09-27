@@ -10,7 +10,6 @@
 --
 -- The kernel congruence of a composite g ⊙ f equals the kernel congruence of f when g is injective, in the congruence order ≑ of Setoid.Congruences.Lattice.
 --
--- GOLD WANTED
 module Algebra-kernel-of-injective-composite where
 
 open import AgdaDojang.Debug
@@ -32,4 +31,6 @@ module _ {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}
   where
 
   kernel-of-injective-composite : IsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f
-  kernel-of-injective-composite g-inj = {!!}
+  kernel-of-injective-composite g-inj = g-inj , Func.cong (proj₁ g)
+    where
+    open import Function using ( Func )
