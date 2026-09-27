@@ -16,7 +16,7 @@ file holds what is particular to these nine rows.  Row numbers are the issue's.
 
 | #  | id                                          | difficulty    | novelty               | gold   |
 |----|---------------------------------------------|---------------|-----------------------|--------|
-| 1  | `hard-group-squares-commute`                | non-obvious   | absent                | wanted |
+| 1  | `hard-group-squares-commute`                | non-obvious   | absent                | in     |
 | 2  | `hard-group-involutive-commute`             | compositional | absent                | wanted |
 | 3  | `hard-group-inverse-homo-commute`           | compositional | absent                | wanted |
 | 4  | `hard-group-unique-involution-central`      | non-obvious   | absent                | wanted |
@@ -34,6 +34,11 @@ judge checks them without `--library agda-algebras`.  Like the other
 standard-library tiers, the directories carry no `.agda-lib`; outside the dev
 shell an editor finds `agda-dojang` through the registry's defaults, with
 `AGDA_DIR` set to the checkout's `agda/`.
+
+Row 1's gold file also keeps an alternative proof after the gold,
+`squares-commute-by-assoc`, which regroups by associativity alone where the
+gold uses the standard library's `uv∙wx≈u[vw∙x]`; both are two cancellations
+around the same chain, `x(xy)y ≈ x²y² ≈ (xy)² ≈ x(yx)y`.
 
 ## The novelty check
 
