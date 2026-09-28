@@ -272,22 +272,38 @@
       # read it; writing it in place with `cat >` and then `>>` left a window
       # with no agda-algebras in it (29,170 of 10.4 million reads over 25
       # shell entries, measured 2026-09-27).  A rename within one directory
-      # is atomic, and mode 644 matches what `cat >` wrote.
-      _anair_libraries_tmp="$(mktemp "$AGDA_DIR/.libraries.XXXXXX")"
-      chmod 644 "$_anair_libraries_tmp"
-      cat > "$_anair_libraries_tmp" <<EOF
+      # is atomic, and mode 644 matches what `cat >` wrote.  A file is renamed
+      # only when every write to it succeeded: this hook runs without
+      # `errexit`, and a failed write (a full disk, a quota) must leave the
+      # previous file standing, not publish an empty one; the staged file is
+      # removed either way.  `_anair_registry_ok` stays non-empty while every
+      # write to the registry has succeeded.
+      _anair_registry_ok=yes
+      if _anair_libraries_tmp="$(mktemp "$AGDA_DIR/.libraries.XXXXXX")" &&
+         chmod 644 "$_anair_libraries_tmp" &&
+         cat > "$_anair_libraries_tmp" <<EOF
     $ROOT/agda-dojang/agda-dojang.agda-lib
     ${agdaStdlibPkg}/standard-library.agda-lib
     EOF
+      then :; else _anair_registry_ok=""; fi
 
       # Default libraries — names must match `name:` fields in the .agda-lib files.
-      _anair_defaults_tmp="$(mktemp "$AGDA_DIR/.defaults.XXXXXX")"
-      chmod 644 "$_anair_defaults_tmp"
-      cat > "$_anair_defaults_tmp" <<EOF
+      _anair_defaults_failed=""
+      if _anair_defaults_tmp="$(mktemp "$AGDA_DIR/.defaults.XXXXXX")" &&
+         chmod 644 "$_anair_defaults_tmp" &&
+         cat > "$_anair_defaults_tmp" <<EOF
     agda-dojang
     standard-library
     EOF
-      mv -f "$_anair_defaults_tmp" "$AGDA_DIR/defaults"
+      then
+        mv -f "$_anair_defaults_tmp" "$AGDA_DIR/defaults" || _anair_defaults_failed=yes
+      else
+        _anair_defaults_failed=yes
+      fi
+      if [ -n "$_anair_defaults_failed" ]; then
+        rm -f "$_anair_defaults_tmp"
+        echo "[agda] WARNING: could not write $AGDA_DIR/defaults; the previous one, if any, stands"
+      fi
 
       echo "[agda] AGDA_DIR=$AGDA_DIR"
 
@@ -327,7 +343,9 @@
             local lib_file
             lib_file="$(find "$lib_root" -maxdepth 1 -name '*.agda-lib' 2>/dev/null | head -1)"
             if [ -n "$lib_file" ]; then
-              echo "$lib_file" >> "$_anair_libraries_tmp"
+              if [ -n "$_anair_registry_ok" ]; then
+                echo "$lib_file" >> "$_anair_libraries_tmp" || _anair_registry_ok=""
+              fi
               AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
               eval "_AGDA_REG_$reg_suffix=yes"
               echo "[agda] registered $display_name from $lib_file"
@@ -375,10 +393,15 @@
       _register_agda_lib AGDA_CATEGORIES_ROOT   agda-categories "$AGDA_CATEGORIES_ROOT"   agda_categories
       _register_agda_lib AGDA_TYPETOPOLOGY_ROOT TypeTopology     "$AGDA_TYPETOPOLOGY_ROOT" TypeTopology
 
-      # Every library is registered: move the registry into place in one step.
-      mv -f "$_anair_libraries_tmp" "$AGDA_DIR/libraries"
-      unset _anair_libraries_tmp _anair_defaults_tmp
-      echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
+      # Every library is registered: move the registry into place in one step,
+      # if every write to it succeeded.
+      if [ -n "$_anair_registry_ok" ] && mv -f "$_anair_libraries_tmp" "$AGDA_DIR/libraries"; then
+        echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
+      else
+        rm -f "$_anair_libraries_tmp"
+        echo "[agda] WARNING: could not write $AGDA_DIR/libraries; the previous one, if any, stands"
+      fi
+      unset _anair_libraries_tmp _anair_defaults_tmp _anair_defaults_failed _anair_registry_ok
 
       # ==== Agda shell function ====
       # Override the Nix-wrapped `agda` binary.  The withPackages wrapper
