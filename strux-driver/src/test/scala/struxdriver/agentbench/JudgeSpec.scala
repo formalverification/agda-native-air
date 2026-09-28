@@ -307,7 +307,7 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Gates.restatement("Overture-proj-op", "π", guess, namesake) shouldBe Vector("ref Data.Product.π")
   }
 
-  test("every committed obligation reads as a statement and every gold keeps its frozen lines and its signature; only the hard tier has scope lines") {
+  test("every committed obligation reads as a statement and every gold keeps its frozen lines and its signature; only the posed tiers have scope lines") {
     val root  = Paths.get("..").toAbsolutePath.normalize
     val index = root.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.isRegularFile(index), s"benchmark index not found at $index")
@@ -329,7 +329,9 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
         Statement.signature(ob, e.hole).exists(_.nonEmpty) shouldBe true
         stmt.scopeLines.exists(_.contains("{!!}")) shouldBe false
         // The mined tiers are judged exactly as before issue #189: nothing outside the definition but its imports.
-        if (!e.tags.contains("stratum:novel")) stmt.scopeLines shouldBe empty
+        // The posed tiers (the hard tier of #189, the composition tier of #160) are written under module
+        // telescopes, whose lines the judge freezes as text.
+        if (!Set("stratum:novel", "stratum:composition").exists(e.tags.contains)) stmt.scopeLines shouldBe empty
         if (e.source == "agda-algebras") Gates.originalOf(e.module, e.hole, e.tags).qualified.exists(_.contains(".")) shouldBe true
       }
     }

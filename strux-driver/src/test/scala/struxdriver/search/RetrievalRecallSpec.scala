@@ -491,8 +491,24 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     assume(Files.exists(index), s"index not found at $index")
     val rows  = Scaffold.readIndex(index, None).unsafeRunSync()
     val novel = rows.filter(_.stratum == "agda-algebras/novel")
-    val alg   = rows.filter(_.source == "agda-algebras").filterNot(novel.contains)
+    val comp  = rows.filter(_.stratum == "agda-algebras/composition")
+    val alg   = rows.filter(_.source == "agda-algebras").filterNot(novel.contains).filterNot(comp.contains)
     alg.size shouldBe 21
+    // The composition tier (issue #160) ranks its needles, never an original
+    // or a target: at least two needles per row, one tag per lemma the gold
+    // strings together, and no restates: or target: tag.
+    comp.foreach { e =>
+      e.taggedValues("needle:").size should be >= 2
+      e.taggedValues("needle:").distinct shouldBe e.taggedValues("needle:")
+      e.tags.exists(t => t.startsWith("restates:") || t.startsWith("target:")) shouldBe false
+    }
+    comp.map(_.id).toSet shouldBe Set(
+      "comp-variety-subalgebra-of-model", "comp-variety-image-of-product",
+      "comp-congruence-monolith-below-member", "comp-subalgebra-subdirect-into-product",
+      "comp-lattice-below-join-bound", "comp-group-normal-of-equivalent-congruence",
+      "comp-congruence-meet-below-join", "comp-homomorphism-isomorph-is-image",
+      "comp-congruence-simple-equivalent-total", "comp-group-normal-of-smaller-congruence",
+      "comp-variety-subdirect-product-models", "comp-homomorphism-epi-through-kernel")
     alg.foreach(e => e.taggedValues("restates:").size shouldBe 1)
     alg.count(_.taggedValues("target:").nonEmpty) shouldBe 18
     // The hard tiers (issue #189) have no original by construction, so no ground
