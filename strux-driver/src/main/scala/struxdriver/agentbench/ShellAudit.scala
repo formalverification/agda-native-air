@@ -466,7 +466,10 @@ object ShellAudit {
     def fail(why: String): Vector[String] = Vector(s"Bash $why: $cmd")
     val prog = s.words.headOption.map(w => Paths.get(w.text).getFileName.toString).getOrElse("")
     val args = s.words.drop(1)
-    if (prog.isEmpty || s.words.forall(w => isAssignment(w.text))) (cwd, Vector.empty)
+    // No program runs (a bare redirection, or assignments alone), but the shell
+    // still opens every redirection's file: `> /etc/passwd` truncates it, and so
+    // does `G=x > /etc/passwd` (PR #197 review), so those paths are audited.
+    if (prog.isEmpty || s.words.forall(w => isAssignment(w.text))) (cwd, auditPaths(s.reads, s.writes, roots, cmd, cwd))
     else if (prog == "cd") {
       args.map(_.text).find(!_.startsWith("-")).map(t => resolve(cwd, t)) match {
         case Some(Some(p)) if roots.canRead(p) => (p, Vector.empty)
@@ -489,24 +492,29 @@ object ShellAudit {
         if (writesAll(prog) || inPlace) cands
         else if (writesLast(prog))      cands.lastOption.toVector
         else                            Vector.empty
-      val readArgs  = cands.filterNot(writeArgs.contains) ++ s.reads
-      val writes    = writeArgs ++ s.writes
-      val badWrites = writes.flatMap { c =>
-        resolve(cwd, c) match {
-          case Some(p) if roots.canWrite(p) => None
-          case Some(p)                      => Some(s"Bash writes outside the work directory ($p): $cmd")
-          case None                         => Some(s"Bash names a path this audit cannot resolve ($c): $cmd")
-        }
-      }
-      val badReads = readArgs.flatMap { c =>
-        resolve(cwd, c) match {
-          case Some(p) if roots.canRead(p) => None
-          case Some(p)                     => Some(s"Bash reads outside the arm's roots ($p): $cmd")
-          case None                        => Some(s"Bash names a path this audit cannot resolve ($c): $cmd")
-        }
-      }
-      badWrites ++ badReads
+      auditPaths(cands.filterNot(writeArgs.contains) ++ s.reads, writeArgs ++ s.writes, roots, cmd, cwd)
     }
+  }
+
+  /** The paths a simple command reads and writes, each against the roots:
+    * writes only under the work directory, reads under any root.
+    */
+  private def auditPaths(reads: Vector[String], writes: Vector[String], roots: ShellRoots, cmd: String, cwd: Path): Vector[String] = {
+    val badWrites = writes.flatMap { c =>
+      resolve(cwd, c) match {
+        case Some(p) if roots.canWrite(p) => None
+        case Some(p)                      => Some(s"Bash writes outside the work directory ($p): $cmd")
+        case None                         => Some(s"Bash names a path this audit cannot resolve ($c): $cmd")
+      }
+    }
+    val badReads = reads.flatMap { c =>
+      resolve(cwd, c) match {
+        case Some(p) if roots.canRead(p) => None
+        case Some(p)                     => Some(s"Bash reads outside the arm's roots ($p): $cmd")
+        case None                        => Some(s"Bash names a path this audit cannot resolve ($c): $cmd")
+      }
+    }
+    badWrites ++ badReads
   }
 
   /** The call's class, the first that applies (`classes`), so the counts of a

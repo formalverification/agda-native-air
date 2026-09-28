@@ -128,6 +128,17 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     .replace("\n  commutator-subgroup\n", "\n  helper : ∀ x → x ∈ Derived → x ∈ Derived\n  helper x p = p\n\n  commutator-subgroup\n")
     .replace("  commutator-subgroup = {!!}\n", "  commutator-subgroup = normal , comm\n    where\n    normal = sgIsSmallest\n    comm = λ x y → helper _ (var (x , y , refl))\n")
 
+  test("signature: the lines from the declaration to the first clause; an honest proof keeps them, a weakened statement does not") {
+    val sig = Statement.signature(telescoped, "commutator-subgroup")
+    sig shouldBe Some(Vector(
+      "  commutator-subgroup",
+      "    :  Conjugate.IsNormal 𝒢 Derived",
+      "    ×  (∀ x y → ((x ∙ y) ⁻¹ ∙ (y ∙ x)) ∈ Derived)"))
+    Statement.signature(honest, "commutator-subgroup") shouldBe sig
+    Statement.signature(telescoped.replace("    ×  (∀ x y → ((x ∙ y) ⁻¹ ∙ (y ∙ x)) ∈ Derived)\n", ""), "commutator-subgroup") should not be sig
+    Statement.signature(telescoped, "no-such-name") shouldBe None
+  }
+
   test("statement: a definition under a module telescope, its name alone on its line, is declared; the telescope, its opens, and the definitions the statement names are scope lines") {
     tst.moduleLine shouldBe "module Group-commutator-subgroup where"
     tst.importLines.size shouldBe 3
@@ -296,7 +307,7 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Gates.restatement("Overture-proj-op", "π", guess, namesake) shouldBe Vector("ref Data.Product.π")
   }
 
-  test("every committed obligation reads as a statement and every gold keeps its frozen lines; only the hard tier has scope lines") {
+  test("every committed obligation reads as a statement and every gold keeps its frozen lines and its signature; only the hard tier has scope lines") {
     val root  = Paths.get("..").toAbsolutePath.normalize
     val index = root.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.isRegularFile(index), s"benchmark index not found at $index")
@@ -312,6 +323,10 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
         Gates.imports(stmt, ob).isRight shouldBe true
         Gates.scope(stmt, gd) shouldBe Right(())
         Gates.scope(stmt, ob) shouldBe Right(())
+        // The gold is the judge's statement oracle, so it must carry the
+        // obligation's signature exactly (PR #197 review).
+        Statement.signature(gd, e.hole) shouldBe Statement.signature(ob, e.hole)
+        Statement.signature(ob, e.hole).exists(_.nonEmpty) shouldBe true
         stmt.scopeLines.exists(_.contains("{!!}")) shouldBe false
         // The mined tiers are judged exactly as before issue #189: nothing outside the definition but its imports.
         if (!e.tags.contains("stratum:novel")) stmt.scopeLines shouldBe empty

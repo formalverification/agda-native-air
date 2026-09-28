@@ -167,6 +167,16 @@ final class ShellAuditSpec extends AnyFunSuite with Matchers {
     ok(s"G=$stdlib; grep -n 'x$$G' $$G/Algebra.agda")
   }
 
+  test("a command that runs no program still opens its redirections, so they are audited") {
+    // PR #197 review: an assignment-only command skipped its redirections, and a
+    // bare redirection always had; the shell opens (and `>` truncates) the file.
+    bad("G=x > /etc/passwd").head should include ("writes outside the work directory (/etc/passwd)")
+    bad("> /etc/passwd").head should include ("writes outside the work directory (/etc/passwd)")
+    bad("G=x < /etc/shadow").head should include ("reads outside the arm's roots (/etc/shadow)")
+    ok("G=x > out.txt")
+    ok(s"G=x < $stdlib/Algebra.agda")
+  }
+
   test("every violation names the command, so the report can quote what failed the gate") {
     bad("cat /etc/passwd").head should include ("cat /etc/passwd")
   }

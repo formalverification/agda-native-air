@@ -112,6 +112,24 @@ object Statement {
       start until (if (end < 0) lines.size else end)
     }
 
+  /** The holed definition's signature as text: its declaring line and every
+    * line after it up to its first clause (the next line that declares it at
+    * the same indentation), comments dropped; None when it is never declared.
+    * A gold must carry its obligation's signature exactly, beside the frozen
+    * module line, imports, and scope lines, which together pin the gold's
+    * statement to the obligation's in CI (JudgeSpec, PR #197 review).  The
+    * judge itself reads the statement from the gold's elaborated type, since
+    * `agda-json` cannot read an obligation whose hole is open (issue #204).
+    */
+  def signature(source: String, hole: String): Option[Vector[String]] = {
+    val lines = Code.keptLines(source)
+    holeBlock(lines, hole).map { block =>
+      val column = indent(lines(block.start))
+      block.drop(1).find(i => indent(lines(i)) == column && declares(lines(i), hole))
+        .fold(block.map(lines).toVector)(first => (block.start until first).map(lines).toVector)
+    }
+  }
+
   /** The import statement a line carries (`open import M ...` or `import M
     * ...`), with a leading `where` removed (`  where open import M using (x)`),
     * or None.
