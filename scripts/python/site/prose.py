@@ -31,8 +31,11 @@ Description: Which characters of a Markdown page are prose, for the site's
                          heading or a table row, which are one line long.
                          Python-Markdown parses inline markup block by
                          block, so a backtick in one list item does not
-                         pair with one in the next.  A backslash before the
-                         opening run escapes it.
+                         pair with one in the next.  A fenced block is not
+                         a break: SuperFences stashes it inside the
+                         surrounding paragraph, so a backtick before it
+                         pairs with one after it, in Markdown and here.  A
+                         backslash before the opening run escapes it.
     HTML comments        `<!--` through `-->`, which is where this
                          repository's documents keep their `File:` headers.
 

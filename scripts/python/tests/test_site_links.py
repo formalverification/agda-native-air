@@ -227,6 +227,11 @@ DIFFERENTIAL = {
     "an unclosed backtick": "a `b [x](y.md)\n",
     "double backticks across lines": "``a\n` [x](y.md) b``\n",
     "a fence inside a list item": "+  a\n\n   ```\n   [x](y.md)\n   ```\n",
+    # SuperFences stashes a fence inside its paragraph, so Markdown pairs a
+    # backtick before the fence with one after it: the link is code.
+    "a span across a fence": "see `a\n```\ncode\n```\n[x](y.md) b`\n",
+    "a span across a tilde fence": "see `a\n~~~\ncode\n~~~\n[x](y.md) b`\n",
+    "a fence set off by blank lines": "see `a\n\n```\ncode\n```\n\n[x](y.md) b`\n",
     "a reference definition": "[t][lbl]\n\n[lbl]: y.md\n",
     "an indented code block": pytest.param(
         "para\n\n    [x](y.md)\n\nafter\n",
