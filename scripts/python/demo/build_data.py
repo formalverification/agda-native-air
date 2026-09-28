@@ -3,18 +3,20 @@
 File: scripts/python/demo/build_data.py
 
 Description: `make demo-data`.  Read the committed agent-bench archive and
-  write the demo site's data (Issue #85).
+  write the demo site's data (Issues #85 and #215).
 
-  The archive is 1,051 files and 14 MB, and none of it is shipped to a
-  browser.  This step reduces it to what the page states: one JSON per replay
-  (the roster in `replays.ROSTER`), and one JSON holding the benchmark table
-  and the two arms' headline totals.  Both are written under `data/demo/`,
-  which is gitignored: the page is rebuilt from the archive, never from a
-  committed copy of its own output.
+  None of the archive is shipped to a browser, and it grows with every run.
+  This step reduces it to what the page states: one JSON per replay (the
+  roster in `replays.ROSTER`), and one JSON holding the numbers (both of
+  ADR 0001 § 9's tables, the arms' headline totals, and the archive's own
+  size, counted rather than quoted; see `numbers.build`).  Both are written
+  under `data/demo/`, which is gitignored: the page is rebuilt from the
+  archive, never from a committed copy of its own output.
 
   The step refuses to write anything if a number disagrees with ADR 0001 § 9
   or if an absolute path survived normalization, so a page that cannot be
-  trusted is a build failure rather than a published claim.
+  trusted is a build failure rather than a published claim.  `make
+  demo-check` runs the first of those refusals alone and writes nothing.
 
 Usage:
 
@@ -36,6 +38,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
 
 from scripts.python.demo import numbers
+from scripts.python.demo.numbers import ADR, ARCHIVE
 from scripts.python.demo.replays import ROSTER, build_replay, index_rows
 from scripts.python.utils.file_ops import load_json, write_text
 from scripts.python.utils.pipeline_types import (
@@ -44,11 +47,9 @@ from scripts.python.utils.pipeline_types import (
     sequence_results,
 )
 
-#: Where the archive, the index, and the decision record live, relative to the
-#: repository root.
-ARCHIVE = Path("reports/agent-bench")
+#: Where the benchmark index lives, relative to the repository root.  The
+#: archive's and the decision record's paths are `numbers`', which reads both.
 INDEX = Path("data/benchmarks/benchmark-index.jsonl")
-ADR = Path("docs/adr/0001-proof-search-on-agda-mcp.md")
 
 #: The default output directory, gitignored like every other `data/` output.
 DEFAULT_OUT = Path("data/demo")

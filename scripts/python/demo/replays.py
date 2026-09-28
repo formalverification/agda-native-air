@@ -61,7 +61,9 @@ from scripts.python.utils.pipeline_types import (
     Result,
 )
 
-REPLAY_SCHEMA = "agda-native-air.demo.replay.v0"
+#: The shape of a replay file.  v1 (Issue #215) added the verdict's
+#: `original` reading; `build_site` refuses a file of any other shape.
+REPLAY_SCHEMA = "agda-native-air.demo.replay.v1"
 
 
 @dataclass(frozen=True)
@@ -207,6 +209,12 @@ def _verdict(outcome: Dict[str, Any]) -> Dict[str, Any]:
         "permissionDenials": outcome.get("permissionDenials"),
         "isolation": outcome.get("isolation") or {},
         "lastWords": outcome.get("lastWords"),
+        # The judge's reading of whether the library's own proof of the
+        # lemma this row restates was in view before the last edit (Issue
+        # #188), `null` on a row with no original.  Reported, never gated.
+        # Its `file` is an absolute store path until the one normalization
+        # pass below; the page prints the original's name, not the file.
+        "original": outcome.get("original"),
     }
 
 

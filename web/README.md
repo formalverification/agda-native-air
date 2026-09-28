@@ -17,6 +17,7 @@ This directory holds two things, and no HTML page.
 
 ```sh
 make demo          # demo-data, then demo-site: the demo page alone, in site/
+make demo-check    # the page's numbers against ADR 0001 § 9, writing nothing
 make site          # make demo, then MkDocs --strict: the whole site, in public/
 ```
 
@@ -32,16 +33,26 @@ distinct on purpose, since MkDocs' own default output directory is also
 
 +  `make demo-data` reads the committed archive under
    [`reports/agent-bench/`](../reports/agent-bench) and writes one small JSON
-   per replay, plus the benchmark table, to `data/demo/`.
+   per replay, plus the numbers, to `data/demo/`.
 +  `make demo-site` renders `site/index.html` from those and copies this
-   directory's files to `site/assets/`.
+   directory's files to `site/assets/`.  It refuses a data file written
+   under another schema than the renderer's, which is what a `data/demo/`
+   left by an older generator holds; `make demo-data` rewrites it.
++  `make demo-check` regenerates the page's two § 9 tables from the five
+   run reports and compares them with ADR 0001 § 9, reading nothing else
+   and writing nothing: the check `make demo-data` makes before it writes,
+   on its own.
 +  `make demo-clean` removes both output directories.
 
 Both outputs are gitignored.  The build reads only files of this repository,
 makes no network request, and needs nothing but Python 3: no Agda, no server,
-no model call.  It refuses to write a page whose benchmark table disagrees
-with [ADR 0001](../docs/adr/0001-proof-search-on-agda-mcp.md) § 9, or one
-carrying an absolute path from the machine the sweep ran on.
+no model call.  It refuses a run report that lacks a field the page reads,
+and it refuses to write a page whose two § 9 tables (the archived arms' and
+the control's) disagree with
+[ADR 0001](../docs/adr/0001-proof-search-on-agda-mcp.md) § 9, or one carrying
+an absolute path from the machine the sweep ran on.  The page's other
+figures (by tier, by tool, per arm) are regenerated from the same reports
+and have no ADR table to be compared with.
 
 `.github/workflows/pages.yml` runs `make site` inside `nix develop .#site`,
 checks the whole tree with `make site-check`, and deploys `public/` to GitHub
@@ -68,6 +79,50 @@ which builds the page and checks it: the selectors the script depends on, that
 every tool answer is on the page in full, and that nothing is fetched from off
 the origin at page load.
 
+## What the page claims, and what it does not
+
+The five sessions come from the project's first agent measurement ([#154]),
+in which every subject had the server and nothing else.  They show what a
+frontier model does with the tools; they cannot show whether the tools help,
+because nothing in that measurement compares the tools with their absence.
+The measurement that does is the control ([#162]), and the page was brought
+up to it by [#215].  The page therefore holds to the following rules, each
+pinned by a test in
+[`test_demo_render.py`](../scripts/python/tests/test_demo_render.py) or
+[`test_demo_numbers.py`](../scripts/python/tests/test_demo_numbers.py):
+
++  **The header carries no solve count**.  It says what the page is: the
+   sessions, their calls, and the suite they come from.  A solve count needs
+   its instrument, its run, and its caveat, and a header has room for none of
+   them; the search loop's count is not there either, because the loop is a
+   different instrument with no model in it, not the agents' baseline
+   ([the guide](../docs/reading-the-results.md) § 1).
++  **The control stands wherever the archived arms' results do**.  Every
+   element that prints an arm's results (a solve, a restatement, a gate, an
+   anomaly, a tool call; not caps, dates, or tool counts) names the arm's
+   run in a `data-runs` attribute, and a section that shows the archived
+   arms' results must show the control's `shell` and `mcp` arms too.  A test
+   pins the attribute on every such element the page has; a new one needs
+   it as well, or the section check cannot see it.  The control's table is
+   ADR 0001 § 9's attribution table, regenerated from
+   `arm162-*/report.json` and compared with the ADR cell for cell, and the
+   page says how its protocol differs from the archived arms' (a fourteenth
+   tool, readable library sources, `--safe` on the subjects' servers).
++  **The restated rule is stated with its limit**.  It reads a body's
+   references, so it catches a proof that cites the library and not one that
+   transcribes it.  What the judge's `original` reading ([#188]) says of each
+   replayed session is read from that session's own verdict; the page prints
+   the original's name, never its store path.
++  **The later findings are linked, not restated**.  Lean answers, the
+   trimmed tool surface, and the hard tier each get a clause and a link to
+   the guide's section or the issue, and no figure.
++  **No figure is typed into the page**.  Counts, caps, dates, tool counts,
+   and the archive's size are read from the data at build time.  The few
+   sentences that rest on a reading of the record (the server did not come
+   out ahead on the count; the control could read the originals the archived
+   arms could not) have their premises pinned by tests, so a re-judge that
+   moves one fails the suite before the sentence is published again.
+
 ## What the page may not do
 
 +  Fetch anything from another origin at load.  No web font, no CDN, no
@@ -87,5 +142,9 @@ the origin at page load.
    failed verdict.
 
 [#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#169]: https://github.com/formalverification/agda-native-air/issues/169
 [#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
+[#215]: https://github.com/formalverification/agda-native-air/issues/215

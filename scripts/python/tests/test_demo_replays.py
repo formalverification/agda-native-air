@@ -122,6 +122,17 @@ def test_every_verdict_is_the_archives(tmp_path: Path) -> None:
         assert verdict["agdaExit"] == outcome["agdaExit"]
         assert verdict["restatementEvidence"] == \
             (outcome.get("restatementEvidence") or [])
+        # Issue #215: the judge's `original` reading travels with the
+        # verdict, every field but the file as the archive has it, and the
+        # file anchored rather than absolute.
+        original = outcome.get("original")
+        if original is None:
+            assert verdict["original"] is None
+            continue
+        for field in ("inView", "how", "at", "reads", "refusedReads"):
+            assert verdict["original"][field] == original[field], field
+        assert original["file"].startswith("/nix/store/")
+        assert verdict["original"]["file"].startswith("<nix>/")
 
 
 def test_the_final_file_on_the_page_is_the_one_the_judge_read(tmp_path: Path) -> None:
