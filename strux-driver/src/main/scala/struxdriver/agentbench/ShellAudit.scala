@@ -295,12 +295,14 @@ object ShellAudit {
     * substitution can neither hide a path nor invent a command.  Every later
     * `$NAME` or `${NAME}` outside single quotes is then replaced by the value.
     * Anything else is left as written, so the lexer still reports it: a use
-    * before the binding, `${NAME:-x}` and the other operator forms, a binding
-    * in a pipeline stage or before `&` (a subshell's), and a prefix
-    * assignment (`NAME=v cmd`, which the shell does not apply to its own
-    * words), which also forgets any earlier binding of NAME.  It reads a
-    * command whose here-doc bodies are already stripped, since a body is data
-    * and its quotes would mislead the quote tracking.
+    * before the binding, and `${NAME:-x}` and the other operator forms.  Only
+    * a standalone assignment changes the shell's own NAME: one whose value is
+    * not plain path text forgets an earlier binding, while an assignment in a
+    * pipeline stage or before `&` (a subshell's) and a prefix assignment
+    * (`NAME=v cmd`, which sets NAME in that command's environment alone)
+    * leave it as it was, as the shell does.  It reads a command whose here-doc
+    * bodies are already stripped, since a body is data and its quotes would
+    * mislead the quote tracking.
     */
   private[agentbench] def bindLiterals(s: String): String = {
     def nameEnd(from: Int): Int = {
@@ -355,7 +357,9 @@ object ShellAudit {
         else if (atStart && nameStart(c) && nameEnd(i) < s.length && s.charAt(nameEnd(i)) == '=') {
           val name       = s.substring(i, nameEnd(i))
           val (v, after) = value(nameEnd(i) + 1)
-          val env2       = v.filter(_ => endsSimple(after)).fold(env - name)(x => env + (name -> x))
+          val env2       =
+            if (!endsSimple(after)) env                        // a prefix, or a subshell's: the shell's NAME is unchanged
+            else v.fold(env - name)(x => env + (name -> x))    // standalone: bound to the literal, or forgotten
           go(after, quote, atStart = false, env2, out + s.substring(i, after))
         }
         else go(i + 1, quote, atStart = false, env, out + c)

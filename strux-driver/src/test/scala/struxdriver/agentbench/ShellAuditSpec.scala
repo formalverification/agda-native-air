@@ -151,7 +151,14 @@ final class ShellAuditSpec extends AnyFunSuite with Matchers {
     bad(s"cat $$G/x; G=$stdlib").size should be >= 1                  // used before it is bound
     bad(s"G=$stdlib cat $$G/x").size should be >= 1                   // a prefix assignment
     bad(s"G=$stdlib | cat $$G/x").size should be >= 1                 // a pipeline stage's own
-    bad(s"G=$stdlib; G=/x cat y; cat $$G/z").size should be >= 1      // forgotten by a prefix
+    bad(s"G=$stdlib; G=\"/a b\"; cat $$G/x").size should be >= 1        // forgotten: the new value is not plain
+    // A prefix assignment or a pipeline stage's leaves the shell's own variable
+    // as it was (PR #197 review); the prefixed command itself is still a
+    // program this audit does not model, and is the only finding.
+    val prefixed = bad(s"G=$stdlib; G=/etc cat y; cat $$G/Algebra.agda")
+    prefixed.size shouldBe 1
+    prefixed.head should include ("does not model")
+    ok(s"G=$stdlib; G=/etc | cat $$G/Algebra.agda")
     bad("G=$(pwd); cat $G/x").size should be >= 1                     // a value that expands
     bad("G=\"/a b\"; cat $G").size should be >= 1                      // not plain path text
     bad("G=\"'\"; cat $G /etc/passwd $G").size should be >= 1          // a quote in the value

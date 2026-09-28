@@ -27,11 +27,15 @@ numbers are the issue's.
 The rows carry `source: "agda-stdlib"` and the tag `stratum:novel`, so every
 report counts them as `agda-stdlib/novel`, and a subject is given the
 standard-library corpus, which indexes the lemmas these proofs use.  The
-obligations import only the standard library and `AgdaDojang.Debug`, so the
-judge checks them without `--library agda-algebras`.  Like the other
-standard-library tiers, the directories carry no `.agda-lib`; outside the dev
-shell an editor finds `agda-dojang` through the registry's defaults, with
-`AGDA_DIR` set to the checkout's `agda/`.
+obligations import only the standard library and `AgdaDojang.Debug`.  The
+judge's batch `agda` (`EvalBenchmark.agdaCommand`, the command the shell arms'
+prompts quote) adds `--library agda-algebras` only for `agda-algebras` rows,
+so it checks these without it; the server a run starts, which answers the
+subjects' and the judge's `check_file`, takes one set of flags for every row,
+and those name agda-algebras, which changes nothing for a file that imports
+none of it.  Like the other standard-library tiers, the directories carry no
+`.agda-lib`; outside the dev shell an editor finds `agda-dojang` through the
+registry's defaults, with `AGDA_DIR` set to the checkout's `agda/`.
 
 ## The golds
 

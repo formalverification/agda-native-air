@@ -5,9 +5,8 @@
 
 The baseline benchmark is a set of Agda proof obligations with committed gold
 solutions, used as the standard evaluation set for subsequent experiments.
-Every finished gold solution type-checks under the pinned toolchain;
-type-checking is the ground truth for a benchmark entry.  (A gold still wanted
-on the hard tiers of issue [#189] is the obligation marked `-- GOLD WANTED`.)
+Every gold solution type-checks under the pinned toolchain; type-checking is
+the ground truth for a benchmark entry.
 
 ---
 
@@ -320,13 +319,13 @@ data/benchmarks/
 │   ├── obligations/                   # 12 modules, one {!!} hole each
 │   └── gold/                          # solved twins, needle named qualified
 ├── agda-stdlib-hard-v0/
-│   ├── README.md                      # the novelty check and the gold status
-│   ├── obligations/                   # 9 modules, one {!!} hole each
-│   └── gold/                          # twins; "-- GOLD WANTED" until filled
+│   ├── README.md                      # the rows, golds, dropped rows, novelty check
+│   ├── obligations/                   # 6 modules, one {!!} hole each
+│   └── gold/                          # solved twins
 └── agda-algebras-hard-v0/
-    ├── README.md                      # the novelty check and the gold status
-    ├── obligations/                   # 9 modules, one {!!} hole each
-    └── gold/                          # twins; "-- GOLD WANTED" until filled
+    ├── README.md                      # the rows, golds, dropped rows, novelty check
+    ├── obligations/                   # 8 modules, one {!!} hole each
+    └── gold/                          # solved twins
 ```
 
 Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
