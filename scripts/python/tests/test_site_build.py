@@ -12,10 +12,12 @@ tree, and then the properties the site is published on:
    is under `demo/`, byte for byte, and nothing else is.
 +  Nothing published is fetched from off the origin, and every link and
    asset reference resolves, over every page and stylesheet.
-+  The allowlist holds: the only pages are the landing page, the 404, and
-   the demo; nothing internal from `docs/` is published.
-+  The landing page's figures were all read: no marker survives into any
-   built page.
++  The allowlist holds: the pages published are the curated ones of
+   [M6-3] (#171), the 404, and the demo, and nothing written for
+   contributors is published.
++  The landing page's figures were all read (no marker survives into any
+   built page), and every link to GitHub, the nav's included, names a path
+   git tracks, on the branch the site links to.
 +  The two source-rewriting hooks fail a build: a fixture project with an
    unresolved figure, and one with a link to nowhere, both stop
    `mkdocs build --strict` with the problem named.
@@ -53,6 +55,7 @@ from scripts.python.site.check_site import (
     off_origin_fetches,
     unresolved_links,
 )
+from scripts.python.site.links_hook import BRANCH, repository
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -155,11 +158,36 @@ def test_every_link_and_asset_reference_resolves(built) -> None:
 
 # ------------------------------------------------------------- the allowlist
 
-def test_only_the_landing_page_the_404_and_the_demo_are_published(built) -> None:
+#: The pages [M6-3] (#171) publishes, as built; the PR names every page left
+#: out and why.  A page added to the allowlist is added here on purpose.
+CURATED = {
+    "index.html",
+    "reading-the-results/index.html",
+    "adr/0001-proof-search-on-agda-mcp/index.html",
+    "adr/0002-agda-mcp/index.html",
+    "agda-mcp/agda-mcp-interaction-lane/index.html",
+    "agda-mcp/agda-mcp-ask-agda-audit/index.html",
+    "agda-mcp/agda-mcp-environment/index.html",
+    "proof-search/overview/index.html",
+    "benchmarks/taxonomy/index.html",
+    "corpora/agda-stdlib-v0/index.html",
+    "corpora/agda-algebras-v0.1/index.html",
+    "corpora/agda-algebras-v0/index.html",
+    "representation/index.html",
+    "architecture/index.html",
+    "notes/browser-ide-proposal/index.html",
+}
+
+
+def test_only_the_curated_pages_the_404_and_the_demo_are_published(built) -> None:
     public = built["public"]
     pages = {str(p.relative_to(public)) for p in _pages(public)}
-    assert pages == {"index.html", "404.html", "demo/index.html"}, pages
-    for internal in ("GITHUB_PROJECT", "PLAN", "WORKFLOW", "README", "feedback", "notes"):
+    expected = CURATED | {"404.html", "demo/index.html"}
+    assert pages == expected, sorted(pages ^ expected)
+    for internal in ("GITHUB_PROJECT", "PLAN", "WORKFLOW", "README", "MANIFESTO",
+                     "feedback", "mcp-field-reports", "import-closure",
+                     "notes/ai-for-theorem-proving-prior-art", "corpora/README",
+                     "benchmarks/obligations"):
         assert not (public / internal).exists(), internal
 
 
@@ -169,6 +197,27 @@ def test_no_figure_marker_survives_into_a_built_page(built) -> None:
     left = [str(p.relative_to(built["public"])) for p in _pages(built["public"])
             if "@fig(" in p.read_text(encoding="utf-8")]
     assert not left, left
+
+
+#: A link into this repository on GitHub, as the link hook and the nav write
+#: them: the kind (file or directory) and the path.
+GITHUB_LINK = re.compile(
+    r'href="https://github\.com/formalverification/agda-native-air/'
+    r'(?P<kind>blob|tree)/(?P<branch>[^/"]+)/(?P<path>[^"#?]+)')
+
+
+def test_every_github_link_names_a_path_git_tracks(built) -> None:
+    repo = repository(REPO, "https://github.com/formalverification/agda-native-air").unwrap()
+    links = {(m["kind"], m["branch"], m["path"].rstrip("/"))
+             for page in _pages(built["public"])
+             for m in GITHUB_LINK.finditer(page.read_text(encoding="utf-8"))}
+    # The rewritten links and the nav's four GitHub entries are both here.
+    assert ("tree", BRANCH, "reports/agent-bench") in links
+    assert ("blob", BRANCH, "agda-mcp/README.md") in links
+    wrong = sorted(link for link in links
+                   if link[1] != BRANCH
+                   or link[2] not in (repo.files if link[0] == "blob" else repo.directories))
+    assert not wrong, wrong
 
 
 # ------------------------------------------------------- the nav and the look

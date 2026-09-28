@@ -1262,7 +1262,10 @@ This runs `make demo` (the archive under `reports/agent-bench/` to
 refuses to write a page whose benchmark table disagrees with ADR 0001 § 9,
 the MkDocs hook refuses a site without a built demo, and `--strict` refuses a
 broken link or a published page missing from the nav; each failure names
-what to fix.  `make demo-data` and `make demo-site` still work on their own.
+what to fix.  Two more hooks rewrite pages as they are read: the landing
+page's figures are read from `reports/agent-bench/` (§ 16.5), and a
+published page's links to files the site does not publish are sent to
+GitHub.  `make demo-data` and `make demo-site` still work on their own.
 
 ### 16.3.  Serve it locally
 
@@ -1283,7 +1286,7 @@ site's own 404 page, an Agda goal that cannot be filled.
 
 ```sh
 make site-check        # public/: nothing fetched off-origin, every link resolves
-make site-test         # the demo's 74 tests and the site's 37
+make site-test         # the demo's tests and the site's
 make site-pins-check   # requirements.txt against this Python environment
 ```
 
@@ -1307,10 +1310,21 @@ that `mkdocs.yml` does not name.  To publish a page, do the following:
     thing).
 2.  Add the page to `nav:`.  A published page missing from the nav is a
     `--strict` failure, on purpose.
-3.  Fix the page's relative links: a link to a file that is not published
-    fails `--strict` too.  Point it at the file on GitHub, drop it, or publish
-    the target as well.
-4.  Run `make site` and `make site-check`.
+3.  Leave the page's relative links as they are.  A link to a file the site
+    does not publish is rewritten at build time to that file on GitHub
+    (`scripts/python/site/links_hook.py`), so the source stays right for
+    its readers on GitHub; a link to a file git does not track fails the
+    build, naming the page and the line.
+4.  Add the page to the `CURATED` set in
+    `scripts/python/tests/test_site_build.py`, which pins what is published.
+5.  Run `make site`, `make site-check`, and `make site-test`.
+
+A figure on a page is not typed but named, and read at build time from the
+archived run it comes from (`scripts/python/site/figures_hook.py`): the
+page sets `figures: true` in its front matter and writes
+`@fig(<run-id> <selector>)`, where the selector is a JSON pointer into
+`reports/agent-bench/<run-id>/report.json` (`/totals/solved`) or the name of
+a figure the hook derives from it.  Only the landing page does this today.
 
 Non-Markdown files under `docs/` (images, stylesheets) follow the same
 allowlist; the `!assets/**` and `!stylesheets/**` lines are what publish the
@@ -1324,8 +1338,14 @@ theme's own.
    runs the demo build itself; this appears only when `mkdocs build` is run
    by hand.
 +  `--strict` reports a page "not included in the nav" or a link whose
-   "target is not found": the allowlist, the nav, and the page's links are
-   out of step; see § 16.5.
+   "target is not found": the allowlist and the nav are out of step; see
+   § 16.5.
++  `links to nowhere: <page>:<line>: ... neither published nor tracked`: a
+   link names a file that is not in the repository, or is gitignored; fix
+   the link, or commit the file.
++  `figures: <page>:<line>: @fig(...)`: a figure marker names a run with no
+   report, a field the report does not have, or a value that is not a
+   count; the message says which.
 +  `Address already in use` on serve: pick another port,
    `make site-serve SITE_PORT=8001`.
 +  The site looks unstyled or fonts fall back: the stylesheets load in a fixed

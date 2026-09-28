@@ -42,7 +42,8 @@
 #      make site-pins-check  requirements.txt and the Nix environment agree.
 #
 #    `deploy` runs only if `verify` passes, and uploads `public/`, the whole
-#    tree: the landing page, the demo under `demo/`, the 404, and the assets.
+#    tree: the curated pages of docs/, the demo under `demo/`, the 404, and
+#    the assets.
 #
 #    This workflow does not touch `ci.yml`'s lanes and is not part of its
 #    `all-green` gate: a page that fails to build should not block a code
