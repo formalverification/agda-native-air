@@ -343,12 +343,17 @@
             local lib_file
             lib_file="$(find "$lib_root" -maxdepth 1 -name '*.agda-lib' 2>/dev/null | head -1)"
             if [ -n "$lib_file" ]; then
-              if [ -n "$_anair_registry_ok" ]; then
-                echo "$lib_file" >> "$_anair_libraries_tmp" || _anair_registry_ok=""
+              # A library is advertised (a --library flag, the summary) only
+              # when its line reached the staged registry; a registry that
+              # could not be written names none of them.
+              if [ -n "$_anair_registry_ok" ] && echo "$lib_file" >> "$_anair_libraries_tmp"; then
+                AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
+                eval "_AGDA_REG_$reg_suffix=yes"
+                echo "[agda] registered $display_name from $lib_file"
+              else
+                _anair_registry_ok=""
+                echo "[agda] WARNING: could not register $display_name: the registry could not be written"
               fi
-              AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
-              eval "_AGDA_REG_$reg_suffix=yes"
-              echo "[agda] registered $display_name from $lib_file"
             else
               echo "[agda] WARNING: $var_name is set but no .agda-lib found in $lib_root"
               echo "[agda]          (expected a *.agda-lib file in that directory)"
@@ -396,7 +401,11 @@
       # Every library is registered: move the registry into place in one step,
       # if every write to it succeeded.
       if [ -n "$_anair_registry_ok" ] && mv -f "$_anair_libraries_tmp" "$AGDA_DIR/libraries"; then
-        echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
+        if [ -z "$_anair_defaults_failed" ]; then
+          echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
+        else
+          echo "[agda] wrote $AGDA_DIR/libraries ($AGDA_DIR/defaults unchanged)"
+        fi
       else
         rm -f "$_anair_libraries_tmp"
         echo "[agda] WARNING: could not write $AGDA_DIR/libraries; the previous one, if any, stands"
