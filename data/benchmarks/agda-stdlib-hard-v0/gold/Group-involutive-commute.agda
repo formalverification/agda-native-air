@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-involutive-commute
 -- Difficulty: compositional
--- Source: exam genre (Algebra.Bundles.Group)
 -- Import stratum: novel
--- Strategy: every element is its own inverse; expand (x ∙ y) ∙ (x ∙ y) ≈ ε
 --
 -- If x ∙ x ≈ ε for every x, the group is commutative.
 --

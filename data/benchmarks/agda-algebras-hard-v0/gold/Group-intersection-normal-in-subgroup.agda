@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-intersection-normal-in-subgroup
 -- Difficulty: compositional
--- Source: group theory qualifying exam 2000 Nov 10, problem 2 (Classical.Structures.Group)
 -- Import stratum: novel
--- Strategy: closure of H under conjugation by its own elements, and normality of K in G, read elementwise
 --
 -- For a subgroup H and a normal subgroup K of G, H ∩ K is normal in H: conjugating an element of H ∩ K by an element of H stays in H ∩ K.
 --

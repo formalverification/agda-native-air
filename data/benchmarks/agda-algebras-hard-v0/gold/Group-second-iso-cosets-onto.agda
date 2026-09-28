@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-second-iso-cosets-onto
 -- Difficulty: non-obvious
--- Source: group theory qualifying exam 2000 Nov 10, problem 2, HK/K ≅ H/(H∩K) as the coset spaces (Classical.Structures.Group)
 -- Import stratum: novel
--- Strategy: x ≈ h ∙ k gives x ⁻¹ ∙ h ≈ k ⁻¹ ∈ K, so the coset of x meets H
 --
 -- The inclusion H → HK is onto the cosets of K in HK: every element of the complex product H ∙ᶜ K lies in the K-coset of some element of H.
 --

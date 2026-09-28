@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-inversion-homo-iff-commutative
 -- Difficulty: non-obvious
--- Source: exam genre; Algebra.Morphism.Structures
 -- Import stratum: novel
--- Strategy: both directions; the homomorphism law for _⁻¹ is exactly (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹
 --
 -- Inversion is a group homomorphism G → G if and only if the group is commutative.
 --

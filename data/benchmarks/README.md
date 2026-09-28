@@ -193,7 +193,10 @@ verdicts, and the search record; what they share is here.
    exactly one `UnsolvedInteractionMetas` and no other error or warning under
    the judge's own `agda` invocation for its row's `source`, with and without
    `--safe`.  The obligations are the issue's files, byte for byte apart from
-   the header's `File:` line.
+   the header's `File:` line and its `Source:` and `Strategy:` lines, which
+   issue [#219] removed: a subject's work file is a byte-for-byte copy of its
+   obligation, so a header must not name helpful lemmas or sketch the proof.
+   Each tier's README keeps every row's source and its proof in brief.
 +  **Module telescopes**.  Every statement is posed under `module _ … where`
    (`(G : Group c ℓ)` with `open Group G`, or agda-algebras' `(𝒢 : Group α ρ)`
    with its subgroups and their proofs), because that is the readable way to
@@ -219,12 +222,13 @@ verdicts, and the search record; what they share is here.
    and `agda-algebras/novel`.  No row carries a `restates:` or `target:` tag,
    since no row has an original, and no definition in either corpus or either
    library's sources carries any of the fourteen hole names, so the
-   restatement rule cannot fire.  `module` names the library module the
-   fixture's `Source:` line names first (nothing is proved there); `goldTerm`
-   is the fixture's `Strategy:` line, a sketch; `type` is the signature as the
-   fixture writes it, as on every other tier, because Agda prints these types
-   with every definition unfolded (past a thousand characters on rows 10 to
-   18).
+   restatement rule cannot fire.  `module` names the first library module of
+   the row's source (nothing is proved there; the tier's README lists each
+   row's source); `goldTerm` is a one-line sketch of the proof, which the
+   fixture's header also carried until issue [#219]; `type` is the signature
+   as the fixture writes it, as on every other tier, because Agda prints these
+   types with every definition unfolded (past a thousand characters on rows 10
+   to 18).
 
 **Golds**.  A wanted gold's twin under `gold/` is the obligation with the hole
 still in it and a `-- GOLD WANTED` line under the header, so it checks exactly
@@ -462,3 +466,4 @@ library, which carries its own (MIT) license and is not vendored here.  See the
 
 [#139]: https://github.com/formalverification/agda-native-air/issues/139
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#219]: https://github.com/formalverification/agda-native-air/issues/219

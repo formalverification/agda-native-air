@@ -37,6 +37,22 @@ none of it.  Like the other standard-library tiers, the directories carry no
 `.agda-lib`; outside the dev shell an editor finds `agda-dojang` through the
 registry's defaults, with `AGDA_DIR` set to the checkout's `agda/`.
 
+The fixtures' headers carry no `Source:` or `Strategy:` line (issue [#219]):
+a subject's work file is a byte-for-byte copy of its obligation, and those
+lines named helpful lemmas and sketched the proof.  Each row's proof, in
+brief, is under "The golds"; its source, as its header named it, is as
+follows:
+
++  **1**.  The exam genre, group theory qualifying exams
+   (`Algebra.Bundles.Group`).
++  **2**.  The exam genre (`Algebra.Bundles.Group`).
++  **3**.  The exam genre (`Algebra.Bundles.Group`); `Algebra.Properties.Group`
+   has `⁻¹-anti-homo-∙`.
++  **4**.  The exam genre (`Algebra.Bundles.Group`).
++  **6**.  The exam genre; `Algebra.Morphism.Structures`.
++  **7**.  The exam genre; `Algebra.Morphism.Structures`,
+   `Function.Definitions`.
+
 ## The golds
 
 Every row's gold is in: each checks under the judge's invocation with
@@ -272,3 +288,4 @@ Counts are hits, from the runs of 2026-09-26.
    `FLRP.Parachute.Basic`.
 
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#219]: https://github.com/formalverification/agda-native-air/issues/219

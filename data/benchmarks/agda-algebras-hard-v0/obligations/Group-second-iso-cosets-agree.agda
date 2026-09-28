@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-second-iso-cosets-agree
 -- Difficulty: non-obvious
--- Source: group theory qualifying exam 2000 Nov 10, problem 2, HK/K ≅ H/(H∩K) as the coset spaces (Classical.Structures.Group)
 -- Import stratum: novel
--- Strategy: the coset relation is x ⁻¹ ∙ y ∈ (subgroup); for h₁ h₂ ∈ H membership in H ∩ K and in K coincide because H is closed
 --
 -- The inclusion H → HK is well defined and injective on cosets: for h₁, h₂ in H, h₁ and h₂ lie in the same coset of H ∩ K exactly when they lie in the same coset of K.  The subgroup H ∩ K is built here so the statement can name its cosets.
 --

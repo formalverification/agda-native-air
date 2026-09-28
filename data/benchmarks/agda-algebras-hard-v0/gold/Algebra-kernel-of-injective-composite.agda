@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-algebra-kernel-of-injective-composite
 -- Difficulty: compositional
--- Source: Setoid.Homomorphisms.Kernels with Setoid.Congruences.Lattice (the congruence order _≑_); Setoid.Homomorphisms.Properties has ⊙-hom
 -- Import stratum: novel
--- Strategy: one direction is cong of g; the other is injectivity of g
 --
 -- The kernel congruence of a composite g ⊙ f equals the kernel congruence of f when g is injective, in the congruence order ≑ of Setoid.Congruences.Lattice.
 --
