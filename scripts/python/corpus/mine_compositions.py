@@ -733,13 +733,29 @@ def parse_options(argv: Sequence[str]) -> Options:
 
 def load_rows(path: Path) -> Result[Tuple[Dict[str, Any], ...], PipelineError]:
     """The corpus rows, the last row per qualified name winning (the server's
-    semantics: it indexes the corpus as a map keyed by `prettyQname`)."""
-    def parse(text: str) -> Result[Tuple[Dict[str, Any], ...], PipelineError]:
+    semantics: it indexes the corpus as a map keyed by `prettyQname`).
+
+    A malformed line (not JSON, or not an object with a string `prettyQname`)
+    fails the load, and the error names every such line.  The server skips
+    and counts them instead, but the miner's verdicts quantify over every row
+    ("no corpus lemma closes it", "no other lemma does this step"), so a
+    skipped row could pass a candidate that is not novel."""
+    def parse_line(line: str) -> Optional[Dict[str, Any]]:
         try:
-            rows = [json.loads(line) for line in text.split("\n") if line.strip()]
-        except json.JSONDecodeError as e:
-            return Result.err(PipelineError(ErrorType.PARSING_ERROR, f"bad corpus row in {path}", cause=e))
-        return Result.ok(tuple({r["prettyQname"]: r for r in rows}.values()))
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        return row if isinstance(row, dict) and isinstance(row.get("prettyQname"), str) else None
+
+    def parse(text: str) -> Result[Tuple[Dict[str, Any], ...], PipelineError]:
+        numbered = [(n, parse_line(line)) for n, line in enumerate(text.split("\n"), 1) if line.strip()]
+        bad = [n for n, row in numbered if row is None]
+        if bad:
+            shown = ", ".join(str(n) for n in bad[:10]) + (f" and {len(bad) - 10} more" if len(bad) > 10 else "")
+            return Result.err(PipelineError(
+                ErrorType.PARSING_ERROR,
+                f"malformed corpus rows in {path} at line(s) {shown}; the miner's checks need every row"))
+        return Result.ok(tuple({row["prettyQname"]: row for _, row in numbered if row is not None}.values()))
     return read_text(path).and_then(parse)
 
 

@@ -273,9 +273,9 @@ gold is wanted, the following hold:
    it; the exception is `Unit-trivial`, whose hole of type `⊤` Agda fills by
    eta).  A row without a gold waits for one.
 
-Since 2026-09-27 no gold is wanted on either tier, and since 2026-09-28 the
-full `make eval-benchmark` passes all 81 rows, the composition tier's
-included.
+Since 2026-09-27 no gold is wanted on either hard tier, and since 2026-09-28
+the full `make eval-benchmark` passes all 81 rows, including the composition
+tier's twelve.
 
 **Alternative proofs**.  A gold file may keep further proofs of its statement
 after the gold itself, each a definition with the same signature and a name

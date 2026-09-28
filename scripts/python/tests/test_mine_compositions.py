@@ -29,6 +29,7 @@ Usage
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
@@ -44,6 +45,7 @@ from scripts.python.corpus.mine_compositions import (
     is_connective,
     layout_nameable,
     lemma_of,
+    load_rows,
     loop_reachable,
     middle,
     mine,
@@ -341,3 +343,22 @@ def test_a_step_that_concludes_a_hypothesis_is_superfluous() -> None:
     r = next(r for r in mine(LIBRARY + (refl,), opts(), everything_nameable)
              if r["statement"] == "(h1 : A ≅ B) (h2 : B ≤ C) → A ≤ C")
     assert r["gold"] == "≤-trans (≅→≤ h1) h2" and r["keep"]
+
+
+def test_a_malformed_corpus_line_fails_the_load_and_is_named(tmp_path: Path) -> None:
+    # Not JSON (line 2) and JSON without a prettyQname (line 4, which used to
+    # raise KeyError): both are named, and nothing is skipped.
+    corpus = tmp_path / "corpus.jsonl"
+    corpus.write_text("\n".join([json.dumps({"prettyQname": "L.a"}), "{not json",
+                                  json.dumps({"prettyQname": "L.b"}), json.dumps({"no": "name"}), ""]),
+                      encoding="utf-8")
+    loaded = load_rows(corpus)
+    assert loaded.is_err
+    assert "at line(s) 2, 4;" in loaded.unwrap_err().message
+
+
+def test_the_last_row_per_name_wins(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus.jsonl"
+    corpus.write_text("\n".join(json.dumps({"prettyQname": q, "n": n}) for q, n in (("L.a", 1), ("L.b", 2), ("L.a", 3))),
+                      encoding="utf-8")
+    assert sorted((r["prettyQname"], r["n"]) for r in load_rows(corpus).unwrap()) == [("L.a", 3), ("L.b", 2)]
