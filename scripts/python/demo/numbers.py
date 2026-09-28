@@ -13,10 +13,13 @@ Description: The demo page's numbers, regenerated from the archived run
   both, beside the archived Sonnet arm.  Transcribing either would be how a
   page and a decision record come to disagree, so every figure is recomputed
   here from the runs' own `report.json` and then compared with the ADR's
-  tables cell for cell.  The comparison is `build`, which `make demo-data`,
-  `make demo-check` (this module's `main`, which writes nothing), and a
-  pytest case all run, so a number that drifts fails a build rather than a
-  reading.
+  tables cell for cell.  The comparison is `validate`, which reads the five
+  reports and the ADR and nothing else; `make demo-check` (this module's
+  `main`, which writes nothing) runs it alone, and `build`, which `make
+  demo-data` and the tests run, runs it first, so a number that drifts
+  fails a build rather than a reading.  Only those two tables are compared:
+  the page's other figures (by tier, by tool, per arm) are regenerated from
+  the same reports and have no table in the ADR to be compared with.
 
   Two of the agent table's columns are not the agents': "loop fixed" and
   "loop retrieval" are the proof-search loop's solve counts on the same suite,
@@ -520,7 +523,8 @@ def _bare(tool: str) -> str:
 
 
 def quiet(report: Dict[str, Any], stratum: str = HAYSTACK) -> Dict[str, Any]:
-    """How a run solved one stratum without asking Agda anything.
+    """How a run solved one stratum without asking Agda anything before its
+    final check.
 
     `quiet` counts the solved rows whose sessions made no call beyond
     reading the file, editing it, and checking it, and `quietTurns` the turn
@@ -692,21 +696,35 @@ def archive_size(archive: Path) -> Result[Dict[str, int], PipelineError]:
                        "bytes": sum(path.stat().st_size for path in files)})
 
 
+@dataclass(frozen=True)
+class Checked:
+    """The run reports, and the two tables regenerated from them and found
+    to agree with ADR 0001 § 9."""
+
+    reports: Dict[str, Dict[str, Any]]
+    tables: Tables
+
+
+def validate(archive: Path, adr: Path) -> Result[Checked, PipelineError]:
+    """The comparison alone: the five run reports and the ADR, and nothing
+    else read.  `make demo-check` is this, so no file the comparison does
+    not use (a transcript, the rest of the archive) can fail it."""
+    return load_reports(archive).and_then(
+        lambda reports: read_record(adr)
+        .and_then(lambda record: check(regenerate(reports, record), record))
+        .map(lambda tables: Checked(reports, tables)))
+
+
 def build(archive: Path, adr: Path) -> Result[Dict[str, Any], PipelineError]:
-    """Everything the page prints about the runs, regenerated and checked, or
-    the first failure."""
-
-    def with_reports(reports: Dict[str, Dict[str, Any]]
-                     ) -> Result[Dict[str, Any], PipelineError]:
-        return (read_record(adr)
-                .and_then(lambda record: check(regenerate(reports, record),
-                                               record))
-                .and_then(lambda tables: start_days(archive, reports)
-                          .and_then(lambda days: archive_size(archive)
-                                    .map(lambda size: _assemble(
-                                        reports, tables, days, size)))))
-
-    return load_reports(archive).and_then(with_reports)
+    """Everything the page prints about the runs, or the first failure:
+    `validate`, then what the page says in words, which also reads every
+    subject's transcript (the day each run began) and walks the archive
+    (its size)."""
+    return validate(archive, adr).and_then(
+        lambda checked: start_days(archive, checked.reports)
+        .and_then(lambda days: archive_size(archive)
+                  .map(lambda size: _assemble(checked.reports, checked.tables,
+                                              days, size))))
 
 
 def _arm(reports: Mapping[str, Dict[str, Any]], days: Mapping[str, str],
@@ -747,22 +765,21 @@ def _assemble(reports: Mapping[str, Dict[str, Any]], tables: Tables,
 # ------------------------------------------------------------------ main
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """`make demo-check`: the comparison alone, writing nothing."""
+    """`make demo-check`: `validate`, writing nothing."""
     parser = argparse.ArgumentParser(
-        description="Check the demo page's numbers against ADR 0001 § 9.")
+        description="Check the demo page's two § 9 tables against ADR 0001.")
     parser.add_argument("--repo", type=Path, default=Path("."),
                         help="the repository root (default: .)")
     args = parser.parse_args(argv)
 
-    outcome = build(args.repo / ARCHIVE, args.repo / ADR)
+    outcome = validate(args.repo / ARCHIVE, args.repo / ADR)
     if outcome.is_err:
         print(f"demo-check: {outcome.unwrap_err()}", file=sys.stderr)
         return 1
-    numbers = outcome.unwrap()
-    print(f"demo-check: {len(RUNS)} run reports agree with "
-          f"{numbers['checkedAgainst']}: the agent table's "
-          f"{len(numbers['rows'])} rows and the attribution table's "
-          f"{len(numbers['control']['rows'])}")
+    tables = outcome.unwrap().tables
+    print(f"demo-check: {len(RUNS)} run reports agree with {ADR} § 9: the "
+          f"agent table's {len(tables.rows)} rows and the attribution "
+          f"table's {len(tables.control)}")
     return 0
 
 

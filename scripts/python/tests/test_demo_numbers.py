@@ -34,6 +34,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Dict
 
+from scripts.python.demo.numbers import ADR as ADR_REL
+from scripts.python.demo.numbers import ARCHIVE as ARCHIVE_REL
 from scripts.python.demo.numbers import (
     BOTH_RUN,
     CONTROL,
@@ -52,8 +54,10 @@ from scripts.python.demo.numbers import (
     control_rows,
     control_table,
     loop_columns,
+    main,
     per_tool,
     rows_from_reports,
+    validate,
 )
 
 REPO = Path(__file__).resolve().parents[3]
@@ -440,3 +444,41 @@ def test_the_archive_is_measured_not_quoted(tmp_path: Path) -> None:
     on_disk = [path for path in ARCHIVE.glob("**/*") if path.is_file()]
     assert measured["files"] == len(on_disk) > 1051
     assert measured["bytes"] == sum(path.stat().st_size for path in on_disk)
+
+
+# ------------------------------------------ make demo-check (Issue #215)
+
+def _reports_only(root: Path, adr_text: str) -> Path:
+    """A repository root holding only what `make demo-check` may read: the
+    five run reports and ADR 0001, with no transcript and no other file."""
+    for run in RUNS:
+        (root / ARCHIVE_REL / run).mkdir(parents=True)
+        (root / ARCHIVE_REL / run / "report.json").write_text(
+            (ARCHIVE / run / "report.json").read_text(encoding="utf-8"),
+            encoding="utf-8")
+    (root / ADR_REL).parent.mkdir(parents=True)
+    (root / ADR_REL).write_text(adr_text, encoding="utf-8")
+    return root
+
+
+def test_demo_check_reads_only_the_reports_and_the_adr(tmp_path: Path,
+                                                        capsys) -> None:
+    # Copilot's review of PR #217: `make demo-check` ran the whole build, so
+    # a transcript the comparison never uses could fail it.  With nothing but
+    # the five reports and the ADR, the comparison passes and the full build,
+    # which needs the transcripts, does not.
+    root = _reports_only(tmp_path, ADR.read_text(encoding="utf-8"))
+    assert main(["--repo", str(root)]) == 0
+    assert "run reports agree with" in capsys.readouterr().out
+    assert validate(root / ARCHIVE_REL, root / ADR_REL).is_ok
+    assert build(root / ARCHIVE_REL, root / ADR_REL).is_err
+
+
+def test_demo_check_fails_on_a_wrong_cell(tmp_path: Path, capsys) -> None:
+    text = ADR.read_text(encoding="utf-8")
+    cell = "**47 solved, 6 restated**"
+    assert text.count(cell) == 1, "the cell this test edits has moved"
+    root = _reports_only(tmp_path,
+                         text.replace(cell, "**47 solved, 5 restated**"))
+    assert main(["--repo", str(root)]) == 1
+    assert f"total / mcp ({MCP_RUN})" in capsys.readouterr().err

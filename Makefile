@@ -461,7 +461,7 @@ help:
 	@echo "  make agent-bench-archive         - Copy a quoted agent-bench run (report, rows, prompts, transcripts, final files) under reports/agent-bench/"
 	@echo "  make demo                        - Build the demo site from reports/agent-bench/ (issue 85): demo-data then demo-site"
 	@echo "  make demo-data                   - Demo site: archive -> $(DEMO_DATA_DIR) (checks the table against ADR 0001 section 9)"
-	@echo "  make demo-check                  - Demo site: check the page's numbers against ADR 0001 section 9's two tables, writing nothing (issue 215)"
+	@echo "  make demo-check                  - Demo site: check the page's two section 9 tables against ADR 0001, from the run reports alone, writing nothing (issue 215)"
 	@echo "  make demo-site                   - Demo site: $(DEMO_DATA_DIR) + web/assets -> $(DEMO_SITE_DIR)/index.html"
 	@echo "  make demo-clean                  - Remove $(DEMO_DATA_DIR) and $(DEMO_SITE_DIR)"
 	@echo "  make site                        - Build the project site (issue 169): demo, then MkDocs --strict -> $(SITE_OUT_DIR)/ (needs mkdocs: nix develop .#site)"

@@ -753,3 +753,59 @@ def test_the_protocol_differences_the_page_names_are_the_archives(built) -> None
             "thirteen tools above, and no subject called it") in html
     assert "and the subjects&rsquo; servers carried the judge&rsquo;s " \
         "<code>--safe</code>" in html
+
+
+# --------------------------------- Copilot's review of PR #217 (Issue #215)
+
+def test_only_the_two_section_9_tables_are_said_to_be_compared(built) -> None:
+    # `numbers.check` compares the archived arms' table and the control's
+    # with ADR 0001 § 9; the tier and tool tables and the arm cards are
+    # regenerated and have no ADR table.  The prose must not claim more.
+    html = " ".join(built["html"].split())
+    assert "Every figure in the tables below is regenerated" not in html
+    assert ("the two tables ADR 0001 &sect; 9 states, this one and the "
+            "control&rsquo;s, are also compared with the ADR cell by cell") \
+        in html
+    assert "Both tables are checked against" not in html
+    assert ("The archived arms&rsquo; table and the control&rsquo;s are "
+            "checked against") in html
+
+
+def _block(built, opening: str) -> Element:
+    found = [el for el in built["root"].walk() if el.tag in ("p", "ul")
+             and " ".join(el.text.split()).startswith(opening)]
+    assert len(found) == 1, f"{len(found)} blocks open with {opening!r}"
+    return found[0]
+
+
+def test_every_block_printing_an_archived_arms_results_is_marked(built) -> None:
+    # The section check sees only what carries `data-runs`, so every element
+    # the page has that prints an archived arm's results carries it: the
+    # tables, the arm cards, and the three paragraphs and one list that
+    # quote results in prose.
+    marked = lambda el: set((el.attrs.get("data-runs") or "").split())
+    tables = [el for el in built["root"].walk()
+              if el.tag == "table" and "numbers" in el.classes]
+    assert len(tables) == 4
+    assert all(marked(t) & {SONNET_RUN, OPUS_RUN} for t in tables)
+    assert [marked(card) for card in built["root"].by_class("arm")] == \
+        [{SONNET_RUN}, {OPUS_RUN}]
+    assert marked(_block(built, "Two readings the table does not show")) \
+        == {SONNET_RUN}
+    assert marked(_block(built, "Turns and tool calls are the comparable")) \
+        == {SONNET_RUN, OPUS_RUN}
+    assert {SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN} <= \
+        marked(_block(built, "Both model arms solve all"))
+    lists = [el for el in built["root"].walk()
+             if el.tag == "ul" and marked(el)]
+    assert len(lists) == 1, "the control's reading is the one marked list"
+    assert {SONNET_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN} <= marked(lists[0])
+
+
+def test_the_quiet_sessions_are_not_said_to_ask_agda_nothing(built) -> None:
+    # The eleven sessions ran `check_file`, which asks Agda; what they did
+    # not do is ask anything before it.
+    html = " ".join(built["html"].split())
+    assert "no Agda query at all" not in html
+    assert "asking Agda nothing before its final check (read the file, " \
+        "edit it, check it)" in html

@@ -12,7 +12,8 @@ Description: Render the demo site's page from the data `make demo-data`
   they are evidence of what a frontier model does *with* the tools, and of
   nothing about whether the tools help: that is the control's question
   (Issue #162), which the numbers section sets beside them, read from its own
-  reports and checked against ADR 0001 § 9 like the rest.  Issue #215 brought
+  reports and checked against ADR 0001 § 9 like the archived arms' table.
+  Issue #215 brought
   the page's framing up to that record, under the following rules:
 
     +  The header carries no solve count.  It says what the page is (the
@@ -21,9 +22,13 @@ Description: Render the demo site's page from the data `make demo-data`
        room for.  The loop's count is not there either: the loop is a
        different instrument with no model in it, and not the agents'
        baseline.
-    +  No count from the archived arms stands anywhere without the control
-       beside it, and `test_demo_render.py` checks that per section through
-       the `data-runs` attribute every figure-bearing element carries.
+    +  No result of the archived arms stands anywhere without the
+       control's beside it.  Every element that prints an arm's results (a
+       solve, a restatement, a gate, an anomaly, a tool call) names the
+       arm's run in `data-runs`; configuration (caps, dates, tool counts) is
+       not marked.  `test_demo_render.py` checks the rule per section, and
+       pins the attribute on every such element the page has: a new one
+       needs it too, or the section check cannot see it.
     +  The restated rule is stated with its limit: it reads references, so it
        catches a proof that cites the library and not one that transcribes
        it.  What the judge's `original` reading (Issue #188) says about each
@@ -83,10 +88,11 @@ Design Principles:
      reads or writes a file.
   +  Escape once, at the edge.  Every value reaching the HTML goes through
      `_esc`; the only unescaped strings are the literals in this file.
-  +  Say where a number came from.  Every figure on the page names its file,
-     every table names the ADR 0001 § 9 table it was checked against, and
-     every element that prints an arm's figure names the arm's run in
-     `data-runs`.
+  +  Say where a number came from.  The page says which files its figures
+     are read from; the two tables checked against ADR 0001 § 9 each name
+     the ADR table they were checked against (the others have none to be
+     checked against); and every element that prints an arm's results
+     names the arm's run in `data-runs`.
 """
 
 from __future__ import annotations
@@ -1009,7 +1015,8 @@ def _archived_readings(numbers: Mapping[str, Any],
     rows_word = ("the one row that is" if unsolved == 1
                  else f"the {_word(unsolved)} rows that are")
     verb = "is" if unsolved == 1 else "include"
-    return f"""<p>Two readings the table does not show on its own.
+    return f"""<p{_runs(sonnet.get("runId"))}>Two readings the table does not
+show on its own.
 Sonnet&rsquo;s {_word(restated)} restatements are {where},
 {_word(wholesale)} of them from the stratum whose fixtures import whole modules
 and name nothing useful.  And {rows_word} neither solved nor restated {verb}
@@ -1129,11 +1136,11 @@ def _numbers_section(numbers: Mapping[str, Any],
 <h2>The numbers</h2>
 <p>The sessions above come from two arms, one subject per obligation, run
 {_word(sonnet.get("parallelism"))} at a time on {_days((sonnet, opus))}.
-Every figure in the tables below is regenerated from the runs&rsquo; own
-<code>report.json</code> at build time and compared with ADR 0001 &sect; 9
-cell by cell, so a number that drifts fails the build.  The one exception is
-the loop&rsquo;s two columns, which no report in the repository carries; they
-are read from the ADR, which is their record.</p>
+Every figure below is read from the archive at build time, and the two tables
+ADR 0001 &sect; 9 states, this one and the control&rsquo;s, are also compared
+with the ADR cell by cell, so a number in either that drifts fails the build.
+The loop&rsquo;s two columns are the exception: no report in the repository
+carries them, so they are read from the ADR, which is their record.</p>
 <p>The <em>loop</em> is a different instrument:
 <code>agda-native-air</code>&rsquo;s own proof-search loop, with no model in
 it, first over a fixed space of candidate terms and then with corpus retrieval
@@ -1148,7 +1155,8 @@ whether the server helps, since every subject had it.
 that.</p>
 <div class="arms">{_arm(sonnet)}{_arm(opus)}</div>
 {tiers(numbers)}
-<p>Turns and tool calls are the comparable columns.  Subjects ran
+<p{_runs(sonnet.get("runId"), opus.get("runId"))}>Turns and tool calls are
+the comparable columns.  Subjects ran
 {_word(sonnet.get("parallelism"))} at a time, so the wall clocks are
 indicative only, and the costs are the client&rsquo;s own list-price
 accounting.  {_ended(numbers)}</p>
@@ -1195,9 +1203,9 @@ The search loop&rsquo;s fixed space solves {fixed} of the {_word(n)}; with
 corpus retrieval it solves {_word(tier.get("loopRetrieval"))}, its first
 solves under target exclusion anywhere in the project.</p>
 <p{_runs(*runs)}>{solved}{control_too}.  Sonnet&nbsp;5 solves
-{_word(quiet.get("quiet"))} of them in {in_turns} turns with no Agda query at
-all (read the file, edit it, check it), naming the needle qualified from
-memory; the {rest} takes {asked} on
+{_word(quiet.get("quiet"))} of them in {in_turns} turns, asking Agda nothing
+before its final check (read the file, edit it, check it) and naming the
+needle qualified from memory; the {rest} takes {asked} on
 <code>Data.Nat.Properties.+-&#8760;-assoc</code>.  These are standard-library
 lemmas, and they are in every frontier model&rsquo;s training data.</p>
 <p class="callout">The tier measures a ranker.  It does not measure a model,
@@ -1223,8 +1231,9 @@ was built, and
 none of it is shipped to your browser; what is here is
 {_word(len(replays))} sessions and the tables.</p>
 <p>Three things the build refuses to do.  It will not write a page whose
-tables disagree with ADR 0001 &sect; 9 (<code>make demo-check</code> runs
-that comparison alone).  It will not write a page carrying an absolute path
+two tables from ADR 0001 &sect; 9, the archived arms&rsquo; and the
+control&rsquo;s, disagree with the ADR (<code>make demo-check</code> runs
+that comparison alone, from the run reports and the ADR).  It will not write a page carrying an absolute path
 from the machine the sweep ran on: every path here is anchored to
 <code>&lt;repo&gt;</code>, <code>&lt;work&gt;</code> (the one directory a
 session could see), or <code>&lt;nix&gt;</code>, and a path left pointing
@@ -1266,7 +1275,8 @@ def _footer(data: Mapping[str, Any]) -> str:
     return f"""<footer class="foot">
 <p>Built by <code>make demo-site</code> from
 {_tree("reports/agent-bench", "reports/agent-bench/")}.
-Both tables are checked against {_esc(numbers.get("checkedAgainst"))}.</p>
+The archived arms&rsquo; table and the control&rsquo;s are checked against
+{_esc(numbers.get("checkedAgainst"))}.</p>
 <p><a href="{REPO_URL}">{REPO_URL.replace("https://", "")}</a></p>
 </footer>"""
 

@@ -36,16 +36,20 @@ distinct on purpose, since MkDocs' own default output directory is also
    per replay, plus the numbers, to `data/demo/`.
 +  `make demo-site` renders `site/index.html` from those and copies this
    directory's files to `site/assets/`.
-+  `make demo-check` regenerates both of the page's tables from the run
-   reports and compares them with ADR 0001 § 9, writing nothing: the check
-   `make demo-data` makes before it writes, on its own.
++  `make demo-check` regenerates the page's two § 9 tables from the five
+   run reports and compares them with ADR 0001 § 9, reading nothing else
+   and writing nothing: the check `make demo-data` makes before it writes,
+   on its own.
 +  `make demo-clean` removes both output directories.
 
 Both outputs are gitignored.  The build reads only files of this repository,
 makes no network request, and needs nothing but Python 3: no Agda, no server,
-no model call.  It refuses to write a page whose tables disagree with
+no model call.  It refuses to write a page whose two § 9 tables (the
+archived arms' and the control's) disagree with
 [ADR 0001](../docs/adr/0001-proof-search-on-agda-mcp.md) § 9, or one carrying
-an absolute path from the machine the sweep ran on.
+an absolute path from the machine the sweep ran on.  The page's other
+figures (by tier, by tool, per arm) are regenerated from the same reports
+and have no ADR table to be compared with.
 
 `.github/workflows/pages.yml` runs `make site` inside `nix develop .#site`,
 checks the whole tree with `make site-check`, and deploys `public/` to GitHub
@@ -90,14 +94,17 @@ pinned by a test in
    them; the search loop's count is not there either, because the loop is a
    different instrument with no model in it, not the agents' baseline
    ([the guide](../docs/reading-the-results.md) § 1).
-+  **The control stands wherever the archived arms' counts do**.  Every
-   element that prints an arm's figure names the arm's run in a `data-runs`
-   attribute, and a section that shows the archived arms' counts must show
-   the control's `shell` and `mcp` arms too.  The control's table is ADR 0001
-   § 9's attribution table, regenerated from `arm162-*/report.json` and
-   compared with the ADR cell for cell, and the page says how its protocol
-   differs from the archived arms' (a fourteenth tool, readable library
-   sources, `--safe` on the subjects' servers).
++  **The control stands wherever the archived arms' results do**.  Every
+   element that prints an arm's results (a solve, a restatement, a gate, an
+   anomaly, a tool call; not caps, dates, or tool counts) names the arm's
+   run in a `data-runs` attribute, and a section that shows the archived
+   arms' results must show the control's `shell` and `mcp` arms too.  A test
+   pins the attribute on every such element the page has; a new one needs
+   it as well, or the section check cannot see it.  The control's table is
+   ADR 0001 § 9's attribution table, regenerated from
+   `arm162-*/report.json` and compared with the ADR cell for cell, and the
+   page says how its protocol differs from the archived arms' (a fourteenth
+   tool, readable library sources, `--safe` on the subjects' servers).
 +  **The restated rule is stated with its limit**.  It reads a body's
    references, so it catches a proof that cites the library and not one that
    transcribes it.  What the judge's `original` reading ([#188]) says of each
