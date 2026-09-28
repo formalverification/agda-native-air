@@ -44,7 +44,7 @@ object Run {
     * that stages the work copies and answers the judge.
     */
   def driveAll(cfg: AgentBenchConfig, entries: Vector[IndexEntry], client: McpClient, extractor: Extractor,
-               sysP: String, userT: String, addDirs: Vector[Path]): IO[Vector[Judged]] = {
+               sysP: String, userT: String, addDirs: Vector[Path], sources: String): IO[Vector[Judged]] = {
     val layout  = cfg.layout
     val subject = SubjectConfig.of(cfg, sysP, userT, addDirs)
     for {
@@ -56,7 +56,7 @@ object Run {
                      val agda = new ServerAgda(oracle, extractor, e.id)
                      archivedClean(cfg, e).flatMap {
                        case true  => IO.println(s">> ${e.id} resume: archived subject kept, re-judged") *> Outcomes.judgeOne(cfg, e, agda, addDirs)
-                       case false => driveOne(cfg, subject, oracle, agda, e)
+                       case false => driveOne(cfg, subject, oracle, agda, e, sources)
                      }
                    }.handleErrorWith { err =>
                      IO.println(s">> ${e.id} FAILED: ${err.getMessage}") *>
@@ -100,7 +100,8 @@ object Run {
   }
 
   /** Stage, spawn, archive, judge: one subject. */
-  private def driveOne(cfg: AgentBenchConfig, subject: SubjectConfig, oracle: Oracle, agda: Agda, entry: IndexEntry): IO[Judged] = {
+  private def driveOne(cfg: AgentBenchConfig, subject: SubjectConfig, oracle: Oracle, agda: Agda, entry: IndexEntry,
+                       sources: String): IO[Judged] = {
     val layout  = cfg.layout
     val workDir = layout.workDir(entry.id)
     val subj    = layout.subject(entry.id)
@@ -116,8 +117,8 @@ object Run {
             IO.pure(Outcomes.anomaly(layout, entry, s"staging: $msg"))
         case Right(st) =>
           val judgeCmd  = judgeCommand(cfg, entry, st.workFile)
-          val prompt    = Subject.render(subject.userTemplate, st.workFile, entry.hole, judgeCmd, corpus)
-          val sysPrompt = Subject.render(subject.systemPrompt,  st.workFile, entry.hole, judgeCmd, corpus)
+          val prompt    = Subject.render(subject.userTemplate, st.workFile, entry.hole, judgeCmd, corpus, sources)
+          val sysPrompt = Subject.render(subject.systemPrompt,  st.workFile, entry.hole, judgeCmd, corpus, sources)
           val perRow    = subject.copy(systemPrompt = sysPrompt)
           val roots     = rootsOf(workDir, subject.addDirs, corpus)
           val finalFile = subj.finalFile(stem)
