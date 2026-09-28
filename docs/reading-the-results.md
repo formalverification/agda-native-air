@@ -463,11 +463,77 @@ it is a win for a lane judgment on the record.  One fact from it to carry:
 for 16 of the 55 obligations the committed gold is a multi-clause strategy,
 not a term, so no hole-filling judgment of any kind can express it.
 
+### 4.5  The hard tier
+
+[#189], PR [#197].  Fourteen obligations posed for the purpose, in group
+theory and universal algebra, with no proof on disk: six in the standard
+library's `Algebra.Bundles.Group` vocabulary (`agda-stdlib/novel`) and eight
+in agda-algebras' (`agda-algebras/novel`).  Their novelty checks, their
+golds, and the four posed rows that were dropped (three proved in
+agda-algebras' vocabulary, one not provable as posed) are in the two tiers'
+own READMEs, beside the conventions they share in
+[`data/benchmarks/README.md`].  Opus 5 ran each arm once, at twice the mined
+tiers' caps (60 turns, 1,800 s, USD 6.00), from frozen server and extractor
+binaries.  n is fourteen and there is one seed per arm, so a difference of a
+row or two is not a finding.
+
+| | `shell` | `mcp` | `both` |
+|---|---:|---:|---:|
+| final file checks, statement kept | 14 | 14 | 14 |
+| solved, as run | 4 | 14 | 7 |
+| solved, re-judged | 8 | 14 | 8 |
+| lost to the isolation gate (re-judged) | 5 | 0 | 6 |
+| lost to the preservation gate | 1 | 0 | 0 |
+| turns | 174 | 143 | 162 |
+| USD (list) | 6.41 | 7.82 | 6.62 |
+
+Runs `hard-opus5-shell-1`, `hard-opus5-mcp-1`, `hard-opus5-both-1`, and the
+cost pairs `cost-hard-shell-1`, `cost-hard-mcp-1`, `cost-hard-both-1`
+([`reports/agent-bench/`]).  "Re-judged" is the same transcripts under the
+shell audit as fixed after the arms (it reads `$?` and a variable the call
+itself binds to a literal path); no archived verdict of an earlier arm moves
+under it.
+
++  **Every arm proves every row**.  All 42 final files type-check under the
+   judge with their statements kept, and in the `mcp` arm every final file
+   passed the first `check_file` after its subject's edits.  On this tier
+   Opus 5 is at the ceiling with or without the server, so the tier answers
+   whether a frontier model can prove these statements (it can) and not
+   whether the tools help it prove, which needs harder rows ([#160]) or a
+   weaker model.
++  **What separates the counts is the protocol, not the proving**.  The
+   shell arms' subjects went looking for agda-algebras' sources, which the
+   prompt says are on disk without saying where, with `find /` or from the
+   repository root, and the isolation gate failed those rows as it should;
+   one such grep listed a row's own gold file by path (row 17, `shell`).  No
+   subject saw a gold's text: no tool answer in any of the 48 transcripts
+   shows a line of its row's gold proof that the subject had not written
+   itself.  Row 4 was lost in both shell arms to programs the audit does not
+   model (`perl -i` on the subject's own file, and `git diff`), and one
+   `shell` file edited an import line rather than adding one (row 6), which
+   the preservation gate refuses.
++  **Which tools, given the server**.  The `mcp` arm located definitions
+   with `definition_of` (14 calls) and then read the files it named (49
+   `Read` calls): the tool answers where and not what, so every answer was
+   followed by a read, which is [#185].  It took every verdict from
+   `check_file`, probed candidates with `fill_hole` (5), and used
+   `search_by_name` and `exports_of` (7 each), `type_of` (5), `normalize`
+   (3), and `get_goal` (2); `search_by_type` and `search_in_scope` went
+   unused.
++  **Which tools, given both**.  The shell did the knowledge work (68 of its
+   86 Bash calls read library sources), and the server gave verdicts
+   (`check_file` for 10 of the 14 final verdicts, `agda` by hand for 4) and
+   probed candidates (`fill_hole`, 9).  No knowledge tool was called except
+   one `type_of`, as on the mined rows (§ 4.3).
+
+The per-row account (what each subject tried, which tools it used, where it
+stopped) is on [#189].
+
 ## 5.  How to tell a win from a loss
 
 | question | look at | it is a win for the tools when |
 |---|---|---|
-| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals**. |
+| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5), with nothing to read, Opus 5 proves every row with or without the server**. |
 | Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero came with the original in view**. |
 | Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
@@ -481,8 +547,11 @@ not a term, so no hole-filling judgment of any kind can express it.
 +  **Problems a shell-only model fails**.  Every arm is at or near ceiling on
    this suite (a shell-only Sonnet solves 91 %), so the suite cannot show a
    tool's upside on hard, novel, multi-lemma work.  That is the original
-   question, and it is untested: the composition tier ([#160]) and the
-   agda-algebras case study ([#23]) are the instruments.
+   question, and it is still open: on the hard tier of [#189] (§ 4.5), posed
+   so that nothing could be copied, a shell-only Opus 5 proves all fourteen
+   rows, so that tier sits at the ceiling too.  The composition tier
+   ([#160]), the agda-algebras case study ([#23]), and a weaker model on the
+   hard tier are the instruments.
 +  **Knowledge tools that return content** ([#185]): the one measured defect
    still without its re-run.  Lean answers ([#184]) were measured by PR
    [#190] and were not the cause (§ 4.3).
@@ -490,7 +559,15 @@ not a term, so no hole-filling judgment of any kind can express it.
    the mined rows, where an answer exists in the library to be found and
    the count measures citing against copying; only on rows with nothing to
    find ([#189]) can the fourteen tools, the four, and the shell be told
-   apart on proving, and no such run exists yet.
+   apart on proving.  The first such runs (§ 4.5) cannot tell them apart
+   either, since every arm proves every row, so the four-tool arm was not
+   run there; it waits for rows that are hard for the model.
++  **A shell prompt that names the library sources**.  On the hard tier the
+   shell arms lost nine rows to the isolation gate because the subject
+   searched `/` or the repository root for agda-algebras' sources, which the
+   prompt says are on disk without saying where (§ 4.5).  A prompt that
+   names them (the registry's include roots) is a protocol change, so it
+   waits for a new run of every shell arm it would be compared with.
 +  **A locator beside the four tools, and a `definition_of` that returns
    the text**.  The four-tool arm's 111 and 97 failed library reads are
    what a subject does without `definition_of`, which the fourteen-tool
@@ -510,7 +587,9 @@ not a term, so no hole-filling judgment of any kind can express it.
    neither.
 +  **Small and local models** ([#27], [#28], [#29]), where a shell is least
    usable and structured verdicts plausibly matter most.
-+  **Opus with a shell**.  The control was run on Sonnet only.
++  **Opus with a shell on the mined rows**.  The mined-tier control was run
+   on Sonnet only; Opus with a shell has run only on the hard tier (§ 4.5),
+   where it proves every row.
 
 ## References
 
@@ -561,3 +640,4 @@ not a term, so no hole-filling judgment of any kind can express it.
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#197]: https://github.com/formalverification/agda-native-air/pull/197

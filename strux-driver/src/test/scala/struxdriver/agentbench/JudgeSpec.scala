@@ -8,7 +8,9 @@
   *  -------
   *  Pins the judge's pure parts (issue #154): the frozen-text diff (module
   *  line and import lines, comments stripped, the commented-out attack of PR
-  *  #158's review refused), and the gates as functions of Agda's answers: the
+  *  #158's review refused; and, issue #189, the scope lines of an obligation
+  *  posed under a module telescope, with the attacks on a definition the
+  *  statement names refused), and the gates as functions of Agda's answers: the
   *  statement rule over the extractor's elaborated type ASTs (binder names
   *  aside), the escape rule over Agda's safe-flag codes, the hole rule over `check_file`'s
   *  count, the original's derivation from the `restates:` tag, and the
@@ -77,8 +79,106 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
   test("statement: the module line and the four original import lines; a text without them is refused") {
     st.moduleLine shouldBe "module Nat-plus-comm where"
     st.importLines.size shouldBe 4
+    st.scopeLines shouldBe empty
     Statement.of("module M where\nf : A\nf = {!!}\n", "g").isLeft shouldBe true
     Statement.of("open import X\nf : A\nf = {!!}\n", "f").isLeft shouldBe true
+  }
+
+  // An obligation posed under a module telescope with definitions the
+  // statement names (issue #189: hard-group-commutator-subgroup, trimmed, a
+  // row since dropped as not provable as posed; the gates below read text, so
+  // it need not check).
+  private val telescoped: String =
+    """-- Group-commutator-subgroup.agda
+      |--
+      |module Group-commutator-subgroup where
+      |
+      |open import AgdaDojang.Debug
+      |
+      |open import Level                                   using ( Level ; _⊔_ )
+      |open import Classical.Structures.Group.Basic        using ( Group ; module Group-Op )
+      |
+      |module _ {α ρ : Level} (𝒢 : Group α ρ) where
+      |  private
+      |    𝑮 = proj₁ 𝒢
+      |    G = 𝕌[ 𝑮 ]
+      |  open Setoid 𝔻[ 𝑮 ] using ( _≈_ )
+      |  open Commutator 𝒢 using ( [_⸴_] )
+      |
+      |  -- The ≈-saturated set of commutators, and the subgroup it generates.
+      |  Commutators : Pred G (α ⊔ ρ)
+      |  Commutators z = Σ[ x ∈ G ] Σ[ y ∈ G ] z ≈ [ x ⸴ y ]
+      |
+      |  Derived : Pred G _
+      |  Derived = Sg 𝑮 Commutators
+      |
+      |  commutator-subgroup
+      |    :  Conjugate.IsNormal 𝒢 Derived
+      |    ×  (∀ x y → ((x ∙ y) ⁻¹ ∙ (y ∙ x)) ∈ Derived)
+      |  commutator-subgroup = {!!}
+      |""".stripMargin
+
+  private val tst: Statement = Statement.of(telescoped, "commutator-subgroup").toOption.get
+
+  // A proof a subject might leave: an open import inside the telescope, a
+  // helper before the definition, a where block under it.
+  private val honest: String = telescoped
+    .replace("  open Commutator 𝒢 using ( [_⸴_] )\n",
+      "  open Commutator 𝒢 using ( [_⸴_] )\n  open import Setoid.Subalgebras.Subuniverses using ( sgIsSmallest )\n")
+    .replace("\n  commutator-subgroup\n", "\n  helper : ∀ x → x ∈ Derived → x ∈ Derived\n  helper x p = p\n\n  commutator-subgroup\n")
+    .replace("  commutator-subgroup = {!!}\n", "  commutator-subgroup = normal , comm\n    where\n    normal = sgIsSmallest\n    comm = λ x y → helper _ (var (x , y , refl))\n")
+
+  test("signature: the lines from the declaration to the first clause; an honest proof keeps them, a weakened statement does not") {
+    val sig = Statement.signature(telescoped, "commutator-subgroup")
+    sig shouldBe Some(Vector(
+      "  commutator-subgroup",
+      "    :  Conjugate.IsNormal 𝒢 Derived",
+      "    ×  (∀ x y → ((x ∙ y) ⁻¹ ∙ (y ∙ x)) ∈ Derived)"))
+    Statement.signature(honest, "commutator-subgroup") shouldBe sig
+    Statement.signature(telescoped.replace("    ×  (∀ x y → ((x ∙ y) ⁻¹ ∙ (y ∙ x)) ∈ Derived)\n", ""), "commutator-subgroup") should not be sig
+    Statement.signature(telescoped, "no-such-name") shouldBe None
+  }
+
+  test("statement: a definition under a module telescope, its name alone on its line, is declared; the telescope, its opens, and the definitions the statement names are scope lines") {
+    tst.moduleLine shouldBe "module Group-commutator-subgroup where"
+    tst.importLines.size shouldBe 3
+    Gates.declarations(tst.scopeLines) shouldBe Vector(
+      Vector("module _ {α ρ : Level} (𝒢 : Group α ρ) where"),
+      Vector("  private", "    𝑮 = proj₁ 𝒢", "    G = 𝕌[ 𝑮 ]"),
+      Vector("  open Setoid 𝔻[ 𝑮 ] using ( _≈_ )"),
+      Vector("  open Commutator 𝒢 using ( [_⸴_] )"),
+      Vector("  Commutators : Pred G (α ⊔ ρ)", "  Commutators z = Σ[ x ∈ G ] Σ[ y ∈ G ] z ≈ [ x ⸴ y ]"),
+      Vector("  Derived : Pred G _", "  Derived = Sg 𝑮 Commutators"))
+    Statement.of(telescoped, "commutator").isLeft shouldBe true
+  }
+
+  test("scope: the obligation and an honest proof keep every scope line; lines added between declarations are allowed") {
+    Gates.scope(tst, telescoped) shouldBe Right(())
+    Gates.scope(tst, honest) shouldBe Right(())
+    Gates.scope(tst, honest.replace("  Derived : Pred G _\n", "  -- a note\n  Derived : Pred G _\n")) shouldBe Right(())
+    Gates.imports(tst, honest) shouldBe Right(Vector("open import Setoid.Subalgebras.Subuniverses using ( sgIsSmallest )"))
+    Gates.scope(st, gold) shouldBe Right(())
+  }
+
+  test("scope: an edited, missing, or reordered definition the statement names fails preservation, as does an edited open or telescope") {
+    def gate(t: String) = Gates.scope(tst, t).left.map(_.gate)
+    gate(honest.replace("z ≈ [ x ⸴ y ]", "Lift _ ⊤")) shouldBe Left("preservation")
+    gate(honest.replace("  Derived = Sg 𝑮 Commutators\n", "")) shouldBe Left("preservation")
+    gate(honest.replace("  open Setoid 𝔻[ 𝑮 ] using ( _≈_ )", "  open Setoid 𝔻[ 𝑮 ] using ( _≈_ ) renaming ( _≈_ to _≃_ )")) shouldBe Left("preservation")
+    gate(honest.replace("(𝒢 : Group α ρ) where", "(𝒢 : Group α ρ) (P : Set) where")) shouldBe Left("preservation")
+    val swapped = honest.replace(
+      "  Commutators : Pred G (α ⊔ ρ)\n  Commutators z = Σ[ x ∈ G ] Σ[ y ∈ G ] z ≈ [ x ⸴ y ]\n\n  Derived : Pred G _\n  Derived = Sg 𝑮 Commutators\n",
+      "  Derived : Pred G _\n  Derived = Sg 𝑮 Commutators\n\n  Commutators : Pred G (α ⊔ ρ)\n  Commutators z = Σ[ x ∈ G ] Σ[ y ∈ G ] z ≈ [ x ⸴ y ]\n")
+    swapped should not be honest
+    gate(swapped) shouldBe Left("preservation")
+  }
+
+  test("scope: a clause slipped into or after a definition the statement names, a where block hung off one, or a line added to its private block fails preservation") {
+    def gate(t: String) = Gates.scope(tst, t).left.map(_.gate)
+    gate(honest.replace("  Commutators z = Σ", "  Commutators _ = Lift _ ⊤\n  Commutators z = Σ")) shouldBe Left("preservation")
+    gate(honest.replace("z ≈ [ x ⸴ y ]\n", "z ≈ [ x ⸴ y ]\n  Commutators _ = Lift _ ⊤\n")) shouldBe Left("preservation")
+    gate(honest.replace("  Derived = Sg 𝑮 Commutators\n", "  Derived = Sg 𝑮 Commutators\n    where open Junk\n")) shouldBe Left("preservation")
+    gate(honest.replace("    G = 𝕌[ 𝑮 ]\n", "    G = 𝕌[ 𝑮 ]\n    _≃_ = λ (_ _ : G) → Lift _ ⊤\n")) shouldBe Left("preservation")
   }
 
   test("imports: the gold keeps every frozen line and logs its where-block import") {
@@ -207,7 +307,7 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
     Gates.restatement("Overture-proj-op", "π", guess, namesake) shouldBe Vector("ref Data.Product.π")
   }
 
-  test("every committed obligation reads as a statement and every gold keeps its frozen lines") {
+  test("every committed obligation reads as a statement and every gold keeps its frozen lines and its signature; only the hard tier has scope lines") {
     val root  = Paths.get("..").toAbsolutePath.normalize
     val index = root.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.isRegularFile(index), s"benchmark index not found at $index")
@@ -221,6 +321,15 @@ final class JudgeSpec extends AnyFunSuite with Matchers {
       withClue(s"${e.id}: ") {
         Gates.imports(stmt, gd).isRight shouldBe true
         Gates.imports(stmt, ob).isRight shouldBe true
+        Gates.scope(stmt, gd) shouldBe Right(())
+        Gates.scope(stmt, ob) shouldBe Right(())
+        // The gold is the judge's statement oracle, so it must carry the
+        // obligation's signature exactly (PR #197 review).
+        Statement.signature(gd, e.hole) shouldBe Statement.signature(ob, e.hole)
+        Statement.signature(ob, e.hole).exists(_.nonEmpty) shouldBe true
+        stmt.scopeLines.exists(_.contains("{!!}")) shouldBe false
+        // The mined tiers are judged exactly as before issue #189: nothing outside the definition but its imports.
+        if (!e.tags.contains("stratum:novel")) stmt.scopeLines shouldBe empty
         if (e.source == "agda-algebras") Gates.originalOf(e.module, e.hole, e.tags).qualified.exists(_.contains(".")) shouldBe true
       }
     }

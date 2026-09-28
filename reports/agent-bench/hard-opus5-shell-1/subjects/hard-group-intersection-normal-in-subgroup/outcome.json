@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "hard-group-intersection-normal-in-subgroup",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "intersection-normal-in-subgroup",
+  "goal" : "∀ {h x} → h ∈ H → x ∈ H → x ∈ K → ((h ∙ x) ∙ h ⁻¹ ∈ H) × ((h ∙ x) ∙ h ⁻¹ ∈ K)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures*' -name '*.agda' 2>/dev/null | head -50; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-pr...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 16,
+  "toolCalls" : {
+    "Read" : 3,
+    "Bash" : 11,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 15,
+  "wallMs" : 96401,
+  "costUsd" : 0.4889855,
+  "tokens" : {
+    "input" : 30,
+    "output" : 5563,
+    "cacheRead" : 169781,
+    "cacheCreation" : 26487
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find / -path '*Classical/Structures*' -name '*.agda' 2>/dev/null | head -50; echo ---; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-pr..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "corpus-grep" : 1,
+      "library-read" : 7,
+      "other" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5382,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+    "final" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-intersection-normal-in-subgroup/final/Group-intersection-normal-in-subgroup.agda",
+  "transcriptPath" : "subjects/hard-group-intersection-normal-in-subgroup/transcript.jsonl",
+  "lastWords" : "Type-checks cleanly on the first attempt.\n\nThe proof: `H ∩ K` normality in `H` splits into the two components of the product —\n- **H-component:** `(h ∙ x) ∙ h ⁻¹ ∈ H` from `H`'s own subgroup closure, `∙-closed (∙-closed h∈H x∈H) (⁻¹-closed h∈H)` (derived fields of `IsSubgroup`).\n- **K-component:** directly `K-normal h x∈K`, since `Conjugate.IsNormal 𝒢 K` unfolds to `∀ g {x} → x ∈ K → (g ∙ x) ∙ g ⁻¹ ∈ K`, matching the goal definitionally.\n\nNaming `h` via `{h}` in the clause was the only restructuring needed, plus a `where open IsSubgroup H-sub`.\n\nYes — the judge command reports success on the ",
+  "rateLimit" : {
+    "maxUtilization" : 0.65,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "hard-group-correspondence-over-N",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "correspondence-over-N",
+  "goal" : "(N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda; find / -name \"Cosets.agda\" -path \"*Group*\" 2>/dev/null; Bash reads outside the arm's roots (/): find / -name \"Conjugation.agda\" 2>/dev/null; echo ---; find /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang -name \"...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 18,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 14,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 17,
+  "wallMs" : 136912,
+  "costUsd" : 0.599801,
+  "tokens" : {
+    "input" : 36,
+    "output" : 7354,
+    "cacheRead" : 382482,
+    "cacheCreation" : 22453
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang/agda; find / -name \"Cosets.agda\" -path \"*Group*\" 2>/dev/null",
+      "Bash reads outside the arm's roots (/): find / -name \"Conjugation.agda\" 2>/dev/null; echo ---; find /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda-dojang -name \"..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 13
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5797,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-correspondence-over-N/final/Group-correspondence-over-N.agda",
+  "transcriptPath" : "subjects/hard-group-correspondence-over-N/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 under `--safe`, with no holes and no diagnostics.",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}

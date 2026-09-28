@@ -1,0 +1,87 @@
+{
+  "benchmarkId" : "hard-group-unique-involution-central",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "unique-involution-central",
+  "goal" : "(a : Carrier) → a ∙ a ≈ ε → ¬ (a ≈ ε) → (∀ b → b ∙ b ≈ ε → b ≈ ε ⊎ b ≈ a) → ∀ b → (b ∙ a) ∙ b ⁻¹ ≈ a",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Empty                using ( ⊥-elim )",
+    "open import Data.Sum.Base             using ( inj₁ ; inj₂ )",
+    "import Algebra.Properties.Group as GroupProperties",
+    "import Relation.Binary.Reasoning.Setoid as SetoidReasoning"
+  ],
+  "terminal" : "completed",
+  "turns" : 12,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 8,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 11,
+  "wallMs" : 88790,
+  "costUsd" : 0.44423999999999997,
+  "tokens" : {
+    "input" : 24,
+    "output" : 7078,
+    "cacheRead" : 146260,
+    "cacheCreation" : 19404
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash runs a program this audit does not model (perl): perl -i -pe 'if ($. > 30) { s/\\bc\\b/z/g; s/c²≈ε/z²≈ε/g; s/c≈ε/z≈ε/g; s/c≈a/z≈a/g; }' Group-unique-involution-central.agda && sed -n 30,70p Group-unique-involution-central.agda"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 4,
+      "other" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 610,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-unique-involution-central/final/Group-unique-involution-central.agda",
+  "transcriptPath" : "subjects/hard-group-unique-involution-central/transcript.jsonl",
+  "lastWords" : "The proof conjugates `a` by `b`, shows the conjugate is an involution, and refutes the `≈ ε` case by left-cancelling `b`; the specified command reports success (exit 0, no errors, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.63,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

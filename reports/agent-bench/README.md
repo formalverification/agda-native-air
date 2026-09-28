@@ -183,6 +183,12 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 | `arm-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 55 | 52 | 1 | 9 of 20 | 0 | 458 | 403 | 3.78 | [#191], PR [#193] |
 | `arm-verdict-mcp-2` | `mcp`, four tools exposed (second seed) | `claude-sonnet-5` | 2026-09-26 | 55 | 53 | 2 | 6 of 19 | 0 | 461 | 406 | 3.84 | [#191], PR [#193] |
 | `arm-surface-mcp-2` | `mcp` (second seed) | `claude-sonnet-5` | 2026-09-26 | 55 | 45 | 8 | 2 of 13 | 0 | 349 | 294 | 3.74 | [#191], PR [#193] |
+| `cost-hard-shell-1` | `shell` | `claude-opus-5` | 2026-09-27 | 2 | 1 | 0 | no original | 0 | 25 | 23 | 1.50 | the cost pairs on [#189] |
+| `cost-hard-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-27 | 2 | 2 | 0 | no original | 0 | 28 | 26 | 2.66 | the cost pairs on [#189] |
+| `cost-hard-both-1` | `both` | `claude-opus-5` | 2026-09-27 | 2 | 1 | 0 | no original | 0 | 30 | 28 | 2.17 | the cost pairs on [#189] |
+| `hard-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-27 | 14 (hard tier) | 8 | 0 | no original | 0 | 174 | 160 | 6.41 | [#189], PR [#197], the guide's § 4.5 |
+| `hard-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-27 | 14 (hard tier) | 14 | 0 | no original | 0 | 143 | 129 | 7.82 | [#189], PR [#197], the guide's § 4.5 |
+| `hard-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-27 | 14 (hard tier) | 8 | 0 | no original | 0 | 162 | 148 | 6.62 | [#189], PR [#197], the guide's § 4.5 |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -481,6 +487,65 @@ Three things to read beside the tables.
    The discarded attempts cost USD 0.12, outside the totals above.  A scan
    of both seed-2 arms for tool results from a killed process found none.
 
+## The hard-tier arms (2026-09-27, [#189])
+
+The first runs on rows with no proof on disk: the fourteen obligations of the
+two hard tiers (`data/benchmarks/agda-stdlib-hard-v0/` and
+`agda-algebras-hard-v0/`, strata `agda-stdlib/novel` and
+`agda-algebras/novel`), posed for the purpose, each with a gold, and with no
+`restates:` tag, so no row can be restated and the column "original in
+view" has nothing to count.  Opus 5, one seed per arm, at twice the mined
+tiers' caps (60 turns, 1,800 s, USD 6.00), parallelism 2, from a frozen copy
+of the server and the extractor and a frozen snapshot of the driver's
+classes; client 2.1.282, as on [#184] and [#191].  Each arm ran after a
+two-row cost pair on rows 1 and 14.  Zero anomalies.
+
+| | `shell` | `mcp` | `both` |
+|---|---:|---:|---:|
+| final file type-checks, statement kept | 14 | 14 | 14 |
+| solved, as run | 4 | 14 | 7 |
+| solved, as archived (re-judged) | 8 | 14 | 8 |
+| isolation gate, as archived | 5 | 0 | 6 |
+| preservation gate | 1 | 0 | 0 |
+| turns | 174 | 143 | 162 |
+| tool calls | 160 | 129 | 148 |
+| USD (list) | 6.41 | 7.82 | 6.62 |
+
++  **The archive holds the re-judged verdicts**.  The runs were judged as run
+   by the audit of commit `d50dcb4`, archived so (commit `7fe76c8`), and
+   re-judged under the audit of `0f04050`, which reads `$?` and a variable
+   the call itself binds to a literal path (`G=<library>/src/...; sed ...
+   $G/...`), both of which the earlier audit refused though neither can
+   name a path outside the roots.  Five rows moved, each from the isolation
+   gate to solved; nothing else moved but the re-judge's own fields, and no
+   verdict of an earlier archived arm moves under the new audit.
++  **Every remaining isolation finding is the subject leaving the
+   protocol**: a `find /` or a read at the repository root, looking for
+   agda-algebras' sources, which the prompt says are on disk without saying
+   where (nine rows across the two arms); a `cd` to the repository root and
+   a recursive grep there, which listed the row's own gold by path (row 17,
+   `shell`); or a program the audit does not model (`perl -i` editing the
+   work file, `git diff`, `time agda`).  No subject saw a gold's text: no
+   tool answer in the 48 transcripts shows a line of its row's gold proof
+   that the subject had not written itself.
++  **The preservation failure** (row 6, `shell`) added `_,_` to an import
+   line's `using` list rather than adding an import line, which the
+   protocol refuses, as on `stdlib-nat-mul-comm` above.
++  **Which tools**.  `mcp`: `definition_of` 14 times, each followed by a
+   `Read` of the file it named (49 reads), every verdict from `check_file`,
+   and `fill_hole` 5, `search_by_name` and `exports_of` 7 each, `type_of`
+   5, `normalize` 3, `get_goal` 2; no `search_by_type` or
+   `search_in_scope`.  Every final file passed the first `check_file` after
+   its subject's edits.  `both`: the shell for the library (68 of 86 Bash
+   calls read library sources), `check_file` for 10 of the 14 final
+   verdicts and `agda` by hand for 4, `fill_hole` 9, `type_of` once, and no
+   other knowledge tool.
+
+What the numbers mean is the guide's § 4.5
+([`docs/reading-the-results.md`](../../docs/reading-the-results.md)); the
+per-row account, what each subject tried and which tools it used, is on
+[#189].
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -547,5 +612,7 @@ new run gets a new run id.
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
+[#197]: https://github.com/formalverification/agda-native-air/pull/197

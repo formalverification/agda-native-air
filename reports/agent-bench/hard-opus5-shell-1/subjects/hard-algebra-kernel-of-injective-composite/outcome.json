@@ -1,0 +1,81 @@
+{
+  "benchmarkId" : "hard-algebra-kernel-of-injective-composite",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "kernel-of-injective-composite",
+  "goal" : "IsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Function                                 using ( Func )",
+    "open import Setoid.Congruences.Lattice               using ( _⊆_ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 7,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 77732,
+  "costUsd" : 0.37045799999999995,
+  "tokens" : {
+    "input" : 22,
+    "output" : 4070,
+    "cacheRead" : 123816,
+    "cacheCreation" : 20669
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 6
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5008,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 𝑪 : Algebra β ρ} (f : hom 𝑨 𝑩)\n(g : hom 𝑩 𝑪) →\nIsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 𝑪 : Algebra β ρ} (f : hom 𝑨 𝑩)\n(g : hom 𝑩 𝑪) →\nIsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-algebra-kernel-of-injective-composite/final/Algebra-kernel-of-injective-composite.agda",
+  "transcriptPath" : "subjects/hard-algebra-kernel-of-injective-composite/transcript.jsonl",
+  "lastWords" : "It type-checks with no errors on the first try.\n\nYes — the exact judge command reports success (clean type-check, no holes) on the final file, where the hole is filled by `g-inj` for the `kercon (⊙-hom f g) ⊆ kercon f` direction and `Func.cong (proj₁ g)` for the converse.",
+  "rateLimit" : {
+    "maxUtilization" : 0.03,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

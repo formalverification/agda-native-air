@@ -1,0 +1,85 @@
+{
+  "benchmarkId" : "hard-group-correspondence-over-N",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "correspondence-over-N",
+  "goal" : "(N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 19,
+  "toolCalls" : {
+    "Read" : 3,
+    "Bash" : 14,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 18,
+  "wallMs" : 132546,
+  "costUsd" : 0.6849715,
+  "tokens" : {
+    "input" : 36,
+    "output" : 8671,
+    "cacheRead" : 283093,
+    "cacheCreation" : 32647
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk; cat agda-dojang/agda-dojang.agda-lib; echo ---; ls agda-dojang; echo ---; l...",
+      "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk/agda/libraries --library standa...",
+      "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/189-m1-40-benchmarks-a-hard-tier-no-proof-on-disk && grep -rl \"Classical.Structures.Group.Cosets\" --include=* -s . 2>/dev/null..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 8,
+      "other" : 5
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5748,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-correspondence-over-N/final/Group-correspondence-over-N.agda",
+  "transcriptPath" : "subjects/hard-group-correspondence-over-N/transcript.jsonl",
+  "lastWords" : "No holes remain, no pragmas or postulates were added, and the header/imports/signature are untouched: the judge command reports success on the final file.\n\nThe proof: forward direction rebuilds `y ≈ x ∙ (x ⁻¹ ∙ y)` from `x ∈ H` and `x ⁻¹ ∙ y ∈ N ⊆ H` via `H-∙-closed` plus `H-respects`; backward direction uses `ε ⁻¹ ∙ n ≈ n` (so `ε ∼ n` for `n ∈ N`) together with `ε ∈ H` and the assumed `Respects` to land `n ∈ H`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.03,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

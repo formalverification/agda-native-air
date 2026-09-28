@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "hard-group-unique-involution-central",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "unique-involution-central",
+  "goal" : "(a : Carrier) → a ∙ a ≈ ε → ¬ (a ≈ ε) → (∀ b → b ∙ b ≈ ε → b ≈ ε ⊎ b ≈ a) → ∀ b → (b ∙ a) ∙ b ⁻¹ ≈ a",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Sum.Base             using ( inj₁ ; inj₂ )",
+    "open import Relation.Nullary.Negation using ( contradiction )",
+    "open import Algebra.Properties.Group G",
+    "open import Relation.Binary.Reasoning.Setoid setoid"
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 3,
+    "mcp__agda__type_of" : 1,
+    "mcp__agda__normalize" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 115947,
+  "costUsd" : 0.48029550000000004,
+  "tokens" : {
+    "input" : 16,
+    "output" : 8983,
+    "cacheRead" : 153201,
+    "cacheCreation" : 17904
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 641,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-unique-involution-central/final/Group-unique-involution-central.agda",
+  "transcriptPath" : "subjects/hard-group-unique-involution-central/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file: the hole is filled by showing the conjugate `(b ∙ a) ∙ b ⁻¹` is an involution, hence `ε` or `a`, with the `ε` case refuted by left cancellation contradicting `a ≉ ε`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.06,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -5,16 +5,17 @@
 
 The baseline benchmark is a set of Agda proof obligations with committed gold
 solutions, used as the standard evaluation set for subsequent experiments.
-Every gold solution type-checks under the pinned toolchain; type-checking is the
-ground truth for a benchmark entry.
+Every gold solution type-checks under the pinned toolchain; type-checking is
+the ground truth for a benchmark entry.
 
 ---
 
 ## Contents (v0)
 
-The current suite has **55 obligations** from two libraries, spanning the three
+The current suite has **69 obligations** from two libraries, spanning the three
 difficulty tiers of `docs/benchmarks/taxonomy.md`: two tiers cut from the Agda
-standard library and one from agda-algebras.
+standard library, one mined from agda-algebras, and two hard tiers, one in each
+library's vocabulary, posed so that no proof of their statements is on disk.
 
 The **`agda-stdlib` tier** (22 obligations) is the original [M1-5] cut and is
 **frozen**: the P1 baseline (issue #113) is quoted against it, so it only ever
@@ -54,6 +55,29 @@ module (the haystack) rather than read it off the fixture:
 
 Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
 (7 obligations), `Data.List.Properties` (3), `Data.Bool.Properties` (2).
+
+The two **hard tiers** (14 obligations, issue [#189]) are posed rather than
+mined: statements in group theory and universal algebra written for them, each
+under a module telescope and tagged `stratum:novel`.  The **`agda-stdlib-hard`
+tier** (6 obligations) is posed in the standard library's
+`Algebra.Bundles.Group` vocabulary and reports as `agda-stdlib/novel`; the
+**`agda-algebras-hard` tier** (8 obligations) is posed in agda-algebras'
+vocabulary and reports as `agda-algebras/novel`.  Each tier's README records
+its rows' novelty checks, their golds, and the rows dropped from the eighteen
+posed; what the two share is under "Hard tiers: conventions, golds, and the
+novelty check" below.
+
+| `agda-stdlib-hard` | Count | Examples                                                                |
+|--------------------|-------|-------------------------------------------------------------------------|
+| `compositional`    | 3     | `x ∙ x ≈ ε` for all `x` makes a group abelian, a surjective image of an abelian group is abelian |
+| `non-obvious`      | 3     | `(x ∙ y)² ≈ x² ∙ y²` makes a group abelian, a unique involution is central |
+
+| `agda-algebras-hard` | Count | Examples                                                              |
+|----------------------|-------|-----------------------------------------------------------------------|
+| `compositional`      | 4     | `H ∩ K` is normal in `H`, the third isomorphism theorem on cosets, `kercon (g ⊙ f) ≑ kercon f` |
+| `non-obvious`        | 4     | `HK/K ≅ H/(H ∩ K)` on cosets, the kernel as a normal subgroup, a product of normal subgroups is their join |
+
+Domains: group, algebra.
 
 ### agda-algebras tier: selection criteria and provenance
 
@@ -157,6 +181,122 @@ Domains: arithmetic, order, list, logic.  Haystacks: `Data.Nat.Properties`
    byte-identical to the P1 and P2 baselines' fixtures; this tier is a new
    directory, which is the only way the stdlib content grows.
 
+### Hard tiers: conventions, golds, and the novelty check
+
+The two hard tiers of issue [#189], `agda-stdlib-hard-v0/` and
+`agda-algebras-hard-v0/`, are one posed set split by the library whose
+vocabulary a statement uses.  Each tier's README holds its rows, their novelty
+verdicts, and the search record; what they share is here.
+
++  **Fixtures**.  One module per obligation, its name the file stem,
+   `open import AgdaDojang.Debug` first, exactly one `{!!}`.  Each checks to
+   exactly one `UnsolvedInteractionMetas` and no other error or warning under
+   the judge's own `agda` invocation for its row's `source`, with and without
+   `--safe`.  The obligations are the issue's files, byte for byte apart from
+   the header's `File:` line.
++  **Module telescopes**.  Every statement is posed under `module _ … where`
+   (`(G : Group c ℓ)` with `open Group G`, or agda-algebras' `(𝒢 : Group α ρ)`
+   with its subgroups and their proofs), because that is the readable way to
+   write them.  The definition's elaborated type includes the telescope, which
+   is what the judge compares.  Goal-anchored `get_goal` and `type_of` answer
+   inside it (checked on row 1: the lane's goal display, and `sq`, `assoc`,
+   `inverseˡ` typed in the goal's scope); a `type_of` without a line sees the
+   top-level scope, where the telescope's opens are not in scope, which is
+   issue [#139].
++  **The scope a statement is posed in**.  Every row opens modules inside its
+   telescope, and four define predicates before the hole.  The judge compares
+   the definition's type by the names it mentions, so a file could keep that
+   type and change what such a predicate means.  Since issue [#189] the judge
+   freezes these lines as text, as it freezes the module line and the imports:
+   every line outside the definition with the hole must survive, each
+   declaration's lines as one run that nothing continues, in the obligation's
+   order, while lines may be added between declarations (`Gates.scope` in
+   `strux-driver/.../agentbench/Judge.scala`, pinned in `JudgeSpec`).  The
+   mined tiers' obligations have no such lines, so their verdicts cannot move.
++  **Index rows**.  `source` is the library whose vocabulary the statement
+   uses, which also chooses the corpus a subject is given, and the tag
+   `stratum:novel` makes every report count the tiers as `agda-stdlib/novel`
+   and `agda-algebras/novel`.  No row carries a `restates:` or `target:` tag,
+   since no row has an original, and no definition in either corpus or either
+   library's sources carries any of the fourteen hole names, so the
+   restatement rule cannot fire.  `module` names the library module the
+   fixture's `Source:` line names first (nothing is proved there); `goldTerm`
+   is the fixture's `Strategy:` line, a sketch; `type` is the signature as the
+   fixture writes it, as on every other tier, because Agda prints these types
+   with every definition unfolded (past a thousand characters on rows 10 to
+   18).
+
+**Golds**.  A wanted gold's twin under `gold/` is the obligation with the hole
+still in it and a `-- GOLD WANTED` line under the header, so it checks exactly
+as the obligation does.  A finished gold replaces the hole and changes no other
+line of the obligation: the proof's imports go in a `where` block under the
+clause, not in the telescope.  It type-checks under the judge's invocation with
+`--safe`, and its statement is the obligation's: the holed definition's
+elaborated type, from `agda-json` on the gold and on a copy of the obligation
+whose hole is postulated, is the same with binder names removed.  While any
+gold is wanted, the following hold:
+
++  the CI slice `make eval-benchmark-smoke` selects rows by a fixed id list
+   (`BENCHMARK_SMOKE_IDS` in the `Makefile`) that names none of these rows, so
+   it stays green;
++  the full `make eval-benchmark`, which is not a CI lane, reports each wanted
+   gold as failing;
++  the judge cannot judge a row whose gold is wanted, since its statement gate
+   reads the statement from the gold's elaborated type and `agda-json` cannot
+   extract a holed file: it stops on an internal error of Agda's
+   (`src/full/Agda/TypeChecking/Rules/LHS.hs:751`) on 68 of the 69 committed
+   obligations, every one whose hole stays open (the exception is
+   `Unit-trivial`, whose hole of type `⊤` Agda fills by eta).  A row without a
+   gold waits for one.
+
+Since 2026-09-27 no gold is wanted on either tier, and the full `make
+eval-benchmark` passes all 69 rows.
+
+**Alternative proofs**.  A gold file may keep further proofs of its statement
+after the gold itself, each a definition with the same signature and a name
+that says how it proves it (`squares-commute-by-assoc`).  Only two things read
+a gold file: `make eval-benchmark` type-checks all of it, so an alternative is
+verified with the gold and cannot rot, and the judge reads only the definition
+the index names as `hole`, so an alternative changes no verdict.  Subjects
+never see a gold.
+
+**The novelty check**.  A statement belongs in a hard tier only if no proof of
+it is on disk: in the agda-algebras library (the flake's store copy, at the
+commit of the corpus), in the standard library 2.3, or in either corpus.  Each
+row was checked four ways, as follows:
+
++  `search_by_type` through the agda-mcp server over the agda-algebras corpus
+   v0.1 (SHA-256 `af864432`), and for the standard-library rows also over the
+   standard-library corpus v0 (`14e0d47e`), with a limit of 2,000.  The tool
+   is a case-insensitive substring match over each definition's printed type,
+   which is fully qualified and broken across lines, so a whole statement
+   never matches; each row records its statement's most distinctive fragments
+   and its conclusion's head, in the corpus's own spelling (`Group-Op.∙`,
+   `Coset.∼`, `Algebra.Definitions.Commutative`);
++  `search_by_name` with the natural names, the same way;
++  a conjunctive search over the same corpus rows, every fragment in one row's
+   type, which the server's tools cannot do;
++  `grep` over both libraries' sources for the conclusion's head symbols
+   together: the files containing all of them, then the lines.
+
+The verdicts are defined as follows:
+
++  **absent**: nothing on disk proves the statement; the nearest lemma is a
+   different statement;
++  **on disk, other vocabulary**: agda-algebras proves the statement's content
+   in its own group vocabulary, as lemmas a subject can read and translate;
++  **generalization**: a theorem on disk implies the statement;
++  **partly on disk**: some conjuncts are one or two library lemmas away, and
+   the rest are absent.
+
+Across both tiers, the check found ten rows absent (1, 2, 3, 4, 10, 11, 12,
+15, 17, 18), three on disk in agda-algebras' vocabulary (5, 8, 9), one a
+generalization's instance (7), and four partly on disk (6, 13, 14, 16).  The
+three on disk were dropped on 2026-09-27, since a subject with a shell can
+read their proofs, and so was row 15, which is not provable as posed; fourteen
+rows remain.  Each tier's README says why under "Dropped rows" and keeps the
+dropped rows' searches as the record of the check.
+
 ## Directory Layout
 
 ```
@@ -175,9 +315,17 @@ data/benchmarks/
 ├── agda-algebras-v0/
 │   ├── obligations/                   # 21 modules, one {!!} hole each
 │   └── gold/                          # solved twins
-└── agda-stdlib-haystack-v0/
-    ├── obligations/                   # 12 modules, one {!!} hole each
-    └── gold/                          # solved twins, needle named qualified
+├── agda-stdlib-haystack-v0/
+│   ├── obligations/                   # 12 modules, one {!!} hole each
+│   └── gold/                          # solved twins, needle named qualified
+├── agda-stdlib-hard-v0/
+│   ├── README.md                      # the rows, golds, dropped rows, novelty check
+│   ├── obligations/                   # 6 modules, one {!!} hole each
+│   └── gold/                          # solved twins
+└── agda-algebras-hard-v0/
+    ├── README.md                      # the rows, golds, dropped rows, novelty check
+    ├── obligations/                   # 8 modules, one {!!} hole each
+    └── gold/                          # solved twins
 ```
 
 Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
@@ -311,3 +459,6 @@ These fixtures are Agda source written for this repository, so the repository's
 code license applies: [Apache-2.0](../../LICENSE).  They import the Agda standard
 library, which carries its own (MIT) license and is not vendored here.  See the
 "Licensing" section of the top-level `README.md` for the wider policy on data.
+
+[#139]: https://github.com/formalverification/agda-native-air/issues/139
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
