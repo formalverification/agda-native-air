@@ -27,18 +27,24 @@ Usage
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
 
 from scripts.python.site.links_hook import (
+    INLINE,
+    REFERENCE,
     Page,
     Repository,
     repository,
     resolve,
     rewrite_links,
 )
+from scripts.python.site.prose import prose_occurrences
+
+ROOT = Path(__file__).resolve().parents[3]
 
 WEB = "https://github.com/owner/repo"
 
@@ -81,6 +87,26 @@ def test_a_file_goes_to_blob_and_a_directory_to_tree_with_the_suffix_kept() -> N
     assert url("../reports/runs/") == f"{WEB}/tree/main/reports/runs"
     assert url("../../tools/src", ADR) == f"{WEB}/tree/main/tools/src"
     assert url("<../reports/runs/README.md>") == f"{WEB}/blob/main/reports/runs/README.md"
+
+
+def test_a_link_to_the_repository_root_goes_to_its_tree() -> None:
+    for page, dest, suffix in ((GUIDE, "../", ""), (GUIDE, "..", ""),
+                               (ADR, "../../", ""), (GUIDE, "../#readme", "#readme")):
+        assert resolve(dest, page, PUBLISHED, REPO).unwrap() == f"{WEB}/tree/main{suffix}", dest
+
+
+def test_a_destination_is_read_whole_through_nested_parentheses() -> None:
+    repo = Repository.of(frozenset({"docs/a(b(c)).md", "docs/a)b.md"}), WEB)
+    out = rewrite_links("[x](a(b(c)).md) and [y](a\\)b.md)\n", GUIDE, PUBLISHED, repo)
+    assert out.unwrap() == (f"[x]({WEB}/blob/main/docs/a%28b%28c%29%29.md) and "
+                            f"[y]({WEB}/blob/main/docs/a%29b.md)\n")
+
+
+def test_what_is_not_a_link_or_is_nested_too_deep_is_left_to_mkdocs() -> None:
+    # `[x](a(b.md)` is no link at all; nesting past PAREN_DEPTH is not read,
+    # rather than read short, so MkDocs validates it as written.
+    for page in ("[x](a(b.md)\n", "[x](a(b(c(d(e)))).md)\n"):
+        assert _rewrite(page).unwrap() == page
 
 
 def test_a_target_the_repository_does_not_track_is_an_error() -> None:
@@ -177,3 +203,47 @@ def test_a_directory_that_is_not_a_repository_is_an_error(tmp_path: Path) -> Non
     repository.cache_clear()
     listing = repository(tmp_path / "nowhere", WEB)
     assert listing.is_err and "with git" in str(listing.unwrap_err())
+
+
+# ------------------------------------------ against Python-Markdown itself
+
+#: Pages on which the hook must find exactly the relative links the site's
+#: own Markdown renders, no more (a link in code) and no fewer (a link a
+#: stray backtick seemed to hide).
+DIFFERENTIAL = {
+    "parentheses, one level": "[x](a(b).md)\n",
+    "parentheses, three levels": "[x](a(b(c(d))).md)\n",
+    "an unbalanced parenthesis": "[x](a(b.md)\n",
+    "a title with parentheses": '[x](y.md "t (a)")\n',
+    "an escaped parenthesis": "[x](a\\)b.md)\n",
+    "an image": "![x](y.png)\n",
+    "a span across a paragraph's lines": "see `a\nb` and [x](y.md)\n",
+    "a span across two list items": "+  see `a\n+  [x](y.md) and `b\n",
+    "a span across numbered items": "1. a `b\n2. [x](y.md) c`\n",
+    "a span across a list continuation": "+  see `a\n   [x](y.md) b`\n",
+    "a span leaving a heading": "# a `b [x](y.md)\nc`\n",
+    "a span across a blockquote's lines": "> a `b\n> [x](y.md) c`\n",
+    "a span across table rows": "| a `b | c |\n|---|---|\n| [x](y.md) ` | d |\n",
+    "an unclosed backtick": "a `b [x](y.md)\n",
+    "double backticks across lines": "``a\n` [x](y.md) b``\n",
+    "a fence inside a list item": "+  a\n\n   ```\n   [x](y.md)\n   ```\n",
+    "a reference definition": "[t][lbl]\n\n[lbl]: y.md\n",
+    "an indented code block": pytest.param(
+        "para\n\n    [x](y.md)\n\nafter\n",
+        marks=pytest.mark.xfail(strict=True, reason="indented code blocks are "
+                                "not masked (prose.py says why)")),
+}
+
+
+@pytest.mark.parametrize("page", list(DIFFERENTIAL.values()), ids=list(DIFFERENTIAL))
+def test_the_hook_reads_the_links_the_sites_markdown_makes(page: str) -> None:
+    markdown = pytest.importorskip("markdown")
+    config = pytest.importorskip("mkdocs.config").load_config(str(ROOT / "mkdocs.yml"))
+    html = markdown.Markdown(extensions=config["markdown_extensions"],
+                             extension_configs=config["mdx_configs"]).convert(page)
+    rendered = sorted(url for url in re.findall(r'<(?:a|img) [^>]*(?:href|src)="([^"]*)"', html)
+                      if not url.startswith("#"))
+    found = sorted(re.sub(r"\\(.)", r"\1", o.text)
+                   for o in prose_occurrences(page, INLINE, "dest")
+                   + prose_occurrences(page, REFERENCE, "dest"))
+    assert found == rendered

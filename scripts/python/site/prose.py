@@ -25,8 +25,14 @@ Description: Which characters of a Markdown page are prose, for the site's
                          an unclosed fence runs to the end of the page, as
                          in CommonMark.
     code spans           A run of n backticks through the next run of
-                         exactly n, not across a blank line; a backslash
-                         before the opening run escapes it.
+                         exactly n, within one inline context: not across a
+                         blank line, not into a line that starts a list
+                         item, a heading, or a table row, and not out of a
+                         heading or a table row, which are one line long.
+                         Python-Markdown parses inline markup block by
+                         block, so a backtick in one list item does not
+                         pair with one in the next.  A backslash before the
+                         opening run escapes it.
     HTML comments        `<!--` through `-->`, which is where this
                          repository's documents keep their `File:` headers.
 
@@ -61,10 +67,22 @@ MASK = "\x00"
 #: string.  A backtick fence's info string may not contain a backtick.
 FENCE_OPEN = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})(?P<info>[^\n]*)$")
 
-#: A code span or an HTML comment, whichever begins first.
+#: What a newline that ends an inline context becomes while code spans are
+#: scanned, a character no span may contain; it is a newline again after.
+BREAK = "\x01"
+
+#: A line that starts a block of its own, so no code span continues into
+#: it: a list item, a heading, or a table row.
+BLOCK_START = re.compile(r"[ \t]*(?:[+*-][ \t]|\d+[.)][ \t]|#|\|)")
+
+#: A block that is one line long, so no code span continues out of it.
+ONE_LINE_BLOCK = re.compile(r"[ \t]*(?:#|\|)")
+
+#: A code span or an HTML comment, whichever begins first.  A comment may
+#: cross a `BREAK`; a code span may not.
 SPAN_OR_COMMENT = re.compile(
     r"(?P<comment><!--.*?-->)"
-    r"|(?<![`\\])(?P<ticks>`+)(?!`)(?:(?!\n[ \t]*\n).)+?(?<!`)(?P=ticks)(?!`)",
+    r"|(?<![`\\])(?P<ticks>`+)(?!`)[^\x01]+?(?<!`)(?P=ticks)(?!`)",
     re.DOTALL)
 
 #: A front-matter block at the top of a page, as MkDocs recognizes it
@@ -87,8 +105,8 @@ class Occurrence:
 
 
 def _blank(text: str) -> str:
-    """`text` with every character but a newline replaced by `MASK`."""
-    return re.sub(r"[^\n]", MASK, text)
+    """`text` with every character but a line break replaced by `MASK`."""
+    return re.sub(r"[^\n\x01]", MASK, text)
 
 
 def _fence_step(state: Tuple[Optional[Fence], Tuple[bool, ...]],
@@ -115,13 +133,30 @@ def _mask_fences(markdown: str) -> str:
                    for line, code in zip(lines, flags))
 
 
+def _ends_inline(line: str, following: str) -> bool:
+    """Whether the newline between two lines ends an inline context."""
+    return (not line.strip() or not following.strip()
+            or ONE_LINE_BLOCK.match(line) is not None
+            or BLOCK_START.match(following) is not None)
+
+
+def _mark_breaks(text: str) -> str:
+    """`text` with each newline that ends an inline context replaced by
+    `BREAK`, one character for one, so positions do not move."""
+    lines = text.split("\n")
+    return lines[0] + "".join(
+        (BREAK if _ends_inline(line, following) else "\n") + following
+        for line, following in zip(lines, lines[1:]))
+
+
 def code_mask(markdown: str) -> str:
     """The page with every character of code and comments masked.
 
     Same length as the input, newlines where the input has them.
     """
     return SPAN_OR_COMMENT.sub(lambda match: _blank(match.group(0)),
-                               _mask_fences(markdown))
+                               _mark_breaks(_mask_fences(markdown))
+                               ).replace(BREAK, "\n")
 
 
 def prose_occurrences(markdown: str, pattern: "re.Pattern[str]",

@@ -211,7 +211,7 @@ def test_every_github_link_names_a_path_git_tracks(built) -> None:
     links = {(m["kind"], m["branch"], m["path"].rstrip("/"))
              for page in _pages(built["public"])
              for m in GITHUB_LINK.finditer(page.read_text(encoding="utf-8"))}
-    # The rewritten links and the nav's four GitHub entries are both here.
+    # The rewritten links and the nav's three GitHub entries are both here.
     assert ("tree", BRANCH, "reports/agent-bench") in links
     assert ("blob", BRANCH, "agda-mcp/README.md") in links
     wrong = sorted(link for link in links

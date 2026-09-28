@@ -40,7 +40,7 @@ def _visible(text: str) -> str:
 
 
 def test_the_mask_keeps_length_and_newlines() -> None:
-    page = "a `b`\n```\nc\n```\n<!-- d\ne -->\n"
+    page = "a `b`\n```\nc\n```\n<!-- d\n\n+  e -->\n+  `f\ng`\n"
     masked = code_mask(page)
     assert len(masked) == len(page)
     assert [i for i, ch in enumerate(masked) if ch == "\n"] == \
@@ -81,6 +81,20 @@ def test_an_escaped_backtick_opens_no_span() -> None:
 def test_a_code_span_does_not_cross_a_blank_line() -> None:
     page = "a `b\n\n[c](d.md) e`"
     assert "[c](d.md)" in _visible(page)
+
+
+def test_a_code_span_stays_inside_its_inline_context() -> None:
+    # Python-Markdown parses inline markup block by block: a backtick in one
+    # list item, table row, or heading does not pair with one in the next.
+    for page in ("+  see `a\n+  [c](d.md) and `e\n",
+                 "1. a `b\n2. [c](d.md) e`\n",
+                 "| a `b | c |\n|---|---|\n| [c](d.md) ` | e |\n",
+                 "# a `b [c](d.md)\ne`\n"):
+        assert "[c](d.md)" in _visible(page), page
+    # A list item's continuation line and a blockquote's next line are the
+    # same inline context, so a span does cross them.
+    assert "[c](d.md)" not in _visible("+  see `a\n   [c](d.md) b`\n")
+    assert "[c](d.md)" not in _visible("> a `b\n> [c](d.md) e`\n")
 
 
 def test_html_comments_are_masked_and_a_backtick_in_one_opens_nothing() -> None:

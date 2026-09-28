@@ -248,7 +248,7 @@ extra:
   demo_dir: !ENV [AIR_DEMO_DIR, "site"]
 
 # The nav names every published page (a published page it does not name
-# fails the build; see `validation`).  The four GitHub entries are links,
+# fails the build; see `validation`).  The three GitHub entries are links,
 # not copies: the run archive, the server's tool contracts, and the suite
 # are the record, which the site cites rather than restates, and a test
 # checks that each one names a path git tracks.

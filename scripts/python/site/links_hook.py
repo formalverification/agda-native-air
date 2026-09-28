@@ -81,10 +81,33 @@ from scripts.python.utils.pipeline_types import (  # noqa: E402
 #: so a reader who follows a link sees the tree the page was built from.
 BRANCH = "main"
 
+#: The repository's root as a normalized path from itself.  It holds no
+#: tracked file of its own, so it is a directory by fiat.
+ROOT = "."
+
+#: How deeply a destination's parentheses may nest.  CommonMark allows any
+#: balanced nesting; a deeper one is not matched at all, so the link is left
+#: to MkDocs' own validation rather than cut short.
+PAREN_DEPTH = 3
+
+
+def _balanced(depth: int) -> str:
+    """One unit of an inline link's destination: a character that is not a
+    space, a parenthesis, or an angle bracket (or any escaped character), or
+    a parenthesized run of such units nested at most `depth` deep."""
+    plain = r"(?:\\.|[^\s()<>\\])"
+    return plain if depth == 0 else rf"(?:{plain}|\((?:{_balanced(depth - 1)})*\))"
+
+
 #: An inline link's or image's destination: after `](`, either `<...>` or a
-#: run without spaces whose parentheses balance one level deep.
+#: run of balanced units, and then only what may end a link, an optional
+#: title and the closing parenthesis.  Requiring the close is what keeps a
+#: destination from being cut short at a parenthesis it could not parse, and
+#: keeps `[x](a(b.md)`, which is not a link, from being read as one.
 INLINE = re.compile(
-    r"(?<!\\)\]\(\s*(?P<dest><[^<>\n]*>|[^\s()<>]+(?:\([^\s()<>]*\)[^\s()<>]*)*)")
+    r"(?<!\\)\]\(\s*"
+    rf"(?P<dest><[^<>\n]*>|(?:{_balanced(PAREN_DEPTH)})+)"
+    r"""(?=\s*(?:"[^"]*"|'[^']*'|\([^()]*\))?\s*\))""")
 
 #: A reference definition's destination, at the start of a line.
 REFERENCE = re.compile(
@@ -113,7 +136,9 @@ class Repository:
             web_root.rstrip("/"))
 
     def url(self, path: str, kind: str, suffix: str) -> str:
-        return f"{self.web_root}/{kind}/{BRANCH}/{quote(path)}{suffix}"
+        """The GitHub URL of a path, `.` being the repository's root."""
+        tail = "" if path == ROOT else f"/{quote(path)}"
+        return f"{self.web_root}/{kind}/{BRANCH}{tail}{suffix}"
 
 
 @dataclass(frozen=True)
@@ -147,7 +172,8 @@ def resolve(dest: str, page: Page, published: AbstractSet[str],
     bare = dest[1:-1] if dest.startswith("<") and dest.endswith(">") else dest
     if not _is_relative(bare):
         return Result.ok(dest)
-    path = unquote(urlsplit(bare).path)
+    # Markdown's backslash escapes are not part of the path.
+    path = re.sub(r"\\(.)", r"\1", unquote(urlsplit(bare).path))
     in_docs = posixpath.normpath(posixpath.join(posixpath.dirname(page.src_uri), path))
     if in_docs in published:
         return Result.ok(dest)
@@ -156,7 +182,7 @@ def resolve(dest: str, page: Page, published: AbstractSet[str],
         return Result.err(f"resolves to {in_repo}, outside the repository")
     if in_repo in repo.files:
         return Result.ok(repo.url(in_repo, "blob", _suffix(bare)))
-    if in_repo in repo.directories:
+    if in_repo == ROOT or in_repo in repo.directories:
         return Result.ok(repo.url(in_repo, "tree", _suffix(bare)))
     return Result.err(f"resolves to {in_repo}, which is neither published "
                       f"nor tracked in the repository")
