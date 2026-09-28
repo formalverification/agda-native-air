@@ -50,10 +50,11 @@ final class SourcesPromptSpec extends AnyFunSuite with Matchers {
       "alpha-1.0" -> a.resolve("src"), "alpha-1.0" -> a.resolve("extra"), "beta" -> b.resolve("agda"))
   }
 
-  test("the named roots are exactly the include roots the read roots are built from") {
+  test("the named roots are exactly the include roots the read roots are built from, in the read roots' form") {
     val (reg, _, _) = registry()
     Extractor.namedIncludesFromRegistry(reg).unsafeRunSync().map(_._2) shouldBe
-      Extractor.includesFromRegistry(reg).unsafeRunSync()
+      Extractor.includesFromRegistry(reg).unsafeRunSync().map(_.toAbsolutePath.normalize)
+    Extractor.namedIncludesFromRegistry(reg).unsafeRunSync().forall(_._2.isAbsolute) shouldBe true
   }
 
   test("the block lists each root with its library, then Agda's primitive modules when the run found them") {

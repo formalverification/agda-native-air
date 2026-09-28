@@ -179,7 +179,8 @@ object Extractor {
     * registry's order: the `name:` of each `.agda-lib` the registry names
     * (the file's stem when it has none) beside each of its `include:` roots.
     * The shell arms' prompts list these (issue #189), so a subject knows where
-    * the sources it may read are without searching the filesystem for them.
+    * the sources it may read are without searching the filesystem for them;
+    * each is absolute and normalized, the form the read roots take.
     */
   def namedIncludesFromRegistry(librariesFile: Path): IO[Vector[(String, Path)]] =
     IO.blocking {
@@ -192,7 +193,7 @@ object Extractor {
                         .getOrElse(lib.getFileName.toString.stripSuffix(".agda-lib"))
           lines.filter(_.toLowerCase.startsWith("include:"))
             .flatMap(_.drop("include:".length).trim.split("\\s+").toVector.filter(_.nonEmpty))
-            .map(d => name -> lib.getParent.resolve(d).normalize)
+            .map(d => name -> lib.getParent.resolve(d).toAbsolutePath.normalize)
         }
       }
     }
