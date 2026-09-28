@@ -1,49 +1,80 @@
 ---
 # File: docs/index.md
 #
-# The project site's landing page (issue #169).  It is the one file in docs/
-# written for a reader of the site rather than for a contributor;
-# docs/README.md is the contributors' index of this directory and is not
-# published.  [M6-3] (#171) writes the landing page proper in its place; this
-# one exists so the skeleton has a page to build, and so the demo stays one
-# click from the site's root while it does.  Every figure below is quoted from
-# the README as of 2026-09-21; #171 replaces them with figures read from the
-# generated data, so they cannot drift.
+# The project site's landing page (issue #171): what agda-native-air is, what
+# has been measured and what it showed, and where to go next, in about one
+# screen.  It is the one file in docs/ written for a reader of the site rather
+# than for a contributor; docs/README.md is the contributors' index of this
+# directory and is not published.
+#
+# No figure below is typed.  Each `@fig(<run-id> <selector>)` is replaced at
+# build time by scripts/python/site/figures_hook.py with the value it names in
+# reports/agent-bench/<run-id>/report.json, either a JSON pointer into that
+# report or a figure the hook derives from it by a named, tested function, and
+# the build fails on a marker it cannot resolve.  So the source cites every
+# figure, and the page cannot drift from the archive.  The story is
+# docs/reading-the-results.md's; when that guide's reading changes, this page
+# changes with it.
 title: agda-native-air
 description: >-
-  Agda-native AI reasoning: the interaction, retrieval, and evaluation
-  infrastructure that lets AI agents work with the Agda proof assistant.
+  Tools that let AI agents prove theorems in Agda, a benchmark that measures
+  what they do with them, and what the measurements have shown so far.
+figures: true
 ---
 
 # Agda-native AI reasoning
 
-`agda-native-air` builds the infrastructure that lets AI agents work with the
-[Agda](https://wiki.portal.chalmers.se/agda) proof assistant: a server that
-exposes Agda's proof state and type-checking verdicts to any agent over the
-Model Context Protocol, corpora extracted from real libraries, a benchmark of
-proof obligations with gold solutions, and the measurements of frontier models
-and of a native proof search on all of it.  Agda remains the final arbiter of
-correctness.
+`agda-native-air` builds tools that let AI agents prove theorems in the
+[Agda](https://wiki.portal.chalmers.se/agda) proof assistant, and measures
+what the agents do with them.  Its server, `agda-mcp`, gives any agent Agda's
+own answers over the Model Context Protocol: does this file type-check, what
+does this hole need, where is this name defined.  Its benchmark poses proof
+obligations with gold solutions, mined from Agda's standard library and from
+agda-algebras or posed for the purpose, and Agda itself decides whether each
+attempt type-checks and still proves the statement it was given.
 
-## Watch a real session
+[Watch a real session](demo/index.html){ .md-button .md-button--primary }
 
-[The demo](demo/index.html) replays five sessions from the committed archive:
-a frontier model, the `agda-mcp` server, and one proof obligation each, with
-every tool call and every answer on the page in full, beside the 55-row
-measurement they belong to.  Nothing on that page is typed by hand.  It is
-generated from the archive under `reports/agent-bench/`, and the build refuses
-to publish it when a number disagrees with the decision record it was checked
-against.
+## What the measurements say
 
-## Read the record
++  **With the server, frontier models solve most of the benchmark**: Opus 5
+   solves @fig(agent-opus5-1 /totals/solved) of the
+   @fig(agent-opus5-1 /totals/total) mined obligations, and Sonnet 5 solves
+   @fig(agent-sonnet5-1 /totals/solved).
++  **Without the server, a shell does as well**: Sonnet 5 solves
+   @fig(arm162-shell-1 /totals/solved), running `agda` itself.  Given both, it
+   took every final verdict from the server's `check_file`
+   (@fig(arm162-both-1 /perVerdictVia/mcp) of
+   @fig(arm162-both-1 /totals/total)) and called its knowledge tools
+   @fig(arm162-both-1 knowledge-tool-calls) times, against
+   @fig(arm162-mcp-1 knowledge-tool-calls) with no shell.
++  **The mined rows cannot tell the two apart**.  On the
+   @fig(arm162-shell-1 rows-with-original) rows that restate a library lemma,
+   the library's source was readable, and
+   @fig(arm162-shell-1 /totals/solvedOriginalInView) of the shell's
+   @fig(arm162-shell-1 solved-with-original) solves there came with the
+   original proof in view; on the other
+   @fig(arm162-shell-1 rows-without-original) rows, every configuration solves
+   nearly all.
++  **Neither can the first hard rows**.  On
+   @fig(hard-opus5-mcp-1 /totals/total) statements posed with no proof on
+   disk, Opus 5's final file type-checks with its statement intact on
+   @fig(hard-opus5-shell-1 final-checks-statement-kept) with a shell,
+   @fig(hard-opus5-mcp-1 final-checks-statement-kept) with the server, and
+   @fig(hard-opus5-both-1 final-checks-statement-kept) with both.
 
-+  The source, the benchmark, the corpora, and the archives are on
-   [GitHub](https://github.com/formalverification/agda-native-air).  Cite them
-   by their GitHub URL or a Zenodo DOI, not by this site's address: the site is
-   the front door, not the archive.
-+  [ADR 0002](https://github.com/formalverification/agda-native-air/blob/main/docs/adr/0002-agda-mcp.md)
-   is the server's design record, and
-   [ADR 0001](https://github.com/formalverification/agda-native-air/blob/main/docs/adr/0001-proof-search-on-agda-mcp.md)
-   is proof search on top of it, with the numbers.
-+  The documentation for contributors starts at the repository's
-   [README](https://github.com/formalverification/agda-native-air#readme).
+So a model wants the server's verdict, and beside a shell it wants little
+else.  Whether the tools help a model prove what it could not prove without
+them is still open: that takes statements harder for the model than these,
+and those are the next instruments.
+
+[Reading the results](reading-the-results.md) gives every number with the run
+that produced it, and its
+[§ 4.5](reading-the-results.md#45-the-hard-tier) says why the hard tier's
+solved column reads lower than the counts above.
+[ADR 0002](adr/0002-agda-mcp.md) records the server's design, and
+[ADR 0001](adr/0001-proof-search-on-agda-mcp.md) a proof search built on it
+with no model in the loop.  The source, the benchmark, and the run archive
+are on [GitHub](https://github.com/formalverification/agda-native-air); cite
+them by their GitHub URL, not by this site's address, since the site is the
+front door and not the archive.

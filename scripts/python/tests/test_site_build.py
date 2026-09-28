@@ -14,6 +14,11 @@ tree, and then the properties the site is published on:
    asset reference resolves, over every page and stylesheet.
 +  The allowlist holds: the only pages are the landing page, the 404, and
    the demo; nothing internal from `docs/` is published.
++  The landing page's figures were all read: no marker survives into any
+   built page.
++  The two source-rewriting hooks fail a build: a fixture project with an
+   unresolved figure, and one with a link to nowhere, both stop
+   `mkdocs build --strict` with the problem named.
 +  The Demo link is in the nav, the demo is not in the sitemap (so
    Material's instant navigation does not intercept the link), the site
    opens dark, and the repository chip carries no API fetch.
@@ -158,6 +163,14 @@ def test_only_the_landing_page_the_404_and_the_demo_are_published(built) -> None
         assert not (public / internal).exists(), internal
 
 
+# ---------------------------------------------- figures and links, as built
+
+def test_no_figure_marker_survives_into_a_built_page(built) -> None:
+    left = [str(p.relative_to(built["public"])) for p in _pages(built["public"])
+            if "@fig(" in p.read_text(encoding="utf-8")]
+    assert not left, left
+
+
 # ------------------------------------------------------- the nav and the look
 
 def test_the_demo_is_in_the_nav_and_out_of_the_sitemap(built) -> None:
@@ -192,3 +205,91 @@ def test_the_self_hosted_faces_are_what_the_pages_load(built) -> None:
     assert "stylesheets/tokens.css" in index and "stylesheets/extra.css" in index
     for face in ("inter-400.woff2", "juliamono-text.woff2", "spacegrotesk-600.woff2"):
         assert (built["public"] / "assets" / "fonts" / face).is_file(), face
+
+
+# ------------------------------------- the rewriting hooks fail a build
+
+HOOKS = REPO / "scripts" / "python" / "site"
+
+#: A project of its own, so a build can be made to fail without touching
+#: the site: the two rewriting hooks, an allowlist, a run report, and a git
+#: index for the link hook to read.
+FIXTURE_CONFIG = f"""\
+site_name: fixture
+repo_url: https://github.com/owner/fixture
+theme:
+  name: mkdocs
+docs_dir: docs
+exclude_docs: |
+  *
+  !index.md
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+hooks:
+  - {HOOKS / "figures_hook.py"}
+  - {HOOKS / "links_hook.py"}
+nav:
+  - Home: index.md
+"""
+
+FIXTURE_PAGE = """\
+---
+figures: true
+---
+# Fixture
+
+Solved @fig(run-1 /totals/solved), and [the notes](notes.md), and
+[the code](../src/), and `[an example](nowhere.md)`.
+"""
+
+
+def _fixture(base: Path, page: str) -> Path:
+    (base / "docs").mkdir(parents=True)
+    (base / "src").mkdir()
+    (base / "reports" / "agent-bench" / "run-1").mkdir(parents=True)
+    (base / "mkdocs.yml").write_text(FIXTURE_CONFIG, encoding="utf-8")
+    (base / "docs" / "index.md").write_text(page, encoding="utf-8")
+    (base / "docs" / "notes.md").write_text("# Left out\n", encoding="utf-8")
+    (base / "src" / "main.py").write_text("", encoding="utf-8")
+    (base / "reports" / "agent-bench" / "run-1" / "report.json").write_text(
+        '{"totals": {"solved": 7}}', encoding="utf-8")
+    for args in (["init", "-q"], ["add", "."]):
+        subprocess.run(["git", *args], cwd=base, check=True, capture_output=True)
+    return base
+
+
+def _build(base: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [str(MKDOCS), "build", "--strict", "-f", str(base / "mkdocs.yml"),
+         "-d", str(base / "public")],
+        cwd=base, capture_output=True, text=True)
+
+
+def test_the_fixture_builds_with_its_figure_read_and_its_links_sent_to_github(tmp_path) -> None:
+    base = _fixture(tmp_path / "ok", FIXTURE_PAGE)
+    run = _build(base)
+    assert run.returncode == 0, run.stderr
+    page = (base / "public" / "index.html").read_text(encoding="utf-8")
+    assert "Solved 7," in page and "@fig(" not in page
+    assert 'href="https://github.com/owner/fixture/blob/main/docs/notes.md"' in page
+    assert 'href="https://github.com/owner/fixture/tree/main/src"' in page
+    assert "[an example](nowhere.md)" in page
+
+
+def test_an_unresolved_figure_fails_the_build(tmp_path) -> None:
+    base = _fixture(tmp_path / "figure",
+                    FIXTURE_PAGE.replace("/totals/solved", "/totals/restated"))
+    run = _build(base)
+    assert run.returncode != 0
+    assert "@fig(run-1 /totals/restated): no key 'restated'" in run.stderr
+
+
+def test_a_link_to_nowhere_fails_the_build(tmp_path) -> None:
+    base = _fixture(tmp_path / "link",
+                    FIXTURE_PAGE + "\nAnd [a lost file](../src/gone.py).\n")
+    run = _build(base)
+    assert run.returncode != 0
+    assert "index.md:9: ../src/gone.py resolves to src/gone.py" in run.stderr

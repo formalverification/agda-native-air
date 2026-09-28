@@ -193,6 +193,14 @@ plugins:
 # site with a dead Demo link cannot be published.  See the module's header.
 hooks:
   - scripts/python/site/demo_hook.py
+  # The figures of a page that sets `figures: true` in its front matter
+  # (the landing page) are read from the archived run reports at build
+  # time; the build fails on a figure it cannot read.  See the module.
+  - scripts/python/site/figures_hook.py
+  # A published page's relative link to a file the site does not publish
+  # becomes a link to that file on GitHub; a link to a file git does not
+  # track fails the build.  See the module.
+  - scripts/python/site/links_hook.py
 
 extra:
   # Where the built demo is, relative to this file.  The tests point it at a
