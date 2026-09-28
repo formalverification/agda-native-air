@@ -182,6 +182,9 @@
     #   5. Checks AGDA_ALGEBRAS_ROOT, AGDA_CATEGORIES_ROOT, and
     #      AGDA_TYPETOPOLOGY_ROOT; if set, locates the .agda-lib file in
     #      that directory and appends it to the libraries file.
+    #      Both files are built in a temporary file beside them and renamed
+    #      into place (the registry after step 5), so a reader never sees
+    #      either half-written.
     #   6. Defines an `agda()` shell function that invokes `command agda`
     #      with --no-default-libraries, --library-file, and --library flags
     #      for every successfully registered library.
@@ -260,19 +263,33 @@
       # Two always-present libraries:
       #   - agda-dojang : repo-local (source lives at $ROOT/agda-dojang)
       #   - standard-library : Nix-managed (resolved from the Nix store)
-      cat > "$AGDA_DIR/libraries" <<EOF
+      #
+      # Both files are built in a temporary file beside them and renamed into
+      # place, the registry only after Phase 2 has appended every external
+      # library, so a reader never sees either half-written.  Every agda-mcp
+      # launch enters this shell (scripts/run-server.sh), so during an
+      # agent-bench arm the registry is rewritten while other subjects' judges
+      # read it; writing it in place with `cat >` and then `>>` left a window
+      # with no agda-algebras in it (29,170 of 10.4 million reads over 25
+      # shell entries, measured 2026-09-27).  A rename within one directory
+      # is atomic, and mode 644 matches what `cat >` wrote.
+      _anair_libraries_tmp="$(mktemp "$AGDA_DIR/.libraries.XXXXXX")"
+      chmod 644 "$_anair_libraries_tmp"
+      cat > "$_anair_libraries_tmp" <<EOF
     $ROOT/agda-dojang/agda-dojang.agda-lib
     ${agdaStdlibPkg}/standard-library.agda-lib
     EOF
 
       # Default libraries — names must match `name:` fields in the .agda-lib files.
-      cat > "$AGDA_DIR/defaults" <<EOF
+      _anair_defaults_tmp="$(mktemp "$AGDA_DIR/.defaults.XXXXXX")"
+      chmod 644 "$_anair_defaults_tmp"
+      cat > "$_anair_defaults_tmp" <<EOF
     agda-dojang
     standard-library
     EOF
+      mv -f "$_anair_defaults_tmp" "$AGDA_DIR/defaults"
 
       echo "[agda] AGDA_DIR=$AGDA_DIR"
-      echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
 
       # ==== Phase 2: optional external Agda library registration ====
       # Set these env vars in your shell profile, .envrc, or on the command
@@ -296,8 +313,10 @@
 
       # _register_agda_lib VAR_NAME DISPLAY_NAME LIB_ROOT REG_VAR_SUFFIX
       #   Searches LIB_ROOT for a *.agda-lib file.
-      #   If found, appends it to $AGDA_DIR/libraries and adds a --library
-      #   flag to AGDA_DEFAULT_LIBS.  Sets _AGDA_REG_<suffix>=yes on success.
+      #   If found, appends it to the registry being built (renamed into
+      #   place as $AGDA_DIR/libraries once every library is registered) and
+      #   adds a --library flag to AGDA_DEFAULT_LIBS.  Sets
+      #   _AGDA_REG_<suffix>=yes on success.
       _register_agda_lib() {
         local var_name="$1"
         local display_name="$2"
@@ -308,7 +327,7 @@
             local lib_file
             lib_file="$(find "$lib_root" -maxdepth 1 -name '*.agda-lib' 2>/dev/null | head -1)"
             if [ -n "$lib_file" ]; then
-              echo "$lib_file" >> "$AGDA_DIR/libraries"
+              echo "$lib_file" >> "$_anair_libraries_tmp"
               AGDA_DEFAULT_LIBS="$AGDA_DEFAULT_LIBS --library $display_name"
               eval "_AGDA_REG_$reg_suffix=yes"
               echo "[agda] registered $display_name from $lib_file"
@@ -355,6 +374,11 @@
       _register_agda_lib AGDA_ALGEBRAS_ROOT     agda-algebras   "$AGDA_ALGEBRAS_ROOT"     agda_algebras
       _register_agda_lib AGDA_CATEGORIES_ROOT   agda-categories "$AGDA_CATEGORIES_ROOT"   agda_categories
       _register_agda_lib AGDA_TYPETOPOLOGY_ROOT TypeTopology     "$AGDA_TYPETOPOLOGY_ROOT" TypeTopology
+
+      # Every library is registered: move the registry into place in one step.
+      mv -f "$_anair_libraries_tmp" "$AGDA_DIR/libraries"
+      unset _anair_libraries_tmp _anair_defaults_tmp
+      echo "[agda] wrote $AGDA_DIR/libraries and $AGDA_DIR/defaults"
 
       # ==== Agda shell function ====
       # Override the Nix-wrapped `agda` binary.  The withPackages wrapper
