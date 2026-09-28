@@ -135,11 +135,19 @@ What the two commands give you is as follows:
    delete the Agda, the standard library it wraps, or the agda-algebras copy the
    registry names;
 +  after `flake.lock` moves, the same two commands, run from a checkout at the
-   new pin, point the links at the new store paths.
+   new pin, point the links at the new store paths; each checkout's registry
+   still names the old pin's paths until its shell writes it again (below),
+   and those paths are no longer rooted, so re-enter the shell there too.
 
 The registry itself, `agda/libraries`, is written by the dev shell, so enter a
-checkout's shell once (`nix develop`) before editing there; the registry names
-that checkout's own `agda-dojang`.
+checkout's shell once before editing there, and again whenever its
+`flake.lock` moves: the registry names that checkout's own `agda-dojang` and the
+pin's standard library and agda-algebras by their store paths.  The following
+writes it without leaving you in the shell:
+
+```sh
+nix develop .#backend --command true
+```
 
 ### 2. Point agda-mode at it
 
