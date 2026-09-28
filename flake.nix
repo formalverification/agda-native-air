@@ -45,6 +45,14 @@
 #     If the `.agda-lib` file is found, the library is registered and the
 #     agda() wrapper passes `--library <name>` automatically.
 #
+#   Editors started outside the shell:
+#     agda() is a shell function, so an editor never sees it.  The shells'
+#     own Agda is exposed as `packages.agda` for that case: build it to an out
+#     link (`nix build .#agda -o ~/.cache/agda-native-air/agda`) and run it
+#     with `--library-file=<checkout>/agda/libraries` and
+#     `AGDA_DIR=<checkout>/agda`.  CONTRIBUTING.md, "Editing Agda in Emacs",
+#     has the Emacs setup.
+#
 #
 # IMPORTANT NOTE ABOUT PYTHON WHEELS ON NIX
 #
@@ -519,7 +527,15 @@
     #   nix build .#agda-algebras && cachix push formalverification result
     # The Agda-capable devShells depend on it via mkAgdaShellSetup, so the
     # first `nix develop` after a pin bump builds (or downloads) it too.
+    #
+    # The pinned Agda 2.8.0 wrapped with the pinned standard library: the very
+    # `agda` the Agda-capable devShells put on PATH (agdaPinnedEnv below), so an
+    # editor started outside `nix develop` can run it from an out link that is
+    # also a garbage-collector root:
+    #   nix build .#agda -o ~/.cache/agda-native-air/agda
+    # See CONTRIBUTING.md, "Editing Agda in Emacs".
     packages = forAllSystems ({ pkgsAgda, ... }: {
+      agda          = mkAgdaEnv pkgsAgda;
       agda-algebras = mkAgdaAlgebrasPkg pkgsAgda;
     });
 
