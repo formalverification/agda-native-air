@@ -46,9 +46,18 @@ copyright: >-
 # pattern excludes everything, and each `!` line re-includes one thing.  The
 # nav below is then a real allowlist, and `validation` turns an included
 # page that is missing from the nav into a build failure rather than an
-# orphan.  [M6-3] (#171) curates the rest of docs/ page by page; each page it
-# publishes becomes a line here.  The patterns are gitignore syntax, matched
-# against each file's path under docs/, last match wins.
+# orphan.  The patterns are gitignore syntax, matched against each file's
+# path under docs/, last match wins.
+#
+# The pages were chosen one by one in [M6-3] (#171), whose PR names every
+# file left out and why; in short, what is published is what a reader of
+# the results needs (the guide, the design records and their notes, the
+# benchmark's taxonomy, the corpus cards and their schema, the architecture,
+# and one proposal as a note), and what is left is written for contributors
+# (the plan and workflow files, the runbooks, the imported feedback, the
+# field-report log that other repositories append to) or superseded.  A
+# published page's links to files left out are sent to GitHub at build time
+# by scripts/python/site/links_hook.py, so a page is published as written.
 docs_dir: docs
 exclude_docs: |
   *
@@ -57,6 +66,26 @@ exclude_docs: |
   !assets/**
   !stylesheets/
   !stylesheets/**
+  !reading-the-results.md
+  !adr/
+  !adr/0001-proof-search-on-agda-mcp.md
+  !adr/0002-agda-mcp.md
+  !agda-mcp/
+  !agda-mcp/agda-mcp-interaction-lane.md
+  !agda-mcp/agda-mcp-ask-agda-audit.md
+  !agda-mcp/agda-mcp-environment.md
+  !proof-search/
+  !proof-search/overview.md
+  !benchmarks/
+  !benchmarks/taxonomy.md
+  !corpora/
+  !corpora/agda-stdlib-v0.md
+  !corpora/agda-algebras-v0.1.md
+  !corpora/agda-algebras-v0.md
+  !representation.md
+  !architecture.md
+  !notes/
+  !notes/browser-ide-proposal.md
 
 # site/ is the demo page's own output directory (`make demo-site`), so the
 # whole site cannot use MkDocs' default of the same name.  It is written to
@@ -156,6 +185,16 @@ markdown_extensions:
   - footnotes
   - md_in_html
   - tables
+  # Anchors are Python-Markdown's, not GitHub's, and no slugger can make
+  # them agree here.  This repository puts two spaces after a section number
+  # (`### 4.5  The hard tier`), which GitHub keeps as two hyphens
+  # (`#45--the-hard-tier`); the toc extension (Markdown 3.10) collapses the
+  # heading's whitespace before it calls any slugify function, so the site's
+  # anchor is `#45-the-hard-tier` whichever slugger is set.  A published
+  # page that links another's anchor writes the site's form, and
+  # `validation.anchors` fails the build on one that does not resolve; a
+  # link into an unpublished page keeps GitHub's form, since it is rewritten
+  # to GitHub (scripts/python/site/links_hook.py).
   - toc:
       permalink: true
       permalink_title: Link to this section
@@ -193,6 +232,14 @@ plugins:
 # site with a dead Demo link cannot be published.  See the module's header.
 hooks:
   - scripts/python/site/demo_hook.py
+  # The figures of a page that sets `figures: true` in its front matter
+  # (the landing page) are read from the archived run reports at build
+  # time; the build fails on a figure it cannot read.  See the module.
+  - scripts/python/site/figures_hook.py
+  # A published page's relative link to a file the site does not publish
+  # becomes a link to that file on GitHub; a link to a file git does not
+  # track fails the build.  See the module.
+  - scripts/python/site/links_hook.py
 
 extra:
   # Where the built demo is, relative to this file.  The tests point it at a
@@ -200,7 +247,35 @@ extra:
   # passes its own DEMO_SITE_DIR the same way.
   demo_dir: !ENV [AIR_DEMO_DIR, "site"]
 
+# The nav names every published page (a published page it does not name
+# fails the build; see `validation`).  The three GitHub entries are links,
+# not copies: the run archive, the server's tool contracts, and the suite
+# are the record, which the site cites rather than restates, and a test
+# checks that each one names a path git tracks.
 nav:
   - Home: index.md
+  - Results:
+      - Reading the results: reading-the-results.md
+      - The run archive: https://github.com/formalverification/agda-native-air/tree/main/reports/agent-bench
+  - Design records:
+      - "ADR 0001: proof search": adr/0001-proof-search-on-agda-mcp.md
+      - "ADR 0002: agda-mcp": adr/0002-agda-mcp.md
+  - The server:
+      - The interaction lane: agda-mcp/agda-mcp-interaction-lane.md
+      - "Ask Agda: the audit": agda-mcp/agda-mcp-ask-agda-audit.md
+      - What it writes, which tree it checks: agda-mcp/agda-mcp-environment.md
+      - The tool contracts: https://github.com/formalverification/agda-native-air/blob/main/agda-mcp/README.md
+  - Proof search: proof-search/overview.md
+  - The benchmark:
+      - The difficulty taxonomy: benchmarks/taxonomy.md
+      - The obligations: https://github.com/formalverification/agda-native-air/tree/main/data/benchmarks
+  - The corpora:
+      - "agda-stdlib v0": corpora/agda-stdlib-v0.md
+      - "agda-algebras v0.1": corpora/agda-algebras-v0.1.md
+      - "agda-algebras v0": corpora/agda-algebras-v0.md
+      - The row schema: representation.md
+  - Architecture: architecture.md
+  - Notes:
+      - A browser workbench (proposal): notes/browser-ide-proposal.md
   # "Demo" follows, appended by scripts/python/site/demo_hook.py; see the
   # `hooks` entry above.
