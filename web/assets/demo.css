@@ -495,6 +495,16 @@ main { display: block; }
   border-bottom: none;
 }
 .numbers.small { min-width: 0; }
+/* A table whose columns come in pairs (an arm's solved and restated, the
+ * loop's two) carries a second header row.  A pair's name centers over its
+ * two columns, and the names under it align with their numbers. */
+.numbers thead th[scope="colgroup"] {
+  text-align: center;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.numbers thead tr + tr th { text-align: right; }
+/* The loop's columns are another instrument's, ruled off from the agents'. */
+.numbers .apart { border-left: 1px solid var(--rule); }
 
 .arms {
   display: grid;
