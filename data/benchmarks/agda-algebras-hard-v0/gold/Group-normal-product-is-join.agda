@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-normal-product-is-join
 -- Difficulty: non-obvious
--- Source: Classical.Structures.Group (Complexes, Conjugation, NormalSubgroupLattice has meets and no join)
 -- Import stratum: novel
--- Strategy: conjugate a product elementwise; for leastness use closure of P under products
 -- (ℓᵖ, the level of the comparison subgroup P, is a parameter so the statement stays in Set)
 --
 -- The complex product of two normal subgroups is normal, and it is their join: it contains both, and it lies inside every subgroup containing both.

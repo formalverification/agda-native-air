@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-third-iso-cosets-descend
 -- Difficulty: compositional
--- Source: group theory qualifying exams, the third isomorphism theorem in the setoid discipline (Classical.Structures.Group.Cosets)
 -- Import stratum: novel
--- Strategy: N ⊆ M gives the first inclusion; for the second, rewrite x' ⁻¹ ∙ y' through x ⁻¹ ∙ y using the two N-witnesses and closure of M
 --
 -- For normal subgroups N ⊆ M of G, the M-coset relation descends to G/N: it contains the N-coset relation, and it respects N-cosets in both arguments, which is the statement (G/N)/(M/N) ≅ G/M on the carrier G.
 --

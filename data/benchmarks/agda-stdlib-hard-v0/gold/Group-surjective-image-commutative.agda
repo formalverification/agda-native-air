@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-surjective-image-commutative
 -- Difficulty: compositional
--- Source: exam genre; Algebra.Morphism.Structures, Function.Definitions
 -- Import stratum: novel
--- Strategy: pull two elements of H back along the surjection and push commutativity through the homomorphism law
 --
 -- The image of a commutative group under a surjective homomorphism is commutative.
 --

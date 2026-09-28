@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-correspondence-over-N
 -- Difficulty: compositional
--- Source: group theory qualifying exams, the correspondence theorem in the setoid discipline (Classical.Structures.Group.Cosets)
 -- Import stratum: novel
--- Strategy: N ⊆ H and x ∼ᴺ y give y ≈ x ∙ (x ⁻¹ ∙ y) ∈ H; conversely ε ∼ᴺ n for n ∈ N and ε ∈ H
 --
 -- A subgroup H of G contains the normal subgroup N exactly when H respects N-cosets, that is, when H is a subgroup of G/N on the same carrier.
 --

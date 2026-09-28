@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-unique-involution-central
 -- Difficulty: non-obvious
--- Source: exam genre (Algebra.Bundles.Group)
 -- Import stratum: novel
--- Strategy: conjugate a by b; the conjugate is an involution, so it is ε or a; ε is refuted
 --
 -- A unique nontrivial involution is central: if a ∙ a ≈ ε, a is not ε, and every involution is ε or a, then b ∙ a ∙ b ⁻¹ ≈ a for every b.
 --

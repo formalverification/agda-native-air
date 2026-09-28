@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-inverse-homo-commute
 -- Difficulty: compositional
--- Source: exam genre (Algebra.Bundles.Group); Algebra.Properties.Group has ⁻¹-anti-homo-∙
 -- Import stratum: novel
--- Strategy: compare (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹ with ⁻¹-anti-homo-∙ and apply ⁻¹-involutive
 --
 -- If (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹ for all x and y, the group is commutative.
 --

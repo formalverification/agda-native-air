@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: hard-group-squares-commute
 -- Difficulty: non-obvious
--- Source: exam genre, group theory qualifying exams (Algebra.Bundles.Group)
 -- Import stratum: novel
--- Strategy: cancellation twice on the hypothesis at (x ∙ y) ∙ (x ∙ y)
 --
 -- If (x ∙ y)² ≈ x² ∙ y² for all x and y, the group is commutative.
 --

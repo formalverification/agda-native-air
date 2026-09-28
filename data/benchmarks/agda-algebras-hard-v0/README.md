@@ -34,6 +34,30 @@ define predicates and abbreviations before the hole (`H∩K` and its subgroup
 proof, `Ker`, and the private `𝑮`, `G`, `h`), which the judge freezes as text
 with the rest of the obligation outside the holed definition.
 
+The fixtures' headers carry no `Source:` or `Strategy:` line (issue [#219]):
+a subject's work file is a byte-for-byte copy of its obligation, and those
+lines named helpful lemmas and sketched the proof.  Each row's proof, in
+brief, is under "The golds"; its source, as its header named it, is as
+follows:
+
++  **10**.  Group theory qualifying exam 2000 Nov 10, problem 2
+   (`Classical.Structures.Group`).
++  **11**.  The same problem, `HK/K ≅ H/(H∩K)` as the coset spaces
+   (`Classical.Structures.Group`).
++  **12**.  The same problem, `HK/K ≅ H/(H∩K)` as the coset spaces
+   (`Classical.Structures.Group`).
++  **13**.  `Classical.Structures.Group` (`Complexes`, `Conjugation`;
+   `NormalSubgroupLattice` has meets and no join).
++  **14**.  `Classical.Structures.Group` with `Setoid.Homomorphisms` (kernels
+   exist only as congruences, `Setoid.Homomorphisms.Kernels`).
++  **16**.  Group theory qualifying exams, the third isomorphism theorem in the
+   setoid discipline (`Classical.Structures.Group.Cosets`).
++  **17**.  Group theory qualifying exams, the correspondence theorem in the
+   setoid discipline (`Classical.Structures.Group.Cosets`).
++  **18**.  `Setoid.Homomorphisms.Kernels` with `Setoid.Congruences.Lattice`
+   (the congruence order `_≑_`); `Setoid.Homomorphisms.Properties` has
+   `⊙-hom`.
+
 ## The golds
 
 Every row's gold is in: each checks under the judge's invocation with
@@ -210,3 +234,4 @@ Counts are hits, from the runs of 2026-09-26.
    together: 1 file, `Setoid.Subalgebras.Subdirect.Irreducible`.
 
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
