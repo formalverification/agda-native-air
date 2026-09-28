@@ -10,7 +10,7 @@ The sources of the libraries this module imports are on disk, in these directori
 
 {{sources}}
 
-The only file you may change is the one you were given, and the only directory you may write in is the one it is in.  Every path you name outside those directories, the corpus, and the directory your file is in is outside your protocol, so do not search the rest of the filesystem for sources.
+The only file you may change is the one you were given, and the only directory you may write in is the one it is in.  Every path you name outside those directories, the corpus, the directory your file is in, and the paths the command above already names is outside your protocol, so do not search the rest of the filesystem for sources.
 
 Rules.
 +  The module header line, every import line already in the file, and the type signature of the definition with the hole must remain byte-for-byte as they are.

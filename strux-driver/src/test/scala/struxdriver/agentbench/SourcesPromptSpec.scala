@@ -73,6 +73,9 @@ final class SourcesPromptSpec extends AnyFunSuite with Matchers {
       val rendered = Subject.render(t, Paths.get("/w/M.agda"), "m", "agda M.agda", Paths.get("/c.jsonl"), block)
       rendered should include ("    /nix/store/a/src   (agda-algebras)")
       rendered should include ("do not search the rest of the filesystem for sources")
+      // The judge's own command names the registry (`--library-file`), which is
+      // no source directory; the boundary must admit it (PR #200 review).
+      rendered should include ("the paths the command above already names")
       rendered should not include ("{{")
     }
     template("system-prompt-mcp.md") should not include ("{{sources}}")
