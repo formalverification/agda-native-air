@@ -186,6 +186,95 @@ Three mined candidates were read and dropped, and one gold was replaced:
    miner, which keeps the composite with the fewest needles per statement,
    found `HomImage-≅' IdHomImage A≅B`: `≅-sym` was not a necessary needle.
 
+## The gates
+
+Every row passed four gates before any agent saw it, as follows:
+
++  **Gate 1: the loop solves no row**.  Three sweeps of the proof-search
+   loop at k = 1 over the twelve rows, at the published knobs (beam 4, depth
+   6, 60 probes, script dedup, the peek on), run serially and detached from a
+   frozen class snapshot on 2026-09-28: the fixed space (`comp160-fixed-1`),
+   and retrieval from the agda-algebras corpus v0.1 with 8 lemmas per goal,
+   exclusion on and dependency expansion off, under the published scorer,
+   token overlap (`comp160-retrieval-1`), and under idf-unfold
+   (`comp160-retrieval-idf-1`).  No sweep solves a row or records an
+   anomaly, and no retrieval outcome excluded a lemma, so the exclusion
+   policy, which keys on the hole's name and the statement, touched no
+   needle.
+
+   | run                       | proposer                 | solved | exhausted | budget exceeded | anomalies | probes | wall     |
+   |---------------------------|--------------------------|--------|-----------|-----------------|-----------|--------|----------|
+   | `comp160-fixed-1`         | fixed space              | 0/12   | 12        | 0               | 0         | 29     | 4.6 min  |
+   | `comp160-retrieval-1`     | retrieval, token overlap | 0/12   | 5         | 7               | 0         | 433    | 37.0 min |
+   | `comp160-retrieval-idf-1` | retrieval, idf-unfold    | 0/12   | 12        | 0               | 0         | 57     | 6.7 min  |
+
+   Under token overlap the proposer never offered a needle, at any goal.
+   Under idf-unfold it offered one on nine rows, and the loop probed a
+   needle on five of them, as follows:
+
+   +  **The root lemma**, refused in both of the loop's forms (`_` and
+      `{!!}` for each explicit argument) with unsolved metas or constraints,
+      which is the implicit middle point at work: row 5's
+      `Lattice-Order.≤-trans`, row 8's `HomImage-≅'`, and row 12's `⊙-epi`.
+   +  **A feeder, refused the same way**: row 9's `simple⇒total`.
+   +  **A feeder, accepted as a refinement of the root goal**: row 4's
+      `subdirect→≤ {!!} {!!}`, whose family hole the loop filled with `𝒜`,
+      leaving a subdirect embedding into the `𝒜 i` that no hypothesis gives
+      (the hypothesis embeds into the `ℬ i`).
+
+   On rows 1, 2, 7, and 11 the offered needles were never probed.  Of the
+   519 probes in the three sweeps, 10 name a needle, all under idf-unfold,
+   and none names two.
+
++  **Gate 2: every gold checks**.  `make eval-benchmark` passes all 81 rows,
+   and `verify-gold.sh` gives each of the twelve golds `--safe` exit 0 and
+   the obligation's statement.
++  **Gate 3: needle recall at the root goal**.  The recall instrument
+   (`RetrievalRecall`) replays each row's root goal as the loop recorded it
+   and ranks the lemmas in scope under both scorers, exclusion on.  Every
+   needle is in its row's pool (33 of 33: import-reachable, though no
+   `using` list names it).
+
+   | scorer                    | needles @8 | needles @32 | MRR   | rows, every needle @8 | rows, every needle @32 |
+   |---------------------------|------------|-------------|-------|-----------------------|------------------------|
+   | token overlap (published) | 0/33       | 0/33        | 0.006 | 0/12                  | 0/12                   |
+   | idf-unfold                | 14/33      | 21/33       | 0.236 | 2/12                  | 7/12                   |
+
+   The published scorer puts no needle in the top 32 of any pool, and the
+   token-overlap sweep never proposed one at any goal.  The goal the loop
+   records is normalized (row 1's `⊧` and row 3's `⊆` appear unfolded),
+   while the needles' types keep the defined names.  idf-unfold, which
+   unfolds a candidate's defined names through the corpus bodies (three
+   steps) and matches the hypotheses against its premises, ranks 14 of the
+   33 needles in the top 8, and every needle of rows 2 and 8; rows 6 and 10,
+   in the group-congruence vocabulary, rank their best needles at 103 and
+   99.  The instrument flags every row `CONTEXT-MISMATCH`, which is
+   expected: the recorded context holds the module telescope's variables
+   (and, on rows 3, 7, and 10, the implicit binders Agda introduces at the
+   hole), which the fallback reconstruction from the clause lacks; the
+   ranking uses the recorded context.
+
+   Each needle's rank in its row's pool, token overlap / idf-unfold
+   (`comp160-recall-1`, replaying `comp160-retrieval-1`'s goals), is as
+   follows:
+
+   | #  | pool | ranks                                                                          |
+   |----|------|--------------------------------------------------------------------------------|
+   | 1  | 396  | `⊧-S-invar` 376/4, `Soundness.sound` 396/1, `mon→≤` 328/31                      |
+   | 2  | 440  | `⊧-H-invar` 371/1, `⊧-P-invar` 372/3, `HomImage-≅` 366/5                        |
+   | 3  | 324  | `⊆-trans` 251/33, `IsMonolith.mono-least` 258/17, `⋂-lower` 285/58              |
+   | 4  | 324  | `≤-trans` 303/12, `subdirect→≤` 227/1, `⨅-≤` 80/2                               |
+   | 5  | 129  | `Lattice-Order.≤-trans` 37/6, `Lattice-Order.∨-least` 61/23                     |
+   | 6  | 237  | `≈ⁿ-trans` 151/103, `normalOf-cong` 120/161, `≑-trans` 177/209, `normalOf∘congruenceOf` 57/142 |
+   | 7  | 319  | `⊆-trans` 256/35, `∧-lowerˡ` 261/77, `⋁-upper` 285/14                           |
+   | 8  | 346  | `HomImage-≅'` 293/2, `IdHomImage` 180/3                                         |
+   | 9  | 304  | `≑-trans` 245/48, `≑-sym` 234/43, `simple⇒total` 289/6                          |
+   | 10 | 237  | `≤ⁿ-trans` 149/99, `normalOf-mono` 114/162                                      |
+   | 11 | 354  | `⊧-S-invar` 327/2, `⊧-P-invar` 309/1, `subdirect→≤` 307/17                      |
+   | 12 | 333  | `⊙-epi` 268/4, `πker` 284/14                                                    |
+
++  **Gate 4: novelty**.  All twelve absent; see "The novelty check" below.
+
 ## The novelty check
 
 As on the hard tiers (`../README.md`, "The novelty check"): `search_by_type`
