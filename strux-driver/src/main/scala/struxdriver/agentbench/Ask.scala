@@ -175,6 +175,42 @@ object Extractor {
         .map(_.toAbsolutePath.normalize).distinct
     }
 
+  /** Every registered library's source roots with the library's name, in the
+    * registry's order: the `name:` of each `.agda-lib` the registry names
+    * (the file's stem when it has none) beside each of its `include:` roots.
+    * The shell arms' prompts list these (issue #189), so a subject knows where
+    * the sources it may read are without searching the filesystem for them;
+    * each is absolute and normalized, the form the read roots take.
+    */
+  def namedIncludesFromRegistry(librariesFile: Path): IO[Vector[(String, Path)]] =
+    IO.blocking {
+      Files.readAllLines(librariesFile, StandardCharsets.UTF_8).asScala.toVector.map(_.trim).filter(_.nonEmpty).flatMap { libLine =>
+        val lib = Paths.get(libLine)
+        if (!Files.isRegularFile(lib)) Vector.empty
+        else {
+          val lines = Files.readAllLines(lib, StandardCharsets.UTF_8).asScala.toVector.map(_.trim)
+          val name  = lines.find(_.toLowerCase.startsWith("name:")).map(_.drop("name:".length).trim).filter(_.nonEmpty)
+                        .getOrElse(lib.getFileName.toString.stripSuffix(".agda-lib"))
+          lines.filter(_.toLowerCase.startsWith("include:"))
+            .flatMap(_.drop("include:".length).trim.split("\\s+").toVector.filter(_.nonEmpty))
+            .map(d => name -> lib.getParent.resolve(d).toAbsolutePath.normalize)
+        }
+      }
+    }
+
+  /** Agda's own primitive modules (`Agda.Builtin.*`, `Agda.Primitive`), which
+    * belong to no registered library: `lib/prim` under the directory
+    * `agda --print-agda-data-dir` names.  None when `agda` is not on the path
+    * or the directory is missing, so a run without it keeps the roots it had.
+    * Three #162 subjects searched `/` for `Agda.Builtin.Nat` for want of it.
+    */
+  def agdaPrimDir: IO[Option[Path]] =
+    IO.blocking {
+      scala.util.Try(scala.sys.process.Process(Seq("agda", "--print-agda-data-dir")).!!.trim).toOption
+        .filter(_.nonEmpty).map(d => Paths.get(d).resolve("lib").resolve("prim").toAbsolutePath.normalize)
+        .filter(Files.isDirectory(_))
+    }
+
   /** Every registered library's source roots: each line of the registry names
     * a `.agda-lib`, whose `include:` line lists roots relative to it.
     */

@@ -69,15 +69,20 @@ object AgentBench extends IOApp {
       // subject exploring one starts at its root) with its source roots, and
       // the registry directory itself, whose `libraries` file the judge's
       // `agda` command names, so a shell subject running that command is
-      // inside the roots.  One set, given to every arm's file tools
+      // inside the roots; and Agda's own primitive modules, which belong to
+      // no library (issue #189).  One set, given to every arm's file tools
       // (`--add-dir`) and used by the shell audit as its read roots, and
       // recorded in the protocol, so a toolchain bump that moves them is a
-      // different protocol.
+      // different protocol.  The shell arms' prompts name the source roots
+      // among them (`sources`), so a subject need not search for them.
       agdaDir   = GoldVerifier.agdaDirOf(cfg.projectRoot)
       registry  = java.nio.file.Paths.get(agdaDir).resolve("libraries")
       includes <- Extractor.includesFromRegistry(registry)
       libRoots <- Extractor.libraryRootsFromRegistry(registry)
-      readRoots = (libRoots ++ includes :+ java.nio.file.Paths.get(agdaDir)).map(_.toAbsolutePath.normalize).distinct
+      named    <- Extractor.namedIncludesFromRegistry(registry)
+      prim     <- Extractor.agdaPrimDir
+      readRoots = (libRoots ++ includes ++ prim.toVector :+ java.nio.file.Paths.get(agdaDir)).map(_.toAbsolutePath.normalize).distinct
+      sources   = Subject.sourcesBlock(named, prim)
       protocol  = if (cfg.rejudge) Json.obj() else Protocol.of(cfg, version, sysP, userT, inputs, readRoots)
       // A run id is one protocol: a fresh run records its own before anything
       // spawns, and a resumed one must be the protocol on record.
@@ -102,7 +107,7 @@ object AgentBench extends IOApp {
       extractor = Extractor(cfg.agdaJsonBin.getOrElse(throw new IllegalStateException("agda-json-bin required")), includes, agdaDir, cfg.serverTimeout.seconds)
       driven   <- McpClient.resource(server).use { client =>
                     if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor, readRoots)
-                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots)
+                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots, sources)
                   }
       corpora   = previous.flatMap(_.hcursor.downField("corpora").focus).getOrElse(fresh)
       _        <- Report.write(cfg, entries, driven, corpora, protocol, previous.flatMap(_.hcursor.downField("config").focus))

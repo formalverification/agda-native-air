@@ -6,7 +6,11 @@ Your tools are an MCP server named agda, the Bash tool, and the Read and Edit to
 
 Agda's interactive protocol is available too, as `agda --interaction-json`.  The extracted corpus of this module's library is loaded in the server and is also a JSON Lines file at {{corpus}}, one row per definition, readable with grep.
 
-The sources of the libraries this module imports are on disk and you may read them.  The only file you may change is the one you were given, and the only directory you may write in is the one it is in.  Every path you name outside those libraries and that directory is outside your protocol.
+The sources of the libraries this module imports are on disk, in these directories, and you may read them there:
+
+{{sources}}
+
+The only file you may change is the one you were given, and the only directory you may write in is the one it is in.  Every path you name outside those directories, the corpus, the directory your file is in, and the paths the command above already names is outside your protocol, so do not search the rest of the filesystem for sources.
 
 Rules.
 +  The module header line, every import line already in the file, and the type signature of the definition with the hole must remain byte-for-byte as they are.

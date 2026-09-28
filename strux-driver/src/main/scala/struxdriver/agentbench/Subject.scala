@@ -182,16 +182,26 @@ object Subject {
 
   /** Render a prompt template for one row.  Both prompts go through this, so
     * the shell arms can state the row's own `agda` command and corpus path
-    * (issue #162) while the archive keeps the templates themselves; a
-    * placeholder a template does not use is simply not there to replace.
+    * (issue #162) and the directories their library sources are in (issue
+    * #189) while the archive keeps the templates themselves; a placeholder a
+    * template does not use is simply not there to replace.
     */
-  def render(template: String, workFile: Path, hole: String, agdaCommand: String, corpus: Path): String =
+  def render(template: String, workFile: Path, hole: String, agdaCommand: String, corpus: Path, sources: String): String =
     template
       .replace("{{path}}", workFile.toString)
       .replace("{{hole}}", hole)
       .replace("{{agda}}", agdaCommand)
       .replace("{{corpus}}", corpus.toString)
+      .replace("{{sources}}", sources)
       .trim
+
+  /** The `{{sources}}` block: one indented line per source root, the library
+    * named after it, then Agda's own primitive modules when the run found
+    * them.  Every directory listed is one of the run's read roots.
+    */
+  def sourcesBlock(named: Vector[(String, Path)], prim: Option[Path]): String =
+    (named.map { case (name, dir) => s"    $dir   ($name)" } ++
+      prim.toVector.map(dir => s"    $dir   (Agda's own Agda.Builtin and Agda.Primitive)")).mkString("\n")
 
   /** The fixed flag set, in one place, so the report can quote it; the arm
     * decides the built-in tools and the pre-approvals, and nothing else.
