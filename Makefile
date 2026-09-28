@@ -430,6 +430,7 @@ help:
 	@echo "  make corpus-stats                - Summary statistics -> stats.json + stats.md"
 	@echo "  make corpus-mcp-smoke            - Drive agda-mcp's search tools against the assembled corpus"
 	@echo "  make corpus-stdlib / -nix        - Extract + package the pinned Nix-store agda-stdlib corpus (issue 123)"
+	@echo "  make mine-compositions           - Mine composition-tier candidates from the agda-algebras corpus (issue 160)"
 	@echo "  make test-scripts-python         - pytest scripts/python/tests"
 	@echo "  make etl-test                    - Run all Scala ETL tests (ml-pipeline/etl)"
 	@echo "  make etl-test-preprocess-agda    - Run ETL smoke test (etl.PreprocessAgdaSpec)"
@@ -1026,6 +1027,25 @@ CORPUS_SMOKE_NAME_PATTERN ?= ∘-hom
 corpus-mcp-smoke:
 	@echo ">> [corpus-mcp-smoke] agda-mcp search tools against $(CORPUS_JSONL)"
 	@$(call run_backend,"$(PROJECT_ROOT)/scripts/corpus-mcp-smoke.sh" --corpus "$(CORPUS_JSONL)" --type-pattern "$(CORPUS_SMOKE_TYPE_PATTERN)" --name-pattern "$(CORPUS_SMOKE_NAME_PATTERN)")
+
+# The composition tier's miner (issue #160): chain the agda-algebras corpus by
+# types into candidate statements whose proof strings several corpus lemmas
+# together, check each against the whole corpus (no lemma states it, the
+# loop's moves cannot prove it, every needle is necessary and nameable), and
+# write the survivors, ranked, as JSONL.  The library source is the one the
+# corpus was extracted from; by default the agda-algebras line of the registry
+# the dev shell writes ($(AGDA_DIR)/libraries), with its `include: src`.
+COMPOSITIONS_CORPUS      ?= data/corpora/agda-algebras/v0.1/corpus.jsonl
+COMPOSITIONS_LIBRARY_SRC ?= $(patsubst %/agda-algebras.agda-lib,%/src,$(shell grep -s '/agda-algebras.agda-lib$$' "$(AGDA_DIR)/libraries" | head -1))
+COMPOSITIONS_OUT         ?= data/benchmarks/reports/compositions/candidates.jsonl
+COMPOSITIONS_ARGS        ?=
+
+.PHONY: mine-compositions
+mine-compositions:
+	@test -n "$(COMPOSITIONS_LIBRARY_SRC)" || { echo "ERROR: set COMPOSITIONS_LIBRARY_SRC to agda-algebras' src/, or run inside nix develop .#backend"; exit 1; }
+	@echo ">> [mine-compositions] $(COMPOSITIONS_CORPUS) (library source $(COMPOSITIONS_LIBRARY_SRC)) -> $(COMPOSITIONS_OUT)"
+	@$(CORPUS_PY) scripts/python/corpus/mine_compositions.py --corpus "$(COMPOSITIONS_CORPUS)" \
+	  --library-src "$(COMPOSITIONS_LIBRARY_SRC)" --out "$(COMPOSITIONS_OUT)" $(COMPOSITIONS_ARGS)
 
 # ---- Python script suites (scripts/python/tests) ----
 # pytest is not in the system python3; enter `nix develop .#mlPipeline` (or the
