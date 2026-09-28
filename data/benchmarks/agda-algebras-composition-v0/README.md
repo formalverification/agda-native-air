@@ -144,6 +144,31 @@ Agda cannot infer written out:
 A subject that finds every needle still has to supply these; that is part of
 what the tier measures.
 
+The proofs, in words, are as follows:
+
++  **1**.  Soundness makes the model satisfy the identity; the monomorphism
+   makes `𝑨` a subalgebra of it; identities pass to subalgebras.
++  **2**.  The product models the identity; an isomorphic copy of a
+   homomorphic image of the product is a homomorphic image of it; identities
+   pass to homomorphic images.
++  **3**.  The monolith lies below the nonzero meet, and the meet below each
+   member.
++  **4**.  A subdirect embedding makes `𝑩` a subalgebra of the product of the
+   `ℬ i`, which is a subalgebra of the product of the `𝒜 i`; compose the two.
++  **5**.  `y ∨ z ≤ w` since both joinands are, and `x ≤ y ∨ z`; compose.
++  **6**.  `θ ≑ congruenceOf 𝑵`, so
+   `normalOf θ ≈ⁿ normalOf (congruenceOf 𝑵) ≈ⁿ 𝑵`.
++  **7**.  `f i ∧ φ` lies below `f i`, which lies below the join of the family.
++  **8**.  `𝑨` is a homomorphic image of itself, and `𝑨 ≅ 𝑩` carries the
+   source of that image across to `𝑩`.
++  **9**.  `θ` relates a distinct pair, so `θ` is total in a simple algebra;
+   `φ` is equivalent to `θ`.
++  **10**.  `normalOf` is monotone, so `normalOf θ ≤ⁿ normalOf φ ≤ⁿ 𝑵`.
++  **11**.  The product of the factors models the identity; `𝑩` is a
+   subalgebra of the product; identities pass to subalgebras.
++  **12**.  The canonical epimorphism onto the kernel quotient, followed by
+   the given epimorphism.
+
 ## Needles and the ground truth
 
 A `needle:` tag names one lemma of the gold, by the corpus's `prettyQname`,
@@ -162,6 +187,16 @@ Each fixture opens every needle's defining module with a single-line
 `open import M using ( … )` (the form the loop's scope reader parses), listing
 the statement's vocabulary and at most a decoy, never a needle.  The gold
 names each needle qualified.
+
+A subject's work file is a byte-for-byte copy of the obligation
+(`Scaffold.stage`), comments included, so this tier's headers carry no
+`Source:` or `Strategy:` line, unlike the other tiers' fixtures: here the
+first would name every needle and the second would sketch the chain,
+middle point included (row 3's read "the monolith lies below the nonzero
+meet, and the meet below each member").  The loop reads only a fixture's
+`open import` lines, so the gates above were unaffected by the change.  The
+needles are in the index and in the table above, and the proofs, in words,
+are under "The golds".
 
 ## Dropped candidates
 

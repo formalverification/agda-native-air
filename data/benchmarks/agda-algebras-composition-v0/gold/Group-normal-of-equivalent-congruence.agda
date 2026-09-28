@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-group-normal-of-equivalent-congruence
 -- Difficulty: non-obvious
--- Source: Classical.Structures.Group.Congruences (GroupCongruences.≈ⁿ-trans, normalOf-cong, normalOf∘congruenceOf), Setoid.Congruences.Lattice (≑-trans)
 -- Import stratum: composition
--- Strategy: θ ≑ congruenceOf N, so normalOf θ ≈ⁿ normalOf (congruenceOf N) ≈ⁿ N
 --
 -- The normal subgroup of a congruence equivalent (through φ) to the congruence of a normal subgroup N is N.
 --

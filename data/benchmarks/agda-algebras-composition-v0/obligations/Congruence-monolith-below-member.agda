@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-congruence-monolith-below-member
 -- Difficulty: non-obvious
--- Source: Setoid.Congruences.Monolith (IsMonolith.mono-least, ⋂-lower), Setoid.Congruences.Lattice (⊆-trans)
 -- Import stratum: composition
--- Strategy: the monolith lies below the nonzero meet, and the meet below each member
 --
 -- The monolith of an algebra lies below every member of a family of congruences whose meet is nonzero.
 --

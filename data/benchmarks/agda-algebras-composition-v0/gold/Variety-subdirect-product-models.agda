@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-variety-subdirect-product-models
 -- Difficulty: non-obvious
--- Source: Setoid.Varieties.Properties (⊧-S-invar, ⊧-P-invar), Setoid.Subalgebras.Subdirect.Basic (subdirect→≤)
 -- Import stratum: composition
--- Strategy: the product of the factors models the identity; B is a subalgebra of the product; identities pass to subalgebras
 --
 -- An identity true in every factor holds in any algebra subdirectly embedded in their product.
 --

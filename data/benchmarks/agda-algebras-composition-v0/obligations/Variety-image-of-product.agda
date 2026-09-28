@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-variety-image-of-product
 -- Difficulty: non-obvious
--- Source: Setoid.Varieties.Properties (⊧-H-invar, ⊧-P-invar), Setoid.Homomorphisms.HomomorphicImages (HomImage-≅)
 -- Import stratum: composition
--- Strategy: the product models the identity; an isomorphic copy of a homomorphic image of the product is a homomorphic image of it; identities pass to homomorphic images
 --
 -- An identity true in every factor holds in every isomorphic copy of a homomorphic image of the product.
 --

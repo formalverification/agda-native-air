@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-homomorphism-epi-through-kernel
 -- Difficulty: compositional
--- Source: Setoid.Homomorphisms.Kernels (πker), Setoid.Homomorphisms.Properties (⊙-epi)
 -- Import stratum: composition
--- Strategy: the canonical epimorphism onto the kernel quotient, followed by the given epimorphism
 --
 -- An epimorphism out of the kernel quotient of h yields an epimorphism out of the domain of h.
 --

@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-subalgebra-subdirect-into-product
 -- Difficulty: compositional
--- Source: Setoid.Subalgebras.Subdirect.Basic (subdirect→≤), Setoid.Subalgebras.Properties (⨅-≤, ≤-trans)
 -- Import stratum: composition
--- Strategy: a subdirect embedding makes B a subalgebra of the product of the Bᵢ, which is a subalgebra of the product of the Aᵢ; compose the two
 --
 -- An algebra subdirectly embedded in a product of subalgebras of the Aᵢ is a subalgebra of the product of the Aᵢ.
 --

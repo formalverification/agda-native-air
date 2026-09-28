@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-lattice-below-join-bound
 -- Difficulty: compositional
--- Source: Classical.Properties.Lattice (Lattice-Order.≤-trans, Lattice-Order.∨-least)
 -- Import stratum: composition
--- Strategy: y ∨ z ≤ w since both joinands are, and x ≤ y ∨ z; compose
 --
 -- In a lattice, anything below a join lies below every common upper bound of the joinands.
 --

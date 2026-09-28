@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-variety-subalgebra-of-model
 -- Difficulty: non-obvious
--- Source: Setoid.Varieties.Properties (⊧-S-invar), Setoid.Varieties.SoundAndComplete (Soundness.sound), Setoid.Subalgebras.Basic (mon→≤)
 -- Import stratum: composition
--- Strategy: soundness makes the model satisfy the identity; the monomorphism makes A a subalgebra of it; identities pass to subalgebras
 --
 -- An algebra that embeds in a model of E satisfies every identity derivable from E.
 --

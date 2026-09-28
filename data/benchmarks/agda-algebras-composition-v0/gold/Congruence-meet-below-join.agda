@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-congruence-meet-below-join
 -- Difficulty: compositional
--- Source: Setoid.Congruences.Lattice (∧-lowerˡ, ⊆-trans), Setoid.Congruences.CompleteLattice (⋁-upper)
 -- Import stratum: composition
--- Strategy: f i ∧ φ lies below f i, which lies below the join of the family
 --
 -- In the congruence lattice, the meet of a family member with any congruence lies below the join of the family.
 --

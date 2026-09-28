@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-congruence-simple-equivalent-total
 -- Difficulty: compositional
--- Source: Setoid.Congruences.Simple (simple⇒total), Setoid.Congruences.Lattice (≑-sym, ≑-trans)
 -- Import stratum: composition
--- Strategy: θ relates a distinct pair, so θ is total in a simple algebra; φ is equivalent to θ
 --
 -- In a simple algebra, a congruence equivalent to one that relates two distinct points is the total congruence.
 --

@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-group-normal-of-smaller-congruence
 -- Difficulty: compositional
--- Source: Classical.Structures.Group.Congruences (GroupCongruences.normalOf-mono, GroupCongruences.≤ⁿ-trans)
 -- Import stratum: composition
--- Strategy: normalOf is monotone, so normalOf θ ≤ⁿ normalOf φ ≤ⁿ N
 --
 -- If θ ⊆ φ and the normal subgroup of φ lies in N, the normal subgroup of θ lies in N.
 --

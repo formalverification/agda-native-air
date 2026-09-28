@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: comp-homomorphism-isomorph-is-image
 -- Difficulty: compositional
--- Source: Setoid.Homomorphisms.HomomorphicImages (HomImage-≅', IdHomImage)
 -- Import stratum: composition
--- Strategy: A is a homomorphic image of itself, and A ≅ B carries the source of that image across to B
 --
 -- An algebra isomorphic to B is a homomorphic image of B.
 --
