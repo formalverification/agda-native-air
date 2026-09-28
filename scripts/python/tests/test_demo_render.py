@@ -809,3 +809,37 @@ def test_the_quiet_sessions_are_not_said_to_ask_agda_nothing(built) -> None:
     assert "no Agda query at all" not in html
     assert "asking Agda nothing before its final check (read the file, " \
         "edit it, check it)" in html
+
+
+def test_data_written_under_another_schema_is_refused(tmp_path) -> None:
+    # Copilot's third review of PR #217: the renderer rendered whatever data
+    # it was handed.  A numbers file in the shape written before Issue #215
+    # (no control, no archive size) made a page that said "110 sessions
+    # ended at a cap or a crash" and "0 files"; a file of another schema is
+    # now refused, naming `make demo-data` as the remedy.
+    data = tmp_path / "data"
+    assert build_data(REPO, data).is_ok
+    numbers_file = data / "numbers.json"
+    numbers = json.loads(numbers_file.read_text(encoding="utf-8"))
+    stale = {key: value for key, value in numbers.items()
+             if key not in ("control", "archive")}
+    numbers_file.write_text(
+        json.dumps({**stale, "schema": "agda-native-air.demo.numbers.v0"}),
+        encoding="utf-8")
+    outcome = build_site(REPO, data, tmp_path / "site")
+    assert outcome.is_err
+    assert "numbers.json is schema 'agda-native-air.demo.numbers.v0'" in \
+        str(outcome.unwrap_err())
+    assert "make demo-data" in str(outcome.unwrap_err())
+
+    numbers_file.write_text(json.dumps(numbers), encoding="utf-8")
+    first = json.loads((data / "manifest.json")
+                       .read_text(encoding="utf-8"))["replays"][0]["file"]
+    replay = json.loads((data / first).read_text(encoding="utf-8"))
+    (data / first).write_text(
+        json.dumps({**replay, "schema": "agda-native-air.demo.replay.v0"}),
+        encoding="utf-8")
+    outcome = build_site(REPO, data, tmp_path / "site")
+    assert outcome.is_err
+    assert f"{first} is schema 'agda-native-air.demo.replay.v0'" in \
+        str(outcome.unwrap_err())

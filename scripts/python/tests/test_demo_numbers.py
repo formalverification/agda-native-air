@@ -56,6 +56,7 @@ from scripts.python.demo.numbers import (
     loop_columns,
     main,
     per_tool,
+    report_problems,
     rows_from_reports,
     validate,
 )
@@ -560,3 +561,89 @@ def test_a_copy_of_the_adr_with_the_loop_total_moved_fails(tmp_path: Path,
     assert main(["--repo", str(root)]) == 1
     assert "total / loop retrieval: the strata's cells sum to 14" in \
         capsys.readouterr().err
+
+
+# ------------------------- a report's fields are required (round three)
+
+def _reports_edited(root: Path, edit: Edit) -> Path:
+    """What `make demo-check` reads, the five reports passed through `edit`
+    and the committed ADR, under a scratch repository root."""
+    for run in RUNS:
+        (root / ARCHIVE_REL / run).mkdir(parents=True)
+        report = json.loads(
+            (ARCHIVE / run / "report.json").read_text(encoding="utf-8"))
+        (root / ARCHIVE_REL / run / "report.json").write_text(
+            json.dumps(edit(run, report)), encoding="utf-8")
+    (root / ADR_REL).parent.mkdir(parents=True)
+    (root / ADR_REL).write_text(ADR.read_text(encoding="utf-8"),
+                                encoding="utf-8")
+    return root
+
+
+def _dropped(runs, *path: str) -> Edit:
+    """An edit that deletes one field from the named runs' reports."""
+    def edit(run: str, report: Dict[str, Any]) -> Dict[str, Any]:
+        if run not in runs:
+            return report
+        copy = json.loads(json.dumps(report))
+        node = copy
+        for key in path[:-1]:
+            node = node[key]
+        del node[path[-1]]
+        return copy
+    return edit
+
+
+def _refusal(root: Path) -> str:
+    outcome = validate(root / ARCHIVE_REL, root / ADR_REL)
+    assert outcome.is_err, "a report missing a field the page reads passed"
+    return str(outcome.unwrap_err())
+
+
+def test_a_report_missing_a_compared_field_is_refused(tmp_path: Path) -> None:
+    # Copilot's third review of PR #217: with `restated` gone from the stdlib
+    # stratum of all four control reports, the reader defaulted it to zero,
+    # the ADR says zero there, and `demo-check` passed a zero no run recorded.
+    control = {run for _, run in CONTROL}
+    message = _refusal(_reports_edited(
+        tmp_path, _dropped(control, "perStratum", "agda-stdlib", "restated")))
+    assert f"{SHELL_RUN}/report.json: no perStratum.agda-stdlib.restated" \
+        in message
+
+
+def test_the_agent_tables_reports_are_held_to_the_same_fields(
+        tmp_path: Path) -> None:
+    message = _refusal(_reports_edited(
+        tmp_path,
+        _dropped({SONNET_RUN}, "perStratum", "agda-stdlib", "restated")))
+    assert f"{SONNET_RUN}/report.json: no perStratum.agda-stdlib.restated" \
+        in message
+
+
+def test_a_field_the_page_prints_but_never_compares_is_required(
+        tmp_path: Path) -> None:
+    # No ADR cell holds an arm's anomaly count, so no comparison would catch
+    # its absence; the page would have said "neither arm produced an anomaly".
+    message = _refusal(_reports_edited(
+        tmp_path, _dropped({OPUS_RUN}, "totals", "anomalies")))
+    assert f"{OPUS_RUN}/report.json: no totals.anomalies" in message
+
+
+def test_a_count_of_the_wrong_kind_is_refused(tmp_path: Path) -> None:
+    def edit(run: str, report: Dict[str, Any]) -> Dict[str, Any]:
+        if run != MCP_RUN:
+            return report
+        copy = json.loads(json.dumps(report))
+        copy["totals"]["solved"] = True
+        copy["outcomes"][0]["turns"] = "4"
+        return copy
+    message = _refusal(_reports_edited(tmp_path, edit))
+    assert f"{MCP_RUN}/report.json: totals.solved is True" in message
+    assert "outcome 0 (stdlib-nat-plus-identity-l): turns is '4'" in message
+
+
+def test_every_committed_report_has_every_field_the_page_reads() -> None:
+    for run in RUNS:
+        report = json.loads(
+            (ARCHIVE / run / "report.json").read_text(encoding="utf-8"))
+        assert report_problems(run, report) == (), run

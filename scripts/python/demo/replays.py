@@ -61,7 +61,9 @@ from scripts.python.utils.pipeline_types import (
     Result,
 )
 
-REPLAY_SCHEMA = "agda-native-air.demo.replay.v0"
+#: The shape of a replay file.  v1 (Issue #215) added the verdict's
+#: `original` reading; `build_site` refuses a file of any other shape.
+REPLAY_SCHEMA = "agda-native-air.demo.replay.v1"
 
 
 @dataclass(frozen=True)

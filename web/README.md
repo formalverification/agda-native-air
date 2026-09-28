@@ -35,7 +35,9 @@ distinct on purpose, since MkDocs' own default output directory is also
    [`reports/agent-bench/`](../reports/agent-bench) and writes one small JSON
    per replay, plus the numbers, to `data/demo/`.
 +  `make demo-site` renders `site/index.html` from those and copies this
-   directory's files to `site/assets/`.
+   directory's files to `site/assets/`.  It refuses a data file written
+   under another schema than the renderer's, which is what a `data/demo/`
+   left by an older generator holds; `make demo-data` rewrites it.
 +  `make demo-check` regenerates the page's two § 9 tables from the five
    run reports and compares them with ADR 0001 § 9, reading nothing else
    and writing nothing: the check `make demo-data` makes before it writes,
@@ -44,8 +46,9 @@ distinct on purpose, since MkDocs' own default output directory is also
 
 Both outputs are gitignored.  The build reads only files of this repository,
 makes no network request, and needs nothing but Python 3: no Agda, no server,
-no model call.  It refuses to write a page whose two § 9 tables (the
-archived arms' and the control's) disagree with
+no model call.  It refuses a run report that lacks a field the page reads,
+and it refuses to write a page whose two § 9 tables (the archived arms' and
+the control's) disagree with
 [ADR 0001](../docs/adr/0001-proof-search-on-agda-mcp.md) § 9, or one carrying
 an absolute path from the machine the sweep ran on.  The page's other
 figures (by tier, by tool, per arm) are regenerated from the same reports

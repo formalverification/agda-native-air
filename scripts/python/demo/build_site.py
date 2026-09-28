@@ -26,7 +26,9 @@ Usage:
 Design Principles:
   +  Refuse rather than publish something stale.  The build reads the
      manifest `make demo-data` wrote and fails if a replay it lists is
-     missing, so a half-written data directory cannot become a page.
+     missing, so a half-written data directory cannot become a page; and it
+     fails on a replay or numbers file written under another schema, so a
+     data directory older than the renderer cannot either.
   +  Assets are copied, not inlined.  A reader can view the stylesheet and
      the script, and a browser can cache them; the *content* is inline, which
      is what makes the page complete without JavaScript.
@@ -40,6 +42,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
 from scripts.python.demo import render
+from scripts.python.demo.numbers import SCHEMA as NUMBERS_SCHEMA
+from scripts.python.demo.replays import REPLAY_SCHEMA
 from scripts.python.utils.file_ops import (
     cp_file,
     ensure_dir_exists,
@@ -61,8 +65,29 @@ DEFAULT_DATA = Path("data/demo")
 DEFAULT_OUT = Path("site")
 
 
+def current(path: Path, schema: str) -> Result[Dict[str, Any], PipelineError]:
+    """A data file, if it has the shape this renderer was written for.
+
+    The renderer reads the fields a file of its own schema carries, and a
+    field that is not there renders as a blank or a default: a data
+    directory written before Issue #215 made a page that said "110 sessions
+    ended at a cap or a crash" and "0 files".  So a file of another shape is
+    refused, and `make demo-data` is the remedy the error names.
+    """
+    def check(loaded: Dict[str, Any]) -> Result[Dict[str, Any], PipelineError]:
+        found = loaded.get("schema")
+        if found != schema:
+            return Result.err(PipelineError(
+                ErrorType.VALIDATION_ERROR,
+                f"{path} is schema {found!r} and this page is rendered from "
+                f"{schema!r}; run `make demo-data`"))
+        return Result.ok(loaded)
+    return load_json(path).and_then(check)
+
+
 def read_data(data: Path) -> Result[Dict[str, Any], PipelineError]:
-    """The manifest and everything it lists, decoded."""
+    """The manifest and everything it lists, decoded, each file of the
+    schema this renderer reads."""
 
     def with_manifest(manifest: Dict[str, Any]) -> Result[Dict[str, Any], PipelineError]:
         listed = manifest.get("replays")
@@ -71,9 +96,10 @@ def read_data(data: Path) -> Result[Dict[str, Any], PipelineError]:
                 ErrorType.VALIDATION_ERROR,
                 f"{data}/manifest.json lists no replays; run `make demo-data`"))
         replays = sequence_results(
-            [load_json(data / str(entry.get("file"))) for entry in listed])
+            [current(data / str(entry.get("file")), REPLAY_SCHEMA)
+             for entry in listed])
         return replays.and_then(
-            lambda loaded: load_json(data / "numbers.json").map(
+            lambda loaded: current(data / "numbers.json", NUMBERS_SCHEMA).map(
                 lambda numbers: {"manifest": manifest,
                                  "replays": loaded,
                                  "numbers": numbers}))

@@ -46,6 +46,12 @@ Description: The demo page's numbers, regenerated from the archived run
   reason: it grows with every run, and a figure typed into the page went
   stale within a week.
 
+  Every field of a report that the page reads is declared in
+  `REPORT_FIELDS` (and `OUTCOME_FIELDS`) and required when the reports are
+  loaded, before anything reads them.  The readers below default an absent
+  field to zero or to nothing, so without that check a report missing a
+  field would have printed a zero no run recorded.
+
 Usage:
 
     PYTHONPATH=. python3 -m scripts.python.demo.numbers [--repo .]
@@ -86,6 +92,11 @@ from scripts.python.utils.pipeline_types import (
 #: repository root.
 ARCHIVE = Path("reports/agent-bench")
 ADR = Path("docs/adr/0001-proof-search-on-agda-mcp.md")
+
+#: The shape of the numbers file this module writes.  v1 (Issue #215) added
+#: the control, the archive's size, and the arms' days, tools, and readings;
+#: `build_site` refuses a file of any other shape rather than render it.
+SCHEMA = "agda-native-air.demo.numbers.v1"
 
 #: The run ids of the two arms the page replays, and the model each ran.
 SONNET_RUN = "agent-sonnet5-1"
@@ -700,11 +711,118 @@ class Tables:
     control: Tuple[ControlRow, ...]
 
 
+#: The kinds of value a report field may hold.  A count is an `int` and never
+#: a `bool`, which Python would otherwise accept as one.
+Kind = Tuple[type, ...]
+COUNT: Kind = (int,)
+NUMBER: Kind = (int, float)
+TEXT: Kind = (str,)
+TABLE: Kind = (dict,)
+FLAG: Kind = (bool,)
+
+#: Every field of a run's `report.json` that the page reads, and what it must
+#: hold.  A report that lacks one is refused before anything reads it: the
+#: readers below would otherwise default it (to zero, to nothing), and a
+#: default standing in for a field the run never recorded is how a page comes
+#: to print a zero, or "neither arm produced an anomaly", that no run measured.
+REPORT_FIELDS: Tuple[Tuple[str, Kind], ...] = (
+    ("config.model", TEXT), ("config.claudeVersion", TEXT),
+    ("config.arm", TEXT), ("config.maxTurns", COUNT),
+    ("config.wallCapSec", COUNT), ("config.maxBudgetUsd", NUMBER),
+    ("config.parallelism", COUNT),
+    ("totals.total", COUNT), ("totals.solved", COUNT),
+    ("totals.restated", COUNT), ("totals.anomalies", COUNT),
+    ("totals.turns", COUNT), ("totals.toolCalls", COUNT),
+    ("totals.costUsd", NUMBER), ("totals.gates", TABLE),
+    ("perTool", TABLE), ("perVerdictVia", TABLE), ("perShell", TABLE),
+) + tuple(
+    (f"perStratum.{name}.{field}", kind) for name in STRATA
+    for field, kind in (("total", COUNT), ("solved", COUNT),
+                        ("restated", COUNT),
+                        ("solvedOriginalInView", COUNT + (type(None),)))
+) + tuple(
+    (f"perTier.{tier}.{field}", COUNT) for tier in TIERS
+    for field in ("total", "solved"))
+
+#: The same, for each row of a report's `outcomes`, and for a row's
+#: `original` block when it has one (Issue #188).
+OUTCOME_FIELDS: Tuple[Tuple[str, Kind], ...] = (
+    ("benchmarkId", TEXT), ("stratum", TEXT), ("solved", FLAG),
+    ("terminal", TEXT), ("turns", COUNT), ("toolCalls", TABLE),
+    ("transcriptPath", TEXT), ("isolation.agdaToolsPresented", (list,)),
+    ("original", (dict, type(None))),
+)
+ORIGINAL_FIELDS: Tuple[Tuple[str, Kind], ...] = (
+    ("inView", FLAG), ("reads", COUNT), ("refusedReads", COUNT))
+
+#: Marks a field that is not there, as distinct from one that holds `None`.
+_ABSENT = object()
+
+
+def _field(node: Any, path: str) -> Any:
+    """The value at a dotted path (stratum names hold no dot), or _ABSENT."""
+    for key in path.split("."):
+        if not isinstance(node, dict) or key not in node:
+            return _ABSENT
+        node = node[key]
+    return node
+
+
+def _holds(value: Any, kind: Kind) -> bool:
+    return isinstance(value, kind) and not (isinstance(value, bool)
+                                            and bool not in kind)
+
+
+def _missing(where: str, node: Any,
+             fields: Sequence[Tuple[str, Kind]]) -> List[str]:
+    """Each field of `fields` that `node` lacks or holds a wrong value in."""
+    values = [(path, _field(node, path), kind) for path, kind in fields]
+    return [f"{where}: no {path}" if value is _ABSENT
+            else f"{where}: {path} is {value!r}"
+            for path, value, kind in values
+            if value is _ABSENT or not _holds(value, kind)]
+
+
+def report_problems(run: str, report: Dict[str, Any]) -> Tuple[str, ...]:
+    """Every field the page reads that a run's report lacks or holds wrongly."""
+    where = f"{run}/report.json"
+    outcomes = report.get("outcomes")
+    if not isinstance(outcomes, list) or not outcomes:
+        return tuple(_missing(where, report, REPORT_FIELDS)
+                     + [f"{where}: no outcomes"])
+    rows = [(f"{where}, outcome {at} ({_field(o, 'benchmarkId')})", o)
+            for at, o in enumerate(outcomes)]
+    return tuple(
+        _missing(where, report, REPORT_FIELDS)
+        + [p for row, o in rows for p in _missing(row, o, OUTCOME_FIELDS)]
+        + [p for row, o in rows
+           if isinstance(_field(o, "original"), dict)
+           for p in _missing(row + ", original", o["original"],
+                             ORIGINAL_FIELDS)])
+
+
+def _well_formed(reports: Dict[str, Dict[str, Any]]
+                 ) -> Result[Dict[str, Dict[str, Any]], PipelineError]:
+    """The reports, or every field any of them lacks, listed at once."""
+    problems = [problem for run, report in reports.items()
+                for problem in report_problems(run, report)]
+    if problems:
+        shown = problems[:12] + (
+            [f"and {len(problems) - 12} more"] if len(problems) > 12 else [])
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            "the run reports lack what the page reads:\n  "
+            + "\n  ".join(shown)))
+    return Result.ok(reports)
+
+
 def load_reports(archive: Path) -> Result[Dict[str, Dict[str, Any]], PipelineError]:
-    """Every run's report, by run id."""
+    """Every run's report, by run id, each holding every field the page
+    reads (`REPORT_FIELDS`), or every field that one of them lacks."""
     return (sequence_results([load_json(archive / run / "report.json")
                               for run in RUNS])
-            .map(lambda loaded: dict(zip(RUNS, loaded))))
+            .map(lambda loaded: dict(zip(RUNS, loaded)))
+            .and_then(_well_formed))
 
 
 def read_record(adr: Path) -> Result[Record, PipelineError]:
@@ -797,7 +915,7 @@ def _assemble(reports: Mapping[str, Dict[str, Any]], tables: Tables,
     """The numbers block the page is rendered from."""
     sonnet, opus = reports[SONNET_RUN], reports[OPUS_RUN]
     return {
-        "schema": "agda-native-air.demo.numbers.v0",
+        "schema": SCHEMA,
         "checkedAgainst": f"{ADR} § 9",
         "archive": {"path": str(ARCHIVE), **size},
         "rows": [row.as_dict() for row in tables.rows],

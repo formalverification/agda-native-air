@@ -86,6 +86,10 @@ Description: Render the demo site's page from the data `make demo-data`
 Design Principles:
   +  Pure.  `page` takes decoded data and returns a string; nothing here
      reads or writes a file.
+  +  Trust the data's shape, which is checked upstream.  `numbers` refuses a
+     report missing a field the page reads, and `build_site` refuses a data
+     file of another schema, so the blanks, `?`, and `or 0` below are guards
+     for a malformed page, never figures a reader is shown.
   +  Escape once, at the edge.  Every value reaching the HTML goes through
      `_esc`; the only unescaped strings are the literals in this file.
   +  Say where a number came from.  The page says which files its figures
