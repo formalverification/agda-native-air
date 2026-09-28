@@ -387,6 +387,36 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
       Fate.Excluded("name:Setoid.Functions.Inverses.IsInRange→IsInImage"))
   }
 
+  test("evaluate: a needle is ranked in the pool with exclusion as configured, kept apart from the targets (#160)") {
+    // A composition row: no original, no target, two needles.  Each needle's
+    // fate is the target machinery's, reported under its own role.
+    val composed = entry.copy(tags = Vector("stratum:composition",
+      "needle:Setoid.Functions.Inverses.Inv",
+      "needle:Setoid.Homomorphisms.Basic.𝒾𝒹"))
+    RetrievalRecall.hasGroundTruth(composed) shouldBe true
+    RetrievalRecall.hasGroundTruth(entry.copy(tags = Vector("stratum:novel"))) shouldBe false
+    val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, composed, recorded, fixtureSource).unsafeRunSync()
+    fr.targets shouldBe empty
+    fr.restates shouldBe empty
+    fr.needles.map(t => (t.qname, t.role, t.status, t.rank, t.detail)) shouldBe Vector(
+      ("Setoid.Functions.Inverses.Inv", "needle", "ranked",       Some(2), None),
+      ("Setoid.Homomorphisms.Basic.𝒾𝒹", "needle", "out-of-scope", None,    Some("Setoid.Homomorphisms.Basic")))
+    // A needle that the exclusion rules remove is reported as excluded, with the rule.
+    val clashing = composed.copy(hole = "Inv")
+    RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, clashing, recorded, fixtureSource).unsafeRunSync()
+      .needles.head.fate shouldBe Fate.Excluded("name:Setoid.Functions.Inverses.Inv")
+  }
+
+  test("json: a row without needles has no needle key, so the other strata's reports are unchanged (#160)") {
+    val plain = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, entry, recorded, fixtureSource).unsafeRunSync()
+    plain.needles shouldBe empty
+    plain.toJson.hcursor.downField("needles").focus shouldBe None
+    val composed = entry.copy(tags = Vector("stratum:composition", "needle:Setoid.Functions.Inverses.Inv"))
+    val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, composed, recorded, fixtureSource).unsafeRunSync()
+    fr.toJson.hcursor.downField("needles").downN(0).get[String]("role") shouldBe Right("needle")
+    fr.toJson.hcursor.downField("needles").downN(0).get[Int]("rank") shouldBe Right(2)
+  }
+
   test("evaluate: a recorded context is used as is, and the reconstruction is checked against it") {
     val live = RetrievalRecall.RecordedGoal("Image F ∋ b",
       Some(Vector("α", "ρᵃ", "β", "ρᵇ", "𝑨", "𝑩", "F", "b", "w").map(n => CtxEntry(n, "", None))))

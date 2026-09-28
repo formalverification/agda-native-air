@@ -47,6 +47,18 @@
   *  folded into a recall miss without comment.  Recall is quoted both over all
   *  recorded targets and over the reachable ones.
   *
+  *  `needle:<prettyQname>` (issue #160) names one of the several corpus
+  *  lemmas a composition row's gold strings together, none of which closes
+  *  the goal alone.  A needle is measured exactly as a target is, in the pool
+  *  with exclusion as configured, but it is kept apart: a composition row has
+  *  no original, and its needles are the pieces a searcher must find, so
+  *  "every needle in the top k" is the row's own question.  The needle
+  *  columns appear only where some fixture carries a `needle:` tag, so a
+  *  report over the other strata is unchanged byte for byte.  Only the ROOT
+  *  goal is replayed: a needle that closes an intermediate goal is ranked
+  *  here against the root goal's display, which is the only goal the loop
+  *  recorded (the intermediate goals are what the loop cannot reach).
+  *
   *  The goal context
   *  ----------------
   *  `Queries.goalTokens` drops the context's names from the goal display, so
@@ -411,7 +423,8 @@ final case class FixtureRecall(
   pool:             RetrievalPool.Built,   // exclusion as configured
   targets:          Vector[TargetStatus],
   restates:         Vector[TargetStatus],  // measured in the unexcluded pool
-  top:              Vector[(String, Double)]
+  top:              Vector[(String, Double)],
+  needles:          Vector[TargetStatus] = Vector.empty  // issue #160; the pool with exclusion as configured
 ) {
   /** Order and multiplicity included: the proposer spells saturated tuples
     * over the context in order, so a permuted reconstruction is a drift
@@ -441,6 +454,9 @@ final case class FixtureRecall(
     ),
     "targets"  -> Json.arr(targets.map(_.toJson): _*),
     "restates" -> Json.arr(restates.map(_.toJson): _*),
+    // Present only on a row that carries needles, so the other rows' JSON is
+    // byte-identical to what it was before issue #160.
+    "needles"  -> Option.when(needles.nonEmpty)(Json.arr(needles.map(_.toJson): _*)).asJson,
     "top"      -> Json.arr(top.map { case (q, s) => Json.obj("qname" -> q.asJson, "score" -> s.asJson) }: _*)
   ).dropNullValues
 }
@@ -491,7 +507,7 @@ object RetrievalRecall extends IOApp {
 
   private val usage: String =
     """usage: runMain struxdriver.search.RetrievalRecall
-      |    --index PATH           benchmark-index.jsonl (the `target:` / `restates:` tags are the ground truth)
+      |    --index PATH           benchmark-index.jsonl (the `target:` / `restates:` / `needle:` tags are the ground truth)
       |    --corpus PATH          agda-strux corpus JSONL, loaded in-process (no server)
       |    --report PATH          a loop run's report.json: the goal displays (and contexts, when recorded)
       |    --project-root PATH    repo root: the index's obligation paths resolve here
@@ -616,6 +632,14 @@ object RetrievalRecall extends IOApp {
     */
   def untypedContext(ctx: Option[Vector[CtxEntry]]): Boolean = ctx.forall(_.exists(_.tpe.trim.isEmpty))
 
+  /** The ground-truth tags a row can carry: `target:` and `restates:` on the
+    * mined tiers, `needle:` on the composition tier (issue #160).  A row with
+    * none of them has nothing to rank and is skipped by name.
+    */
+  val GroundTruthTags: Vector[String] = Vector("target:", "restates:", "needle:")
+
+  def hasGroundTruth(e: IndexEntry): Boolean = GroundTruthTags.exists(p => e.taggedValues(p).nonEmpty)
+
   /** Statuses of the ground-truth names against one built pool. */
   def statuses(names: Vector[String], role: String, corpus: InMemoryCorpus, scope: ImportScope,
                built: RetrievalPool.Built, score: SearchHit => Double): Vector[TargetStatus] =
@@ -674,7 +698,8 @@ object RetrievalRecall extends IOApp {
         pool           = built,
         targets        = statuses(entry.taggedValues("target:"), "target", corpus, scope, built, score),
         restates       = statuses(entry.taggedValues("restates:"), "restates", corpus, scope, builtOff, scoreOff),
-        top            = built.ranked.take(cfg.top).map(h => (h.prettyQname, score(h)))
+        top            = built.ranked.take(cfg.top).map(h => (h.prettyQname, score(h))),
+        needles        = statuses(entry.taggedValues("needle:"), "needle", corpus, scope, built, score)
       )
     }
   }
@@ -685,7 +710,7 @@ object RetrievalRecall extends IOApp {
       report   <- IO.blocking(new String(Files.readAllBytes(cfg.report), StandardCharsets.UTF_8))
                     .flatMap(s => IO.fromEither(io.circe.parser.parse(s).leftMap(e => new RuntimeException(s"bad report: ${e.message}"))))
       goals     = recordedGoals(report)
-      withGT    = entries0.filter(e => e.taggedValues("target:").nonEmpty || e.taggedValues("restates:").nonEmpty)
+      withGT    = entries0.filter(RetrievalRecall.hasGroundTruth)
       skippedNoGT   = entries0.filterNot(withGT.contains).map(_.id)
       skippedNoGoal = withGT.filterNot(e => goals.contains(e.id)).map(_.id)
       entries   = withGT.filter(e => goals.contains(e.id))
@@ -721,14 +746,24 @@ object RetrievalRecall extends IOApp {
   private def summaries(fs: Vector[FixtureRecall], ks: Vector[Int]): Json = {
     def block(sel: Vector[FixtureRecall]): Json = {
       val withTargets = sel.filter(_.targets.nonEmpty)
-      Json.obj(
+      val withNeedles = sel.filter(_.needles.nonEmpty)
+      // The needle keys join a block only when one of its fixtures carries a
+      // needle, so a summary over the other strata is unchanged (issue #160).
+      val needleKeys =
+        if (withNeedles.isEmpty) Vector.empty
+        else Vector(
+          "fixturesWithNeedles" -> withNeedles.size.asJson,
+          "needles"             -> RecallSummary.of(sel.flatMap(_.needles), ks).toJson(ks),
+          "fixturesAllNeedlesAt" -> Json.obj(ks.map(k =>
+            k.toString -> withNeedles.count(_.needles.forall(_.hitAt(k))).asJson): _*))
+      Json.fromFields(Vector(
         "fixtures"          -> sel.size.asJson,
         "fixturesWithTargets" -> withTargets.size.asJson,
         "targets"           -> RecallSummary.of(sel.flatMap(_.targets), ks).toJson(ks),
         "fixturesAllTargetsAt" -> Json.obj(ks.map(k =>
           k.toString -> withTargets.count(_.targets.forall(_.hitAt(k))).asJson): _*),
         "restates"          -> RecallSummary.of(sel.flatMap(_.restates), ks).toJson(ks)
-      )
+      ) ++ needleKeys)
     }
     Json.obj(
       "overall"    -> block(fs),
@@ -793,8 +828,23 @@ object RetrievalRecall extends IOApp {
     val header =
       s"| stratum | fixtures | targets reachable | ${ks.map(k => s"targets @$k").mkString(" | ")} | MRR | ${ks.map(k => s"fixtures all @$k").mkString(" | ")} | ${ks.map(k => s"originals @$k (excl. off)").mkString(" | ")} |\n" +
       s"|---|---|---|${ks.map(_ => "---").mkString("|")}|---|${ks.map(_ => "---").mkString("|")}|${ks.map(_ => "---").mkString("|")}|"
+    // The needle table (issue #160), printed only when some fixture has needles.
+    def needleRow(label: String, sel: Vector[FixtureRecall]): String = {
+      val wn = sel.filter(_.needles.nonEmpty)
+      val n  = RecallSummary.of(wn.flatMap(_.needles), ks)
+      val nCols = ks.map(k => s"${n.hitsAt(k)}/${n.names} (${pct(n.hitsAt(k), n.names)})").mkString(" | ")
+      val fCols = ks.map(k => s"${wn.count(_.needles.forall(_.hitAt(k)))}/${wn.size}").mkString(" | ")
+      s"| $label | ${wn.size} | ${n.reachable}/${n.names} | $nCols | ${f"${n.mrr}%.3f"} | $fCols |"
+    }
+    val needleHeader =
+      s"| stratum | fixtures with needles | needles reachable | ${ks.map(k => s"needles @$k").mkString(" | ")} | MRR | ${ks.map(k => s"fixtures all needles @$k").mkString(" | ")} |\n" +
+      s"|---|---|---|${ks.map(_ => "---").mkString("|")}|---|${ks.map(_ => "---").mkString("|")}|"
     val tables = perScorer.map { case (sc, fs) =>
       val strata = strataOf(fs).map(s => row(s, fs.filter(_.stratum == s)))
+      val needled = strataOf(fs).filter(s => fs.exists(f => f.stratum == s && f.needles.nonEmpty))
+      val needleTable =
+        if (needled.isEmpty) ""
+        else "\n" + needleHeader + "\n" + needled.map(s => needleRow(s, fs.filter(_.stratum == s))).mkString("\n") + "\n"
       val details = fs.map { f =>
         def one(t: TargetStatus) = t.fate match {
           case Fate.Ranked(at, _) => s"${t.qname} #$at"
@@ -804,10 +854,11 @@ object RetrievalRecall extends IOApp {
                    (if (f.degraded) " DEGRADED(no hypothesis types on record)" else "")
         s"  ${f.benchmarkId} [${f.stratum}] pool=${f.pool.ranked.size} ctx=${f.contextSource}$mism\n" +
           f.targets.map(t => s"      target   ${one(t)}").mkString("\n") + (if (f.targets.isEmpty) "      target   (none recorded)" else "") + "\n" +
-          f.restates.map(t => s"      restates ${one(t)}").mkString("\n")
+          f.restates.map(t => s"      restates ${one(t)}").mkString("\n") +
+          f.needles.map(t => s"\n      needle   ${one(t)}").mkString
       }
       s"\n== scorer ${sc.name} (targets in the pool with exclusion ${if (cfg.excludeTarget) "on" else "off"}; originals in the unexcluded pool) ==\n" +
-        header + "\n" + (strata :+ row("overall", fs)).mkString("\n") + "\n" + details.mkString("\n")
+        header + "\n" + (strata :+ row("overall", fs)).mkString("\n") + "\n" + needleTable + details.mkString("\n")
     }
     val skipped =
       (if (skippedNoGT.nonEmpty) s"\nskipped, no ground-truth tags: ${skippedNoGT.mkString(", ")}" else "") +
