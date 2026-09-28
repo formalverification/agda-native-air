@@ -456,7 +456,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     entry.taggedValues("target:").size shouldBe 4
   }
 
-  test("the committed index: every mined agda-algebras row carries one restates: tag; the frozen stdlib rows and the hard tier carry none") {
+  test("the committed index: every mined agda-algebras row carries one restates: tag; the frozen stdlib rows and the hard tiers carry none, and the hard tiers hold exactly their rows") {
     val index = Paths.get(sys.props("user.dir")).getParent.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.exists(index), s"index not found at $index")
     val rows  = Scaffold.readIndex(index, None).unsafeRunSync()
@@ -465,8 +465,18 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     alg.size shouldBe 21
     alg.foreach(e => e.taggedValues("restates:").size shouldBe 1)
     alg.count(_.taggedValues("target:").nonEmpty) shouldBe 18
-    // The hard tier (issue #189) has no original by construction, so no ground truth to rank.
-    novel.size should be > 0
+    // The hard tiers (issue #189) have no original by construction, so no ground
+    // truth to rank.  Their rows are pinned by id, so a row lost from the index
+    // fails here rather than passing unnoticed (PR #197 review).
+    novel.map(_.id).toSet shouldBe Set(
+      "hard-group-intersection-normal-in-subgroup", "hard-group-second-iso-cosets-agree",
+      "hard-group-second-iso-cosets-onto", "hard-group-normal-product-is-join",
+      "hard-group-kernel-normal-subgroup", "hard-group-third-iso-cosets-descend",
+      "hard-group-correspondence-over-N", "hard-algebra-kernel-of-injective-composite")
+    rows.filter(_.stratum == "agda-stdlib/novel").map(_.id).toSet shouldBe Set(
+      "hard-group-squares-commute", "hard-group-involutive-commute", "hard-group-inverse-homo-commute",
+      "hard-group-unique-involution-central", "hard-group-inversion-homo-iff-commutative",
+      "hard-group-surjective-image-commutative")
     (rows.filter(_.source == "agda-stdlib").filterNot(_.id.startsWith("haystack-")) ++ novel)
       .foreach(e => e.tags.exists(t => t.startsWith("restates:") || t.startsWith("target:")) shouldBe false)
   }
