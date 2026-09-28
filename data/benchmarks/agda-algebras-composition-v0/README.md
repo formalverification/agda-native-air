@@ -190,10 +190,11 @@ names each needle qualified.
 
 A subject's work file is a byte-for-byte copy of the obligation
 (`Scaffold.stage`), comments included, so this tier's headers carry no
-`Source:` or `Strategy:` line, unlike the other tiers' fixtures: here the
-first would name every needle and the second would sketch the chain,
-middle point included (row 3's read "the monolith lies below the nonzero
-meet, and the meet below each member").  The loop reads only a fixture's
+`Source:` or `Strategy:` line, the two hint lines of the suite's original
+fixture template, which issue [#219] removes everywhere.  Here the first
+would name every needle and the second would sketch the chain, middle point
+included (row 3's read "the monolith lies below the nonzero meet, and the
+meet below each member").  The loop reads only a fixture's
 `open import` lines, so the gates above were unaffected by the change.  The
 needles are in the index and in the table above, and the proofs, in words,
 are under "The golds".
@@ -473,3 +474,4 @@ Counts are hits, from the run of 2026-09-28.
 +  `grep` over the agda-algebras sources for `πker`, `⊙-epi` together: 0 files.
 
 [#160]: https://github.com/formalverification/agda-native-air/issues/160
+[#219]: https://github.com/formalverification/agda-native-air/issues/219

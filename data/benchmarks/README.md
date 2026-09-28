@@ -90,11 +90,11 @@ its conclusion does not mention, as in a transitivity law, so the proof-search
 loop cannot use it: the loop's refinement leaves that argument unsolved, and
 `fill_hole` refuses the candidate.  No corpus lemma proves a statement alone,
 and no needle can be replaced by another lemma.  The rows carry `stratum:composition` and one `needle:` tag per
-lemma, and report as `agda-algebras/composition`.  Unlike the other tiers'
-fixtures, its headers carry no `Source:` or `Strategy:` line: a subject reads
-the obligation as written, and those lines would name the needles.  The
-tier's README records the mining, the golds, the candidates dropped on reading
-the source, and each row's novelty check.
+lemma, and report as `agda-algebras/composition`.  Its headers carry no
+`Source:` or `Strategy:` line: a subject reads the obligation as written, and
+those lines would name the needles.  The tier's README records the mining, the
+golds, the candidates dropped on reading the source, and each row's novelty
+check.
 
 | `agda-algebras-composition` | Count | Examples                                                   |
 |-----------------------------|-------|------------------------------------------------------------|
