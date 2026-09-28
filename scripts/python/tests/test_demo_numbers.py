@@ -482,3 +482,81 @@ def test_demo_check_fails_on_a_wrong_cell(tmp_path: Path, capsys) -> None:
                          text.replace(cell, "**47 solved, 5 restated**"))
     assert main(["--repo", str(root)]) == 1
     assert f"total / mcp ({MCP_RUN})" in capsys.readouterr().err
+
+
+# ------------------------- reading the ADR strictly (PR #217, round two)
+
+ATTRIBUTION_HEAD = ("| stratum | n | archive `mcp` | `shell` | `mcp` | "
+                    "`both` |\n|---|---|---|---|---|---|\n")
+CONTROL_STDLIB = ("| agda-stdlib | 22 | 21 solved | 20 solved | 21 solved | "
+                  "20 solved |")
+AGENT_STDLIB = "| agda-stdlib | 22 | 6 | 6 | 21 | 0 | 22 | 0 |"
+
+
+def test_a_row_with_a_missing_cell_is_named_not_dropped() -> None:
+    # A lenient reader ended the table at the short row and reported every
+    # row after it missing; the row itself is the problem, and is named.
+    row = ("| agda-algebras/using | 11 | 9 solved, 2 restated | 9 solved | "
+           "9 solved, 1 restated | 11 solved |")
+    assert MARKDOWN.count(row) == 1
+    short = row.replace("| 9 solved, 1 restated |", "|")
+    message = str(control_table(MARKDOWN.replace(row, short)).unwrap_err())
+    assert "5 cells where the header has 6" in message
+    assert "agda-algebras/using" in message
+
+
+def test_a_repeated_row_is_refused_in_either_table() -> None:
+    # A lenient reader let the second row replace the first, so a wrong row
+    # followed by a right one passed.
+    for read, row, wrong in (
+            (control_table, CONTROL_STDLIB,
+             CONTROL_STDLIB.replace("| 20 solved |", "| 19 solved |", 1)),
+            (adr_table, AGENT_STDLIB,
+             AGENT_STDLIB.replace("| 21 |", "| 20 |"))):
+        assert MARKDOWN.count(row) == 1 and wrong != row
+        outcome = read(MARKDOWN.replace(row, wrong + "\n" + row))
+        assert outcome.is_err
+        assert "a second row for 'agda-stdlib'" in str(outcome.unwrap_err())
+
+
+def test_a_table_without_its_delimiter_row_is_refused() -> None:
+    assert MARKDOWN.count(ATTRIBUTION_HEAD) == 1
+    header_only = ATTRIBUTION_HEAD.split("\n")[0] + "\n"
+    outcome = control_table(MARKDOWN.replace(ATTRIBUTION_HEAD, header_only))
+    assert outcome.is_err
+    assert "not the table's delimiter row" in str(outcome.unwrap_err())
+
+
+def test_a_non_numeric_agent_cell_is_refused_not_raised() -> None:
+    # The loop's columns are read as integers; a cell that is not one used
+    # to end the build in a ValueError traceback.
+    broken = MARKDOWN.replace("| agda-stdlib | 22 | 6 | 6 |",
+                              "| agda-stdlib | 22 | 6 | six |")
+    outcome = adr_table(broken)
+    assert outcome.is_err
+    assert "agda-stdlib / loop retrieval: 'six' is not a count" in \
+        str(outcome.unwrap_err())
+
+
+def test_the_loop_total_must_be_the_sum_of_its_strata() -> None:
+    moved = MARKDOWN.replace("| **total** | 55 | 8 | 14 |",
+                             "| **total** | 55 | 8 | 15 |")
+    table = adr_table(moved).unwrap()
+    rows = rows_from_reports(SONNET, OPUS, loop_columns(table))
+    assert compare(rows, table) == (
+        "total / loop retrieval: the strata's cells sum to 14, "
+        "ADR 0001 § 9's total says 15",)
+
+
+def test_a_copy_of_the_adr_with_the_loop_total_moved_fails(tmp_path: Path,
+                                                          capsys) -> None:
+    # Copilot's Balanced review of PR #217: moving only the ADR's loop total
+    # (14 to 15) passed `make demo-check`, while the page printed 14.
+    text = ADR.read_text(encoding="utf-8")
+    total = "| **total** | 55 | 8 | 14 | **46** | 8 | **54** | 1 |"
+    assert text.count(total) == 1, "the row this test edits has moved"
+    root = _reports_only(tmp_path,
+                         text.replace(total, total.replace("| 14 |", "| 15 |")))
+    assert main(["--repo", str(root)]) == 1
+    assert "total / loop retrieval: the strata's cells sum to 14" in \
+        capsys.readouterr().err

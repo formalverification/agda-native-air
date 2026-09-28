@@ -26,7 +26,9 @@ Description: The demo page's numbers, regenerated from the archived run
   a different instrument with no model in it and its own final check, and
   they have no machine-readable source in this repository.  They are taken
   from the ADR, which is their record, and the page says so where it prints
-  them.
+  them.  The one check they admit is the ADR's own arithmetic: the page
+  prints their sums as its total row, so the ADR's total row must equal the
+  sums of its strata, or the two would disagree unnoticed.
 
   The attribution table's cells are prose, `9 solved, 2 restated`, where the
   agent table's are one number each.  `control_table` reads them with one
@@ -143,6 +145,9 @@ TALLY = re.compile(r"^(\d+) solved(?:, (\d+) restated)?$")
 #: A Markdown table row: the cells between the outer pipes.
 ROW = re.compile(r"^\s*\|(.+)\|\s*$")
 
+#: One cell of a table's delimiter row, the line under its header.
+DELIMITER = re.compile(r"^:?-{3,}:?$")
+
 #: How the harness names the server's tools in a transcript.
 AGDA_PREFIX = "mcp__agda__"
 
@@ -255,31 +260,72 @@ def _table(markdown: str, header: Tuple[str, ...],
     """The table headed `header`, as a map from its first cell to the rest.
 
     The cells exclude the first, so they line up with `header` from index 1.
+    The table is every row between its delimiter line and the first line
+    that is not a table row, and it is read strictly: a missing delimiter, a
+    row with the wrong number of cells, and a first cell that repeats are
+    each an error naming the line.  A lenient reader would end the table at
+    a short row, so every row after it would be reported missing, and would
+    let a repeated row silently replace the one before it.
     """
     lines = markdown.splitlines()
-    for index, line in enumerate(lines):
-        cells = _cells(line)
-        if cells is None or _header(cells) != header:
-            continue
-        table: Dict[str, List[str]] = {}
-        for body in lines[index + 2:]:
-            row = _cells(body)
-            if row is None or len(row) != len(header):
-                break
-            table[row[0].lower()] = row[1:]
-        if not table:
-            return Result.err(PipelineError(
-                ErrorType.PARSING_ERROR,
-                f"ADR 0001's {name} has a header and no rows"))
-        return Result.ok(table)
-    return Result.err(PipelineError(
-        ErrorType.PARSING_ERROR,
-        "ADR 0001 has no table headed " + " | ".join(header)))
+    found = next((index for index, line in enumerate(lines)
+                  if (_cells(line) is not None
+                      and _header(_cells(line) or []) == header)), None)
+    if found is None:
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            "ADR 0001 has no table headed " + " | ".join(header)))
+
+    def problem(number: int, why: str) -> Result[Dict[str, List[str]],
+                                                 PipelineError]:
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            f"ADR 0001's {name}, line {number}: {why}"))
+
+    delimiter = _cells(lines[found + 1]) if found + 1 < len(lines) else None
+    if delimiter is None or not all(DELIMITER.match(cell)
+                                    for cell in delimiter):
+        return problem(found + 2, "the line under the header is not the "
+                                  "table's delimiter row")
+    table: Dict[str, List[str]] = {}
+    for number, body in enumerate(lines[found + 2:], start=found + 3):
+        row = _cells(body)
+        if row is None:
+            break
+        if len(row) != len(header):
+            return problem(number, f"{len(row)} cells where the header has "
+                                   f"{len(header)}: {body.strip()}")
+        if row[0].lower() in table:
+            return problem(number, f"a second row for {row[0]!r}")
+        table[row[0].lower()] = row[1:]
+    if not table:
+        return problem(found + 1, "a header and no rows")
+    return Result.ok(table)
+
+
+def _counts(table: Dict[str, List[str]]
+            ) -> Result[Dict[str, List[str]], PipelineError]:
+    """The agent table, if every cell after the stratum is a count.
+
+    The loop's columns are read from here as integers, so a cell that is
+    not one would otherwise end the build in a traceback rather than a
+    problem naming it.
+    """
+    bad = next(((stratum, ADR_HEADER[at + 1], cell)
+                for stratum, cells in table.items()
+                for at, cell in enumerate(cells) if not cell.isdigit()), None)
+    if bad is not None:
+        stratum, column, cell = bad
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            f"ADR 0001's agent table, {stratum} / {column}: {cell!r} is not "
+            "a count"))
+    return Result.ok(table)
 
 
 def adr_table(markdown: str) -> Result[Dict[str, List[str]], PipelineError]:
     """§ 9's agent table, as a map from stratum name to its cells."""
-    return _table(markdown, ADR_HEADER, "agent table")
+    return _table(markdown, ADR_HEADER, "agent table").and_then(_counts)
 
 
 def _tally(stratum: str, column: str,
@@ -388,8 +434,10 @@ def compare(rows: Sequence[Row],
             table: Dict[str, List[str]]) -> Tuple[str, ...]:
     """Every disagreement between the regenerated rows and the ADR's table.
 
-    Only the columns this module recomputes are checked: the loop columns are
-    read *from* the ADR, so checking them against it would prove nothing.
+    The columns this module recomputes are checked cell by cell.  The loop
+    columns are read *from* the ADR's strata, so the one check they admit is
+    the ADR's own arithmetic: the page prints their sums in its total row,
+    and the ADR's total row must say the same.
     """
     #: The ADR column each recomputed cell sits in, as an index into the
     #: cells after the stratum name.
@@ -412,6 +460,17 @@ def compare(rows: Sequence[Row],
         if name not in {row.stratum.lower() for row in rows}:
             problems.append(
                 f"ADR 0001 § 9 has a row {name!r} the archive does not")
+    total = next((row for row in rows if row.stratum == TOTAL), None)
+    stated = table.get(TOTAL)
+    if total is not None and stated is not None:
+        for column, summed, said in (("loop fixed", total.loop_fixed,
+                                      stated[1]),
+                                     ("loop retrieval", total.loop_retrieval,
+                                      stated[2])):
+            if said != str(summed):
+                problems.append(
+                    f"total / {column}: the strata's cells sum to {summed}, "
+                    f"ADR 0001 § 9's total says {said}")
     return tuple(problems)
 
 

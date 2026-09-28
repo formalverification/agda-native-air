@@ -1140,7 +1140,9 @@ Every figure below is read from the archive at build time, and the two tables
 ADR 0001 &sect; 9 states, this one and the control&rsquo;s, are also compared
 with the ADR cell by cell, so a number in either that drifts fails the build.
 The loop&rsquo;s two columns are the exception: no report in the repository
-carries them, so they are read from the ADR, which is their record.</p>
+carries them, so they are read from the ADR, which is their record, and the
+build checks only that the ADR&rsquo;s totals for them are the sums of its
+rows.</p>
 <p>The <em>loop</em> is a different instrument:
 <code>agda-native-air</code>&rsquo;s own proof-search loop, with no model in
 it, first over a fixed space of candidate terms and then with corpus retrieval
