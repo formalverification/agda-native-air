@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-mul-zero-r
 -- Difficulty: compositional (Tier 2)
--- Source: Data.Nat.Properties
--- Strategy: induction on n; base refl, step is the IH (0 + n * 0 reduces to n * 0)
 --
 module Nat-mul-zeroR where
 

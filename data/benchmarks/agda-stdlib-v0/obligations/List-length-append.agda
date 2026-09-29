@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-list-length-append
 -- Difficulty: compositional (Tier 2)
--- Source: Data.List.Properties
--- Strategy: induction on xs; base refl, step cong suc IH
 --
 module List-length-append where
 

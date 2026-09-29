@@ -35,7 +35,10 @@ Design Principles:
      and its gold live, so no path is composed from a naming convention.
   +  The diff is computed, not described.  `marked_diff` turns the obligation
      and the final file into a marked listing, so the page shows what the
-     session changed instead of asserting it.
+     session changed instead of asserting it.  Comment lines are never
+     marked: the judge strips comments before its one textual gate, and a
+     fixture's header can change after a run (issue #219 removed the hint
+     lines from every header), which is nothing the session did.
 """
 
 from __future__ import annotations
@@ -148,19 +151,38 @@ def tag_values(tags: Sequence[str], prefix: str) -> Tuple[str, ...]:
                  if tag.startswith(prefix + ":"))
 
 
+def _is_comment(line: str) -> bool:
+    """A `--` line comment, the only comment form a fixture header uses."""
+    return line.lstrip().startswith("--")
+
+
 def marked_diff(before: str, after: str) -> Tuple[Tuple[str, str], ...]:
     """The second file as a listing, each line marked against the first.
 
-    `difflib.ndiff`'s hint lines (`? `) describe intra-line changes for a
-    human reading a diff and would render as noise here, so they are dropped;
-    every other line keeps its mark.
+    The marks come from `difflib.ndiff` over the two files' code lines, with
+    comment lines (`-- …`) left out of the comparison and shown unmarked
+    where the second file has them: the judge strips comments before its
+    textual gate, and a fixture's header can change after a run (issue #219
+    removed the hint lines from every header), which is nothing the session
+    did.  `ndiff`'s hint lines (`? `) describe intra-line changes for a human
+    reading a diff and would render as noise here, so they are dropped.
     """
+    code_before = [l for l in before.splitlines() if not _is_comment(l)]
+    code_after = [l for l in after.splitlines() if not _is_comment(l)]
+    marks = [(line[0], line[2:]) for line in difflib.ndiff(code_before, code_after) if line[0] != "?"]
     out: List[Tuple[str, str]] = []
-    for line in difflib.ndiff(before.splitlines(), after.splitlines()):
-        mark, _, text = line[0], line[1], line[2:]
-        if mark == "?":
+    i = 0
+    for line in after.splitlines():
+        if _is_comment(line):
+            out.append((" ", line))
             continue
-        out.append((mark if mark in "+-" else " ", text))
+        # A code line of the second file is the next "+" or " " mark; the
+        # "-" marks before it are lines of the first file gone from here.
+        while marks[i][0] == "-":
+            out.append(marks[i]); i += 1
+        mark, text = marks[i]; i += 1
+        out.append((mark if mark == "+" else " ", text))
+    out.extend(marks[i:])
     return tuple(out)
 
 

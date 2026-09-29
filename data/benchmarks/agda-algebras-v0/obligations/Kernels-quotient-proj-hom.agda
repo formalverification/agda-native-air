@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-kernels-quotient-proj-hom
 -- Difficulty: compositional
--- Source: Setoid.Homomorphisms.Kernels (agda-algebras)
 -- Import stratum: using
--- Strategy: application
 --
 module Kernels-quotient-proj-hom where
 

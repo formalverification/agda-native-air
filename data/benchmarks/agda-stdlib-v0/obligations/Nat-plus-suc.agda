@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-plus-suc
 -- Difficulty: compositional (Tier 2)
--- Source: Data.Nat.Properties
--- Strategy: induction on m; base refl, step cong suc IH
 --
 module Nat-plus-suc where
 

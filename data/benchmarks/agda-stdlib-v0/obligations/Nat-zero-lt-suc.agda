@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-zero-lt-suc
 -- Difficulty: routine (Tier 1)
--- Source: Data.Nat.Base
--- Strategy: apply the _≤_ constructors (s≤s, z≤n)
 --
 module Nat-zero-lt-suc where
 

@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-kernels-ker-in-con
 -- Difficulty: non-obvious
--- Source: Setoid.Homomorphisms.Kernels (agda-algebras)
 -- Import stratum: wholesale
--- Strategy: identity-function
 --
 module Kernels-ker-in-con where
 

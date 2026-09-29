@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-plus-identity-l
 -- Difficulty: routine (Tier 1)
--- Source: Data.Nat.Properties
--- Strategy: refl (0 + n reduces to n by definition of _+_)
 --
 module Nat-plus-identityL where
 

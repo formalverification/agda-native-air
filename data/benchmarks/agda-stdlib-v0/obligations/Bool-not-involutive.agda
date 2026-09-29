@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-bool-not-involutive
 -- Difficulty: routine (Tier 1)
--- Source: Data.Bool.Properties
--- Strategy: case split on the boolean; each branch is refl
 --
 module Bool-not-involutive where
 

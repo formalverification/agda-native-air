@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-prod-mk-pair
 -- Difficulty: routine (Tier 1)
--- Source: standalone
--- Strategy: apply the product constructor
 --
 module Prod-mk-pair where
 

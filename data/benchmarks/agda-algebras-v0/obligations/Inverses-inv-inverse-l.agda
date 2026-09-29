@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-inverses-inv-inverse-l
 -- Difficulty: routine
--- Source: Setoid.Functions.Inverses (agda-algebras)
 -- Import stratum: wholesale
--- Strategy: refl
 --
 module Inverses-inv-inverse-l where
 

@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-homs-mon-to-hom
 -- Difficulty: compositional
--- Source: Setoid.Homomorphisms.Basic (agda-algebras)
 -- Import stratum: wholesale
--- Strategy: application
 --
 module Homs-mon-to-hom where
 

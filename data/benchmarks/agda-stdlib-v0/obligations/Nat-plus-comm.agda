@@ -4,12 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-plus-comm
 -- Difficulty: compositional (Tier 2)
--- Source: Data.Nat.Properties
--- Strategy: induction on m, using +-identityʳ (base) and +-suc (step)
---
--- Note: the obligation provides +-identityʳ and +-suc as imports so
--- the agent has access to the key lemmas.  The challenge is composing
--- them correctly in the inductive proof.
 --
 module Nat-plus-comm where
 

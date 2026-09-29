@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-functions-lift-lower
 -- Difficulty: routine
--- Source: Setoid.Functions.Basic (agda-algebras)
 -- Import stratum: wholesale
--- Strategy: refl
 --
 module Functions-lift-lower where
 

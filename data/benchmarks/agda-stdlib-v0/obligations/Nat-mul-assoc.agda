@@ -4,10 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-mul-assoc
 -- Difficulty: non-obvious (Tier 3)
--- Source: Data.Nat.Properties
--- Strategy: induction on m; equational chain pivoting on *-distribʳ-+
---
--- Note: *-distribʳ-+ is the non-local lemma that unlocks the suc case.
 --
 module Nat-mul-assoc where
 
