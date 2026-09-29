@@ -66,7 +66,7 @@ Description: The demo page's numbers, regenerated from the archived run
   the same module; the ADR has no table of it, so it is regenerated and not
   compared.  The loop's three sweeps over the tier, which no report in this
   repository carries, are read from the gate table of the tier's own README
-  (`LOOP_SWEEPS`), which is their record.
+  (`loop_sweeps`), which is their record.
 
   Every field of a report that the page reads is declared in
   `REPORT_FIELDS` (and `OUTCOME_FIELDS`, and for the composition arms
@@ -153,7 +153,8 @@ RUNS: Tuple[str, ...] = tuple(dict.fromkeys(
 
 #: The composition tier's six arms (Issue #160), in the order ADR 0001 § 9's
 #: composition table sets its columns: each column's header as `_header`
-#: reads it (`Opus \`shell\`` is `opus shell`), and the run it reports.
+#: reads it (the ADR's Opus `shell` is `opus shell`), and the run it
+#: reports.
 COMPOSITION: Tuple[Tuple[str, str], ...] = (
     ("opus shell", "comp-opus5-shell-1"),
     ("opus mcp", "comp-opus5-mcp-1"),
@@ -1370,8 +1371,10 @@ def build(archive: Path, adr: Path, repo: Optional[Path] = None
     subject's transcript (the day each run began, and where each needle
     came from), the composition tier's README (the loop's sweeps), and
     walks the archive (its size).  `repo` is the repository root the README
-    is read from, by default the one the ADR is in (`docs/adr/` below it)."""
-    root = repo if repo is not None else adr.parents[2]
+    is read from, by default the one the ADR is in (`docs/adr/` below it),
+    found from the ADR's absolute path so a short relative one cannot run
+    out of parents."""
+    root = repo if repo is not None else adr.resolve().parents[2]
     return validate(archive, adr).and_then(
         lambda checked: start_days(archive, checked.reports)
         .and_then(lambda days: traces(archive, checked)

@@ -1086,3 +1086,80 @@ def test_the_intro_and_the_nav_point_to_the_composition_tier(built) -> None:
     nav = built["root"].by_class("jump")[0]
     assert "#composition" in [el.attrs.get("href") for el in nav.walk()
                               if el.tag == "a"]
+
+
+# ------------------------- the self-review of PR #226 (Issue #224)
+
+def test_needle_line_says_each_origin_it_can_meet() -> None:
+    # The three replays reach two origins (an answer, and never); the line
+    # has four branches, and each is pinned here on a synthetic session.
+    steps = [{"kind": "text", "text": "reading"},
+             {"kind": "call", "display": "search_by_name",
+              "args": [["query", "⨅-≤"]]},
+             {"kind": "call", "display": "Read",
+              "args": [["file_path", "<nix>/src/Congruences.lagda.md"]]}]
+    subject = render.needle_line(
+        {"name": "⨅-≤", "origin": "subject", "call": 1, "used": True},
+        steps, "c9")
+    assert _plain(subject) == (
+        "⨅-≤: first named by the session itself, in call 1, search_by_name "
+        "for ⨅-≤, before any answer had shown it; the final file uses it.")
+    assert 'href="#answer-c9-1"' in subject
+    read = render.needle_line(
+        {"name": "normalOf-mono", "origin": "answer", "call": 2,
+         "located": True, "used": False}, steps, "c9")
+    assert _plain(read) == (
+        "normalOf-mono: first shown by the answer to call 2, Read of "
+        "Congruences.lagda.md, a file an earlier definition_of answer had "
+        "named; the final file does not use it.")
+    assert render.needle_line({"name": "x", "origin": "never",
+                               "used": False}, steps, "c9") == \
+        "<code>x</code>: never named in the session; the final file does " \
+        "not use it."
+    # A call number the session does not have is not linked to anything.
+    stray = render.needle_line({"name": "y", "origin": "answer", "call": 7,
+                                "used": True}, steps, "c9")
+    assert "href" not in stray
+
+
+def test_the_tiers_caps_are_every_arms(built) -> None:
+    # The section prints the first arm's caps as the tier's.
+    arms = built["data"]["numbers"]["composition"]["arms"]
+    caps = {(a["turnCap"], a["wallCapSec"], a["budgetCapUsd"]) for a in arms}
+    assert caps == {(60, 1800, 6.0)}
+    said = _said(built, _composition(built))
+    assert "at caps of 60 turns, 1,800 seconds, and USD 6.00" in said
+
+
+def test_the_two_tablists_have_names_of_their_own(built) -> None:
+    names = [t.attrs.get("aria-label")
+             for t in built["root"].by_class("replay-tabs")]
+    assert names == ["Sessions", "Composition-tier sessions"]
+    groups = [p.attrs.get("aria-label") for p in _players(built)]
+    assert len(set(groups)) == 2
+
+
+def test_the_gate_sentence_is_withheld_when_the_gates_fall_short(
+        built) -> None:
+    # "Each of the 26 rows missing from a solved count lost a gate" is the
+    # record's today; if the gates stopped accounting for every unsolved
+    # row (an anomaly, a crash), the page must not print it.
+    numbers = json.loads(json.dumps(built["data"]["numbers"]))
+    row = next(r for r in numbers["composition"]["table"]
+               if r["key"] == "isolation")
+    row["cells"][0] = str(int(row["cells"][0]) - 1)
+    said = _plain(render._composition(numbers,
+                                      built["data"]["composition"]))
+    assert "lost a gate with a file that checks" not in said
+    assert "and 25 of the 26 rows missing from a solved count lost a gate" \
+        in said
+    assert "lost a gate with a file that checks" in \
+        _said(built, _composition(built))
+
+
+def test_the_provenance_caption_links_the_rule_in_this_repository(
+        built) -> None:
+    table = _table(built, "provenance")
+    links = [el.attrs.get("href") for el in table.walk() if el.tag == "a"]
+    assert f"{render.REPO_URL}/blob/main/{render.NEEDLES}" in links
+    assert (REPO / render.NEEDLES).is_file()

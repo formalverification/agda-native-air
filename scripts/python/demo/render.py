@@ -141,6 +141,9 @@ GUIDE_SECTIONS: Dict[str, str] = {
 #: the dated tables, measured with the fixture headers' hints in view, stay
 #: in the subsections above it as evidence.
 ADR = "docs/adr/0001-proof-search-on-agda-mcp.md"
+
+#: The rule the page traces each composition needle by (Issue #224).
+NEEDLES = "scripts/python/demo/needles.py"
 ADR_SECTIONS: Dict[str, str] = {
     "agents": "The header-free arms (2026-09-29)",
     "control": "The header-free arms (2026-09-29)",
@@ -579,7 +582,8 @@ def _panel(index: int, replay: Mapping[str, Any], prefix: str = "") -> str:
         f'</section>')
 
 
-def _tabs(replays: Sequence[Mapping[str, Any]], prefix: str = "") -> str:
+def _tabs(replays: Sequence[Mapping[str, Any]], prefix: str = "",
+          name: str = "Sessions") -> str:
     """The tab strip.  Each tab says how many turns its session took, so a
     reader can see which sessions are short before choosing one."""
     buttons = []
@@ -600,15 +604,19 @@ def _tabs(replays: Sequence[Mapping[str, Any]], prefix: str = "") -> str:
             f'<span class="pip pip-{_esc(kind)}">'
             f'{_esc(_PIP.get(kind, kind))}</span></button>')
     return (f'<div class="replay-tabs" role="tablist" '
-            f'aria-label="Sessions" hidden>{"".join(buttons)}</div>')
+            f'aria-label="{_esc(name)}" hidden>{"".join(buttons)}</div>')
 
 
 def player(replays: Sequence[Mapping[str, Any]], prefix: str = "",
-           label: str = "Replays of archived agda-mcp sessions") -> str:
+           label: str = "Replays of archived agda-mcp sessions",
+           tabs: str = "Sessions") -> str:
+    """A player: its tab strip, named `tabs` for a screen reader, and its
+    panels.  A second player on the page gets a `prefix` for its ids and
+    names of its own, so no two landmarks read alike."""
     panels = "".join(_panel(index, replay, prefix)
                      for index, replay in enumerate(replays))
     return (f'<div class="replay" role="group" aria-label="{_esc(label)}">'
-            f'{_tabs(replays, prefix)}{panels}</div>')
+            f'{_tabs(replays, prefix, tabs)}{panels}</div>')
 
 
 # ------------------------------------------------- pointing at a tab
@@ -1404,7 +1412,7 @@ def _provenance(numbers: Mapping[str, Any], column: str) -> Mapping[str, Any]:
 
 def composition_table(numbers: Mapping[str, Any]) -> str:
     """The composition tier's table, ADR 0001 § 9's regenerated: one column
-    per arm, grouped by model, the run behind each column in its last
+    per arm, grouped by model, the run behind each column in its first
     row."""
     comp = _comp(numbers)
     columns = list(comp.get("columns") or [])
@@ -1474,10 +1482,11 @@ def provenance_table(numbers: Mapping[str, Any]) -> str:
     return (f'<div class="table-wrap"><table class="numbers small '
             f'provenance"{_runs(*runs)}>'
             f'<caption>Where each needle first appeared, per arm: the first '
-            f'event of each session that names it, by the rule of the '
-            f'sweeps skill&rsquo;s <code>needle-source.py</code>.  Read from '
-            f'the transcripts when this page was built; the ADR has no table '
-            f'of it to be checked against.</caption>'
+            f'event of each session that names it, by the rule in '
+            f'{_blob(NEEDLES, NEEDLES)} (the sweeps skill&rsquo;s '
+            f'<code>needle-source.py</code>, which the guide cites, ported).  '
+            f'Read from the transcripts when this page was built; the ADR '
+            f'has no table of it to be checked against.</caption>'
             f'<thead><tr><th scope="col">first named by</th>{head}</tr>'
             f'</thead><tbody>{body}<tr class="total"><th scope="row">'
             f'needles</th>{total}</tr></tbody></table></div>')
@@ -1522,7 +1531,6 @@ def _composition(numbers: Mapping[str, Any],
     lost = sum(kept.values()) + sum(isolated.values())
     missing = sum(int(rows or 0) - n for n in solved.values())
     provenance = [arm.get("provenance") or {} for arm in arms]
-    by_group = [p.get("byGroup") or {} for p in provenance]
     mentioned = sum(int(p.get("needles") or 0)
                     - int((p.get("byGroup") or {}).get("never") or 0)
                     for p in provenance)
@@ -1550,6 +1558,14 @@ def _composition(numbers: Mapping[str, Any],
                else f"{_num(finals)} of the {_num(total)} final files "
                     "type-check")
     tagged = sum(int(p.get("needles") or 0) for p in provenance)
+    # The sentence says every unsolved row lost a gate with a file that
+    # checks only when both halves are the record's: the gates account for
+    # every unsolved row, and every final file checks.
+    gated = (f"so each of the {_count(missing, 'row', 'rows')} missing from "
+             "a solved count lost a gate with a file that checks:"
+             if lost == missing and every
+             else f"and {_word(lost)} of the {_count(missing, 'row', 'rows')} "
+                  "missing from a solved count lost a gate:")
     gate_needles = len(((gate or {}).get("obligation") or {})
                        .get("needles") or [])
     proved = ("Every configuration of both models wrote a proof that checks "
@@ -1576,8 +1592,7 @@ seconds, and {_money(first.get("budgetCapUsd"))}, on
 <p>What it shows is as follows:</p>
 <ul{_runs(*runs)}>
 <li><strong>The tier is {ceiling}</strong>.  {checked} with their
-statements kept, so each of the {_count(missing, "row", "rows")} missing
-from a solved count lost a gate with a file that checks:
+statements kept, {gated}
 {_word(sum(kept.values()))} to the preservation gate
 ({"all of them Sonnet&rsquo;s, " if opus_kept == 0 else ""}each an edited
 <code>using</code> list) and {_word(sum(isolated.values()))} to the
@@ -1621,7 +1636,8 @@ infer the middle point, the session named it, as the gold does, and the
 first session below shows that happen.</li>
 </ul>
 {provenance_table(numbers)}
-{player(replays, "c", "Replays of three composition-tier sessions")}
+{player(replays, "c", "Replays of three composition-tier sessions",
+        "Composition-tier sessions")}
 <p class="callout"{_runs(*runs)}>What the tier says: it is a second
 instrument built to sit below the ceiling, and it could not tell the tools
 apart.  {proved}.  With {_word(rows)} rows and one seed per arm, a

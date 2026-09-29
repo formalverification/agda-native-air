@@ -267,10 +267,11 @@ GROUPS: Tuple[Tuple[str, str], ...] = (
 
 def tally(found: Sequence[Source]) -> Dict[str, Any]:
     """One arm's provenance over every needle of its rows: how many the
-    final files use, how many first appeared in each group, and by which
-    call; `located` counts the reads of a file a `definition_of` answer had
-    named first.  The rows on the gold's whole route are the caller's to
-    count, since they need the row boundaries this list has lost."""
+    final files use, how many first appeared in each group, and in the
+    answer of which tool; `located` counts the reads of a file that a
+    `definition_of` answer had named first.  The rows on the gold's whole
+    route are the caller's to count, since they need the row boundaries
+    this list has lost."""
     return {
         "needles": len(found),
         "used": sum(1 for s in found if s.used),
