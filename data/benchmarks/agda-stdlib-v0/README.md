@@ -34,8 +34,12 @@ on the machine that ran them.
 
 ## What the headers said
 
-Per row, as the header had it; the index's `module` field names the same
-source module, and its `goldTerm` carries the same sketch.
+Per row, as the header had it.  The index describes the same rows in its own
+words: its `module` field names the source module on 20 rows and
+`Data.Unit.Base` and `Data.Product.Base` where the header said `standalone`
+(`stdlib-unit-trivial`, `stdlib-prod-mk-pair`), and its `goldTerm` is a
+sketch of its own, the same as the header's on 8 rows and worded differently
+or the gold term itself on the other 14.
 
 | #  | id | difficulty | source | strategy | note |
 |----|----|------------|--------|----------|------|

@@ -11,9 +11,10 @@ A subject's work file is a byte-for-byte copy of its obligation, comments
 included, and until issue [#219] the header carried a `Source:` line naming
 the library module that holds the original proof and a `Strategy:` line
 naming the proof's shape.  Both were removed from the obligations on
-2026-09-29 (the golds carry their own header and never had them) and are
+2026-09-29 (the golds carry their own header; one of them,
+`Overture-lift-lower`, had the two lines as well and lost them) and are
 recorded here, per row, as they were.  The index's `module` field names the
-same module.
+same module on every row.
 
 | #  | id | difficulty | source | strategy |
 |----|----|------------|--------|----------|
