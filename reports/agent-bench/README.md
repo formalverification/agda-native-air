@@ -167,17 +167,19 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 
 ## The runs
 
-Every run dated before 2026-09-29 had the fixture headers' hints in view
-(the "header hints" column): a subject works on a byte-for-byte copy of its
+Every run dated before 2026-09-29 had the fixture headers' hints in view (the
+"header hints" column): a subject works on a byte-for-byte copy of its
 obligation, and until [#219] every obligation's header carried a `Strategy:`
 line sketching the proof, the haystack tier's a `Needle:` line naming the
 lemma the tier asks a searcher to find, and the mined tiers' a `Source:` line
 naming the module that holds the original.  The runs dated 2026-09-29 had
-none: the headers were stripped from every tier first (PRs [#220] and
-[#221]), and what they said is in each tier's README.  Neither the loop nor
-the judge reads comments, so no verdict of an old run would change under a
-re-judge; what changed is what a subject was told.  The old runs stay as
-archived, and the section on the header-free arms below says which of their
+none, and neither has any run since: the headers were stripped from every tier
+first (PRs [#220] and [#221]), and what they said is in each tier's README.
+The composition tier's arms and the hard tier's header-free re-runs (the
+`comp-*` and `hard219-*` runs, [#160] and [#219]) are among them.  Neither the
+loop nor the judge reads comments, so no verdict of an old run would change
+under a re-judge; what changed is what a subject was told.  The old runs stay
+as archived, and the section on the header-free arms below says which of their
 figures the new runs replace.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
@@ -218,6 +220,21 @@ figures the new runs replace.
 | `suite219-sonnet5-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-29 | none | 55 | 47 | 4 | 12 of 14 | 0 | 345 | 290 | 3.42 | ADR 0001 § 9, ADR 0002 § 12, the site, [#219] |
 | `suite219-sonnet5-both-1` | `both` | `claude-sonnet-5` | 2026-09-29 | none | 55 | 48 | 5 | 11 of 16 | 0 | 353 | 298 | 4.13 | ADR 0001 § 9, ADR 0002 § 12, the site, [#219] |
 | `suite219-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29 | none | 55 | 55 | 0 | 4 of 21 | 0 | 323 | 268 | 7.07 | ADR 0001 § 9, README, the site, [#219] |
+| `cost-comp-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29 | none | 2 (composition) | 2 | 0 | no original | 0 | 19 | 17 | 0.71 | the cost pairs on [#160] |
+| `cost-comp-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-29 | none | 2 (composition) | 1 | 0 | no original | 0 | 28 | 26 | 0.74 | the cost pairs on [#160] |
+| `cost-comp-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-29 | none | 2 (composition) | 2 | 0 | no original | 0 | 25 | 23 | 0.96 | the cost pairs on [#160] |
+| `cost-comp-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-29 | none | 2 (composition) | 1 | 0 | no original | 0 | 37 | 35 | 0.69 | the cost pairs on [#160] |
+| `cost-comp-sonnet5-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-29 | none | 2 (composition) | 2 | 0 | no original | 0 | 28 | 26 | 0.50 | the cost pairs on [#160] |
+| `cost-comp-sonnet5-both-1` | `both` | `claude-sonnet-5` | 2026-09-29 | none | 2 (composition) | 0 | 0 | no original | 0 | 30 | 28 | 0.53 | the cost pairs on [#160] |
+| `comp-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29 | none | 12 (composition) | 12 | 0 | no original | 0 | 128 | 116 | 4.05 | the guide's § 4.7, [#160] |
+| `comp-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-29 | none | 12 (composition) | 3 | 0 | no original | 0 | 206 | 194 | 3.55 | the guide's § 4.7, [#160] |
+| `hard219-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 139 | 125 | 7.71 | the guide's § 4.5, the site, [#219] |
+| `comp-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-29 | none | 12 (composition) | 10 | 0 | no original | 0 | 130 | 118 | 4.14 | the guide's § 4.7, [#160] |
+| `comp-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-29 | none | 12 (composition) | 10 | 0 | no original | 0 | 148 | 136 | 4.87 | the guide's § 4.7, [#160] |
+| `comp-sonnet5-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-29 | none | 12 (composition) | 6 | 0 | no original | 0 | 157 | 145 | 2.60 | the guide's § 4.7, [#160] |
+| `comp-sonnet5-both-1` | `both` | `claude-sonnet-5` | 2026-09-29 | none | 12 (composition) | 5 | 0 | no original | 0 | 179 | 167 | 3.39 | the guide's § 4.7, [#160] |
+| `hard219-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-29 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 148 | 134 | 6.31 | the guide's § 4.5, the site, [#219] |
+| `hard219-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-29 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 174 | 160 | 6.56 | the guide's § 4.5, the site, [#219] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -648,6 +665,65 @@ What each replaces, and how comparable the two are, is as follows:
    what a difference can mean with one seed a side are the guide's § 4.6
    ([`docs/reading-the-results.md`](../../docs/reading-the-results.md)).
 
+## The composition tier's arms, and the hard tier's without hints (2026-09-29, [#160], [#219])
+
+Nine arms from one detached driver, one seed each, at the hard tier's caps
+(60 turns, 1,800 s, USD 6.00), parallelism 2, client 2.1.282, from one frozen
+copy of the server and the extractor (built from `main` at `e9c1ee5`, whose
+server source differs from the hard tier's `.bin-189` only by a comment) and
+one snapshot of the driver's classes: Opus 5 and Sonnet 5 in the `shell`,
+`mcp`, and `both` arms on the twelve composition rows
+(`agda-algebras-composition-v0/`, stratum `agda-algebras/composition`), and
+Opus 5 in the three arms on the fourteen hard rows again, header-free.  Each
+model and arm ran a two-row cost pair first, on rows 5 and 1 of the
+composition tier (`comp-lattice-below-join-bound`,
+`comp-variety-subalgebra-of-model`); the hard-tier arms share the Opus pairs,
+and [#189]'s `cost-hard-*-1` give the hard tier's cost per row.  Zero
+anomalies; USD 47.28 for the nine arms and six pairs, and the account's
+seven-day window went from 0.32 to 0.39.  `gold-leak.py`, which since this
+run also flags an answer by its content (an index record, or a README line
+that the obligation does not itself contain), finds no gold proof line and
+no README line in any of them.
+
+| | Opus `shell` | Opus `mcp` | Opus `both` | Sonnet `shell` | Sonnet `mcp` | Sonnet `both` |
+|---|---:|---:|---:|---:|---:|---:|
+| composition: final file checks, statement kept | 12 | 12 | 12 | 12 | 12 | 12 |
+| composition: solved | 10 | 12 | 10 | 6 | 3 | 5 |
+| composition: preservation, isolation | 0, 2 | 0, 0 | 0, 2 | 5, 1 | 9, 0 | 5, 2 |
+| composition: USD | 4.14 | 4.05 | 4.87 | 2.60 | 3.55 | 3.39 |
+| hard, header-free: final file checks, statement kept | 14 | 14 | 14 | | | |
+| hard, header-free: solved | 10 | 14 | 10 | | | |
+| hard, header-free: USD | 6.31 | 7.71 | 6.56 | | | |
+
++  **Every final file type-checks with its statement kept**, 72 of 72 on
+   the composition tier and 42 of 42 on the hard tier.  The solved counts
+   are lowered by the protocol only.
++  **The preservation rows are all one edit**.  Each of the 19 Sonnet rows
+   (and the three in its cost pairs) differs from its obligation only in
+   `using` lists: the fixture imports every needle's module through a
+   `using` list of decoys, and Sonnet appended the needle there, which the
+   prompt forbids; Opus added an import line on every row.
++  **The isolation rows are of two kinds**.  The subject left its roots on
+   four composition rows and five hard rows: `find /` for agda-algebras'
+   modules although the prompt names their directory, a `cd` to the
+   repository root, a relative path that climbs out of the worktree, and a
+   `find` at the repository root (on `comp-group-normal-of-smaller-congruence`,
+   `both`, it listed three gold directories' `.agda-lib` files and no
+   proof).  The other six are the audit's limits: `perl -pi` and Python
+   editing or reading the subject's own file, `xargs grep` inside
+   agda-algebras' sources, and a grep pattern whose Markdown backticks,
+   inside double quotes, read as a command substitution.
++  **The hard tier's `mcp` re-run is the clean comparison with the hinted
+   one**: the same prompts, tools, caps, flags, client, and corpora, and
+   only the index and one read root (Agda's primitive modules) differ.  It
+   solves 14 of 14 again, in 139 turns against 143.
+
+What the numbers mean is the guide's § 4.5 and § 4.7
+([`docs/reading-the-results.md`](../../docs/reading-the-results.md)); the
+per-row accounts are on [#160] (the composition tier: each row's route per
+arm and where each needle came from) and [#219] (the hard tier, against the
+hinted runs).
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -726,6 +802,7 @@ new run gets a new run id.
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#160]: https://github.com/formalverification/agda-native-air/issues/160
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#193]: https://github.com/formalverification/agda-native-air/pull/193

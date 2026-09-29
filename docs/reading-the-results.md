@@ -217,9 +217,9 @@ loop's ability to commit it.  It does not test a model.
 
 Every run below reported zero anomalies.  Run ids are the harness's own;
 "recorded" says where the table lives.  Every agent run dated before
-2026-09-29 had the fixture headers' hints in view; the `suite219-*` runs of
-that day had none, and where the two differ, the header-free number is the
-one quoted (§ 4.6).
+2026-09-29 had the fixture headers' hints in view; the runs of that day
+(`suite219-*`, `hard219-*`, and the composition tier's `comp-*`) had none,
+and where the two differ, the header-free number is the one quoted (§ 4.6).
 
 ### 4.1  The loop
 
@@ -549,66 +549,92 @@ in agda-algebras' (`agda-algebras/novel`).  Their novelty checks, their
 golds, and the four posed rows that were dropped (three proved in
 agda-algebras' vocabulary, one not provable as posed) are in the two tiers'
 own READMEs, beside the conventions they share in
-[`data/benchmarks/README.md`].  Opus 5 ran each arm once, at twice the mined
-tiers' caps (60 turns, 1,800 s, USD 6.00), from frozen server and extractor
-binaries.  n is fourteen and there is one seed per arm, so a difference of a
-row or two is not a finding.  These arms were measured with the fixture
-headers' hints in view, and on this tier the `Strategy:` lines were proof
-sketches written for the purpose (§ 4.6); their header-free re-run is
-[#219]'s runs 2 and 3, and until it lands the numbers below stand with that
-caveat.
+[`data/benchmarks/README.md`].  Opus 5 ran each arm twice, once with the
+fixture headers' hints in view (2026-09-27) and once without them
+(2026-09-29, [#219]'s runs 2 and 3), at twice the mined tiers' caps (60
+turns, 1,800 s, USD 6.00), each time from frozen server and extractor
+binaries.  On this tier the headers carried a `Source:` line, sometimes
+naming a lemma to use, and a `Strategy:` line sketching the proof ("one
+direction is cong of g; the other is injectivity of g"); PR [#220] moved
+both into the tiers' READMEs.  n is fourteen and there is one seed per arm
+and per condition, so a difference of a row or two is not a finding.
 
-| | `shell` | `mcp` | `both` |
-|---|---:|---:|---:|
-| final file checks, statement kept | 14 | 14 | 14 |
-| solved, as run | 4 | 14 | 7 |
-| solved, re-judged | 8 | 14 | 8 |
-| lost to the isolation gate (re-judged) | 5 | 0 | 6 |
-| lost to the preservation gate | 1 | 0 | 0 |
-| turns | 174 | 143 | 162 |
-| USD (list) | 6.41 | 7.82 | 6.62 |
+| | `shell`, hints | `shell`, header-free | `mcp`, hints | `mcp`, header-free | `both`, hints | `both`, header-free |
+|---|---:|---:|---:|---:|---:|---:|
+| final file checks, statement kept | 14 | 14 | 14 | 14 | 14 | 14 |
+| solved | 8 | 10 | 14 | 14 | 8 | 10 |
+| lost to the isolation gate | 5 | 4 | 0 | 0 | 6 | 4 |
+| lost to the preservation gate | 1 | 0 | 0 | 0 | 0 | 0 |
+| turns | 174 | 148 | 143 | 139 | 162 | 174 |
+| tool calls | 160 | 134 | 129 | 125 | 148 | 160 |
+| USD (list) | 6.41 | 6.31 | 7.82 | 7.71 | 6.62 | 6.56 |
 
-Runs `hard-opus5-shell-1`, `hard-opus5-mcp-1`, `hard-opus5-both-1`, and the
-cost pairs `cost-hard-shell-1`, `cost-hard-mcp-1`, `cost-hard-both-1`
-([`reports/agent-bench/`]).  "Re-judged" is the same transcripts under the
-shell audit as fixed after the arms (it reads `$?` and a variable the call
-itself binds to a literal path); no archived verdict of an earlier arm moves
+Runs `hard-opus5-shell-1`, `hard-opus5-mcp-1`, `hard-opus5-both-1` (with
+the hints; their cost pairs `cost-hard-shell-1`, `cost-hard-mcp-1`,
+`cost-hard-both-1`) and `hard219-opus5-shell-1`, `hard219-opus5-mcp-1`,
+`hard219-opus5-both-1` (header-free; they ran beside the composition tier's
+arms of § 4.7 and share its Opus cost pairs) ([`reports/agent-bench/`]).
+The hinted runs' solved counts are as re-judged under the shell audit as
+fixed after them (it reads `$?` and a variable the call itself binds to a
+literal path), 4 and 7 as run; no archived verdict of an earlier arm moves
 under it.
 
-+  **Every arm proves every row**.  All 42 final files type-check under the
-   judge with their statements kept, and in the `mcp` arm every final file
-   passed the first `check_file` after its subject's edits.  On this tier
-   Opus 5 is at the ceiling with or without the server, so the tier answers
-   whether a frontier model can prove these statements (it can) and not
-   whether the tools help it prove, which needs harder rows ([#160]) or a
++  **Every arm proves every row, with the hints and without them**.  All 84
+   final files type-check under the judge with their statements kept.  On
+   this tier Opus 5 is at the ceiling with or without the server, so the
+   tier answers whether a frontier model can prove these statements (it
+   can) and not whether the tools help it prove, which needs rows that are
+   hard for the model (the composition tier of § 4.7 is not one) or a
    weaker model.
-+  **What separates the counts is the protocol, not the proving**.  The
-   shell arms' subjects went looking for agda-algebras' sources, which the
-   prompt says are on disk without saying where, with `find /` or from the
-   repository root, and the isolation gate failed those rows as it should;
-   one such grep listed a row's own gold file by path (row 17, `shell`).  No
-   subject saw a gold's text: no tool answer in any of the 48 transcripts
-   shows a line of its row's gold proof that the subject had not written
-   itself.  Row 4 was lost in both shell arms to programs the audit does not
-   model (`perl -i` on the subject's own file, and `git diff`), and one
-   `shell` file edited an import line rather than adding one (row 6), which
-   the preservation gate refuses.
-+  **Which tools, given the server**.  The `mcp` arm located definitions
-   with `definition_of` (14 calls) and then read the files it named (49
-   `Read` calls): the tool answers where and not what, so every answer was
-   followed by a read, which is [#185].  It took every verdict from
-   `check_file`, probed candidates with `fill_hole` (5), and used
-   `search_by_name` and `exports_of` (7 each), `type_of` (5), `normalize`
-   (3), and `get_goal` (2); `search_by_type` and `search_in_scope` went
-   unused.
-+  **Which tools, given both**.  The shell did the knowledge work (68 of its
-   86 Bash calls read library sources), and the server gave verdicts
-   (`check_file` for 10 of the 14 final verdicts, `agda` by hand for 4) and
-   probed candidates (`fill_hole`, 9).  No knowledge tool was called except
-   one `type_of`, as on the mined rows (§ 4.3).
++  **The hints were worth nothing measurable**.  The `mcp` pair is the
+   clean comparison: its prompts, tools, caps, flags, client (2.1.282), and
+   corpora are those of the hinted run, and only the index (the stripped
+   headers) and one read root (Agda's primitive modules, PR [#200]) differ.
+   It solves 14 of 14 on both sides, in 139 turns against 143 and USD 7.71
+   against 7.82, and without the sketches Opus wrote the proofs they
+   described: cancellation twice for row 1, `⁻¹-anti-homo-∙` and then
+   `⁻¹-involutive` for row 3, and the same one-line proof for row 18 (the
+   kernel of an injective composite).  No subject in the six arms cites a
+   header line in its visible text.
++  **What separates the counts is the protocol, not the proving**.  With
+   the hints, the shell arms' subjects went looking for agda-algebras'
+   sources, which the prompt said were on disk without saying where, with
+   `find /` or from the repository root, and the isolation gate failed
+   those rows as it should (nine across the two arms; one such grep listed
+   a row's own gold file by path, row 17, `shell`).  Row 4 was lost in both
+   shell arms to programs the audit does not model (`perl -i` on the
+   subject's own file, and `git diff`), and one `shell` file edited an
+   import line rather than adding one (row 6).  The header-free shell
+   prompts name the source directories (PR [#200]), and the searches
+   outside the roots fell from nine rows to five: two in `shell` (a
+   relative path that climbs out of the worktree, a `find` at the
+   repository root) and three in `both` (`find /` for agda-algebras' group
+   modules, despite the named directories); the other three isolation rows
+   are the audit's limits (`perl -pi` twice and a Python edit, each on the
+   subject's own file).  Since the prompts changed, the shell arms' two
+   extra solves are a re-baseline, not the headers' effect.  No subject saw
+   a gold's text: `gold-leak.py` finds no answer in any of the 84
+   transcripts that shows a line of its row's gold proof the subject had
+   not written itself, or a line of a tier README.
++  **Which tools, given the server**.  The `mcp` arms located definitions
+   with `definition_of` (14 calls with the hints, 18 without) and then read
+   the files it named (49 and 45 `Read` calls): the tool answers where and
+   not what, so every answer was followed by a read, which is [#185].  They
+   took every verdict from `check_file`, probed candidates with `fill_hole`
+   (5 and 5), and used `search_by_name` (7 and 10), `exports_of` (7 and 8),
+   `type_of` (5 and 1), `normalize` (3 and 0), and `get_goal` (2 and 2);
+   `search_by_type` was called once, in the header-free arm, and
+   `search_in_scope` never.
++  **Which tools, given both**.  The shell did the knowledge work (86 and 96
+   Bash calls; with the hints, 68 of the 86 read library sources), and the
+   server gave verdicts (`check_file` for 10 and 9 of the 14 final
+   verdicts, `agda` by hand for 4 and 5) and probed candidates
+   (`fill_hole`, 9 and 6).  The knowledge tools were called once in each
+   arm (`type_of`, then `exports_of`), as on the mined rows (§ 4.3).
 
-The per-row account (what each subject tried, which tools it used, where it
-stopped) is on [#189].
+The per-row account of the hinted arms (what each subject tried, which
+tools it used, where it stopped) is on [#189]; the header-free runs are
+reported against them on [#219].
 
 ### 4.6  What the fixture headers were worth
 
@@ -714,16 +740,127 @@ else, nothing measurable.  The headers' hints did not make the suite
 easier to pass, since the solve counts barely moved, but they did decide
 how some of it was passed.
 
+### 4.7  The composition tier
+
+[#160], PRs [#218] and [#225].  Twelve agda-algebras obligations
+(`agda-algebras/composition`), found by a program that chains the corpus's
+own types (`scripts/python/corpus/mine_compositions.py`) and then read
+against the source, posed, and given golds that Agda checks.  Each gold
+strings two to four library lemmas together, the row's *needles* (one
+`needle:` tag each in the index), through a root lemma with an implicit
+*middle point*: a variable its premises share and its conclusion does not
+mention, as `y` in `x ≤ y → y ≤ z → x ≤ z`.  The miner checked every
+needle against the whole corpus: no lemma closes the statement in one step,
+no other lemma does a needle's step from the same inputs, and the loop's
+moves cannot prove it.  The loop solves none of the twelve, in the fixed
+space and under retrieval with both scorers (`comp160-fixed-1`,
+`comp160-retrieval-1`, `comp160-retrieval-idf-1`), because `fill_hole`
+refuses a root lemma whose middle point is an unsolved meta; the tier's
+README (`data/benchmarks/agda-algebras-composition-v0/README.md`) keeps
+those gates and each row's needles, novelty record, and gold.
+
+The agents ran on header-free fixtures, one seed per arm, at the hard tier's
+caps (60 turns, 1,800 s, USD 6.00), parallelism 2, from one frozen copy of
+the server and the extractor and one snapshot of the driver's classes,
+client 2.1.282, each arm after a two-row cost pair.  Zero anomalies; USD
+22.60 for the six arms.  n is twelve and there is one seed per arm, so a
+difference of a row or two is not a finding.
+
+| | Opus `shell` | Opus `mcp` | Opus `both` | Sonnet `shell` | Sonnet `mcp` | Sonnet `both` |
+|---|---:|---:|---:|---:|---:|---:|
+| final file checks, statement kept | 12 | 12 | 12 | 12 | 12 | 12 |
+| solved | 10 | 12 | 10 | 6 | 3 | 5 |
+| lost to the preservation gate | 0 | 0 | 0 | 5 | 9 | 5 |
+| lost to the isolation gate | 2 | 0 | 2 | 1 | 0 | 2 |
+| needles in the final files (of 33) | 20 | 20 | 22 | 25 | 32 | 26 |
+| rows on the gold's whole route | 5 | 5 | 6 | 7 | 11 | 8 |
+| turns | 130 | 128 | 148 | 157 | 206 | 179 |
+| USD (list) | 4.14 | 4.05 | 4.87 | 2.60 | 3.55 | 3.39 |
+
+Runs `comp-opus5-shell-1`, `comp-opus5-mcp-1`, `comp-opus5-both-1`,
+`comp-sonnet5-shell-1`, `comp-sonnet5-mcp-1`, `comp-sonnet5-both-1`, and
+the cost pairs `cost-comp-*-1` ([`reports/agent-bench/`]).  "On the gold's
+whole route" is a final file that names every needle of its row's gold
+(`needle-source.py` in the `running-proof-search-sweeps` skill).
+
++  **Every arm proves every row**.  All 72 final files type-check under the
+   judge with their statements kept, for both models, in every arm.  The
+   tier sits at the ceiling of both frontier models, as the hard tier sits
+   at Opus's (§ 4.5): it answers whether they can string the library's
+   lemmas together (they can) and not whether the tools help them do it.
++  **What separates the counts is the protocol, not the proving**.  The
+   preservation gate took 19 Sonnet rows and no Opus row, and each of the 19
+   final files differs from its obligation only in `using` lists: every
+   needle's module is already imported through a `using` list of decoys,
+   and Sonnet appended the needle to that list, which the prompt forbids,
+   where Opus added an import line.  The isolation gate took seven rows,
+   four of them the subject leaving its roots (a `find /` twice, a `cd` to
+   the repository root, and a `find` there that listed three gold
+   directories' `.agda-lib` files, never a proof) and three the audit's own
+   limits (Python and `xargs` inside the roots, and a grep pattern whose
+   Markdown backticks, inside double quotes, read as a command
+   substitution).  So the Sonnet counts measure a habit of editing, not
+   what the model could prove, and no row of the tier is one on which the
+   configurations differ in what the subject proved: a row solved in one arm
+   and not in another lost a gate, never the proof.
++  **The needles came from the tools and the sources, not from memory**.
+   Of the needles a transcript names, all but three first appear in a tool
+   answer: in the `mcp` arms mostly an `exports_of` on a module the fixture
+   imports (Sonnet 21 of 33) or a `Read` of a file `definition_of` located
+   (Opus 19), and in the arms with a shell a `cat` or a `grep` of
+   agda-algebras' sources.  The three exceptions are names guessed from a
+   neighbor and handed to `search_by_name` (`≑-trans` beside the fixture's
+   `≑-refl`).  That is the reverse of the haystack tier, where Opus named
+   the needle from memory on 10 of 12 rows (§ 4.6).
++  **The two models took different routes**.  Sonnet stayed on the gold's
+   route (11 of 12 rows with the server, 32 of 33 needles).  Opus did on 5
+   or 6 rows; on others it unfolded the relations the needles are about,
+   which agda-algebras defines as functions and pairs, and wrote the
+   composition pointwise: `λ p → φ≤N (θ⊆φ p)` for row 10, where the gold is
+   `≤ⁿ-trans` applied to `normalOf-mono`, and `from A≅B , fromIsSurjective
+   A≅B` for row 8, where it is `HomImage-≅' IdHomImage A≅B`.  Rows 8, 9, and
+   10 took no needle at all in the Opus `mcp` and `shell` arms.  The miner
+   checked that each needle is necessary among the corpus's lemmas, not
+   against a term built from the definitions, and on this tier the second
+   check is the one that binds.
++  **Row 2 has a second route**.  All six arms proved it with
+   `⊧-I-invar`, the decoy in the fixture's own `using` list, in place of
+   the gold's `HomImage-≅`: take the identity to the homomorphic image
+   first, then carry it across the isomorphism.  The miner compared each
+   needle's step with other lemmas from the same inputs, and a route that
+   takes the steps in another order escapes that comparison.
++  **The middle point stopped no subject**.  On the gold's route a subject
+   supplied it through the feeder's conclusion (`≤-trans x≤y∨z (∨-least y≤w
+   z≤w)`), and on the defined relations by naming the endpoints, as the gold
+   does (`⊆-trans {θ = f i ∧ φ} {φ = f i} {ψ = ⋁ 𝑨 ℓ₀ f}`).  The loop's
+   refusal is `fill_hole` asked for the root lemma with holes for its
+   arguments, which a subject that writes both arguments never meets.
++  **Which tools**.  With the server, Sonnet leaned on the knowledge tools
+   (`type_of` 26, `definition_of` 21, `exports_of` 18, `search_by_name` 10)
+   and Opus on `fill_hole` (20) and `definition_of` (13).  Given both, each
+   took nearly every verdict from `check_file` (Opus 11, Sonnet 12 of 12)
+   and did its reading on the shell (68 and 57 Bash calls), calling the
+   knowledge tools 2 and 13 times in the arm, as on the mined rows (§ 4.3)
+   and the hard tier.
+
+The per-row account (each row's verdict and route per arm, where each
+needle came from, and the finals) is on [#160].  **What the tier says,
+then**: it is below the loop's ceiling by construction and at both models'
+ceiling in fact.  Rows the models cannot assemble alone need relations the
+proof cannot unfold (a record or an abstract definition), longer chains,
+or weaker subjects; this tier's twelve cannot tell the tools apart.
+
 ## 5.  How to tell a win from a loss
 
 | question | look at | it is a win for the tools when |
 |---|---|---|
-| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count (header-free, 47 with a shell against 44 with the server; with the hints, 50 against 47); the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5, measured with the hints), with nothing to read, Opus 5 proves every row with or without the server**. |
+| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count (header-free, 47 with a shell against 44 with the server; with the hints, 50 against 47); the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5, with the hints and without them) and the composition tier (§ 4.7), with nothing to copy, every final file of Opus 5, and on the composition tier of Sonnet 5, checks with or without the server**. |
 | Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; the shell arm restates fewer (4 against 9 header-free, 0 against 6 with the hints), with the original in view for most of its solves**. |
 | Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no, by 17 % header-free (USD 3.99 against 3.42), from 83 % in the first control.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
 | Did the fixture headers' hints change what the agents did? | § 4.6 | the header-free arms differ from the hinted ones by more than a seed's spread.  **The haystack tier's route, yes (3 rows solved with no query before the final check, against 8 to 11); about three agda-algebras rows per Sonnet arm written out rather than cited, in the same direction in every arm; the rows with no original, no** |
+| Do the tools help a model assemble a proof from library lemmas? | § 4.7, the composition tier, per arm | a row is solved only with the server, or its needles come only from the server's answers.  **Today: not measurable; every final file checks in all six arms, the needles came from tool answers and source reads alike (not from memory), and Opus often skipped them by unfolding the definitions** |
 | Is the loop a baseline for the agents? | nothing | **never**; a different instrument |
 | Is a lane judgment as trustworthy as batch? | § 4.4 | parity holds.  **Yes, on 80 of 80**. |
 | Is the fixed space's 6/22 a failure? | § 3.1 | it is the vocabulary's ceiling, stated; not a loss |
@@ -736,9 +873,14 @@ how some of it was passed.
    tool's upside on hard, novel, multi-lemma work.  That is the original
    question, and it is still open: on the hard tier of [#189] (§ 4.5), posed
    so that nothing could be copied, a shell-only Opus 5 proves all fourteen
-   rows, so that tier sits at the ceiling too.  The composition tier
-   ([#160]), the agda-algebras case study ([#23]), and a weaker model on the
-   hard tier are the instruments.
+   rows, with the headers' hints and without them, and on the composition
+   tier of [#160] (§ 4.7), whose golds string two to four library lemmas
+   together, every final file of Opus 5 and of Sonnet 5 checks in every
+   arm, so both tiers sit at the ceiling too.  The instruments left are rows
+   whose relations a proof cannot unfold (a record or an abstract
+   definition, where the composition tier's needles could not be bypassed),
+   longer chains, the agda-algebras case study ([#23]), and weaker models
+   on the two tiers.
 +  **Knowledge tools that return content** ([#185]): the one measured defect
    still without its re-run.  Lean answers ([#184]) were measured by PR
    [#190] and were not the cause (§ 4.3).
@@ -747,16 +889,20 @@ how some of it was passed.
    the count measures citing against copying; only on rows with nothing to
    find ([#189]) can the fourteen tools, the four, and the shell be told
    apart on proving.  The first such runs (§ 4.5) cannot tell them apart
-   either, since every arm proves every row, so the four-tool arm was not
-   run there; it waits for rows that are hard for the model.
-+  **A shell prompt that names the library sources**.  On the hard tier the
-   shell arms lost nine rows to the isolation gate because the subject
-   searched `/` or the repository root for agda-algebras' sources, which the
-   prompt says are on disk without saying where (§ 4.5).  A prompt that
-   names them (the registry's include roots) is a protocol change; the
-   header-free arms ran with it (PR [#200]), and two of their subjects still
-   searched `/` (§ 4.3).  On the hard tier it waits for [#219]'s runs 2
-   and 3.
+   either, since every arm proves every row, and neither can the
+   composition tier's (§ 4.7), so the four-tool arm was not run there; it
+   waits for rows that are hard for the model.
++  **A shell prompt that keeps the subject inside its roots**.  On the hard
+   tier the hinted shell arms lost nine rows to the isolation gate because
+   the subject searched `/` or the repository root for agda-algebras'
+   sources, which the prompt said were on disk without saying where
+   (§ 4.5).  The prompt now names them (PR [#200]), and the searches fell
+   but did not stop: two subjects of the 55-row Sonnet arms (§ 4.3), five
+   rows of the header-free hard arms, and four rows of the composition
+   tier's arms still ran `find /` or climbed to the repository root.  The
+   gate fails every such row, so each arm's solved count is a lower bound,
+   and the final files' count (every one checks, on both new tiers) is the
+   figure that measures proving.
 +  **A locator beside the four tools, and a `definition_of` that returns
    the text**.  The four-tool arm's 111 and 97 failed library reads are
    what a subject does without `definition_of`, which the fourteen-tool
@@ -777,8 +923,8 @@ how some of it was passed.
 +  **Small and local models** ([#27], [#28], [#29]), where a shell is least
    usable and structured verdicts plausibly matter most.
 +  **Opus with a shell on the mined rows**.  The mined-tier control was run
-   on Sonnet only; Opus with a shell has run only on the hard tier (§ 4.5),
-   where it proves every row.
+   on Sonnet only; Opus with a shell has run only on the hard and
+   composition tiers (§ 4.5, § 4.7), where it proves every row.
 
 ## References
 
@@ -830,6 +976,8 @@ how some of it was passed.
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#197]: https://github.com/formalverification/agda-native-air/pull/197
+[#218]: https://github.com/formalverification/agda-native-air/pull/218
+[#225]: https://github.com/formalverification/agda-native-air/pull/225
 [#200]: https://github.com/formalverification/agda-native-air/pull/200
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
 [#220]: https://github.com/formalverification/agda-native-air/pull/220

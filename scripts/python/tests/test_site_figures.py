@@ -177,6 +177,21 @@ def test_the_hard_tier_headline_is_not_the_solved_count() -> None:
     assert [r["totals"]["solved"] for r in reports] == [8, 14, 8]
 
 
+def test_the_header_free_tiers_headline_is_not_the_solved_count() -> None:
+    # The same trap on the runs the landing page quotes since issues #160
+    # and #219: the hard tier's header-free arms, and the composition tier's
+    # Sonnet arms, whose solved column the preservation gate lowers too.
+    load = report_loader(REPO)
+    hard = ("hard219-opus5-shell-1", "hard219-opus5-mcp-1", "hard219-opus5-both-1")
+    comp = ("comp-sonnet5-shell-1", "comp-sonnet5-mcp-1", "comp-sonnet5-both-1")
+    hard_reports = [load(run).unwrap() for run in hard]
+    comp_reports = [load(run).unwrap() for run in comp]
+    assert [final_checks_statement_kept(r).unwrap() for r in hard_reports] == [14, 14, 14]
+    assert [r["totals"]["solved"] for r in hard_reports] == [10, 14, 10]
+    assert [final_checks_statement_kept(r).unwrap() for r in comp_reports] == [12, 12, 12]
+    assert [r["totals"]["solved"] for r in comp_reports] == [6, 3, 5]
+
+
 # --------------------------------------------------------------- the page
 
 def test_markers_are_replaced_by_their_figures() -> None:

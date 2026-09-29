@@ -131,11 +131,13 @@ As of September 2026 the following are built, measured, and in use.
    [card](docs/corpora/agda-algebras-v0.1.md), published as the
    [`agda-algebras-corpus-v0.1`](https://github.com/formalverification/agda-native-air/releases/tag/agda-algebras-corpus-v0.1)
    release).
-+  **A benchmark of 69 proof obligations** with gold solutions: 22 from the
++  **A benchmark of 81 proof obligations** with gold solutions: 22 from the
    standard library, 21 mined from agda-algebras at the corpus commit, 12
    standard-library obligations whose proofs need a lemma the fixture imports
-   but never names (the haystack tier), and 14 posed in group theory and
-   universal algebra with no proof on disk (the hard tier).  Every row is
+   but never names (the haystack tier), 14 posed in group theory and
+   universal algebra with no proof on disk (the hard tier), and 12 mined from
+   agda-algebras' types whose proofs string two to four library lemmas
+   together (the composition tier).  Every row is
    classified into one of three difficulty tiers.  Every gold type-checks under
    the pinned toolchain, and CI re-verifies a slice whenever the benchmark, the
    Scala driver, or the flake changes.  See
@@ -185,9 +187,14 @@ As of September 2026 the following are built, measured, and in use.
    a server arm's per-turn context fell by a third and its cost by 17 to
    19 %, with the same tool mix within the run-to-run spread.
    On the hard tier, where there is nothing to copy, Opus 5 proves all 14
-   rows with the server, with a shell, and with both, so that tier measures
-   the model's ceiling rather than the tools
-   ([#189](https://github.com/formalverification/agda-native-air/issues/189)).
+   rows with the server, with a shell, and with both, with the headers'
+   proof sketches and without them
+   ([#189](https://github.com/formalverification/agda-native-air/issues/189)),
+   and on the composition tier every final file of Opus 5 and of Sonnet 5
+   type-checks in all three configurations, the lemmas found through the
+   tools or the sources rather than remembered
+   ([#160](https://github.com/formalverification/agda-native-air/issues/160));
+   so both tiers measure the models' ceiling rather than the tools.
    The search's 8 and 14 are a different instrument, not a baseline for the
    agents; which instrument produced every number in this section, and how to
    tell a win from a loss, is
