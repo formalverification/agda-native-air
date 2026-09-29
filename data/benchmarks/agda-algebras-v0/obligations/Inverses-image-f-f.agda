@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-inverses-image-f-f
 -- Difficulty: routine
--- Source: Setoid.Functions.Inverses (agda-algebras)
 -- Import stratum: wholesale
--- Strategy: constructor
 --
 module Inverses-image-f-f where
 

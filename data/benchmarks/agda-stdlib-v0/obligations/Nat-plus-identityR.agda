@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-plus-identity-r
 -- Difficulty: compositional (Tier 2)
--- Source: Data.Nat.Properties
--- Strategy: induction on n; base refl, step cong suc IH
 --
 module Nat-plus-identityR where
 

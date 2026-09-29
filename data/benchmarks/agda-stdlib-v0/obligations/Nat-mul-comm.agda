@@ -4,12 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-mul-comm
 -- Difficulty: non-obvious (Tier 3)
--- Source: Data.Nat.Properties
--- Strategy: induction on m; base sym (*-zeroʳ n), step an equational chain using *-suc
---
--- Note: *-zeroʳ and *-suc are provided as imports; the challenge is the
--- non-obvious composition (the recursive call sits under cong, and the final
--- step rewrites with *-suc backwards).
 --
 module Nat-mul-comm where
 

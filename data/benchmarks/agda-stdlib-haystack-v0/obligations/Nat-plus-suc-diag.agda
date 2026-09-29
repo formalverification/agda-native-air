@@ -4,16 +4,6 @@
 --
 -- Benchmark obligation: haystack-nat-plus-suc-diag
 -- Difficulty: routine (Tier 1)
--- Haystack: Data.Nat.Properties
--- Needle: Data.Nat.Properties.+-suc
--- Strategy: one saturated application of the needle over the goal's context
---
--- Note: the diagonal instance of +-suc; the goal's operators spell the needle.
---
--- Haystack tier (issue #129): the Properties module is opened with a
--- deliberately narrow `using` list of decoys that cannot close the goal, so
--- the needle is import-reachable only by its qualified name.  A gold that
--- names it qualified is the same text the retrieval ladder renders.
 --
 module Nat-plus-suc-diag where
 

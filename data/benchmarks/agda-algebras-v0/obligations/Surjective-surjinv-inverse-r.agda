@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-surjective-surjinv-inverse-r
 -- Difficulty: compositional
--- Source: Setoid.Functions.Surjective (agda-algebras)
 -- Import stratum: using
--- Strategy: application
 --
 module Surjective-surjinv-inverse-r where
 

@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-subalgebras-sub-trans
 -- Difficulty: non-obvious
--- Source: Setoid.Subalgebras.Properties (agda-algebras)
 -- Import stratum: using
--- Strategy: pairing
 --
 module Subalgebras-sub-trans where
 

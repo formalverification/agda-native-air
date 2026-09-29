@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-inverses-range-to-image
 -- Difficulty: compositional
--- Source: Setoid.Functions.Inverses (agda-algebras)
 -- Import stratum: wholesale
--- Strategy: constructor
 --
 module Inverses-range-to-image where
 

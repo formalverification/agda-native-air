@@ -4,11 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-mul-distrib-r
 -- Difficulty: non-obvious (Tier 3)
--- Source: Data.Nat.Properties
--- Strategy: induction on n; equational chain using +-assoc (backwards)
---
--- Note: +-assoc is provided as an import; the agent must reassociate the
--- middle term to expose the suc-case redex.
 --
 module Nat-mul-distribR where
 

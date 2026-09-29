@@ -18,8 +18,12 @@ standard library, one mined from agda-algebras, and two hard tiers, one in each
 library's vocabulary, posed so that no proof of their statements is on disk.
 
 The **`agda-stdlib` tier** (22 obligations) is the original [M1-5] cut and is
-**frozen**: the P1 baseline (issue #113) is quoted against it, so it only ever
-grows by whole new tiers, never by edits.
+**frozen in its code**: the P1 baseline (issue #113) is quoted against it, so
+its statements, imports, and golds only ever grow by whole new tiers, never by
+edits.  Its header comments are not code: issue [#219] removed their
+`Source:`, `Strategy:`, and `Note:` lines on 2026-09-29, with the loop's
+fixed space run over the tier before and after and its outcomes identical row
+for row (the tier's README has the runs).
 
 | Tier            | Count | Examples                                                            |
 |-----------------|-------|---------------------------------------------------------------------|
@@ -178,8 +182,9 @@ Domains: group, algebra.
    harness reports the tier under `agda-stdlib/haystack` in `perStratum`,
    separately from the frozen tier's plain `agda-stdlib`.
 +  **Frozen tier untouched**: the 22 obligations of `agda-stdlib-v0` are
-   byte-identical to the P1 and P2 baselines' fixtures; this tier is a new
-   directory, which is the only way the stdlib content grows.
+   byte-identical in their code to the P1 and P2 baselines' fixtures (their
+   header comments lost three hint lines under issue [#219]); this tier is a
+   new directory, which is the only way the stdlib content grows.
 
 ### Hard tiers: conventions, golds, and the novelty check
 
@@ -308,6 +313,7 @@ data/benchmarks/
 ├── README.md                          # this file
 ├── benchmark-index.jsonl              # machine-readable index of all obligations
 ├── agda-stdlib-v0/
+│   ├── README.md                      # the frozen tier: its headers' former lines, the freeze runs
 │   ├── obligations/                   # .agda files with one {!!} hole each
 │   │   ├── Nat-plus-identityL.agda
 │   │   ├── Nat-plus-comm.agda
@@ -317,9 +323,11 @@ data/benchmarks/
 │       ├── Nat-plus-comm.agda
 │       └── ...
 ├── agda-algebras-v0/
+│   ├── README.md                      # the headers' former source and strategy lines
 │   ├── obligations/                   # 21 modules, one {!!} hole each
 │   └── gold/                          # solved twins
 ├── agda-stdlib-haystack-v0/
+│   ├── README.md                      # the needles, and the headers' former lines
 │   ├── obligations/                   # 12 modules, one {!!} hole each
 │   └── gold/                          # solved twins, needle named qualified
 ├── agda-stdlib-hard-v0/
@@ -351,6 +359,13 @@ Each obligation is a self-contained Agda module:
    copy of the obligation rather than reshaping the corpus.
 +  It contains exactly **one** `{!!}` hole to be filled.
 +  The module name matches the filename stem.
++  Its comment header names the file, the obligation id, the difficulty, and
+   the import stratum, and nothing that helps prove it: no source module,
+   strategy, needle, haystack, or note (issue [#219]).  A subject of the agent
+   bench works on a byte-for-byte copy of the obligation, header included, and
+   the archived subjects quoted those lines.  Each tier's README keeps what
+   its headers used to say, and `FixtureHeadersSpec` refuses a header that
+   brings any of it back.
 +  Any prerequisite lemmas are provided as explicit imports; the obligation may
    import lemmas, just not the definition it is asked to prove.  Wholesale-stratum
    agda-algebras fixtures qualify this deliberately: their module-wide `open`

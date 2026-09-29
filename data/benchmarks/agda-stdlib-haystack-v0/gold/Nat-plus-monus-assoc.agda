@@ -4,16 +4,6 @@
 --
 -- Benchmark obligation: haystack-nat-plus-monus-assoc
 -- Difficulty: compositional (Tier 2)
--- Haystack: Data.Nat.Properties
--- Needle: Data.Nat.Properties.+-∸-assoc
--- Strategy: one saturated application of the needle over the goal's context
---
--- Note: a hypothesis-consuming instance whose goal signals ∸ and +.
---
--- Haystack tier (issue #129): the Properties module is opened with a
--- deliberately narrow `using` list of decoys that cannot close the goal, so
--- the needle is import-reachable only by its qualified name.  A gold that
--- names it qualified is the same text the retrieval ladder renders.
 --
 module Nat-plus-monus-assoc where
 

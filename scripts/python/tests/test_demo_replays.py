@@ -64,6 +64,21 @@ def test_marked_diff_of_an_unchanged_file_marks_nothing() -> None:
     assert {mark for mark, _ in marked} == {" "}
 
 
+def test_marked_diff_never_marks_a_comment_line() -> None:
+    # The obligation lost two header lines after the run (issue #219); the
+    # final file still has them, and one code line changed.  Every comment
+    # line is listed unmarked, in place; the marks are ndiff's over the code
+    # lines alone; and the final file's lines keep their order.
+    before = "-- File: X.agda\n--\nmodule X where\nf = {!!}\ng = 1"
+    after = "-- File: X.agda\n-- Strategy: refl\n--\nmodule X where\nf = refl\n-- trailing note"
+    marked = marked_diff(before, after)
+    comments = [(mark, text) for mark, text in marked if text.startswith("--")]
+    assert comments == [(" ", "-- File: X.agda"), (" ", "-- Strategy: refl"), (" ", "--"), (" ", "-- trailing note")]
+    assert [pair for pair in marked if pair[0] == "+"] == [("+", "f = refl")]
+    assert {pair for pair in marked if pair[0] == "-"} == {("-", "f = {!!}"), ("-", "g = 1")}
+    assert [text for mark, text in marked if mark != "-"] == after.splitlines()
+
+
 def test_tags_are_read_by_prefix() -> None:
     tags = ["stratum:using", "restates:M.f", "target:M.g", "target:M.h"]
     assert tag_value(tags, "restates") == "M.f"

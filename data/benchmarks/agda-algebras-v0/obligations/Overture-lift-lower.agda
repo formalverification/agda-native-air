@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: algebras-overture-lift-lower
 -- Difficulty: routine (Tier 1)
--- Source: Overture.Basic (agda-algebras)
--- Strategy: refl (lift and lower cancel definitionally)
 --
 module Overture-lift-lower where
 

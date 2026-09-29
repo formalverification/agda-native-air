@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-injective-comp-injective
 -- Difficulty: compositional
--- Source: Setoid.Functions.Injective (agda-algebras)
 -- Import stratum: using
--- Strategy: composition
 --
 module Injective-comp-injective where
 

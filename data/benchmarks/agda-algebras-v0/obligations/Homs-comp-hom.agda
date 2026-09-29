@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-homs-comp-hom
 -- Difficulty: compositional
--- Source: Setoid.Homomorphisms.Properties (agda-algebras)
 -- Import stratum: using
--- Strategy: pairing
 --
 module Homs-comp-hom where
 

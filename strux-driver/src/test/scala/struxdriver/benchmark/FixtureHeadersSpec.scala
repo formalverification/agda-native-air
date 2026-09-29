@@ -12,10 +12,7 @@
 // loop parses only `open import` lines), so nothing else would notice such a
 // line coming back.  This spec does.
 //
-// It covers the tiers whose headers are clean so far: the hard tiers
-// (`stratum:novel`) and the composition tier (`stratum:composition`).  Issue
-// #219 strips the other tiers; when it lands, the filter below goes and the
-// guard covers every row.
+// It covers every row of the index.
 
 package struxdriver.benchmark
 
@@ -32,18 +29,15 @@ final class FixtureHeadersSpec extends AnyFunSuite with Matchers {
   /** The header keys that hand a subject a hint. */
   private val Hint = """^--\s*(Source|Strategy|Haystack|Needle|Note)\s*:""".r
 
-  /** The strata whose headers issue #219 has cleaned so far. */
-  private val Clean = Set("stratum:novel", "stratum:composition")
-
-  test("no clean tier's obligation header names a source, a strategy, a needle, or a haystack (issue #219)") {
+  test("no obligation header names a source, a strategy, a needle, a haystack, or a note (issue #219)") {
     val root  = Paths.get("..").toAbsolutePath.normalize
     val index = root.resolve("data/benchmarks/benchmark-index.jsonl")
     assume(Files.isRegularFile(index), s"benchmark index not found at $index")
     val rows = Files.readAllLines(index, StandardCharsets.UTF_8).asScala.toVector.filter(_.trim.nonEmpty)
       .map(l => io.circe.parser.decode[Obligation](l).fold(e => fail(s"bad index row: ${e.getMessage}"), identity))
-      .filter(e => Clean.exists(e.tags.contains))
-    // The fourteen hard-tier rows at least; the composition tier adds twelve.
-    rows.size should be >= 14
+    // The 55 rows of the mined and haystack tiers and the fourteen of the
+    // hard tiers at least; the composition tier (PR #218) adds twelve.
+    rows.size should be >= 69
     rows.foreach { e =>
       val header = Files.readAllLines(root.resolve(e.obligationPath), StandardCharsets.UTF_8).asScala
         .takeWhile(l => !l.startsWith("module "))

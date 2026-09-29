@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-list-length-nil
 -- Difficulty: routine (Tier 1)
--- Source: Data.List.Base
--- Strategy: refl (length [] reduces to 0)
 --
 module List-length-nil where
 

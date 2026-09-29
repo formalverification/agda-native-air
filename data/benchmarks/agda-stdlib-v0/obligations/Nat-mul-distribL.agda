@@ -4,11 +4,6 @@
 --
 -- Benchmark obligation: stdlib-nat-mul-distrib-l
 -- Difficulty: non-obvious (Tier 3)
--- Source: Data.Nat.Properties
--- Strategy: reduce to right-distributivity via commutativity (no induction here)
---
--- Note: *-comm and *-distribʳ-+ are provided; the non-obvious move is to use
--- commutativity to convert the goal into the right-distributive form.
 --
 module Nat-mul-distribL where
 

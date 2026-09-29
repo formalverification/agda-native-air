@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-unit-trivial
 -- Difficulty: routine (Tier 1)
--- Source: standalone
--- Strategy: inhabit the unit type with its constructor
 --
 module Unit-trivial where
 

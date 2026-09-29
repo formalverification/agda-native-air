@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-overture-proj-op
 -- Difficulty: routine
--- Source: Overture.Operations (agda-algebras)
 -- Import stratum: using
--- Strategy: lambda
 --
 module Overture-proj-op where
 

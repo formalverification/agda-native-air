@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-list-map-id
 -- Difficulty: compositional (Tier 2)
--- Source: Data.List.Properties
--- Strategy: induction on xs; base refl, step cong (x ∷_) IH
 --
 module List-map-id where
 

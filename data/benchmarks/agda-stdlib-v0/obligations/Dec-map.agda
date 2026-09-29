@@ -4,11 +4,6 @@
 --
 -- Benchmark obligation: stdlib-dec-map
 -- Difficulty: non-obvious (Tier 3)
--- Source: Relation.Nullary.Decidable.Core
--- Strategy: case split on the decision; transport the witness / refutation
---
--- Note: requires understanding the Dec structure (yes / no pattern synonyms)
--- and constructing a refutation of B from a refutation of A.
 --
 module Dec-map where
 

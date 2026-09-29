@@ -4,9 +4,7 @@
 --
 -- Benchmark obligation: algebras-overture-lower-lift
 -- Difficulty: routine
--- Source: Overture.Basic (agda-algebras)
 -- Import stratum: using
--- Strategy: refl
 --
 module Overture-lower-lift where
 

@@ -4,8 +4,6 @@
 --
 -- Benchmark obligation: stdlib-maybe-map-nothing
 -- Difficulty: routine (Tier 1)
--- Source: Data.Maybe.Base
--- Strategy: refl (map f nothing reduces to nothing)
 --
 module Maybe-map-nothing where
 
