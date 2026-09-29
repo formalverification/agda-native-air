@@ -15,7 +15,10 @@ absolute paths; toolchain match), and the alternative `claude mcp add` command.
 
 Both templates check the client project with **its own pinned Agda**, never this
 repository's, so the client's version pins stay authoritative (issue #103), and
-both anchor the server in the client's checkout with `--cwd`.
+both anchor the server in the client's checkout with `--cwd`.  The server
+splits `--agda-flags` and `--check-command` on whitespace, with no quoting, so
+no path inside either may contain a space; keep the gc-roots under a
+space-free directory such as `~/.cache`.
 
 ## `agda-algebras.mcp.json`
 
@@ -61,7 +64,10 @@ Each binding does one job; they are the following:
    from when it spawns the server, so each session is anchored in its own
    worktree.  Agda finds that worktree's `agda-algebras.agda-lib` from there,
    resolves the modules in that tree, and writes their `.agdai` interfaces to its
-   `_build/`, which the worktree's own `nix develop` runs share.
+   `_build/`, which the worktree's own `nix develop` runs share.  A client
+   that does not expand variables passes `${PWD}` through literally, and the
+   server stops with `cannot enter --cwd`; give such a client the worktree's
+   absolute path instead.
 +  `--agda-bin`: agda-algebras's wrapped Agda, the one its `nix develop` and CI
    use, through the gc-rooted symlink built above.
 +  `--agda-flags`: two flags.  `--library-file` names the same registry the
@@ -101,7 +107,8 @@ the arrangement:
 +  `--cwd`: the absolute path to the fls checkout.  Agda anchors its project
    discovery (the nearest `*.agda-lib`) to the directory it runs in, so this is
    what makes fls modules resolve, and write their `.agdai` interfaces, exactly
-   as fls's own `nix develop --command agda` does.  `${PWD}`, as in the
+   as fls's own `nix develop --command agda` does.  The template carries an
+   absolute placeholder; under Claude Code, `${PWD}` in its place, as in the
    agda-algebras template, lets one copy serve every fls worktree.
 +  `--agda-bin`: fls's wrapped Agda, through a gc-rooted symlink realized once:
 
