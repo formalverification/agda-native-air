@@ -159,36 +159,57 @@ behind under `data/benchmarks/reports/agent-bench/<run-id>/` (gitignored).
 
 ## The runs
 
-| run id | arm | model | date | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `smoke-haiku-1` | `mcp` | `claude-haiku-4-5-20251001` | 2026-09-15 | 1 | 1 | 0 | not re-judged | 0 | 4 | 3 | 0.04 | the isolation verification on [#154] |
-| `cost-sonnet-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | 2 | 1 | 1 | not re-judged | 0 | 10 | 8 | 0.28 | the cost estimate on [#154] |
-| `cost-opus-1` | `mcp` | `claude-opus-5` | 2026-09-15 | 2 | 2 | 0 | not re-judged | 0 | 12 | 10 | 0.47 | the cost estimate on [#154] |
-| `agent-sonnet5-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | 55 | 46 | 8 | 0 of 13 | 0 | 327 | 272 | 4.62 | ADR 0001 § 9, README, [#154] |
-| `agent-opus5-1` | `mcp` | `claude-opus-5` | 2026-09-15 | 55 | 54 | 1 | 0 of 20 | 0 | 325 | 270 | 9.14 | ADR 0001 § 9, README, [#154] |
-| `agent-opus5-2` | `mcp` | `claude-opus-5` (second seed) | 2026-09-15 | 55 | 54 | 1 | 0 of 20 | 0 | 338 | 283 | 9.46 | ADR 0001 § 9, [#154] |
-| `arm162-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-21 | 55 | 50 | 0 | 15 of 18 | 0 | 308 | 253 | 2.88 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
-| `arm162-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-21 | 55 | 47 | 6 | 4 of 14 | 0 | 342 | 287 | 5.28 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
-| `arm162-both-1` | `both` | `claude-sonnet-5` | 2026-09-21 | 55 | 51 | 2 | 16 of 19 | 0 | 327 | 272 | 4.25 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
-| `iso184-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 1 | 1 | 0 | not re-judged | 0 | 4 | 3 | 0.11 | the isolation check for client 2.1.282 on [#184] |
-| `cost184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | not re-judged | 0 | 10 | 8 | 0.12 | the cost pair on [#184] |
-| `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 2 | 1 | 1 | not re-judged | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
-| `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | 55 | 46 | 8 | 3 of 12 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
-| `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | 55 | 49 | 2 | 14 of 18 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
-| `cost-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | 2 | 0 | 1 | 0 of 0 | 0 | 11 | 9 | 0.15 | the cost pairs on [#191] |
-| `cost-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | 2 | 1 | 1 | 0 of 0 | 0 | 14 | 12 | 0.23 | the cost pairs on [#191] |
-| `cost-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 2 | 0 | 1 | 0 of 0 | 0 | 17 | 15 | 0.16 | the cost pairs on [#191] |
-| `arm-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | 55 | 48 | 7 | 6 of 14 | 0 | 345 | 290 | 3.83 | [#191], PR [#193] |
-| `arm-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | 55 | 46 | 4 | 8 of 14 | 0 | 318 | 263 | 3.55 | [#191], PR [#193] |
-| `arm-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | 55 | 52 | 1 | 9 of 20 | 0 | 458 | 403 | 3.78 | [#191], PR [#193] |
-| `arm-verdict-mcp-2` | `mcp`, four tools exposed (second seed) | `claude-sonnet-5` | 2026-09-26 | 55 | 53 | 2 | 6 of 19 | 0 | 461 | 406 | 3.84 | [#191], PR [#193] |
-| `arm-surface-mcp-2` | `mcp` (second seed) | `claude-sonnet-5` | 2026-09-26 | 55 | 45 | 8 | 2 of 13 | 0 | 349 | 294 | 3.74 | [#191], PR [#193] |
-| `cost-hard-shell-1` | `shell` | `claude-opus-5` | 2026-09-27 | 2 | 1 | 0 | no original | 0 | 25 | 23 | 1.50 | the cost pairs on [#189] |
-| `cost-hard-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-27 | 2 | 2 | 0 | no original | 0 | 28 | 26 | 2.66 | the cost pairs on [#189] |
-| `cost-hard-both-1` | `both` | `claude-opus-5` | 2026-09-27 | 2 | 1 | 0 | no original | 0 | 30 | 28 | 2.17 | the cost pairs on [#189] |
-| `hard-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-27 | 14 (hard tier) | 8 | 0 | no original | 0 | 174 | 160 | 6.41 | [#189], PR [#197], the guide's § 4.5 |
-| `hard-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-27 | 14 (hard tier) | 14 | 0 | no original | 0 | 143 | 129 | 7.82 | [#189], PR [#197], the guide's § 4.5 |
-| `hard-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-27 | 14 (hard tier) | 8 | 0 | no original | 0 | 162 | 148 | 6.62 | [#189], PR [#197], the guide's § 4.5 |
+Every run dated before 2026-09-29 had the fixture headers' hints in view
+(the "header hints" column): a subject works on a byte-for-byte copy of its
+obligation, and until [#219] every obligation's header carried a `Strategy:`
+line sketching the proof, the haystack tier's a `Needle:` line naming the
+lemma the tier asks a searcher to find, and the mined tiers' a `Source:` line
+naming the module that holds the original.  The runs dated 2026-09-29 had
+none: the headers were stripped from every tier first (PRs [#220] and
+[#221]), and what they said is in each tier's README.  Neither the loop nor
+the judge reads comments, so no verdict of an old run would change under a
+re-judge; what changed is what a subject was told.  The old runs stay as
+archived, and the section on the header-free arms below says which of their
+figures the new runs replace.
+
+| run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `smoke-haiku-1` | `mcp` | `claude-haiku-4-5-20251001` | 2026-09-15 | in view | 1 | 1 | 0 | not re-judged | 0 | 4 | 3 | 0.04 | the isolation verification on [#154] |
+| `cost-sonnet-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | in view | 2 | 1 | 1 | not re-judged | 0 | 10 | 8 | 0.28 | the cost estimate on [#154] |
+| `cost-opus-1` | `mcp` | `claude-opus-5` | 2026-09-15 | in view | 2 | 2 | 0 | not re-judged | 0 | 12 | 10 | 0.47 | the cost estimate on [#154] |
+| `agent-sonnet5-1` | `mcp` | `claude-sonnet-5` | 2026-09-15 | in view | 55 | 46 | 8 | 0 of 13 | 0 | 327 | 272 | 4.62 | ADR 0001 § 9, README, [#154] |
+| `agent-opus5-1` | `mcp` | `claude-opus-5` | 2026-09-15 | in view | 55 | 54 | 1 | 0 of 20 | 0 | 325 | 270 | 9.14 | ADR 0001 § 9, README, [#154] |
+| `agent-opus5-2` | `mcp` | `claude-opus-5` (second seed) | 2026-09-15 | in view | 55 | 54 | 1 | 0 of 20 | 0 | 338 | 283 | 9.46 | ADR 0001 § 9, [#154] |
+| `arm162-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-21 | in view | 55 | 50 | 0 | 15 of 18 | 0 | 308 | 253 | 2.88 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `arm162-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-21 | in view | 55 | 47 | 6 | 4 of 14 | 0 | 342 | 287 | 5.28 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `arm162-both-1` | `both` | `claude-sonnet-5` | 2026-09-21 | in view | 55 | 51 | 2 | 16 of 19 | 0 | 327 | 272 | 4.25 | ADR 0001 § 9, ADR 0002 § 12, [#162] |
+| `iso184-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | in view | 1 | 1 | 0 | not re-judged | 0 | 4 | 3 | 0.11 | the isolation check for client 2.1.282 on [#184] |
+| `cost184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | in view | 2 | 1 | 1 | not re-judged | 0 | 10 | 8 | 0.12 | the cost pair on [#184] |
+| `cost184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | in view | 2 | 1 | 1 | not re-judged | 0 | 15 | 13 | 0.27 | the cost pair on [#184] |
+| `arm184-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-25 | in view | 55 | 46 | 8 | 3 of 12 | 0 | 359 | 304 | 4.63 | [#184], PR [#190] |
+| `arm184-both-1` | `both` | `claude-sonnet-5` | 2026-09-25 | in view | 55 | 49 | 2 | 14 of 18 | 0 | 318 | 263 | 4.00 | [#184], PR [#190] |
+| `cost-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | in view | 2 | 0 | 1 | 0 of 0 | 0 | 11 | 9 | 0.15 | the cost pairs on [#191] |
+| `cost-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | in view | 2 | 1 | 1 | 0 of 0 | 0 | 14 | 12 | 0.23 | the cost pairs on [#191] |
+| `cost-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | in view | 2 | 0 | 1 | 0 of 0 | 0 | 17 | 15 | 0.16 | the cost pairs on [#191] |
+| `arm-surface-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-26 | in view | 55 | 48 | 7 | 6 of 14 | 0 | 345 | 290 | 3.83 | [#191], PR [#193] |
+| `arm-surface-both-1` | `both` | `claude-sonnet-5` | 2026-09-26 | in view | 55 | 46 | 4 | 8 of 14 | 0 | 318 | 263 | 3.55 | [#191], PR [#193] |
+| `arm-verdict-mcp-1` | `mcp`, four tools exposed | `claude-sonnet-5` | 2026-09-26 | in view | 55 | 52 | 1 | 9 of 20 | 0 | 458 | 403 | 3.78 | [#191], PR [#193] |
+| `arm-verdict-mcp-2` | `mcp`, four tools exposed (second seed) | `claude-sonnet-5` | 2026-09-26 | in view | 55 | 53 | 2 | 6 of 19 | 0 | 461 | 406 | 3.84 | [#191], PR [#193] |
+| `arm-surface-mcp-2` | `mcp` (second seed) | `claude-sonnet-5` | 2026-09-26 | in view | 55 | 45 | 8 | 2 of 13 | 0 | 349 | 294 | 3.74 | [#191], PR [#193] |
+| `cost-hard-shell-1` | `shell` | `claude-opus-5` | 2026-09-27 | in view | 2 | 1 | 0 | no original | 0 | 25 | 23 | 1.50 | the cost pairs on [#189] |
+| `cost-hard-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-27 | in view | 2 | 2 | 0 | no original | 0 | 28 | 26 | 2.66 | the cost pairs on [#189] |
+| `cost-hard-both-1` | `both` | `claude-opus-5` | 2026-09-27 | in view | 2 | 1 | 0 | no original | 0 | 30 | 28 | 2.17 | the cost pairs on [#189] |
+| `hard-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-27 | in view | 14 (hard tier) | 8 | 0 | no original | 0 | 174 | 160 | 6.41 | [#189], PR [#197], the guide's § 4.5 |
+| `hard-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-27 | in view | 14 (hard tier) | 14 | 0 | no original | 0 | 143 | 129 | 7.82 | [#189], PR [#197], the guide's § 4.5 |
+| `hard-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-27 | in view | 14 (hard tier) | 8 | 0 | no original | 0 | 162 | 148 | 6.62 | [#189], PR [#197], the guide's § 4.5 |
+| `cost-suite219-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-29 | none | 2 | 1 | 1 | 0 of 0 | 0 | 10 | 8 | 0.15 | the cost pairs on [#219] |
+| `cost-suite219-sonnet5-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-29 | none | 2 | 1 | 1 | 0 of 0 | 0 | 13 | 11 | 0.14 | the cost pairs on [#219] |
+| `cost-suite219-sonnet5-both-1` | `both` | `claude-sonnet-5` | 2026-09-29 | none | 2 | 1 | 1 | 0 of 0 | 0 | 12 | 10 | 0.20 | the cost pairs on [#219] |
+| `cost-suite219-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29 | none | 2 | 2 | 0 | 1 of 1 | 0 | 12 | 10 | 0.36 | the cost pairs on [#219] |
+| `suite219-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-29 | none | 55 | 44 | 9 | 4 of 11 | 0 | 347 | 292 | 3.99 | ADR 0001 § 9, ADR 0002 § 12, README, the site, [#219] |
+| `suite219-sonnet5-shell-1` | `shell` | `claude-sonnet-5` | 2026-09-29 | none | 55 | 47 | 4 | 12 of 14 | 0 | 345 | 290 | 3.42 | ADR 0001 § 9, ADR 0002 § 12, the site, [#219] |
+| `suite219-sonnet5-both-1` | `both` | `claude-sonnet-5` | 2026-09-29 | none | 55 | 48 | 5 | 11 of 16 | 0 | 353 | 298 | 4.13 | ADR 0001 § 9, ADR 0002 § 12, the site, [#219] |
+| `suite219-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29 | none | 55 | 55 | 0 | 4 of 21 | 0 | 323 | 268 | 7.07 | ADR 0001 § 9, README, the site, [#219] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -222,12 +243,18 @@ The one Sonnet row that is neither solved nor restated
 than adding an import line, which the preservation gate refuses by the
 protocol; its `outcome.json` records that the file type-checks (`agdaExit` 0).
 
+These first arms had the headers' hints in view; their header-free re-runs
+are `suite219-sonnet5-mcp-1` and `suite219-opus5-mcp-1`, in
+[the header-free arms](#the-header-free-arms-2026-09-29-219) below.
+
 ## The attribution arms (2026-09-21, [#162])
 
 The three arms above were run fresh at one protocol version, one arm at a
 time, to ask what the server is worth: `shell` gives the subject Bash and the
 pinned `agda`, `mcp` gives it the server, `both` gives it both.  Zero
-anomalies in all three; USD 12.41 together.
+anomalies in all three; USD 12.41 together.  Their subjects had the headers'
+hints in view; the same three arms without them are the `suite219-sonnet5-*`
+runs in [the header-free arms](#the-header-free-arms-2026-09-29-219) below.
 
 | stratum | n | archive `mcp` | `shell` | `mcp` | `both` |
 |---|---|---|---|---|---|
@@ -546,6 +573,73 @@ What the numbers mean is the guide's § 4.5
 per-row account, what each subject tried and which tools it used, is on
 [#189].
 
+## The header-free arms (2026-09-29, [#219])
+
+The four 55-row arms behind every agent figure the documents and the site
+quote, run again with the fixture headers stripped of their hints (see the
+sentence above the run table): Sonnet 5 in the `mcp`, `shell`, and `both`
+arms, and Opus 5 in the `mcp` arm.  One arm at a time, parallelism 3, the
+caps of every 55-row arm (30 turns, 900 s, USD 3.00), client 2.1.282, from
+one frozen copy of the server and the extractor and one snapshot of the
+driver's classes; each arm after a two-row cost pair whose isolation audit
+came back clean; the 55 rows named with `--ids`, since the index now holds
+81.  Zero anomalies; USD 18.61 for the four.  `gold-leak.py`, which
+now also reports any call or answer naming the index or a tier README
+(where the headers' hints went), finds nothing in any of them.
+
+What each replaces, and how comparable the two are, is as follows:
+
++  **`suite219-sonnet5-mcp-1`** replaces `agent-sonnet5-1` and
+   `arm162-mcp-1`.  Its server, prompts, client, and caps are those of the
+   two [#191] seeds (`arm-surface-mcp-1`, `-2`), so that comparison is the
+   clean one: the headers are the one variable, besides the read roots'
+   gaining Agda's primitive modules (PR [#200]).
++  **`suite219-sonnet5-shell-1` and `suite219-sonnet5-both-1`** replace
+   `arm162-shell-1` and `arm162-both-1`.  Their prompts now name each
+   library's source directory (PR [#200]), and the `both` arm's server has
+   the lean answers and the trimmed surface, so each differs from the run it
+   replaces in more than the headers.
++  **`suite219-opus5-mcp-1`** replaces `agent-opus5-1`, whose protocol
+   predates everything [#162], [#184], and [#191] changed.
+
+| | `shell` | `mcp` | `both` | Opus `mcp` |
+|---|---:|---:|---:|---:|
+| solved | 47 | 44 | 48 | 55 |
+| restated | 4 | 9 | 5 | 0 |
+| lost to a gate | 4 | 2 | 2 | 0 |
+| solved, the 34 rows with no original | 33 | 33 | 32 | 34 |
+| agda-algebras solved and restated (of 21) | 14, 4 | 11, 9 | 16, 5 | 21, 0 |
+| of those solves, original in view (the judge) | 12 | 4 | 11 | 4 |
+| haystack rows solved with no query before the final check | not read | 3 | not read | 1 |
+| haystack needle named before any search (of 12) | 6 | 7 | 6 | 10 |
+| turns | 345 | 347 | 353 | 323 |
+| tool calls | 290 | 292 | 298 | 268 |
+| USD | 3.42 | 3.99 | 4.13 | 7.07 |
+| output tokens | 92,135 | 87,335 | 81,546 | 74,363 |
+
++  **Every gated file type-checks with its statement kept**.  The `shell`
+   arm's four are two subjects that ran `find /` although the prompt names
+   the directories (`algebras-inverses-image-f-f`,
+   `algebras-inverses-range-to-image`), one `xargs` over a path inside the
+   roots, which the audit does not model (`algebras-kernels-ker-con`, whose
+   file also cites `kercon`), and one edited `using` list
+   (`haystack-nat-plus-zero-diag`).  The `mcp` arm's two are edited `using`
+   lists (`stdlib-nat-mul-comm`, as in `agent-sonnet5-1`, and
+   `algebras-injective-comp-injective`, which appends the original it then
+   cites), and so are the `both` arm's (`stdlib-nat-mul-distrib-r`,
+   `haystack-list-map-append-diag`).  So the files earned 50, 45, and 50
+   solves.  The Opus arm has no gate row.
++  **The `both` arm keeps its shape**: all 55 verdicts from `check_file`,
+   `agda` on the shell never, Bash 84 calls (83 library reads and one grep
+   of the row's corpus, as in the `shell` arm), and the knowledge tools
+   beside the shell
+   `definition_of` 0, `search_by_name` 4, `exports_of` 4, against 11, 21,
+   and 23 in the `mcp` arm.
++  **What moved against the runs these replace** (the haystack tier's route,
+   about three agda-algebras rows per Sonnet arm from solved to restated) and
+   what a difference can mean with one seed a side are the guide's § 4.6
+   ([`docs/reading-the-results.md`](../../docs/reading-the-results.md)).
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -577,6 +671,18 @@ run id is one arm, so each needs its own.
 make agent-bench AGENT_BENCH_ARM=shell AGENT_BENCH_MODEL=claude-sonnet-5 AGENT_BENCH_PARALLELISM=3 AGENT_BENCH_RUN_ID=arm162-shell-1
 make agent-bench AGENT_BENCH_ARM=mcp   AGENT_BENCH_MODEL=claude-sonnet-5 AGENT_BENCH_PARALLELISM=3 AGENT_BENCH_RUN_ID=arm162-mcp-1
 make agent-bench AGENT_BENCH_ARM=both  AGENT_BENCH_MODEL=claude-sonnet-5 AGENT_BENCH_PARALLELISM=3 AGENT_BENCH_RUN_ID=arm162-both-1
+```
+
+Since the hard and composition tiers joined the index, it has 81 rows, and
+the 55-row arms name their rows rather than taking `--all` (the header-free
+arms of 2026-09-29 were run so, from a frozen server, extractor, and class
+snapshot, one arm at a time):
+
+```sh
+IDS=$(jq -r 'select(.tags | index("stratum:novel") or index("stratum:composition") | not) | .id' \
+  data/benchmarks/benchmark-index.jsonl | paste -sd,)
+make agent-bench AGENT_BENCH_ARM=mcp AGENT_BENCH_MODEL=claude-sonnet-5 AGENT_BENCH_PARALLELISM=3 \
+  AGENT_BENCH_RUN_ID=suite219-sonnet5-mcp-1 "AGENT_BENCH_IDS=--ids $IDS"
 ```
 
 A re-judge does not need `AGENT_BENCH_ARM`: each subject's `subject.json`
@@ -616,3 +722,7 @@ new run gets a new run id.
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#197]: https://github.com/formalverification/agda-native-air/pull/197
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
+[#220]: https://github.com/formalverification/agda-native-air/pull/220
+[#221]: https://github.com/formalverification/agda-native-air/pull/221
+[#200]: https://github.com/formalverification/agda-native-air/pull/200

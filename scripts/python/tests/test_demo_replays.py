@@ -15,8 +15,8 @@ worth pinning are properties of what gets published.
 +  Every verdict on the page is the archive's.  Each replay's verdict fields
    are compared with the `outcome.json` they were read from, so no later
    convenience can turn a restatement into a solve on the way to the HTML.
-+  The four contrasts the page is built around still hold.  If the archive is
-   ever regenerated and `algebras-kernels-ker-con` stops being a solve beside
++  The contrasts the page is built around still hold.  If the archive is
+   ever regenerated and `algebras-homs-mon-to-hom` stops being a solve beside
    a restatement, the page's claim about it becomes false, and this is where
    that is found out.
 
@@ -179,27 +179,36 @@ def test_each_replay_has_an_exchange_with_an_answer(tmp_path: Path) -> None:
 
 
 def test_the_flagship_contrast_still_holds(tmp_path: Path) -> None:
-    # The page's central claim: one obligation, the same thirteen tools, two
+    # The page's central claim: one obligation, the same fourteen tools, two
     # verdicts.  If the archive ever stops saying that, the page is wrong.
     built = _built(tmp_path)
-    opus = built["agent-opus5-1--algebras-kernels-ker-con"]
-    sonnet = built["agent-sonnet5-1--algebras-kernels-ker-con"]
+    opus = built["suite219-opus5-mcp-1--algebras-homs-mon-to-hom"]
+    sonnet = built["suite219-sonnet5-mcp-1--algebras-homs-mon-to-hom"]
     assert opus["obligation"]["path"] == sonnet["obligation"]["path"]
     assert opus["verdict"]["kind"] == "solved"
     assert sonnet["verdict"]["kind"] == "restated"
     assert sonnet["verdict"]["agdaExit"] == 0
     assert sonnet["verdict"]["restatementEvidence"] == \
-        ["ref Setoid.Homomorphisms.Kernels.kercon"]
-    assert "kercon h" in sonnet["final"]["text"]
-    assert "mkcon" in opus["final"]["text"]
+        ["ref Setoid.Homomorphisms.Basic.mon→hom"]
+    assert "mon→hom _ _ m" in sonnet["final"]["text"]
+    assert "IsMon.isHom (proj₂ m)" in opus["final"]["text"]
+    # The blurb's first probe: `_,_` not in scope, then the qualified one.
+    probes = [s for s in opus["session"]["steps"]
+              if s["kind"] == "call" and s["display"] == "fill_hole"]
+    assert len(probes) == 2
+    assert "Not in scope" in probes[0]["answer"]["body"]
+    assert ["status", "ok"] in probes[1]["answer"]["headline"]
+    # Neither session had the original's proof in view.
+    assert opus["verdict"]["original"]["inView"] is False
+    assert sonnet["verdict"]["original"]["inView"] is False
 
 
 def test_the_gate_contrast_still_holds(tmp_path: Path) -> None:
     # Both arms needed `trans`; the two final files differ by one import
     # line, and that line is the whole difference between a solve and a gate.
     built = _built(tmp_path)
-    opus = built["agent-opus5-1--stdlib-nat-mul-comm"]
-    sonnet = built["agent-sonnet5-1--stdlib-nat-mul-comm"]
+    opus = built["suite219-opus5-mcp-1--stdlib-nat-mul-comm"]
+    sonnet = built["suite219-sonnet5-mcp-1--stdlib-nat-mul-comm"]
     assert opus["verdict"]["kind"] == "solved"
     assert opus["verdict"]["addedImports"] == [
         "open import Relation.Binary.PropositionalEquality using ( trans )"]
@@ -211,26 +220,22 @@ def test_the_gate_contrast_still_holds(tmp_path: Path) -> None:
                                                 sonnet["final"]["text"])
              if mark == "+"]
     assert any("; trans )" in line for line in added)
+    assert opus["verdict"]["turns"] == 4
 
 
-def test_the_composition_contrast_still_holds(tmp_path: Path) -> None:
-    # A wholesale row solved through two answers that were errors: an
-    # `exports_of` on a module not in scope, and a `type_of` whose NotInScope
-    # answer suggested the name the proof ends up using.
+def test_the_wholesale_session_still_holds(tmp_path: Path) -> None:
+    # A wholesale row solved through a located definition and one
+    # `search_in_scope` question, whose one in-scope row is the proof's.
     replay = _built(tmp_path)[
-        "agent-opus5-1--algebras-subalgebras-sub-trans-iso"]
+        "suite219-opus5-mcp-1--algebras-subalgebras-sub-reflexive"]
     assert replay["verdict"]["kind"] == "solved"
     assert replay["obligation"]["stratum"] == "agda-algebras/wholesale"
     calls = [s for s in replay["session"]["steps"] if s["kind"] == "call"]
-    not_in_scope = [call for call in calls
-                    if ["error.code", "NotInScope"]
-                    in call["answer"]["headline"]]
-    assert {call["display"] for call in not_in_scope} == \
-        {"exports_of", "type_of"}
-    suggesting = [call for call in not_in_scope
-                  if "⊙-hom" in call["answer"]["body"]]
-    assert suggesting, "the suggestion the session acted on is gone"
-    assert "⊙-hom" in replay["final"]["text"]
+    names = [call["display"] for call in calls]
+    assert "definition_of" in names and names.count("search_in_scope") == 1
+    asked = next(call for call in calls if call["display"] == "search_in_scope")
+    assert "Setoid.Homomorphisms.Basic.𝒾𝒹" in asked["answer"]["body"]
+    assert "𝒾𝒹 , (λ z → z)" in replay["final"]["text"]
 
 
 def test_the_index_row_of_every_replay_exists() -> None:

@@ -54,6 +54,7 @@ from scripts.python.demo.build_site import build as build_site, read_data
 from scripts.python.demo.numbers import (
     ARCHIVE,
     BOTH_RUN,
+    HINTED_RUN,
     MCP_RUN,
     OPUS_RUN,
     SHELL_RUN,
@@ -294,7 +295,7 @@ def test_the_page_carries_the_table_it_was_checked_against(built) -> None:
     # moved them: a column to the left of the agents' reads as a baseline).
     total = built["data"]["numbers"]["rows"][-1]
     printed = _total_row(_table(built, "agents"))
-    assert printed == ["total", "55", "46", "8", "54", "1", "8", "14"]
+    assert printed == ["total", "55", "44", "9", "55", "0", "8", "14"]
     assert str(total["opusSolved"]) == printed[4]
 
 
@@ -537,8 +538,9 @@ def test_the_control_table_is_the_adrs(built) -> None:
     table = _table(built, "control")
     assert set((table.attrs.get("data-runs") or "").split()) == \
         {SONNET_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN}
-    assert _total_row(table) == ["total", "55", "46", "8", "50", "0",
-                                 "47", "6", "51", "2"]
+    # The header-free control (Issue #219): shell, mcp, both.
+    assert _total_row(table) == ["total", "55", "47", "4", "44", "9",
+                                 "48", "5"]
     assert "attribution table" in table.text
 
 
@@ -557,31 +559,33 @@ def test_the_intro_says_what_the_sessions_are_evidence_of(built) -> None:
 def test_the_intros_figures_are_the_archives(built) -> None:
     sonnet = built["data"]["numbers"]["arms"]["sonnet"]
     opus = built["data"]["numbers"]["arms"]["opus"]
-    assert sonnet["toolCount"] == opus["toolCount"] == 13
+    assert sonnet["toolCount"] == opus["toolCount"] == 14
     intro = next(r for r in _regions(built) if r.attrs.get("id") == "what")
     said = " ".join(intro.text.split())
     assert f"server’s {render._word(sonnet['toolCount'])} tools" in said
-    assert f"as they stood on {sonnet['startedOn']}" in said
+    assert f"as re-run on {sonnet['startedOn']}" in said
+    assert sonnet["startedOn"] == opus["startedOn"] == "2026-09-29"
     assert (f"caps of {sonnet['turnCap']} turns, {sonnet['wallCapSec']} "
             f"seconds, and USD {sonnet['budgetCapUsd']:.2f}") in said
 
 
 def test_the_intros_reading_of_the_control_still_holds(built) -> None:
     # The intro says the server did not come out ahead on the count, and
-    # that the control could read the library proofs these sessions could
-    # not.  Those are readings of the record; if a re-judge moves one, this
-    # fails, and the sentence has to be rewritten rather than republished.
+    # that every arm could read the library's proofs, some of them in view.
+    # Those are readings of the record; if a re-judge moves one, this fails,
+    # and the sentence has to be rewritten rather than republished.
     arms = {arm["runId"]: arm
             for arm in built["data"]["numbers"]["control"]["arms"]}
     assert arms[SHELL_RUN]["solved"] >= arms[MCP_RUN]["solved"]
     assert arms[SHELL_RUN]["restated"] <= arms[MCP_RUN]["restated"]
+    intro = next(r for r in _regions(built) if r.attrs.get("id") == "what")
+    assert "the server did not come out ahead on the count" in \
+        " ".join(intro.text.split())
     for run in (SHELL_RUN, MCP_RUN, BOTH_RUN):
         assert arms[run]["withOriginal"]["refusedReads"] == 0
         assert arms[run]["withOriginal"]["inView"] > 0
     for arm in built["data"]["numbers"]["arms"].values():
-        assert arm["withOriginal"]["reads"] == 0
-        assert arm["withOriginal"]["inView"] == 0
-        assert arm["withOriginal"]["refusedReads"] > 0
+        assert arm["withOriginal"]["refusedReads"] == 0
     # And "given both, the subject took every verdict from the server".
     both = arms[BOTH_RUN]
     assert both["verdictVia"] == {"mcp": both["total"]}
@@ -625,17 +629,17 @@ def test_every_replayed_sessions_original_is_read_onto_the_page(built) -> None:
     assert check_clean(built["html"]).is_ok
 
 
-def test_the_refused_read_on_the_page_is_the_blocks(built) -> None:
-    # The one refused read the readings mention is a step on the page: the
-    # third session's Read of the original's file, answered by the client's
-    # refusal.
-    replay = next(r for r in built["data"]["replays"]
-                  if (r["verdict"]["original"] or {}).get("refusedReads"))
-    refused = [step for step in replay["session"]["steps"]
-               if step["kind"] == "call" and step["display"] == "Read"
-               and (step.get("answer") or {}).get("isError")]
-    assert len(refused) == replay["verdict"]["original"]["refusedReads"]
-    assert "Subalgebras/Properties.lagda.md" in refused[0]["answer"]["body"]
+def test_no_replayed_session_was_refused_a_read(built) -> None:
+    # The first roster's sessions could not read the libraries, and one of
+    # them was refused the original's file on the page.  The header-free
+    # arms could read them (Issue #219), so no session on the page was
+    # refused one, and the page does not say it was.
+    for replay in built["data"]["replays"]:
+        original = replay["verdict"]["original"] or {}
+        assert original.get("refusedReads", 0) == 0
+    section = next(r for r in _regions(built)
+                   if r.attrs.get("id") == "restated")
+    assert "the client refused" not in " ".join(section.text.split())
 
 
 def _headings(path: Path) -> Set[str]:
@@ -681,12 +685,12 @@ def test_the_anchor_rule_is_githubs() -> None:
 
 def test_the_later_findings_are_linked_not_restated(built) -> None:
     paragraph = next(el for el in built["root"].walk() if el.tag == "p"
-                     and el.text.startswith("Three measurements followed"))
+                     and el.text.startswith("The measurements before these"))
     links = [el.attrs.get("href") or "" for el in paragraph.walk()
              if el.tag == "a"]
-    for issue in (184, 191, 189):
+    for issue in (162, 184, 191, 189):
         assert f"{render.REPO_URL}/issues/{issue}" in links
-    for section in ("4.3", "4.5"):
+    for section in ("4.3", "4.5", "4.6"):
         assert any(link.endswith(render.anchor(render.GUIDE_SECTIONS[section]))
                    for link in links)
     # No figure: the digits left once the issue numbers, the section
@@ -695,26 +699,32 @@ def test_the_later_findings_are_linked_not_restated(built) -> None:
     assert not re.search(r"\d", bare), bare
 
 
-def test_the_haystack_sentence_still_holds(built) -> None:
-    # The sentence's figures are read from the data; its shape (every row
-    # but one without a query, and that one a single `type_of`) and the
-    # name it quotes are pinned against the archive here.
-    quiet = built["data"]["numbers"]["arms"]["sonnet"]["haystack"]
-    assert quiet["quiet"] == quiet["rows"] - 1
-    assert quiet["quietTurns"] == [4]
-    assert quiet["queries"] == {"type_of": 1}
-    (row,) = quiet["others"]
-    transcript = (REPO / ARCHIVE / SONNET_RUN / "subjects" / row
-                  / "transcript.jsonl")
-    asked = [block.get("input") or {}
-             for line in transcript.read_text(encoding="utf-8").splitlines()
-             for block in (json.loads(line).get("message") or {})
-             .get("content") or []
-             if isinstance(block, dict) and block.get("type") == "tool_use"
-             and block.get("name") == "mcp__agda__type_of"]
-    assert len(asked) == 1
-    assert "Data.Nat.Properties.+-∸-assoc" in json.dumps(asked[0],
-                                                          ensure_ascii=False)
+def test_the_haystack_reading_still_holds(built) -> None:
+    # Issue #219: with each header naming its needle, the Sonnet arm solved
+    # most of the tier asking nothing before its final check; without it, it
+    # asked first on most rows, and what it asked with was the search tools.
+    # The section says so from the data, and these are its premises.
+    numbers = built["data"]["numbers"]
+    now = numbers["arms"]["sonnet"]["haystack"]
+    was = numbers["hinted"]["haystack"]
+    assert numbers["hinted"]["runId"] == HINTED_RUN
+    assert now["rows"] == was["rows"] == 12
+    assert now["solved"] == was["solved"] == 12
+    assert was["quiet"] > was["rows"] / 2 > now["quiet"]
+    searched = {tool: n for tool, n in now["queries"].items()
+                if tool.startswith("search_") or tool == "exports_of"}
+    assert sum(searched.values()) > sum(now["queries"].values()) / 2
+    section = next(r for r in _regions(built)
+                   if r.attrs.get("id") == "haystack")
+    said = " ".join(section.text.split())
+    assert "On most rows it was the header." in said
+    # And Opus's route: probes of lemmas it named, and no search call.
+    opus = numbers["arms"]["opus"]["haystack"]
+    assert opus["solved"] == 12 and opus["quiet"] < opus["rows"] / 2
+    assert set(opus["queries"]) <= {"fill_hole", "type_of"}
+    assert "it searched for none" in said
+    assert f"solved {render._word(was['quiet'])} of the twelve" in said
+    assert "Needle:" in said
 
 
 def test_the_archive_size_on_the_page_is_the_measured_one(built) -> None:
@@ -723,36 +733,36 @@ def test_the_archive_size_on_the_page_is_the_measured_one(built) -> None:
     assert "1,051" not in built["html"]
 
 
-def test_the_protocol_differences_the_page_names_are_the_archives(built) -> None:
-    # The control section says its protocol differs from the archived arms'
-    # in three ways.  Each is read here from the record: the one tool the
-    # control's server added and nobody called, the reads the archived arms
-    # were refused and the control's were not, and `--safe` on the control's
-    # subjects' servers (the archived arms' reports record no such flag,
-    # and reports/agent-bench/README.md says they ran without it).
+def test_the_protocol_the_page_names_is_the_archives(built) -> None:
+    # Issue #219: the control section says its three arms share one protocol
+    # with the Opus arm (the tools, readable sources, `--safe`, headers with
+    # no hints), and that one difference is deliberate: the prompts of the
+    # two arms with a shell name the library source directories.  Each is
+    # read here from the runs' own records.
     numbers = built["data"]["numbers"]
     arms = {arm["runId"]: arm for arm in numbers["control"]["arms"]}
-    added = set(arms[MCP_RUN]["agdaTools"]) - set(arms[SONNET_RUN]["agdaTools"])
-    assert added == {"search_in_scope"}
-    assert set(arms[BOTH_RUN]["agdaTools"]) == set(arms[MCP_RUN]["agdaTools"])
-    for run in (MCP_RUN, BOTH_RUN):
-        called = dict(numbers["control"]["perTool"][run])
-        assert "mcp__agda__search_in_scope" not in called
-    for run in (SHELL_RUN, MCP_RUN, BOTH_RUN):
-        config = json.loads((REPO / ARCHIVE / run / "report.json")
-                            .read_text(encoding="utf-8"))["config"]
+    opus = numbers["arms"]["opus"]
+    assert set(arms[MCP_RUN]["agdaTools"]) == set(arms[BOTH_RUN]["agdaTools"]) \
+        == set(opus["agdaTools"])
+    assert "search_in_scope" in arms[MCP_RUN]["agdaTools"]
+    configs = {run: json.loads((REPO / ARCHIVE / run / "report.json")
+                               .read_text(encoding="utf-8"))["config"]
+               for run in (SHELL_RUN, MCP_RUN, BOTH_RUN, OPUS_RUN)}
+    for config in configs.values():
         assert config["subjectAgdaFlags"].split()[-1] == "--safe"
-    for run in (SONNET_RUN, OPUS_RUN):
-        config = json.loads((REPO / ARCHIVE / run / "report.json")
-                            .read_text(encoding="utf-8"))["config"]
-        assert "subjectAgdaFlags" not in config
-    # `Element.text` puts an element's own text before its children's, so a
-    # phrase that spans a <code> is checked in the HTML, in document order.
+        assert config["claudeVersion"] == configs[MCP_RUN]["claudeVersion"]
+        assert (config["maxTurns"], config["wallCapSec"],
+                config["maxBudgetUsd"]) == (30, 900, 3.0)
+    prompts = {run: (REPO / ARCHIVE / run / "prompts" / "system-prompt.md")
+               .read_text(encoding="utf-8")
+               for run in (SHELL_RUN, MCP_RUN, BOTH_RUN, OPUS_RUN)}
+    assert "{{sources}}" in prompts[SHELL_RUN] and \
+        "{{sources}}" in prompts[BOTH_RUN]
+    assert "{{sources}}" not in prompts[MCP_RUN]
+    assert prompts[MCP_RUN] == prompts[OPUS_RUN]
     html = " ".join(built["html"].split())
-    assert ("its server offered <code>search_in_scope</code> besides the "
-            "thirteen tools above, and no subject called it") in html
-    assert "and the subjects&rsquo; servers carried the judge&rsquo;s " \
-        "<code>--safe</code>" in html
+    assert "the prompts of the two arms with a shell name the directory " \
+        "holding each library&rsquo;s sources" in html
 
 
 # --------------------------------- Copilot's review of PR #217 (Issue #215)
@@ -767,7 +777,7 @@ def test_only_the_two_section_9_tables_are_said_to_be_compared(built) -> None:
             "control&rsquo;s, are also compared with the ADR cell by cell") \
         in html
     assert "Both tables are checked against" not in html
-    assert ("The archived arms&rsquo; table and the control&rsquo;s are "
+    assert ("The agents&rsquo; table and the control&rsquo;s are "
             "checked against") in html
 
 

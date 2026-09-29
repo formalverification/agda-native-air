@@ -238,6 +238,33 @@ def knowledge_tool_calls(report: Report) -> Result[int, str]:
         and name[len(SERVER_TOOL_PREFIX):] in KNOWLEDGE_TOOLS))
 
 
+#: The haystack tier's stratum (Issue #129), and the calls a session needs
+#: to read its staged file, edit it, and check it.  The demo's
+#: `numbers.quiet` counts the same sessions by the same rule.
+HAYSTACK = "agda-stdlib/haystack"
+LEAST_CALLS: FrozenSet[str] = frozenset({"Read", "Edit",
+                                         SERVER_TOOL_PREFIX + "check_file"})
+
+
+def haystack_unqueried(report: Report) -> Result[int, str]:
+    """Haystack rows solved by a session that called nothing but Read, Edit,
+    and `check_file`: it asked no question before its final check.
+
+    Until Issue #219 each haystack fixture's header named the lemma its
+    proof needs, and this is the figure that header moved (the guide's
+    § 4.6), so the landing page cites it for a run with the header and one
+    without.
+    """
+    def unqueried(outcome: Mapping[str, Any]) -> bool:
+        calls = outcome.get("toolCalls")
+        return (outcome.get("stratum") == HAYSTACK and outcome.get("solved") is True
+                and isinstance(calls, Mapping) and set(calls) <= LEAST_CALLS)
+    return (_outcomes(report)
+            .and_then(lambda os: _every(os, "stratum"))
+            .and_then(lambda os: _every(os, "toolCalls"))
+            .map(lambda os: sum(1 for o in os if unqueried(o))))
+
+
 #: The derived figures, by the name a marker uses.
 DERIVED: Dict[str, Callable[[Report], Result[int, str]]] = {
     "final-checks-statement-kept": final_checks_statement_kept,
@@ -245,6 +272,7 @@ DERIVED: Dict[str, Callable[[Report], Result[int, str]]] = {
     "rows-without-original": rows_without_original,
     "solved-with-original": solved_with_original,
     "knowledge-tool-calls": knowledge_tool_calls,
+    "haystack-unqueried": haystack_unqueried,
 }
 
 

@@ -3,15 +3,20 @@
 File: scripts/python/demo/numbers.py
 
 Description: The demo page's numbers, regenerated from the archived run
-  reports and checked against ADR 0001 § 9 (Issues #85 and #215).
+  reports and checked against ADR 0001 § 9 (Issues #85, #215, and #219).
 
-  § 9 states two tables the page carries.  The agent table, under "The agent
-  in the loop", gives the two arms whose sessions the page replays
-  (Issue #154).  The attribution table, under "The attribution arms: what the
-  server is worth", gives the control (Issue #162): the same model with a
-  shell and the same `agda` in place of the server, with the server, and with
-  both, beside the archived Sonnet arm.  Transcribing either would be how a
-  page and a decision record come to disagree, so every figure is recomputed
+  § 9 states two tables the page carries, each twice: once as first measured,
+  with the fixture headers' hints in view, and once re-measured without them
+  (Issue #219).  The page carries the header-free pair.  The agent table
+  gives the two arms whose sessions the page replays, Sonnet 5 and Opus 5
+  with the server.  The attribution table gives the control (Issue #162):
+  the same model with a shell and the same `agda` in place of the server,
+  with the server, and with both; its `mcp` column is the Sonnet arm of the
+  agent table, one run held to both tables.  Each table is found by the
+  caption line the ADR sets above it (`AGENT_CAPTION`, `CONTROL_CAPTION`),
+  since the dated tables share their headers.  Transcribing either table
+  would be how a page and a decision record come to disagree, so every
+  figure is recomputed
   here from the runs' own `report.json` and then compared with the ADR's
   tables cell for cell.  The comparison is `validate`, which reads the five
   reports and the ADR and nothing else; `make demo-check` (this module's
@@ -61,9 +66,10 @@ Design Principles:
      order is an artifact of how the harness wrote it; the table's order is
      declared here and the ADR's rows are matched to it by name.
   +  The ADR is parsed, not assumed.  `_table` finds the one table in the
-     document whose header carries a given column set, so a new table
-     elsewhere in § 9 cannot be picked up by accident and a renamed column
-     fails loudly.
+     document under a given caption line and requires its header to carry a
+     given column set, so a dated table with the same columns cannot be
+     picked up by accident, a caption that moves off its table is refused,
+     and a renamed column fails loudly.
   +  Differences are values.  `compare` and `compare_control` return the
      list of disagreements rather than raising, so a caller can print all of
      them at once, both tables' together.
@@ -95,20 +101,33 @@ ADR = Path("docs/adr/0001-proof-search-on-agda-mcp.md")
 
 #: The shape of the numbers file this module writes.  v1 (Issue #215) added
 #: the control, the archive's size, and the arms' days, tools, and readings;
-#: `build_site` refuses a file of any other shape rather than render it.
-SCHEMA = "agda-native-air.demo.numbers.v1"
+#: v2 (Issue #219) dropped the control's archived column, since its `mcp`
+#: arm is now the replayed Sonnet arm itself.  `build_site` refuses a file of
+#: any other shape rather than render it.
+SCHEMA = "agda-native-air.demo.numbers.v2"
 
-#: The run ids of the two arms the page replays, and the model each ran.
-SONNET_RUN = "agent-sonnet5-1"
-OPUS_RUN = "agent-opus5-1"
+#: The run ids of the two arms the page replays, and the model each ran:
+#: the header-free re-runs of Issue #219.
+SONNET_RUN = "suite219-sonnet5-mcp-1"
+OPUS_RUN = "suite219-opus5-mcp-1"
 
-#: The three attribution arms of Issue #162, one instrument each.
-SHELL_RUN = "arm162-shell-1"
-MCP_RUN = "arm162-mcp-1"
-BOTH_RUN = "arm162-both-1"
+#: The three arms of the control (Issue #162), one instrument each, re-run
+#: header-free.  The `mcp` arm is the Sonnet arm the page replays: the four
+#: runs of Issue #219 share one protocol, so one run serves both tables.
+SHELL_RUN = "suite219-sonnet5-shell-1"
+MCP_RUN = SONNET_RUN
+BOTH_RUN = "suite219-sonnet5-both-1"
+
+#: The Sonnet arm first measured with the fixture headers' hints in view
+#: (Issue #154), the same model, server arm, and obligations.  The page reads
+#: one thing from it, how the haystack tier was solved while each header
+#: named its needle, and sets it beside the header-free arm's; no table
+#: reads it.
+HINTED_RUN = "agent-sonnet5-1"
 
 #: Every run the page reads, each read once.
-RUNS: Tuple[str, ...] = (SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN)
+RUNS: Tuple[str, ...] = tuple(dict.fromkeys(
+    (SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN, HINTED_RUN)))
 
 #: The stratum rows, in the order the table prints them.
 STRATA: Tuple[str, ...] = (
@@ -124,8 +143,16 @@ TIERS: Tuple[str, ...] = ("routine", "compositional", "non-obvious")
 #: The ADR's name for the total row.
 TOTAL = "total"
 
-#: The header cells that identify § 9's agent table, lower-cased.  The
-#: document has many tables; this is the only one with these columns.
+#: The caption lines that identify § 9's two header-free tables, as the ADR
+#: writes them above each table (emphasis markers aside).  The dated tables
+#: carry the same headers under captions of their own, so the caption, not
+#: the header, is what tells them apart.
+AGENT_CAPTION = ("The agent table, 2026-09-29, fixture headers stripped of "
+                 "hints.")
+CONTROL_CAPTION = ("The attribution table, 2026-09-29, fixture headers "
+                   "stripped of hints.")
+
+#: The header cells § 9's agent table must carry, lower-cased.
 ADR_HEADER: Tuple[str, ...] = (
     "stratum", "n", "loop fixed", "loop retrieval",
     "sonnet 5 solved", "sonnet 5 restated",
@@ -133,11 +160,9 @@ ADR_HEADER: Tuple[str, ...] = (
 )
 
 #: § 9's attribution table: its arm columns, in the table's order, and the
-#: run each one reports.  "archive mcp" is the archived Sonnet arm, the same
-#: run the agent table's Sonnet columns come from, so that one run is held to
-#: both tables.
+#: run each one reports.  The `mcp` column is the same run the agent table's
+#: Sonnet columns come from, so that one run is held to both tables.
 CONTROL: Tuple[Tuple[str, str], ...] = (
-    ("archive mcp", SONNET_RUN),
     ("shell", SHELL_RUN),
     ("mcp", MCP_RUN),
     ("both", BOTH_RUN),
@@ -152,6 +177,9 @@ CONTROL_HEADER: Tuple[str, ...] = ("stratum", "n") + tuple(
 #: `9 solved` or `9 solved, 2 restated`, and leaves a zero restated count out
 #: everywhere but the total row.
 TALLY = re.compile(r"^(\d+) solved(?:, (\d+) restated)?$")
+
+#: A caption line as the ADR writes it: the text, in emphasis or not.
+CAPTION = re.compile(r"^\s*[*_]*(.+?)[*_]*\s*$")
 
 #: A Markdown table row: the cells between the outer pipes.
 ROW = re.compile(r"^\s*\|(.+)\|\s*$")
@@ -266,32 +294,60 @@ def _header(cells: Sequence[str]) -> Tuple[str, ...]:
     return tuple(cell.replace("`", "").lower() for cell in cells)
 
 
-def _table(markdown: str, header: Tuple[str, ...],
-           name: str) -> Result[Dict[str, List[str]], PipelineError]:
-    """The table headed `header`, as a map from its first cell to the rest.
+def _caption(line: str) -> str:
+    """A line's text with the emphasis markers around it dropped."""
+    match = CAPTION.match(line)
+    return match.group(1).strip() if match else ""
 
-    The cells exclude the first, so they line up with `header` from index 1.
-    The table is every row between its delimiter line and the first line
-    that is not a table row, and it is read strictly: a missing delimiter, a
-    row with the wrong number of cells, and a first cell that repeats are
-    each an error naming the line.  A lenient reader would end the table at
-    a short row, so every row after it would be reported missing, and would
-    let a repeated row silently replace the one before it.
+
+def _table(markdown: str, caption: str, header: Tuple[str, ...],
+           name: str) -> Result[Dict[str, List[str]], PipelineError]:
+    """The table under the line `caption`, as a map from its first cell to
+    the rest.
+
+    The caption must occur on exactly one line, the first line after it that
+    is not blank must be the table's header, and that header must carry
+    `header`'s cells: a caption that has moved off its table, or a table
+    whose columns were renamed, is an error rather than a guess (Issue #219
+    put two tables with one header set in § 9, the dated one and the
+    header-free one, and a reader that searched by header would take
+    whichever came first).  The cells exclude the first, so they line up
+    with `header` from index 1.  The table is every row between its
+    delimiter line and the first line that is not a table row, and it is
+    read strictly: a missing delimiter, a row with the wrong number of
+    cells, and a first cell that repeats are each an error naming the line.
+    A lenient reader would end the table at a short row, so every row after
+    it would be reported missing, and would let a repeated row silently
+    replace the one before it.
     """
     lines = markdown.splitlines()
-    found = next((index for index, line in enumerate(lines)
-                  if (_cells(line) is not None
-                      and _header(_cells(line) or []) == header)), None)
-    if found is None:
-        return Result.err(PipelineError(
-            ErrorType.PARSING_ERROR,
-            "ADR 0001 has no table headed " + " | ".join(header)))
 
     def problem(number: int, why: str) -> Result[Dict[str, List[str]],
                                                  PipelineError]:
         return Result.err(PipelineError(
             ErrorType.PARSING_ERROR,
             f"ADR 0001's {name}, line {number}: {why}"))
+
+    captions = [index for index, line in enumerate(lines)
+                if _caption(line) == caption]
+    if not captions:
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            f"ADR 0001 has no table captioned {caption!r}"))
+    if len(captions) > 1:
+        return problem(captions[1] + 1, f"a second caption {caption!r}")
+    found = next((index for index in range(captions[0] + 1, len(lines))
+                  if lines[index].strip()), None)
+    cells = _cells(lines[found]) if found is not None else None
+    if found is None or cells is None:
+        return problem(captions[0] + 1, f"the caption {caption!r} is not "
+                                        "followed by a table")
+    if _header(cells) != header:
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            f"ADR 0001 has no table headed {' | '.join(header)} under "
+            f"{caption!r} (line {found + 1} is headed "
+            f"{' | '.join(_header(cells))})"))
 
     delimiter = _cells(lines[found + 1]) if found + 1 < len(lines) else None
     if delimiter is None or not all(DELIMITER.match(cell)
@@ -336,7 +392,8 @@ def _counts(table: Dict[str, List[str]]
 
 def adr_table(markdown: str) -> Result[Dict[str, List[str]], PipelineError]:
     """§ 9's agent table, as a map from stratum name to its cells."""
-    return _table(markdown, ADR_HEADER, "agent table").and_then(_counts)
+    return _table(markdown, AGENT_CAPTION, ADR_HEADER,
+                  "agent table").and_then(_counts)
 
 
 def _tally(stratum: str, column: str,
@@ -374,7 +431,8 @@ def control_table(markdown: str) -> Result[Stated, PipelineError]:
                                  for name in names])
         return rows.map(lambda read_rows: dict(zip(names, read_rows)))
 
-    return _table(markdown, CONTROL_HEADER, "attribution table").and_then(read)
+    return _table(markdown, CONTROL_CAPTION, CONTROL_HEADER,
+                  "attribution table").and_then(read)
 
 
 # ------------------------------------------------------ the agent table
@@ -928,6 +986,9 @@ def _assemble(reports: Mapping[str, Dict[str, Any]], tables: Tables,
             "sonnet": [list(pair) for pair in per_tool(sonnet)],
             "opus": [list(pair) for pair in per_tool(opus)],
         },
+        "hinted": {"runId": HINTED_RUN,
+                   "startedOn": days[HINTED_RUN],
+                   "haystack": quiet(reports[HINTED_RUN])},
         "control": {
             "checkedAgainst": f"{ADR} § 9, the attribution arms",
             "columns": [column for column, _ in CONTROL],

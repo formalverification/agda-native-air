@@ -6,21 +6,28 @@ Description: The sessions the demo page replays, and how one is assembled from
   the committed archive (Issue #85).
 
   `ROSTER` names them.  They are not a sample: each is one half of a contrast
-  the archive already holds, and the page exists to show the contrast.
+  the archive already holds, and the page exists to show the contrast.  They
+  come from the header-free arms of Issue #219 (`suite219-sonnet5-mcp-1` and
+  `suite219-opus5-mcp-1`), chosen by the criteria the first roster was: a row
+  one model solves and the other restates, a wholesale row, and the
+  preservation gate, which recurred.
 
-    +  `algebras-kernels-ker-con`, both arms.  The same obligation, the same
-       thirteen tools, two verdicts.  Opus 5 assembles the congruence from
-       `kerRel`, `mkcon`, and `HomKerComp`; Sonnet 5 finds the same names and
-       writes `kercon′ h = kercon h`, which the judge puts in the restated
-       column and not in the solve count.
-    +  `algebras-subalgebras-sub-trans-iso`, Opus 5.  A composition, watched:
-       `⊙-hom` and `⊙-injective` composed with `≅toInjective`, reached through
-       an `exports_of` that answered `NotInScope` and a `type_of` whose
-       `NotInScope` answer carried the right name as a suggestion.
+    +  `algebras-homs-mon-to-hom`, both arms.  The same obligation, the same
+       fourteen tools, two verdicts.  Both find the library's `mon→hom`;
+       Sonnet 5 cites it (`mon→hom′ m = mon→hom _ _ m`), which the judge puts
+       in the restated column, and Opus 5 writes the pair out,
+       `Data.Product._,_ _ (IsMon.isHom (proj₂ m))`, after a first probe with
+       an unimported `_,_` came back a type error.  Both seeds of the first
+       Opus arm, with the header's hints in view, restated this row.
+    +  `algebras-subalgebras-sub-reflexive`, Opus 5.  A wholesale row, whose
+       fixture names nothing useful: `get_goal`, a `definition_of` of `_≤_`
+       and a Read of the file it named, then the first `search_in_scope` call
+       in any archived arm, which answered with the one in-scope row, `𝒾𝒹`;
+       one probe, one edit, one check.
     +  `stdlib-nat-mul-comm`, both arms.  Both models needed `trans`; Opus
        added an import line and was counted a solve, Sonnet appended `; trans`
        to the fixture's own `using` list and failed the preservation gate with
-       a file that type-checks.  The two final files differ by one line.
+       a file that type-checks, as it had in the first Sonnet arm.
 
   Everything a replay carries is read out of a committed file: the obligation
   and its metadata from `data/benchmarks/`, the exchange from the subject's
@@ -85,48 +92,50 @@ class Choice:
 ROSTER: Tuple[Choice, ...] = (
     Choice(
         run=OPUS_RUN,
-        subject="algebras-kernels-ker-con",
+        subject="algebras-homs-mon-to-hom",
         model_label="Opus 5",
         blurb=(
-            "Four `type_of` queries, one `fill_hole` probe, one edit, one "
-            "check.  The congruence is assembled from the pieces the "
-            "fixture's own `using` lists name, under a `where` block."),
+            "A search finds the library's own lemma, and this session writes "
+            "the proof out instead of citing it: a first probe with `_,_`, "
+            "which the file does not import, comes back a type error, and the "
+            "constructor named in full is accepted."),
     ),
     Choice(
         run=SONNET_RUN,
-        subject="algebras-kernels-ker-con",
+        subject="algebras-homs-mon-to-hom",
         model_label="Sonnet 5",
         blurb=(
-            "The same obligation and the same tools.  This session finds the "
-            "library's own lemma for the statement, imports it, and calls "
-            "it.  The file type-checks; the judge counts it restated, not "
-            "solved."),
+            "The same obligation and the same tools.  Two `exports_of` "
+            "queries find `mon→hom`, and the session calls it.  The file "
+            "type-checks; the judge counts it restated, not solved."),
     ),
     Choice(
         run=OPUS_RUN,
-        subject="algebras-subalgebras-sub-trans-iso",
+        subject="algebras-subalgebras-sub-reflexive",
         model_label="Opus 5",
         blurb=(
-            "A wholesale row, where the fixture names nothing useful.  Two "
-            "queries answer `NotInScope`, and the second one's error carries "
-            "the name that ends up in the proof."),
+            "A wholesale row, where the fixture names nothing useful.  The "
+            "session reads the definition of `_≤_` where `definition_of` "
+            "points, and asks `search_in_scope` for the identity "
+            "homomorphism: one row in scope, and it is the one the proof "
+            "uses."),
     ),
     Choice(
         run=SONNET_RUN,
         subject="stdlib-nat-mul-comm",
         model_label="Sonnet 5",
         blurb=(
-            "Four turns, no query, a correct induction.  Agda exits 0 and the "
-            "row is still not a solve: the session reached for `trans` by "
-            "editing the fixture's own import line."),
+            "A correct induction, and Agda exits 0, and the row is still not "
+            "a solve: the session reached for `trans` by editing the "
+            "fixture's own import line."),
     ),
     Choice(
         run=OPUS_RUN,
         subject="stdlib-nat-mul-comm",
         model_label="Opus 5",
         blurb=(
-            "The same obligation, the same four turns, the same need for "
-            "`trans`.  This session added an import line instead of editing "
+            "The same obligation and the same need for `trans`, in four "
+            "turns.  This session added an import line instead of editing "
             "one, which is what the preservation gate allows."),
     ),
 )

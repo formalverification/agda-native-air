@@ -124,15 +124,18 @@ GUIDE_SECTIONS: Dict[str, str] = {
     "1": "1.  The four instruments",
     "4.3": "4.3  The control, and the comparison",
     "4.5": "4.5  The hard tier",
+    "4.6": "4.6  What the fixture headers were worth",
     "5": "5.  How to tell a win from a loss",
 }
 
-#: The decision record both tables are checked against, and the two
-#: subsections of its § 9 that hold them.
+#: The decision record both tables are checked against, and the subsection
+#: of its § 9 that holds the header-free pair the page carries (Issue #219):
+#: the dated tables, measured with the fixture headers' hints in view, stay
+#: in the subsections above it as evidence.
 ADR = "docs/adr/0001-proof-search-on-agda-mcp.md"
 ADR_SECTIONS: Dict[str, str] = {
-    "agents": "The agent in the loop",
-    "control": "The attribution arms: what the server is worth",
+    "agents": "The header-free arms (2026-09-29)",
+    "control": "The header-free arms (2026-09-29)",
 }
 
 def _esc(value: Any) -> str:
@@ -562,12 +565,9 @@ def _arms(numbers: Mapping[str, Any]) -> Tuple[Mapping[str, Any], Mapping[str, A
 
 def _control_arm(numbers: Mapping[str, Any], arm: str) -> Mapping[str, Any]:
     """One of the control's three arms (`shell`, `mcp`, `both`) by name.
-
-    The archived Sonnet arm is also an `mcp` arm and leads the control's
-    columns, so it is skipped: the control's own arms are the rest.
-    """
+    The `mcp` arm is the replayed Sonnet arm itself (Issue #219)."""
     arms = list((numbers.get("control") or {}).get("arms") or [])
-    return next((a for a in arms[1:] if a.get("arm") == arm), {})
+    return next((a for a in arms if a.get("arm") == arm), {})
 
 
 def _calls(numbers: Mapping[str, Any], run: Any, tool: str) -> int:
@@ -621,14 +621,12 @@ def table(numbers: Mapping[str, Any]) -> str:
 
 def _column_label(column: str) -> str:
     """How the control table heads one of its arm columns."""
-    if column == "archive mcp":
-        return "archived <code>mcp</code>"
     return f"<code>{_esc(column)}</code>"
 
 
 def control_table(numbers: Mapping[str, Any]) -> str:
     """The control's table, the ADR's attribution table regenerated: one
-    column pair per arm, the archived Sonnet arm first."""
+    column pair per arm, `shell`, `mcp`, `both`."""
     control = numbers.get("control") or {}
     columns = [str(c) for c in control.get("columns") or []]
     runs = [a.get("runId") for a in control.get("arms") or []]
@@ -653,8 +651,8 @@ def control_table(numbers: Mapping[str, Any]) -> str:
             f'{_runs(*runs)}>'
             f'<caption>The control, solved and restated per stratum, checked '
             f'against {_adr("control", "ADR 0001 § 9’s attribution table")}.'
-            f'  Sonnet 5 in every column; the archived <code>mcp</code> '
-            f'column is the Sonnet arm above.</caption>'
+            f'  Sonnet 5 in every column; the <code>mcp</code> column is '
+            f'the Sonnet arm above.</caption>'
             f'<colgroup><col><col></colgroup>{spans}'
             f'<thead><tr><th scope="col" rowspan="2">stratum</th>'
             f'<th scope="col" rowspan="2">n</th>{groups}</tr>'
@@ -805,7 +803,7 @@ they come from</li>
 <a href="#restated">what restated means</a>
 <a href="#numbers">the numbers</a>
 <a href="#control">the control</a>
-<a href="#haystack">one tier that measures nothing about the model</a>
+<a href="#haystack">one tier whose header named the answer</a>
 <a href="#built">how this page is built</a>
 </nav>
 </header>"""
@@ -814,10 +812,13 @@ they come from</li>
 def _intro(numbers: Mapping[str, Any],
            replays: Sequence[Mapping[str, Any]]) -> str:
     sonnet, _ = _arms(numbers)
+    shell, mcp = (_control_arm(numbers, name) for name in ("shell", "mcp"))
+    ahead = ("the server did not come out ahead on the count"
+             if int(shell.get("solved") or 0) >= int(mcp.get("solved") or 0)
+             else "the server came out ahead on the count")
     # The premises of the last sentence are the record's, and
-    # `test_the_intros_reading_of_the_control_still_holds` pins them: the
-    # shell arm solved at least as many rows as the server arm, and the
-    # control's arms could read the originals the archived arms could not.
+    # `test_the_intros_reading_of_the_control_still_holds` pins them: every
+    # arm could read the originals, and some solves had one in view.
     return f"""<section class="prose" id="what">
 <h2>What this is</h2>
 <p><code>agda-native-air</code> gives a coding agent a way to ask Agda
@@ -826,25 +827,26 @@ a file, report a hole&rsquo;s goal and context, infer the type of an
 expression, resolve a name, list a module&rsquo;s exports, search a corpus,
 probe a candidate term into a hole, and type-check the result.</p>
 <p>The {_word(len(replays))} sessions below come from the project&rsquo;s
-first agent measurement ({_issue(154)}): each of {_word(_suite(numbers))}
-proof obligations handed to one fresh, non-interactive Claude Code session
-with the server&rsquo;s {_word(sonnet.get("toolCount"))} tools as they stood
-on {_esc(sonnet.get("startedOn"))}, Read and Edit on a single staged file, and
-nothing else (no shell, no settings, no project instructions, no memory),
-under caps of {_word(sonnet.get("turnCap"))} turns,
-{_word(sonnet.get("wallCapSec"))} seconds, and
-{_money(sonnet.get("budgetCapUsd"))}.</p>
+agent measurement ({_issue(154)}), as re-run on
+{_esc(sonnet.get("startedOn"))} with fixture headers that no longer carry
+hints ({_issue(219)}): each of {_word(_suite(numbers))} proof obligations
+handed to one fresh, non-interactive Claude Code session with the
+server&rsquo;s {_word(sonnet.get("toolCount"))} tools, Read and Edit on a
+single staged file and on the libraries&rsquo; sources, and nothing else (no
+shell, no settings, no project instructions, no memory), under caps of
+{_word(sonnet.get("turnCap"))} turns, {_word(sonnet.get("wallCapSec"))}
+seconds, and {_money(sonnet.get("budgetCapUsd"))}.</p>
 <p>They are evidence of what a frontier model does with the tools: which ones
 it calls, what it asks, what the answers say, and what it writes from them.
-They are not evidence that the tools help.  Every session in that measurement
-had the server, so nothing in it compares the tools with their absence.  That
+They are not evidence that the tools help.  Every session in these arms had
+the server, so nothing in them compares the tools with their absence.  That
 comparison is <a href="#control">the control</a> ({_issue(162)}): the same
 model, prompts, caps, and judge, with a shell and the same <code>agda</code>
-in place of the server.  The numbers below set it beside these sessions&rsquo;
-arms, and the guide to the results reads it in {_guide("4.3")}.  In short:
-the server did not come out ahead on the count, and the count does not settle
-the question, because the control could read the library&rsquo;s own proofs,
-which these sessions could not.</p>
+in place of the server, run the same day.  The numbers below set it beside
+these sessions&rsquo; arms, and the guide to the results reads it in
+{_guide("4.3")}.  In short: {ahead}, and the count does not settle the
+question, because every arm could read the library&rsquo;s own proofs, and a
+proof in view can be written out rather than cited.</p>
 <p>Every fact the judge uses about the <em>Agda</em> in the file a session
 left behind is Agda&rsquo;s own answer, asked through the same server and the
 same <code>agda</code> invocation the benchmark&rsquo;s gold solutions are
@@ -943,8 +945,9 @@ def _readings_summary(replays: Sequence[Mapping[str, Any]],
             "original: the client confined the file tools to the staged "
             "file and refused every such read.")
     parts.append(
-        '<a href="#control">The control</a> could read the libraries&rsquo; '
-        "sources, and there the same reading changes what the counts mean.")
+        "Every arm on this page could read the libraries&rsquo; sources; "
+        '<a href="#control">the control</a> says what that does to the '
+        "counts.")
     return "<p>" + "  ".join(parts) + "</p>"
 
 
@@ -1047,28 +1050,23 @@ def _ended(numbers: Mapping[str, Any]) -> str:
 
 
 def _control(numbers: Mapping[str, Any]) -> str:
-    """The control's subsection: who ran, how the protocol differs, the
-    table, and what it shows, every figure read from the data."""
+    """The control's subsection: who ran, the one way the protocol differs
+    between its arms, the table, and what it shows, every figure read from
+    the data."""
     control = numbers.get("control") or {}
     arms = list(control.get("arms") or [])
-    archived = arms[0] if arms else {}
     shell, mcp, both = (_control_arm(numbers, name)
                         for name in ("shell", "mcp", "both"))
-    added = sorted(set(mcp.get("agdaTools") or [])
-                   - set(archived.get("agdaTools") or []))
-    uncalled = all(_calls(numbers, arm.get("runId"), tool) == 0
-                   for arm in (mcp, both) for tool in added)
-    offered = " and ".join(f"<code>{_esc(tool)}</code>" for tool in added)
     by_hand = sum(int(n) for kind, n in (both.get("perShell") or {}).items()
                   if str(kind).startswith("agda"))
     verdicts = int((both.get("verdictVia") or {}).get("mcp") or 0)
     s_orig = shell.get("withOriginal") or {}
     m_orig = mcp.get("withOriginal") or {}
-    a_orig = archived.get("withOriginal") or {}
     gap = int(shell.get("solved") or 0) - int(mcp.get("solved") or 0)
+    ahead = ("the server did not come out ahead on the count" if gap >= 0
+             else "the server came out ahead on the count")
     ran = ("never ran <code>agda</code> on the shell" if by_hand == 0
            else f"ran <code>agda</code> on the shell {_times(by_hand)}")
-    called = "no subject called it" if uncalled else "subjects called it"
     share = ("all" if verdicts == both.get("total") else _word(verdicts))
     both_run, mcp_run = both.get("runId"), mcp.get("runId")
     dropped = (f"<code>definition_of</code> "
@@ -1082,55 +1080,55 @@ def _control(numbers: Mapping[str, Any]) -> str:
 cannot say whether it helps.  The control ({_issue(162)}) can: Sonnet 5
 again, over the same {_word(_suite(numbers))} obligations with the same
 prompts, caps, and judge, in three arms run one at a time on
-{_days(arms[1:])}.  The
+{_days(arms)}.  The
 <code>shell</code> arm has Bash with the same pinned <code>agda</code> and no
 server, the <code>mcp</code> arm has the server, and the <code>both</code> arm
-has both.  Their counts are regenerated from their reports and checked against
-ADR 0001 &sect; 9 the same way, beside the archived Sonnet arm above.</p>
-<p>The control&rsquo;s protocol differs from the archived arms&rsquo; in three
-ways, and the differences travel with any comparison across the columns: its
-server offered {offered} besides the {_word(archived.get("toolCount"))} tools
-above, and {called}; the libraries&rsquo; own sources were readable on every
-arm, where the
-archived arms&rsquo; reads of them were refused; and the subjects&rsquo;
-servers carried the judge&rsquo;s <code>--safe</code>.</p>
+has both.  The <code>mcp</code> arm is the Sonnet arm above, so its column
+repeats that arm&rsquo;s counts.  Their counts are regenerated from their
+reports and checked against ADR 0001 &sect; 9 the same way.</p>
+<p>The three arms and the Opus arm above share one protocol: the
+server&rsquo;s {_word(mcp.get("toolCount"))} tools, the libraries&rsquo; own
+sources readable on every arm, the judge&rsquo;s <code>--safe</code> on the
+subjects&rsquo; servers, and fixture headers that carry no hints
+({_issue(219)}).  One difference is deliberate: the prompts of the two arms
+with a shell name the directory holding each library&rsquo;s sources, which
+a subject with only the server&rsquo;s file tools could not search anyway.</p>
 {control_table(numbers)}
 <p>What it shows, read with the guide&rsquo;s {_guide("4.3")} and
 {_guide("5")}, is as follows:</p>
 <ul{_runs(*[a.get("runId") for a in arms])}>
 <li><strong>Solved</strong>: {_num(shell.get("solved"))} with a shell and
-{_num(mcp.get("solved"))} with the server, so the server did not come out
-ahead on the count.  The difference is {_count(gap, "row", "rows")}, on one
-seed of one model.</li>
-<li><strong>Restated</strong>: {_num(shell.get("restated"))} with a shell and
-{_num(mcp.get("restated"))} with the server, and the zero is not evidence of
-construction.  With the sources readable, the <code>shell</code> arm had the
-original&rsquo;s own proof in view before its last edit for
-{_num(s_orig.get("inView"))} of its {_num(s_orig.get("solved"))}
-<code>agda-algebras</code> solves, and the <code>mcp</code> arm for
-{_num(m_orig.get("inView"))} of its {_num(m_orig.get("solved"))}; the
-archived arm, which could read none, for {_num(a_orig.get("inView"))} of its
-{_num(a_orig.get("solved"))}.  The restated rule cannot see a transcription,
-so on these rows the counts measure access to the library&rsquo;s text as
-much as the instrument.</li>
+{_num(mcp.get("solved"))} with the server, so {ahead}.  The difference is
+{_count(abs(gap), "row", "rows")}, on one seed of one model.</li>
+<li><strong>Restated</strong>: {_num(shell.get("restated"))} with a shell
+and {_num(mcp.get("restated"))} with the server, and neither count separates
+construction from copying.  With the sources readable, the
+<code>shell</code> arm had the original&rsquo;s own proof in view before its
+last edit for {_num(s_orig.get("inView"))} of its
+{_num(s_orig.get("solved"))} <code>agda-algebras</code> solves, and the
+<code>mcp</code> arm for {_num(m_orig.get("inView"))} of its
+{_num(m_orig.get("solved"))}.  The restated rule cannot see a
+transcription, so on these rows the counts measure access to the
+library&rsquo;s text as much as the instrument.</li>
 <li><strong>Given both</strong>, the subject took {share}
 {_num(both.get("total"))} of its verdicts from the server and {ran}, and it
 all but dropped the server&rsquo;s knowledge tools, the ones that answer a
 question and give no verdict: {dropped}.  What a model keeps from the server,
 offered a shell as well, is the verdict.</li>
 </ul>
-<p>Three measurements followed, and the guide carries each with its numbers.
-Lean answers ({_issue(184)}, {_guide("4.3")}) cut the size of the
-server&rsquo;s answers and little of its cost, with the tool mix and the solve
-counts within the runs&rsquo; spread: answer size was not what made a server
-arm cost more than the shell arm.  A trimmed tool surface ({_issue(191)},
-{_guide("4.3")}) cut what a server arm reads every turn, and its cost with it,
-without closing the gap to the shell arm&rsquo;s cost.  And a hard tier of
-statements posed with no proof on disk ({_issue(189)}, {_guide("4.5")}) left
-nothing to transcribe: every file
+<p>The measurements before these, each made with the fixture headers&rsquo;
+hints in view, are in the guide with their numbers.  The first control
+({_issue(162)}, {_guide("4.3")}) put the shell ahead on the count too.  Lean
+answers ({_issue(184)}) cut the size of the server&rsquo;s answers and little
+of its cost: answer size was not what made a server arm cost more than the
+shell arm.  A trimmed tool surface ({_issue(191)}) cut what a server arm
+reads every turn, and its cost with it, without closing the gap to the shell
+arm&rsquo;s cost.  And a hard tier of statements posed with no proof on disk
+({_issue(189)}, {_guide("4.5")}) left nothing to transcribe: every file
 Opus&nbsp;5 left there, with the server, with a shell, and with both,
 type-checks with its statement kept, so that tier sits at the model&rsquo;s
-ceiling and cannot yet tell the instruments apart.</p>"""
+ceiling and cannot yet tell the instruments apart.  What the headers were
+worth is the guide&rsquo;s {_guide("4.6")}.</p>"""
 
 
 def _numbers_section(numbers: Mapping[str, Any],
@@ -1177,14 +1175,21 @@ def _haystack(numbers: Mapping[str, Any]) -> str:
     rows = {row.get("stratum"): row for row in numbers.get("rows") or []}
     tier = rows.get("agda-stdlib/haystack") or {}
     n = tier.get("n")
-    control = list((numbers.get("control") or {}).get("arms") or [])[1:]
+    control = list((numbers.get("control") or {}).get("arms") or [])
     every = all((arm.get("haystack") or {}).get("solved") == n
                 for arm in control)
     both = (tier.get("sonnetSolved") == n and tier.get("opusSolved") == n)
     quiet = sonnet.get("haystack") or {}
-    turns = quiet.get("quietTurns") or []
+    hinted = numbers.get("hinted") or {}
+    was = hinted.get("haystack") or {}
     asked = ", ".join(f"{_word(count)} <code>{_esc(tool)}</code>"
                       for tool, count in (quiet.get("queries") or {}).items())
+    others = len(quiet.get("others") or [])
+    opus_quiet = opus.get("haystack") or {}
+    opus_others = len(opus_quiet.get("others") or [])
+    opus_asked = ", ".join(
+        f"{_word(count)} <code>{_esc(tool)}</code>"
+        for tool, count in (opus_quiet.get("queries") or {}).items())
     runs = [sonnet.get("runId"), opus.get("runId")] + [
         arm.get("runId") for arm in control]
     fixed = ("none" if tier.get("loopFixed") == 0
@@ -1192,15 +1197,23 @@ def _haystack(numbers: Mapping[str, Any]) -> str:
     solved = (f"Both model arms solve all {_word(n)}" if both
               else f"The model arms solve {_word(tier.get('sonnetSolved'))} "
                    f"and {_word(tier.get('opusSolved'))}")
-    control_too = (", and so does every arm of the control, including the "
-                   "shell arm, which has no server at all" if every else "")
-    in_turns = " or ".join(_word(t) for t in turns)
-    rest = _ordinal(int(quiet.get("quiet") or 0))
-    # The rest of the tier is one session and one query, and the name it
-    # asked about is quoted here; `test_the_haystack_sentence_still_holds`
-    # pins all three against the archive, the name from the transcript.
+    shell = _control_arm(numbers, "shell")
+    counts = [tier.get("sonnetSolved"), tier.get("opusSolved")] + [
+        (arm.get("haystack") or {}).get("solved") for arm in control]
+    least = min((c for c in counts if isinstance(c, int)), default=0)
+    everyone = (f"every arm solves all {_word(n)}" if least == n
+                else f"every arm solves {_word(least)} of the {_word(n)} "
+                     f"or more")
+    control_too = (
+        ", and so does every arm of the control, including the shell arm, "
+        "which has no server at all" if every
+        else f"; the control&rsquo;s shell arm, which has no server at all, "
+             f"solves {_word((shell.get('haystack') or {}).get('solved'))}")
+    # The comparison with the hinted arm is pinned by
+    # `test_the_haystack_reading_still_holds`: the header-free arm asks
+    # before its final check on most rows, and the hinted arm did not.
     return f"""<section class="prose" id="haystack">
-<h2>One tier that measures nothing about the model</h2>
+<h2>One tier whose header named the answer</h2>
 <p>{_capital(_word(n))} of the {_word(_suite(numbers))} obligations are a tier
 built to defeat retrieval by construction: each gold applies one
 standard-library lemma that the fixture imports but does not name in its
@@ -1209,15 +1222,26 @@ The search loop&rsquo;s fixed space solves {fixed} of the {_word(n)}; with
 corpus retrieval it solves {_word(tier.get("loopRetrieval"))}, its first
 solves under target exclusion anywhere in the project.</p>
 <p{_runs(*runs)}>{solved}{control_too}.  Sonnet&nbsp;5 solves
-{_word(quiet.get("quiet"))} of them in {in_turns} turns, asking Agda nothing
-before its final check (read the file, edit it, check it) and naming the
-needle qualified from memory; the {rest} takes {asked} on
-<code>Data.Nat.Properties.+-&#8760;-assoc</code>.  These are standard-library
-lemmas, and they are in every frontier model&rsquo;s training data.</p>
-<p class="callout">The tier measures a ranker.  It does not measure a model,
-and a page that reported its {_word(n)} solves as a result about the agent
-would be reporting a result about the corpus the tier was designed to
-stress.</p>
+{_word(quiet.get("quiet"))} of them asking Agda nothing before its final
+check (read the file, edit it, check it); on the other {_word(others)} it
+asked first, with {asked}.  These are standard-library lemmas, in every
+frontier model&rsquo;s training data, and Sonnet still looked most of them
+up.  Opus&nbsp;5 asked first on {_word(opus_others)} rows as well, but only
+by probing lemmas it named itself ({opus_asked}): it searched for none.</p>
+<p{_runs(hinted.get("runId"), sonnet.get("runId"), *runs[2:])}>Sonnet
+did not look them up while the file named them.  Until {_issue(219)} each fixture&rsquo;s
+header carried a <code>Needle:</code> line naming its lemma, qualified, and
+a subject works on a copy of the fixture.  With that line in view the same
+model and server solved {_word(was.get("quiet"))} of the {_word(n)} asking
+Agda nothing before the final check (run
+{_tree("reports/agent-bench/" + str(hinted.get("runId")), str(hinted.get("runId")))},
+{_esc(hinted.get("startedOn"))}), and an earlier version of this page
+read that as the model naming the needle from memory.  On most rows it was
+the header.</p>
+<p class="callout">The tier&rsquo;s count does not tell the arms apart:
+{everyone}.  What the header&rsquo;s removal shows is the route: when the
+file does not name the lemma, Sonnet&nbsp;5 reaches for the search tools,
+and Opus&nbsp;5 names it from memory and asks Agda whether it fits.</p>
 </section>"""
 
 
@@ -1237,7 +1261,7 @@ was built, and
 none of it is shipped to your browser; what is here is
 {_word(len(replays))} sessions and the tables.</p>
 <p>Three things the build refuses to do.  It will not write a page whose
-two tables from ADR 0001 &sect; 9, the archived arms&rsquo; and the
+two tables from ADR 0001 &sect; 9, the agents&rsquo; and the
 control&rsquo;s, disagree with the ADR (<code>make demo-check</code> runs
 that comparison alone, from the run reports and the ADR).  It will not write a page carrying an absolute path
 from the machine the sweep ran on: every path here is anchored to
@@ -1281,7 +1305,7 @@ def _footer(data: Mapping[str, Any]) -> str:
     return f"""<footer class="foot">
 <p>Built by <code>make demo-site</code> from
 {_tree("reports/agent-bench", "reports/agent-bench/")}.
-The archived arms&rsquo; table and the control&rsquo;s are checked against
+The agents&rsquo; table and the control&rsquo;s are checked against
 {_esc(numbers.get("checkedAgainst"))}.</p>
 <p><a href="{REPO_URL}">{REPO_URL.replace("https://", "")}</a></p>
 </footer>"""
