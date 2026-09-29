@@ -1,0 +1,80 @@
+{
+  "benchmarkId" : "hard-group-correspondence-over-N",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "correspondence-over-N",
+  "goal" : "(N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 15,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 12,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 14,
+  "wallMs" : 93284,
+  "costUsd" : 0.5452049999999999,
+  "tokens" : {
+    "input" : 28,
+    "output" : 6902,
+    "cacheRead" : 192110,
+    "cacheCreation" : 27646
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 9,
+      "other" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5387,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-correspondence-over-N/final/Group-correspondence-over-N.agda",
+  "transcriptPath" : "subjects/hard-group-correspondence-over-N/transcript.jsonl",
+  "lastWords" : "The hole is filled — forward direction multiplies `x ∈ H` by `x ⁻¹ ∙ y ∈ N ⊆ H` and cancels; backward direction instantiates `Respects` at `ε ∼ n` using `ε ⁻¹ ∙ n ≈ n` and `ε ∈ H` — and the given `agda ... --safe` command reports success (no errors, no remaining holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.62,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

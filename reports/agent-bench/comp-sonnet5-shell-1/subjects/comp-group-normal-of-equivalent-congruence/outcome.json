@@ -1,0 +1,83 @@
+{
+  "benchmarkId" : "comp-group-normal-of-equivalent-congruence",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.≈ⁿ-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-cong",
+    "needle:Setoid.Congruences.Lattice.≑-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf∘congruenceOf"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "normal-of-equivalent-congruence",
+  "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ≑ φ → φ ≑ congruenceOf 𝑵 → normalOf θ ≈ⁿ 𝑵",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 5,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 81539,
+  "costUsd" : 0.2600844,
+  "tokens" : {
+    "input" : 20,
+    "output" : 6541,
+    "cacheRead" : 239552,
+    "cacheCreation" : 36681
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 3
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5900,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-group-normal-of-equivalent-congruence/final/Group-normal-of-equivalent-congruence.agda",
+  "transcriptPath" : "subjects/comp-group-normal-of-equivalent-congruence/transcript.jsonl",
+  "lastWords" : "The command now type-checks the file successfully with no errors reported.",
+  "rateLimit" : {
+    "maxUtilization" : 0.5,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

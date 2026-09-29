@@ -1,0 +1,82 @@
+{
+  "benchmarkId" : "hard-group-inversion-homo-iff-commutative",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "inversion-homo-iff-commutative",
+  "goal" : "(IsGroupHomomorphism _⁻¹ → Commutative _≈_ _∙_) × (Commutative _≈_ _∙_ → IsGroupHomomorphism _⁻¹)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product.Base         using ( _,_ )",
+    "import Algebra.Properties.Group",
+    "import Relation.Binary.Reasoning.Setoid"
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 3,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 60937,
+  "costUsd" : 0.281967,
+  "tokens" : {
+    "input" : 12,
+    "output" : 4975,
+    "cacheRead" : 50844,
+    "cacheCreation" : 13211
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 624,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-inversion-homo-iff-commutative/final/Group-inversion-homo-iff-commutative.agda",
+  "transcriptPath" : "subjects/hard-group-inversion-homo-iff-commutative/transcript.jsonl",
+  "lastWords" : "It type-checks cleanly on the first try.\n\nThe proof: forward direction chains `x ∙ y ≈ (x⁻¹)⁻¹ ∙ (y⁻¹)⁻¹ ≈ (y⁻¹ ∙ x⁻¹)⁻¹ ≈ (y⁻¹)⁻¹ ∙ (x⁻¹)⁻¹ ≈ y ∙ x`, using `⁻¹-anti-homo-∙` backwards and then the homomorphism's `homo`; the backward direction builds the nested record from `⁻¹-cong`, `⁻¹-anti-homo-∙` composed with commutativity, `ε⁻¹≈ε`, and `refl` for `⁻¹-homo`.\n\nThe judge command reports success (no errors, only the \"Checking …\" line) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.57,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "benchmarkId" : "comp-homomorphism-epi-through-kernel",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Homomorphisms.Properties.⊙-epi",
+    "needle:Setoid.Homomorphisms.Kernels.πker"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "epi-through-kernel",
+  "goal" : "(h : hom 𝑨 𝑩) → epi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash runs a program this audit does not model (xargs): find /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid -iname \"*.agda\" | xargs grep -l \"epi\"",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Homomorphisms.Kernels    using ( πker )",
+    "open import Setoid.Homomorphisms.Properties using ( ⊙-epi )"
+  ],
+  "terminal" : "completed",
+  "turns" : 15,
+  "toolCalls" : {
+    "Read" : 3,
+    "Bash" : 7,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 14,
+  "wallMs" : 86763,
+  "costUsd" : 0.21118640000000002,
+  "tokens" : {
+    "input" : 30,
+    "output" : 4200,
+    "cacheRead" : 386392,
+    "cacheCreation" : 22962
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash runs a program this audit does not model (xargs): find /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid -iname \"*.agda\" | xargs grep -l \"epi\""
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 7
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 4630,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ}\n(h : hom 𝑨 𝑩) →\nepi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ}\n(h : hom 𝑨 𝑩) →\nepi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-homomorphism-epi-through-kernel/final/Homomorphism-epi-through-kernel.agda",
+  "transcriptPath" : "subjects/comp-homomorphism-epi-through-kernel/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully: the hole was filled with `⊙-epi (πker h) e`, composing the canonical epimorphism onto the kernel quotient with the given epimorphism `e`, and the verdict is success (exit code 0, no diagnostics, no holes).",
+  "rateLimit" : {
+    "maxUtilization" : 0.55,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

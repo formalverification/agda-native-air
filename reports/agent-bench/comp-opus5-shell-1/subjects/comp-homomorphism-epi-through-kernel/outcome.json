@@ -1,0 +1,83 @@
+{
+  "benchmarkId" : "comp-homomorphism-epi-through-kernel",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Homomorphisms.Properties.⊙-epi",
+    "needle:Setoid.Homomorphisms.Kernels.πker"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "epi-through-kernel",
+  "goal" : "(h : hom 𝑨 𝑩) → epi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Homomorphisms.Kernels    using ( πker )",
+    "open import Setoid.Homomorphisms.Properties using ( ⊙-epi )"
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 4,
+    "Edit" : 5
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 66161,
+  "costUsd" : 0.42609250000000004,
+  "tokens" : {
+    "input" : 22,
+    "output" : 3977,
+    "cacheRead" : 183755,
+    "cacheCreation" : 23468
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4518,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ}\n(h : hom 𝑨 𝑩) →\nepi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ}\n(h : hom 𝑨 𝑩) →\nepi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-homomorphism-epi-through-kernel/final/Homomorphism-epi-through-kernel.agda",
+  "transcriptPath" : "subjects/comp-homomorphism-epi-through-kernel/transcript.jsonl",
+  "lastWords" : "The hole is filled with `⊙-epi (πker h) e` (composing the canonical kernel projection with the given epimorphism), and the judge command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.45,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

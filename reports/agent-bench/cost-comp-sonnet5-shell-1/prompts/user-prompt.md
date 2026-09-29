@@ -1,0 +1,1 @@
+The file is {{path}}.  It declares `{{hole}}` with the type signature shown in the file, and its definition contains exactly one hole, {!!}.  Fill the hole so that the module type-checks, following the rules you were given.  Edit the file in place: the file as it stands when you stop is what is judged.

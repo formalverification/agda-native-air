@@ -1,0 +1,81 @@
+{
+  "benchmarkId" : "hard-group-involutive-commute",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "involutive-commute",
+  "goal" : "(∀ x → x ∙ x ≈ ε) → Commutative _≈_ _∙_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Algebra.Properties.Group G using ( inverseˡ-unique; ⁻¹-anti-homo-∙ )",
+    "open import Relation.Binary.Reasoning.Setoid setoid"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 2,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 31830,
+  "costUsd" : 0.13203399999999998,
+  "tokens" : {
+    "input" : 10,
+    "output" : 2156,
+    "cacheRead" : 28748,
+    "cacheCreation" : 6371
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 518,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-involutive-commute/final/Group-involutive-commute.agda",
+  "transcriptPath" : "subjects/hard-group-involutive-commute/transcript.jsonl",
+  "lastWords" : "Type-checks cleanly on the first try.\n\nThe proof: from `x ∙ x ≈ ε` every element is its own inverse (`self x : x ≈ x ⁻¹` via `inverseˡ-unique`), so `x ∙ y ≈ (x ∙ y)⁻¹ ≈ y ⁻¹ ∙ x ⁻¹ ≈ y ∙ x` using `⁻¹-anti-homo-∙`.\n\nThe judge command reports success (no errors, no remaining holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.56,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "comp-variety-subdirect-product-models",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Varieties.Properties.⊧-S-invar",
+    "needle:Setoid.Varieties.Properties.⊧-P-invar",
+    "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "subdirect-product-models",
+  "goal" : "(∀ i → 𝒜 i ⊧ (p ≈̇ q)) → SubdirectEmbedding {𝑩 = 𝑩} 𝒜 → 𝑩 ⊧ (p ≈̇ q)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Setoid.Subalgebras.Subdirect.Basic    using ( SubdirectEmbedding )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 18,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 12,
+    "Edit" : 4
+  },
+  "toolCallsTotal" : 17,
+  "wallMs" : 114454,
+  "costUsd" : 0.2700986,
+  "tokens" : {
+    "input" : 36,
+    "output" : 7772,
+    "cacheRead" : 374053,
+    "cacheCreation" : 29374
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 3,
+      "library-read" : 9
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5842,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝑩 : Algebra β ρᵇ} {𝒜 : I → Algebra α ρ}\n{p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) → SubdirectEmbedding 𝒜 → 𝑩 ⊧ (p ≈̇ q)",
+    "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝑩 : Algebra β ρᵇ} {𝒜 : I → Algebra α ρ}\n{p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) → SubdirectEmbedding 𝒜 → 𝑩 ⊧ (p ≈̇ q)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-variety-subdirect-product-models/final/Variety-subdirect-product-models.agda",
+  "transcriptPath" : "subjects/comp-variety-subdirect-product-models/transcript.jsonl",
+  "lastWords" : "It type-checks with no errors now — the exact judge command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.51,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

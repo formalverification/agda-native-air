@@ -1,0 +1,85 @@
+{
+  "benchmarkId" : "comp-lattice-below-join-bound",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Properties.Lattice.Lattice-Order.≤-trans",
+    "needle:Classical.Properties.Lattice.Lattice-Order.∨-least"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "below-join-bound",
+  "goal" : "∀ {x y z w : 𝕌[ proj₁ 𝑳 ]} → x ≤ (y ∨ z) → y ≤ w → z ≤ w → x ≤ w",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda/libraries; find / -maxdepth 6 -name 'agda-algebras*.agda-lib' 2>/dev/null | head",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 7,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 52980,
+  "costUsd" : 0.274335,
+  "tokens" : {
+    "input" : 22,
+    "output" : 2306,
+    "cacheRead" : 89930,
+    "cacheCreation" : 17161
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda/libraries; find / -maxdepth 6 -name 'agda-algebras*.agda-lib' 2>/dev/null | head"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 5,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4782,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+    "final" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-lattice-below-join-bound/final/Lattice-below-join-bound.agda",
+  "transcriptPath" : "subjects/comp-lattice-below-join-bound/transcript.jsonl",
+  "lastWords" : "The hole is filled with `≤-trans x≤y∨z (∨-least y≤w z≤w)` (with a `where`-local open of `Lattice-Order 𝑳` for those two names), and the judge command reports success (exit 0) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.15,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

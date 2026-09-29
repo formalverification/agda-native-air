@@ -1,0 +1,85 @@
+{
+  "benchmarkId" : "comp-congruence-simple-equivalent-total",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.≑-trans",
+    "needle:Setoid.Congruences.Lattice.≑-sym",
+    "needle:Setoid.Congruences.Simple.simple⇒total"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "simple-equivalent-total",
+  "goal" : "IsSimple 𝑨 ℓ → RelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product                  using ( _,_ )",
+    "open import Data.Unit.Base                using ( tt )",
+    "open import Level                         using ( lift )"
+  ],
+  "terminal" : "completed",
+  "turns" : 12,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 7,
+    "Edit" : 3
+  },
+  "toolCallsTotal" : 11,
+  "wallMs" : 66635,
+  "costUsd" : 0.35147849999999997,
+  "tokens" : {
+    "input" : 24,
+    "output" : 3834,
+    "cacheRead" : 150817,
+    "cacheCreation" : 18010
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 6
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4225,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+    "final" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-simple-equivalent-total/final/Congruence-simple-equivalent-total.agda",
+  "transcriptPath" : "subjects/comp-congruence-simple-equivalent-total/transcript.jsonl",
+  "lastWords" : "Type-checks cleanly with no errors or warnings.\n\nThe hole is filled by destructuring the distinct-pair witness `(a , b , aθb , a≉b)` and the containment `θ ⊆ φ`, transporting the witness to `φ`, then giving `φ ≑ 𝟙[ 𝑨 ]` as `(λ _ → lift tt) , λ _ → simple φ … x y`; the judging command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.44,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

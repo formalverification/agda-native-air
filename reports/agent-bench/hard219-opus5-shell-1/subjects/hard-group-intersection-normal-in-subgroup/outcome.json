@@ -1,0 +1,86 @@
+{
+  "benchmarkId" : "hard-group-intersection-normal-in-subgroup",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "intersection-normal-in-subgroup",
+  "goal" : "∀ {h x} → h ∈ H → x ∈ H → x ∈ K → ((h ∙ x) ∙ h ⁻¹ ∈ H) × ((h ∙ x) ∙ h ⁻¹ ∈ K)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/agda/libraries): ls -R . | head -50; cat ../../../../../../../../agda/libraries 2>/dev/null; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda/libraries; Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1 && ls -la && head -c 2000 corpus.jsonl; Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda/libraries --library standard-library --library agda-doja...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 23,
+  "toolCalls" : {
+    "Read" : 4,
+    "Bash" : 17,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 22,
+  "wallMs" : 135647,
+  "costUsd" : 0.8668580000000001,
+  "tokens" : {
+    "input" : 42,
+    "output" : 7365,
+    "cacheRead" : 379326,
+    "cacheCreation" : 49286
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/agda/libraries): ls -R . | head -50; cat ../../../../../../../../agda/libraries 2>/dev/null; cat /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda/libraries",
+      "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1 && ls -la && head -c 2000 corpus.jsonl",
+      "Bash runs a program this audit does not model (time): time agda --no-default-libraries --library-file /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda/libraries --library standard-library --library agda-doja..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "corpus-grep" : 1,
+      "library-read" : 13,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4818,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+    "final" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-intersection-normal-in-subgroup/final/Group-intersection-normal-in-subgroup.agda",
+  "transcriptPath" : "subjects/hard-group-intersection-normal-in-subgroup/transcript.jsonl",
+  "lastWords" : "The hole is filled with `∙-closed (∙-closed h∈H x∈H) (⁻¹-closed h∈H) , K-normal h x∈K` (closure of H under product/inverse, plus normality of K applied at `h`), and the exact judge command reports success (exit 0, no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.58,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

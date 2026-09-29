@@ -1,0 +1,97 @@
+{
+  "benchmarkId" : "comp-homomorphism-isomorph-is-image",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Homomorphisms.HomomorphicImages.HomImage-≅'",
+    "needle:Setoid.Homomorphisms.HomomorphicImages.IdHomImage"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "isomorph-is-image",
+  "goal" : "𝑨 ≅ 𝑩 → 𝑨 IsHomImageOf 𝑩",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product using ( _,_ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 13,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 6,
+    "mcp__agda__fill_hole" : 2,
+    "Edit" : 2,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 12,
+  "wallMs" : 65242,
+  "costUsd" : 0.39563400000000004,
+  "tokens" : {
+    "input" : 24,
+    "output" : 2903,
+    "cacheRead" : 263558,
+    "cacheCreation" : 19116
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 6
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5666,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 IsHomImageOf 𝑩",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 IsHomImageOf 𝑩",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-homomorphism-isomorph-is-image/final/Homomorphism-isomorph-is-image.agda",
+  "transcriptPath" : "subjects/comp-homomorphism-isomorph-is-image/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 and no remaining holes, with the hole filled by `_≅_.from A≅B , _≅_.fromIsSurjective A≅B` (plus an added `open import Data.Product using ( _,_ )`).",
+  "rateLimit" : {
+    "maxUtilization" : 0.47,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "benchmarkId" : "hard-group-inverse-homo-commute",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "inverse-homo-commute",
+  "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "import Algebra.Properties.Group as GroupProperties"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 2,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 47073,
+  "costUsd" : 0.18687,
+  "tokens" : {
+    "input" : 10,
+    "output" : 3702,
+    "cacheRead" : 30840,
+    "cacheCreation" : 7885
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 560,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-inverse-homo-commute/final/Group-inverse-homo-commute.agda",
+  "transcriptPath" : "subjects/hard-group-inverse-homo-commute/transcript.jsonl",
+  "lastWords" : "Type-checks cleanly. The proof uses the always-true anti-homomorphism `(x ∙ y)⁻¹ ≈ y⁻¹ ∙ x⁻¹` together with the hypothesis applied at `y⁻¹, x⁻¹` and involutivity of inverse, giving `x ∙ y ≈ (y⁻¹ ∙ x⁻¹)⁻¹ ≈ y⁻¹⁻¹ ∙ x⁻¹⁻¹ ≈ y ∙ x`.\n\nYes — the given `agda --safe` command reports success on the final file with no holes or errors.",
+  "rateLimit" : {
+    "maxUtilization" : 0.56,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

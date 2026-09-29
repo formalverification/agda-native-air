@@ -1,0 +1,83 @@
+{
+  "benchmarkId" : "comp-variety-image-of-product",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Varieties.Properties.⊧-H-invar",
+    "needle:Setoid.Varieties.Properties.⊧-P-invar",
+    "needle:Setoid.Homomorphisms.HomomorphicImages.HomImage-≅"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "image-of-product-models",
+  "goal" : "(∀ i → 𝒜 i ⊧ (p ≈̇ q)) → 𝑨 IsHomImageOf ⨅ 𝒜 → 𝑨 ≅ 𝑩 → 𝑩 ⊧ (p ≈̇ q)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Varieties.Properties             using ( ⊧-H-invar ; ⊧-P-invar )"
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 4,
+    "Edit" : 3
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 73855,
+  "costUsd" : 0.3890925,
+  "tokens" : {
+    "input" : 18,
+    "output" : 4240,
+    "cacheRead" : 126685,
+    "cacheCreation" : 21966
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 6054,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝒜 : I → Algebra α ρᵃ}\n{𝑨 : Algebra (α ⊔ ι) (ρᵃ ⊔ ι)} {𝑩 : Algebra β ρᵇ} {p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) →\n𝑨 IsHomImageOf ⨅ 𝒜 → 𝑨 ≅ 𝑩 → 𝑩 ⊧ (p ≈̇ q)",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝒜 : I → Algebra α ρᵃ}\n{𝑨 : Algebra (α ⊔ ι) (ρᵃ ⊔ ι)} {𝑩 : Algebra β ρᵇ} {p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) →\n𝑨 IsHomImageOf ⨅ 𝒜 → 𝑨 ≅ 𝑩 → 𝑩 ⊧ (p ≈̇ q)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-variety-image-of-product/final/Variety-image-of-product.agda",
+  "transcriptPath" : "subjects/comp-variety-image-of-product/transcript.jsonl",
+  "lastWords" : "The hole is filled by composing product-, homomorphic-image-, and isomorphism-invariance of `⊧`, and the given `agda` command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.42,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

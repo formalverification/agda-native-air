@@ -1,0 +1,101 @@
+{
+  "benchmarkId" : "comp-subalgebra-subdirect-into-product",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Subalgebras.Properties.≤-trans",
+    "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤",
+    "needle:Setoid.Subalgebras.Properties.⨅-≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "subdirect-into-product",
+  "goal" : "SubdirectEmbedding {𝑩 = 𝑩} ℬ → (∀ i → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Overture                                 using ( 𝓞 ; 𝓥 ; Signature )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 25,
+  "toolCalls" : {
+    "Read" : 5,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__search_by_name" : 2,
+    "Bash" : 8,
+    "mcp__agda__exports_of" : 2,
+    "Edit" : 4,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 24,
+  "wallMs" : 140543,
+  "costUsd" : 0.5336702,
+  "tokens" : {
+    "input" : 40,
+    "output" : 9687,
+    "cacheRead" : 1009661,
+    "cacheCreation" : 58697
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 8
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 4734,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-subalgebra-subdirect-into-product/final/Subalgebra-subdirect-into-product.agda",
+  "transcriptPath" : "subjects/comp-subalgebra-subdirect-into-product/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully with no holes, diagnostics, or errors (verdict exitCode 0, success: true).",
+  "rateLimit" : {
+    "maxUtilization" : 0.53,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

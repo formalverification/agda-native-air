@@ -1,0 +1,87 @@
+{
+  "benchmarkId" : "comp-group-normal-of-equivalent-congruence",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.≈ⁿ-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-cong",
+    "needle:Setoid.Congruences.Lattice.≑-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf∘congruenceOf"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "normal-of-equivalent-congruence",
+  "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ≑ φ → φ ≑ congruenceOf 𝑵 → normalOf θ ≈ⁿ 𝑵",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two; cat agda/libraries; ls agda; find agda -path \"*Classical/Structures/Group*\" -o -path \"*Setoid/Congruences...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 12,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 8,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 11,
+  "wallMs" : 81661,
+  "costUsd" : 0.366407,
+  "tokens" : {
+    "input" : 24,
+    "output" : 4242,
+    "cacheRead" : 143874,
+    "cacheCreation" : 18830
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash changes the working directory outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two): cd /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two; cat agda/libraries; ls agda; find agda -path \"*Classical/Structures/Group*\" -o -path \"*Setoid/Congruences..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 5,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5802,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-group-normal-of-equivalent-congruence/final/Group-normal-of-equivalent-congruence.agda",
+  "transcriptPath" : "subjects/comp-group-normal-of-equivalent-congruence/transcript.jsonl",
+  "lastWords" : "The hole is filled by chaining `normalOf-cong` along both equivalences and closing with `normalOf∘congruenceOf` (with explicit endpoint arguments, since `_≈ⁿ_` is a defined, non-injective relation), and the given `agda ... --safe` command reports success on the final file with no errors or unsolved metas.",
+  "rateLimit" : {
+    "maxUtilization" : 0.43,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
