@@ -387,6 +387,36 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
       Fate.Excluded("name:Setoid.Functions.Inverses.IsInRange→IsInImage"))
   }
 
+  test("evaluate: a needle is ranked in the pool with exclusion as configured, kept apart from the targets (#160)") {
+    // A composition row: no original, no target, two needles.  Each needle's
+    // fate is the target machinery's, reported under its own role.
+    val composed = entry.copy(tags = Vector("stratum:composition",
+      "needle:Setoid.Functions.Inverses.Inv",
+      "needle:Setoid.Homomorphisms.Basic.𝒾𝒹"))
+    RetrievalRecall.hasGroundTruth(composed) shouldBe true
+    RetrievalRecall.hasGroundTruth(entry.copy(tags = Vector("stratum:novel"))) shouldBe false
+    val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, composed, recorded, fixtureSource).unsafeRunSync()
+    fr.targets shouldBe empty
+    fr.restates shouldBe empty
+    fr.needles.map(t => (t.qname, t.role, t.status, t.rank, t.detail)) shouldBe Vector(
+      ("Setoid.Functions.Inverses.Inv", "needle", "ranked",       Some(2), None),
+      ("Setoid.Homomorphisms.Basic.𝒾𝒹", "needle", "out-of-scope", None,    Some("Setoid.Homomorphisms.Basic")))
+    // A needle that the exclusion rules remove is reported as excluded, with the rule.
+    val clashing = composed.copy(hole = "Inv")
+    RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, clashing, recorded, fixtureSource).unsafeRunSync()
+      .needles.head.fate shouldBe Fate.Excluded("name:Setoid.Functions.Inverses.Inv")
+  }
+
+  test("json: a row without needles has no needle key, so the other strata's reports are unchanged (#160)") {
+    val plain = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, entry, recorded, fixtureSource).unsafeRunSync()
+    plain.needles shouldBe empty
+    plain.toJson.hcursor.downField("needles").focus shouldBe None
+    val composed = entry.copy(tags = Vector("stratum:composition", "needle:Setoid.Functions.Inverses.Inv"))
+    val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, composed, recorded, fixtureSource).unsafeRunSync()
+    fr.toJson.hcursor.downField("needles").downN(0).get[String]("role") shouldBe Right("needle")
+    fr.toJson.hcursor.downField("needles").downN(0).get[Int]("rank") shouldBe Right(2)
+  }
+
   test("evaluate: a recorded context is used as is, and the reconstruction is checked against it") {
     val live = RetrievalRecall.RecordedGoal("Image F ∋ b",
       Some(Vector("α", "ρᵃ", "β", "ρᵇ", "𝑨", "𝑩", "F", "b", "w").map(n => CtxEntry(n, "", None))))
@@ -461,8 +491,37 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     assume(Files.exists(index), s"index not found at $index")
     val rows  = Scaffold.readIndex(index, None).unsafeRunSync()
     val novel = rows.filter(_.stratum == "agda-algebras/novel")
-    val alg   = rows.filter(_.source == "agda-algebras").filterNot(novel.contains)
+    val comp  = rows.filter(_.stratum == "agda-algebras/composition")
+    val alg   = rows.filter(_.source == "agda-algebras").filterNot(novel.contains).filterNot(comp.contains)
     alg.size shouldBe 21
+    // The composition tier (issue #160) ranks its needles, never an original
+    // or a target: at least two needles per row, one tag per lemma the gold
+    // strings together, and no restates: or target: tag.
+    comp.foreach { e =>
+      e.taggedValues("needle:").size should be >= 2
+      e.taggedValues("needle:").distinct shouldBe e.taggedValues("needle:")
+      e.tags.exists(t => t.startsWith("restates:") || t.startsWith("target:")) shouldBe false
+      // A needle is what the gold applies and what the fixture withholds: its
+      // name is in the gold's text and in none of the obligation's `using`
+      // lists (PR #218 review, "needle-tag validation").
+      val repo   = Paths.get(sys.props("user.dir")).getParent
+      val gold   = Files.readString(repo.resolve(e.goldPath))
+      val listed = Imports.usingNames(Files.readString(repo.resolve(e.obligationPath))).toSet
+      e.taggedValues("needle:").foreach { q =>
+        val short = q.substring(q.lastIndexOf('.') + 1)
+        withClue(s"${e.id}, needle $q: ") {
+          gold.contains(short) shouldBe true
+          listed.contains(short) shouldBe false
+        }
+      }
+    }
+    comp.map(_.id).toSet shouldBe Set(
+      "comp-variety-subalgebra-of-model", "comp-variety-image-of-product",
+      "comp-congruence-monolith-below-member", "comp-subalgebra-subdirect-into-product",
+      "comp-lattice-below-join-bound", "comp-group-normal-of-equivalent-congruence",
+      "comp-congruence-meet-below-join", "comp-homomorphism-isomorph-is-image",
+      "comp-congruence-simple-equivalent-total", "comp-group-normal-of-smaller-congruence",
+      "comp-variety-subdirect-product-models", "comp-homomorphism-epi-through-kernel")
     alg.foreach(e => e.taggedValues("restates:").size shouldBe 1)
     alg.count(_.taggedValues("target:").nonEmpty) shouldBe 18
     // The hard tiers (issue #189) have no original by construction, so no ground

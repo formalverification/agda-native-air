@@ -12,10 +12,12 @@ the ground truth for a benchmark entry.
 
 ## Contents (v0)
 
-The current suite has **69 obligations** from two libraries, spanning the three
+The current suite has **81 obligations** from two libraries, spanning the three
 difficulty tiers of `docs/benchmarks/taxonomy.md`: two tiers cut from the Agda
-standard library, one mined from agda-algebras, and two hard tiers, one in each
-library's vocabulary, posed so that no proof of their statements is on disk.
+standard library, one mined from agda-algebras, two hard tiers, one in each
+library's vocabulary, posed so that no proof of their statements is on disk,
+and a composition tier mined from agda-algebras' types, whose golds string
+several library lemmas together.
 
 The **`agda-stdlib` tier** (22 obligations) is the original [M1-5] cut and is
 **frozen**: the P1 baseline (issue #113) is quoted against it, so it only ever
@@ -78,6 +80,28 @@ novelty check" below.
 | `non-obvious`        | 4     | `HK/K ≅ H/(H ∩ K)` on cosets, the kernel as a normal subgroup, a product of normal subgroups is their join |
 
 Domains: group, algebra.
+
+The **`agda-algebras-composition` tier** (12 obligations, issue [#160]) is
+mined by a program, `scripts/python/corpus/mine_compositions.py`
+(`make mine-compositions`), that chains the agda-algebras corpus by types.
+Each gold applies two to four library lemmas, its *needles*.  The lemma at
+the root has a *middle point*, an implicit argument that its premises share and
+its conclusion does not mention, as in a transitivity law, so the proof-search
+loop cannot use it: the loop's refinement leaves that argument unsolved, and
+`fill_hole` refuses the candidate.  No corpus lemma proves a statement alone,
+and no needle can be replaced by another lemma.  The rows carry `stratum:composition` and one `needle:` tag per
+lemma, and report as `agda-algebras/composition`.  Its headers carry no
+`Source:` or `Strategy:` line: a subject reads the obligation as written, and
+those lines would name the needles.  The tier's README records the mining, the
+golds, the candidates dropped on reading the source, and each row's novelty
+check.
+
+| `agda-algebras-composition` | Count | Examples                                                   |
+|-----------------------------|-------|------------------------------------------------------------|
+| `compositional`             | 7     | an algebra subdirectly embedded in a product of subalgebras is a subalgebra of the product, an isomorphic copy is a homomorphic image |
+| `non-obvious`               | 5     | an algebra embedding in a model of `E` satisfies every consequence of `E`, the monolith lies below every member of a family with nonzero meet |
+
+Domains: algebra, group, order.
 
 ### agda-algebras tier: selection criteria and provenance
 
@@ -248,13 +272,14 @@ gold is wanted, the following hold:
 +  the judge cannot judge a row whose gold is wanted, since its statement gate
    reads the statement from the gold's elaborated type and `agda-json` cannot
    extract a holed file: it stops on an internal error of Agda's
-   (`src/full/Agda/TypeChecking/Rules/LHS.hs:751`) on 68 of the 69 committed
-   obligations, every one whose hole stays open (the exception is
-   `Unit-trivial`, whose hole of type `⊤` Agda fills by eta).  A row without a
-   gold waits for one.
+   (`src/full/Agda/TypeChecking/Rules/LHS.hs:751`) on every committed
+   obligation whose hole stays open (68 of the 69 when issue [#189] measured
+   it; the exception is `Unit-trivial`, whose hole of type `⊤` Agda fills by
+   eta).  A row without a gold waits for one.
 
-Since 2026-09-27 no gold is wanted on either tier, and the full `make
-eval-benchmark` passes all 69 rows.
+Since 2026-09-27 no gold is wanted on either hard tier, and since 2026-09-28
+the full `make eval-benchmark` passes all 81 rows, including the composition
+tier's twelve.
 
 **Alternative proofs**.  A gold file may keep further proofs of its statement
 after the gold itself, each a definition with the same signature and a name
@@ -326,10 +351,14 @@ data/benchmarks/
 │   ├── README.md                      # the rows, golds, dropped rows, novelty check
 │   ├── obligations/                   # 6 modules, one {!!} hole each
 │   └── gold/                          # solved twins
-└── agda-algebras-hard-v0/
-    ├── README.md                      # the rows, golds, dropped rows, novelty check
-    ├── obligations/                   # 8 modules, one {!!} hole each
-    └── gold/                          # solved twins
+├── agda-algebras-hard-v0/
+│   ├── README.md                      # the rows, golds, dropped rows, novelty check
+│   ├── obligations/                   # 8 modules, one {!!} hole each
+│   └── gold/                          # solved twins
+└── agda-algebras-composition-v0/
+    ├── README.md                      # the mining, rows, golds, dropped candidates, novelty check
+    ├── obligations/                   # 12 modules, one {!!} hole each
+    └── gold/                          # solved twins, needles named qualified
 ```
 
 Tier definitions and selection criteria live in `docs/benchmarks/taxonomy.md`;
@@ -465,5 +494,6 @@ library, which carries its own (MIT) license and is not vendored here.  See the
 "Licensing" section of the top-level `README.md` for the wider policy on data.
 
 [#139]: https://github.com/formalverification/agda-native-air/issues/139
+[#160]: https://github.com/formalverification/agda-native-air/issues/160
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
