@@ -392,16 +392,23 @@ Every tier above asks for one lemma.  The composition tier asks for several: twe
 
 | | Opus `shell` | Opus `mcp` | Opus `both` | Sonnet `shell` | Sonnet `mcp` | Sonnet `both` |
 |---|---|---|---|---|---|---|
+| run | `comp-opus5-shell-1` | `comp-opus5-mcp-1` | `comp-opus5-both-1` | `comp-sonnet5-shell-1` | `comp-sonnet5-mcp-1` | `comp-sonnet5-both-1` |
 | final file checks, statement kept | 12 | 12 | 12 | 12 | 12 | 12 |
 | solved | 10 | 12 | 10 | 6 | 3 | 5 |
-| lost to preservation, isolation | 0, 2 | 0, 0 | 0, 2 | 5, 1 | 9, 0 | 5, 2 |
+| lost to the preservation gate | 0 | 0 | 0 | 5 | 9 | 5 |
+| lost to the isolation gate | 2 | 0 | 2 | 1 | 0 | 2 |
 | needles in the final files (of 33) | 20 | 20 | 22 | 25 | 32 | 26 |
+| rows on the gold's whole route | 5 | 5 | 6 | 7 | 11 | 8 |
+| turns | 130 | 128 | 148 | 157 | 206 | 179 |
+| USD (list) | 4.14 | 4.05 | 4.87 | 2.60 | 3.55 | 3.39 |
+
+A final file *checks* when the judge's own run of `agda` on it exits 0 and its statement is the obligation's.  A needle is *in* a final file when its name, as its last dotted component, occurs there bounded by Agda's delimiters, and a row is *on the gold's whole route* when its final file names every needle of the row.  USD is each report's list-price total rounded half up to the cent.
 
 +  **At both models' ceiling**: all 72 final files type-check with their statements kept.  Every row missing from a solved count lost a gate: 19 Sonnet rows to preservation, each an edited `using` list (the fixture imports each needle's module through a `using` list of decoys), and seven rows to isolation, four the subject leaving its roots and three the audit's limits.
-+  **The needles came from the tools and the sources**: all but three of the needles the transcripts name first appear in a tool answer (`exports_of` and `Read` with the server, `cat` and `grep` with a shell); the three were names the subject handed to `search_by_name` first.  On the haystack tier, by contrast, Opus names the needle before any search on 10 of 12 rows.
++  **The needles came from the tools and the sources**: all but three of the needles the transcripts name first appear in a tool answer (`exports_of` and `Read` with the server; with a shell, `cat` and `grep` for Opus and `Read` for Sonnet); the three were names the subject handed to `search_by_name` first.  On the haystack tier, by contrast, Opus names the needle before any search on 10 of 12 rows.
 +  **The miner's necessity check does not bind the models**: the needles' relations are defined as functions and pairs, and Opus proved rows 3, 7, 8, 9, and 10 by unfolding them, with the needles in view; row 2 has a second three-lemma route through the fixture's own decoy `⊧-I-invar`, which all six arms took.  The check compares a needle with the corpus's other lemmas, not with terms built from the definitions.
 
-**Status**.  Adopted ([#160]); the tier is landed and measured, and the loop's zero stands as the tier's construction.  The agents' ceiling is the finding: the tier cannot tell the tools apart for either frontier model.  Open, for William on [#160]: a revision would pose relations a proof cannot unfold (a record or an abstract definition), add the definitional check to the miner, lengthen the chains, or run weaker subjects.
+**Status**.  Adopted ([#160]); the tier is landed and measured, and the loop's zero stands as the tier's construction.  The agents' ceiling is the finding: the tier cannot tell the tools apart for either frontier model, and the instruments differ in route, not in what was proved.  The demo reads this table by its caption and replays three of its sessions for where the needles came from and which route each model took ([#224]).  Open, for William on [#160]: a revision would pose relations a proof cannot unfold (a record or an abstract definition), add the definitional check to the miner, lengthen the chains, or run weaker subjects.
 
 ## 10.  Where it is going
 
@@ -438,6 +445,7 @@ Every tier above asks for one lemma.  The composition tier asks for several: twe
 | 21 | The server is measured against its own control: an arm is one instrument (`shell`, `mcp`, `both`), the libraries' sources are readable on every arm, a shell arm is confined by a conservative audit over the paths its commands name rather than by the client, which cannot confine Bash, and the report gains `via`, `verdictVia`, and Bash calls by class | Adopted ([#162]) | Sonnet 5: shell 50/55 and 0 restated, mcp 47/55 and 6, both 51/55 and 2, zero anomalies; the `both` arm takes all 55 verdicts from `check_file` and runs `agda` on the shell never, `definition_of` 19 calls against 0; `ShellAuditSpec` written before the parser (§ 9) |
 | 22 | Every agent number is measured on fixtures whose headers carry no hints (no `Source:`, `Strategy:`, `Haystack:`, `Needle:`, or `Note:` line); the arms measured with them stay archived, dated, and marked | Adopted ([#219]) | Header-free, Sonnet 5 `mcp` 44/55 and 9 restated against 48 and 45 with the hints; the haystack tier solved with no query on 3 of 12 rows against 8 to 11; about three agda-algebras rows per Sonnet arm from solved to restated; `FixtureHeadersSpec` over every index row (§ 9) |
 | 23 | The composition instrument is a mined tier whose every gold has an implicit middle point at its root, gated by the loop at zero, by per-needle recall, and by needle provenance per transcript | Adopted ([#160]) | The loop 0/12 in three sweeps; idf-unfold 14/33 needles in the top 8; every one of the 72 agent final files checks, Opus 5 solved 10, 12, 10 and Sonnet 5 6, 3, 5 in `shell`, `mcp`, `both`, the rest lost to gates; needles from tool answers, not memory (§ 9) |
+| 24 | A tier at the models' ceiling is read by its final files and its route, not by its solved count: where every final file checks, a solved count measures the gates, and what separates the arms is where each needle came from and whether the proof took the gold's route | Adopted ([#224]) | The composition tier: 72 of 72 final files check; 19 preservation and 7 isolation losses, each after a file that checks; Sonnet 5 on the gold's whole route on 11 of 12 rows with the server, Opus 5 on 5 or 6 in every arm; all but three needles first shown by a tool answer (§ 9) |
 
 ## References
 
@@ -482,6 +490,7 @@ Every tier above asks for one lemma.  The composition tier asks for several: twe
 [#160]: https://github.com/formalverification/agda-native-air/issues/160
 [#218]: https://github.com/formalverification/agda-native-air/pull/218
 [#225]: https://github.com/formalverification/agda-native-air/pull/225
+[#224]: https://github.com/formalverification/agda-native-air/issues/224
 
 [`proof-search/overview.md`]: ../proof-search/overview.md
 [`agda-mcp/agda-mcp-interaction-lane.md`]: ../agda-mcp/agda-mcp-interaction-lane.md

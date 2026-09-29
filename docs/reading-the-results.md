@@ -806,9 +806,11 @@ whole route" is a final file that names every needle of its row's gold
 +  **The needles came from the tools and the sources, not from memory**.
    Of the needles a transcript names, all but three first appear in a tool
    answer: in the `mcp` arms mostly an `exports_of` on a module the fixture
-   imports (Sonnet 21 of 33) or a `Read` of a file `definition_of` located
-   (Opus 19), and in the arms with a shell a `cat` or a `grep` of
-   agda-algebras' sources.  The three exceptions are names guessed from a
+   imports (Sonnet 21 of 33) or a `Read` of a library file (Opus 19, 15 of
+   them in a file a `definition_of` answer had named first); in the arms
+   with a shell, for Opus a `cat` or a `grep` of agda-algebras' sources (28
+   and 25 of 33), and for Sonnet a `Read` even there (18 and 22).  The
+   three exceptions are names guessed from a
    neighbor and handed to `search_by_name` (`≑-trans` beside the fixture's
    `≑-refl`).  That is the reverse of the haystack tier, where Opus named
    the needle from memory on 10 of 12 rows (§ 4.6).
@@ -834,7 +836,12 @@ whole route" is a final file that names every needle of its row's gold
    z≤w)`), and on the defined relations by naming the endpoints, as the gold
    does (`⊆-trans {θ = f i ∧ φ} {φ = f i} {ψ = ⋁ 𝑨 ℓ₀ f}`).  The loop's
    refusal is `fill_hole` asked for the root lemma with holes for its
-   arguments, which a subject that writes both arguments never meets.
+   arguments, which a subject that writes both arguments never meets; it
+   can still meet the middle point, where a relation unfolds to a function
+   space and fixes nothing.  Sonnet's first file for row 10 in the `mcp`
+   arm, `≤ⁿ-trans (normalOf-mono θ φ θ⊆φ) φ≤N`, came back from
+   `check_file` with unsolved metas at `≤ⁿ-trans`, and the file checked
+   once the session named the three normal subgroups, as the gold does.
 +  **Which tools**.  With the server, Sonnet leaned on the knowledge tools
    (`type_of` 26, `definition_of` 21, `exports_of` 18, `search_by_name` 10)
    and Opus on `fill_hole` (20) and `definition_of` (13).  Given both, each
