@@ -36,9 +36,12 @@ from typing import Any, Callable, Dict
 
 from scripts.python.demo.numbers import ADR as ADR_REL
 from scripts.python.demo.numbers import ARCHIVE as ARCHIVE_REL
+from scripts.python.demo.numbers import RUNS as MINED
 from scripts.python.demo.numbers import (
     AGENT_CAPTION,
     BOTH_RUN,
+    COMPOSITION_RUNS,
+    EVERY_RUN,
     CONTROL_CAPTION,
     HINTED_RUN,
     CONTROL,
@@ -287,9 +290,11 @@ def test_the_page_agrees_with_adr_0001() -> None:
 
 #: Every run the build reads, each once: the two arms the page replays, the
 #: control's shell and both arms (its mcp arm is the Sonnet arm), and the
-#: hinted Sonnet arm whose haystack sessions the page compares.
-RUNS = tuple(dict.fromkeys(
-    (SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN, HINTED_RUN)))
+#: hinted Sonnet arm whose haystack sessions the page compares, and the six
+#: composition arms (Issue #224).
+RUNS = EVERY_RUN
+assert set(MINED) == {SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN,
+                      HINTED_RUN}
 
 Edit = Callable[[str, Dict[str, Any]], Dict[str, Any]]
 
@@ -533,14 +538,28 @@ def test_the_archive_is_measured_not_quoted(tmp_path: Path) -> None:
 
 # ------------------------------------------ make demo-check (Issue #215)
 
+def _finals(root: Path, run: str) -> None:
+    """A composition arm's final files, the one part of a subject's
+    directory `make demo-check` reads (the table counts the needles they
+    name)."""
+    for final in (ARCHIVE / run / "subjects").glob("*/final/*"):
+        target = root / ARCHIVE_REL / run / final.relative_to(ARCHIVE / run)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(final.read_text(encoding="utf-8"),
+                          encoding="utf-8")
+
+
 def _reports_only(root: Path, adr_text: str) -> Path:
     """A repository root holding only what `make demo-check` may read: the
-    five run reports and ADR 0001, with no transcript and no other file."""
+    run reports, the composition arms' final files, and ADR 0001, with no
+    transcript and no other file."""
     for run in RUNS:
         (root / ARCHIVE_REL / run).mkdir(parents=True)
         (root / ARCHIVE_REL / run / "report.json").write_text(
             (ARCHIVE / run / "report.json").read_text(encoding="utf-8"),
             encoding="utf-8")
+        if run in COMPOSITION_RUNS:
+            _finals(root, run)
     (root / ADR_REL).parent.mkdir(parents=True)
     (root / ADR_REL).write_text(adr_text, encoding="utf-8")
     return root
@@ -650,14 +669,17 @@ def test_a_copy_of_the_adr_with_the_loop_total_moved_fails(tmp_path: Path,
 # ------------------------- a report's fields are required (round three)
 
 def _reports_edited(root: Path, edit: Edit) -> Path:
-    """What `make demo-check` reads, the five reports passed through `edit`
-    and the committed ADR, under a scratch repository root."""
+    """What `make demo-check` reads, the reports passed through `edit`, the
+    composition arms' final files, and the committed ADR, under a scratch
+    repository root."""
     for run in RUNS:
         (root / ARCHIVE_REL / run).mkdir(parents=True)
         report = json.loads(
             (ARCHIVE / run / "report.json").read_text(encoding="utf-8"))
         (root / ARCHIVE_REL / run / "report.json").write_text(
             json.dumps(edit(run, report)), encoding="utf-8")
+        if run in COMPOSITION_RUNS:
+            _finals(root, run)
     (root / ADR_REL).parent.mkdir(parents=True)
     (root / ADR_REL).write_text(ADR.read_text(encoding="utf-8"),
                                 encoding="utf-8")
@@ -727,7 +749,7 @@ def test_a_count_of_the_wrong_kind_is_refused(tmp_path: Path) -> None:
 
 
 def test_every_committed_report_has_every_field_the_page_reads() -> None:
-    for run in RUNS:
+    for run in MINED:
         report = json.loads(
             (ARCHIVE / run / "report.json").read_text(encoding="utf-8"))
         assert report_problems(run, report) == (), run

@@ -29,6 +29,27 @@ Description: The sessions the demo page replays, and how one is assembled from
        to the fixture's own `using` list and failed the preservation gate with
        a file that type-checks, as it had in the first Sonnet arm.
 
+  `COMPOSITION` names the three sessions of the composition tier (Issue
+  #224), from its `mcp` arms (Issue #160).  That tier sits at both models'
+  ceiling (every final file of every arm checks), so no session is chosen
+  as a row one configuration proves and another cannot; there is none.
+  They are chosen for what the tier alone shows, as follows:
+
+    +  `comp-group-normal-of-smaller-congruence`, Sonnet 5.  The gold's
+       route: one `exports_of` lists both needles, and the middle point
+       shows itself, since the first file, both arguments written, leaves
+       the root lemma's implicit arguments unsolved until the session names
+       them as the gold does.
+    +  The same row, Opus 5.  No needle: the goal as `get_goal` prints it is
+       unfolded, a `Read` shows `normalOf-mono`, and the proof is written
+       pointwise, `λ p → φ≤N (θ⊆φ p)`.
+    +  `comp-lattice-below-join-bound`, Sonnet 5.  A file that checks and
+       lost a gate: the gold's own proof, with the needles appended to the
+       fixture's `using` list, which the preservation gate refuses.
+
+  A composition row restates nothing, so its verdict's `original` is null
+  and the page reads each needle's provenance instead (`needles`).
+
   Everything a replay carries is read out of a committed file: the obligation
   and its metadata from `data/benchmarks/`, the exchange from the subject's
   `transcript.jsonl`, the verdict from its `outcome.json`, and the file the
@@ -57,7 +78,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from scripts.python.demo.numbers import OPUS_RUN, SONNET_RUN
+from scripts.python.demo import needles
+from scripts.python.demo.numbers import (
+    COMP_OPUS_MCP_RUN,
+    COMP_SONNET_MCP_RUN,
+    OPUS_RUN,
+    SONNET_RUN,
+)
 from scripts.python.demo.paths import check_clean, normalize_value
 from scripts.python.demo.transcript import (
     Session,
@@ -72,8 +99,9 @@ from scripts.python.utils.pipeline_types import (
 )
 
 #: The shape of a replay file.  v1 (Issue #215) added the verdict's
-#: `original` reading; `build_site` refuses a file of any other shape.
-REPLAY_SCHEMA = "agda-native-air.demo.replay.v1"
+#: `original` reading; v2 (Issue #224) added the obligation's needles and
+#: where each came from.  `build_site` refuses a file of any other shape.
+REPLAY_SCHEMA = "agda-native-air.demo.replay.v2"
 
 
 @dataclass(frozen=True)
@@ -137,6 +165,49 @@ ROSTER: Tuple[Choice, ...] = (
             "The same obligation and the same need for `trans`, in four "
             "turns.  This session added an import line instead of editing "
             "one, which is what the preservation gate allows."),
+    ),
+)
+
+
+#: The composition tier's replays, in tab order: one row by both models,
+#: whose routes differ, then the shortest session that lost a gate.
+COMPOSITION: Tuple[Choice, ...] = (
+    Choice(
+        run=COMP_SONNET_MCP_RUN,
+        subject="comp-group-normal-of-smaller-congruence",
+        model_label="Sonnet 5",
+        blurb=(
+            "The gold's route.  One `exports_of` on the module the fixture "
+            "opens lists both needles.  The first file writes both "
+            "arguments of `≤ⁿ-trans` and still comes back with unsolved "
+            "metas at it: `_≤ⁿ_` unfolds to a function space, which fixes "
+            "no normal subgroup.  With the three it relates named, as the "
+            "gold names them, the file checks."),
+    ),
+    Choice(
+        run=COMP_OPUS_MCP_RUN,
+        subject="comp-group-normal-of-smaller-congruence",
+        model_label="Opus 5",
+        blurb=(
+            "The same row, and no needle in the proof.  `get_goal` prints "
+            "the goal unfolded, a membership to a membership; a Read of the "
+            "file `definition_of` located has `normalOf-mono` in it; and "
+            "the session writes `λ p → φ≤N (θ⊆φ p)`, probes it with "
+            "`fill_hole`, and checks it."),
+    ),
+    Choice(
+        run=COMP_SONNET_MCP_RUN,
+        subject="comp-lattice-below-join-bound",
+        model_label="Sonnet 5",
+        blurb=(
+            "A file that checks and is not a solve.  One `exports_of` lists "
+            "both needles and the session writes the gold's proof, "
+            "`≤-trans x≤y∨z (∨-least y≤w z≤w)`, supplying the middle point "
+            "through the second needle's conclusion.  To bring the two "
+            "into scope it appended them to the fixture's own `using` "
+            "list, and the preservation gate refused the file.  `≤-trans` "
+            "is the root lemma the loop reached for on this row, and "
+            "`fill_hole` refused it with holes for its arguments."),
     ),
 )
 
@@ -249,12 +320,21 @@ def _verdict(outcome: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _outcome_label(verdict: Dict[str, Any]) -> Tuple[str, str]:
+def _outcome_label(verdict: Dict[str, Any],
+                   restates: Optional[str]) -> Tuple[str, str]:
     """The verdict's short name and the one sentence the page prints with it.
 
     The sentence explains the archive's fields; it never adds a judgment of
-    its own, and every name it uses is quoted from `outcome.json`.
+    its own, and every name it uses is quoted from `outcome.json`.  On a row
+    whose index entry names no original (no `restates:` tag: every
+    composition row, and every standard-library row) the judge looks for no
+    citation, so the sentence claims none was absent.
     """
+    if verdict["solved"] and restates is None:
+        return "solved", (
+            "Every gate passed, so the row counts as a solve.  Its index "
+            "entry names no library original, so the judge looks for no "
+            "citation of one.")
     if verdict["solved"]:
         return "solved", (
             "Every gate passed, and the definition does not refer to the "
@@ -331,9 +411,10 @@ def _finish(archive: Path, repo: Path, row: Dict[str, Any], choice: Choice,
 
     obligation = texts["obligation"].unwrap()
     final = texts["final"].unwrap()
-    verdict = _verdict(outcome)
-    kind, sentence = _outcome_label(verdict)
     tags = [str(t) for t in (outcome.get("tags") or [])]
+    verdict = _verdict(outcome)
+    kind, sentence = _outcome_label(verdict, tag_value(tags, "restates"))
+    row_needles = needles.needles_of(tags)
 
     replay = {
         "schema": REPLAY_SCHEMA,
@@ -354,6 +435,7 @@ def _finish(archive: Path, repo: Path, row: Dict[str, Any], choice: Choice,
             "module": row.get("module"),
             "restates": tag_value(tags, "restates"),
             "targets": list(tag_values(tags, "target")),
+            "needles": list(row_needles),
             "path": obligation_rel,
             "text": obligation,
         },
@@ -365,6 +447,10 @@ def _finish(archive: Path, repo: Path, row: Dict[str, Any], choice: Choice,
             "totals": session.totals,
         },
         "verdict": {**verdict, "kind": kind, "sentence": sentence},
+        # Where each needle came from, by `needles`' rule; empty on a row
+        # with no needle, which is every row of the mined suite.
+        "needles": [found.as_dict() for found
+                    in needles.sources(records, row_needles, final)],
         "final": {
             "path": f"{subject_rel}/final/{final_name}",
             "text": final,

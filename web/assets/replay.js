@@ -10,7 +10,7 @@
  * between them is deliberate.
  *
  * The tabs are navigation, not motion, so they are wired wherever this
- * script runs at all: a reduced-motion reader gets five finished sessions,
+ * script runs at all: a reduced-motion reader gets finished sessions,
  * switched instantly.  They ship hidden, and so does every replay button,
  * because a control that switches nothing should not exist on a page that
  * has no script.
@@ -27,12 +27,14 @@
  *
  * One session plays, and then it stops.  There is no auto-advance from tab
  * to tab and no loop: a proof session is a minute of reading, not a
- * three-second vignette, and five of them in a row would be a demand rather
+ * three-second vignette, and several of them in a row would be a demand rather
  * than an offer.  Any gesture (choosing a tab, pressing the control) takes
  * the wheel; from then on a panel plays only when asked.
  *
  * The one control each panel has is a stop as well as a replay, because the
- * first session starts on its own and the five run 6 to 25 seconds: that is
+ * first session of each player starts on its own, and at the stylesheet's
+ * rhythm the sessions run about 8 to 27 seconds (the page has two players,
+ * the mined suite's and the composition tier's, each armed alone): that is
  * auto-updating content beside other content, and WCAG 2.2.2 asks for a way
  * to stop it.  While a panel plays, the button reads "stop" and settles it
  * to the finished session; at rest it reads "replay" and starts one.
@@ -269,7 +271,7 @@
 
     // Everything past here is the replay itself, and exists only where
     // motion is allowed: no button is revealed and no observer is armed, so
-    // a reduced-motion reader is left with five finished sessions and a tab
+    // a reduced-motion reader is left with finished sessions and a tab
     // bar, which is the whole of what this page has to say.
     if (!canReplay) return;
 
