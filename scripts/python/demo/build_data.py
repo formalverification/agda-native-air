@@ -7,9 +7,11 @@ Description: `make demo-data`.  Read the committed agent-bench archive and
 
   None of the archive is shipped to a browser, and it grows with every run.
   This step reduces it to what the page states: one JSON per replay (the
-  roster in `replays.ROSTER`), and one JSON holding the numbers (both of
-  ADR 0001 § 9's tables, the arms' headline totals, and the archive's own
-  size, counted rather than quoted; see `numbers.build`).  Both are written
+  rosters in `replays.ROSTER` and `replays.COMPOSITION`), and one JSON
+  holding the numbers (the three of ADR 0001 § 9's tables the page
+  carries, the arms' headline totals, where each composition needle came
+  from, and the archive's own size, counted rather than quoted; see
+  `numbers.build`).  Both are written
   under `data/demo/`, which is gitignored: the page is rebuilt from the
   archive, never from a committed copy of its own output.
 
@@ -39,7 +41,13 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 from scripts.python.demo import numbers
 from scripts.python.demo.numbers import ADR, ARCHIVE
-from scripts.python.demo.replays import ROSTER, build_replay, index_rows
+from scripts.python.demo.replays import (
+    COMPOSITION,
+    ROSTER,
+    Choice,
+    build_replay,
+    index_rows,
+)
 from scripts.python.utils.file_ops import load_json, write_text
 from scripts.python.utils.pipeline_types import (
     PipelineError,
@@ -54,7 +62,8 @@ INDEX = Path("data/benchmarks/benchmark-index.jsonl")
 #: The default output directory, gitignored like every other `data/` output.
 DEFAULT_OUT = Path("data/demo")
 
-DATA_SCHEMA = "agda-native-air.demo.v0"
+#: The manifest's shape.  v1 (Issue #224) added the `composition` list.
+DATA_SCHEMA = "agda-native-air.demo.v1"
 
 
 def write_pretty(path: Path, data: Any) -> Result[None, PipelineError]:
@@ -70,7 +79,7 @@ def write_pretty(path: Path, data: Any) -> Result[None, PipelineError]:
 
 def arm_models(archive: Path) -> Result[Dict[str, str], PipelineError]:
     """Each arm's model id, read once from its run report."""
-    runs = sorted({choice.run for choice in ROSTER})
+    runs = sorted({choice.run for choice in ROSTER + COMPOSITION})
     reports = [load_json(archive / run / "report.json") for run in runs]
     return sequence_results(reports).map(
         lambda loaded: {run: str((report.get("config") or {}).get("model", ""))
@@ -79,36 +88,46 @@ def arm_models(archive: Path) -> Result[Dict[str, str], PipelineError]:
 
 def build_replays(archive: Path, repo: Path,
                   rows: Dict[str, Dict[str, Any]],
-                  models: Dict[str, str]) -> Result[List[Dict[str, Any]], PipelineError]:
-    """Every replay of the roster, in tab order."""
+                  models: Dict[str, str],
+                  roster: Sequence[Choice] = ROSTER
+                  ) -> Result[List[Dict[str, Any]], PipelineError]:
+    """Every replay of a roster, in tab order."""
     return sequence_results([
         build_replay(archive, repo, rows, choice, models.get(choice.run, ""))
-        for choice in ROSTER
+        for choice in roster
     ])
 
 
-def manifest(replays: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
-    """The index the page's builder reads: one entry per replay, in order."""
+def _entries(replays: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "file": f"{replay['id']}.json",
+            "id": replay["id"],
+            "label": replay["label"],
+            "modelLabel": replay["modelLabel"],
+            "subject": replay["subject"],
+            "run": replay["run"],
+            "verdict": replay["verdict"]["kind"],
+        }
+        for replay in replays
+    ]
+
+
+def manifest(replays: Sequence[Dict[str, Any]],
+             composition: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """The index the page's builder reads: one entry per replay, in order,
+    the mined suite's and the composition tier's in lists of their own."""
     return {
         "schema": DATA_SCHEMA,
         "command": "make demo-data",
         "archive": str(ARCHIVE),
-        "replays": [
-            {
-                "file": f"{replay['id']}.json",
-                "id": replay["id"],
-                "label": replay["label"],
-                "modelLabel": replay["modelLabel"],
-                "subject": replay["subject"],
-                "run": replay["run"],
-                "verdict": replay["verdict"]["kind"],
-            }
-            for replay in replays
-        ],
+        "replays": _entries(replays),
+        "composition": _entries(composition),
     }
 
 
 def emit(out: Path, replays: Sequence[Dict[str, Any]],
+         composition: Sequence[Dict[str, Any]],
          table: Dict[str, Any]) -> Result[List[Path], PipelineError]:
     """Write the manifest, every replay, and the table.
 
@@ -116,8 +135,9 @@ def emit(out: Path, replays: Sequence[Dict[str, Any]],
     `write_text` succeeds with `None`, and `Result.unwrap` (which
     `sequence_results` calls) treats a `None` success as an invalid state.
     """
-    files = [(out / "manifest.json", manifest(replays))]
-    files += [(out / f"{replay['id']}.json", replay) for replay in replays]
+    files = [(out / "manifest.json", manifest(replays, composition))]
+    files += [(out / f"{replay['id']}.json", replay)
+              for replay in list(replays) + list(composition)]
     files.append((out / "numbers.json", table))
     return sequence_results([write_pretty(path, data).map(lambda _, p=path: p)
                              for path, data in files])
@@ -127,18 +147,25 @@ def run(repo: Path, out: Path) -> Result[Tuple[int, int], PipelineError]:
     """Build everything; on success report how many replays and rows landed."""
     archive = repo / ARCHIVE
 
-    def with_rows(rows: Dict[str, Dict[str, Any]]) -> Result[Tuple[int, int], PipelineError]:
-        return (arm_models(archive)
-                .and_then(lambda models: build_replays(archive, repo, rows,
-                                                       models))
+    def with_models(rows: Dict[str, Dict[str, Any]], models: Dict[str, str]
+                    ) -> Result[Tuple[int, int], PipelineError]:
+        return (build_replays(archive, repo, rows, models)
                 .and_then(lambda replays:
-                          numbers.build(archive, repo / ADR)
-                          .and_then(lambda table:
-                                    emit(out, replays, table)
-                                    .map(lambda _: (len(replays),
-                                                    len(table["rows"]))))))
+                          build_replays(archive, repo, rows, models,
+                                        COMPOSITION)
+                          .and_then(lambda composition:
+                                    numbers.build(archive, repo / ADR, repo)
+                                    .and_then(lambda table:
+                                              emit(out, replays, composition,
+                                                   table)
+                                              .map(lambda _: (
+                                                  len(replays)
+                                                  + len(composition),
+                                                  len(table["rows"])))))))
 
-    return index_rows(repo / INDEX).and_then(with_rows)
+    return index_rows(repo / INDEX).and_then(
+        lambda rows: arm_models(archive).and_then(
+            lambda models: with_models(rows, models)))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

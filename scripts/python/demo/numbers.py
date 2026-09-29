@@ -3,7 +3,8 @@
 File: scripts/python/demo/numbers.py
 
 Description: The demo page's numbers, regenerated from the archived run
-  reports and checked against ADR 0001 § 9 (Issues #85, #215, and #219).
+  reports and checked against ADR 0001 § 9 (Issues #85, #215, #219, and
+  #224).
 
   § 9 states two tables the page carries, each twice: once as first measured,
   with the fixture headers' hints in view, and once re-measured without them
@@ -14,17 +15,18 @@ Description: The demo page's numbers, regenerated from the archived run
   with the server, and with both; its `mcp` column is the Sonnet arm of the
   agent table, one run held to both tables.  Each table is found by the
   caption line the ADR sets above it (`AGENT_CAPTION`, `CONTROL_CAPTION`),
-  since the dated tables share their headers.  Transcribing either table
-  would be how a page and a decision record come to disagree, so every
-  figure is recomputed
-  here from the runs' own `report.json` and then compared with the ADR's
-  tables cell for cell.  The comparison is `validate`, which reads the five
-  reports and the ADR and nothing else; `make demo-check` (this module's
-  `main`, which writes nothing) runs it alone, and `build`, which `make
-  demo-data` and the tests run, runs it first, so a number that drifts
-  fails a build rather than a reading.  Only those two tables are compared:
-  the page's other figures (by tier, by tool, per arm) are regenerated from
-  the same reports and have no table in the ADR to be compared with.
+  since the dated tables share their headers.  Transcribing a table would
+  be how a page and a decision record come to disagree, so every figure is
+  recomputed here from the runs' own `report.json` and then compared with
+  the ADR's tables cell for cell.  The comparison is `validate`, which
+  reads the run reports, the composition arms' final files, and the ADR,
+  and nothing else; `make demo-check` (this module's `main`, which writes
+  nothing) runs it alone, and `build`, which `make demo-data` and the tests
+  run, runs it first, so a number that drifts fails a build rather than a
+  reading.  Only the three tables below are compared: the page's other
+  figures (by tier, by tool, per arm, where each needle came from) are
+  regenerated from the same archive and have no table in the ADR to be
+  compared with.
 
   Two of the agent table's columns are not the agents': "loop fixed" and
   "loop retrieval" are the proof-search loop's solve counts on the same suite,
@@ -40,7 +42,7 @@ Description: The demo page's numbers, regenerated from the archived run
   pattern and refuses any cell it does not match, the way `adr_table` refuses
   a renamed column: a cell in another form is an error, never a guess.
 
-  Beyond the two tables the page is handed what it says about the runs in
+  Beyond the tables the page is handed what it says about the runs in
   words, each read from the same reports: which tools each run's subjects
   were presented (from their own isolation audits, not the harness's
   allowlist, which omits the fourteenth tool the attribution arms' subjects
@@ -51,11 +53,28 @@ Description: The demo page's numbers, regenerated from the archived run
   reason: it grows with every run, and a figure typed into the page went
   stale within a week.
 
+  § 9 states a third table the page carries, the composition tier's (Issue
+  #160): six arms, Opus 5 and Sonnet 5 each with a shell, with the server,
+  and with both, on twelve rows mined so that each gold strings two to four
+  library lemmas (the row's needles) together.  It is found by its caption
+  (`COMPOSITION_CAPTION`) and compared cell by cell like the other two, and
+  its first row names the run behind each column, so a column cannot be
+  compared with the wrong arm.  Two of its rows are read from the files the
+  judge read rather than from the reports: how many needles the final files
+  name, and how many rows took the gold's whole route, by the rule in
+  `needles`.  Where each needle came from is read from the transcripts, by
+  the same module; the ADR has no table of it, so it is regenerated and not
+  compared.  The loop's three sweeps over the tier, which no report in this
+  repository carries, are read from the gate table of the tier's own README
+  (`loop_sweeps`), which is their record.
+
   Every field of a report that the page reads is declared in
-  `REPORT_FIELDS` (and `OUTCOME_FIELDS`) and required when the reports are
-  loaded, before anything reads them.  The readers below default an absent
-  field to zero or to nothing, so without that check a report missing a
-  field would have printed a zero no run recorded.
+  `REPORT_FIELDS` (and `OUTCOME_FIELDS`, and for the composition arms
+  `COMPOSITION_REPORT_FIELDS` and `COMPOSITION_OUTCOME_FIELDS`) and
+  required when the reports are loaded, before anything reads them.  The
+  readers below default an absent field to zero or to nothing, so without
+  that check a report missing a field would have printed a zero no run
+  recorded.
 
 Usage:
 
@@ -82,9 +101,11 @@ import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from scripts.python.demo import needles
 from scripts.python.demo.transcript import load as load_transcript
 from scripts.python.utils.file_ops import load_json, ls_dir_special, read_text
 from scripts.python.utils.pipeline_types import (
@@ -102,9 +123,10 @@ ADR = Path("docs/adr/0001-proof-search-on-agda-mcp.md")
 #: The shape of the numbers file this module writes.  v1 (Issue #215) added
 #: the control, the archive's size, and the arms' days, tools, and readings;
 #: v2 (Issue #219) dropped the control's archived column, since its `mcp`
-#: arm is now the replayed Sonnet arm itself.  `build_site` refuses a file of
-#: any other shape rather than render it.
-SCHEMA = "agda-native-air.demo.numbers.v2"
+#: arm is now the replayed Sonnet arm itself; v3 (Issue #224) added the
+#: composition tier.  `build_site` refuses a file of any other shape rather
+#: than render it.
+SCHEMA = "agda-native-air.demo.numbers.v3"
 
 #: The run ids of the two arms the page replays, and the model each ran:
 #: the header-free re-runs of Issue #219.
@@ -125,9 +147,34 @@ BOTH_RUN = "suite219-sonnet5-both-1"
 #: reads it.
 HINTED_RUN = "agent-sonnet5-1"
 
-#: Every run the page reads, each read once.
+#: Every run of the mined suite the page reads, each read once.
 RUNS: Tuple[str, ...] = tuple(dict.fromkeys(
     (SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN, HINTED_RUN)))
+
+#: The composition tier's six arms (Issue #160), in the order ADR 0001 § 9's
+#: composition table sets its columns: each column's header as `_header`
+#: reads it (the ADR's Opus `shell` is `opus shell`), and the run it
+#: reports.
+COMPOSITION: Tuple[Tuple[str, str], ...] = (
+    ("opus shell", "comp-opus5-shell-1"),
+    ("opus mcp", "comp-opus5-mcp-1"),
+    ("opus both", "comp-opus5-both-1"),
+    ("sonnet shell", "comp-sonnet5-shell-1"),
+    ("sonnet mcp", "comp-sonnet5-mcp-1"),
+    ("sonnet both", "comp-sonnet5-both-1"),
+)
+COMPOSITION_RUNS: Tuple[str, ...] = tuple(run for _, run in COMPOSITION)
+
+#: The replayed composition sessions' arms, by the names the roster uses.
+COMP_SONNET_MCP_RUN = "comp-sonnet5-mcp-1"
+COMP_OPUS_MCP_RUN = "comp-opus5-mcp-1"
+
+#: The composition tier's stratum, as the index and the reports name it.
+COMPOSITION_STRATUM = "agda-algebras/composition"
+
+#: The tier's README, whose gate table is the record of the loop's sweeps.
+COMPOSITION_README = Path(
+    "data/benchmarks/agda-algebras-composition-v0/README.md")
 
 #: The stratum rows, in the order the table prints them.
 STRATA: Tuple[str, ...] = (
@@ -151,6 +198,7 @@ AGENT_CAPTION = ("The agent table, 2026-09-29, fixture headers stripped of "
                  "hints.")
 CONTROL_CAPTION = ("The attribution table, 2026-09-29, fixture headers "
                    "stripped of hints.")
+COMPOSITION_CAPTION = "The composition table, 2026-09-29."
 
 #: The header cells § 9's agent table must carry, lower-cased.
 ADR_HEADER: Tuple[str, ...] = (
@@ -172,6 +220,33 @@ CONTROL: Tuple[Tuple[str, str], ...] = (
 #: the backticks the ADR sets the arm names in dropped.
 CONTROL_HEADER: Tuple[str, ...] = ("stratum", "n") + tuple(
     column for column, _ in CONTROL)
+
+#: The header cells that identify the composition table: an empty corner,
+#: then one column per arm.
+COMPOSITION_HEADER: Tuple[str, ...] = ("",) + tuple(
+    column for column, _ in COMPOSITION)
+
+#: The composition table's rows, in order: the key the page's data carries,
+#: and the ADR's name for the row, which is matched lower-cased.  `{needles}`
+#: is the tier's needle count, filled in from the reports, so a count that
+#: moved makes the row missing rather than leaving a stale label.
+COMPOSITION_ROWS: Tuple[Tuple[str, str], ...] = (
+    ("run", "run"),
+    ("checks", "final file checks, statement kept"),
+    ("solved", "solved"),
+    ("preservation", "lost to the preservation gate"),
+    ("isolation", "lost to the isolation gate"),
+    ("needles", "needles in the final files (of {needles})"),
+    ("route", "rows on the gold's whole route"),
+    ("turns", "turns"),
+    ("usd", "USD (list)"),
+)
+
+#: The header of the gate table in the tier's README that records the
+#: loop's sweeps, lower-cased.
+LOOP_HEADER: Tuple[str, ...] = (
+    "run", "proposer", "solved", "exhausted", "budget exceeded",
+    "anomalies", "probes", "wall")
 
 #: One cell of the attribution table.  The ADR writes a tally in prose,
 #: `9 solved` or `9 solved, 2 restated`, and leaves a zero restated count out
@@ -312,22 +387,10 @@ def _table(markdown: str, caption: str, header: Tuple[str, ...],
     put two tables with one header set in § 9, the dated one and the
     header-free one, and a reader that searched by header would take
     whichever came first).  The cells exclude the first, so they line up
-    with `header` from index 1.  The table is every row between its
-    delimiter line and the first line that is not a table row, and it is
-    read strictly: a missing delimiter, a row with the wrong number of
-    cells, and a first cell that repeats are each an error naming the line.
-    A lenient reader would end the table at a short row, so every row after
-    it would be reported missing, and would let a repeated row silently
-    replace the one before it.
+    with `header` from index 1.  The rows are read by `_rows`.
     """
     lines = markdown.splitlines()
-
-    def problem(number: int, why: str) -> Result[Dict[str, List[str]],
-                                                 PipelineError]:
-        return Result.err(PipelineError(
-            ErrorType.PARSING_ERROR,
-            f"ADR 0001's {name}, line {number}: {why}"))
-
+    where = f"ADR 0001's {name}"
     captions = [index for index, line in enumerate(lines)
                 if _caption(line) == caption]
     if not captions:
@@ -335,39 +398,82 @@ def _table(markdown: str, caption: str, header: Tuple[str, ...],
             ErrorType.PARSING_ERROR,
             f"ADR 0001 has no table captioned {caption!r}"))
     if len(captions) > 1:
-        return problem(captions[1] + 1, f"a second caption {caption!r}")
+        return _problem(where, captions[1] + 1,
+                        f"a second caption {caption!r}")
     found = next((index for index in range(captions[0] + 1, len(lines))
                   if lines[index].strip()), None)
     cells = _cells(lines[found]) if found is not None else None
     if found is None or cells is None:
-        return problem(captions[0] + 1, f"the caption {caption!r} is not "
-                                        "followed by a table")
+        return _problem(where, captions[0] + 1,
+                        f"the caption {caption!r} is not followed by a table")
     if _header(cells) != header:
         return Result.err(PipelineError(
             ErrorType.PARSING_ERROR,
             f"ADR 0001 has no table headed {' | '.join(header)} under "
             f"{caption!r} (line {found + 1} is headed "
             f"{' | '.join(_header(cells))})"))
+    return _rows(lines, found, header, where)
 
+
+def _problem(where: str, number: int,
+             why: str) -> Result[Dict[str, List[str]], PipelineError]:
+    return Result.err(PipelineError(ErrorType.PARSING_ERROR,
+                                    f"{where}, line {number}: {why}"))
+
+
+def _rows(lines: Sequence[str], found: int, header: Tuple[str, ...],
+          where: str) -> Result[Dict[str, List[str]], PipelineError]:
+    """The body of the table whose header is line `found`.
+
+    The table is every row between its delimiter line and the first line
+    that is not a table row, and it is read strictly: a missing delimiter, a
+    row with the wrong number of cells, and a first cell that repeats are
+    each an error naming the line.  A lenient reader would end the table at
+    a short row, so every row after it would be reported missing, and would
+    let a repeated row silently replace the one before it.
+    """
     delimiter = _cells(lines[found + 1]) if found + 1 < len(lines) else None
     if delimiter is None or not all(DELIMITER.match(cell)
                                     for cell in delimiter):
-        return problem(found + 2, "the line under the header is not the "
-                                  "table's delimiter row")
+        return _problem(where, found + 2, "the line under the header is not "
+                                          "the table's delimiter row")
     table: Dict[str, List[str]] = {}
     for number, body in enumerate(lines[found + 2:], start=found + 3):
         row = _cells(body)
         if row is None:
             break
         if len(row) != len(header):
-            return problem(number, f"{len(row)} cells where the header has "
-                                   f"{len(header)}: {body.strip()}")
+            return _problem(where, number,
+                            f"{len(row)} cells where the header has "
+                            f"{len(header)}: {body.strip()}")
         if row[0].lower() in table:
-            return problem(number, f"a second row for {row[0]!r}")
+            return _problem(where, number, f"a second row for {row[0]!r}")
         table[row[0].lower()] = row[1:]
     if not table:
-        return problem(found + 1, "a header and no rows")
+        return _problem(where, found + 1, "a header and no rows")
     return Result.ok(table)
+
+
+def _headed_table(markdown: str, header: Tuple[str, ...],
+                  where: str) -> Result[Dict[str, List[str]], PipelineError]:
+    """The one table in a document headed `header`, which has no caption.
+
+    Only a document with a single such table can be read this way, so a
+    second table under the same header is refused rather than chosen
+    between (the trap `_table`'s captions exist for).
+    """
+    lines = markdown.splitlines()
+    found = [index for index, line in enumerate(lines)
+             if (_cells(line) is not None
+                 and _header(_cells(line) or []) == header)]
+    if not found:
+        return Result.err(PipelineError(
+            ErrorType.PARSING_ERROR,
+            f"{where}: no table headed {' | '.join(header)}"))
+    if len(found) > 1:
+        return _problem(where, found[1] + 1,
+                        f"a second table headed {' | '.join(header)}")
+    return _rows(lines, found[0], header, where)
 
 
 def _counts(table: Dict[str, List[str]]
@@ -586,6 +692,244 @@ def compare_control(rows: Sequence[ControlRow],
     return tuple(problems)
 
 
+# ------------------------------------------------- the composition table
+
+def composition_table(markdown: str
+                      ) -> Result[Dict[str, List[str]], PipelineError]:
+    """§ 9's composition table, as a map from row name to its six cells.
+
+    The backticks the ADR sets its run ids in are dropped, so a cell reads
+    as the value it names.
+    """
+    return _table(markdown, COMPOSITION_CAPTION, COMPOSITION_HEADER,
+                  "composition table").map(
+        lambda table: {name: [cell.replace("`", "") for cell in cells]
+                       for name, cells in table.items()})
+
+
+def usd(value: Any) -> str:
+    """A report's list-price total to the cent, rounded half up.
+
+    The reports keep three decimals, and a binary float prints 4.135 as
+    4.13 under `:.2f`; the ADR and the guide round 4.135 to 4.14, so the
+    rounding is done in decimal, from the report's own digits.
+    """
+    return str(Decimal(str(value)).quantize(Decimal("0.01"),
+                                            rounding=ROUND_HALF_UP))
+
+
+def checks(outcome: Mapping[str, Any]) -> bool:
+    """Whether a final file checks: the judge's own run of `agda` on it
+    exited 0, and its statement is the obligation's."""
+    return outcome.get("agdaExit") == 0 and \
+        bool((outcome.get("statement") or {}).get("equal"))
+
+
+#: The final files the composition table reads, by (run, obligation id).
+Finals = Dict[Tuple[str, str], str]
+
+
+def load_finals(archive: Path, reports: Mapping[str, Dict[str, Any]]
+                ) -> Result[Finals, PipelineError]:
+    """The file the judge read, for every row of every composition arm."""
+    keys = [(run, str(o["benchmarkId"]), str(o["finalPath"]))
+            for run in COMPOSITION_RUNS for o in _outcomes(reports[run])]
+    return sequence_results([read_text(archive / run / final)
+                             for run, _, final in keys]).map(
+        lambda texts: {(run, bid): text
+                       for (run, bid, _), text in zip(keys, texts)})
+
+
+def tier_needles(report: Mapping[str, Any]) -> int:
+    """How many needles the tier's rows name, over one arm's rows."""
+    return sum(len(needles.needles_of([str(t) for t in o.get("tags") or []]))
+               for o in _outcomes(report))
+
+
+def route(report: Mapping[str, Any], run: str,
+          finals: Finals) -> Tuple[int, int]:
+    """(needles the final files name, rows that name every needle)."""
+    used = [[needles.mentions(n, finals[(run, str(o["benchmarkId"]))])
+             for n in needles.needles_of([str(t) for t in
+                                          o.get("tags") or []])]
+            for o in _outcomes(report)]
+    return (sum(sum(row) for row in used),
+            sum(1 for row in used if row and all(row)))
+
+
+@dataclass(frozen=True)
+class CompositionArm:
+    """One column of the composition table, every cell as the ADR prints it.
+
+    `model` and `arm` are the run's own `config`, for `compare_composition`
+    to hold against the column's header.
+    """
+
+    column: str
+    run: str
+    model: str
+    arm: str
+    cells: Tuple[Tuple[str, str], ...]
+
+    def cell(self, key: str) -> str:
+        return dict(self.cells)[key]
+
+
+def composition_arms(reports: Mapping[str, Dict[str, Any]],
+                     finals: Finals) -> Tuple[CompositionArm, ...]:
+    """The composition table, every cell taken from its run's report or
+    from the files its judge read."""
+    def arm(column: str, run: str) -> CompositionArm:
+        report = reports[run]
+        totals = report.get("totals") or {}
+        gates = totals.get("gates") or {}
+        named, whole = route(report, run, finals)
+        config = report.get("config") or {}
+        return CompositionArm(
+            column=column, run=run, model=str(config.get("model")),
+            arm=str(config.get("arm")),
+            cells=(("run", run),
+                   ("checks", str(sum(1 for o in _outcomes(report)
+                                      if checks(o)))),
+                   ("solved", str(totals.get("solved"))),
+                   ("preservation", str(gates.get("preservation", 0))),
+                   ("isolation", str(gates.get("isolation", 0))),
+                   ("needles", str(named)),
+                   ("route", str(whole)),
+                   ("turns", str(totals.get("turns"))),
+                   ("usd", usd(totals.get("costUsd")))))
+    return tuple(arm(column, run) for column, run in COMPOSITION)
+
+
+def composition_row_names(count: int) -> Tuple[Tuple[str, str], ...]:
+    """The table's rows, the needle row's label carrying the tier's count."""
+    return tuple((key, name.format(needles=count))
+                 for key, name in COMPOSITION_ROWS)
+
+
+def compare_composition(arms: Sequence[CompositionArm], count: int,
+                        stated: Dict[str, List[str]]) -> Tuple[str, ...]:
+    """Every disagreement between the regenerated composition table and the
+    ADR's, each naming the run, and every column whose run is not the arm
+    its header names."""
+    problems: List[str] = []
+    rows = composition_row_names(count)
+    for key, name in rows:
+        cells = stated.get(name.lower())
+        if cells is None:
+            problems.append(f"ADR 0001 § 9's composition table has no row "
+                            f"{name!r}")
+            continue
+        for at, arm in enumerate(arms):
+            if cells[at] != arm.cell(key):
+                problems.append(
+                    f"composition / {name} / {arm.column} ({arm.run}): the "
+                    f"archive says {arm.cell(key)}, ADR 0001 § 9 says "
+                    f"{cells[at]}")
+    names = {name.lower() for _, name in rows}
+    problems += [f"ADR 0001 § 9's composition table has a row {name!r} the "
+                 "archive does not" for name in stated if name not in names]
+    for arm in arms:
+        model, kind = arm.column.split()
+        if model not in arm.model or kind != arm.arm:
+            problems.append(
+                f"composition / {arm.column}: {arm.run} ran {arm.model} in "
+                f"the {arm.arm} arm")
+    return tuple(problems)
+
+
+def composition_problems(reports: Mapping[str, Dict[str, Any]]
+                         ) -> Tuple[str, ...]:
+    """What the page's reading of the tier assumes of its rows: every row is
+    the tier's, restates nothing, and names at least one needle; and every
+    arm ran the same rows, with the same needles."""
+    problems: List[str] = []
+    shapes = set()
+    for run in COMPOSITION_RUNS:
+        rows = _outcomes(reports[run])
+        for o in rows:
+            tags = [str(t) for t in o.get("tags") or []]
+            where = f"{run}/report.json, {o.get('benchmarkId')}"
+            if o.get("stratum") != COMPOSITION_STRATUM:
+                problems.append(f"{where}: stratum {o.get('stratum')!r}")
+            if any(t.startswith("restates:") for t in tags):
+                problems.append(f"{where}: a composition row with a "
+                                "restates: tag")
+            if not needles.needles_of(tags):
+                problems.append(f"{where}: no needle: tag")
+        shapes.add(tuple(sorted(
+            (str(o.get("benchmarkId")),
+             needles.needles_of([str(t) for t in o.get("tags") or []]))
+            for o in rows)))
+    if len(shapes) > 1:
+        problems.append("the composition arms did not run the same rows "
+                        "with the same needles")
+    return tuple(problems)
+
+
+#: One arm's rows, each with where its needles came from.
+Traced = Tuple[Tuple[str, Tuple[needles.Source, ...]], ...]
+
+
+def trace(archive: Path, run: str, report: Mapping[str, Any],
+          finals: Finals) -> Result[Traced, PipelineError]:
+    """Where each needle came from, per row of one composition arm."""
+    rows = _outcomes(report)
+    return sequence_results([
+        load_transcript(archive / run / str(o["transcriptPath"])).map(
+            lambda records, o=o: needles.sources(
+                records,
+                needles.needles_of([str(t) for t in o.get("tags") or []]),
+                finals[(run, str(o["benchmarkId"]))]))
+        for o in rows]).map(
+        lambda traced: tuple((str(o["benchmarkId"]), found)
+                             for o, found in zip(rows, traced)))
+
+
+def provenance(traced: Sequence[Tuple[str, Sequence[needles.Source]]]
+               ) -> Dict[str, Any]:
+    """One arm's provenance, as the page reads it: `needles.tally` over its
+    every needle, the rows on the gold's whole route, and each needle the
+    session named before any answer showed it."""
+    every = [s for _, found in traced for s in found]
+    return {
+        **needles.tally(every),
+        "route": sum(1 for _, found in traced
+                     if found and all(s.used for s in found)),
+        "subjectFirst": [{"row": row, "name": s.name, "label": s.label,
+                          "searched": s.searched}
+                         for row, found in traced for s in found
+                         if s.origin == needles.SUBJECT],
+    }
+
+
+def loop_sweeps(readme: str) -> Result[Tuple[Dict[str, Any], ...],
+                                       PipelineError]:
+    """The loop's sweeps over the tier, from the gate table of its README.
+
+    Each `solved` cell is `N/M`; any other form is refused, as a prose cell
+    of the attribution table is.
+    """
+    where = f"{COMPOSITION_README}'s loop table"
+
+    def read(table: Dict[str, List[str]]
+             ) -> Result[Tuple[Dict[str, Any], ...], PipelineError]:
+        sweeps: List[Dict[str, Any]] = []
+        for run, cells in table.items():
+            match = re.match(r"^(\d+)/(\d+)$", cells[1])
+            if match is None:
+                return Result.err(PipelineError(
+                    ErrorType.PARSING_ERROR,
+                    f"{where}, {run}: solved {cells[1]!r} is not N/M"))
+            sweeps.append({"run": run.replace("`", ""),
+                           "proposer": cells[0],
+                           "solved": int(match.group(1)),
+                           "total": int(match.group(2))})
+        return Result.ok(tuple(sweeps))
+
+    return _headed_table(readme, LOOP_HEADER, where).and_then(read)
+
+
 # ------------------------------------------------- what the page is told
 
 def per_tier(sonnet: Dict[str, Any], opus: Dict[str, Any]) -> Tuple[Dict[str, Any], ...]:
@@ -755,18 +1099,22 @@ def started_on(archive: Path, run: str,
 
 @dataclass(frozen=True)
 class Record:
-    """What ADR 0001 § 9 states: the two tables this module checks."""
+    """What ADR 0001 § 9 states: the three tables this module checks."""
 
     agent: Dict[str, List[str]]
     control: Stated
+    composition: Dict[str, List[str]]
 
 
 @dataclass(frozen=True)
 class Tables:
-    """The two tables, regenerated from the archive."""
+    """The three tables, regenerated from the archive; `needles` is the
+    composition tier's needle count, which heads one of its rows."""
 
     rows: Tuple[Row, ...]
     control: Tuple[ControlRow, ...]
+    composition: Tuple[CompositionArm, ...]
+    needles: int
 
 
 #: The kinds of value a report field may hold.  A count is an `int` and never
@@ -813,6 +1161,30 @@ OUTCOME_FIELDS: Tuple[Tuple[str, Kind], ...] = (
 ORIGINAL_FIELDS: Tuple[Tuple[str, Kind], ...] = (
     ("inView", FLAG), ("reads", COUNT), ("refusedReads", COUNT))
 
+#: The same, for a composition arm's report.  Its one stratum is the tier's,
+#: and its rows restate nothing, so a row's `original` must be null: a row
+#: with an original block would be read by the page as a composition row it
+#: is not.
+COMPOSITION_REPORT_FIELDS: Tuple[Tuple[str, Kind], ...] = (
+    ("config.model", TEXT), ("config.claudeVersion", TEXT),
+    ("config.arm", TEXT), ("config.maxTurns", COUNT),
+    ("config.wallCapSec", COUNT), ("config.maxBudgetUsd", NUMBER),
+    ("config.parallelism", COUNT),
+    ("totals.total", COUNT), ("totals.solved", COUNT),
+    ("totals.restated", COUNT), ("totals.anomalies", COUNT),
+    ("totals.turns", COUNT), ("totals.toolCalls", COUNT),
+    ("totals.costUsd", NUMBER), ("totals.gates", TABLE),
+    (f"perStratum.{COMPOSITION_STRATUM}.total", COUNT),
+    (f"perStratum.{COMPOSITION_STRATUM}.solved", COUNT),
+)
+COMPOSITION_OUTCOME_FIELDS: Tuple[Tuple[str, Kind], ...] = (
+    ("benchmarkId", TEXT), ("stratum", TEXT), ("solved", FLAG),
+    ("terminal", TEXT), ("turns", COUNT), ("tags", (list,)),
+    ("agdaExit", COUNT + (type(None),)), ("statement.equal", FLAG),
+    ("finalPath", TEXT), ("transcriptPath", TEXT),
+    ("original", (type(None),)),
+)
+
 #: Marks a field that is not there, as distinct from one that holds `None`.
 _ABSENT = object()
 
@@ -841,29 +1213,45 @@ def _missing(where: str, node: Any,
             if value is _ABSENT or not _holds(value, kind)]
 
 
-def report_problems(run: str, report: Dict[str, Any]) -> Tuple[str, ...]:
-    """Every field the page reads that a run's report lacks or holds wrongly."""
+def report_problems(run: str, report: Dict[str, Any],
+                    fields: Sequence[Tuple[str, Kind]] = REPORT_FIELDS,
+                    outcome_fields: Sequence[Tuple[str, Kind]] = OUTCOME_FIELDS
+                    ) -> Tuple[str, ...]:
+    """Every field the page reads that a run's report lacks or holds wrongly,
+    by the declarations for its kind of run (a mined arm's by default)."""
     where = f"{run}/report.json"
     outcomes = report.get("outcomes")
     if not isinstance(outcomes, list) or not outcomes:
-        return tuple(_missing(where, report, REPORT_FIELDS)
+        return tuple(_missing(where, report, fields)
                      + [f"{where}: no outcomes"])
     rows = [(f"{where}, outcome {at} ({_field(o, 'benchmarkId')})", o)
             for at, o in enumerate(outcomes)]
     return tuple(
-        _missing(where, report, REPORT_FIELDS)
-        + [p for row, o in rows for p in _missing(row, o, OUTCOME_FIELDS)]
+        _missing(where, report, fields)
+        + [p for row, o in rows for p in _missing(row, o, outcome_fields)]
         + [p for row, o in rows
            if isinstance(_field(o, "original"), dict)
            for p in _missing(row + ", original", o["original"],
                              ORIGINAL_FIELDS)])
 
 
+def _problems_of(run: str, report: Dict[str, Any]) -> Tuple[str, ...]:
+    """A report's problems, by the declarations for its kind of run."""
+    if run in COMPOSITION_RUNS:
+        return report_problems(run, report, COMPOSITION_REPORT_FIELDS,
+                               COMPOSITION_OUTCOME_FIELDS)
+    return report_problems(run, report)
+
+
 def _well_formed(reports: Dict[str, Dict[str, Any]]
                  ) -> Result[Dict[str, Dict[str, Any]], PipelineError]:
-    """The reports, or every field any of them lacks, listed at once."""
+    """The reports, or every field any of them lacks, listed at once; and,
+    once the composition arms' are well formed, what the page assumes of
+    their rows (`composition_problems`)."""
     problems = [problem for run, report in reports.items()
-                for problem in report_problems(run, report)]
+                for problem in _problems_of(run, report)]
+    if not problems:
+        problems = list(composition_problems(reports))
     if problems:
         shown = problems[:12] + (
             [f"and {len(problems) - 12} more"] if len(problems) > 12 else [])
@@ -874,36 +1262,48 @@ def _well_formed(reports: Dict[str, Dict[str, Any]]
     return Result.ok(reports)
 
 
+#: Every run the page reads: the mined suite's, then the composition tier's.
+EVERY_RUN: Tuple[str, ...] = RUNS + COMPOSITION_RUNS
+
+
 def load_reports(archive: Path) -> Result[Dict[str, Dict[str, Any]], PipelineError]:
     """Every run's report, by run id, each holding every field the page
-    reads (`REPORT_FIELDS`), or every field that one of them lacks."""
+    reads (`REPORT_FIELDS`, or `COMPOSITION_REPORT_FIELDS`), or every field
+    that one of them lacks."""
     return (sequence_results([load_json(archive / run / "report.json")
-                              for run in RUNS])
-            .map(lambda loaded: dict(zip(RUNS, loaded)))
+                              for run in EVERY_RUN])
+            .map(lambda loaded: dict(zip(EVERY_RUN, loaded)))
             .and_then(_well_formed))
 
 
 def read_record(adr: Path) -> Result[Record, PipelineError]:
-    """Both of § 9's tables, read."""
+    """The three of § 9's tables the page carries, read."""
     return read_text(adr).and_then(
         lambda text: adr_table(text).and_then(
-            lambda agent: control_table(text).map(
-                lambda control: Record(agent, control))))
+            lambda agent: control_table(text).and_then(
+                lambda control: composition_table(text).map(
+                    lambda composition: Record(agent, control,
+                                               composition)))))
 
 
-def regenerate(reports: Mapping[str, Dict[str, Any]],
+def regenerate(reports: Mapping[str, Dict[str, Any]], finals: Finals,
                record: Record) -> Tables:
-    """Both tables from the archive; the loop columns from the record."""
+    """The three tables from the archive; the loop columns from the
+    record."""
     return Tables(
         rows=rows_from_reports(reports[SONNET_RUN], reports[OPUS_RUN],
                                loop_columns(record.agent)),
-        control=control_rows(reports))
+        control=control_rows(reports),
+        composition=composition_arms(reports, finals),
+        needles=tier_needles(reports[COMPOSITION_RUNS[0]]))
 
 
 def check(tables: Tables, record: Record) -> Result[Tables, PipelineError]:
     """The regenerated tables, or every disagreement with the ADR at once."""
     problems = compare(tables.rows, record.agent) + \
-        compare_control(tables.control, record.control)
+        compare_control(tables.control, record.control) + \
+        compare_composition(tables.composition, tables.needles,
+                            record.composition)
     if problems:
         return Result.err(PipelineError(
             ErrorType.VALIDATION_ERROR,
@@ -916,8 +1316,8 @@ def start_days(archive: Path, reports: Mapping[str, Dict[str, Any]]
                ) -> Result[Dict[str, str], PipelineError]:
     """The day each run began, by run id."""
     return (sequence_results([started_on(archive, run, reports[run])
-                              for run in RUNS])
-            .map(lambda days: dict(zip(RUNS, days))))
+                              for run in EVERY_RUN])
+            .map(lambda days: dict(zip(EVERY_RUN, days))))
 
 
 def archive_size(archive: Path) -> Result[Dict[str, int], PipelineError]:
@@ -933,33 +1333,57 @@ def archive_size(archive: Path) -> Result[Dict[str, int], PipelineError]:
 
 @dataclass(frozen=True)
 class Checked:
-    """The run reports, and the two tables regenerated from them and found
-    to agree with ADR 0001 § 9."""
+    """The run reports, the composition arms' final files, and the three
+    tables regenerated from them and found to agree with ADR 0001 § 9."""
 
     reports: Dict[str, Dict[str, Any]]
+    finals: Finals
     tables: Tables
 
 
 def validate(archive: Path, adr: Path) -> Result[Checked, PipelineError]:
-    """The comparison alone: the five run reports and the ADR, and nothing
-    else read.  `make demo-check` is this, so no file the comparison does
-    not use (a transcript, the rest of the archive) can fail it."""
+    """The comparison alone: the run reports, the composition arms' final
+    files, and the ADR, and nothing else read.  `make demo-check` is this,
+    so no file the comparison does not use (a transcript, the rest of the
+    archive) can fail it."""
     return load_reports(archive).and_then(
-        lambda reports: read_record(adr)
-        .and_then(lambda record: check(regenerate(reports, record), record))
-        .map(lambda tables: Checked(reports, tables)))
+        lambda reports: load_finals(archive, reports).and_then(
+            lambda finals: read_record(adr)
+            .and_then(lambda record: check(regenerate(reports, finals,
+                                                      record), record))
+            .map(lambda tables: Checked(reports, finals, tables))))
 
 
-def build(archive: Path, adr: Path) -> Result[Dict[str, Any], PipelineError]:
+def traces(archive: Path, checked: Checked
+           ) -> Result[Dict[str, Any], PipelineError]:
+    """Each composition arm's provenance, from every transcript it holds."""
+    return sequence_results([
+        trace(archive, run, checked.reports[run], checked.finals)
+        for run in COMPOSITION_RUNS]).map(
+        lambda traced: {run: provenance(found)
+                        for run, found in zip(COMPOSITION_RUNS, traced)})
+
+
+def build(archive: Path, adr: Path, repo: Optional[Path] = None
+          ) -> Result[Dict[str, Any], PipelineError]:
     """Everything the page prints about the runs, or the first failure:
     `validate`, then what the page says in words, which also reads every
-    subject's transcript (the day each run began) and walks the archive
-    (its size)."""
+    subject's transcript (the day each run began, and where each needle
+    came from), the composition tier's README (the loop's sweeps), and
+    walks the archive (its size).  `repo` is the repository root the README
+    is read from, by default the one the ADR is in (`docs/adr/` below it),
+    found from the ADR's absolute path so a short relative one cannot run
+    out of parents."""
+    root = repo if repo is not None else adr.resolve().parents[2]
     return validate(archive, adr).and_then(
         lambda checked: start_days(archive, checked.reports)
-        .and_then(lambda days: archive_size(archive)
-                  .map(lambda size: _assemble(checked.reports, checked.tables,
-                                              days, size))))
+        .and_then(lambda days: traces(archive, checked)
+                  .and_then(lambda traced: read_text(root / COMPOSITION_README)
+                            .and_then(loop_sweeps)
+                            .and_then(lambda sweeps: archive_size(archive)
+                                      .map(lambda size: _assemble(
+                                          checked.reports, checked.tables,
+                                          days, size, traced, sweeps))))))
 
 
 def _arm(reports: Mapping[str, Dict[str, Any]], days: Mapping[str, str],
@@ -967,9 +1391,40 @@ def _arm(reports: Mapping[str, Dict[str, Any]], days: Mapping[str, str],
     return {**arm_summary(reports[run], run), "startedOn": days[run]}
 
 
+def _composition(reports: Mapping[str, Dict[str, Any]], tables: Tables,
+                 days: Mapping[str, str], traced: Mapping[str, Any],
+                 sweeps: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """The composition tier, as the page prints it: the table's cells, each
+    arm's summary and provenance, and the loop's sweeps."""
+    arms = tables.composition
+    first = reports[COMPOSITION_RUNS[0]]
+    per_row = [len(needles.needles_of([str(t) for t in o.get("tags") or []]))
+               for o in _outcomes(first)]
+    return {
+        "checkedAgainst": f"{ADR} § 9, the composition tier",
+        "caption": COMPOSITION_CAPTION,
+        "stratum": COMPOSITION_STRATUM,
+        "rows": int((first.get("totals") or {}).get("total") or 0),
+        "needles": tables.needles,
+        "needleRange": [min(per_row), max(per_row)],
+        "groups": [list(pair) for pair in needles.GROUPS],
+        "columns": [{"column": arm.column, "runId": arm.run,
+                     "model": arm.model, "arm": arm.arm} for arm in arms],
+        "table": [{"key": key, "name": name,
+                   "cells": [arm.cell(key) for arm in arms]}
+                  for key, name in composition_row_names(tables.needles)],
+        "arms": [{**arm_summary(reports[arm.run], arm.run),
+                  "startedOn": days[arm.run],
+                  "column": arm.column,
+                  "provenance": traced[arm.run]} for arm in arms],
+        "loop": {"source": str(COMPOSITION_README), "sweeps": list(sweeps)},
+    }
+
+
 def _assemble(reports: Mapping[str, Dict[str, Any]], tables: Tables,
-              days: Mapping[str, str],
-              size: Mapping[str, int]) -> Dict[str, Any]:
+              days: Mapping[str, str], size: Mapping[str, int],
+              traced: Mapping[str, Any],
+              sweeps: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     """The numbers block the page is rendered from."""
     sonnet, opus = reports[SONNET_RUN], reports[OPUS_RUN]
     return {
@@ -997,6 +1452,7 @@ def _assemble(reports: Mapping[str, Dict[str, Any]], tables: Tables,
             "perTool": {run: [list(pair) for pair in per_tool(reports[run])]
                         for _, run in CONTROL},
         },
+        "composition": _composition(reports, tables, days, traced, sweeps),
     }
 
 
@@ -1005,7 +1461,8 @@ def _assemble(reports: Mapping[str, Dict[str, Any]], tables: Tables,
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """`make demo-check`: `validate`, writing nothing."""
     parser = argparse.ArgumentParser(
-        description="Check the demo page's two § 9 tables against ADR 0001.")
+        description="Check the demo page's three § 9 tables against ADR "
+                    "0001.")
     parser.add_argument("--repo", type=Path, default=Path("."),
                         help="the repository root (default: .)")
     args = parser.parse_args(argv)
@@ -1015,9 +1472,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"demo-check: {outcome.unwrap_err()}", file=sys.stderr)
         return 1
     tables = outcome.unwrap().tables
-    print(f"demo-check: {len(RUNS)} run reports agree with {ADR} § 9: the "
-          f"agent table's {len(tables.rows)} rows and the attribution "
-          f"table's {len(tables.control)}")
+    print(f"demo-check: {len(EVERY_RUN)} run reports agree with {ADR} § 9: "
+          f"the agent table's {len(tables.rows)} rows, the attribution "
+          f"table's {len(tables.control)}, and the composition table's "
+          f"{len(COMPOSITION_ROWS)} rows over {len(tables.composition)} "
+          f"arms")
     return 0
 
 

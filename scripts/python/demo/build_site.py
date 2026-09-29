@@ -89,20 +89,28 @@ def read_data(data: Path) -> Result[Dict[str, Any], PipelineError]:
     """The manifest and everything it lists, decoded, each file of the
     schema this renderer reads."""
 
-    def with_manifest(manifest: Dict[str, Any]) -> Result[Dict[str, Any], PipelineError]:
-        listed = manifest.get("replays")
-        if not isinstance(listed, list) or not listed:
+    def listed(manifest: Dict[str, Any], key: str
+               ) -> Result[List[Dict[str, Any]], PipelineError]:
+        entries = manifest.get(key)
+        if not isinstance(entries, list) or not entries:
             return Result.err(PipelineError(
                 ErrorType.VALIDATION_ERROR,
-                f"{data}/manifest.json lists no replays; run `make demo-data`"))
-        replays = sequence_results(
+                f"{data}/manifest.json lists no {key}"
+                f"{'' if key == 'replays' else ' replays'}; run "
+                "`make demo-data`"))
+        return sequence_results(
             [current(data / str(entry.get("file")), REPLAY_SCHEMA)
-             for entry in listed])
-        return replays.and_then(
-            lambda loaded: current(data / "numbers.json", NUMBERS_SCHEMA).map(
-                lambda numbers: {"manifest": manifest,
-                                 "replays": loaded,
-                                 "numbers": numbers}))
+             for entry in entries])
+
+    def with_manifest(manifest: Dict[str, Any]) -> Result[Dict[str, Any], PipelineError]:
+        return listed(manifest, "replays").and_then(
+            lambda loaded: listed(manifest, "composition").and_then(
+                lambda composition: current(data / "numbers.json",
+                                            NUMBERS_SCHEMA).map(
+                    lambda numbers: {"manifest": manifest,
+                                     "replays": loaded,
+                                     "composition": composition,
+                                     "numbers": numbers})))
 
     return load_json(data / "manifest.json").and_then(with_manifest)
 

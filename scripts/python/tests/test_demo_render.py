@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import re
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -60,8 +61,9 @@ from scripts.python.demo.numbers import (
     SHELL_RUN,
     SONNET_RUN,
 )
+from scripts.python.demo.numbers import COMPOSITION_RUNS
 from scripts.python.demo.paths import check_clean
-from scripts.python.demo.replays import ROSTER
+from scripts.python.demo.replays import COMPOSITION, ROSTER
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -157,36 +159,63 @@ def built(tmp_path_factory) -> Dict[str, Any]:
 
 # ---------------------------------------------------- the markup contract
 
-def test_the_player_is_there_with_one_panel_per_replay(built) -> None:
+def _players(built) -> List[Element]:
+    """The page's two players: the mined suite's, then the composition
+    tier's (Issue #224)."""
     players = built["root"].by_class("replay")
-    assert len(players) == 1
-    panels = players[0].by_class("replay-panel")
-    assert len(panels) == len(ROSTER)
-    assert [el.attrs.get("data-index") for el in panels] == \
-        [str(i) for i in range(len(ROSTER))]
+    assert len(players) == 2
+    return players
 
 
-def test_the_tablist_and_every_replay_control_ship_hidden(built) -> None:
+def test_each_player_is_there_with_one_panel_per_replay(built) -> None:
+    for player, roster in zip(_players(built), (ROSTER, COMPOSITION)):
+        panels = player.by_class("replay-panel")
+        assert len(panels) == len(roster)
+        assert [el.attrs.get("data-index") for el in panels] == \
+            [str(i) for i in range(len(roster))]
+    # The composition player sits in its own section.
+    assert any(a.attrs.get("id") == "composition"
+               for a in _players(built)[1].ancestors())
+
+
+def test_the_tablists_and_every_replay_control_ship_hidden(built) -> None:
     # A control that switches nothing should not exist on a page with no
     # script, so the script is what reveals these.
-    tablist = built["root"].by_class("replay-tabs")
-    assert len(tablist) == 1 and "hidden" in tablist[0].attrs
+    tablists = built["root"].by_class("replay-tabs")
+    assert len(tablists) == 2 and all("hidden" in t.attrs for t in tablists)
     buttons = built["root"].by_class("replay-again")
-    assert len(buttons) == len(ROSTER)
+    assert len(buttons) == len(ROSTER) + len(COMPOSITION)
     assert all("hidden" in el.attrs for el in buttons)
 
 
 def test_the_tabs_are_wired_to_their_panels(built) -> None:
+    for player in _players(built):
+        tabs = player.by_class("replay-tab")
+        panels = player.by_class("replay-panel")
+        assert len(tabs) == len(panels)
+        for index, (tab, panel) in enumerate(zip(tabs, panels)):
+            assert tab.attrs.get("role") == "tab"
+            assert panel.attrs.get("role") == "tabpanel"
+            assert tab.attrs["aria-controls"] == panel.attrs["id"]
+            assert panel.attrs["aria-labelledby"] == tab.attrs["id"]
+            assert tab.attrs["aria-selected"] == \
+                ("true" if index == 0 else "false")
+            assert ("tabindex" in tab.attrs) == (index != 0)
+
+
+def test_no_id_repeats_across_the_two_players(built) -> None:
+    ids = [el.attrs["id"] for el in built["root"].walk() if "id" in el.attrs]
+    assert len(ids) == len(set(ids)), [i for i in ids if ids.count(i) > 1][:5]
+
+
+def test_every_tab_says_how_many_turns_its_session_took(built) -> None:
+    replays = built["data"]["replays"] + built["data"]["composition"]
     tabs = built["root"].by_class("replay-tab")
-    panels = built["root"].by_class("replay-panel")
-    assert len(tabs) == len(panels)
-    for index, (tab, panel) in enumerate(zip(tabs, panels)):
-        assert tab.attrs.get("role") == "tab"
-        assert panel.attrs.get("role") == "tabpanel"
-        assert tab.attrs["aria-controls"] == panel.attrs["id"]
-        assert panel.attrs["aria-labelledby"] == tab.attrs["id"]
-        assert tab.attrs["aria-selected"] == ("true" if index == 0 else "false")
-        assert ("tabindex" in tab.attrs) == (index != 0)
+    assert len(tabs) == len(replays)
+    for tab, replay in zip(tabs, replays):
+        turns = replay["verdict"]["turns"]
+        assert tab.by_class("tab-model")[0].text == \
+            f"{replay['modelLabel']}, {turns} turns"
 
 
 def test_every_panel_holds_a_stream_of_steps(built) -> None:
@@ -446,14 +475,15 @@ def test_the_prose_points_at_the_tab_it_means(built) -> None:
     # which the roster had made false.  The sentence is generated from the
     # roster now; this reads the rendered tab strip and checks the two
     # positional claims the page makes against it.
-    tabs = built["root"].by_class("replay-tab")
+    mined = _players(built)[0]
+    tabs = mined.by_class("replay-tab")
     verdicts = [next(p for p in tab.by_class("pip")).classes for tab in tabs]
     gate = [i for i, cs in enumerate(verdicts) if "pip-gate" in cs]
     assert len(gate) == 1, "the page's sentence assumes exactly one refusal"
     assert f"the {render._ordinal(gate[0])} tab above" in built["html"], (
         f"the refused session is tab {gate[0] + 1}; the page says otherwise")
 
-    panels = built["root"].by_class("replay-panel")
+    panels = mined.by_class("replay-panel")
     subjects = [p.attrs["data-obligation-path"] for p in panels]
     pair = next(i for i in range(len(subjects) - 1)
                 if subjects[i] == subjects[i + 1])
@@ -472,8 +502,10 @@ def test_the_replay_can_be_stopped(built) -> None:
     assert "setControl(p, false);" in script      # settle releases it
     assert script.count("STOP_LABEL") >= 2
     buttons = built["root"].by_class("replay-again")
-    assert len(buttons) == len(ROSTER)
+    assert len(buttons) == len(ROSTER) + len(COMPOSITION)
     assert all("hidden" in b.attrs for b in buttons)
+    # Each player is armed on its own, so the second one works too.
+    assert 'document.querySelectorAll(".replay").forEach(arm);' in script
 
 
 # ------------------------------------------- the framing (Issue #215)
@@ -499,16 +531,18 @@ def test_the_header_carries_no_solve_count_and_no_loop_count(built) -> None:
 
 
 def test_the_header_says_what_the_page_is(built) -> None:
-    # Five sessions, their calls, and the suite they come from, all counted
-    # from the data rather than typed.
-    replays = built["data"]["replays"]
+    # Every session on the page, their calls, and the two suites they come
+    # from (the mined 55 and the composition tier's 12), all counted from
+    # the data rather than typed.
+    replays = built["data"]["replays"] + built["data"]["composition"]
     calls = sum(1 for replay in replays
                 for step in replay["session"]["steps"]
                 if step["kind"] == "call")
     hero = built["root"].by_class("hero")[0]
     figures = [el.text for el in hero.walk() if el.tag == "strong"]
-    assert figures == [str(len(replays)), str(calls), "55"]
+    assert figures == [str(len(replays)), str(calls), "67"]
     assert render.tagline(replays) in built["html"]
+    assert "eight real sessions" in render.tagline(replays)
 
 
 def test_the_title_names_no_tool_count(built) -> None:
@@ -777,8 +811,8 @@ def test_only_the_two_section_9_tables_are_said_to_be_compared(built) -> None:
             "control&rsquo;s, are also compared with the ADR cell by cell") \
         in html
     assert "Both tables are checked against" not in html
-    assert ("The agents&rsquo; table and the control&rsquo;s are "
-            "checked against") in html
+    assert ("The agents&rsquo; table, the control&rsquo;s, and the "
+            "composition tier&rsquo;s are checked against") in html
 
 
 def _block(built, opening: str) -> Element:
@@ -794,8 +828,12 @@ def test_every_block_printing_an_archived_arms_results_is_marked(built) -> None:
     # tables, the arm cards, and the three paragraphs and one list that
     # quote results in prose.
     marked = lambda el: set((el.attrs.get("data-runs") or "").split())
+    composition = next(r for r in _regions(built)
+                       if r.attrs.get("id") == "composition")
+    inside = set(id(el) for el in composition.walk())
     tables = [el for el in built["root"].walk()
-              if el.tag == "table" and "numbers" in el.classes]
+              if el.tag == "table" and "numbers" in el.classes
+              and id(el) not in inside]
     assert len(tables) == 4
     assert all(marked(t) & {SONNET_RUN, OPUS_RUN} for t in tables)
     assert [marked(card) for card in built["root"].by_class("arm")] == \
@@ -807,7 +845,7 @@ def test_every_block_printing_an_archived_arms_results_is_marked(built) -> None:
     assert {SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN} <= \
         marked(_block(built, "Both model arms solve all"))
     lists = [el for el in built["root"].walk()
-             if el.tag == "ul" and marked(el)]
+             if el.tag == "ul" and marked(el) and id(el) not in inside]
     assert len(lists) == 1, "the control's reading is the one marked list"
     assert {SONNET_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN} <= marked(lists[0])
 
@@ -853,3 +891,275 @@ def test_data_written_under_another_schema_is_refused(tmp_path) -> None:
     assert outcome.is_err
     assert f"{first} is schema 'agda-native-air.demo.replay.v0'" in \
         str(outcome.unwrap_err())
+
+
+# ------------------------------------- the composition tier (Issue #224)
+
+def _composition(built) -> Element:
+    return next(r for r in _regions(built)
+                if r.attrs.get("id") == "composition")
+
+
+def _plain(fragment: str) -> str:
+    """A fragment of the page as a reader reads it, in document order: the
+    tags dropped, the entities decoded, and the whitespace collapsed.
+    `Element.text` gathers an element's own text before its children's,
+    which is out of order around inline markup."""
+    return " ".join(unescape(re.sub(r"<[^>]+>", "", fragment)).split())
+
+
+def _said(built, region: Element) -> str:
+    """What a region says, read from the page's own markup."""
+    return _plain(_markup(built, region))
+
+
+def _markup(built, region: Element) -> str:
+    """The markup of an element with an id, cut out of the page."""
+    html = built["html"]
+    ident = region.attrs["id"]
+    start = html.index(f'id="{ident}"')
+    start = html.rindex("<", 0, start)
+    tag = region.tag
+    depth, at = 0, start
+    pattern = re.compile(rf"<(/?){tag}\b[^>]*>")
+    for match in pattern.finditer(html, start):
+        depth += -1 if match.group(1) else 1
+        if depth == 0:
+            return html[start:match.end()]
+    raise AssertionError(f"<{tag} id={ident}> is not closed")
+
+
+def test_the_composition_table_is_the_adrs(built) -> None:
+    comp = built["data"]["numbers"]["composition"]
+    table = _table(built, "composition")
+    assert set((table.attrs.get("data-runs") or "").split()) == \
+        set(COMPOSITION_RUNS)
+    rows = [el for el in table.walk() if el.tag == "tr"
+            and any(c.tag == "th" and c.attrs.get("scope") == "row"
+                    for c in el.children)]
+    printed = [[c.text for c in row.children if c.tag in ("td", "th")]
+               for row in rows]
+    assert printed == [[r["name"], *r["cells"]] for r in comp["table"]]
+    assert printed[0][0] == "run"
+    assert [r[0] for r in printed[1:]] == [
+        "final file checks, statement kept", "solved",
+        "lost to the preservation gate", "lost to the isolation gate",
+        "needles in the final files (of 33)",
+        "rows on the gold's whole route", "turns", "USD (list)"]
+    links = [el.attrs.get("href") or "" for el in table.walk()
+             if el.tag == "a"]
+    assert any(link.endswith("#" + render.anchor(
+        render.ADR_SECTIONS["composition"])) for link in links)
+
+
+def test_the_composition_region_prints_no_mined_arms_figures(built) -> None:
+    # The control rule of Issue #215 is about the mined arms; this section
+    # prints the six composition arms, all of them, and no mined arm.
+    runs = _runs_in(_composition(built))
+    assert runs == set(COMPOSITION_RUNS)
+    assert not runs & {SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN}
+
+
+def test_a_composition_panel_names_its_needles_and_no_original(built) -> None:
+    panels = _players(built)[1].by_class("replay-panel")
+    for panel, replay in zip(panels, built["data"]["composition"]):
+        terms = [dt.text for dt in panel.walk() if dt.tag == "dt"]
+        assert "the needles" in terms
+        assert "the library original" not in terms
+        facts = panel.by_class("facts")[0].text
+        for needle in replay["obligation"]["needles"]:
+            assert needle in facts
+    # No sentence written for a row with an original lands here: `original`
+    # is null on every composition row, and a template that printed "no call
+    # named the file that holds it" would be lying.
+    said = _said(built, _composition(built))
+    for original in ({"inView": False, "reads": 0, "refusedReads": 0},
+                     {"inView": True}, {"reads": 1}, {"refusedReads": 1}):
+        sentence = re.sub(r"<[^>]+>", "", render.reading(original)
+                          .replace("&rsquo;", "’"))
+        assert sentence not in said
+    assert "the file that holds it" not in said
+
+
+def test_every_needle_line_links_the_answer_it_names(built) -> None:
+    panels = _players(built)[1].by_class("replay-panel")
+    checked = 0
+    for panel, replay in zip(panels, built["data"]["composition"]):
+        block = _markup(built, panel)
+        needles_at = block.index('<div class="needles">')
+        items = re.findall(r"<li>(.*?)</li>",
+                           block[needles_at:block.index("</div>",
+                                                        needles_at)])
+        assert len(items) == len(replay["needles"])
+        ids = {el.attrs.get("id") for el in panel.walk()}
+        steps = replay["session"]["steps"]
+        calls = [at for at, s in enumerate(steps) if s["kind"] == "call"]
+        for item, found in zip(items, replay["needles"]):
+            line = _plain(item)
+            assert line.startswith(found["name"] + ":")
+            links = re.findall(r'href="([^"]+)"', item)
+            if found["origin"] == "never":
+                assert not links and "never named in the session" in line
+                continue
+            at = calls[found["call"] - 1]
+            assert links == [f"#answer-{panel.attrs['id'][13:]}-{at}"]
+            assert links[0][1:] in ids
+            assert steps[at]["display"] == found["label"]
+            assert f"call {found['call']}" in line
+            assert ("the final file uses it" in line) == found["used"]
+            checked += 1
+    assert checked == 5
+
+
+def test_the_composition_findings_still_hold(built) -> None:
+    # The premises of the section's qualitative sentences, read from the
+    # data and the archive; if a re-judge moves one, the sentence has to be
+    # rewritten rather than republished.
+    comp = built["data"]["numbers"]["composition"]
+    table = {r["key"]: dict(zip((c["column"] for c in comp["columns"]),
+                                r["cells"])) for r in comp["table"]}
+    rows = comp["rows"]
+    assert all(int(n) == rows for n in table["checks"].values())
+    lost = sum(int(n) for n in table["preservation"].values()) + \
+        sum(int(n) for n in table["isolation"].values())
+    assert lost == sum(rows - int(n) for n in table["solved"].values())
+    assert all(table["preservation"][c] == "0"
+               for c in ("opus shell", "opus mcp", "opus both"))
+    # "each an edited using list": every preservation loss names an
+    # `open … using` line of the fixture as the line that changed.
+    for column, run in zip(table["run"], table["run"].values()):
+        report = json.loads((REPO / ARCHIVE / run / "report.json")
+                            .read_text(encoding="utf-8"))
+        for o in report["outcomes"]:
+            if o.get("gate") == "preservation":
+                assert o["agdaExit"] == 0 and o["statement"]["equal"]
+                assert re.search(r"open .* using \(", o["gateDetail"]), \
+                    (run, o["benchmarkId"], o["gateDetail"])
+    first = [e for arm in comp["arms"]
+             for e in arm["provenance"]["subjectFirst"]]
+    assert len(first) == 3 and {e["label"] for e in first} == \
+        {"search_by_name"}
+    assert all(s["solved"] == 0 for s in comp["loop"]["sweeps"])
+    # "Sonnet stayed on the gold's route": its server arm's route is longer
+    # than any Opus arm's.
+    assert int(table["route"]["sonnet mcp"]) > max(
+        int(table["route"][c])
+        for c in ("opus shell", "opus mcp", "opus both"))
+    said = _said(built, _composition(built))
+    assert "The tier is at both models’ ceiling" in said
+    assert "All 72 final files type-check" in said
+    assert "No row is one that one configuration proves and another cannot" \
+        in said
+    assert "all but three of those first appear in a tool answer" in said
+    assert "each handed straight to search_by_name" in said
+    assert "The search loop solves none of the twelve in three sweeps" in said
+    assert "it could not tell the tools apart" in said
+    assert "The last session below is one of Sonnet’s nineteen" in said
+
+
+def test_the_provenance_table_is_the_datas(built) -> None:
+    comp = built["data"]["numbers"]["composition"]
+    table = _table(built, "provenance")
+    assert "the ADR has no table of it to be checked against" in table.text
+    printed = {row.children[0].text: [c.text for c in row.children[1:]]
+               for row in table.walk() if row.tag == "tr"
+               and row.children and row.children[0].tag == "th"
+               and row.children[0].attrs.get("scope") == "row"}
+    labels = dict(comp["groups"])
+    for name, label in labels.items():
+        counts = [str(arm["provenance"]["byGroup"][name])
+                  for arm in comp["arms"]]
+        if any(c != "0" for c in counts):
+            assert printed[label] == counts
+        else:
+            assert label not in printed
+    assert printed["needles"] == ["33"] * 6
+
+
+def test_the_intro_and_the_nav_point_to_the_composition_tier(built) -> None:
+    intro = next(r for r in _regions(built) if r.attrs.get("id") == "what")
+    links = [el.attrs.get("href") for el in intro.walk() if el.tag == "a"]
+    assert "#composition" in links
+    assert ("with no proof on disk to copy, every configuration of both "
+            "models wrote a checking proof of every row") in \
+        _said(built, intro)
+    nav = built["root"].by_class("jump")[0]
+    assert "#composition" in [el.attrs.get("href") for el in nav.walk()
+                              if el.tag == "a"]
+
+
+# ------------------------- the self-review of PR #226 (Issue #224)
+
+def test_needle_line_says_each_origin_it_can_meet() -> None:
+    # The three replays reach two origins (an answer, and never); the line
+    # has four branches, and each is pinned here on a synthetic session.
+    steps = [{"kind": "text", "text": "reading"},
+             {"kind": "call", "display": "search_by_name",
+              "args": [["query", "⨅-≤"]]},
+             {"kind": "call", "display": "Read",
+              "args": [["file_path", "<nix>/src/Congruences.lagda.md"]]}]
+    subject = render.needle_line(
+        {"name": "⨅-≤", "origin": "subject", "call": 1, "used": True},
+        steps, "c9")
+    assert _plain(subject) == (
+        "⨅-≤: first named by the session itself, in call 1, search_by_name "
+        "for ⨅-≤, before any answer had shown it; the final file uses it.")
+    assert 'href="#answer-c9-1"' in subject
+    read = render.needle_line(
+        {"name": "normalOf-mono", "origin": "answer", "call": 2,
+         "located": True, "used": False}, steps, "c9")
+    assert _plain(read) == (
+        "normalOf-mono: first shown by the answer to call 2, Read of "
+        "Congruences.lagda.md, a file an earlier definition_of answer had "
+        "named; the final file does not use it.")
+    assert render.needle_line({"name": "x", "origin": "never",
+                               "used": False}, steps, "c9") == \
+        "<code>x</code>: never named in the session; the final file does " \
+        "not use it."
+    # A call number the session does not have is not linked to anything.
+    stray = render.needle_line({"name": "y", "origin": "answer", "call": 7,
+                                "used": True}, steps, "c9")
+    assert "href" not in stray
+
+
+def test_the_tiers_caps_are_every_arms(built) -> None:
+    # The section prints the first arm's caps as the tier's.
+    arms = built["data"]["numbers"]["composition"]["arms"]
+    caps = {(a["turnCap"], a["wallCapSec"], a["budgetCapUsd"]) for a in arms}
+    assert caps == {(60, 1800, 6.0)}
+    said = _said(built, _composition(built))
+    assert "at caps of 60 turns, 1,800 seconds, and USD 6.00" in said
+
+
+def test_the_two_tablists_have_names_of_their_own(built) -> None:
+    names = [t.attrs.get("aria-label")
+             for t in built["root"].by_class("replay-tabs")]
+    assert names == ["Sessions", "Composition-tier sessions"]
+    groups = [p.attrs.get("aria-label") for p in _players(built)]
+    assert len(set(groups)) == 2
+
+
+def test_the_gate_sentence_is_withheld_when_the_gates_fall_short(
+        built) -> None:
+    # "Each of the 26 rows missing from a solved count lost a gate" is the
+    # record's today; if the gates stopped accounting for every unsolved
+    # row (an anomaly, a crash), the page must not print it.
+    numbers = json.loads(json.dumps(built["data"]["numbers"]))
+    row = next(r for r in numbers["composition"]["table"]
+               if r["key"] == "isolation")
+    row["cells"][0] = str(int(row["cells"][0]) - 1)
+    said = _plain(render._composition(numbers,
+                                      built["data"]["composition"]))
+    assert "lost a gate with a file that checks" not in said
+    assert "and 25 of the 26 rows missing from a solved count lost a gate" \
+        in said
+    assert "lost a gate with a file that checks" in \
+        _said(built, _composition(built))
+
+
+def test_the_provenance_caption_links_the_rule_in_this_repository(
+        built) -> None:
+    table = _table(built, "provenance")
+    links = [el.attrs.get("href") for el in table.walk() if el.tag == "a"]
+    assert f"{render.REPO_URL}/blob/main/{render.NEEDLES}" in links
+    assert (REPO / render.NEEDLES).is_file()

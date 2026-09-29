@@ -66,15 +66,20 @@ Description: Render the demo site's page from the data `make demo-data`
     +  `.replay-again`, one control per panel, shipped `hidden` for the same
        reason as the tablist.  The script gives it two states: while a panel
        plays it stops the replay, and at rest it starts one.  The stop is
-       not decoration: the first session starts on its own when the player
-       scrolls into view, and the five run 6 to 25 seconds, which is exactly
-       what WCAG 2.2.2 asks for a way to stop.
+       not decoration: the first session of each player starts on its own
+       when the player scrolls into view, and the sessions run about 8 to
+       27 seconds, which is exactly what WCAG 2.2.2 asks for a way to stop.
 
   Panels other than the first are shipped visible and are hidden by CSS only
   when the document element carries `has-js`, which a one-line script in the
   head sets before this markup is parsed.  A reader without JavaScript then
-  gets all five sessions in document order rather than the first one and four
-  dead tabs.
+  gets every session in document order rather than the first one and dead
+  tabs.
+
+  The page has two players (Issue #224): the mined suite's five sessions,
+  and the composition tier's three in a section of their own.  The second
+  player's ids carry the prefix `c` (`replay-panel-c0`), so no id repeats,
+  and the script arms each player on its own.
 
 ## The seam Issue #85 leaves for a live type-checker
 
@@ -127,6 +132,7 @@ GUIDE_SECTIONS: Dict[str, str] = {
     "4.3": "4.3  The control, and the comparison",
     "4.5": "4.5  The hard tier",
     "4.6": "4.6  What the fixture headers were worth",
+    "4.7": "4.7  The composition tier",
     "5": "5.  How to tell a win from a loss",
 }
 
@@ -135,9 +141,13 @@ GUIDE_SECTIONS: Dict[str, str] = {
 #: the dated tables, measured with the fixture headers' hints in view, stay
 #: in the subsections above it as evidence.
 ADR = "docs/adr/0001-proof-search-on-agda-mcp.md"
+
+#: The rule the page traces each composition needle by (Issue #224).
+NEEDLES = "scripts/python/demo/needles.py"
 ADR_SECTIONS: Dict[str, str] = {
     "agents": "The header-free arms (2026-09-29)",
     "control": "The header-free arms (2026-09-29)",
+    "composition": "The composition tier (2026-09-29)",
 }
 
 def _esc(value: Any) -> str:
@@ -310,7 +320,7 @@ def _answer(answer: Mapping[str, Any], index: str) -> str:
     )
 
 
-def _step(step: Mapping[str, Any], panel: int, index: int) -> str:
+def _step(step: Mapping[str, Any], panel: str, index: int) -> str:
     """One beat of the session."""
     kind = str(step.get("kind"))
     at = f"{panel}-{index}"
@@ -381,6 +391,12 @@ def _facts(replay: Mapping[str, Any]) -> str:
     if ob.get("restates"):
         items.insert(3, ("the library original",
                          f'<code>{_esc(ob["restates"])}</code>'))
+    elif ob.get("needles"):
+        # A composition row has no original; its ground truth is the lemmas
+        # its gold strings together, and the panel names them instead.
+        shown = ", ".join(f'<code>{_esc(needle)}</code>'
+                          for needle in ob["needles"])
+        items.insert(3, ("the needles", shown))
     cells = "".join(f'<div class="fact"><dt>{name}</dt><dd>{value}</dd></div>'
                     for name, value in items)
     return f'<dl class="facts">{cells}</dl>'
@@ -435,12 +451,88 @@ def _listing(marked: Iterable[Sequence[str]]) -> str:
     return "\n".join(rows)
 
 
-def _panel(index: int, replay: Mapping[str, Any]) -> str:
-    """One session, finished."""
+#: How a needle's deciding call is described, by the argument that names
+#: what it asked about, and the word that joins the two.
+_BRIEF: Tuple[Tuple[str, str], ...] = (
+    ("module", "on"), ("name", "for"), ("query", "for"), ("type", "for"),
+    ("expr", "on"), ("candidate", "with"), ("file_path", "of"),
+    ("command", ""))
+
+
+def _brief(step: Mapping[str, Any]) -> str:
+    """A call in a few words: the tool, and the argument that says what it
+    asked about (a file by its name only, since the stream prints the
+    path)."""
+    tool = f'<code>{_esc(step.get("display"))}</code>'
+    args = {str(name): str(value) for name, value in step.get("args") or []}
+    for key, word in _BRIEF:
+        if key not in args:
+            continue
+        value = args[key]
+        if key == "file_path":
+            value = value.rsplit("/", 1)[-1]
+        if len(value) > 60:
+            value = value[:60] + "…"
+        joiner = f" {word} " if word else " "
+        return f'{tool}{joiner}<code>{_esc(value)}</code>'
+    return tool
+
+
+def needle_line(found: Mapping[str, Any], steps: Sequence[Mapping[str, Any]],
+                panel: str) -> str:
+    """Where one needle came from in one session, as the panel says it.
+
+    `found` is one entry of the replay's `needles` (see `needles.Source`);
+    `call` counts the session's calls, so it is resolved to the call's step
+    here, and the sentence links that step's answer.
+    """
+    name = f'<code>{_esc(found.get("name"))}</code>'
+    used = ("the final file uses it" if found.get("used")
+            else "the final file does not use it")
+    origin = found.get("origin")
+    if origin not in ("answer", "subject"):
+        return f"{name}: never named in the session; {used}."
+    calls = [at for at, step in enumerate(steps) if step.get("kind") == "call"]
+    number = found.get("call")
+    if not isinstance(number, int) or not 0 < number <= len(calls):
+        return f"{name}: first named in the session&rsquo;s own words; {used}."
+    at = calls[number - 1]
+    link = (f'<a class="src" href="#answer-{_esc(panel)}-{at}">'
+            f'call {number}</a>')
+    brief = _brief(steps[at])
+    if origin == "answer":
+        where = f"first shown by the answer to {link}, {brief}"
+        if found.get("located"):
+            where += (", a file an earlier <code>definition_of</code> answer "
+                      "had named")
+    else:
+        where = (f"first named by the session itself, in {link}, {brief}, "
+                 "before any answer had shown it")
+    return f"{name}: {where}; {used}."
+
+
+def _needles(replay: Mapping[str, Any], panel: str) -> str:
+    """The composition row's reading, where a mined row's is its original's:
+    each needle's first mention in the session."""
+    found = replay.get("needles") or []
+    if not found:
+        return ""
+    steps = (replay.get("session") or {}).get("steps") or []
+    items = "".join(f"<li>{needle_line(entry, steps, panel)}</li>"
+                    for entry in found)
+    return (f'<div class="needles"><p class="needles-head">Where each '
+            f'needle came from: the first event of the session that names '
+            f'it.</p><ul>{items}</ul></div>')
+
+
+def _panel(index: int, replay: Mapping[str, Any], prefix: str = "") -> str:
+    """One session, finished.  `prefix` keeps a second player's ids apart
+    from the first's."""
     ob = replay.get("obligation") or {}
     session = replay.get("session") or {}
     verdict = replay.get("verdict") or {}
-    steps = "".join(_step(step, index, at) for at, step
+    key = f"{prefix}{index}"
+    steps = "".join(_step(step, key, at) for at, step
                     in enumerate(session.get("steps") or []))
     totals = session.get("totals") or {}
     thinking = totals.get("thinkingTokens")
@@ -449,7 +541,7 @@ def _panel(index: int, replay: Mapping[str, Any]) -> str:
                if isinstance(thinking, int) else "")
     return (
         f'<section class="replay-panel" role="tabpanel" '
-        f'id="replay-panel-{index}" aria-labelledby="replay-tab-{index}" '
+        f'id="replay-panel-{key}" aria-labelledby="replay-tab-{key}" '
         f'data-index="{index}" '
         f'data-obligation-path="{_esc(ob.get("path"))}" '
         f'data-final-path="{_esc((replay.get("final") or {}).get("path"))}">'
@@ -477,6 +569,7 @@ def _panel(index: int, replay: Mapping[str, Any]) -> str:
         f'; every answer below a call is the server’s own, in full.'
         f'{_esc(thought)}</p>'
         f'{_verdict(replay)}'
+        f'{_needles(replay, key)}'
         f'<details class="replay-file">'
         f'<summary>the file the judge read, marked against the obligation it '
         f'started as</summary>'
@@ -489,30 +582,41 @@ def _panel(index: int, replay: Mapping[str, Any]) -> str:
         f'</section>')
 
 
-def _tabs(replays: Sequence[Mapping[str, Any]]) -> str:
+def _tabs(replays: Sequence[Mapping[str, Any]], prefix: str = "",
+          name: str = "Sessions") -> str:
+    """The tab strip.  Each tab says how many turns its session took, so a
+    reader can see which sessions are short before choosing one."""
     buttons = []
     for index, replay in enumerate(replays):
-        kind = str((replay.get("verdict") or {}).get("kind"))
+        verdict = replay.get("verdict") or {}
+        kind = str(verdict.get("kind"))
         first = index == 0
+        key = f"{prefix}{index}"
         buttons.append(
             f'<button class="replay-tab" type="button" role="tab" '
-            f'id="replay-tab-{index}" aria-controls="replay-panel-{index}" '
+            f'id="replay-tab-{key}" aria-controls="replay-panel-{key}" '
             f'aria-selected="{"true" if first else "false"}"'
             f'{"" if first else " tabindex=-1"}>'
             f'<span class="tab-name"><code>{_esc(replay.get("label"))}</code>'
             f'</span>'
-            f'<span class="tab-model">{_esc(replay.get("modelLabel"))}</span>'
+            f'<span class="tab-model">{_esc(replay.get("modelLabel"))}, '
+            f'{_esc(_plural(verdict.get("turns"), "turn", "turns"))}</span>'
             f'<span class="pip pip-{_esc(kind)}">'
             f'{_esc(_PIP.get(kind, kind))}</span></button>')
     return (f'<div class="replay-tabs" role="tablist" '
-            f'aria-label="Sessions" hidden>{"".join(buttons)}</div>')
+            f'aria-label="{_esc(name)}" hidden>{"".join(buttons)}</div>')
 
 
-def player(replays: Sequence[Mapping[str, Any]]) -> str:
-    panels = "".join(_panel(index, replay)
+def player(replays: Sequence[Mapping[str, Any]], prefix: str = "",
+           label: str = "Replays of archived agda-mcp sessions",
+           tabs: str = "Sessions") -> str:
+    """A player: its tab strip, named `tabs` for a screen reader, and its
+    panels.  A second player on the page gets a `prefix` for its ids and
+    names of its own, so no two landmarks read alike."""
+    panels = "".join(_panel(index, replay, prefix)
                      for index, replay in enumerate(replays))
-    return (f'<div class="replay" role="group" aria-label="Replays of '
-            f'archived agda-mcp sessions">{_tabs(replays)}{panels}</div>')
+    return (f'<div class="replay" role="group" aria-label="{_esc(label)}">'
+            f'{_tabs(replays, prefix, tabs)}{panels}</div>')
 
 
 # ------------------------------------------------- pointing at a tab
@@ -765,7 +869,8 @@ FOOT = """<script src="assets/replay.js" defer></script>
 
 
 def tagline(replays: Sequence[Mapping[str, Any]]) -> str:
-    """The page's one-line description: what the sessions are evidence of."""
+    """The page's one-line description: what the sessions are evidence of.
+    `replays` is every session on the page, the composition tier's too."""
     return ("What a frontier model does with the agda-mcp server’s tools: "
             f"{_word(len(replays))} real sessions from the committed archive, "
             "replayed with every call and every answer in full.")
@@ -783,6 +888,12 @@ def _suite(numbers: Mapping[str, Any]) -> Any:
     return ((numbers.get("rows") or [{}])[-1]).get("n")
 
 
+def _obligations(numbers: Mapping[str, Any]) -> int:
+    """The obligations of the two suites the sessions come from: the mined
+    suite and the composition tier."""
+    return int(_suite(numbers) or 0) + int(_comp(numbers).get("rows") or 0)
+
+
 def _hero(numbers: Mapping[str, Any],
           replays: Sequence[Mapping[str, Any]]) -> str:
     # No solve count and no loop count: the figures say what the page is.
@@ -797,8 +908,8 @@ def _hero(numbers: Mapping[str, Any],
 transcripts</li>
 <li><strong>{_esc(_tool_calls(replays))}</strong> tool calls, and every
 answer in full</li>
-<li><strong>{_esc(_suite(numbers))}</strong> obligations in the benchmark
-they come from</li>
+<li><strong>{_esc(_obligations(numbers))}</strong> obligations in the two
+suites they come from</li>
 </ul>
 <nav class="jump" aria-label="Sections">
 <a href="#sessions">the sessions</a>
@@ -806,6 +917,7 @@ they come from</li>
 <a href="#numbers">the numbers</a>
 <a href="#control">the control</a>
 <a href="#haystack">one tier whose header named the answer</a>
+<a href="#composition">a tier built to need several lemmas</a>
 <a href="#built">how this page is built</a>
 </nav>
 </header>"""
@@ -818,6 +930,13 @@ def _intro(numbers: Mapping[str, Any],
     ahead = ("the server did not come out ahead on the count"
              if int(shell.get("solved") or 0) >= int(mcp.get("solved") or 0)
              else "the server came out ahead on the count")
+    rows = _comp(numbers).get("rows")
+    checks = _comp_cells(numbers, "checks")
+    every = ("every configuration of both models wrote a checking proof of "
+             "every row" if checks and all(n == rows
+                                            for n in checks.values())
+             else "not every configuration wrote a checking proof of every "
+                  "row")
     # The premises of the last sentence are the record's, and
     # `test_the_intros_reading_of_the_control_still_holds` pins them: every
     # arm could read the originals, and some solves had one in view.
@@ -848,7 +967,9 @@ in place of the server, run the same day.  The numbers below set it beside
 these sessions&rsquo; arms, and the guide to the results reads it in
 {_guide("4.3")}.  In short: {ahead}, and the count does not settle the
 question, because every arm could read the library&rsquo;s own proofs, and a
-proof in view can be written out rather than cited.</p>
+proof in view can be written out rather than cited; and on
+<a href="#composition">a tier built to need several lemmas</a>, with no
+proof on disk to copy, {every}.</p>
 <p>Every fact the judge uses about the <em>Agda</em> in the file a session
 left behind is Agda&rsquo;s own answer, asked through the same server and the
 same <code>agda</code> invocation the benchmark&rsquo;s gold solutions are
@@ -1247,8 +1368,286 @@ and Opus&nbsp;5 names it from memory and asks Agda whether it fits.</p>
 </section>"""
 
 
+# ------------------------------------------------ the composition tier
+
+def _comp(numbers: Mapping[str, Any]) -> Mapping[str, Any]:
+    return numbers.get("composition") or {}
+
+
+def _comp_arms(numbers: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    return list(_comp(numbers).get("arms") or [])
+
+
+def _comp_arm(numbers: Mapping[str, Any], column: str) -> Mapping[str, Any]:
+    """One composition arm by its column, `opus mcp` and the like."""
+    return next((arm for arm in _comp_arms(numbers)
+                 if arm.get("column") == column), {})
+
+
+def _comp_cells(numbers: Mapping[str, Any], key: str) -> Dict[str, int]:
+    """One row of the composition table, by column, as counts."""
+    comp = _comp(numbers)
+    row = next((r for r in comp.get("table") or [] if r.get("key") == key),
+               {})
+    columns = [c.get("column") for c in comp.get("columns") or []]
+    out: Dict[str, int] = {}
+    for column, cell in zip(columns, row.get("cells") or []):
+        try:
+            out[str(column)] = int(cell)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _model_label(model: Any) -> str:
+    """`claude-opus-5` reads as `Opus 5`."""
+    parts = str(model or "").split("-")
+    return (f"{parts[1].capitalize()} {' '.join(parts[2:])}"
+            if len(parts) >= 3 else str(model or ""))
+
+
+def _provenance(numbers: Mapping[str, Any], column: str) -> Mapping[str, Any]:
+    return _comp_arm(numbers, column).get("provenance") or {}
+
+
+def composition_table(numbers: Mapping[str, Any]) -> str:
+    """The composition tier's table, ADR 0001 § 9's regenerated: one column
+    per arm, grouped by model, the run behind each column in its first
+    row."""
+    comp = _comp(numbers)
+    columns = list(comp.get("columns") or [])
+    runs = [c.get("runId") for c in columns]
+    models: List[Tuple[str, int]] = []
+    for column in columns:
+        label = _model_label(column.get("model"))
+        if models and models[-1][0] == label:
+            models[-1] = (label, models[-1][1] + 1)
+        else:
+            models.append((label, 1))
+    groups = "".join(f'<th scope="colgroup" colspan="{span}">{_esc(label)}'
+                     f'</th>' for label, span in models)
+    arms = "".join(f'<th scope="col"><code>{_esc(c.get("arm"))}</code></th>'
+                   for c in columns)
+    spans = "".join(f'<colgroup span="{span}"></colgroup>'
+                    for _, span in models)
+    body = []
+    for row in comp.get("table") or []:
+        if row.get("key") == "run":
+            cells = "".join(
+                f'<td class="num run">'
+                f'{_tree("reports/agent-bench/" + str(cell), str(cell))}</td>'
+                for cell in row.get("cells") or [])
+        else:
+            cells = "".join(f'<td class="num">{_esc(cell)}</td>'
+                            for cell in row.get("cells") or [])
+        body.append(f'<tr><th scope="row">{_esc(row.get("name"))}</th>'
+                    f'{cells}</tr>')
+    return (f'<div class="table-wrap"><table class="numbers composition"'
+            f'{_runs(*runs)}>'
+            f'<caption>The composition tier, per arm, checked against '
+            f'{_adr("composition", "ADR 0001 § 9’s composition table")}'
+            f'.  One seed per arm.</caption>'
+            f'<colgroup><col></colgroup>{spans}'
+            f'<thead><tr><th scope="col" rowspan="2"></th>{groups}</tr>'
+            f'<tr>{arms}</tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div>')
+
+
+def provenance_table(numbers: Mapping[str, Any]) -> str:
+    """Where each needle first appeared, per arm: regenerated from the
+    transcripts, with no table in the ADR to be checked against."""
+    comp = _comp(numbers)
+    columns = list(comp.get("columns") or [])
+    runs = [c.get("runId") for c in columns]
+    groups = [(str(name), str(label)) for name, label
+              in comp.get("groups") or []]
+    by = {str(c.get("column")): (_provenance(numbers, str(c.get("column")))
+                                 .get("byGroup") or {}) for c in columns}
+    shown = [(name, label) for name, label in groups
+             if any(int(by[str(c.get("column"))].get(name) or 0)
+                    for c in columns)]
+    head = "".join(
+        f'<th scope="col">{_esc(_model_label(c.get("model")))} '
+        f'<code>{_esc(c.get("arm"))}</code></th>' for c in columns)
+    body = "".join(
+        f'<tr><th scope="row">{_esc(label)}</th>' + "".join(
+            f'<td class="num">'
+            f'{_esc(by[str(c.get("column"))].get(name, 0))}</td>'
+            for c in columns) + '</tr>'
+        for name, label in shown)
+    total = "".join(
+        f'<th class="num">'
+        f'{_esc(_provenance(numbers, str(c.get("column"))).get("needles"))}'
+        f'</th>' for c in columns)
+    return (f'<div class="table-wrap"><table class="numbers small '
+            f'provenance"{_runs(*runs)}>'
+            f'<caption>Where each needle first appeared, per arm: the first '
+            f'event of each session that names it, by the rule in '
+            f'{_blob(NEEDLES, NEEDLES)} (the sweeps skill&rsquo;s '
+            f'<code>needle-source.py</code>, which the guide cites, ported).  '
+            f'Read from the transcripts when this page was built; the ADR '
+            f'has no table of it to be checked against.</caption>'
+            f'<thead><tr><th scope="col">first named by</th>{head}</tr>'
+            f'</thead><tbody>{body}<tr class="total"><th scope="row">'
+            f'needles</th>{total}</tr></tbody></table></div>')
+
+
+def _sweeps(numbers: Mapping[str, Any]) -> str:
+    """The loop's sweeps over the tier, as a phrase with their runs."""
+    sweeps = list((_comp(numbers).get("loop") or {}).get("sweeps") or [])
+    names = ", ".join(f"<code>{_esc(s.get('run'))}</code>" for s in sweeps)
+    solved = sum(int(s.get("solved") or 0) for s in sweeps)
+    rows = _comp(numbers).get("rows")
+    count = (f"none of the {_word(rows)}" if solved == 0
+             else f"{_word(solved)} of the {_word(rows)} over all")
+    return (f"The search loop solves {count} in "
+            f"{_count(len(sweeps), 'sweep', 'sweeps')} ({names})")
+
+
+def _composition(numbers: Mapping[str, Any],
+                 replays: Sequence[Mapping[str, Any]]) -> str:
+    """The composition tier's section: what the tier is, its table, what it
+    shows, three of its sessions, and what it means.  Every figure is read
+    from the data; the premises of the qualitative sentences are pinned by
+    `test_demo_render.py`."""
+    comp = _comp(numbers)
+    rows, count = comp.get("rows"), comp.get("needles")
+    low, high = (list(comp.get("needleRange") or [0, 0]) + [0, 0])[:2]
+    arms = _comp_arms(numbers)
+    runs = [arm.get("runId") for arm in arms]
+    first = arms[0] if arms else {}
+    checks = _comp_cells(numbers, "checks")
+    finals = sum(checks.values())
+    every = all(n == rows for n in checks.values())
+    kept = _comp_cells(numbers, "preservation")
+    isolated = _comp_cells(numbers, "isolation")
+    solved = _comp_cells(numbers, "solved")
+    route = _comp_cells(numbers, "route")
+    named = _comp_cells(numbers, "needles")
+    sonnet_kept = sum(n for column, n in kept.items()
+                      if column.startswith("sonnet"))
+    opus_kept = sum(n for column, n in kept.items()
+                    if column.startswith("opus"))
+    lost = sum(kept.values()) + sum(isolated.values())
+    missing = sum(int(rows or 0) - n for n in solved.values())
+    provenance = [arm.get("provenance") or {} for arm in arms]
+    mentioned = sum(int(p.get("needles") or 0)
+                    - int((p.get("byGroup") or {}).get("never") or 0)
+                    for p in provenance)
+    subject = [entry for p in provenance
+               for entry in p.get("subjectFirst") or []]
+    labels = {str(entry.get("label")) for entry in subject}
+    handed = (f"each handed straight to <code>{_esc(next(iter(labels)))}"
+              f"</code>" if len(labels) == 1 else "each handed to a search")
+    s_mcp = _provenance(numbers, "sonnet mcp")
+    o_mcp = _provenance(numbers, "opus mcp")
+    shell_of = {column: int((_provenance(numbers, column).get("byGroup")
+                             or {}).get("shell") or 0)
+                for column in ("opus shell", "opus both")}
+    read_of = {column: int((_provenance(numbers, column).get("byGroup")
+                            or {}).get("read") or 0)
+               for column in ("sonnet shell", "sonnet both")}
+    gate = next((r for r in replays
+                 if (r.get("verdict") or {}).get("kind") == "gate"), None)
+    pair = [r for r in replays if replays
+            and r.get("subject") == replays[0].get("subject")]
+    ceiling = ("at both models&rsquo; ceiling" if every
+               else "short of both models&rsquo; ceiling")
+    total = int(rows or 0) * len(arms)
+    checked = (f"All {_num(total)} final files type-check" if every
+               else f"{_num(finals)} of the {_num(total)} final files "
+                    "type-check")
+    tagged = sum(int(p.get("needles") or 0) for p in provenance)
+    # The sentence says every unsolved row lost a gate with a file that
+    # checks only when both halves are the record's: the gates account for
+    # every unsolved row, and every final file checks.
+    gated = (f"so each of the {_count(missing, 'row', 'rows')} missing from "
+             "a solved count lost a gate with a file that checks:"
+             if lost == missing and every
+             else f"and {_word(lost)} of the {_count(missing, 'row', 'rows')} "
+                  "missing from a solved count lost a gate:")
+    gate_needles = len(((gate or {}).get("obligation") or {})
+                       .get("needles") or [])
+    proved = ("Every configuration of both models wrote a proof that checks "
+              "for every row, so the arms differ in the route to it and in "
+              "the gates, not in what was proved" if every
+              else "Not every final file checks, so the table's counts are "
+                   "to be read row by row")
+    return f"""<section class="prose" id="composition">
+<h2>A tier built to need several lemmas</h2>
+<p>The sessions above come from a suite most of whose rows have the
+library&rsquo;s own proof on disk.  The composition tier ({_issue(160)})
+has none to copy: {_word(rows)} <code>agda-algebras</code> obligations
+mined so that each gold strings {_word(low)} to {_word(high)} library
+lemmas together, the row&rsquo;s <em>needles</em>, through a root
+lemma whose premises share a <em>middle point</em> its conclusion does not
+mention (the <code>y</code> of <code>x ≤ y → y ≤ z → x ≤ z</code>).
+{_sweeps(numbers)}, since <code>fill_hole</code> refuses such a root lemma
+with holes for its arguments.  Opus&nbsp;5 and Sonnet&nbsp;5 each ran the
+tier with a shell, with the server, and with both, one seed each, at caps of
+{_word(first.get("turnCap"))} turns, {_num(first.get("wallCapSec"))}
+seconds, and {_money(first.get("budgetCapUsd"))}, on
+{_days(arms)}; the guide reads the runs in {_guide("4.7")}.</p>
+{composition_table(numbers)}
+<p>What it shows is as follows:</p>
+<ul{_runs(*runs)}>
+<li><strong>The tier is {ceiling}</strong>.  {checked} with their
+statements kept, {gated}
+{_word(sum(kept.values()))} to the preservation gate
+({"all of them Sonnet&rsquo;s, " if opus_kept == 0 else ""}each an edited
+<code>using</code> list) and {_word(sum(isolated.values()))} to the
+isolation gate.  No row is one that one configuration proves and another
+cannot.</li>
+<li><strong>The needles came from the tools and the sources</strong>.
+Counting each needle once per arm, the sessions name {_num(mentioned)} of
+{_num(tagged)}, and all but {_word(len(subject))} of those first appear in a
+tool answer; the {_word(len(subject))} are names the session wrote before
+any answer had shown them, {handed}.  With the server, Sonnet&rsquo;s came
+most often from <code>exports_of</code> on a module the fixture opens
+({_num((s_mcp.get("byLabel") or {}).get("exports_of"))} of
+{_num(s_mcp.get("needles"))}) and Opus&rsquo;s from a Read of a library file
+({_num((o_mcp.get("byLabel") or {}).get("Read"))},
+{_num(o_mcp.get("located"))} of them a file a <code>definition_of</code>
+answer had named); beside a shell, Opus read the sources through it
+({_num(shell_of["opus shell"])} and {_num(shell_of["opus both"])} of
+{_num(count)}) and Sonnet still with Read ({_num(read_of["sonnet shell"])}
+and {_num(read_of["sonnet both"])}).  That is the reverse of the haystack
+tier&rsquo;s Opus, above, which named every lemma it probed itself.</li>
+<li><strong>Two models, two routes</strong>.  With the server,
+Sonnet&rsquo;s final files took the gold&rsquo;s whole route on
+{_num(route.get("sonnet mcp"))} of the {_num(rows)} rows and name
+{_num(named.get("sonnet mcp"))} of the {_num(count)} needles; Opus&rsquo;s
+did on {_num(route.get("opus shell"))}, {_num(route.get("opus mcp"))}, and
+{_num(route.get("opus both"))} rows in its three arms, and on others it
+unfolded the relations the needles are about, which
+<code>agda-algebras</code> defines as functions and pairs, and wrote the
+composition pointwise.  The first {_word(len(pair))} sessions below are one
+row by each model.</li>
+<li><strong>A file that checks and lost a gate</strong>.  The
+{"last" if gate is replays[-1] else "one"} session below is one of
+Sonnet&rsquo;s {_word(sonnet_kept)} preservation losses: the gold&rsquo;s
+proof, refused because the session brought its {_word(gate_needles)}
+needles into scope by editing the fixture&rsquo;s own <code>using</code>
+list rather than adding a line.</li>
+<li><strong>The middle point stopped no session</strong>.  A subject writes
+both arguments of the root lemma, so it never meets the loop&rsquo;s
+refusal; where a relation unfolds to a function space and Agda still cannot
+infer the middle point, the session named it, as the gold does, and the
+first session below shows that happen.</li>
+</ul>
+{provenance_table(numbers)}
+{player(replays, "c", "Replays of three composition-tier sessions",
+        "Composition-tier sessions")}
+<p class="callout"{_runs(*runs)}>What the tier says: it is a second
+instrument built to sit below the ceiling, and it could not tell the tools
+apart.  {proved}.  With {_word(rows)} rows and one seed per arm, a
+difference of a row or two would not be a finding.</p>
+</section>"""
+
+
 def _built(data: Mapping[str, Any]) -> str:
-    replays = data.get("replays") or []
+    replays = list(data.get("replays") or []) + list(
+        data.get("composition") or [])
     archive = (data.get("numbers") or {}).get("archive") or {}
     files = f"{int(archive.get('files') or 0):,}"
     return f"""<section class="prose" id="built">
@@ -1263,11 +1662,13 @@ was built, and
 none of it is shipped to your browser; what is here is
 {_word(len(replays))} sessions and the tables.</p>
 <p>Three things the build refuses to do.  It will not write a page whose
-two tables from ADR 0001 &sect; 9, the agents&rsquo; and the
-control&rsquo;s, disagree with the ADR (<code>make demo-check</code> runs
-that comparison alone, from the run reports and the ADR).  It will not write a page carrying an absolute path
-from the machine the sweep ran on: every path here is anchored to
-<code>&lt;repo&gt;</code>, <code>&lt;work&gt;</code> (the one directory a
+three tables from ADR 0001 &sect; 9, the agents&rsquo;, the
+control&rsquo;s, and the composition tier&rsquo;s, disagree with the ADR
+(<code>make demo-check</code> runs that comparison alone, from the run
+reports, the composition arms&rsquo; final files, and the ADR).  It will not
+write a page carrying an absolute path from the machine the sweep ran on:
+every path here is anchored to <code>&lt;repo&gt;</code>,
+<code>&lt;work&gt;</code> (the one directory a
 session could see), or <code>&lt;nix&gt;</code>, and a path left pointing
 into a home directory, a Nix store, or a per-user runtime directory fails the
 build.  And it quotes no reasoning: the archived transcripts carry each
@@ -1281,11 +1682,13 @@ files:</p>
 which says which instrument produced it and what it is evidence of.</li>
 <li>{_blob("reports/agent-bench/README.md", "reports/agent-bench/README.md")}:
 the protocol, the judge&rsquo;s gates, and what a run directory holds.</li>
-<li>{_blob(ADR, ADR)} &sect; 9: the decision record both tables are checked
-against.</li>
+<li>{_blob(ADR, ADR)} &sect; 9: the decision record the three tables are
+checked against.</li>
 <li>{_blob("data/benchmarks/README.md", "data/benchmarks/README.md")}: the
-{_word(_suite(data.get("numbers") or {}))} obligations, their gold solutions,
-and the index row behind each panel&rsquo;s facts.</li>
+obligations, their gold solutions, and the index row behind each
+panel&rsquo;s facts; the composition tier&rsquo;s own README,
+{_blob(str(_comp(data.get("numbers") or {}).get("loop", {}).get("source")))},
+records its gates, the loop&rsquo;s sweeps among them.</li>
 <li>{_tree("scripts/python/demo", "scripts/python/demo/")}: the generator,
 and {_tree("scripts/python/tests", "scripts/python/tests/")} its tests,
 which run in CI.</li>
@@ -1307,8 +1710,8 @@ def _footer(data: Mapping[str, Any]) -> str:
     return f"""<footer class="foot">
 <p>Built by <code>make demo-site</code> from
 {_tree("reports/agent-bench", "reports/agent-bench/")}.
-The agents&rsquo; table and the control&rsquo;s are checked against
-{_esc(numbers.get("checkedAgainst"))}.</p>
+The agents&rsquo; table, the control&rsquo;s, and the composition
+tier&rsquo;s are checked against {_esc(numbers.get("checkedAgainst"))}.</p>
 <p><a href="{REPO_URL}">{REPO_URL.replace("https://", "")}</a></p>
 </footer>"""
 
@@ -1317,9 +1720,11 @@ def page(data: Mapping[str, Any]) -> str:
     """The whole document, from the decoded data `make demo-data` wrote."""
     numbers = data.get("numbers") or {}
     replays = data.get("replays") or []
+    composition = data.get("composition") or []
+    every = list(replays) + list(composition)
     return (
-        HEAD.format(title=_esc(TITLE), tagline=_esc(tagline(replays)))
-        + _hero(numbers, replays)
+        HEAD.format(title=_esc(TITLE), tagline=_esc(tagline(every)))
+        + _hero(numbers, every)
         + '<main>'
         + _intro(numbers, replays)
         + '<section class="prose" id="sessions">'
@@ -1336,6 +1741,7 @@ def page(data: Mapping[str, Any]) -> str:
         + _restated(replays, numbers)
         + _numbers_section(numbers, replays)
         + _haystack(numbers)
+        + _composition(numbers, composition)
         + _built(data)
         + '</main>'
         + _footer(data)
