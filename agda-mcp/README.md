@@ -447,6 +447,8 @@ A project that pins its own Agda (e.g., formal-ledger-specifications) must be ch
 
 `--agda-flags` then needs only what the wrapped binary does not already carry.  One addition is load-bearing: `-i <this-repo>/agda-dojang/agda`, because `get_goal` splices `open import AgdaDojang.Debug` into the file it inspects, and the client's Agda must be able to see that module's source (it imports only builtins, so it compiles under any Agda 2.8).  [`examples/fls.mcp.json`](examples/fls.mcp.json) is the registration this section describes, tested against real formal-ledger modules.
 
+A second addition is needed when this repository's registry knows the client's library.  The server decides which tree a file belongs to by reading a libraries registry (see [`docs/agda-mcp/agda-mcp-environment.md`](../docs/agda-mcp/agda-mcp-environment.md) § 4), and it cannot see the `--library-file` baked into a wrapper, so it reads the one in its own flags, else `$AGDA_DIR/libraries`, which the shell `run-server.sh` enters sets to this repository's `agda/libraries`.  That registry names agda-algebras (at the flake-pinned store copy), so a server checking an agda-algebras worktree refuses every file with a `rootMismatch` unless its flags name the wrapper's own registry: gc-root the wrapper's libraries file beside the wrapper and pass `--library-file=<that root>`.  Agda gets the same file twice and takes the last.  [`examples/agda-algebras.mcp.json`](examples/agda-algebras.mcp.json) does this, and its [README section](examples/README.md#agda-algebrasmcpjson) has the commands.
+
 ---
 
 ## What we've implemented so far

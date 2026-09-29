@@ -3,12 +3,14 @@
     "agda": {
       "command": "/ABS/PATH/TO/agda-native-air/scripts/run-server.sh",
       "args": [
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
-        "--timeout", "600"
-      ],
-      "env": {
-        "AGDA_ALGEBRAS_ROOT": "/ABS/PATH/TO/agda-algebras/<your-worktree>"
-      }
+        "--cwd", "${PWD}",
+        "--agda-bin", "/ABS/PATH/TO/agda-algebras-agda-root/bin/agda",
+        "--agda-flags", "--library-file=/ABS/PATH/TO/agda-algebras-libraries -i /ABS/PATH/TO/agda-native-air/agda-dojang/agda",
+        "--corpus", "/ABS/PATH/TO/agda-algebras-corpus-v0.1/corpus.jsonl",
+        "--timeout", "600",
+        "--check-command", "make check AGDA=/ABS/PATH/TO/agda-algebras-agda-root/bin/agda",
+        "--check-timeout", "3600"
+      ]
     }
   }
 }

@@ -31,16 +31,18 @@
 --      file's own directory is the effective root, which is what the tools'
 --      existing @-i \<dir-of-file\>@ already provides.
 --
---   Why refusing matters.  The field configuration in
---   @agda-mcp/examples/agda-algebras.mcp.json@ binds a worktree through an
---   environment variable read by the flake's shellHook, which rewrites a
---   checkout-wide @agda/libraries@ on shell entry.  That file is shared,
---   mutable, process-global state: a second shell entry elsewhere silently
---   repoints it.  Without step 3, pointing the client at a file in worktree B
---   while the registry still names worktree A resolves B's imports against A
---   and reports success — a wrong answer rather than an error, which § 3.6 of
---   @docs/feedback/flrp-agda-mcp-improvements.md@ calls the worst outcome an
---   agent client can be handed.
+--   Why refusing matters.  The field configuration that
+--   @agda-mcp/examples/agda-algebras.mcp.json@ first shipped bound a worktree
+--   through an environment variable read by the flake's shellHook, which
+--   rewrites a checkout-wide @agda/libraries@ on shell entry.  That file is
+--   shared, mutable, process-global state: a second shell entry elsewhere
+--   silently repoints it.  (The template now anchors each session with @--cwd@
+--   and names a read-only registry, but any registration that shares a
+--   registry is exposed the same way.)  Without step 3, pointing the client
+--   at a file in worktree B while the registry still names worktree A resolves
+--   B's imports against A and reports success: a wrong answer rather than an
+--   error, which § 3.6 of @docs/feedback/flrp-agda-mcp-improvements.md@ calls
+--   the worst outcome an agent client can be handed.
 --
 --   Everything here is best-effort about /parsing/ and strict about
 --   /disagreement/: an unreadable registry contributes no entries, so nothing
