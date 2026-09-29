@@ -1,0 +1,87 @@
+{
+  "benchmarkId" : "comp-group-normal-of-smaller-congruence",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.≤ⁿ-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-mono"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "normal-of-smaller-congruence",
+  "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ⊆ φ → normalOf φ ≤ⁿ 𝑵 → normalOf θ ≤ⁿ 𝑵",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang -iname \"*Group*\" ; echo ---; find / -iname \"Congruences.agda\" -path \"*Group*\" 2>/dev/null; Bash writes outside the work directory (/tmp/backup.agda): cp Group-normal-of-smaller-congruence.agda /tmp/backup.agda",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 21,
+  "toolCalls" : {
+    "Read" : 3,
+    "Bash" : 11,
+    "Edit" : 6
+  },
+  "toolCallsTotal" : 20,
+  "wallMs" : 203131,
+  "costUsd" : 0.5028416,
+  "tokens" : {
+    "input" : 42,
+    "output" : 15212,
+    "cacheRead" : 732768,
+    "cacheCreation" : 51021
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang -iname \"*Group*\" ; echo ---; find / -iname \"Congruences.agda\" -path \"*Group*\" 2>/dev/null",
+      "Bash writes outside the work directory (/tmp/backup.agda): cp Group-normal-of-smaller-congruence.agda /tmp/backup.agda"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 6,
+      "corpus-grep" : 1,
+      "library-read" : 3,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 6007,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ⊆ φ →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 φ) 𝑵 →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ⊆ φ →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 φ) 𝑵 →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-group-normal-of-smaller-congruence/final/Group-normal-of-smaller-congruence.agda",
+  "transcriptPath" : "subjects/comp-group-normal-of-smaller-congruence/transcript.jsonl",
+  "lastWords" : "It type-checks cleanly now (no output/errors, exit code 0), so the Agda command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.51,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "benchmarkId" : "comp-congruence-monolith-below-member",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.⊆-trans",
+    "needle:Setoid.Congruences.Monolith.IsMonolith.mono-least",
+    "needle:Setoid.Congruences.Monolith.⋂-lower"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "monolith-below-member",
+  "goal" : "IsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Setoid.Congruences.Lattice   using ( _⊆_ ; ⊆-refl )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 15,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__search_by_name" : 3,
+    "mcp__agda__exports_of" : 1,
+    "Edit" : 4,
+    "mcp__agda__check_file" : 3,
+    "mcp__agda__type_of" : 2
+  },
+  "toolCallsTotal" : 14,
+  "wallMs" : 89604,
+  "costUsd" : 0.257396,
+  "tokens" : {
+    "input" : 24,
+    "output" : 5626,
+    "cacheRead" : 361800,
+    "cacheCreation" : 32182
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3581,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+    "final" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-monolith-below-member/final/Congruence-monolith-below-member.agda",
+  "transcriptPath" : "subjects/comp-congruence-monolith-below-member/transcript.jsonl",
+  "lastWords" : "check_file now reports success:true (exitCode 0) on the final file, confirming the hole was filled correctly.",
+  "rateLimit" : {
+    "maxUtilization" : 0.23,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

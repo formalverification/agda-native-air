@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "comp-congruence-meet-below-join",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.⊆-trans",
+    "needle:Setoid.Congruences.Lattice.∧-lowerˡ",
+    "needle:Setoid.Congruences.CompleteLattice.⋁-upper"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "meet-below-join",
+  "goal" : "(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) → (f i ∧ φ) ⊆ ⋁ 𝑨 ℓ₀ f",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Congruences.CompleteLattice   using ( ⋁-upper )",
+    "open import Data.Product                         using ( _,_ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 22,
+  "toolCalls" : {
+    "Read" : 3,
+    "Bash" : 12,
+    "Edit" : 6
+  },
+  "toolCallsTotal" : 21,
+  "wallMs" : 119010,
+  "costUsd" : 0.30715319999999996,
+  "tokens" : {
+    "input" : 44,
+    "output" : 7778,
+    "cacheRead" : 519606,
+    "cacheCreation" : 31341
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 5,
+      "library-read" : 7
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4403,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ₀ : Level} {𝑆 : Signature 𝓞 𝓥}\n(𝑨 : Algebra α ρ) {I : Set ℓ₀} (f : I → Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀))\n(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) →\nf i ∧ φ ⊆ ⋁ 𝑨 ℓ₀ f",
+    "final" : "{𝓞 𝓥 : Level} {α ρ ℓ₀ : Level} {𝑆 : Signature 𝓞 𝓥}\n(𝑨 : Algebra α ρ) {I : Set ℓ₀} (f : I → Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀))\n(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) →\nf i ∧ φ ⊆ ⋁ 𝑨 ℓ₀ f",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-meet-below-join/final/Congruence-meet-below-join.agda",
+  "transcriptPath" : "subjects/comp-congruence-meet-below-join/transcript.jsonl",
+  "lastWords" : "The specified Agda type-check command exits with status 0, reporting success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.5,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

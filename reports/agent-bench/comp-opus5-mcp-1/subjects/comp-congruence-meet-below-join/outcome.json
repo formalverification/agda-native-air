@@ -1,0 +1,101 @@
+{
+  "benchmarkId" : "comp-congruence-meet-below-join",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.⊆-trans",
+    "needle:Setoid.Congruences.Lattice.∧-lowerˡ",
+    "needle:Setoid.Congruences.CompleteLattice.⋁-upper"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "meet-below-join",
+  "goal" : "(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) → (f i ∧ φ) ⊆ ⋁ 𝑨 ℓ₀ f",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product.Base                    using ( proj₁ )",
+    "open import Setoid.Congruences.CompleteLattice   using ( ⋁-upper )"
+  ],
+  "terminal" : "completed",
+  "turns" : 13,
+  "toolCalls" : {
+    "Read" : 3,
+    "mcp__agda__definition_of" : 2,
+    "mcp__agda__type_of" : 2,
+    "mcp__agda__exports_of" : 1,
+    "Edit" : 2,
+    "mcp__agda__fill_hole" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 12,
+  "wallMs" : 55953,
+  "costUsd" : 0.33045899999999995,
+  "tokens" : {
+    "input" : 20,
+    "output" : 3321,
+    "cacheRead" : 191088,
+    "cacheCreation" : 15179
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3965,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ₀ : Level} {𝑆 : Signature 𝓞 𝓥}\n(𝑨 : Algebra α ρ) {I : Set ℓ₀} (f : I → Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀))\n(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) →\nf i ∧ φ ⊆ ⋁ 𝑨 ℓ₀ f",
+    "final" : "{𝓞 𝓥 : Level} {α ρ ℓ₀ : Level} {𝑆 : Signature 𝓞 𝓥}\n(𝑨 : Algebra α ρ) {I : Set ℓ₀} (f : I → Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀))\n(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) →\nf i ∧ φ ⊆ ⋁ 𝑨 ℓ₀ f",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-meet-below-join/final/Congruence-meet-below-join.agda",
+  "transcriptPath" : "subjects/comp-congruence-meet-below-join/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `λ p → ⋁-upper 𝑨 ℓ₀ f i (proj₁ p)`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.2,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

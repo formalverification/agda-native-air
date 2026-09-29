@@ -1,0 +1,83 @@
+{
+  "benchmarkId" : "hard-group-surjective-image-commutative",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "surjective-image-commutative",
+  "goal" : "(f : A → B) → IsGroupHomomorphism f → Surjective _≈₁_ _≈₂_ f → Commutative _≈₁_ _∙₁_ → Commutative _≈₂_ _∙₂_",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash runs a program this audit does not model (python3): python3 - <<'EOF' ; p='Group-surjective-image-commutative.agda' ; s=open(p).read() ; s=s.replace(\"open import Function.Definitions      using ( Surjective )\",\"open import Function.Definitions      ...",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product.Base         using ( proj₁ ; proj₂ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 2,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 39293,
+  "costUsd" : 0.21580549999999998,
+  "tokens" : {
+    "input" : 10,
+    "output" : 2898,
+    "cacheRead" : 38131,
+    "cacheCreation" : 12424
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash runs a program this audit does not model (python3): python3 - <<'EOF' ; p='Group-surjective-image-commutative.agda' ; s=open(p).read() ; s=s.replace(\"open import Function.Definitions      using ( Surjective )\",\"open import Function.Definitions      ..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 566,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+    "final" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-surjective-image-commutative/final/Group-surjective-image-commutative.agda",
+  "transcriptPath" : "subjects/hard-group-surjective-image-commutative/transcript.jsonl",
+  "lastWords" : "It type-checks cleanly on the first run.\n\nYes — the judge command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.57,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

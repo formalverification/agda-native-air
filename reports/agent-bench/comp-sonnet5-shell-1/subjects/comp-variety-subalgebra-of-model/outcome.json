@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "comp-variety-subalgebra-of-model",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Varieties.Properties.⊧-S-invar",
+    "needle:Setoid.Varieties.SoundAndComplete.Soundness.sound",
+    "needle:Setoid.Subalgebras.Basic.mon→≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "embeds-in-model",
+  "goal" : "𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Setoid.Subalgebras.Basic           using ( _≤_ )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 17,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 12,
+    "Edit" : 3
+  },
+  "toolCallsTotal" : 16,
+  "wallMs" : 108793,
+  "costUsd" : 0.29941519999999994,
+  "tokens" : {
+    "input" : 34,
+    "output" : 8740,
+    "cacheRead" : 327596,
+    "cacheCreation" : 36607
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 10
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5911,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-variety-subalgebra-of-model/final/Variety-subalgebra-of-model.agda",
+  "transcriptPath" : "subjects/comp-variety-subalgebra-of-model/transcript.jsonl",
+  "lastWords" : "The file now type-checks: the exact judging command exits with no errors, confirming success.",
+  "rateLimit" : {
+    "maxUtilization" : 0.49,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

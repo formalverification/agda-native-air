@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/comp-sonnet5-both-1/work/comp-group-normal-of-equivalent-congruence /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/comp-sonnet5-both-1/work/comp-group-normal-of-equivalent-congruence/Group-normal-of-equivalent-congruence.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/.bin-160/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}

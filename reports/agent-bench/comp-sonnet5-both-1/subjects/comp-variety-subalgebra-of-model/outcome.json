@@ -1,0 +1,99 @@
+{
+  "benchmarkId" : "comp-variety-subalgebra-of-model",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Varieties.Properties.⊧-S-invar",
+    "needle:Setoid.Varieties.SoundAndComplete.Soundness.sound",
+    "needle:Setoid.Subalgebras.Basic.mon→≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "embeds-in-model",
+  "goal" : "𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Setoid.Varieties.Properties        using ( ⊧-I-invar )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 16,
+  "toolCalls" : {
+    "Read" : 5,
+    "Bash" : 4,
+    "mcp__agda__search_by_name" : 2,
+    "Edit" : 2,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 15,
+  "wallMs" : 95455,
+  "costUsd" : 0.38454580000000005,
+  "tokens" : {
+    "input" : 32,
+    "output" : 6022,
+    "cacheRead" : 556149,
+    "cacheCreation" : 53258
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 4
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5228,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-variety-subalgebra-of-model/final/Variety-subalgebra-of-model.agda",
+  "transcriptPath" : "subjects/comp-variety-subalgebra-of-model/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully: the verdict is success (exit code 0, no diagnostics, no holes).",
+  "rateLimit" : {
+    "maxUtilization" : 0.52,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

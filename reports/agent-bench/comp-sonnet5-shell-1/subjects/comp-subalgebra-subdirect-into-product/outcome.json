@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "comp-subalgebra-subdirect-into-product",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Subalgebras.Properties.≤-trans",
+    "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤",
+    "needle:Setoid.Subalgebras.Properties.⨅-≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "subdirect-into-product",
+  "goal" : "SubdirectEmbedding {𝑩 = 𝑩} ℬ → (∀ i → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Setoid.Subalgebras.Properties            using ( ≤-reflexive )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 5,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 39122,
+  "costUsd" : 0.1519354,
+  "tokens" : {
+    "input" : 18,
+    "output" : 3279,
+    "cacheRead" : 141547,
+    "cacheCreation" : 22700
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 4
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5476,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-subalgebra-subdirect-into-product/final/Subalgebra-subdirect-into-product.agda",
+  "transcriptPath" : "subjects/comp-subalgebra-subdirect-into-product/transcript.jsonl",
+  "lastWords" : "The judge command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.49,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "hard-group-second-iso-cosets-agree",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "second-iso-cosets-agree",
+  "goal" : "∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -name 'Cosets.agda' -path '*Group*' 2>/dev/null | head -20",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 15,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 9,
+    "mcp__agda__fill_hole" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 14,
+  "wallMs" : 63368,
+  "costUsd" : 0.3715925,
+  "tokens" : {
+    "input" : 30,
+    "output" : 3042,
+    "cacheRead" : 286225,
+    "cacheCreation" : 15228
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find / -name 'Cosets.agda' -path '*Group*' 2>/dev/null | head -20"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 8,
+      "other" : 1
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5643,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-second-iso-cosets-agree/final/Group-second-iso-cosets-agree.agda",
+  "transcriptPath" : "subjects/hard-group-second-iso-cosets-agree/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks with no holes, the hole filled by `proj₂ , λ k → IsSubgroup.∙-closed H-sub (IsSubgroup.⁻¹-closed H-sub h₁∈H) h₂∈H , k`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.65,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

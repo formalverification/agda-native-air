@@ -1,0 +1,99 @@
+{
+  "benchmarkId" : "comp-variety-subalgebra-of-model",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Varieties.Properties.⊧-S-invar",
+    "needle:Setoid.Varieties.SoundAndComplete.Soundness.sound",
+    "needle:Setoid.Subalgebras.Basic.mon→≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "embeds-in-model",
+  "goal" : "𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Subalgebras.Basic           using ( mon→≤ )",
+    "open import Setoid.Varieties.Properties        using ( ⊧-S-invar )",
+    "open import Setoid.Varieties.SoundAndComplete  using ( module Soundness )"
+  ],
+  "terminal" : "completed",
+  "turns" : 15,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 8,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 14,
+  "wallMs" : 93390,
+  "costUsd" : 0.5778475,
+  "tokens" : {
+    "input" : 30,
+    "output" : 4474,
+    "cacheRead" : 380935,
+    "cacheCreation" : 27538
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 8
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5316,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-variety-subalgebra-of-model/final/Variety-subalgebra-of-model.agda",
+  "transcriptPath" : "subjects/comp-variety-subalgebra-of-model/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks with no holes, proving `embeds-in-model` by soundness of the equational calculus in the model `𝑩` transported back along the monomorphism via subalgebra invariance of `⊧`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.16,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

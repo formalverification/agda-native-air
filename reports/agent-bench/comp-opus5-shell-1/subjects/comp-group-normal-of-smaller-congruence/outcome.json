@@ -1,0 +1,81 @@
+{
+  "benchmarkId" : "comp-group-normal-of-smaller-congruence",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.≤ⁿ-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-mono"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "normal-of-smaller-congruence",
+  "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ⊆ φ → normalOf φ ≤ⁿ 𝑵 → normalOf θ ≤ⁿ 𝑵",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 6,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 58325,
+  "costUsd" : 0.2331795,
+  "tokens" : {
+    "input" : 18,
+    "output" : 2581,
+    "cacheRead" : 83809,
+    "cacheCreation" : 12666
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 4
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 6007,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ⊆ φ →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 φ) 𝑵 →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ⊆ φ →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 φ) 𝑵 →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-group-normal-of-smaller-congruence/final/Group-normal-of-smaller-congruence.agda",
+  "transcriptPath" : "subjects/comp-group-normal-of-smaller-congruence/transcript.jsonl",
+  "lastWords" : "The hole is filled with `λ p → φ≤N (θ⊆φ p)` (composing the containment with the bound, since `≤ⁿ` and `⊆` both unfold to pointwise implications), and the exact judge command reports success (exit 0, no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.44,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

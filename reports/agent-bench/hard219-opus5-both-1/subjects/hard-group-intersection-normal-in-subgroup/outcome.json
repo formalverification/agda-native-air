@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "hard-group-intersection-normal-in-subgroup",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "intersection-normal-in-subgroup",
+  "goal" : "∀ {h x} → h ∈ H → x ∈ H → x ∈ K → ((h ∙ x) ∙ h ⁻¹ ∈ H) × ((h ∙ x) ∙ h ⁻¹ ∈ K)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -name 'Conjugation.agda' -not -path '*/proc/*' 2>/dev/null | head",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 17,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 11,
+    "mcp__agda__fill_hole" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 16,
+  "wallMs" : 73256,
+  "costUsd" : 0.46176749999999994,
+  "tokens" : {
+    "input" : 34,
+    "output" : 3959,
+    "cacheRead" : 344885,
+    "cacheCreation" : 19018
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find / -name 'Conjugation.agda' -not -path '*/proc/*' 2>/dev/null | head"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 10,
+      "other" : 1
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5124,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+    "final" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-intersection-normal-in-subgroup/final/Group-intersection-normal-in-subgroup.agda",
+  "transcriptPath" : "subjects/hard-group-intersection-normal-in-subgroup/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks with no holes, errors, or warnings.",
+  "rateLimit" : {
+    "maxUtilization" : 0.65,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

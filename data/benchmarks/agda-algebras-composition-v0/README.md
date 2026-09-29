@@ -311,6 +311,34 @@ Every row passed four gates before any agent saw it, as follows:
 
 +  **Gate 4: novelty**.  All twelve absent; see "The novelty check" below.
 
+## The agents on the tier
+
+Stage two of [#160] ran Opus 5 and Sonnet 5 on the twelve rows, each in the
+`shell`, `mcp`, and `both` arms, on these header-free fixtures (runs
+`comp-*-1`; the numbers and their reading are § 4.7 of
+`docs/reading-the-results.md`).  Every one of the 72 final files type-checks
+with its statement kept, so the tier sits at both models' ceiling.  Two of
+its findings are about the rows, and a revision of the tier would start from
+them:
+
++  **A needle can be bypassed by unfolding its relation**.  `_⊆_`, `_≑_`,
+   `_≤ⁿ_`, and `_IsHomImageOf_` are defined as functions and pairs, so a
+   proof can compose pointwise instead of through the needles: Opus proved
+   row 10 as `λ p → φ≤N (θ⊆φ p)`, row 8 as `from A≅B , fromIsSurjective
+   A≅B`, and row 9 by pattern matching on the equivalence's two halves, and
+   used only one of row 3's and row 7's three needles.  The miner's
+   necessity check compares a needle with the corpus's other lemmas, not
+   with a term built from the definitions.
++  **Row 2 has a second route through its own decoy**.  All six arms proved
+   it with `⊧-I-invar`, which the fixture's `using` list offers, in place of
+   `HomImage-≅`: the identity is taken to the homomorphic image first and
+   then carried across the isomorphism.  A route that takes the steps in
+   another order escapes the miner's same-inputs comparison.
+
+Sonnet also lost 19 of its 36 rows to the preservation gate by appending a
+needle to one of these `using` lists instead of adding an import line; the
+rows' shape invites that edit, and the prompt forbids it.
+
 ## The novelty check
 
 As on the hard tiers (`../README.md`, "The novelty check"): `search_by_type`

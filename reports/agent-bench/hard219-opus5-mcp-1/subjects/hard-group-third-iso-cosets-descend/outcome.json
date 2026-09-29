@@ -1,0 +1,93 @@
+{
+  "benchmarkId" : "hard-group-third-iso-cosets-descend",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "third-iso-cosets-descend",
+  "goal" : "(∀ {x y} → x ∼ᴺ y → x ∼ᴹ y) × (∀ {x x' y y'} → x ∼ᴺ x' → y ∼ᴺ y' → x ∼ᴹ y → x' ∼ᴹ y')",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__definition_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 51691,
+  "costUsd" : 0.20674500000000004,
+  "tokens" : {
+    "input" : 12,
+    "output" : 2213,
+    "cacheRead" : 90200,
+    "cacheCreation" : 10626
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 5697,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-third-iso-cosets-descend/final/Group-third-iso-cosets-descend.agda",
+  "transcriptPath" : "subjects/hard-group-third-iso-cosets-descend/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.4,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

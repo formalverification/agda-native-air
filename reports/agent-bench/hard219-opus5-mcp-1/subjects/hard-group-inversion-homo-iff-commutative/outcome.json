@@ -1,0 +1,97 @@
+{
+  "benchmarkId" : "hard-group-inversion-homo-iff-commutative",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "inversion-homo-iff-commutative",
+  "goal" : "(IsGroupHomomorphism _⁻¹ → Commutative _≈_ _∙_) × (Commutative _≈_ _∙_ → IsGroupHomomorphism _⁻¹)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product.Base using ( _,_ )",
+    "import Algebra.Properties.Group as GroupProperties"
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 4,
+    "mcp__agda__exports_of" : 1,
+    "mcp__agda__definition_of" : 1,
+    "mcp__agda__search_by_name" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 148483,
+  "costUsd" : 1.046546,
+  "tokens" : {
+    "input" : 22,
+    "output" : 11788,
+    "cacheRead" : 397112,
+    "cacheCreation" : 55318
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 680,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-inversion-homo-iff-commutative/final/Group-inversion-homo-iff-commutative.agda",
+  "transcriptPath" : "subjects/hard-group-inversion-homo-iff-commutative/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.37,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

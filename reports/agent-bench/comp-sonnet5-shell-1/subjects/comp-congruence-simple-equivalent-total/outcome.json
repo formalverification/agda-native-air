@@ -1,0 +1,84 @@
+{
+  "benchmarkId" : "comp-congruence-simple-equivalent-total",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.≑-trans",
+    "needle:Setoid.Congruences.Lattice.≑-sym",
+    "needle:Setoid.Congruences.Simple.simple⇒total"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "simple-equivalent-total",
+  "goal" : "IsSimple 𝑨 ℓ → RelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product                  using ( _,_ )",
+    "open import Setoid.Congruences.Simple     using ( simple⇒total )"
+  ],
+  "terminal" : "completed",
+  "turns" : 13,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 7,
+    "Edit" : 3
+  },
+  "toolCallsTotal" : 12,
+  "wallMs" : 84536,
+  "costUsd" : 0.17943520000000002,
+  "tokens" : {
+    "input" : 26,
+    "output" : 6070,
+    "cacheRead" : 207316,
+    "cacheCreation" : 19305
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 6
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4000,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+    "final" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-simple-equivalent-total/final/Congruence-simple-equivalent-total.agda",
+  "transcriptPath" : "subjects/comp-congruence-simple-equivalent-total/transcript.jsonl",
+  "lastWords" : "The Agda type-checker command reports success on the final file, confirming the hole was filled correctly.",
+  "rateLimit" : {
+    "maxUtilization" : 0.5,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

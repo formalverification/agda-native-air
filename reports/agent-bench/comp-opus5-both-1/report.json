@@ -1,0 +1,1422 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "comp-opus5-both-1",
+  "timestamp" : "2026-09-29T18:06:47.034248112Z",
+  "rejudged" : false,
+  "config" : {
+    "arm" : "both",
+    "parallelism" : 2,
+    "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
+    "resume" : false,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "model" : "claude-opus-5",
+    "maxTurns" : 60,
+    "wallCapSec" : 1800,
+    "maxBudgetUsd" : 6.00,
+    "safe" : true,
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "claudeVersion" : "2.1.282 (Claude Code)",
+    "claudeFlags" : [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--max-turns",
+      "60",
+      "--max-budget-usd",
+      "6.00",
+      "--strict-mcp-config",
+      "--tools",
+      "Bash,Edit,Read",
+      "--allowedTools",
+      "mcp__agda,Bash",
+      "--permission-mode",
+      "acceptEdits",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--restricted",
+      "--add-dir",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda",
+      "--no-session-persistence"
+    ],
+    "envAdded" : {
+      "MCP_TIMEOUT" : "120000",
+      "ENABLE_TOOL_SEARCH" : "false"
+    },
+    "envRemovedPrefix" : "CLAUDE",
+    "tools" : [
+      "Bash",
+      "Edit",
+      "Read",
+      "mcp__agda__get_goal",
+      "mcp__agda__fill_hole",
+      "mcp__agda__check_file",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__check_project",
+      "mcp__agda__type_of",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__get_dependencies"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda"
+    ],
+    "persistSessions" : false,
+    "inputs" : {
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "62092c1da926245a38cb3cfff81b72c6c45ab6c10987a6145a058ac9592e89e0"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/.bin-160/agda-mcp",
+        "sha256" : "a3e52cc90875f5827169067cdd7ecc885c1f17be5c45981fa9eb48fde0a5fae2"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/.bin-160/agda-json",
+        "sha256" : "85beae1fd12c878e3b03f2415a9eaad6e4f8828e9ded43e995a1e2d35fbc21c0"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "de2f42f8575031ee9c01dc6c2f13cfcbf15db7519955ee9f257d19a487811f8f"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "obligations" : 12,
+  "totals" : {
+    "total" : 12,
+    "solved" : 10,
+    "restated" : 0,
+    "solvedOriginalInView" : null,
+    "gates" : {
+      "isolation" : 2
+    },
+    "anomalies" : 0,
+    "turns" : 148,
+    "toolCalls" : 136,
+    "wallMs" : 911182,
+    "costUsd" : 4.867
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : 0.000
+    },
+    "compositional" : {
+      "total" : 7,
+      "solved" : 6,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 79,
+      "toolCalls" : 72,
+      "wallMs" : 479134,
+      "costUsd" : 2.442
+    },
+    "non-obvious" : {
+      "total" : 5,
+      "solved" : 4,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 69,
+      "toolCalls" : 64,
+      "wallMs" : 432048,
+      "costUsd" : 2.426
+    }
+  },
+  "perStratum" : {
+    "agda-algebras/composition" : {
+      "total" : 12,
+      "solved" : 10,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "isolation" : 2
+      },
+      "anomalies" : 0,
+      "turns" : 148,
+      "toolCalls" : 136,
+      "wallMs" : 911182,
+      "costUsd" : 4.867
+    }
+  },
+  "perTool" : {
+    "Bash" : 68,
+    "Edit" : 23,
+    "mcp__agda__fill_hole" : 16,
+    "mcp__agda__check_file" : 14,
+    "Read" : 13,
+    "mcp__agda__exports_of" : 1,
+    "mcp__agda__search_by_name" : 1
+  },
+  "perShell" : {
+    "agda-batch" : 1,
+    "library-read" : 64,
+    "other" : 3
+  },
+  "perVia" : {
+    "both" : 12
+  },
+  "perVerdictVia" : {
+    "mcp" : 11,
+    "shell" : 1
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "comp-variety-subalgebra-of-model",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Varieties.Properties.⊧-S-invar",
+        "needle:Setoid.Varieties.SoundAndComplete.Soundness.sound",
+        "needle:Setoid.Subalgebras.Basic.mon→≤"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "embeds-in-model",
+      "goal" : "𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Subalgebras.Basic           using ( mon→≤ )",
+        "open import Setoid.Varieties.Properties        using ( ⊧-S-invar )",
+        "open import Setoid.Varieties.SoundAndComplete  using ( module Soundness )"
+      ],
+      "terminal" : "completed",
+      "turns" : 12,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 5,
+        "Edit" : 2,
+        "mcp__agda__fill_hole" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 11,
+      "wallMs" : 79782,
+      "costUsd" : 0.46690050000000005,
+      "tokens" : {
+        "input" : 24,
+        "output" : 3828,
+        "cacheRead" : 284321,
+        "cacheCreation" : 22892
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 5
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6193,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-variety-subalgebra-of-model/final/Variety-subalgebra-of-model.agda",
+      "transcriptPath" : "subjects/comp-variety-subalgebra-of-model/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with no holes, the hole filled by soundness of the equational logic in 𝑩 combined with subalgebraic invariance of ⊧ via `mon→≤`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.45,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-variety-image-of-product",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Varieties.Properties.⊧-H-invar",
+        "needle:Setoid.Varieties.Properties.⊧-P-invar",
+        "needle:Setoid.Homomorphisms.HomomorphicImages.HomImage-≅"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "image-of-product-models",
+      "goal" : "(∀ i → 𝒜 i ⊧ (p ≈̇ q)) → 𝑨 IsHomImageOf ⨅ 𝒜 → 𝑨 ≅ 𝑩 → 𝑩 ⊧ (p ≈̇ q)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Varieties.Properties             using ( ⊧-H-invar ; ⊧-P-invar )"
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "mcp__agda__search_by_name" : 1,
+        "Edit" : 2,
+        "mcp__agda__fill_hole" : 3,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 66702,
+      "costUsd" : 0.47274600000000006,
+      "tokens" : {
+        "input" : 18,
+        "output" : 2477,
+        "cacheRead" : 260202,
+        "cacheCreation" : 28063
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6075,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝒜 : I → Algebra α ρᵃ}\n{𝑨 : Algebra (α ⊔ ι) (ρᵃ ⊔ ι)} {𝑩 : Algebra β ρᵇ} {p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) →\n𝑨 IsHomImageOf ⨅ 𝒜 → 𝑨 ≅ 𝑩 → 𝑩 ⊧ (p ≈̇ q)",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝒜 : I → Algebra α ρᵃ}\n{𝑨 : Algebra (α ⊔ ι) (ρᵃ ⊔ ι)} {𝑩 : Algebra β ρᵇ} {p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) →\n𝑨 IsHomImageOf ⨅ 𝒜 → 𝑨 ≅ 𝑩 → 𝑩 ⊧ (p ≈̇ q)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-variety-image-of-product/final/Variety-image-of-product.agda",
+      "transcriptPath" : "subjects/comp-variety-image-of-product/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 and no holes, the hole filled by composing `⊧-P-invar`, `⊧-H-invar`, and `⊧-I-invar`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.45,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-congruence-monolith-below-member",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Congruences.Lattice.⊆-trans",
+        "needle:Setoid.Congruences.Monolith.IsMonolith.mono-least",
+        "needle:Setoid.Congruences.Monolith.⋂-lower"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "monolith-below-member",
+      "goal" : "IsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 2,
+        "Bash" : 2,
+        "mcp__agda__fill_hole" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 56087,
+      "costUsd" : 0.31125,
+      "tokens" : {
+        "input" : 18,
+        "output" : 2669,
+        "cacheRead" : 181730,
+        "cacheCreation" : 15357
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 2
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 4390,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+        "final" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-congruence-monolith-below-member/final/Congruence-monolith-below-member.agda",
+      "transcriptPath" : "subjects/comp-congruence-monolith-below-member/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the hole is filled with `λ p → IsMonolith.mono-least mono (⋂ 𝑨 θ) nz p i` (the monolith lies below the nonzero meet, and the meet below each member) and Agda type-checks the module with exit code 0.",
+      "rateLimit" : {
+        "maxUtilization" : 0.46,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-subalgebra-subdirect-into-product",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Subalgebras.Properties.≤-trans",
+        "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤",
+        "needle:Setoid.Subalgebras.Properties.⨅-≤"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "subdirect-into-product",
+      "goal" : "SubdirectEmbedding {𝑩 = 𝑩} ℬ → (∀ i → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Subalgebras.Properties            using ( ≤-trans ; ⨅-≤ )",
+        "open import Setoid.Subalgebras.Subdirect.Basic       using ( subdirect→≤ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 3,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 51632,
+      "costUsd" : 0.373577,
+      "tokens" : {
+        "input" : 14,
+        "output" : 2598,
+        "cacheRead" : 155214,
+        "cacheCreation" : 23095
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 3
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5813,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+        "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-subalgebra-subdirect-into-product/final/Subalgebra-subdirect-into-product.agda",
+      "transcriptPath" : "subjects/comp-subalgebra-subdirect-into-product/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with the hole filled by `≤-trans (subdirect→≤ ℬ e) (⨅-≤ ℬ≤𝒜)`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.46,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-lattice-below-join-bound",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Classical.Properties.Lattice.Lattice-Order.≤-trans",
+        "needle:Classical.Properties.Lattice.Lattice-Order.∨-least"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "below-join-bound",
+      "goal" : "∀ {x y z w : 𝕌[ proj₁ 𝑳 ]} → x ≤ (y ∨ z) → y ≤ w → z ≤ w → x ≤ w",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "mcp__agda__exports_of" : 1,
+        "mcp__agda__fill_hole" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 51855,
+      "costUsd" : 0.22513699999999998,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1883,
+        "cacheRead" : 125544,
+        "cacheCreation" : 11522
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6469,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+        "final" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-lattice-below-join-bound/final/Lattice-below-join-bound.agda",
+      "transcriptPath" : "subjects/comp-lattice-below-join-bound/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with no holes, the hole filled by `Lattice-Order.≤-trans 𝑳 x≤y∨z (Lattice-Order.∨-least 𝑳 y≤w z≤w)`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.46,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-group-normal-of-equivalent-congruence",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Classical.Structures.Group.Congruences.GroupCongruences.≈ⁿ-trans",
+        "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-cong",
+        "needle:Setoid.Congruences.Lattice.≑-trans",
+        "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf∘congruenceOf"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "normal-of-equivalent-congruence",
+      "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ≑ φ → φ ≑ congruenceOf 𝑵 → normalOf θ ≈ⁿ 𝑵",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash reads outside the arm's roots (/): find / -maxdepth 8 -name \"Congruences\" -type d -path \"*Setoid*\" 2>/dev/null | head",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Congruences.Lattice              using ( ≑-trans )"
+      ],
+      "terminal" : "completed",
+      "turns" : 22,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 15,
+        "Edit" : 3,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 21,
+      "wallMs" : 143130,
+      "costUsd" : 0.7193835000000001,
+      "tokens" : {
+        "input" : 42,
+        "output" : 6275,
+        "cacheRead" : 519677,
+        "cacheCreation" : 30246
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash reads outside the arm's roots (/): find / -maxdepth 8 -name \"Congruences\" -type d -path \"*Setoid*\" 2>/dev/null | head"
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "agda-batch" : 1,
+          "library-read" : 12,
+          "other" : 2
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "shell",
+      "agdaExit" : 0,
+      "agdaMs" : 6327,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-group-normal-of-equivalent-congruence/final/Group-normal-of-equivalent-congruence.agda",
+      "transcriptPath" : "subjects/comp-group-normal-of-equivalent-congruence/transcript.jsonl",
+      "lastWords" : "The hole is filled by composing `≑-trans`, `normalOf-cong`, and `normalOf∘congruenceOf` (with implicits given explicitly, since `Con`/`NormalSubgroup` are non-injective defined types), and the verdict on the final file is success (agda exits 0).",
+      "rateLimit" : {
+        "maxUtilization" : 0.47,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-congruence-meet-below-join",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Congruences.Lattice.⊆-trans",
+        "needle:Setoid.Congruences.Lattice.∧-lowerˡ",
+        "needle:Setoid.Congruences.CompleteLattice.⋁-upper"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "meet-below-join",
+      "goal" : "(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) → (f i ∧ φ) ⊆ ⋁ 𝑨 ℓ₀ f",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Congruences.CompleteLattice   using ( ⋁-upper )",
+        "open import Data.Product                         using ( _,_ ; proj₁ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 15,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 8,
+        "Edit" : 3,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 14,
+      "wallMs" : 77513,
+      "costUsd" : 0.39573499999999995,
+      "tokens" : {
+        "input" : 24,
+        "output" : 3429,
+        "cacheRead" : 258780,
+        "cacheCreation" : 18050
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 8
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 4419,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ₀ : Level} {𝑆 : Signature 𝓞 𝓥}\n(𝑨 : Algebra α ρ) {I : Set ℓ₀} (f : I → Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀))\n(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) →\nf i ∧ φ ⊆ ⋁ 𝑨 ℓ₀ f",
+        "final" : "{𝓞 𝓥 : Level} {α ρ ℓ₀ : Level} {𝑆 : Signature 𝓞 𝓥}\n(𝑨 : Algebra α ρ) {I : Set ℓ₀} (f : I → Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀))\n(φ : Con 𝑨 (𝓞 ⊔ 𝓥 ⊔ α ⊔ ρ ⊔ ℓ₀)) (i : I) →\nf i ∧ φ ⊆ ⋁ 𝑨 ℓ₀ f",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-congruence-meet-below-join/final/Congruence-meet-below-join.agda",
+      "transcriptPath" : "subjects/comp-congruence-meet-below-join/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0, with the hole filled by `meet-below-join φ i (p , _) = ⋁-upper 𝑨 ℓ₀ f i p`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.47,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-homomorphism-isomorph-is-image",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Homomorphisms.HomomorphicImages.HomImage-≅'",
+        "needle:Setoid.Homomorphisms.HomomorphicImages.IdHomImage"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "isomorph-is-image",
+      "goal" : "𝑨 ≅ 𝑩 → 𝑨 IsHomImageOf 𝑩",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Product using ( _,_ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 13,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 6,
+        "mcp__agda__fill_hole" : 2,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 12,
+      "wallMs" : 65242,
+      "costUsd" : 0.39563400000000004,
+      "tokens" : {
+        "input" : 24,
+        "output" : 2903,
+        "cacheRead" : 263558,
+        "cacheCreation" : 19116
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 6
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5666,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 IsHomImageOf 𝑩",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 IsHomImageOf 𝑩",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-homomorphism-isomorph-is-image/final/Homomorphism-isomorph-is-image.agda",
+      "transcriptPath" : "subjects/comp-homomorphism-isomorph-is-image/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 and no remaining holes, with the hole filled by `_≅_.from A≅B , _≅_.fromIsSurjective A≅B` (plus an added `open import Data.Product using ( _,_ )`).",
+      "rateLimit" : {
+        "maxUtilization" : 0.47,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-congruence-simple-equivalent-total",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Congruences.Lattice.≑-trans",
+        "needle:Setoid.Congruences.Lattice.≑-sym",
+        "needle:Setoid.Congruences.Simple.simple⇒total"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "simple-equivalent-total",
+      "goal" : "IsSimple 𝑨 ℓ → RelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Product                  using ( _,_ )",
+        "open import Setoid.Congruences.Simple     using ( simple⇒total )"
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 57247,
+      "costUsd" : 0.3282185,
+      "tokens" : {
+        "input" : 18,
+        "output" : 2957,
+        "cacheRead" : 177447,
+        "cacheCreation" : 16548
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 4612,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+        "final" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-congruence-simple-equivalent-total/final/Congruence-simple-equivalent-total.agda",
+      "transcriptPath" : "subjects/comp-congruence-simple-equivalent-total/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: Agda type-checks it with exit code 0 and no holes remain (the proof transports the witnessed distinct pair along `θ ⊆ φ` and applies `simple⇒total`).",
+      "rateLimit" : {
+        "maxUtilization" : 0.47,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-group-normal-of-smaller-congruence",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Classical.Structures.Group.Congruences.GroupCongruences.≤ⁿ-trans",
+        "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-mono"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "normal-of-smaller-congruence",
+      "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ⊆ φ → normalOf φ ≤ⁿ 𝑵 → normalOf θ ≤ⁿ 𝑵",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "isolation",
+      "gateDetail" : "Bash reads outside the arm's roots (/): find /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two...; Bash reads outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda/AgdaDojang | head; find /home/williamdemeo/git/formalverification/agda-native-air/worktre...",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 15,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 9,
+        "mcp__agda__fill_hole" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 14,
+      "wallMs" : 108571,
+      "costUsd" : 0.3743294999999999,
+      "tokens" : {
+        "input" : 30,
+        "output" : 3063,
+        "cacheRead" : 283009,
+        "cacheCreation" : 15610
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+          "Bash reads outside the arm's roots (/): find /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two...",
+          "Bash reads outside the arm's roots (/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two): ls /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda/AgdaDojang | head; find /home/williamdemeo/git/formalverification/agda-native-air/worktre..."
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 9
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6352,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ⊆ φ →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 φ) 𝑵 →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ⊆ φ →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 φ) 𝑵 →\n(𝒢 GroupCongruences.≤ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-group-normal-of-smaller-congruence/final/Group-normal-of-smaller-congruence.agda",
+      "transcriptPath" : "subjects/comp-group-normal-of-smaller-congruence/transcript.jsonl",
+      "lastWords" : "The hole is filled with `λ p → φ≤N (θ⊆φ p)` and the verdict on the final file is success (Agda exits 0, no holes, no diagnostics).",
+      "rateLimit" : {
+        "maxUtilization" : 0.48,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-variety-subdirect-product-models",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Varieties.Properties.⊧-S-invar",
+        "needle:Setoid.Varieties.Properties.⊧-P-invar",
+        "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "subdirect-product-models",
+      "goal" : "(∀ i → 𝒜 i ⊧ (p ≈̇ q)) → SubdirectEmbedding {𝑩 = 𝑩} 𝒜 → 𝑩 ⊧ (p ≈̇ q)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Subalgebras.Subdirect.Basic    using ( subdirect→≤ )",
+        "open import Setoid.Varieties.Properties           using ( ⊧-S-invar ; ⊧-P-invar )"
+      ],
+      "terminal" : "completed",
+      "turns" : 16,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 9,
+        "Edit" : 2,
+        "mcp__agda__fill_hole" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 15,
+      "wallMs" : 86347,
+      "costUsd" : 0.4553405,
+      "tokens" : {
+        "input" : 28,
+        "output" : 4073,
+        "cacheRead" : 301191,
+        "cacheCreation" : 20278
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 8,
+          "other" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6165,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝑩 : Algebra β ρᵇ} {𝒜 : I → Algebra α ρ}\n{p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) → SubdirectEmbedding 𝒜 → 𝑩 ⊧ (p ≈̇ q)",
+        "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {𝑩 : Algebra β ρᵇ} {𝒜 : I → Algebra α ρ}\n{p q : Term X} →\n((i : I) → 𝒜 i ⊧ (p ≈̇ q)) → SubdirectEmbedding 𝒜 → 𝑩 ⊧ (p ≈̇ q)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-variety-subdirect-product-models/final/Variety-subdirect-product-models.agda",
+      "transcriptPath" : "subjects/comp-variety-subdirect-product-models/transcript.jsonl",
+      "lastWords" : "The hole is filled with `⊧-S-invar {p = p} {q} (⊧-P-invar {p = p} {q} 𝒜 𝒜⊧) (subdirect→≤ 𝒜 e)` (plus two added `open import` lines), and Agda's batch verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.48,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-homomorphism-epi-through-kernel",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Homomorphisms.Properties.⊙-epi",
+        "needle:Setoid.Homomorphisms.Kernels.πker"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "epi-through-kernel",
+      "goal" : "(h : hom 𝑨 𝑩) → epi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Homomorphisms.Kernels    using ( πker )",
+        "open import Setoid.Homomorphisms.Properties using ( ⊙-epi )"
+      ],
+      "terminal" : "completed",
+      "turns" : 11,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 5,
+        "Edit" : 2,
+        "mcp__agda__fill_hole" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 10,
+      "wallMs" : 67074,
+      "costUsd" : 0.349078,
+      "tokens" : {
+        "input" : 20,
+        "output" : 2791,
+        "cacheRead" : 206726,
+        "cacheCreation" : 17584
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 5
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 4842,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ}\n(h : hom 𝑨 𝑩) →\nepi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ}\n(h : hom 𝑨 𝑩) →\nepi (ker[ 𝑨 ⇒ 𝑩 ] h) 𝑪 → epi 𝑨 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-homomorphism-epi-through-kernel/final/Homomorphism-epi-through-kernel.agda",
+      "transcriptPath" : "subjects/comp-homomorphism-epi-through-kernel/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with `epi-through-kernel h e = ⊙-epi (πker h) e` (adding imports of `πker` and `⊙-epi`), no holes remaining.",
+      "rateLimit" : {
+        "maxUtilization" : 0.48,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "benchmarkId" : "comp-variety-subalgebra-of-model",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Varieties.Properties.⊧-S-invar",
+    "needle:Setoid.Varieties.SoundAndComplete.Soundness.sound",
+    "needle:Setoid.Subalgebras.Basic.mon→≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "embeds-in-model",
+  "goal" : "𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Subalgebras.Basic           using ( mon→≤ )",
+    "open import Setoid.Varieties.Properties        using ( ⊧-S-invar )",
+    "open import Setoid.Varieties.SoundAndComplete  using ( module Soundness )"
+  ],
+  "terminal" : "completed",
+  "turns" : 17,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 13,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 16,
+  "wallMs" : 89902,
+  "costUsd" : 0.4670555,
+  "tokens" : {
+    "input" : 28,
+    "output" : 4368,
+    "cacheRead" : 215871,
+    "cacheCreation" : 24978
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 10,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5148,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-variety-subalgebra-of-model/final/Variety-subalgebra-of-model.agda",
+  "transcriptPath" : "subjects/comp-variety-subalgebra-of-model/transcript.jsonl",
+  "lastWords" : "The hole is filled by deriving `𝑩 ⊧ (p ≈̇ q)` from soundness of the equational calculus (`Soundness.sound` applied to `B⊨E` and `Epq`) and transferring it along the monomorphism `𝑨 ≤ 𝑩` via `⊧-S-invar`; the given command reports success (exit 0, no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.16,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

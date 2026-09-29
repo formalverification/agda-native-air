@@ -1,0 +1,427 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "cost-comp-opus5-both-1",
+  "timestamp" : "2026-09-29T16:57:53.596773868Z",
+  "rejudged" : false,
+  "config" : {
+    "arm" : "both",
+    "parallelism" : 2,
+    "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
+    "resume" : false,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "model" : "claude-opus-5",
+    "maxTurns" : 60,
+    "wallCapSec" : 1800,
+    "maxBudgetUsd" : 6.00,
+    "safe" : true,
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "claudeVersion" : "2.1.282 (Claude Code)",
+    "claudeFlags" : [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--max-turns",
+      "60",
+      "--max-budget-usd",
+      "6.00",
+      "--strict-mcp-config",
+      "--tools",
+      "Bash,Edit,Read",
+      "--allowedTools",
+      "mcp__agda,Bash",
+      "--permission-mode",
+      "acceptEdits",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--restricted",
+      "--add-dir",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda",
+      "--no-session-persistence"
+    ],
+    "envAdded" : {
+      "MCP_TIMEOUT" : "120000",
+      "ENABLE_TOOL_SEARCH" : "false"
+    },
+    "envRemovedPrefix" : "CLAUDE",
+    "tools" : [
+      "Bash",
+      "Edit",
+      "Read",
+      "mcp__agda__get_goal",
+      "mcp__agda__fill_hole",
+      "mcp__agda__check_file",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__check_project",
+      "mcp__agda__type_of",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__get_dependencies"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/agda"
+    ],
+    "persistSessions" : false,
+    "inputs" : {
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "62092c1da926245a38cb3cfff81b72c6c45ab6c10987a6145a058ac9592e89e0"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/.bin-160/agda-mcp",
+        "sha256" : "a3e52cc90875f5827169067cdd7ecc885c1f17be5c45981fa9eb48fde0a5fae2"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/.bin-160/agda-json",
+        "sha256" : "85beae1fd12c878e3b03f2415a9eaad6e4f8828e9ded43e995a1e2d35fbc21c0"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "de2f42f8575031ee9c01dc6c2f13cfcbf15db7519955ee9f257d19a487811f8f"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "obligations" : 2,
+  "totals" : {
+    "total" : 2,
+    "solved" : 2,
+    "restated" : 0,
+    "solvedOriginalInView" : null,
+    "gates" : {
+      
+    },
+    "anomalies" : 0,
+    "turns" : 25,
+    "toolCalls" : 23,
+    "wallMs" : 145065,
+    "costUsd" : 0.958
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : 0.000
+    },
+    "compositional" : {
+      "total" : 1,
+      "solved" : 1,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 10,
+      "toolCalls" : 9,
+      "wallMs" : 51675,
+      "costUsd" : 0.380
+    },
+    "non-obvious" : {
+      "total" : 1,
+      "solved" : 1,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 15,
+      "toolCalls" : 14,
+      "wallMs" : 93390,
+      "costUsd" : 0.578
+    }
+  },
+  "perStratum" : {
+    "agda-algebras/composition" : {
+      "total" : 2,
+      "solved" : 2,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 25,
+      "toolCalls" : 23,
+      "wallMs" : 145065,
+      "costUsd" : 0.958
+    }
+  },
+  "perTool" : {
+    "Bash" : 11,
+    "Edit" : 5,
+    "mcp__agda__check_file" : 3,
+    "Read" : 2,
+    "mcp__agda__fill_hole" : 2
+  },
+  "perShell" : {
+    "library-read" : 11
+  },
+  "perVia" : {
+    "both" : 2
+  },
+  "perVerdictVia" : {
+    "mcp" : 2
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "comp-variety-subalgebra-of-model",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Setoid.Varieties.Properties.⊧-S-invar",
+        "needle:Setoid.Varieties.SoundAndComplete.Soundness.sound",
+        "needle:Setoid.Subalgebras.Basic.mon→≤"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "embeds-in-model",
+      "goal" : "𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Setoid.Subalgebras.Basic           using ( mon→≤ )",
+        "open import Setoid.Varieties.Properties        using ( ⊧-S-invar )",
+        "open import Setoid.Varieties.SoundAndComplete  using ( module Soundness )"
+      ],
+      "terminal" : "completed",
+      "turns" : 15,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 8,
+        "Edit" : 3,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 14,
+      "wallMs" : 93390,
+      "costUsd" : 0.5778475,
+      "tokens" : {
+        "input" : 30,
+        "output" : 4474,
+        "cacheRead" : 380935,
+        "cacheCreation" : 27538
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 8
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5316,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρᵇ χ ι : Level} {𝑆 : Signature 𝓞 𝓥}\n{X : Set χ} {I : Set ι} {E : I → Eq} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {p q : Term X} →\n𝑩 ⊨ E → E ⊢ X ▹ p ≈ q → mon 𝑨 𝑩 → 𝑨 ⊧ (p ≈̇ q)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-variety-subalgebra-of-model/final/Variety-subalgebra-of-model.agda",
+      "transcriptPath" : "subjects/comp-variety-subalgebra-of-model/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with no holes, proving `embeds-in-model` by soundness of the equational calculus in the model `𝑩` transported back along the monomorphism via subalgebra invariance of `⊧`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.16,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "comp-lattice-below-join-bound",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:composition",
+        "needle:Classical.Properties.Lattice.Lattice-Order.≤-trans",
+        "needle:Classical.Properties.Lattice.Lattice-Order.∨-least"
+      ],
+      "stratum" : "agda-algebras/composition",
+      "hole" : "below-join-bound",
+      "goal" : "∀ {x y z w : 𝕌[ proj₁ 𝑳 ]} → x ≤ (y ∨ z) → y ≤ w → z ≤ w → x ≤ w",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 3,
+        "Edit" : 2,
+        "mcp__agda__fill_hole" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 51675,
+      "costUsd" : 0.3798524999999999,
+      "tokens" : {
+        "input" : 20,
+        "output" : 2246,
+        "cacheRead" : 175705,
+        "cacheCreation" : 23575
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 3
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 4718,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+        "final" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/comp-lattice-below-join-bound/final/Lattice-below-join-bound.agda",
+      "transcriptPath" : "subjects/comp-lattice-below-join-bound/transcript.jsonl",
+      "lastWords" : "The hole is filled with `≤-trans x≤y∨z (∨-least y≤w z≤w)` (adding an `open Lattice-Order 𝑳 using ( ≤-trans ; ∨-least )` line), and the final file's batch verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.16,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    }
+  ]
+}

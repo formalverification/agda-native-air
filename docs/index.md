@@ -57,14 +57,16 @@ attempt type-checks and still proves the statement it was given.
    came with the original proof in view; on the other
    @fig(suite219-sonnet5-shell-1 rows-without-original) rows, every
    configuration solves nearly all.
-+  **Neither can the first hard rows, so far**.  On
-   @fig(hard-opus5-mcp-1 /totals/total) statements posed with no proof on
++  **Nor can the rows built to be hard, so far**.  On
+   @fig(hard219-opus5-mcp-1 /totals/total) statements posed with no proof on
    disk, Opus 5's final file type-checks with its statement intact on
-   @fig(hard-opus5-shell-1 final-checks-statement-kept) with a shell,
-   @fig(hard-opus5-mcp-1 final-checks-statement-kept) with the server, and
-   @fig(hard-opus5-both-1 final-checks-statement-kept) with both.  Those
-   runs had each fixture's proof sketched in its header, and their re-run
-   without the sketch is still to come.
+   @fig(hard219-opus5-shell-1 final-checks-statement-kept) with a shell,
+   @fig(hard219-opus5-mcp-1 final-checks-statement-kept) with the server, and
+   @fig(hard219-opus5-both-1 final-checks-statement-kept) with both, as it
+   did when each fixture's header sketched the proof.  On
+   @fig(comp-sonnet5-mcp-1 /totals/total) statements whose proofs string two
+   to four library lemmas together, every final file of Opus 5 and of
+   Sonnet 5 type-checks in every configuration.
 +  **A fixture's header used to name the answer**.  Until 2026-09-29 each
    haystack fixture's header named the one lemma its proof needs.  With that
    line in view, Sonnet 5 solved
@@ -72,7 +74,8 @@ attempt type-checks and still proves the statement it was given.
    @fig(agent-sonnet5-1 /perStratum/agda-stdlib~1haystack/total) rows
    asking Agda nothing before its final check; without it,
    @fig(suite219-sonnet5-mcp-1 haystack-unqueried), and on the rest it
-   asked first, mostly through the server's search.  Every figure above but the hard rows' is from runs whose
+   asked first, mostly through the server's search.  Apart from the one run
+   said to have that line in view, every figure above is from runs whose
    headers carry no hints.
 
 So a model wants the server's verdict, and beside a shell it wants little
@@ -83,7 +86,9 @@ and those are the next instruments.
 [Reading the results](reading-the-results.md) gives every number with the run
 that produced it; its
 [§ 4.5](reading-the-results.md#45-the-hard-tier) says why the hard tier's
-solved column reads lower than the counts above, and its
+solved column reads lower than the counts above, its
+[§ 4.7](reading-the-results.md#47-the-composition-tier) what the composition
+tier's arms did with the lemmas they found, and its
 [§ 4.6](reading-the-results.md#46-what-the-fixture-headers-were-worth) what
 the fixture headers' hints were worth.
 [ADR 0002](adr/0002-agda-mcp.md) records the server's design, and

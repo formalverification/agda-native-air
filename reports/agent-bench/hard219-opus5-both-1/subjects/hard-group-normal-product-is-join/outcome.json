@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "hard-group-normal-product-is-join",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "normal-product-is-join",
+  "goal" : "Conjugate.IsNormal 𝒢 (N ∙ᶜ M) × (N ⊆ (N ∙ᶜ M)) × (M ⊆ (N ∙ᶜ M)) × (∀ {P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} → IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (N ∙ᶜ M) ⊆ P)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash runs a program this audit does not model (perl): perl -pi -e 's/open IsSubgroup 𝒢 (N|M|P) (N-sub|M-sub|P-sub)/open IsSubgroup $2/' Group-normal-product-is-join.agda && grep -n \"open IsSubgroup\" Group-normal-product-is-join.agda",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 21,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 14,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 20,
+  "wallMs" : 125573,
+  "costUsd" : 0.8122715,
+  "tokens" : {
+    "input" : 40,
+    "output" : 7576,
+    "cacheRead" : 556023,
+    "cacheCreation" : 34466
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash runs a program this audit does not model (perl): perl -pi -e 's/open IsSubgroup 𝒢 (N|M|P) (N-sub|M-sub|P-sub)/open IsSubgroup $2/' Group-normal-product-is-join.agda && grep -n \"open IsSubgroup\" Group-normal-product-is-join.agda"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 12,
+      "other" : 1
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5757,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+    "final" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-normal-product-is-join/final/Group-normal-product-is-join.agda",
+  "transcriptPath" : "subjects/hard-group-normal-product-is-join/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 under `--safe`, with no holes remaining.",
+  "rateLimit" : {
+    "maxUtilization" : 0.68,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

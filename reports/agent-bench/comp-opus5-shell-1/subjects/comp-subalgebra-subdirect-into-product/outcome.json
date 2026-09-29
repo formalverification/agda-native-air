@@ -1,0 +1,85 @@
+{
+  "benchmarkId" : "comp-subalgebra-subdirect-into-product",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Subalgebras.Properties.≤-trans",
+    "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤",
+    "needle:Setoid.Subalgebras.Properties.⨅-≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "subdirect-into-product",
+  "goal" : "SubdirectEmbedding {𝑩 = 𝑩} ℬ → (∀ i → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Subalgebras.Properties            using ( ≤-trans ; ⨅-≤ )",
+    "open import Setoid.Subalgebras.Subdirect.Basic       using ( subdirect→≤ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 5,
+    "Edit" : 3
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 57475,
+  "costUsd" : 0.36753299999999994,
+  "tokens" : {
+    "input" : 18,
+    "output" : 2845,
+    "cacheRead" : 138116,
+    "cacheCreation" : 22726
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+      "Edit /home/williamdemeo/git/formalverification/agda-native-air/worktrees/160-m2-18-stage-two/data/benchmarks/reports/agent-bench/comp-opus5-shell-1/work/comp-subdirect-into-product/Subalgebra-subdirect-into-product.agda"
+    ],
+    "shellClasses" : {
+      "agda-batch" : 2,
+      "library-read" : 3
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5485,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-subalgebra-subdirect-into-product/final/Subalgebra-subdirect-into-product.agda",
+  "transcriptPath" : "subjects/comp-subalgebra-subdirect-into-product/transcript.jsonl",
+  "lastWords" : "The hole is filled with `≤-trans (subdirect→≤ ℬ e) (⨅-≤ ℬ≤𝒜)` (plus two added `open import` lines), and the judge command reports success (exit 0) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.43,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

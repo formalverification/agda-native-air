@@ -1,0 +1,98 @@
+{
+  "benchmarkId" : "comp-congruence-monolith-below-member",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.⊆-trans",
+    "needle:Setoid.Congruences.Monolith.IsMonolith.mono-least",
+    "needle:Setoid.Congruences.Monolith.⋂-lower"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "monolith-below-member",
+  "goal" : "IsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__definition_of" : 1,
+    "mcp__agda__type_of" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 60139,
+  "costUsd" : 0.23651999999999995,
+  "tokens" : {
+    "input" : 16,
+    "output" : 2720,
+    "cacheRead" : 126800,
+    "cacheCreation" : 10504
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3834,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+    "final" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-monolith-below-member/final/Congruence-monolith-below-member.agda",
+  "transcriptPath" : "subjects/comp-congruence-monolith-below-member/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file, where the hole is filled with `IsMonolith.mono-least mono (θ i) (λ bd → nz (λ q → bd (q i)))` — i.e. `θ i` is nonzero because a below-diagonal `θ i` would force the meet `⋂ 𝑨 θ` below the diagonal.",
+  "rateLimit" : {
+    "maxUtilization" : 0.19,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

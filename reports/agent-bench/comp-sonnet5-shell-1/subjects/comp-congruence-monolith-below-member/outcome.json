@@ -1,0 +1,83 @@
+{
+  "benchmarkId" : "comp-congruence-monolith-below-member",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.⊆-trans",
+    "needle:Setoid.Congruences.Monolith.IsMonolith.mono-least",
+    "needle:Setoid.Congruences.Monolith.⋂-lower"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "monolith-below-member",
+  "goal" : "IsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Congruences.Monolith  using ( mono-least )"
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 5,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 55587,
+  "costUsd" : 0.12366800000000001,
+  "tokens" : {
+    "input" : 20,
+    "output" : 3947,
+    "cacheRead" : 134330,
+    "cacheCreation" : 14323
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 4
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4025,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+    "final" : "{𝓞 𝓥 : Level} {α ρ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{I : Set ρ} {μ : Con 𝑨 ρ} {θ : I → Con 𝑨 ρ} →\nIsMonolith 𝑨 μ → Nonzero 𝑨 (⋂ 𝑨 θ) → (i : I) → μ ⊆ θ i",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-monolith-below-member/final/Congruence-monolith-below-member.agda",
+  "transcriptPath" : "subjects/comp-congruence-monolith-below-member/transcript.jsonl",
+  "lastWords" : "The type-checking command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.49,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
