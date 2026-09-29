@@ -962,28 +962,29 @@ file, immune to shell aliasing, and self-documenting.
 
 Copy the committed template
 [`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
-into the worktree you are editing as `.mcp.json`, replace the two `/ABS/PATH/TO/...`
-placeholders with real absolute paths, and keep it out of that project's history:
+into the checkout you are editing as `.mcp.json`, replace its `/ABS/PATH/TO/...`
+placeholders with real absolute paths, and keep it out of that project's history.
+The template names no worktree (`--cwd ${PWD}` anchors the server wherever Claude
+Code starts), so the same file serves every worktree.  Its three machine-specific
+inputs (agda-algebras's own Agda, the libraries file that Agda reads, and the
+search corpus) are realized once; the commands are in the
+[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).  Then:
 
 ```sh
 cd /path/to/agda-algebras/<your-branch-worktree>
 cp /abs/path/to/agda-native-air/agda-mcp/examples/agda-algebras.mcp.json ./.mcp.json
-# edit ./.mcp.json — set `command` to this repo's scripts/run-server.sh, and
-#                    env.AGDA_ALGEBRAS_ROOT to your agda-algebras worktree path
-echo '.mcp.json' >> .git/info/exclude   # local-only ignore; leaves tracked .gitignore alone
+# edit ./.mcp.json: replace every /ABS/PATH/TO/... placeholder with a real path
+echo '.mcp.json' >> "$(git rev-parse --git-common-dir)/info/exclude"   # once per clone
 
 nix develop   # optional: gives Claude's own Bash the agda-algebras toolchain
 claude        # approve the "agda" server when prompted, then /mcp → agda · ✔ connected
 ```
 
-Claude Code auto-loads `.mcp.json` from the working directory (asking once to approve
-it).  Two entries in it do the real work:
-
-+ `env.AGDA_ALGEBRAS_ROOT`, which registers your library so the proof-state tools
-  resolve it, and
-+ (optionally) `--corpus`, which turns on the search tools.
-
-Both are covered in *Library registration and the search corpus* below.
+(In a worktree `.git` is a file, so the exclude file has to be named through
+`git rev-parse --git-common-dir`; the shared `info/exclude` then covers every
+worktree of the clone.)  Claude Code auto-loads `.mcp.json` from the working
+directory, asking once to approve it.  What each argument does is covered in
+*Which Agda checks your files* and *The search corpus* below.
 
 Keep `--timeout 600`: the bound is enforced; on expiry the `agda` process group is
 killed and the tool returns a timeout rather than blocking.  The first typecheck
@@ -1004,14 +1005,19 @@ Equivalently, register the server on the command line from the worktree:
 
 ```sh
 claude mcp add agda --scope local \
-  --env AGDA_ALGEBRAS_ROOT=/path/to/agda-algebras/<your-branch-worktree> \
   -- /abs/path/to/agda-native-air/scripts/run-server.sh \
-     --agda-flags "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras" \
-     --timeout 600
+     --cwd "$PWD" \
+     --agda-bin /abs/path/to/agda-algebras-agda-root/bin/agda \
+     --agda-flags "--library-file=/abs/path/to/agda-algebras-libraries -i /abs/path/to/agda-native-air/agda-dojang/agda" \
+     --corpus /abs/path/to/agda-algebras-corpus-v0.1/corpus.jsonl \
+     --timeout 600 \
+     --check-command "make check AGDA=/abs/path/to/agda-algebras-agda-root/bin/agda" \
+     --check-timeout 3600
 ```
 
 `--scope local` keeps the registration in your per-project config, not committed to the
-other repository.
+other repository.  That config is per directory, so each worktree needs its own
+`claude mcp add`; the shell expands `"$PWD"` to that worktree when you run it.
 
 > **If this errors with `script: unrecognized option '--scope'`** (or similar), your
 > shell has `claude` aliased or wrapped — e.g. under `script` for session logging — so
@@ -1020,71 +1026,72 @@ other repository.
 > bypasses the alias/function) or just use Option A, which avoids the `claude` CLI for
 > configuration entirely.
 
-#### Library registration and the search corpus
+#### Which Agda checks your files
 
-Two things in the config carry the machine-specific setup.  The templates above already
-include both; this is what they do and how to get them right.
+agda-mcp runs inside **this** repository's `.#backend` shell (`run-server.sh` does
+`nix develop <agda-native-air>#backend --command …`; your own `nix develop` before
+launching `claude` equips only Claude's Bash, not the server), but the template has it
+check agda-algebras files with **agda-algebras's own** Agda, the one its `nix develop`
+and CI use.  Three arguments carry that, as follows:
 
-**Register your library: `env.AGDA_ALGEBRAS_ROOT` (needed for the proof-state tools).**
-agda-mcp answers *every* tool call with **this repository's** Agda, inside its `.#backend`
-shell — not your project's shell.  (`run-server.sh` does `nix develop <agda-native-air>#backend
---command …`; your own `nix develop` before launching `claude` only equips Claude's Bash,
-not the server.)  So `-l agda-algebras` has to resolve in *this* repo's `agda/libraries`,
-and setting `AGDA_ALGEBRAS_ROOT` is exactly what puts it there: `run-server.sh` passes the
-variable into the `.#backend` shell, whose hook appends your library's `.agda-lib` to
-`agda/libraries` (see [§1.3](#13--registering-external-agda-libraries)).  This is
-verified to propagate through `run-server.sh`; when registration seems not to happen it is
-almost always one of two things:
++  `--agda-bin` names agda-algebras's wrapped Agda, which bakes in a `--library-file`
+   registering its standard library.
++  `--cwd ${PWD}` runs Agda in the worktree Claude Code started in.  Agda finds a
+   file's project by walking up from the directory it runs in, so this is what makes
+   the worktree's `agda-algebras.agda-lib` the project, and what sends its `.agdai`
+   interfaces to that worktree's `_build/`, shared with your own `nix develop` runs
+   there.
++  `--library-file`, in `--agda-flags`, names the same registry the wrapper bakes in.
+   Agda does not need it; the server does.  The server reads the registry to decide
+   which tree a file belongs to, it cannot see inside the wrapper, and without the
+   flag it reads this repository's `agda/libraries`, which registers agda-algebras at
+   the flake-pinned store copy; every worktree file would then be refused with a
+   `rootMismatch`.
 
-+  **The path points at the wrong worktree.**  `AGDA_ALGEBRAS_ROOT` must be the *exact*
-   worktree you are editing and must contain a `*.agda-lib` at its top level.  If it is
-   stale or wrong, the hook prints a warning to **stderr**, which the MCP client hides,
-   and silently skips registration, so `-l agda-algebras` then fails with "library not
-   found".
-+  **The server was not restarted after editing `.mcp.json`.**  The server reads the
-   variable and rewrites `agda/libraries` once, at startup; changes to `.mcp.json` take
-   effect only after a full restart of Claude Code.
+Nothing in this arrangement is shared between sessions, so sessions in different
+worktrees do not disturb each other.  (An earlier template set `env.AGDA_ALGEBRAS_ROOT`
+instead, which made every server launch rewrite this repository's `agda/libraries` to
+name its own worktree.  A second session in another worktree re-pointed the registry,
+and the first session's server then refused its own files.)  Rebuild the two gc-roots
+after agda-algebras's `flake.lock` moves; the commands in the examples README re-point
+the same symlinks, and until you run them the server keeps checking with the previous
+pin.
 
-Do **not** hand-edit `agda/libraries` to work around this: the hook regenerates that file
-on every shell entry, so a manual line is wiped the next time the server starts.
-`AGDA_ALGEBRAS_ROOT` is the durable fix.  For a different library, set the matching
-`*_ROOT` variable and `-l <name>`; see [§1.3](#13--registering-external-agda-libraries)
-for the supported set.
-
-**You cannot get a silent answer about the wrong worktree.**  A stale `AGDA_ALGEBRAS_ROOT`
-used to be a genuine hazard: the server would resolve your file's imports against the
-*other* branch's tree and report success.  It now refuses instead; a file whose nearest
-`*.agda-lib` names a library the server has registered at a different root fails with a
-`rootMismatch` object naming both roots and the libraries file that disagrees.  You do not
-have to wait for that to notice, either: every proof-state response carries a `project`
-block naming the tree it checked, alongside `command` (the exact `agda` invocation,
-resolved binary and cwd included) and `verdict` (what green means, and Agda's own exit
-code, which the verdict is read from).  See
+**You cannot get a silent answer about the wrong worktree**.  A registration that
+shares one registry between worktrees would let the server resolve your file's imports
+against another branch's tree and report success.  The server refuses instead; a file
+whose nearest `*.agda-lib` names a library the server has registered at a different
+root fails with a `rootMismatch` object naming both roots and the libraries file that
+disagrees.  You do not have to wait for that to notice, either: every proof-state
+response carries a `project` block naming the tree it checked, alongside `command` (the
+exact `agda` invocation, resolved binary and cwd included) and `verdict` (what green
+means, and Agda's own exit code, which the verdict is read from).  See
 [`docs/agda-mcp/agda-mcp-environment.md`](agda-mcp/agda-mcp-environment.md).
 
-**Add a corpus: `--corpus <abs-path>.jsonl` (turns on the search tools).**  The
-`search_by_name` / `search_by_type` / `get_dependencies` tools appear in `tools/list` only
-when a corpus is loaded; the proof-state tools do not need one.  Build a corpus of your
-library once, then point `--corpus` at it:
+#### The search corpus
+
+**`--corpus <abs-path>.jsonl` turns on the search tools**.  `search_by_name`,
+`search_by_type`, `get_dependencies`, and `search_in_scope` appear in `tools/list` only
+when a corpus is loaded, so a registration without one shows 10 tools in `/mcp` rather
+than 14; the proof-state tools do not need one.  The released agda-algebras corpus
+(v0.1: 13,123 rows, taken at agda-algebras commit `4662373d`) is one download:
 
 ```sh
-# in agda-native-air, in the .#all shell (Spark), see §5.1 for detail:
-make extract-lib LIB_NAME=agda-algebras \
-     AGDA_ALGEBRAS_ROOT=/abs/path/to/agda-algebras/<your-worktree>
-# collect the per-module JSONL the extractor writes into one file:
-find data/agda-algebras/raw -name '*.jsonl' -print0 | xargs -0 cat \
-     > /abs/path/to/agda-algebras-corpus.jsonl
+gh release download agda-algebras-corpus-v0.1 -R formalverification/agda-native-air \
+  -p corpus.jsonl.gz -D /abs/path/to/agda-algebras-corpus-v0.1
+gunzip -k /abs/path/to/agda-algebras-corpus-v0.1/corpus.jsonl.gz
 ```
 
-Then add `"--corpus", "/abs/path/to/agda-algebras-corpus.jsonl"` to the server's `args`.
-`make extract-lib` emits exactly the agda-strux JSONL schema that `--corpus` reads (one
-entry per line: name, type, kind, dependencies, …), and the server logs how many entries
-it loaded at startup, so you can confirm it took.  Retrieval is independent of the
-proof-state tools; it neither requires nor affects library registration.
+The corpus describes the library at the commit it was taken from, so a lemma your
+branch has added since is visible to the proof-state tools but not to the search tools.
+[`docs/corpora/agda-algebras-v0.1.md`](corpora/agda-algebras-v0.1.md) records its
+digests and how to rebuild it.  The server logs how many entries it loaded at startup,
+so you can confirm it took.  Retrieval is independent of the proof-state tools; it
+neither requires nor affects library registration.
 
 #### Three things to know
 
-+  **`get_goal` and `fill_hole` do not yet work on library-embedded modules.**  Both
++  **`get_goal` and `fill_hole` do not yet work on library-embedded modules**.  Both
    typecheck a temporary copy of the file; for a module that lives inside a library at a
    hierarchical path (e.g. `FLRP.Bridge` at `src/FLRP/Bridge.lagda.md`) that copy
    collides with the module's canonical file once the library is on the include path,
@@ -1098,20 +1105,21 @@ proof-state tools; it neither requires nor affects library registration.
    you build on (there all four proof-state tools work, and `get_goal` finds
    `reportGoalCtx` because the import is present); or edit the library file directly and
    verify each change with `check_file` / `get_diagnostics`.
-+  **Use absolute file paths.**  The server's working directory is agda-native-air, not
-   your project, so tool calls resolve paths from there.  Claude passes absolute paths
-   automatically from its own Read/Edit tools; just avoid hand-typing relative paths in
-   prompts.  (A registration that passes `--cwd`, as the fls template does, has moved
-   that directory to the client project, so its project-relative paths resolve too;
-   absolute remains the form that is correct under every registration.)
-+  **Match the toolchain.**  agda-mcp typechecks with this repo's pinned Agda 2.8.0 and
-   standard-library 2.3.  That is only correct if the other project is compatible with
-   those versions; confirm `agda --version` and the std-lib version line up.  A project
-   that pins its own toolchain should instead be checked with it: give the registration
-   `--agda-bin` naming that project's `agda` and `--cwd` naming its checkout root, the
-   issue-#103 pattern that [`agda-mcp/examples/fls.mcp.json`](../agda-mcp/examples/fls.mcp.json)
-   and its [README section](../agda-mcp/examples/README.md#flsmcpjson) implement for
-   formal-ledger-specifications.
++  **Use absolute file paths**.  Claude passes absolute paths automatically from its own
+   Read/Edit tools; just avoid hand-typing relative paths in prompts.  Both templates
+   pass `--cwd`, which moves the server's working directory to the client project, so
+   project-relative paths resolve there too; a registration without `--cwd` leaves the
+   server in agda-native-air, and resolves them here.  Absolute is the form that is
+   correct under every registration.
++  **Match the toolchain**.  The server checks with the Agda its registration names.
+   Both templates name the client project's own, with `--agda-bin` naming that
+   project's `agda` and `--cwd` naming its checkout: the issue-#103 pattern that
+   [`agda-mcp/examples/fls.mcp.json`](../agda-mcp/examples/fls.mcp.json) introduced
+   for formal-ledger-specifications (see its
+   [README section](../agda-mcp/examples/README.md#flsmcpjson)).  A registration
+   without `--agda-bin` checks with this repo's pinned Agda 2.8.0 and standard-library
+   2.3, which is correct only if the other project is compatible with those versions;
+   confirm `agda --version` and the std-lib version line up.
 
 #### Web UI
 
@@ -1130,11 +1138,24 @@ once the workflow is proven, but for a first sanity test the terminal is far sim
 `-i agda-dojang/agda` so that Agda can find the AgdaDojang macros.  Double-check the
 flags match the example above.
 
-**"Library 'agda-algebras' not found" on another project**.  The library is not
-registered in this repo's `agda/libraries`.  Set `env.AGDA_ALGEBRAS_ROOT` in your
-`.mcp.json` to the exact worktree you are editing (it must contain a `*.agda-lib`) and
-**fully restart** Claude Code; see *Library registration and the search corpus* in
-§13.5 for the two common causes.
+**A `rootMismatch` naming this repo's `agda/libraries`, on another project**.  The
+registration passes no `--library-file`, so the server read this repository's
+registry, which places agda-algebras at the flake-pinned store copy, and refused a file
+in your worktree.  Pass the registry the client's Agda actually reads, as the template
+does; see *Which Agda checks your files* in §13.5.
+
+**`Library 'agda-dojang' not found` on another project**.  Agda found no `.agda-lib`
+above the directory the server runs in (or, for the lane tools, above the file), so it
+fell back to this repository's `$AGDA_DIR/defaults`, which names `agda-dojang`, and the
+registration's registry has no such library.  Start Claude Code
+inside a checkout of the project, and keep scratch modules inside it; see the
+[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).
+
+**"Libraries file not found" on another project**.  The `--library-file` in the
+registration names a path that is gone, usually a gc-root that was never built on this
+machine.  Run the two `nix build` lines in the
+[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson), and **fully
+restart** Claude Code.
 
 **"ModuleDefinedInOtherFile" from `get_goal` / `fill_hole` on a library file**.  This is
 the known limitation tracked in
