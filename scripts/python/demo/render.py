@@ -7,14 +7,16 @@ Description: Render the demo site's page from the data `make demo-data`
 
 ## What the page claims, and what it does not
 
-  The sessions on the page come from the project's first agent measurement
-  (Issue #154), in which every subject had the server and nothing else.  So
-  they are evidence of what a frontier model does *with* the tools, and of
+  The sessions on the page come from the project's agent measurement
+  (Issue #154) as re-run with fixture headers that carry no hints (Issue
+  #219), in which every subject had the server and nothing else.  So they
+  are evidence of what a frontier model does *with* the tools, and of
   nothing about whether the tools help: that is the control's question
-  (Issue #162), which the numbers section sets beside them, read from its own
-  reports and checked against ADR 0001 § 9 like the archived arms' table.
-  Issue #215 brought
-  the page's framing up to that record, under the following rules:
+  (Issue #162), run the same day under the same protocol, which the numbers
+  section sets beside them, read from its own reports and checked against
+  ADR 0001 § 9 like the agents' table.  Issue #215 brought the page's
+  framing up to that record, under the following rules, and Issue #219 kept
+  them:
 
     +  The header carries no solve count.  It says what the page is (the
        sessions, their calls, the suite they come from), because a solve
@@ -109,9 +111,9 @@ from typing import (Any, Dict, Iterable, List, Mapping, Optional, Sequence,
 #: The repository this page belongs to, for the links back to the evidence.
 REPO_URL = "https://github.com/formalverification/agda-native-air"
 
-#: The page's own title.  It names no tool count: thirteen was true of the
-#: sessions it replays and is not true of the server since PR #161 added a
-#: fourteenth, so a count here would be false of one or the other.
+#: The page's own title.  It names no tool count: the server has grown from
+#: thirteen tools to fourteen (PR #161) between the runs the page has
+#: replayed, and a count in the title would go stale with the next one.
 TITLE = "agda-native-air: an agent, Agda, and the tools between them"
 HEADLINE = "An agent, Agda, and the tools between them"
 

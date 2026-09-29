@@ -512,8 +512,8 @@ def test_the_header_says_what_the_page_is(built) -> None:
 
 
 def test_the_title_names_no_tool_count(built) -> None:
-    # Thirteen was true of these sessions and is not of the server since
-    # PR #161; the title says neither.
+    # The server has had thirteen tools and fourteen (PR #161) across the
+    # runs this page has replayed; the title says neither.
     for said in (render.TITLE, render.HEADLINE):
         assert not re.search(r"\d|thirteen|fourteen", said.lower()), said
 

@@ -58,11 +58,19 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    judge's (`GoldVerifier.agdaCommand`, `--safe` included), names
    `agda --interaction-json` in one sentence with no protocol documentation,
    and gives the path of the row's corpus JSONL; its rules add one, that
-   every command runs in the directory the file is in.
+   every command runs in the directory the file is in.  Since PR [#200] the
+   shell and `both` prompts also name each registered library's source
+   directory, and the directory of Agda's own `Agda.Builtin` and
+   `Agda.Primitive` modules, and say not to search the rest of the
+   filesystem; the header-free arms of 2026-09-29 are the first archived
+   runs with that prompt.
 +  **Read roots**, the same on every arm.  Besides its own directory, a
    subject may read every registered library's directory and source roots and
    the Agda registry directory, whose `libraries` file the judge's command
-   names; the file tools reach them through `--add-dir`.  This is why the
+   names, and since PR [#200] the directory of Agda's primitive modules
+   (`lib/prim` under `agda --print-agda-data-dir`), which three [#162]
+   subjects searched `/` for; the file tools reach them through
+   `--add-dir`.  This is why the
    arms are comparable: the archived `mcp` arm refused eleven library-source
    reads for Sonnet and two for Opus as a confinement side effect, and a
    shell arm that can `cat` a module while the server arm cannot would
@@ -141,7 +149,7 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 | path | contents |
 |---|---|
 | `report.json` | the run: `config` (model, caps, every client flag, the prompts' digests, the client version), `corpora` (paths and digests), `totals`, `perTier`, `perStratum` (each with `solved`, `restated`, and `solvedOriginalInView`, which is `null` on a slice with no original), `perTool`, and one `outcomes[]` entry per obligation (`solved`, `restated`, `gate`, `restatementEvidence`, `original`, `addedImports`, `terminal`, `turns`, `toolCalls`, `wallMs`, `costUsd`, `tokens`, `isolation`, `agdaExit`) |
-| `results.jsonl` | one `eval-proof-completion.v0` attempt row per `fill_hole` the subject probed |
+| `results.jsonl` | one `eval-proof-completion.v0` attempt row per `fill_hole` the subject probed, the refused ones included: a reply that was an error (no hole at the address the call named, or no address) or that the strict reader could not decode is a row with `status` `crash`, `elapsedMs` 0, and `rc` -1, the reader's defaults, with no `agda` run behind it (`Audit.attemptRows`); a run whose subjects never called `fill_hole`, such as every `shell` arm, has an empty file |
 | `fixtures.jsonl` | one `eval-proof-completion.v0` fixture row per obligation, plus `restated`, `gate`, and `terminal` |
 | `prompts/` | the system prompt and the user-prompt template, verbatim |
 | `subjects/<id>/transcript.jsonl` | the client's `stream-json` output: every tool call with its result, the model's text, the init and result records |
