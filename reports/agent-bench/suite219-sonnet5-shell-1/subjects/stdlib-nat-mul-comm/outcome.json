@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-comm",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-comm",
+  "goal" : "∀ (m n : ℕ) → m * n ≡ n * m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 14966,
+  "costUsd" : 0.04243380000000001,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1387,
+    "cacheRead" : 35319,
+    "cacheCreation" : 5371
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 1940,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n : ℕ) → m * n ≡ n * m",
+    "final" : "(m n : ℕ) → m * n ≡ n * m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-comm/final/Nat-mul-comm.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-comm/transcript.jsonl",
+  "lastWords" : "The type-checking command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.72,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

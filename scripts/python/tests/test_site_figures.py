@@ -38,6 +38,7 @@ from scripts.python.site.figures_hook import (
     count,
     figure,
     final_checks_statement_kept,
+    haystack_unqueried,
     knowledge_tool_calls,
     report_loader,
     resolve_pointer,
@@ -53,7 +54,8 @@ REPO = Path(__file__).resolve().parents[3]
 
 def _outcome(**fields: Any) -> Dict[str, Any]:
     base: Dict[str, Any] = {"benchmarkId": "row", "solved": False, "original": None,
-                            "agdaExit": 0, "statement": {"equal": True}}
+                            "agdaExit": 0, "statement": {"equal": True},
+                            "stratum": "agda-stdlib", "toolCalls": {"Read": 1}}
     return {**base, **fields}
 
 
@@ -78,6 +80,14 @@ REPORT: Dict[str, Any] = {
         _outcome(benchmarkId="d", statement={"equal": False}, original={"inView": False}),
         # solved, no original
         _outcome(benchmarkId="e", solved=True),
+        # haystack rows: solved asking nothing; solved after a search; unsolved
+        _outcome(benchmarkId="h1", solved=True, stratum="agda-stdlib/haystack",
+                 toolCalls={"Read": 1, "Edit": 1, "mcp__agda__check_file": 1}),
+        _outcome(benchmarkId="h2", solved=True, stratum="agda-stdlib/haystack",
+                 toolCalls={"Read": 1, "mcp__agda__search_by_name": 1,
+                            "mcp__agda__check_file": 1}),
+        _outcome(benchmarkId="h3", stratum="agda-stdlib/haystack",
+                 toolCalls={"Read": 1, "Edit": 1}),
     ],
 }
 
@@ -121,9 +131,10 @@ def test_only_a_count_is_a_figure() -> None:
 # ---------------------------------------------------------- derived figures
 
 def test_the_derived_figures_count_what_they_say() -> None:
-    assert final_checks_statement_kept(REPORT).unwrap() == 3   # a, b, e
+    assert final_checks_statement_kept(REPORT).unwrap() == 6   # a, b, e, h1-h3
     assert rows_with_original(REPORT).unwrap() == 2            # a, d
-    assert rows_without_original(REPORT).unwrap() == 3         # b, c, e
+    assert rows_without_original(REPORT).unwrap() == 6         # b, c, e, h1-h3
+    assert haystack_unqueried(REPORT).unwrap() == 1            # h1
     assert solved_with_original(REPORT).unwrap() == 1          # a
     assert knowledge_tool_calls(REPORT).unwrap() == 6          # type_of, search_by_name, search_in_scope
 
@@ -134,6 +145,20 @@ def test_a_derived_figure_refuses_a_report_without_its_fields() -> None:
     assert "'original'" in rows_with_original(bare).unwrap_err()
     assert knowledge_tool_calls({}).is_err
     assert final_checks_statement_kept({}).is_err
+    assert "'stratum'" in haystack_unqueried(bare).unwrap_err()
+
+
+def test_the_haystack_figure_is_the_demos_quiet_count() -> None:
+    # The landing page's haystack bullet and the demo's haystack section
+    # count one thing; on the archive the two readings must agree, for a run
+    # with the needle named in the header and one without (Issue #219).
+    from scripts.python.demo.numbers import quiet
+    load = report_loader(REPO)
+    for run, expected in (("agent-sonnet5-1", 11),
+                          ("suite219-sonnet5-mcp-1", 3)):
+        report = load(run).unwrap()
+        assert haystack_unqueried(report).unwrap() == expected
+        assert quiet(report)["quiet"] == expected
 
 
 def test_every_derived_figure_is_reachable_by_name() -> None:
@@ -157,7 +182,7 @@ def test_the_hard_tier_headline_is_not_the_solved_count() -> None:
 def test_markers_are_replaced_by_their_figures() -> None:
     page = ("Solved @fig(run-1 /totals/solved) of @fig(run-1 /totals/total); "
             "kept @fig(run-1 final-checks-statement-kept).\n")
-    assert substitute_figures(page, True, LOAD).unwrap() == "Solved 2 of 5; kept 3.\n"
+    assert substitute_figures(page, True, LOAD).unwrap() == "Solved 2 of 5; kept 6.\n"
 
 
 def test_a_page_without_markers_is_returned_as_is() -> None:

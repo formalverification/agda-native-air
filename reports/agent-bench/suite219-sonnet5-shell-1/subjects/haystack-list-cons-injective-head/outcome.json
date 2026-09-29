@@ -1,0 +1,79 @@
+{
+  "benchmarkId" : "haystack-list-cons-injective-head",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "∷-injective-head",
+  "goal" : "∀ {A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 2,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 34400,
+  "costUsd" : 0.043566799999999996,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1117,
+    "cacheRead" : 46364,
+    "cacheCreation" : 5776
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2776,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
+  "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
+  "lastWords" : "The Agda type-check command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.76,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

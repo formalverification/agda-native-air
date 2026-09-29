@@ -1,0 +1,80 @@
+{
+  "benchmarkId" : "haystack-nat-plus-zero-diag",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-zero-diag",
+  "goal" : "∀ (m : ℕ) → m + m ≡ 0 → m ≡ 0",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Relation.Binary.PropositionalEquality using ( _≡_ )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 3,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 28439,
+  "costUsd" : 0.06642340000000001,
+  "tokens" : {
+    "input" : 12,
+    "output" : 2608,
+    "cacheRead" : 60097,
+    "cacheCreation" : 7075
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 1918,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
+  "lastWords" : "The file now type-checks successfully with no errors or warnings, confirming Agda's batch verdict is success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

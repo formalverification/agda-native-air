@@ -1,0 +1,88 @@
+{
+  "benchmarkId" : "algebras-kernels-ker-in-con",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Kernels.ker-in-con",
+    "target:Function.Base.id"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "ker-in-con′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ} {x y : Setoid.Carrier 𝔻[ 𝑨 ]} →  proj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 2,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 4,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 40034,
+  "costUsd" : 0.08795240000000001,
+  "tokens" : {
+    "input" : 14,
+    "output" : 2011,
+    "cacheRead" : 83892,
+    "cacheCreation" : 12759
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 3
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 4823,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda",
+  "transcriptPath" : "subjects/algebras-kernels-ker-in-con/transcript.jsonl",
+  "lastWords" : "The judge command reports success (clean type-check with no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

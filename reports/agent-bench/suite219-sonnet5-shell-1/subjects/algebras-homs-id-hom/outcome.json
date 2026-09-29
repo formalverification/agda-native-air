@@ -1,0 +1,90 @@
+{
+  "benchmarkId" : "algebras-homs-id-hom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.𝒾𝒹",
+    "target:Setoid.Functions.Basic.𝑖𝑑",
+    "target:Setoid.Homomorphisms.Basic.mkIsHom"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "𝒾𝒹′",
+  "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} → hom 𝑨 𝑨",
+  "solved" : false,
+  "restated" : true,
+  "restatementEvidence" : [
+    "ref Setoid.Homomorphisms.Basic.𝒾𝒹"
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 4,
+    "reads" : 2,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 6,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 24031,
+  "costUsd" : 0.08800480000000001,
+  "tokens" : {
+    "input" : 18,
+    "output" : 1838,
+    "cacheRead" : 105284,
+    "cacheCreation" : 12133
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 5
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5904,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-id-hom/final/Homs-id-hom.agda",
+  "transcriptPath" : "subjects/algebras-homs-id-hom/transcript.jsonl",
+  "lastWords" : "The file type-checks successfully — Agda reports no errors, confirming `agda --safe` verifies the completed module with the hole filled by `𝒾𝒹`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.74,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

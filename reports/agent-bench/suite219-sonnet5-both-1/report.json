@@ -1,0 +1,5594 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "suite219-sonnet5-both-1",
+  "timestamp" : "2026-09-29T07:02:06.135108541Z",
+  "rejudged" : false,
+  "config" : {
+    "arm" : "both",
+    "parallelism" : 3,
+    "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
+    "resume" : false,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "model" : "claude-sonnet-5",
+    "maxTurns" : 30,
+    "wallCapSec" : 900,
+    "maxBudgetUsd" : 3.00,
+    "safe" : true,
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "claudeVersion" : "2.1.282 (Claude Code)",
+    "claudeFlags" : [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--max-turns",
+      "30",
+      "--max-budget-usd",
+      "3.00",
+      "--strict-mcp-config",
+      "--tools",
+      "Bash,Edit,Read",
+      "--allowedTools",
+      "mcp__agda,Bash",
+      "--permission-mode",
+      "acceptEdits",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--restricted",
+      "--add-dir",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda",
+      "--no-session-persistence"
+    ],
+    "envAdded" : {
+      "MCP_TIMEOUT" : "120000",
+      "ENABLE_TOOL_SEARCH" : "false"
+    },
+    "envRemovedPrefix" : "CLAUDE",
+    "tools" : [
+      "Bash",
+      "Edit",
+      "Read",
+      "mcp__agda__get_goal",
+      "mcp__agda__fill_hole",
+      "mcp__agda__check_file",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__check_project",
+      "mcp__agda__type_of",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__get_dependencies"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda-dojang",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda-dojang/agda",
+      "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+      "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda"
+    ],
+    "persistSessions" : false,
+    "inputs" : {
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "62092c1da926245a38cb3cfff81b72c6c45ab6c10987a6145a058ac9592e89e0"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/reports/agent-bench/.bin-219/agda-mcp",
+        "sha256" : "800324ca97484822568635f0ebc500d16ac3fdeae1a66500a9f8cd4e61ad90d3"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/reports/agent-bench/.bin-219/agda-json",
+        "sha256" : "004b79b66b05c465cd19133fd1978361eb6eaed459cb28ecec47a9afb7f43439"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "de2f42f8575031ee9c01dc6c2f13cfcbf15db7519955ee9f257d19a487811f8f"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "obligations" : 55,
+  "totals" : {
+    "total" : 55,
+    "solved" : 48,
+    "restated" : 5,
+    "solvedOriginalInView" : 11,
+    "gates" : {
+      "preservation" : 2
+    },
+    "anomalies" : 0,
+    "turns" : 353,
+    "toolCalls" : 298,
+    "wallMs" : 1664904,
+    "costUsd" : 4.133
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 16,
+      "solved" : 16,
+      "restated" : 0,
+      "solvedOriginalInView" : 3,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 86,
+      "toolCalls" : 70,
+      "wallMs" : 388144,
+      "costUsd" : 0.892
+    },
+    "compositional" : {
+      "total" : 25,
+      "solved" : 20,
+      "restated" : 4,
+      "solvedOriginalInView" : 5,
+      "gates" : {
+        "preservation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 159,
+      "toolCalls" : 134,
+      "wallMs" : 729787,
+      "costUsd" : 1.828
+    },
+    "non-obvious" : {
+      "total" : 14,
+      "solved" : 12,
+      "restated" : 1,
+      "solvedOriginalInView" : 3,
+      "gates" : {
+        "preservation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 108,
+      "toolCalls" : 94,
+      "wallMs" : 546973,
+      "costUsd" : 1.414
+    }
+  },
+  "perStratum" : {
+    "agda-stdlib" : {
+      "total" : 22,
+      "solved" : 21,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "preservation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 97,
+      "toolCalls" : 75,
+      "wallMs" : 527465,
+      "costUsd" : 1.079
+    },
+    "agda-algebras/using" : {
+      "total" : 11,
+      "solved" : 11,
+      "restated" : 0,
+      "solvedOriginalInView" : 7,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 108,
+      "toolCalls" : 97,
+      "wallMs" : 431898,
+      "costUsd" : 1.260
+    },
+    "agda-algebras/wholesale" : {
+      "total" : 10,
+      "solved" : 5,
+      "restated" : 5,
+      "solvedOriginalInView" : 4,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 80,
+      "toolCalls" : 70,
+      "wallMs" : 331918,
+      "costUsd" : 0.946
+    },
+    "agda-stdlib/haystack" : {
+      "total" : 12,
+      "solved" : 11,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        "preservation" : 1
+      },
+      "anomalies" : 0,
+      "turns" : 68,
+      "toolCalls" : 56,
+      "wallMs" : 373623,
+      "costUsd" : 0.848
+    }
+  },
+  "perTool" : {
+    "Bash" : 84,
+    "Edit" : 65,
+    "Read" : 58,
+    "mcp__agda__check_file" : 58,
+    "mcp__agda__fill_hole" : 10,
+    "mcp__agda__type_of" : 7,
+    "mcp__agda__get_goal" : 6,
+    "mcp__agda__exports_of" : 4,
+    "mcp__agda__search_by_name" : 4,
+    "mcp__agda__resolve_name" : 1,
+    "mcp__agda__search_by_type" : 1
+  },
+  "perShell" : {
+    "corpus-grep" : 1,
+    "library-read" : 83
+  },
+  "perVia" : {
+    "mcp" : 33,
+    "both" : 22
+  },
+  "perVerdictVia" : {
+    "mcp" : 55
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "stdlib-nat-plus-identity-l",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-identityˡ",
+      "goal" : "∀ (n : ℕ) → 0 + n ≡ n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 23059,
+      "costUsd" : 0.0420026,
+      "tokens" : {
+        "input" : 8,
+        "output" : 629,
+        "cacheRead" : 71123,
+        "cacheCreation" : 5368
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 984,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → 0 + n ≡ n",
+        "final" : "(n : ℕ) → 0 + n ≡ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-identity-l/final/Nat-plus-identityL.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-identity-l/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks with `refl` filling the hole.",
+      "rateLimit" : {
+        "maxUtilization" : 0.76,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-bool-not-involutive",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "not-involutive",
+      "goal" : "∀ (b : Bool) → not (not b) ≡ b",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 21299,
+      "costUsd" : 0.041530000000000004,
+      "tokens" : {
+        "input" : 8,
+        "output" : 604,
+        "cacheRead" : 71030,
+        "cacheCreation" : 5317
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1021,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(b : Bool) → not (not b) ≡ b",
+        "final" : "(b : Bool) → not (not b) ≡ b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-bool-not-involutive/final/Bool-not-involutive.agda",
+      "transcriptPath" : "subjects/stdlib-bool-not-involutive/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.76,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-unit-trivial",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "standalone"
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "trivial",
+      "goal" : "⊤",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 21681,
+      "costUsd" : 0.040496599999999994,
+      "tokens" : {
+        "input" : 8,
+        "output" : 558,
+        "cacheRead" : 70803,
+        "cacheCreation" : 5185
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 230,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "⊤",
+        "final" : "⊤",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
+      "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.76,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-prod-mk-pair",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "standalone"
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "mk-pair",
+      "goal" : "{A B : Set} → A → B → A × B",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 16533,
+      "costUsd" : 0.040993600000000005,
+      "tokens" : {
+        "input" : 8,
+        "output" : 579,
+        "cacheRead" : 70918,
+        "cacheCreation" : 5251
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 200,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B : Set} → A → B → A × B",
+        "final" : "{A B : Set} → A → B → A × B",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-prod-mk-pair/final/Prod-mk-pair.agda",
+      "transcriptPath" : "subjects/stdlib-prod-mk-pair/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-maybe-map-nothing",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "map-nothing",
+      "goal" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 18219,
+      "costUsd" : 0.0417022,
+      "tokens" : {
+        "input" : 8,
+        "output" : 612,
+        "cacheRead" : 71071,
+        "cacheCreation" : 5338
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 909,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
+        "final" : "{A B : Set} {f : A → B} → map f nothing ≡ nothing",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-maybe-map-nothing/final/Maybe-map-nothing.agda",
+      "transcriptPath" : "subjects/stdlib-maybe-map-nothing/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-list-length-nil",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "standalone"
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "length-[]",
+      "goal" : "{A : Set} → length {A = A} [] ≡ 0",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 20116,
+      "costUsd" : 0.0413144,
+      "tokens" : {
+        "input" : 8,
+        "output" : 599,
+        "cacheRead" : 70962,
+        "cacheCreation" : 5279
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 935,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} → length [] ≡ 0",
+        "final" : "{A : Set} → length [] ≡ 0",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-list-length-nil/final/List-length-nil.agda",
+      "transcriptPath" : "subjects/stdlib-list-length-nil/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with `refl` filling the hole.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-zero-lt-suc",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "0<1+n",
+      "goal" : "∀ {n : ℕ} → 0 < suc n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 19343,
+      "costUsd" : 0.0421882,
+      "tokens" : {
+        "input" : 8,
+        "output" : 641,
+        "cacheRead" : 71131,
+        "cacheCreation" : 5384
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 321,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{n : ℕ} → 0 < suc n",
+        "final" : "{n : ℕ} → 0 < suc n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
+      "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-plus-comm",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-comm",
+      "goal" : "∀ (m n : ℕ) → m + n ≡ n + m",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.PropositionalEquality using ( trans )"
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 19528,
+      "costUsd" : 0.045156400000000006,
+      "tokens" : {
+        "input" : 8,
+        "output" : 839,
+        "cacheRead" : 71312,
+        "cacheCreation" : 5622
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2107,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m + n ≡ n + m",
+        "final" : "(m n : ℕ) → m + n ≡ n + m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully: the verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-plus-identity-r",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-identityʳ",
+      "goal" : "∀ (n : ℕ) → n + 0 ≡ n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 19842,
+      "costUsd" : 0.0441982,
+      "tokens" : {
+        "input" : 8,
+        "output" : 782,
+        "cacheRead" : 71211,
+        "cacheCreation" : 5530
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 865,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → n + 0 ≡ n",
+        "final" : "(n : ℕ) → n + 0 ≡ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-identity-r/final/Nat-plus-identityR.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-identity-r/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully with no holes — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-plus-suc",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-suc",
+      "goal" : "∀ (m n : ℕ) → m + suc n ≡ suc (m + n)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 17001,
+      "costUsd" : 0.041720400000000005,
+      "tokens" : {
+        "input" : 8,
+        "output" : 611,
+        "cacheRead" : 71072,
+        "cacheCreation" : 5345
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 888,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+        "final" : "(m n : ℕ) → m + suc n ≡ suc (m + n)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-suc/final/Nat-plus-suc.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-suc/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-plus-assoc",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-assoc",
+      "goal" : "∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 24281,
+      "costUsd" : 0.044497400000000006,
+      "tokens" : {
+        "input" : 8,
+        "output" : 805,
+        "cacheRead" : 71217,
+        "cacheCreation" : 5547
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 849,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+        "final" : "(m n p : ℕ) → m + n + p ≡ m + (n + p)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-assoc/final/Nat-plus-assoc.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-assoc/transcript.jsonl",
+      "lastWords" : "The verdict is success: the file type-checks with exit code 0 and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-mul-zero-r",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "*-zeroʳ",
+      "goal" : "∀ (n : ℕ) → n * 0 ≡ 0",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 23174,
+      "costUsd" : 0.04536640000000001,
+      "tokens" : {
+        "input" : 8,
+        "output" : 865,
+        "cacheRead" : 71222,
+        "cacheCreation" : 5614
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 880,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → n * 0 ≡ 0",
+        "final" : "(n : ℕ) → n * 0 ≡ 0",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-mul-zero-r/final/Nat-mul-zeroR.agda",
+      "transcriptPath" : "subjects/stdlib-nat-mul-zero-r/transcript.jsonl",
+      "lastWords" : "The verdict is success: the file type-checks cleanly with no holes or errors.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-mul-identity-r",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "*-identityʳ",
+      "goal" : "∀ (n : ℕ) → n * 1 ≡ n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 26077,
+      "costUsd" : 0.0475868,
+      "tokens" : {
+        "input" : 8,
+        "output" : 1021,
+        "cacheRead" : 71524,
+        "cacheCreation" : 5764
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 975,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(n : ℕ) → n * 1 ≡ n",
+        "final" : "(n : ℕ) → n * 1 ≡ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-mul-identity-r/final/Nat-mul-identityR.agda",
+      "transcriptPath" : "subjects/stdlib-nat-mul-identity-r/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with no holes or errors.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-list-length-append",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "length-++",
+      "goal" : "∀ {A : Set} (xs ys : List A) → length (xs ++ ys) ≡ length xs + length ys",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 18080,
+      "costUsd" : 0.0442206,
+      "tokens" : {
+        "input" : 8,
+        "output" : 793,
+        "cacheRead" : 71153,
+        "cacheCreation" : 5511
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1033,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+        "final" : "{A : Set} (xs ys : List A) →\nlength (xs ++ ys) ≡ length xs + length ys",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-list-length-append/final/List-length-append.agda",
+      "transcriptPath" : "subjects/stdlib-list-length-append/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks cleanly with no holes and no diagnostics.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-list-map-id",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "map-id",
+      "goal" : "∀ {A : Set} (xs : List A) → map id xs ≡ xs",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 22488,
+      "costUsd" : 0.042434999999999994,
+      "tokens" : {
+        "input" : 8,
+        "output" : 678,
+        "cacheRead" : 71035,
+        "cacheCreation" : 5358
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 915,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+        "final" : "{A : Set} (xs : List A) → map id xs ≡ xs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-list-map-id/final/List-map-id.agda",
+      "transcriptPath" : "subjects/stdlib-list-map-id/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-list-append-assoc",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "++-assoc",
+      "goal" : "∀ {A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ (ys ++ zs)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 21186,
+      "costUsd" : 0.0422108,
+      "tokens" : {
+        "input" : 8,
+        "output" : 646,
+        "cacheRead" : 71114,
+        "cacheCreation" : 5378
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 993,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
+        "final" : "{A : Set} (xs ys zs : List A) → (xs ++ ys) ++ zs ≡ xs ++ ys ++ zs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-list-append-assoc/final/List-append-assoc.agda",
+      "transcriptPath" : "subjects/stdlib-list-append-assoc/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks with no holes or errors.",
+      "rateLimit" : {
+        "maxUtilization" : 0.77,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-list-map-compose",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "map-compose",
+      "goal" : "∀ {A B C : Set} (f : B → C) (g : A → B) (xs : List A) → map (f ∘ g) xs ≡ map f (map g xs)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 23725,
+      "costUsd" : 0.04184860000000001,
+      "tokens" : {
+        "input" : 8,
+        "output" : 614,
+        "cacheRead" : 71103,
+        "cacheCreation" : 5368
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1056,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B C : Set} (f : B → C) (g : A → B) (xs : List A) →\nmap (f ∘ g) xs ≡ map f (map g xs)",
+        "final" : "{A B C : Set} (f : B → C) (g : A → B) (xs : List A) →\nmap (f ∘ g) xs ≡ map f (map g xs)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-list-map-compose/final/List-map-compose.agda",
+      "transcriptPath" : "subjects/stdlib-list-map-compose/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-mul-comm",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "*-comm",
+      "goal" : "∀ (m n : ℕ) → m * n ≡ n * m",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.PropositionalEquality using ( trans )"
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 3,
+        "Edit" : 4,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 40235,
+      "costUsd" : 0.1082796,
+      "tokens" : {
+        "input" : 20,
+        "output" : 2884,
+        "cacheRead" : 204178,
+        "cacheCreation" : 9641
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 3
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2277,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m * n ≡ n * m",
+        "final" : "(m n : ℕ) → m * n ≡ n * m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-mul-comm/final/Nat-mul-comm.agda",
+      "transcriptPath" : "subjects/stdlib-nat-mul-comm/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully: the verdict is success (exit code 0) with no holes or diagnostics remaining.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-mul-distrib-r",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "*-distribʳ-+",
+      "goal" : "∀ (m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "preservation",
+      "gateDetail" : "import line changed or missing: open import Relation.Binary.PropositionalEquality using ( _≡_ ; refl ; cong ; sym )",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 33264,
+      "costUsd" : 0.0637788,
+      "tokens" : {
+        "input" : 8,
+        "output" : 2132,
+        "cacheRead" : 72814,
+        "cacheCreation" : 6970
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2223,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+        "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-mul-distrib-r/final/Nat-mul-distribR.agda",
+      "transcriptPath" : "subjects/stdlib-nat-mul-distrib-r/transcript.jsonl",
+      "lastWords" : "The module type-checks successfully — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-mul-distrib-l",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "*-distribˡ-+",
+      "goal" : "∀ (m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.PropositionalEquality using ( trans )"
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 26363,
+      "costUsd" : 0.0537798,
+      "tokens" : {
+        "input" : 8,
+        "output" : 1432,
+        "cacheRead" : 72099,
+        "cacheCreation" : 6256
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2142,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+        "final" : "(m n p : ℕ) → m * (n + p) ≡ m * n + m * p",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-mul-distrib-l/final/Nat-mul-distribL.agda",
+      "transcriptPath" : "subjects/stdlib-nat-mul-distrib-l/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks with no errors or open holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-nat-mul-assoc",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "*-assoc",
+      "goal" : "∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.PropositionalEquality using ( trans )"
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "Edit" : 3,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 47894,
+      "costUsd" : 0.0783918,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1993,
+        "cacheRead" : 135529,
+        "cacheCreation" : 7832
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2333,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+        "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
+      "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — the verdict is success (exit code 0, no diagnostics, no holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "stdlib-dec-map",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "map′",
+      "goal" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 24077,
+      "costUsd" : 0.0454448,
+      "tokens" : {
+        "input" : 8,
+        "output" : 912,
+        "cacheRead" : 71064,
+        "cacheCreation" : 5524
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 195,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+        "final" : "{A B : Set} → (A → B) → (B → A) → Dec A → Dec B",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-dec-map/final/Dec-map.agda",
+      "transcriptPath" : "subjects/stdlib-dec-map/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — the verdict is success (exit code 0, no diagnostics, no remaining holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-overture-lift-lower",
+      "difficulty" : "routine",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "universe-polymorphic",
+        "restates:Overture.Basic.lift∼lower"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "lift∼lower",
+      "goal" : "{a b : Level} {A : Set a} → lift ∘ lower ≡ 𝑖𝑑 (Lift b A)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 5,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__fill_hole" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 4,
+      "wallMs" : 29053,
+      "costUsd" : 0.05457,
+      "tokens" : {
+        "input" : 10,
+        "output" : 1141,
+        "cacheRead" : 91760,
+        "cacheCreation" : 6197
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 800,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+        "final" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-overture-lift-lower/final/Overture-lift-lower.agda",
+      "transcriptPath" : "subjects/algebras-overture-lift-lower/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks with `lift∼lower = refl`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-overture-lower-lift",
+      "difficulty" : "routine",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "universe-polymorphic",
+        "restates:Overture.Basic.lower∼lift"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "lower∼lift",
+      "goal" : "{a b : Level} {A : Set a} → lower {a}{b} ∘ lift ≡ 𝑖𝑑 A",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 19062,
+      "costUsd" : 0.0418442,
+      "tokens" : {
+        "input" : 8,
+        "output" : 602,
+        "cacheRead" : 71201,
+        "cacheCreation" : 5392
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 719,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+        "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda",
+      "transcriptPath" : "subjects/algebras-overture-lower-lift/transcript.jsonl",
+      "lastWords" : "The verdict is success: the file type-checks with `refl` filling the hole.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-overture-proj-op",
+      "difficulty" : "routine",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Overture.Operations.π"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "π",
+      "goal" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Operations.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 17626,
+      "costUsd" : 0.0710074,
+      "tokens" : {
+        "input" : 16,
+        "output" : 1136,
+        "cacheRead" : 153157,
+        "cacheCreation" : 7246
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 246,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+        "final" : "{𝓥 a : Level} {I : Set 𝓥} {A : Set a} → I → Op I A",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-overture-proj-op/final/Overture-proj-op.agda",
+      "transcriptPath" : "subjects/algebras-overture-proj-op/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.78,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-functions-lift-lower",
+      "difficulty" : "routine",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "universe-polymorphic",
+        "restates:Setoid.Functions.Basic.lift∼lower",
+        "target:Relation.Binary.Bundles.Setoid.refl"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "lift∼lower′",
+      "goal" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ) (a : Lift β (Setoid.Carrier 𝑨)) →  Setoid._≈_ (𝑙𝑖𝑓𝑡 {𝑨 = 𝑨} β) (lift (lower a)) a",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__get_goal" : 2,
+        "mcp__agda__search_by_name" : 1,
+        "mcp__agda__fill_hole" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 37929,
+      "costUsd" : 0.0723488,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1476,
+        "cacheRead" : 135164,
+        "cacheCreation" : 7632
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3588,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+        "final" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-functions-lift-lower/final/Functions-lift-lower.agda",
+      "transcriptPath" : "subjects/algebras-functions-lift-lower/transcript.jsonl",
+      "lastWords" : "The file now type-checks with exit code 0 and no holes: the verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-inverses-image-f-f",
+      "difficulty" : "routine",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Functions.Inverses.Imagef∋f",
+        "target:Setoid.Functions.Inverses.Image_∋_.eq",
+        "target:Relation.Binary.Bundles.Setoid.refl"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "Imagef∋f′",
+      "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} (F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →  Image F ∋ (Func.to F a)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 5,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 6,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 26693,
+      "costUsd" : 0.09411320000000001,
+      "tokens" : {
+        "input" : 20,
+        "output" : 1710,
+        "cacheRead" : 199006,
+        "cacheCreation" : 9293
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 6
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3091,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-inverses-image-f-f/final/Inverses-image-f-f.agda",
+      "transcriptPath" : "subjects/algebras-inverses-image-f-f/transcript.jsonl",
+      "lastWords" : "The file now type-checks with exit code 0 and no holes: the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-inverses-inv-inverse-l",
+      "difficulty" : "routine",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Functions.Inverses.InvIsInverseˡ",
+        "target:Relation.Binary.Bundles.Setoid.refl"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "InvIsInverseˡ′",
+      "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →  Setoid._≈_ 𝑨 (Inv F {b = Func.to F a} Imagef∋f) a",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 2,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 3,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 31193,
+      "costUsd" : 0.0893272,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1385,
+        "cacheRead" : 145666,
+        "cacheCreation" : 11579
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 3
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3085,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda",
+      "transcriptPath" : "subjects/algebras-inverses-inv-inverse-l/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully: the verdict is success with exit code 0 and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-surjective-surjinv-inverse-r",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Functions.Surjective.SurjInvIsInverseʳ",
+        "target:Setoid.Functions.Inverses.InvIsInverseʳ"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "SurjInvIsInverseʳ′",
+      "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} (f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →  Setoid._≈_ 𝑩 (Func.to f (SurjInv f fE b)) b",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Surjective.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__type_of" : 3,
+        "mcp__agda__get_goal" : 1,
+        "mcp__agda__fill_hole" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 33786,
+      "costUsd" : 0.0895868,
+      "tokens" : {
+        "input" : 16,
+        "output" : 2140,
+        "cacheRead" : 160354,
+        "cacheCreation" : 9021
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3075,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-surjective-surjinv-inverse-r/final/Surjective-surjinv-inverse-r.agda",
+      "transcriptPath" : "subjects/algebras-surjective-surjinv-inverse-r/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with no errors and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-injective-comp-injective",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Functions.Injective.⊙-injective",
+        "target:Function.Base._∘_"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "⊙-injective′",
+      "goal" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →  IsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "mcp__agda__get_goal" : 1,
+        "mcp__agda__fill_hole" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 29070,
+      "costUsd" : 0.102737,
+      "tokens" : {
+        "input" : 20,
+        "output" : 1681,
+        "cacheRead" : 209115,
+        "cacheCreation" : 11016
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3023,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+        "final" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda",
+      "transcriptPath" : "subjects/algebras-injective-comp-injective/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-homs-id-hom",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.𝒾𝒹",
+        "target:Setoid.Functions.Basic.𝑖𝑑",
+        "target:Setoid.Homomorphisms.Basic.mkIsHom"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "𝒾𝒹′",
+      "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} → hom 𝑨 𝑨",
+      "solved" : false,
+      "restated" : true,
+      "restatementEvidence" : [
+        "ref Setoid.Homomorphisms.Basic.𝒾𝒹"
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 3,
+        "reads" : 2,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 30953,
+      "costUsd" : 0.0902954,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1415,
+        "cacheRead" : 143467,
+        "cacheCreation" : 11856
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5713,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+        "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → hom 𝑨 𝑨",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-homs-id-hom/final/Homs-id-hom.agda",
+      "transcriptPath" : "subjects/algebras-homs-id-hom/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully with `𝒾𝒹′ {𝑨 = 𝑨} = 𝒾𝒹` (reusing the library's built-in identity homomorphism) — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-homs-comp-hom",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Homomorphisms.Properties.⊙-hom",
+        "target:Setoid.Functions.Basic._⊙_",
+        "target:Setoid.Homomorphisms.Properties.⊙-is-hom"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "⊙-hom′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  hom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Properties.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 6,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 12,
+      "toolCalls" : {
+        "Read" : 2,
+        "Bash" : 6,
+        "mcp__agda__fill_hole" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 11,
+      "wallMs" : 42897,
+      "costUsd" : 0.1324822,
+      "tokens" : {
+        "input" : 24,
+        "output" : 2624,
+        "cacheRead" : 260411,
+        "cacheCreation" : 13528
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 6
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5988,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\nhom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-homs-comp-hom/final/Homs-comp-hom.agda",
+      "transcriptPath" : "subjects/algebras-homs-comp-hom/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully with no holes and no errors: success is true.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-homs-mon-to-hom",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.mon→hom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.HomReduct"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "mon→hom′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → hom 𝑨 𝑩",
+      "solved" : false,
+      "restated" : true,
+      "restatementEvidence" : [
+        "ref Setoid.Homomorphisms.Basic.mon→hom"
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 6,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__exports_of" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 5,
+      "wallMs" : 26923,
+      "costUsd" : 0.0873884,
+      "tokens" : {
+        "input" : 10,
+        "output" : 1146,
+        "cacheRead" : 106702,
+        "cacheCreation" : 13642
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5347,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda",
+      "transcriptPath" : "subjects/algebras-homs-mon-to-hom/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-inverses-range-to-image",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Functions.Inverses.IsInRange→IsInImage",
+        "target:Setoid.Functions.Inverses.Image_∋_.eq",
+        "target:Relation.Binary.Bundles.Setoid.sym"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "IsInRange→IsInImage′",
+      "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →  IsInRange F b → Image F ∋ b",
+      "solved" : false,
+      "restated" : true,
+      "restatementEvidence" : [
+        "ref Setoid.Functions.Inverses.IsInRange→IsInImage"
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 40066,
+      "costUsd" : 0.09351019999999999,
+      "tokens" : {
+        "input" : 16,
+        "output" : 1583,
+        "cacheRead" : 161741,
+        "cacheCreation" : 11325
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3483,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
+        "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {b : Setoid.Carrier 𝑩} →\nIsInRange F b → Image F ∋ b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-inverses-range-to-image/final/Inverses-range-to-image.agda",
+      "transcriptPath" : "subjects/algebras-inverses-range-to-image/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — the verdict is success (exit code 0, no diagnostics, no holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-subalgebras-sup-refl",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Subalgebras.Properties.≥-refl",
+        "target:Function.Base._∘_",
+        "target:Setoid.Subalgebras.Properties.≅→≤",
+        "target:Setoid.Homomorphisms.Isomorphisms.≅-sym"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "≥-refl′",
+      "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra {𝑆 = 𝑆} α ρᵃ} →  𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 4,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 28081,
+      "costUsd" : 0.078698,
+      "tokens" : {
+        "input" : 16,
+        "output" : 1350,
+        "cacheRead" : 156650,
+        "cacheCreation" : 8459
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5856,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+        "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-subalgebras-sup-refl/final/Subalgebras-sup-refl.agda",
+      "transcriptPath" : "subjects/algebras-subalgebras-sup-refl/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully: verdict is success with exit code 0 and no holes or diagnostics.",
+      "rateLimit" : {
+        "maxUtilization" : 0.79,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-subalgebras-sup-trans",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Subalgebras.Properties.≥-trans",
+        "target:Setoid.Subalgebras.Properties.≤-trans"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "≥-trans′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 5,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 5,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 32873,
+      "costUsd" : 0.095109,
+      "tokens" : {
+        "input" : 18,
+        "output" : 1491,
+        "cacheRead" : 182295,
+        "cacheCreation" : 10926
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 5
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 7580,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≥ 𝑩 → 𝑩 ≥ 𝑪 → 𝑨 ≥ 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-subalgebras-sup-trans/final/Subalgebras-sup-trans.agda",
+      "transcriptPath" : "subjects/algebras-subalgebras-sup-trans/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.8,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-homs-mon-to-intohom",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.mon→intohom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.isHom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.isInjective"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "mon→intohom′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → Σ[ h ∈ hom 𝑨 𝑩 ] IsInjective (proj₁ h)",
+      "solved" : false,
+      "restated" : true,
+      "restatementEvidence" : [
+        "ref Setoid.Homomorphisms.Basic.mon→intohom"
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 1,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 2,
+        "mcp__agda__exports_of" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 39536,
+      "costUsd" : 0.09389600000000001,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1734,
+        "cacheRead" : 148700,
+        "cacheCreation" : 11697
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 2
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6132,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda",
+      "transcriptPath" : "subjects/algebras-homs-mon-to-intohom/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully with exit code 0 and no holes or diagnostics — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.8,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-kernels-quotient-proj-hom",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Homomorphisms.Kernels.πhom",
+        "target:Setoid.Homomorphisms.Basic.epi→hom",
+        "target:Setoid.Homomorphisms.Kernels.πepi"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "πhom′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) (θ : Con 𝑨 ℓ) →  hom 𝑨 (𝑨 ╱ θ)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 3,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 11,
+      "toolCalls" : {
+        "Read" : 2,
+        "mcp__agda__type_of" : 2,
+        "Bash" : 2,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 10,
+      "wallMs" : 64012,
+      "costUsd" : 0.14518999999999999,
+      "tokens" : {
+        "input" : 20,
+        "output" : 3551,
+        "cacheRead" : 227760,
+        "cacheCreation" : 16022
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 2
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6552,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → (θ : Con 𝑨 ℓ) → hom 𝑨 (𝑨 ╱ θ)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-kernels-quotient-proj-hom/final/Kernels-quotient-proj-hom.agda",
+      "transcriptPath" : "subjects/algebras-kernels-quotient-proj-hom/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully with exit code 0 and no diagnostics or holes — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.8,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-subalgebras-sub-reflexive",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Subalgebras.Properties.≤-reflexive",
+        "target:Setoid.Homomorphisms.Basic.𝒾𝒹",
+        "target:Setoid.Functions.Injective.id-is-injective"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "≤-reflexive′",
+      "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} →  𝑨 ≤ 𝑨",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "read",
+        "at" : 4,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 4,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 26533,
+      "costUsd" : 0.08077999999999999,
+      "tokens" : {
+        "input" : 16,
+        "output" : 1375,
+        "cacheRead" : 157610,
+        "cacheCreation" : 8869
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 4
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6485,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
+        "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ} → 𝑨 ≤ 𝑨",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-subalgebras-sub-reflexive/final/Subalgebras-sub-reflexive.agda",
+      "transcriptPath" : "subjects/algebras-subalgebras-sub-reflexive/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully with exit code 0, so the verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.8,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-subalgebras-sub-trans",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Subalgebras.Properties.≤-trans",
+        "target:Setoid.Homomorphisms.Properties.⊙-hom",
+        "target:Setoid.Functions.Injective.⊙-injective"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "≤-trans′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 13,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 7,
+        "mcp__agda__fill_hole" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 12,
+      "wallMs" : 55025,
+      "costUsd" : 0.17955079999999998,
+      "tokens" : {
+        "input" : 26,
+        "output" : 3745,
+        "cacheRead" : 324924,
+        "cacheCreation" : 19266
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 7
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6110,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-subalgebras-sub-trans/final/Subalgebras-sub-trans.agda",
+      "transcriptPath" : "subjects/algebras-subalgebras-sub-trans/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks with exit code 0 and no holes or diagnostics.",
+      "rateLimit" : {
+        "maxUtilization" : 0.8,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-subalgebras-sub-trans-iso",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Subalgebras.Properties.≤-trans-≅",
+        "target:Setoid.Homomorphisms.Properties.⊙-hom",
+        "target:Setoid.Functions.Injective.⊙-injective",
+        "target:Setoid.Homomorphisms.Isomorphisms.≅toInjective"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "≤-trans-≅′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →  𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+      "solved" : false,
+      "restated" : true,
+      "restatementEvidence" : [
+        "ref Setoid.Subalgebras.Properties.≤-trans-≅"
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 7,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 13,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 9,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 12,
+      "wallMs" : 50389,
+      "costUsd" : 0.1801034,
+      "tokens" : {
+        "input" : 26,
+        "output" : 2591,
+        "cacheRead" : 326647,
+        "cacheCreation" : 22203
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "corpus-grep" : 1,
+          "library-read" : 8
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6429,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} {𝑪 : Algebra γ ρᶜ} →\n𝑨 ≤ 𝑩 → 𝑩 ≅ 𝑪 → 𝑨 ≤ 𝑪",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-subalgebras-sub-trans-iso/final/Subalgebras-sub-trans-iso.agda",
+      "transcriptPath" : "subjects/algebras-subalgebras-sub-trans-iso/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks cleanly with no errors, warnings, or remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-kernels-ker-con",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:using",
+        "restates:Setoid.Homomorphisms.Kernels.kercon",
+        "target:Overture.Relations.kerRel",
+        "target:Overture.Relations.kerRelOfEquiv",
+        "target:Setoid.Homomorphisms.Kernels.HomKerComp",
+        "target:Setoid.Congruences.Basic.mkcon"
+      ],
+      "stratum" : "agda-algebras/using",
+      "hole" : "kercon′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) →  Con 𝑨 ρᵇ",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 9,
+        "reads" : 1,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 19,
+      "toolCalls" : {
+        "Read" : 2,
+        "Bash" : 10,
+        "mcp__agda__get_goal" : 1,
+        "mcp__agda__type_of" : 2,
+        "mcp__agda__fill_hole" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 18,
+      "wallMs" : 80413,
+      "costUsd" : 0.2687712,
+      "tokens" : {
+        "input" : 38,
+        "output" : 5292,
+        "cacheRead" : 542516,
+        "cacheCreation" : 26818
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 10
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 5730,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-kernels-ker-con/final/Kernels-ker-con.agda",
+      "transcriptPath" : "subjects/algebras-kernels-ker-con/transcript.jsonl",
+      "lastWords" : "The file now type-checks with exit code 0 and no holes: the verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-kernels-ker-in-con",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Kernels.ker-in-con",
+        "target:Function.Base.id"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "ker-in-con′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ} {x y : Setoid.Carrier 𝔻[ 𝑨 ]} →  proj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : {
+        "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+        "inView" : true,
+        "how" : "result",
+        "at" : 1,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 5,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 4,
+      "wallMs" : 21703,
+      "costUsd" : 0.0645472,
+      "tokens" : {
+        "input" : 10,
+        "output" : 909,
+        "cacheRead" : 97486,
+        "cacheCreation" : 8985
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 6637,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) {θ : Con 𝑨 ℓ}\n{x y : Setoid.Carrier 𝔻[ 𝑨 ]} →\nproj₁ (kercon (πhom h θ)) x y → proj₁ θ x y",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-kernels-ker-in-con/final/Kernels-ker-in-con.agda",
+      "transcriptPath" : "subjects/algebras-kernels-ker-in-con/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks with `ker-in-con′ h = id`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-plus-suc-diag",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "+-suc-diag",
+      "goal" : "∀ (m : ℕ) → m + suc m ≡ suc (m + m)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 24521,
+      "costUsd" : 0.04595880000000001,
+      "tokens" : {
+        "input" : 8,
+        "output" : 886,
+        "cacheRead" : 71514,
+        "cacheCreation" : 5695
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2040,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+        "final" : "(m : ℕ) → m + suc m ≡ suc (m + m)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-plus-suc-diag/final/Nat-plus-suc-diag.agda",
+      "transcriptPath" : "subjects/haystack-nat-plus-suc-diag/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully — the verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-plus-zero-diag",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "+-zero-diag",
+      "goal" : "∀ (m : ℕ) → m + m ≡ 0 → m ≡ 0",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Nat.Base using ( zero ; suc )",
+        "open import Relation.Binary.PropositionalEquality using ( refl )"
+      ],
+      "terminal" : "completed",
+      "turns" : 6,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__get_goal" : 1,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 5,
+      "wallMs" : 41188,
+      "costUsd" : 0.08981800000000001,
+      "tokens" : {
+        "input" : 12,
+        "output" : 3213,
+        "cacheRead" : 116900,
+        "cacheCreation" : 8571
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2340,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+        "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
+      "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully: the verdict on the final file is success (exit code 0, no holes, no diagnostics).",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-plus-mono-diag",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "+-mono-diag",
+      "goal" : "∀ {m n : ℕ} → m ≤ n → m + m ≤ n + n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 5,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__search_by_name" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 4,
+      "wallMs" : 27641,
+      "costUsd" : 0.0574252,
+      "tokens" : {
+        "input" : 10,
+        "output" : 930,
+        "cacheRead" : 93966,
+        "cacheCreation" : 7328
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2645,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
+        "final" : "{m n : ℕ} → m ≤ n → m + m ≤ n + n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-plus-mono-diag/final/Nat-plus-mono-diag.agda",
+      "transcriptPath" : "subjects/haystack-nat-plus-mono-diag/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — verdict success is true (exit code 0, no holes, no diagnostics).",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-mul-mono-sq",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "*-mono-sq",
+      "goal" : "∀ {m n : ℕ} → m ≤ n → m * m ≤ n * n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Nat.Properties using ( *-mono-≤ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 2,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 27693,
+      "costUsd" : 0.076945,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1722,
+        "cacheRead" : 135425,
+        "cacheCreation" : 8153
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 2
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2499,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+        "final" : "{m n : ℕ} → m ≤ n → m * m ≤ n * n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-mul-mono-sq/final/Nat-mul-mono-sq.agda",
+      "transcriptPath" : "subjects/haystack-nat-mul-mono-sq/transcript.jsonl",
+      "lastWords" : "The module type-checks successfully: verdict is success (exit code 0) with no holes or diagnostics.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-plus-monus-assoc",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "+-∸-assoc-diag",
+      "goal" : "∀ {m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 5,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 4,
+      "wallMs" : 26114,
+      "costUsd" : 0.0607842,
+      "tokens" : {
+        "input" : 10,
+        "output" : 1489,
+        "cacheRead" : 92971,
+        "cacheCreation" : 6820
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2449,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+        "final" : "{m n : ℕ} → m ≤ n → n + n ∸ m ≡ n + (n ∸ m)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-plus-monus-assoc/final/Nat-plus-monus-assoc.agda",
+      "transcriptPath" : "subjects/haystack-nat-plus-monus-assoc/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully: the verdict is success with exit code 0 and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-plus-mono-lt-diag",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "+-mono-<-diag",
+      "goal" : "∀ {m n : ℕ} → m < n → m + m < n + n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Nat.Properties using ( <⇒≤ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 36979,
+      "costUsd" : 0.0721282,
+      "tokens" : {
+        "input" : 8,
+        "output" : 2722,
+        "cacheRead" : 73421,
+        "cacheCreation" : 7552
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2059,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m < n → m + m < n + n",
+        "final" : "{m n : ℕ} → m < n → m + m < n + n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-plus-mono-lt-diag/final/Nat-plus-mono-lt-diag.agda",
+      "transcriptPath" : "subjects/haystack-nat-plus-mono-lt-diag/transcript.jsonl",
+      "lastWords" : "The file type-checks successfully — the verdict is success (exit code 0, no diagnostics, no remaining holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-nat-plus-le-hyp",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "m+m≤n⇒m≤n",
+      "goal" : "∀ {m n : ℕ} → m + m ≤ n → m ≤ n",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 22422,
+      "costUsd" : 0.043037,
+      "tokens" : {
+        "input" : 8,
+        "output" : 675,
+        "cacheRead" : 71335,
+        "cacheCreation" : 5501
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1973,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+        "final" : "{m n : ℕ} → m + m ≤ n → m ≤ n",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-nat-plus-le-hyp/final/Nat-plus-le-hyp.agda",
+      "transcriptPath" : "subjects/haystack-nat-plus-le-hyp/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully — the verdict is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-list-length-append-diag",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "length-++-diag",
+      "goal" : "∀ {A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.List.Properties using ( length-++ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 5,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 4,
+      "wallMs" : 29397,
+      "costUsd" : 0.0564448,
+      "tokens" : {
+        "input" : 10,
+        "output" : 1106,
+        "cacheRead" : 92584,
+        "cacheCreation" : 6712
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 3021,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+        "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
+      "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: it type-checks cleanly with `length-++-diag xs = length-++ xs` using `Data.List.Properties.length-++`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.81,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-list-cons-injective-head",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "∷-injective-head",
+      "goal" : "∀ {A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.PropositionalEquality using ( refl )"
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "Bash" : 1,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 40488,
+      "costUsd" : 0.08577379999999998,
+      "tokens" : {
+        "input" : 14,
+        "output" : 2312,
+        "cacheRead" : 137729,
+        "cacheCreation" : 8770
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          "library-read" : 1
+        }
+      },
+      "via" : "both",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2888,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+        "final" : "{A : Set} {x y : A} {xs : List A} → x ∷ xs ≡ y ∷ xs → x ≡ y",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-list-cons-injective-head/final/List-cons-injective-head.agda",
+      "transcriptPath" : "subjects/haystack-list-cons-injective-head/transcript.jsonl",
+      "lastWords" : "The file now type-checks successfully (verdict exitCode 0, success true).",
+      "rateLimit" : {
+        "maxUtilization" : 0.82,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-list-map-append-diag",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "map-++-diag",
+      "goal" : "∀ (f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+      "solved" : false,
+      "restated" : false,
+      "gate" : "preservation",
+      "gateDetail" : "import line changed or missing: open import Data.List.Properties using ( ++-assoc )",
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__search_by_name" : 1,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 35990,
+      "costUsd" : 0.0794964,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1668,
+        "cacheRead" : 138702,
+        "cacheCreation" : 8762
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2973,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+        "final" : "(f : ℕ → ℕ) (xs : List ℕ) → map f (xs ++ xs) ≡ map f xs ++ map f xs",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-list-map-append-diag/final/List-map-append-diag.agda",
+      "transcriptPath" : "subjects/haystack-list-map-append-diag/transcript.jsonl",
+      "lastWords" : "The file now type-checks cleanly with no warnings or holes: the verdict on the final file is success.",
+      "rateLimit" : {
+        "maxUtilization" : 0.82,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-bool-and-assoc-diag",
+      "difficulty" : "routine",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "∧-assoc-diag",
+      "goal" : "∀ (a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ (b ∧ a)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__resolve_name" : 1,
+        "mcp__agda__fill_hole" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 32420,
+      "costUsd" : 0.0757808,
+      "tokens" : {
+        "input" : 14,
+        "output" : 1743,
+        "cacheRead" : 135754,
+        "cacheCreation" : 7793
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1103,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+        "final" : "(a b : Bool) → (a ∧ b) ∧ a ≡ a ∧ b ∧ a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-bool-and-assoc-diag/final/Bool-and-assoc-diag.agda",
+      "transcriptPath" : "subjects/haystack-bool-and-assoc-diag/transcript.jsonl",
+      "lastWords" : "The verdict on the final file is success: the module type-checks with the hole filled by `Data.Bool.Properties.∧-assoc a b a`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.82,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "haystack-bool-and-distrib-diag",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:haystack"
+      ],
+      "stratum" : "agda-stdlib/haystack",
+      "hole" : "∧-distrib-diag",
+      "goal" : "∀ (a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 7,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__search_by_name" : 1,
+        "mcp__agda__search_by_type" : 1,
+        "mcp__agda__exports_of" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 6,
+      "wallMs" : 28770,
+      "costUsd" : 0.1047574,
+      "tokens" : {
+        "input" : 12,
+        "output" : 1774,
+        "cacheRead" : 136087,
+        "cacheCreation" : 14944
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "both",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__search_in_scope",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1357,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+        "final" : "(a b : Bool) → a ∧ (a ∨ b) ≡ a ∧ a ∨ a ∧ b",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/haystack-bool-and-distrib-diag/final/Bool-and-distrib-diag.agda",
+      "transcriptPath" : "subjects/haystack-bool-and-distrib-diag/transcript.jsonl",
+      "lastWords" : "The verdict is success: the file type-checks with no errors and no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.82,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    }
+  ]
+}

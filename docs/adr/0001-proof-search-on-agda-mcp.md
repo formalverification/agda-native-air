@@ -5,7 +5,7 @@
 File: `agda-native-air/docs/adr/0001-proof-search-on-agda-mcp.md`
 
 +  **Status**: Accepted through P2.  P0, P1, and P2 are landed on `main` and measured; P3 is direction.  The agent-in-the-loop comparison ([#154]) is measured and recorded in § 9.  Rewritten 2026-09-09 as a decision record; the explanatory companion is [`proof-search/overview.md`], which defines the vocabulary both documents use.
-+  **Date**: 2026-08-22 (P0 and P1); 2026-08-27 (P2, first measurement); 2026-09-08 (P2 re-measured after review, and measured on the agda-algebras tier); 2026-09-10 (the haystack tier measured); 2026-09-15 (the agent in the loop measured).
++  **Date**: 2026-08-22 (P0 and P1); 2026-08-27 (P2, first measurement); 2026-09-08 (P2 re-measured after review, and measured on the agda-algebras tier); 2026-09-10 (the haystack tier measured); 2026-09-15 (the agent in the loop measured); 2026-09-21 (its control); 2026-09-29 (both re-measured without the fixture headers' hints, [#219]).
 +  **Tracking**: [#113] ([M2-9]); phases [#119] (P0, PR [#121]), [#122] (P1, PR [#126]), [#123] (P2, [M2-10], PR [#130] and the stage-two measurement in its comments), [#124] (P3, direction); the benchmark instruments [#127] (the agda-algebras tier, PR [#132]), [#129], and [#142]; the hand-off [#19] ([M2-5]); the agent-in-the-loop comparison [#154] ([M1-10]).
 +  **Ancestry**: [#112], the post-mortem of the retired `search.py`, whose four lessons this design encodes as types and tests, and whose one defect it makes unrepresentable.
 
@@ -33,7 +33,7 @@ We are building a machine that proves Agda theorems by search, with Agda itself 
 +  **P2** landed retrieval over real corpora (the standard library, 55,576 rows; agda-algebras, 13,123 rows) behind the same proposer interface, and measured the honest result twice.  On the standard-library tier retrieval adds **zero** solves under target exclusion, because the ceiling binds any term-mode proposer, while the labeled control with exclusion off retrieves and commits all five admissible standard-library lemmas.  On the agda-algebras tier, built so that every gold is a single term, the fixed space solves 2 of 21, retrieval again adds zero under exclusion, and the control commits one wholesale-stratum lemma end to end; the ledgers locate the binding constraint in ranking at scale, not in the move vocabulary.  The baseline over the 43 obligations of those two tiers is **8 of 43**, byte-stable across four reproductions; with the haystack tier's twelve rows added, the fixed space stands at 8 of 55 and retrieval under exclusion at 14 of 55, by composition of the separately measured tiers (each fixture's search is independent of every other).
 +  **The haystack tier** ([#129]) is the instrument those two nulls called for: twelve standard-library obligations whose needles are import-reachable but never `using`-listed and never the answer key.  On it retrieval has its first solves under exclusion, **6 of 12** against the fixed space's 0 of 12, each attributable to retrieval by construction, and each of the six nulls pins one limitation of the placeholder ranker or the peek (§ 9).
 
-+  **The agent in the loop** ([#154]) is the comparison the loop numbers were always waiting for: a frontier model as proposer and search, driving the same server over the same 55 obligations under the same verifier, one fresh session per obligation with nothing but the thirteen tools and the one file.  Sonnet 5 solves **46 of 55** and Opus 5 **54 of 55**, against the loop's 8 of 55 (fixed space) and 14 of 55 (retrieval under exclusion); the rows the agent does not solve honestly are the ones where it looks the answer up, reported in a *restated* column (8 for Sonnet, 1 for Opus), and the standard-library rows, which every model has memorized, are read as memory plus composition (§ 9).
++  **The agent in the loop** ([#154]) is a second instrument beside the loop: a frontier model as proposer and search, driving the same server over the same 55 obligations under the same verifier, one fresh session per obligation with nothing but the server's tools and the one file.  Measured without the fixture headers' hints ([#219]), Sonnet 5 solves **44 of 55** and Opus 5 ****55 of 55****, against the loop's 8 of 55 (fixed space) and 14 of 55 (retrieval under exclusion), which is a different instrument and no baseline for them; the rows an agent does not solve honestly are the ones where it cites the library's own lemma, reported in a *restated* column (9 for Sonnet, 0 for Opus).  The first arms, with the hints in view, solved 46 and 54; the difference is § 9's last subsection.
 
 ### Where it goes
 
@@ -275,7 +275,9 @@ The terms.  A *subject* is one fresh, non-interactive Claude Code session (`clau
 +  **Turns and tool calls are the comparable columns**.  Subjects ran three at a time, so wall clocks are indicative only; the client's list-price cost is recorded per subject.
 +  **The standard-library rows measure memory**.  Their statements are standard-library lemmas in every model's training data, and their `using` lists hand the subject the key lemmas; the wholesale and haystack rows are where the subject has to find something with the tools.
 
-**Evidence**.  Runs `agent-sonnet5-1` (`claude-sonnet-5`) and `agent-opus5-1` (`claude-opus-5`), 2026-09-15, Claude Code 2.1.261, 30 turns, 900 s, and USD 3.00 per subject, parallelism 3, the stdlib v0 corpus (`14e0d47e`) for standard-library rows and the agda-algebras v0.1 corpus (`af864432`) for the others; zero anomalies in either arm; every subject ended on its own (no cap reached).  Loop columns are the fixed space and retrieval under exclusion on `main` (the composed 8 of 55 and 14 of 55 above).  The subjects' servers of these runs ran without `--safe`, which the judge applied; no final file carries a safe-flag refusal and every subject's last `check_file` verdict agrees with the judge's, so no verdict depends on it, and the harness now gives the subjects' servers the judge's flags and records each run's protocol before the first subject spawns.
+**Evidence**.  Runs `agent-sonnet5-1` (`claude-sonnet-5`) and `agent-opus5-1` (`claude-opus-5`), 2026-09-15, Claude Code 2.1.261, 30 turns, 900 s, and USD 3.00 per subject, parallelism 3, the stdlib v0 corpus (`14e0d47e`) for standard-library rows and the agda-algebras v0.1 corpus (`af864432`) for the others; zero anomalies in either arm; every subject ended on its own (no cap reached).  Loop columns are the fixed space and retrieval under exclusion on `main` (the composed 8 of 55 and 14 of 55 above).  The subjects' servers of these runs ran without `--safe`, which the judge applied; no final file carries a safe-flag refusal and every subject's last `check_file` verdict agrees with the judge's, so no verdict depends on it, and the harness now gives the subjects' servers the judge's flags and records each run's protocol before the first subject spawns.  Every subject had its fixture's header in view, and until [#219] the headers carried hints (a `Strategy:` line on every row, the haystack tier's `Needle:` line); the header-free re-run is [below](#the-header-free-arms-2026-09-29).
+
+*The agent table, 2026-09-15, fixture headers' hints in view.*
 
 | stratum | n | loop fixed | loop retrieval | Sonnet 5 solved | Sonnet 5 restated | Opus 5 solved | Opus 5 restated |
 |---|---|---|---|---|---|---|---|
@@ -306,7 +308,9 @@ Every subject of § 9's arms had the server and nothing else, so those numbers s
 +  **The `both` arm is not a tie-breaker but the measurement**, through two columns the report gains: `via` per row (which instruments the subject used) and `verdictVia` (which gave it its last verdict), with the run's Bash calls counted by class.
 +  **The judge does not change**, and neither does the report shape; a run id is one arm, recorded in `protocol.json` and in each subject's own `subject.json` with the roots it was given, so a re-judge audits a run under the arm it ran with.
 
-**Evidence**.  Runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1` (`claude-sonnet-5`, 2026-09-21, Claude Code 2.1.261, one arm at a time at one protocol version, 30 turns, 900 s and USD 3.00 per subject, parallelism 3, the same two corpora); zero anomalies in all three; USD 12.41 together.
+**Evidence**.  Runs `arm162-shell-1`, `arm162-mcp-1`, `arm162-both-1` (`claude-sonnet-5`, 2026-09-21, Claude Code 2.1.261, one arm at a time at one protocol version, 30 turns, 900 s and USD 3.00 per subject, parallelism 3, the same two corpora); zero anomalies in all three; USD 12.41 together.  The fixture headers' hints were in view on every arm; the header-free re-run is [below](#the-header-free-arms-2026-09-29).
+
+*The attribution table, 2026-09-21, fixture headers' hints in view.*
 
 | stratum | n | archive `mcp` | `shell` | `mcp` | `both` |
 |---|---|---|---|---|---|
@@ -326,6 +330,49 @@ Turns and tool calls are the comparable columns (308, 342, 327 and 253, 287, 272
 Two qualifications the numbers carry.  Five rows across the two shell-bearing arms failed the isolation gate, and every one of those files type-checks with its statement preserved and no restatement evidence, so 50 and 51 are lower bounds and the files earned 54 and 52; three of the five are subjects hunting for Agda's own primitive modules (`Agda.Builtin.*`, which ship in Agda's data directory and belong to no registered library, so no read root contains them) by searching the filesystem, and two are the audit refusing `xargs`, which takes its paths from standard input and so names none the reader can account for.  Neither was changed while the comparison ran, because one audit across three arms is what makes them comparable.  And the `mcp` arm re-run reproduces the archive: 7 of 55 rows differ and they cancel, to 47 and 6 against 46 and 8, inside the variance the two Opus seeds already document, so the three protocol differences from the archive moved nothing measurable (the fourteenth tool `search_in_scope` from PR [#161], presented on every server-arm subject and called zero times; the readable library sources; the subjects' servers carrying the judge's `--safe`).
 
 **Status**.  Adopted and measured ([#162]).  ADR 0002 § 12's honest pattern stands and is sharpened: the server's value on this suite is the verdict, which is latency and a structured answer, and which the `both` arm shows an agent will not give up; its retrieval and knowledge surface is not merely reproducible by a shell but worse than one here, and that gap is worth six restatements.  The work it points at is [#17], retrieval as server tools, whose first rung is the thing a shell does best and the server cannot do at all, searching the library's own sources.  Open: the read roots omit Agda's primitive sources, and the audit does not model `xargs`; both are recorded on [#162] and cost no sweep to fix, since a re-judge re-audits every arm.  Opus arms are not run, since Opus is at 54 of 55 with the server and its control could only move the restated column and the cost.
+
+### The header-free arms (2026-09-29)
+
+(See also [#219], [#220], [#221], [`reports/agent-bench/README.md`], and [`docs/reading-the-results.md`] § 4.6.)
+
+The two tables above were measured with the fixture headers' hints in view.  A subject works on a byte-for-byte copy of its obligation, and until [#219] each obligation's header carried a `Strategy:` line sketching the proof, the haystack tier's a `Needle:` line naming the lemma the tier asks a searcher to find, and the mined tiers' a `Source:` line naming the module that holds the original.  Neither the loop nor the judge reads comments, so no loop number and no archived verdict moves; what the headers changed is what a subject was told.  They are now stripped from every tier ([#220], [#221]), each tier's README keeps what they said, and the four arms behind the two tables were run again without them.
+
+**Decision**.  Every agent number is measured on fixtures whose headers carry no hints, and the dated tables above stay as the evidence they were.
+
++  **A fixture's header names the file and the obligation, and nothing else**: no `Source:`, `Strategy:`, `Haystack:`, `Needle:`, or `Note:` line, which `FixtureHeadersSpec` asserts over every index row.
++  **The re-run replaces; the archive keeps**.  The run table marks every run before 2026-09-29 "hints in view", and a number quoted anywhere is the header-free run's where one exists.
++  **The protocol is otherwise the current one, not the first arms'**: fourteen tools, lean answers ([#184]) and the trimmed surface ([#191]), readable library sources, `--safe` on the subjects' servers, client 2.1.282, and, on the two arms with a shell, a prompt that names each library's source directory (PR [#200]).  So the Sonnet `mcp` arm is the one clean comparison, against the two [#191] seeds with the hints (`arm-surface-mcp-1` and `-2`: 48 and 45 solved, 7 and 8 restated), and every other arm has one seed a side and more than one variable.
+
+**Evidence**.  Runs `suite219-sonnet5-mcp-1`, `suite219-sonnet5-shell-1`, and `suite219-sonnet5-both-1` (`claude-sonnet-5`) and `suite219-opus5-mcp-1` (`claude-opus-5`), 2026-09-29, Claude Code 2.1.282, the 55 rows named by `--ids` (the index now holds 81), 30 turns, 900 s, and USD 3.00 per subject, parallelism 3, one arm at a time from one frozen server, extractor, and class snapshot, the same two corpora; each arm after a two-row cost pair (`cost-suite219-*`); zero anomalies; USD 18.61 for the four.
+
+*The agent table, 2026-09-29, fixture headers stripped of hints.*
+
+| stratum | n | loop fixed | loop retrieval | Sonnet 5 solved | Sonnet 5 restated | Opus 5 solved | Opus 5 restated |
+|---|---|---|---|---|---|---|---|
+| agda-stdlib | 22 | 6 | 6 | 21 | 0 | 22 | 0 |
+| agda-stdlib/haystack | 12 | 0 | 6 | 12 | 0 | 12 | 0 |
+| agda-algebras/using | 11 | 2 | 2 | 9 | 1 | 11 | 0 |
+| agda-algebras/wholesale | 10 | 0 | 0 | 2 | 8 | 10 | 0 |
+| **total** | 55 | 8 | 14 | **44** | 9 | **55** | 0 |
+
+*The attribution table, 2026-09-29, fixture headers stripped of hints.*
+
+| stratum | n | `shell` | `mcp` | `both` |
+|---|---|---|---|---|
+| agda-stdlib | 22 | 22 solved | 21 solved | 21 solved |
+| agda-stdlib/haystack | 12 | 11 solved | 12 solved | 11 solved |
+| agda-algebras/using | 11 | 10 solved | 9 solved, 1 restated | 11 solved |
+| agda-algebras/wholesale | 10 | 4 solved, 4 restated | 2 solved, 8 restated | 5 solved, 5 restated |
+| **total** | 55 | **47 solved, 4 restated** | **44 solved, 9 restated** | **48 solved, 5 restated** |
+
+The `mcp` column is the agent table's Sonnet arm.  Turns (`shell`, `mcp`, `both`, Opus `mcp`): 345, 347, 353, 323; tool calls 290, 292, 298, 268; USD 3.42, 3.99, 4.13, 7.07.  Every gated row's file type-checks with its statement kept: the `shell` arm's four are two `find /` searches (although the prompt names the directories), one `xargs` the audit does not model, and one edited `using` list; the `mcp` and `both` arms' two each are edited `using` lists, one of them appending the original it then cites.  Four readings.
+
++  **The haystack tier's route was the header's**.  Every arm still solves all twelve rows or all but one (an edited `using` list), but with the `Needle:` line in view the Sonnet `mcp` arms solved 8 to 11 of them with no query before the final check (11 in `agent-sonnet5-1`), and header-free 3, with `search_by_name` called on eight rows; the needle was named before any search on 12 of 12 rows in every Sonnet arm with the hints and on 7, 6, and 6 without them.  § 9's reading of the first arms, the needle "named qualified from memory", was on most rows the header; without it the model searched, and the server's search found the needle.
++  **About three agda-algebras rows per Sonnet arm move from solved to restated**, in the same direction in every arm: `shell` 18 and 0 to 14 and 4, `mcp` 14 and 7 (or 13 and 8) to 11 and 9, `both` 19 and 2 to 16 and 5.  On those rows the `Strategy:` line named the proof's shape in a word (`pairing`, `application`, `constructor`); in both shell-bearing arms the subject had the original's proof in view on every row that moved, with the headers and without them, and wrote it out only when the shape was named.  The restated rule cannot see a transcription (§ 9's attribution readings), so on these rows the header decided which column a found answer landed in.
++  **The rest did not move**: the 34 rows with no original solve 33, 33, and 32 (32 to 34 with the hints); the `both` arm again took all 55 verdicts from `check_file`, ran `agda` on the shell never, and left the knowledge tools beside the shell (`definition_of` 0 calls against 11 in the `mcp` arm, `search_by_name` 4 against 21); and the shell arm still solves at least as many rows as the server arm (47 against 44) and restates fewer (4 against 9).
++  **Opus**.  Opus 5 moved the other way: 54 solved and 1 restated with the hints (both seeds), 55 and 0 header-free, its one restatement (`algebras-homs-mon-to-hom`) now written out without the original in view; one row on one seed a side is not a finding, and the arm sits at the suite's ceiling.  Its haystack route is its own: header-free it asked before its final check on 11 of the 12 rows (7 with the hints), but with 15 `fill_hole` probes and 3 `type_of` calls on lemmas it named itself and no search call, naming the needle before any search on 10 of 12 (11 with the hints).  For Opus the needle came from memory; for Sonnet, on most rows, from the header.  Its protocol differs from `agent-opus5-1`'s in everything [#162], [#184], and [#191] changed, and it cost USD 7.07 against 9.14.
+
+**Status**.  Adopted ([#219]).  The demo and the project site read these two tables (the demo finds each by its caption, since the dated tables above share their headers) and the guide's § 4.6 carries the comparison with the hinted runs.  Open: the hard tier's three Opus arms ([`docs/reading-the-results.md`] § 4.5; this record quotes none of them) were measured with proof sketches in their headers, and their re-run is [#219]'s runs 2 and 3; and each haystack obligation keeps one inline comment under its module line ("The haystack: reachable qualified; the `using` list holds decoys only"), which names no lemma and was in view in these runs.
 
 ## 10.  Where it is going
 
@@ -360,6 +407,7 @@ Two qualifications the numbers carry.  Five rows across the two shell-bearing ar
 | 19 | `idf-unfold` is the deterministic scorer; the default stays `token-overlap` so published numbers reproduce | Adopted ([#19]); the name rule re-instated after PR [#152]'s review un-confounded its knob | 9/33 fair targets and 12/21 originals in the top eight against 1/33 and 5/21; every rule pinned on corpus rows in `RetrieveSpec` |
 | 20 | The agent in the loop is a second instrument under the loop's verifier and report shape: one fresh session per obligation with the thirteen tools and one file, isolation verified per transcript, a restated column for a looked-up lemma, turns and tool calls as the comparable columns, and every fact about the final file Agda's own answer (check_file under --safe, agda-strux's elaborated types and body references) | Adopted ([#154]) | Sonnet 5 46/55 and Opus 5 54/55 against the loop's 14/55, 8 and 1 restated, zero anomalies; `JudgeSpec` over all 55 pairs, `TranscriptSpec` on a captured stream, `AgentBenchIntegrationSpec` (§ 9) |
 | 21 | The server is measured against its own control: an arm is one instrument (`shell`, `mcp`, `both`), the libraries' sources are readable on every arm, a shell arm is confined by a conservative audit over the paths its commands name rather than by the client, which cannot confine Bash, and the report gains `via`, `verdictVia`, and Bash calls by class | Adopted ([#162]) | Sonnet 5: shell 50/55 and 0 restated, mcp 47/55 and 6, both 51/55 and 2, zero anomalies; the `both` arm takes all 55 verdicts from `check_file` and runs `agda` on the shell never, `definition_of` 19 calls against 0; `ShellAuditSpec` written before the parser (§ 9) |
+| 22 | Every agent number is measured on fixtures whose headers carry no hints (no `Source:`, `Strategy:`, `Haystack:`, `Needle:`, or `Note:` line); the arms measured with them stay archived, dated, and marked | Adopted ([#219]) | Header-free, Sonnet 5 `mcp` 44/55 and 9 restated against 48 and 45 with the hints; the haystack tier solved with no query on 3 of 12 rows against 8 to 11; about three agda-algebras rows per Sonnet arm from solved to restated; `FixtureHeadersSpec` over every index row (§ 9) |
 
 ## References
 
@@ -395,6 +443,12 @@ Two qualifications the numbers carry.  Five rows across the two shell-bearing ar
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#83]: https://github.com/formalverification/agda-native-air/issues/83
+[#200]: https://github.com/formalverification/agda-native-air/pull/200
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#221]: https://github.com/formalverification/agda-native-air/pull/221
+[#220]: https://github.com/formalverification/agda-native-air/pull/220
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
 
 [`proof-search/overview.md`]: ../proof-search/overview.md
 [`agda-mcp/agda-mcp-interaction-lane.md`]: ../agda-mcp/agda-mcp-interaction-lane.md

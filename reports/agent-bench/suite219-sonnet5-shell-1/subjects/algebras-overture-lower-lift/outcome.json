@@ -1,0 +1,87 @@
+{
+  "benchmarkId" : "algebras-overture-lower-lift",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "universe-polymorphic",
+    "restates:Overture.Basic.lower∼lift"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "lower∼lift",
+  "goal" : "{a b : Level} {A : Set a} → lower {a}{b} ∘ lift ≡ 𝑖𝑑 A",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 9002,
+  "costUsd" : 0.0344888,
+  "tokens" : {
+    "input" : 8,
+    "output" : 829,
+    "cacheRead" : 34754,
+    "cacheCreation" : 4808
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 896,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "final" : "{a b : Level} {A : Set a} → (λ r → lower r) ∘ lift ≡ 𝑖𝑑 A",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-overture-lower-lift/final/Overture-lower-lift.agda",
+  "transcriptPath" : "subjects/algebras-overture-lower-lift/transcript.jsonl",
+  "lastWords" : "The command reports success: the file type-checks cleanly with no errors or warnings.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -164,15 +164,21 @@ As of September 2026 the following are built, measured, and in use.
 +  **An agent in the loop, measured**
    ([#154](https://github.com/formalverification/agda-native-air/issues/154)):
    a frontier model driving the server over the 55 library obligations, one
-   fresh session per obligation with the thirteen tools and the one file,
-   judged by the gold verifier's own `agda` invocation.  Sonnet 5 solves 46
-   of 55 and Opus 5 solves 54 of 55 with the server; with a shell holding the
-   same `agda` and no server, Sonnet 5 solves 50 and restates none, and given
-   both it takes every verdict from `check_file` and never runs `agda` itself
+   fresh session per obligation with the server's tools and the one file,
+   judged by the gold verifier's own `agda` invocation.  On fixtures whose
+   headers carry no hints
+   ([#219](https://github.com/formalverification/agda-native-air/issues/219)),
+   Sonnet 5 solves 44 of 55 and Opus 5 solves 55 of 55 with the
+   server; with a shell holding the same `agda` and no server, Sonnet 5
+   solves 47 and restates 4, and given both it takes every verdict from
+   `check_file` and never runs `agda` itself
    ([#162](https://github.com/formalverification/agda-native-air/issues/162)).
-   That zero is not construction: the shell arm could read the library, and
-   had the original's proof in view for 15 of its 18 agda-algebras solves
+   Neither count is construction: the shell arm could read the library, and
+   had the original's proof in view for 12 of its 14 agda-algebras solves
    ([#188](https://github.com/formalverification/agda-native-air/issues/188)).
+   Every earlier run had the headers' hints in view, a sketch of each proof
+   and, on one tier, the lemma the proof needs; with them the three counts
+   were 46, 54, and 50, and that tier was solved mostly without a query.
    The tools' descriptions had been cut by the client at 2,048 characters in
    every earlier arm; trimmed to their contracts
    ([#191](https://github.com/formalverification/agda-native-air/issues/191)),

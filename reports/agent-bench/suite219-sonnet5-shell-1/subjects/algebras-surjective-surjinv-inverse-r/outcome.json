@@ -1,0 +1,88 @@
+{
+  "benchmarkId" : "algebras-surjective-surjinv-inverse-r",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Functions.Surjective.SurjInvIsInverseʳ",
+    "target:Setoid.Functions.Inverses.InvIsInverseʳ"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "SurjInvIsInverseʳ′",
+  "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} (f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →  Setoid._≈_ 𝑩 (Func.to f (SurjInv f fE b)) b",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Surjective.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 1,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 2,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 24402,
+  "costUsd" : 0.04429160000000001,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1059,
+    "cacheRead" : 47048,
+    "cacheCreation" : 6068
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 3149,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(f : Func 𝑨 𝑩) (fE : IsSurjective f) {b : Setoid.Carrier 𝑩} →\n(𝑩 Setoid.≈ Func.to f (SurjInv f fE b)) b",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-surjective-surjinv-inverse-r/final/Surjective-surjinv-inverse-r.agda",
+  "transcriptPath" : "subjects/algebras-surjective-surjinv-inverse-r/transcript.jsonl",
+  "lastWords" : "The command reports success: the module type-checks with no errors.",
+  "rateLimit" : {
+    "maxUtilization" : 0.74,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

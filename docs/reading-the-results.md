@@ -52,7 +52,9 @@ One fresh, non-interactive `claude -p` session per obligation, given the
 thirteen (since PR [#161], fourteen) `agda-mcp` tools plus Read and Edit on a
 single staged file, **no shell**, under caps of 30 turns, 900 s, and USD 3.00
 per subject ([#154], [`reports/agent-bench/README.md`]).  Every agent number
-published before 2026-09-21 is this arm.
+published before 2026-09-21 is this arm.  Until 2026-09-29 the staged file
+carried its fixture's header, and the header carried hints (§ 4.6); the
+arm's current numbers are the header-free runs of that day.
 
 ### 1.3  The agent with a shell: the `shell` arm
 
@@ -134,6 +136,11 @@ for the second.
    (§ 3.2).  A measurement "under exclusion" is fair; one "with exclusion off"
    is a labeled control that shows the machinery works.
 +  **Needle**: on the haystack tier, the one lemma the gold needs.
++  **Header hints**: the comment lines at the top of a fixture that, until
+   [#219], sketched the proof (`Strategy:`), named the needle (`Needle:`),
+   or named the module holding the original (`Source:`).  A subject works
+   on a byte-for-byte copy of its fixture, so every run before 2026-09-29
+   had them in view; the runs of that day had none (§ 4.6).
 
 ## 3.  The tools, in two classes
 
@@ -209,7 +216,10 @@ loop's ability to commit it.  It does not test a model.
 ## 4.  The numbers, each with its line back
 
 Every run below reported zero anomalies.  Run ids are the harness's own;
-"recorded" says where the table lives.
+"recorded" says where the table lives.  Every agent run dated before
+2026-09-29 had the fixture headers' hints in view; the `suite219-*` runs of
+that day had none, and where the two differ, the header-free number is the
+one quoted (§ 4.6).
 
 ### 4.1  The loop
 
@@ -257,34 +267,80 @@ edge, stated.
 
 | what | number | instrument | run id | recorded |
 |---|---|---|---|---|
-| Sonnet 5, `mcp` arm | **46 solved, 8 restated**, 1 preservation gate; 327 turns, 272 calls, USD 4.62 | § 1.2, 13 tools | `agent-sonnet5-1` | [ADR 0001] § 9, [`reports/agent-bench/`] |
-| Opus 5, `mcp` arm | **54 solved, 1 restated**; 325 turns, 270 calls, USD 9.14 | same | `agent-opus5-1` | same |
-| Opus 5, second seed | 54 solved, 1 restated, the same rows; 338 turns, 283 calls | same | `agent-opus5-2` | same |
+| Sonnet 5, `mcp` arm, header-free | **44 solved, 9 restated**, 2 preservation gates; 347 turns, 292 calls, USD 3.99 | § 1.2, 14 tools | `suite219-sonnet5-mcp-1` | [ADR 0001] § 9, [`reports/agent-bench/`] |
+| Opus 5, `mcp` arm, header-free | **55 solved, 0 restated**; 323 turns, 268 calls, USD 7.07 | same | `suite219-opus5-mcp-1` | same |
+| Sonnet 5, `mcp` arm, hints in view | 46 solved, 8 restated, 1 preservation gate; 327 turns, 272 calls, USD 4.62 | § 1.2, 13 tools | `agent-sonnet5-1` | [ADR 0001] § 9, dated table |
+| Opus 5, `mcp` arm, hints in view | 54 solved, 1 restated; 325 turns, 270 calls, USD 9.14 | same | `agent-opus5-1` | same |
+| Opus 5, second seed, hints in view | 54 solved, 1 restated, the same rows; 338 turns, 283 calls | same | `agent-opus5-2` | same |
 
-Per stratum (Sonnet, then Opus): stdlib 21 and 22 of 22; haystack 12 and 12 of
-12; `using` 9 (2 restated) and 11 of 11; `wholesale` 4 (6 restated) and 9
-(1 restated) of 10.  Per tier: routine 15 and 16 of 16; compositional 20 and
-24 of 25; non-obvious 11 and 14 of 14.
+Header-free, per stratum (Sonnet, then Opus): stdlib 21 and 22 of
+22; haystack 12 and 12 of 12; `using` 9 (1 restated) and
+11 of 11; `wholesale` 2 (8 restated) and 10 of 10.  Per
+tier: routine 15 and 16 of 16; compositional 20 and
+25 of 25; non-obvious 9 and 14 of 14.
 
-Per tool (Sonnet, then Opus): `check_file` 56 and 55; `type_of` 24 and 21;
-`fill_hole` 12 and 41; `get_goal` 10 and 17; `search_by_name` 15 and 8;
-`definition_of` 13 and 4; `exports_of` 12 and 4; `get_dependencies` 4 and 2;
-`search_by_type` 2 and 1; `normalize` 0 and 3; `resolve_name` 0 and 1;
-`get_diagnostics` and `check_project` never.
+Header-free, per tool (Sonnet, then Opus): `check_file` 61 and 55; `fill_hole` 11 and 42; `type_of` 23 and 17; `exports_of` 23 and 0; `search_by_name` 21 and 7; `get_goal` 5 and 14; `definition_of` 11 and 10; `search_by_type` 2 and 0; `normalize` 0 and 2; `search_in_scope` 0 and 1; `get_dependencies`, `resolve_name`, `get_diagnostics`, and `check_project` never.
+
+The header-free arms differ from the first ones in more than the headers:
+the server has fourteen tools rather than thirteen, lean answers ([#184])
+and a trimmed surface ([#191]); the libraries' sources are readable; the
+subjects' servers carry the judge's `--safe`; and the client is 2.1.282
+rather than 2.1.261.  For Sonnet the like-for-like runs with the hints in
+view are the two [#191] seeds, `arm-surface-mcp-1` and `-2` (48 and 45
+solved, 7 and 8 restated), and § 4.6 compares against them.
 
 **Reading these**.  They say what a frontier model does *with* the server.
-**They say nothing about the server's value**, because no arm without it
-existed when they were made.  Two readings that do hold: the haystack tier is
-12/12 for both models, eleven of Sonnet's rows in four turns with no query at
-all, so that tier measures a ranker and not a model; and the restated column
-is where the models differ (8 against 1), all of it on the agda-algebras
-tiers.
+**They say nothing about the server's value**; the control (§ 4.3) does.  Two
+readings that do hold.  The haystack tier is 12 of 12 for both models, and the
+count separates nothing, but its route changed with the headers: Sonnet asked
+before its final check on nine of the twelve rows (`search_by_name` on eight),
+where in the two like-for-like runs with the header naming the needle it had
+asked on one and two (§ 4.6).  And the restated column is where the models
+differ (9 against 0), all of it on the agda-algebras tiers.
 
 ### 4.3  The control, and the comparison
 
-[#162], PR [#175].  Sonnet 5, 2026-09-21, one arm at a time at one protocol
-version, the same caps and judge, the libraries' sources readable on every
-arm.  Three Sonnet arms cost USD 12.41 together.
+[#162], PR [#175]; re-run without the header hints for [#219].  Sonnet 5,
+one arm at a time at one protocol version, the same caps and judge, the
+libraries' sources readable on every arm.
+
+**Header-free, 2026-09-29**.  The three arms share their protocol with each
+other and with § 4.2's header-free Opus arm, but for one deliberate
+difference: the prompts of the two arms with a shell name each library's
+source directory (PR [#200]).  USD 11.54 together.
+
+| stratum | n | `shell` | `mcp` | `both` |
+|---|---|---|---|---|
+| agda-stdlib | 22 | 22 | 21 | 21 |
+| agda-stdlib/haystack | 12 | 11 | 12 | 11 |
+| agda-algebras/using | 11 | 10 | 9 (1 restated) | 11 |
+| agda-algebras/wholesale | 10 | 4 (4 restated) | 2 (8 restated) | 5 (5 restated) |
+| **total solved / restated** | 55 | **47 / 4** | 44 / 9 | **48 / 5** |
+
+| arm | run id | turns | tool calls | USD | output tokens | bytes returned by tools |
+|---|---|---|---|---|---|---|
+| `shell` | `suite219-sonnet5-shell-1` | 345 | 290 | **3.42** | 92,135 | 260,271 |
+| `mcp` | `suite219-sonnet5-mcp-1` | 347 | 292 | 3.99 | 87,335 | 414,106 |
+| `both` | `suite219-sonnet5-both-1` | 353 | 298 | 4.13 | 81,546 | 274,106 |
+
+Every row that failed a gate type-checks with its statement kept.  The
+`shell` arm's four are two subjects that ran `find /` although the prompt
+names the source directories, one `xargs` inside the roots (which the audit
+does not model; that file also cites `kercon`), and one edited `using`
+list; the `mcp` arm's two and the `both` arm's two are edited `using` lists,
+one of them (`algebras-injective-comp-injective`, `mcp`) appending the
+original it then cites.  So the files earned 50 solves and 5 restatements
+with a shell, 45 and 10 with the server, and 50 and 5 with both.  The `both`
+arm's per-tool counts against the `mcp` arm's: `check_file` 58 and 61;
+`type_of` 7 and 23; `definition_of` **0** and 11; `search_by_name` **4**
+and 21; `exports_of` 4 and 23.  Bash in the `both` arm: 84 calls, 83 of them
+library-source reads and one a grep of the corpus; `agda` run on the shell:
+**never**; all 55 verdicts from `check_file`.
+
+**With the hints in view, 2026-09-21**.  The first control, whose arms had
+the fixture headers' hints in view and whose shell prompts said only that
+the sources were on disk; `archive mcp` is `agent-sonnet5-1`.  Three Sonnet
+arms cost USD 12.41 together.
 
 | stratum | n | archive `mcp` | `shell` | `mcp` | `both` |
 |---|---|---|---|---|---|
@@ -322,6 +378,10 @@ before its last edit of the work file.  Over the 21 agda-algebras rows:
 
 | arm | run id | solved | restated | solved with the original's proof in view | reads of the original refused |
 |---|---|---|---|---|---|
+| `shell`, header-free | `suite219-sonnet5-shell-1` | 14 | 4 | **12** | 0 |
+| `mcp`, header-free | `suite219-sonnet5-mcp-1` | 11 | 9 | 4 | 0 |
+| `both`, header-free | `suite219-sonnet5-both-1` | 16 | 5 | **11** | 0 |
+| `mcp`, Opus, header-free | `suite219-opus5-mcp-1` | 21 | 0 | 4 | 0 |
 | archive `mcp`, Sonnet | `agent-sonnet5-1` | 13 | 8 | **0** | 2 |
 | archive `mcp`, Opus | `agent-opus5-1` | 20 | 1 | **0** | 2 |
 | archive `mcp`, Opus | `agent-opus5-2` | 20 | 1 | **0** | 4 |
@@ -336,8 +396,11 @@ before its last edit of the work file.  Over the 21 agda-algebras rows:
 | `mcp`, four tools exposed | `arm-verdict-mcp-1` | 20 | 1 | **9** | 0 |
 | `mcp`, four tools, second seed | `arm-verdict-mcp-2` | 19 | 2 | 6 | 0 |
 
-Six of the eight rows the archive restated are `shell` solves written with
-the original in view.  The `shell` arm's three solves without it are the
+Header-free, the `shell` arm still had the original's proof in view for 12
+of its 14 agda-algebras solves, and it now cites the original on four rows
+where it used to write the proof out (§ 4.6).  With the hints in view, six
+of the eight rows the archive restated are `shell` solves written with the
+original in view.  The `shell` arm's three solves without it are the
 three one-line proofs every arm writes the same way (`lift∼lower = refl`,
 `lower∼lift = refl`, `π i = λ x → x i`); among the fifteen with it,
 `⊙-hom′` and the two lines of `≤-trans-≅′` are the library's own bodies but
@@ -361,25 +424,35 @@ at all is a decision not yet taken (§ 6).
 
 **Reading this, number by number**.
 
-+  **Solved, tools against no tools: a loss on the count; not on
-   construction**.  50 with a shell, 47 with the server.  Three rows, on one
-   seed of one model.  The archive's only variance measurement is two Opus
-   seeds, which differed by 0 rows and 13 turns; there is no Sonnet variance
-   measurement, so nothing bounds a three-row difference on one seed.  And
-   on the agda-algebras rows, where the whole difference sits, the `shell`
-   arm had the original's proof in view for 15 of its 18 solves.
-+  **Restated, tools against no tools: not a loss; a loophole**.  0 with a
-   shell, 6 with the server, 8 in the archive.  The zero is no evidence of
-   construction: six of the rows the archive cited, the `shell` arm solved
-   with the original's proof in view, and the rule cannot see a
-   transcription.  The honest comparison for this column is between arms
-   that cannot read the original, and [#162] has none.
-+  **Cost, tools against no tools: a loss, diagnosed**.  USD 5.28 against
-   2.88 with output tokens within 9 % (76,732 against 70,403) and **3.6 times
-   the bytes read from tool results** (929,386 against 259,520), because the
-   tools' answers carry echo and boilerplate (a `type_of` answer is 3 KB for
-   one line of type; `exports_of` averages 23 KB).  Tracked as [#184]; the
-   re-run is the next bullet.
++  **Solved, tools against no tools: a loss on the count, twice; not on
+   construction**.  Header-free, 47 with a shell and 44 with the server;
+   with the hints, 50 and 47.  Three rows each time, on one seed of one
+   model each time.  The only Sonnet variance measurement is the two
+   [#191] seeds of the `mcp` arm (48 and 45 solved), also three rows
+   apart, so a three-row difference is within a seed's reach.  And on the
+   agda-algebras rows, where the whole difference sits, the `shell` arm had
+   the original's proof in view for 12 of its 14 solves (15 of 18 with the
+   hints).
++  **Restated, tools against no tools: fewer with a shell; still no evidence
+   of construction**.  Header-free, 4 with a shell and 9 with the server;
+   with the hints, 0 and 6, and 8 in the archive.  The shell arm's zero did
+   not survive the headers' removal (§ 4.6), and neither count was evidence
+   of construction: the rule cannot see a transcription, and the `shell`
+   arm had the original in view for most of its solves.  The honest
+   comparison for this column is between arms that cannot read the
+   original, and none has run.
++  **Cost, tools against no tools: still a loss, a smaller one**.
+   Header-free, USD 3.99 against 3.42, 17 % more, where the first control
+   cost 83 % more (5.28 against 2.88).  Most of the change is the server's:
+   lean answers and a trimmed surface came between the two controls (the
+   next three bullets).  The shell arm cost more than its first run (345
+   turns against 308, 92 thousand output tokens against 70), and the
+   headers' removal, the prompt that names the sources, and the seed each
+   could account for that; one run cannot say which.  The tools still
+   return more text (414,106 characters against 260,271).
++  **With the hints in view**, three measurements came between the two
+   controls, each changing the server alone, and each is quoted here as it
+   was measured.
 +  **The lean re-run: answer size was not the cause** ([#184], PR [#190],
    `arm184-mcp-1` and `arm184-both-1`, Sonnet 5 at the same protocol).  With
    the echo cut, characters per call fell 46 % and 51 % and cost fell 12 %
@@ -439,11 +512,15 @@ at all is a decision not yet taken (§ 6).
    most of those failed reads.
 +  **The verdict tool: a win, by revealed preference**.  Offered both, the
    model took **every one of its 55 verdicts from `check_file`** and never
-   ran `agda` by hand.
-+  **The knowledge tools, as built: a loss**.  Beside a shell they collapse,
-   because `grep` over the source needs no prior knowledge of where a thing is
-   while `definition_of` answers where and not what.  Tracked as [#185].
-+  **`both` beats `shell` by one row**: within noise; not a claim.
+   ran `agda` by hand, in each of the four `both` arms (header-free, and the
+   three with the hints).
++  **The knowledge tools, as built: a loss**.  Beside a shell they collapse
+   (header-free, `definition_of` 0 calls against 11 without a shell,
+   `search_by_name` 4 against 21), because `grep` over the source needs no
+   prior knowledge of where a thing is while `definition_of` answers where
+   and not what.  Tracked as [#185].
++  **`both` beats `shell` by one row**, header-free (48 and 47) as with the
+   hints (51 and 50): within noise; not a claim.
 
 ### 4.4  The lane parity
 
@@ -475,7 +552,11 @@ own READMEs, beside the conventions they share in
 [`data/benchmarks/README.md`].  Opus 5 ran each arm once, at twice the mined
 tiers' caps (60 turns, 1,800 s, USD 6.00), from frozen server and extractor
 binaries.  n is fourteen and there is one seed per arm, so a difference of a
-row or two is not a finding.
+row or two is not a finding.  These arms were measured with the fixture
+headers' hints in view, and on this tier the `Strategy:` lines were proof
+sketches written for the purpose (§ 4.6); their header-free re-run is
+[#219]'s runs 2 and 3, and until it lands the numbers below stand with that
+caveat.
 
 | | `shell` | `mcp` | `both` |
 |---|---:|---:|---:|
@@ -529,15 +610,120 @@ under it.
 The per-row account (what each subject tried, which tools it used, where it
 stopped) is on [#189].
 
+### 4.6  What the fixture headers were worth
+
+[#219], PRs [#220] and [#221].  Every agent run before 2026-09-29 had its
+fixture's header in view: `Scaffold.stage` copies the obligation byte for
+byte, comments included, and the suite's template put hints in the header.
+Neither the loop nor the judge reads comments (the loop parses only
+`open import` lines; the judge strips comments before its one textual
+gate), so no loop number and no archived verdict depends on them; what
+they changed is what a subject was told.  They carried the following:
+
++  **A `Strategy:` line on every obligation**, sketching the proof, from
+   `refl` and "case split on the boolean; each branch is refl" to the hard
+   tier's "one direction is cong of g; the other is injectivity of g".
++  **On the haystack tier, `Haystack:` and `Needle:` lines** naming the
+   module and the very lemma the tier asks a searcher to find
+   (`-- Needle: Data.Bool.Properties.∧-assoc`), a `Note:` naming it again,
+   and a paragraph on the tier's design.
++  **On the mined tiers, a `Source:` line** naming the module that holds the
+   original, which only 3 of the 21 agda-algebras fixtures import directly.
++  **On the standard-library tier, `Note:` lines**, some naming the key move
+   ("`*-distribʳ-+` is the non-local lemma that unlocks the suc case").
+
+What a subject visibly did with them is bounded by what the archive keeps,
+which is no thinking text.  Three of the 757 transcripts of the sixteen full
+arms quote a header line: `agent-opus5-2` on `haystack-bool-and-assoc-diag`
+(`the needle named qualified`; no prompt says "needle"), `arm-surface-both-1`
+on `algebras-overture-lower-lift` (`Given strategy hint "refl", let's just try
+it`), and `arm-verdict-mcp-2` on `algebras-subalgebras-sup-refl` (`composing is
+allowed per "Strategy: composition"`).  The header's lines were stripped for
+[#219], and every tier's README keeps what its headers said, per row.  One line
+survives on the haystack tier, an inline comment under each module line ("The
+haystack: reachable qualified; the `using` list holds decoys only"): it names
+no lemma, and the header-free runs had it in view.
+
+The re-run: four arms on the same 55 obligations at the same caps
+(`suite219-sonnet5-mcp-1`, `suite219-sonnet5-shell-1`,
+`suite219-sonnet5-both-1`, `suite219-opus5-mcp-1`), from one frozen
+server, extractor, and class snapshot, zero anomalies, compared with the
+runs they replace.
+
+| arm | hints in view: run, solved, restated | header-free: solved, restated | rows with no original (34), then and now | agda-algebras (21), solved and restated, then and now | haystack rows solved with no query before the final check, then and now | needle named before any search, then and now |
+|---|---|---|---|---|---|---|
+| Sonnet `mcp` | `arm-surface-mcp-1`, 48, 7; `-2`, 45, 8 | 44, 9 | 34 and 32; 33 | 14, 7 and 13, 8; 11, 9 | 11 and 10; 3 | 12 and 12; 7 |
+| Sonnet `shell` | `arm162-shell-1`, 50, 0 | 47, 4 | 32; 33 | 18, 0; 14, 4 | not read on a shell arm | 12; 6 |
+| Sonnet `both` | `arm162-both-1`, 51, 2 | 48, 5 | 32; 32 | 19, 2; 16, 5 | not read on a shell arm | 12; 6 |
+| Opus `mcp` | `agent-opus5-1`, 54, 1 | 55, 0 | 34; 34 | 20, 1; 21, 0 | 5; 1 | 11; 10 |
+
+"No query before the final check" is a session that read its file, edited
+it, and checked it, and called nothing else (the demo's reading); "needle
+named before any search" is a session whose first mention of the needle in
+a tool call came before its first search call of any kind, server or shell
+(`header-hints.py`).
+
+**What moved**.
+
++  **The haystack tier's route**.  Every arm still solves all or all but one
+   of the twelve (the misses are edited `using` lists whose files
+   type-check), but with the `Needle:` line in view the Sonnet `mcp` arms
+   solved 8 to 11 of the twelve without a query before the final check
+   (11 in `agent-sonnet5-1`, 10 in `arm162-mcp-1`, 8 in `arm184-mcp-1`,
+   11 and 10 in the [#191] seeds), and header-free 3; the subject named the
+   needle before any search on every row in every Sonnet arm with the
+   hints, and on 7, 6, and 6 rows without them.  The reading that the model
+   named "the needle qualified from memory" ([ADR 0001] § 9 and the demo
+   page, as first written) was, on most rows, the header.  Without it the model
+   searched, and `search_by_name` found the needle.
++  **The agda-algebras rows, from solved to restated**.  Each Sonnet arm
+   moved three or four of them: `shell` 18 and 0 to 14 and 4, `mcp` 14 and
+   7 (or 13 and 8) to 11 and 9, `both` 19 and 2 to 16 and 5, most on the
+   `wholesale` stratum.  On those rows the `Strategy:` line named the
+   proof's shape in a word (`pairing`, `application`, `constructor`).  In
+   the two shell-bearing arms the subject had the original's proof in view
+   on every row that moved, with the headers and without them; with the
+   shape named it wrote a proof of that shape, and without it cited the
+   original.  So on these rows the line decided whether a found answer was
+   written out or cited, which is the restated rule's blind spot (§ 2).  Opus moved the other way, one row: 54 and 1 to 55 and 0.
++  **Output**.  Every header-free Sonnet arm wrote more output than its
+   counterpart with the hints: 87 thousand tokens against 77 and 82
+   (`mcp`), 92 against 70 (`shell`), 82 against 67 (`both`).
+
+**What did not move**.  The 34 rows with no original: 33, 33, and 32
+solved, against 32 to 34 with the hints.  The `both` arm's shape: every
+verdict from `check_file`, `agda` never run on the shell, and the knowledge
+tools unused beside a shell.  And Opus: all 34 rows with no original, as with the hints, and on the haystack tier the needle named before any search on 10 of 12 rows against 11, since it probed lemmas it named itself with `fill_hole` (15 probes, no search call) where Sonnet searched.
+
+**What a difference can mean here**.  The Sonnet `mcp` arm is the one clean
+comparison: its server, prompts, client, caps, and read roots are those of
+the two [#191] seeds, so the headers are the one variable, and 44 solved and
+9 restated sit one row outside those seeds' spread on each column (45 to 48,
+7 to 8).  The two shell-bearing arms changed their prompt too (PR [#200]
+names the source directories), and each has one seed a side; the Opus arm
+has one a side and more changes besides (the server's lean answers and
+trimmed surface, readable sources, `--safe`, client 2.1.282 against
+2.1.261).  So what holds is the direction, the same in every arm, and the
+haystack route, which moved far beyond any seed's spread; a difference of
+three rows in one arm alone is not a finding.
+
+**What the headers were worth, then**: on the haystack tier, the answer to
+the tier's question on most rows; on the mined agda-algebras rows, about
+three proofs written out rather than cited per Sonnet arm; on everything
+else, nothing measurable.  The headers' hints did not make the suite
+easier to pass, since the solve counts barely moved, but they did decide
+how some of it was passed.
+
 ## 5.  How to tell a win from a loss
 
 | question | look at | it is a win for the tools when |
 |---|---|---|
-| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count; the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5), with nothing to read, Opus 5 proves every row with or without the server**. |
-| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; [#162]'s zero came with the original in view**. |
-| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
+| Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count (header-free, 47 with a shell against 44 with the server; with the hints, 50 against 47); the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5, measured with the hints), with nothing to read, Opus 5 proves every row with or without the server**. |
+| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; the shell arm restates fewer (4 against 9 header-free, 0 against 6 with the hints), with the original in view for most of its solves**. |
+| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no, by 17 % header-free (USD 3.99 against 3.42), from 83 % in the first control.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
+| Did the fixture headers' hints change what the agents did? | § 4.6 | the header-free arms differ from the hinted ones by more than a seed's spread.  **The haystack tier's route, yes (3 rows solved with no query before the final check, against 8 to 11); about three agda-algebras rows per Sonnet arm written out rather than cited, in the same direction in every arm; the rows with no original, no** |
 | Is the loop a baseline for the agents? | nothing | **never**; a different instrument |
 | Is a lane judgment as trustworthy as batch? | § 4.4 | parity holds.  **Yes, on 80 of 80**. |
 | Is the fixed space's 6/22 a failure? | § 3.1 | it is the vocabulary's ceiling, stated; not a loss |
@@ -545,7 +731,8 @@ stopped) is on [#189].
 ## 6.  What is not measured
 
 +  **Problems a shell-only model fails**.  Every arm is at or near ceiling on
-   this suite (a shell-only Sonnet solves 91 %), so the suite cannot show a
+   this suite (a shell-only Sonnet solves 85 % header-free and 91 % with the
+   hints, and its files earn 91 % and 98 %), so the suite cannot show a
    tool's upside on hard, novel, multi-lemma work.  That is the original
    question, and it is still open: on the hard tier of [#189] (§ 4.5), posed
    so that nothing could be copied, a shell-only Opus 5 proves all fourteen
@@ -566,8 +753,10 @@ stopped) is on [#189].
    shell arms lost nine rows to the isolation gate because the subject
    searched `/` or the repository root for agda-algebras' sources, which the
    prompt says are on disk without saying where (§ 4.5).  A prompt that
-   names them (the registry's include roots) is a protocol change, so it
-   waits for a new run of every shell arm it would be compared with.
+   names them (the registry's include roots) is a protocol change; the
+   header-free arms ran with it (PR [#200]), and two of their subjects still
+   searched `/` (§ 4.3).  On the hard tier it waits for [#219]'s runs 2
+   and 3.
 +  **A locator beside the four tools, and a `definition_of` that returns
    the text**.  The four-tool arm's 111 and 97 failed library reads are
    what a subject does without `definition_of`, which the fourteen-tool
@@ -641,3 +830,7 @@ stopped) is on [#189].
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#197]: https://github.com/formalverification/agda-native-air/pull/197
+[#200]: https://github.com/formalverification/agda-native-air/pull/200
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
+[#220]: https://github.com/formalverification/agda-native-air/pull/220
+[#221]: https://github.com/formalverification/agda-native-air/pull/221

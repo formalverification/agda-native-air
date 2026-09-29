@@ -1,0 +1,87 @@
+{
+  "benchmarkId" : "algebras-overture-lift-lower",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "universe-polymorphic",
+    "restates:Overture.Basic.lift∼lower"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "lift∼lower",
+  "goal" : "{a b : Level} {A : Set a} → lift ∘ lower ≡ 𝑖𝑑 (Lift b A)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Overture/Basic.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 16562,
+  "costUsd" : 0.0423294,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1383,
+    "cacheRead" : 35317,
+    "cacheCreation" : 5355
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 803,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+    "final" : "{a b : Level} {A : Set a} → lift ∘ (λ r → lower r) ≡ 𝑖𝑑 (Lift b A)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-overture-lift-lower/final/Overture-lift-lower.agda",
+  "transcriptPath" : "subjects/algebras-overture-lift-lower/transcript.jsonl",
+  "lastWords" : "`refl` works — the Agda batch command reports success (clean type-check with no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

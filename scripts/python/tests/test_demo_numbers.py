@@ -37,7 +37,10 @@ from typing import Any, Callable, Dict
 from scripts.python.demo.numbers import ADR as ADR_REL
 from scripts.python.demo.numbers import ARCHIVE as ARCHIVE_REL
 from scripts.python.demo.numbers import (
+    AGENT_CAPTION,
     BOTH_RUN,
+    CONTROL_CAPTION,
+    HINTED_RUN,
     CONTROL,
     MCP_RUN,
     OPUS_RUN,
@@ -62,11 +65,28 @@ from scripts.python.demo.numbers import (
 )
 
 REPO = Path(__file__).resolve().parents[3]
+
+#: The header-free Opus arm's figures (Issue #219), as ADR 0001 § 9 states
+#: them.
+OPUS_SOLVED, OPUS_RESTATED = 55, 0
+OPUS_ALG_SOLVED, OPUS_INVIEW = 21, 4
 ARCHIVE = REPO / "reports" / "agent-bench"
 ADR = REPO / "docs" / "adr" / "0001-proof-search-on-agda-mcp.md"
 
 MARKDOWN = """
 Prose before.
+
+*The agent table, 2026-09-15, fixture headers' hints in view.*
+
+| stratum | n | loop fixed | loop retrieval | Sonnet 5 solved | Sonnet 5 restated | Opus 5 solved | Opus 5 restated |
+|---|---|---|---|---|---|---|---|
+| agda-stdlib | 22 | 6 | 6 | 19 | 0 | 21 | 0 |
+| agda-stdlib/haystack | 12 | 0 | 6 | 12 | 0 | 12 | 0 |
+| agda-algebras/using | 11 | 2 | 2 | 9 | 2 | 11 | 0 |
+| agda-algebras/wholesale | 10 | 0 | 0 | 4 | 6 | 9 | 1 |
+| **total** | 55 | 8 | 14 | **44** | 8 | **53** | 1 |
+
+*The agent table, 2026-09-29, fixture headers stripped of hints.*
 
 | stratum | n | loop fixed | loop retrieval | Sonnet 5 solved | Sonnet 5 restated | Opus 5 solved | Opus 5 restated |
 |---|---|---|---|---|---|---|---|
@@ -78,6 +98,8 @@ Prose before.
 
 Prose between.
 
+*The attribution table, 2026-09-21, fixture headers' hints in view.*
+
 | stratum | n | archive `mcp` | `shell` | `mcp` | `both` |
 |---|---|---|---|---|---|
 | agda-stdlib | 22 | 21 solved | 20 solved | 21 solved | 20 solved |
@@ -85,6 +107,16 @@ Prose between.
 | agda-algebras/using | 11 | 9 solved, 2 restated | 9 solved | 9 solved, 1 restated | 11 solved |
 | agda-algebras/wholesale | 10 | 4 solved, 6 restated | 9 solved | 5 solved, 5 restated | 8 solved, 2 restated |
 | **total** | 55 | **46 solved, 8 restated** | **50 solved, 0 restated** | **47 solved, 6 restated** | **51 solved, 2 restated** |
+
+*The attribution table, 2026-09-29, fixture headers stripped of hints.*
+
+| stratum | n | `shell` | `mcp` | `both` |
+|---|---|---|---|---|
+| agda-stdlib | 22 | 20 solved | 21 solved | 20 solved |
+| agda-stdlib/haystack | 12 | 12 solved | 12 solved | 12 solved |
+| agda-algebras/using | 11 | 9 solved | 9 solved, 2 restated | 11 solved |
+| agda-algebras/wholesale | 10 | 9 solved | 4 solved, 6 restated | 8 solved, 2 restated |
+| **total** | 55 | **50 solved, 0 restated** | **46 solved, 8 restated** | **51 solved, 2 restated** |
 
 Prose after.
 
@@ -130,7 +162,58 @@ def test_the_right_table_is_found_among_several() -> None:
 def test_a_document_without_the_table_is_refused() -> None:
     outcome = adr_table("# Just prose\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
     assert outcome.is_err
-    assert "no table headed" in str(outcome.unwrap_err())
+    assert "no table captioned" in str(outcome.unwrap_err())
+
+
+# ------------------------------- the caption decides (Issue #219)
+
+def test_the_dated_tables_are_not_picked_up() -> None:
+    # § 9 keeps its 2026-09-15 and 2026-09-21 tables as evidence, with the
+    # same headers as the header-free ones.  Each dated table here comes
+    # first and differs from its header-free twin (44 and 53 solved; an
+    # archive column), and neither is read.
+    assert adr_table(MARKDOWN).unwrap()["agda-stdlib"][3] == "21"
+    assert control_table(MARKDOWN).unwrap()["total"] == \
+        (55, (Tally(50, 0), Tally(46, 8), Tally(51, 2)))
+    # Without the header-free captions, the reader refuses rather than
+    # falling back on the first table with the right header.
+    for caption in (AGENT_CAPTION, CONTROL_CAPTION):
+        assert MARKDOWN.count(caption) == 1
+    no_agent = MARKDOWN.replace(AGENT_CAPTION, "The agent table.")
+    assert "no table captioned" in str(adr_table(no_agent).unwrap_err())
+    no_control = MARKDOWN.replace(CONTROL_CAPTION, "The control.")
+    assert "no table captioned" in \
+        str(control_table(no_control).unwrap_err())
+
+
+def test_the_committed_adr_keeps_its_dated_tables_apart() -> None:
+    # The same in the committed ADR: the dated tables are still there, under
+    # their own captions, and the header-free ones are what the page reads.
+    text = ADR.read_text(encoding="utf-8")
+    assert "*The agent table, 2026-09-15, fixture headers' hints in view.*" \
+        in text
+    assert ("*The attribution table, 2026-09-21, fixture headers' hints in "
+            "view.*") in text
+    assert "| **total** | 55 | 8 | 14 | **46** | 8 | **54** | 1 |" in text
+    assert adr_table(text).unwrap()["total"][3:] != ["**46**", "8", "**54**",
+                                                     "1"]
+    assert adr_table(text).unwrap()["total"][3:] != ["46", "8", "54", "1"]
+
+
+def test_a_caption_moved_off_its_table_is_refused() -> None:
+    # A caption whose next line is prose, or whose table has other columns,
+    # names the problem instead of reading a table somewhere below it.
+    moved = MARKDOWN.replace(f"*{AGENT_CAPTION}*\n",
+                             f"*{AGENT_CAPTION}*\n\nA paragraph.\n")
+    assert "is not followed by a table" in \
+        str(adr_table(moved).unwrap_err())
+    other = MARKDOWN.replace(f"*{CONTROL_CAPTION}*\n",
+                             f"*{CONTROL_CAPTION}*\n\n| a | b |\n|---|---|\n"
+                             "| 1 | 2 |\n")
+    message = str(control_table(other).unwrap_err())
+    assert "no table headed" in message and CONTROL_CAPTION in message
+    twice = MARKDOWN + f"\n*{AGENT_CAPTION}*\n"
+    assert "a second caption" in str(adr_table(twice).unwrap_err())
 
 
 def test_the_loop_columns_come_from_the_adr() -> None:
@@ -192,18 +275,21 @@ def test_the_page_agrees_with_adr_0001() -> None:
     total = table["rows"][-1]
     assert total["stratum"] == "total"
     assert (total["n"], total["sonnetSolved"], total["sonnetRestated"],
-            total["opusSolved"], total["opusRestated"]) == (55, 46, 8, 54, 1)
+            total["opusSolved"], total["opusRestated"]) == \
+        (55, 44, 9, OPUS_SOLVED, OPUS_RESTATED)
     assert (total["loopFixed"], total["loopRetrieval"]) == (8, 14)
     assert table["arms"]["sonnet"]["runId"] == SONNET_RUN
     assert table["arms"]["opus"]["runId"] == OPUS_RUN
-    assert table["arms"]["opus"]["toolCount"] == 13
+    assert table["arms"]["opus"]["toolCount"] == 14
     assert table["arms"]["sonnet"]["anomalies"] == 0
     assert table["arms"]["opus"]["anomalies"] == 0
 
 
-#: Every run the build reads: the two arms the page replays, and the three
-#: attribution arms of Issue #162 beside them.
-RUNS = (SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN)
+#: Every run the build reads, each once: the two arms the page replays, the
+#: control's shell and both arms (its mcp arm is the Sonnet arm), and the
+#: hinted Sonnet arm whose haystack sessions the page compares.
+RUNS = tuple(dict.fromkeys(
+    (SONNET_RUN, OPUS_RUN, SHELL_RUN, MCP_RUN, BOTH_RUN, HINTED_RUN)))
 
 Edit = Callable[[str, Dict[str, Any]], Dict[str, Any]]
 
@@ -267,29 +353,30 @@ def test_the_attribution_table_is_read_as_tallies() -> None:
     assert set(rows) == {name.lower() for name in STRATA} | {"total"}
     # A restated count the ADR leaves out is zero; one it writes, bold or
     # not, is read as written.
-    assert rows["agda-stdlib"] == (22, (Tally(21, 0), Tally(20, 0),
-                                        Tally(21, 0), Tally(20, 0)))
-    assert rows["total"] == (55, (Tally(46, 8), Tally(50, 0),
-                                  Tally(47, 6), Tally(51, 2)))
+    assert rows["agda-stdlib"] == (22, (Tally(20, 0), Tally(21, 0),
+                                        Tally(20, 0)))
+    assert rows["total"] == (55, (Tally(50, 0), Tally(46, 8),
+                                  Tally(51, 2)))
 
 
 def test_the_columns_are_the_runs_they_name() -> None:
-    # The archived `mcp` column is the Sonnet arm the page replays, so that
-    # one run is held to both of § 9's tables.
-    assert CONTROL == (("archive mcp", SONNET_RUN), ("shell", SHELL_RUN),
-                       ("mcp", MCP_RUN), ("both", BOTH_RUN))
+    # The `mcp` column is the Sonnet arm the page replays, so that one run is
+    # held to both of § 9's header-free tables.
+    assert CONTROL == (("shell", SHELL_RUN), ("mcp", MCP_RUN),
+                       ("both", BOTH_RUN))
+    assert MCP_RUN == SONNET_RUN
 
 
 def test_a_cell_that_is_not_a_tally_is_refused() -> None:
     # The guide writes the same table as `9 (2 restated)`; the ADR does not,
     # and a cell in any form but the ADR's is an error, never a guess.
-    broken = MARKDOWN.replace("| 9 solved, 1 restated |",
-                              "| 9 (1 restated) |")
+    broken = MARKDOWN.replace("| 9 solved, 2 restated | 11 solved |",
+                              "| 9 (2 restated) | 11 solved |")
     outcome = control_table(broken)
     assert outcome.is_err
     message = str(outcome.unwrap_err())
     assert "agda-algebras/using" in message and "mcp" in message
-    assert "9 (1 restated)" in message
+    assert "9 (2 restated)" in message
 
 
 def test_a_renamed_arm_column_is_refused() -> None:
@@ -300,8 +387,9 @@ def test_a_renamed_arm_column_is_refused() -> None:
 
 
 def test_the_agent_table_is_still_found_beside_the_other() -> None:
-    # Two tables in one document share their first two columns; each is
-    # found by its whole header, and neither is taken for the other.
+    # Four tables in one document share their first two columns; each is
+    # found by its caption and its whole header, and none is taken for
+    # another.
     assert adr_table(MARKDOWN).unwrap()["total"] == \
         ["55", "8", "14", "46", "8", "54", "1"]
 
@@ -324,14 +412,14 @@ def test_an_agreeing_control_reports_nothing() -> None:
 def test_a_control_disagreement_names_the_run_and_both_tallies() -> None:
     reports = _reports()
     reports[MCP_RUN]["perStratum"]["agda-algebras/wholesale"]["restated"] = 4
-    reports[MCP_RUN]["totals"]["restated"] = 5
+    reports[MCP_RUN]["totals"]["restated"] = 6
     problems = compare_control(control_rows(reports),
                                control_table(MARKDOWN).unwrap())
     assert len(problems) == 2
     wholesale = next(p for p in problems if "wholesale" in p)
     assert MCP_RUN in wholesale
-    assert "5 solved, 4 restated" in wholesale
-    assert "5 solved, 5 restated" in wholesale
+    assert "4 solved, 4 restated" in wholesale
+    assert "4 solved, 6 restated" in wholesale
 
 
 def test_the_control_agrees_with_adr_0001() -> None:
@@ -343,10 +431,8 @@ def test_the_control_agrees_with_adr_0001() -> None:
     total = next(row for row in control["rows"] if row["stratum"] == "total")
     assert [(cell["runId"], cell["solved"], cell["restated"])
             for cell in total["cells"]] == [
-        (SONNET_RUN, 46, 8), (SHELL_RUN, 50, 0),
-        (MCP_RUN, 47, 6), (BOTH_RUN, 51, 2)]
-    assert [arm["arm"] for arm in control["arms"]] == \
-        ["mcp", "shell", "mcp", "both"]
+        (SHELL_RUN, 47, 4), (MCP_RUN, 44, 9), (BOTH_RUN, 48, 5)]
+    assert [arm["arm"] for arm in control["arms"]] == ["shell", "mcp", "both"]
     assert all(arm["anomalies"] == 0 for arm in control["arms"])
 
 
@@ -354,19 +440,19 @@ def test_a_copy_of_the_adr_with_one_wrong_cell_fails(tmp_path: Path) -> None:
     # The kick-off's case: the committed archive, and a copy of ADR 0001
     # whose attribution table has one cell moved, must not build.
     text = ADR.read_text(encoding="utf-8")
-    row = ("| agda-algebras/wholesale | 10 | 4 solved, 6 restated "
-           "| 9 solved | 5 solved, 5 restated | 8 solved, 2 restated |")
+    row = ("| agda-algebras/wholesale | 10 | 4 solved, 4 restated "
+           "| 2 solved, 8 restated | 5 solved, 5 restated |")
     assert text.count(row) == 1, "the row this test edits has moved"
     wrong = tmp_path / "adr.md"
-    wrong.write_text(text.replace(row, row.replace("| 9 solved |",
-                                                   "| 8 solved |")),
+    wrong.write_text(text.replace(row, row.replace("| 4 solved, 4 restated |",
+                                                   "| 3 solved, 4 restated |")),
                      encoding="utf-8")
     outcome = build(ARCHIVE, wrong)
     assert outcome.is_err
     message = str(outcome.unwrap_err())
     assert "agda-algebras/wholesale / shell" in message
-    assert "9 solved, 0 restated" in message
-    assert "8 solved, 0 restated" in message
+    assert "4 solved, 4 restated" in message
+    assert "3 solved, 4 restated" in message
 
 
 def test_a_drifted_control_report_fails(tmp_path: Path) -> None:
@@ -380,47 +466,45 @@ def test_a_drifted_control_report_fails(tmp_path: Path) -> None:
 # ------------------------------------------- what the page is handed
 
 def test_the_tools_presented_are_read_from_the_subjects_not_the_allowlist() -> None:
-    # The attribution arms' `config.tools` lists thirteen agda tools, the
-    # harness's allowlist; their subjects were presented fourteen, and
-    # `search_in_scope` is the one the list omits.  The count the page
-    # prints is the subjects'.
-    config = json.loads((ARCHIVE / MCP_RUN / "report.json")
-                        .read_text(encoding="utf-8"))["config"]["tools"]
-    assert len([t for t in config if t.startswith("mcp__agda__")]) == 13
+    # The harness's `config.tools` allowlist still names thirteen agda tools;
+    # the subjects were presented fourteen, and `search_in_scope` is the one
+    # the list omits.  The count the page prints is the subjects'.
     report = json.loads((ARCHIVE / MCP_RUN / "report.json")
                         .read_text(encoding="utf-8"))
+    config = report["config"]["tools"]
+    assert len([t for t in config if t.startswith("mcp__agda__")]) == 13
     summary = arm_summary(report, MCP_RUN)
     assert summary["toolCount"] == 14
     assert "search_in_scope" in summary["agdaTools"]
     table = build(ARCHIVE, ADR).unwrap()
-    assert table["arms"]["opus"]["toolCount"] == 13
-    assert "search_in_scope" not in table["arms"]["opus"]["agdaTools"]
+    assert table["arms"]["opus"]["toolCount"] == 14
 
 
 def test_original_in_view_is_counted_over_the_strata_that_have_one() -> None:
     # The judge's `original` column (Issue #188): solves on rows with an
-    # original, and how many of them had its proof in view.  The archived
-    # arm could read no original; the attribution arms could read every one.
+    # original, and how many of them had its proof in view.  Every arm of
+    # the header-free runs could read every original.
+    numbers = build(ARCHIVE, ADR).unwrap()
     arms = {arm["runId"]: arm["withOriginal"]
-            for arm in build(ARCHIVE, ADR).unwrap()["control"]["arms"]}
-    assert (arms[SONNET_RUN]["solved"], arms[SONNET_RUN]["inView"]) == (13, 0)
-    assert arms[SONNET_RUN]["reads"] == 0
-    assert arms[SONNET_RUN]["refusedReads"] > 0
-    assert (arms[SHELL_RUN]["solved"], arms[SHELL_RUN]["inView"]) == (18, 15)
-    assert (arms[MCP_RUN]["solved"], arms[MCP_RUN]["inView"]) == (14, 4)
-    assert (arms[BOTH_RUN]["solved"], arms[BOTH_RUN]["inView"]) == (19, 16)
+            for arm in numbers["control"]["arms"]}
+    assert (arms[SHELL_RUN]["solved"], arms[SHELL_RUN]["inView"]) == (14, 12)
+    assert (arms[MCP_RUN]["solved"], arms[MCP_RUN]["inView"]) == (11, 4)
+    assert (arms[BOTH_RUN]["solved"], arms[BOTH_RUN]["inView"]) == (16, 11)
+    opus = numbers["arms"]["opus"]["withOriginal"]
+    assert (opus["solved"], opus["inView"]) == (OPUS_ALG_SOLVED, OPUS_INVIEW)
     assert all(arms[run]["refusedReads"] == 0
                for run in (SHELL_RUN, MCP_RUN, BOTH_RUN))
 
 
 def test_every_arm_started_on_the_day_its_first_transcript_says() -> None:
     table = build(ARCHIVE, ADR).unwrap()
-    assert table["arms"]["sonnet"]["startedOn"] == "2026-09-15"
-    assert table["arms"]["opus"]["startedOn"] == "2026-09-15"
+    assert table["arms"]["sonnet"]["startedOn"] == "2026-09-29"
+    assert table["arms"]["opus"]["startedOn"] == "2026-09-29"
+    assert table["hinted"]["startedOn"] == "2026-09-15"
     assert {arm["runId"]: arm["startedOn"]
             for arm in table["control"]["arms"]} == {
-        SONNET_RUN: "2026-09-15", SHELL_RUN: "2026-09-21",
-        MCP_RUN: "2026-09-21", BOTH_RUN: "2026-09-21"}
+        SHELL_RUN: "2026-09-29", MCP_RUN: "2026-09-29",
+        BOTH_RUN: "2026-09-29"}
 
 
 def test_every_session_of_the_replayed_arms_ended_on_its_own() -> None:
@@ -477,32 +561,31 @@ def test_demo_check_reads_only_the_reports_and_the_adr(tmp_path: Path,
 
 def test_demo_check_fails_on_a_wrong_cell(tmp_path: Path, capsys) -> None:
     text = ADR.read_text(encoding="utf-8")
-    cell = "**47 solved, 6 restated**"
+    cell = "**44 solved, 9 restated**"
     assert text.count(cell) == 1, "the cell this test edits has moved"
     root = _reports_only(tmp_path,
-                         text.replace(cell, "**47 solved, 5 restated**"))
+                         text.replace(cell, "**44 solved, 8 restated**"))
     assert main(["--repo", str(root)]) == 1
     assert f"total / mcp ({MCP_RUN})" in capsys.readouterr().err
 
 
 # ------------------------- reading the ADR strictly (PR #217, round two)
 
-ATTRIBUTION_HEAD = ("| stratum | n | archive `mcp` | `shell` | `mcp` | "
-                    "`both` |\n|---|---|---|---|---|---|\n")
-CONTROL_STDLIB = ("| agda-stdlib | 22 | 21 solved | 20 solved | 21 solved | "
-                  "20 solved |")
+ATTRIBUTION_HEAD = ("| stratum | n | `shell` | `mcp` | `both` |\n"
+                    "|---|---|---|---|---|\n")
+CONTROL_STDLIB = "| agda-stdlib | 22 | 20 solved | 21 solved | 20 solved |"
 AGENT_STDLIB = "| agda-stdlib | 22 | 6 | 6 | 21 | 0 | 22 | 0 |"
 
 
 def test_a_row_with_a_missing_cell_is_named_not_dropped() -> None:
     # A lenient reader ended the table at the short row and reported every
     # row after it missing; the row itself is the problem, and is named.
-    row = ("| agda-algebras/using | 11 | 9 solved, 2 restated | 9 solved | "
-           "9 solved, 1 restated | 11 solved |")
+    row = ("| agda-algebras/using | 11 | 9 solved | 9 solved, 2 restated | "
+           "11 solved |")
     assert MARKDOWN.count(row) == 1
-    short = row.replace("| 9 solved, 1 restated |", "|")
+    short = row.replace("| 9 solved, 2 restated |", "|")
     message = str(control_table(MARKDOWN.replace(row, short)).unwrap_err())
-    assert "5 cells where the header has 6" in message
+    assert "4 cells where the header has 5" in message
     assert "agda-algebras/using" in message
 
 
@@ -554,7 +637,8 @@ def test_a_copy_of_the_adr_with_the_loop_total_moved_fails(tmp_path: Path,
     # Copilot's Balanced review of PR #217: moving only the ADR's loop total
     # (14 to 15) passed `make demo-check`, while the page printed 14.
     text = ADR.read_text(encoding="utf-8")
-    total = "| **total** | 55 | 8 | 14 | **46** | 8 | **54** | 1 |"
+    total = (f"| **total** | 55 | 8 | 14 | **44** | 9 | **{OPUS_SOLVED}** | "
+             f"{OPUS_RESTATED} |")
     assert text.count(total) == 1, "the row this test edits has moved"
     root = _reports_only(tmp_path,
                          text.replace(total, total.replace("| 14 |", "| 15 |")))

@@ -1,0 +1,90 @@
+{
+  "benchmarkId" : "algebras-homs-mon-to-intohom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.mon→intohom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.isHom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.isInjective"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "mon→intohom′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → Σ[ h ∈ hom 𝑨 𝑩 ] IsInjective (proj₁ h)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 2,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+    "open import Setoid.Homomorphisms.Basic using ( IsMon )"
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 5,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 58764,
+  "costUsd" : 0.15404400000000001,
+  "tokens" : {
+    "input" : 20,
+    "output" : 5556,
+    "cacheRead" : 141520,
+    "cacheCreation" : 17535
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 4
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5308,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda",
+  "transcriptPath" : "subjects/algebras-homs-mon-to-intohom/transcript.jsonl",
+  "lastWords" : "It type-checked successfully on the first try. The final `agda --safe` command reports success on the file as it now stands.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

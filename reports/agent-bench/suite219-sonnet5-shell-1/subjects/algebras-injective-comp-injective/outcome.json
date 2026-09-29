@@ -1,0 +1,88 @@
+{
+  "benchmarkId" : "algebras-injective-comp-injective",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Functions.Injective.⊙-injective",
+    "target:Function.Base._∘_"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "⊙-injective′",
+  "goal" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →  IsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 3,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 2,
+    "Bash" : 3,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 18315,
+  "costUsd" : 0.0682396,
+  "tokens" : {
+    "input" : 14,
+    "output" : 1366,
+    "cacheRead" : 77118,
+    "cacheCreation" : 9782
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2956,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+    "final" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda",
+  "transcriptPath" : "subjects/algebras-injective-comp-injective/transcript.jsonl",
+  "lastWords" : "The file type-checks successfully with no errors reported.",
+  "rateLimit" : {
+    "maxUtilization" : 0.74,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
