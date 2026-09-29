@@ -1,0 +1,96 @@
+{
+  "benchmarkId" : "algebras-kernels-ker-con",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Homomorphisms.Kernels.kercon",
+    "target:Overture.Relations.kerRel",
+    "target:Overture.Relations.kerRelOfEquiv",
+    "target:Setoid.Homomorphisms.Kernels.HomKerComp",
+    "target:Setoid.Congruences.Basic.mkcon"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "kercon′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} (h : hom 𝑨 𝑩) →  Con 𝑨 ρᵇ",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash runs a program this audit does not model (xargs): find /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms -type f | xargs ls; echo ---; grep -rn \"HomKerComp\\|^hom \\|hom :\" /nix/store/0mkdwhwzshgs...",
+  "restatementEvidence" : [
+    "ref Setoid.Homomorphisms.Kernels.kercon"
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Kernels.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 5,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+    "open import Setoid.Homomorphisms.Kernels using ( kercon )"
+  ],
+  "terminal" : "completed",
+  "turns" : 12,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 8,
+    "Edit" : 2
+  },
+  "toolCallsTotal" : 11,
+  "wallMs" : 39627,
+  "costUsd" : 0.1662812,
+  "tokens" : {
+    "input" : 24,
+    "output" : 3566,
+    "cacheRead" : 201866,
+    "cacheCreation" : 22550
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash runs a program this audit does not model (xargs): find /nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms -type f | xargs ls; echo ---; grep -rn \"HomKerComp\\|^hom \\|hom :\" /nix/store/0mkdwhwzshgs..."
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 7
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5512,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nhom 𝑨 𝑩 → Con 𝑨 ρᵇ",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-kernels-ker-con/final/Kernels-ker-con.agda",
+  "transcriptPath" : "subjects/algebras-kernels-ker-con/transcript.jsonl",
+  "lastWords" : "The command reports success (no errors) on the final file, confirming it type-checks under the specified Agda invocation.",
+  "rateLimit" : {
+    "maxUtilization" : 0.75,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

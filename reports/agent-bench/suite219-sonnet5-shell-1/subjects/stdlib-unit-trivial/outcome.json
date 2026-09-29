@@ -1,0 +1,78 @@
+{
+  "benchmarkId" : "stdlib-unit-trivial",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "standalone"
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "trivial",
+  "goal" : "⊤",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 7943,
+  "costUsd" : 0.0329668,
+  "tokens" : {
+    "input" : 8,
+    "output" : 775,
+    "cacheRead" : 34364,
+    "cacheCreation" : 4582
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 165,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "⊤",
+    "final" : "⊤",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-unit-trivial/final/Unit-trivial.agda",
+  "transcriptPath" : "subjects/stdlib-unit-trivial/transcript.jsonl",
+  "lastWords" : "The type-check command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.71,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

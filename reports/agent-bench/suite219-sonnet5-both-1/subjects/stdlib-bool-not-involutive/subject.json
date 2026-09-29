@@ -1,0 +1,18 @@
+{
+  "arm" : "both",
+  "workDir" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/reports/agent-bench/suite219-sonnet5-both-1/work/stdlib-bool-not-involutive",
+  "readRoots" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda-dojang",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda-dojang/agda",
+    "/nix/store/pkks1pz1n2bci0pva1sxbydnc4xyliid-standard-library-2.3/src",
+    "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src",
+    "/nix/store/4931qlybjmy7l9p6khlm5l9rzkx920kd-Agda-2.8.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-1e5d/Agda-2.8.0/lib/prim",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/agda"
+  ],
+  "corpora" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/corpora/agda-stdlib/v0/corpus.jsonl",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/129-m2-11-benchmarks-obligations-with-imports/data/corpora/agda-stdlib/v0/corpus.jsonl"
+  ]
+}

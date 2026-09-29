@@ -1,0 +1,94 @@
+{
+  "benchmarkId" : "algebras-inverses-image-f-f",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.Imagef∋f",
+    "target:Setoid.Functions.Inverses.Image_∋_.eq",
+    "target:Relation.Binary.Bundles.Setoid.refl"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "Imagef∋f′",
+  "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} (F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →  Image F ∋ (Func.to F a)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "Bash reads outside the arm's roots (/): find / -path /proc -prune -o -iname \"Functions.agda\" -print 2>/dev/null | grep -i setoid; Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -iname \"Functions.agda\" -print 2>/dev/null | grep -i setoid",
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+    "inView" : true,
+    "how" : "read",
+    "at" : 7,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 3,
+    "Bash" : 6,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 50542,
+  "costUsd" : 0.10515399999999998,
+  "tokens" : {
+    "input" : 22,
+    "output" : 2439,
+    "cacheRead" : 132820,
+    "cacheCreation" : 13539
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+      "Bash reads outside the arm's roots (/): find / -path /proc -prune -o -iname \"Functions.agda\" -print 2>/dev/null | grep -i setoid",
+      "Bash reads outside the arm's roots (/proc): find / -path /proc -prune -o -iname \"Functions.agda\" -print 2>/dev/null | grep -i setoid"
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 4,
+      "other" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 2964,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n(F : Func 𝑨 𝑩) (a : Setoid.Carrier 𝑨) →\nImage F ∋ Func.to F a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-inverses-image-f-f/final/Inverses-image-f-f.agda",
+  "transcriptPath" : "subjects/algebras-inverses-image-f-f/transcript.jsonl",
+  "lastWords" : "The type-check command reports success (no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.74,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-assoc",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-assoc",
+  "goal" : "∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Relation.Binary.PropositionalEquality using ( trans )"
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 3,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 26343,
+  "costUsd" : 0.0680774,
+  "tokens" : {
+    "input" : 12,
+    "output" : 2640,
+    "cacheRead" : 59167,
+    "cacheCreation" : 7455
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 2
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 1753,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "final" : "(m n p : ℕ) → m * n * p ≡ m * (n * p)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-assoc/final/Nat-mul-assoc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-assoc/transcript.jsonl",
+  "lastWords" : "The type-checking command reports success on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.73,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

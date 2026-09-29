@@ -1,0 +1,77 @@
+{
+  "benchmarkId" : "stdlib-nat-zero-lt-suc",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "0<1+n",
+  "goal" : "∀ {n : ℕ} → 0 < suc n",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "Bash" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 12631,
+  "costUsd" : 0.03477859999999999,
+  "tokens" : {
+    "input" : 8,
+    "output" : 865,
+    "cacheRead" : 34683,
+    "cacheCreation" : 4794
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 244,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{n : ℕ} → 0 < suc n",
+    "final" : "{n : ℕ} → 0 < suc n",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-zero-lt-suc/final/Nat-zero-lt-suc.agda",
+  "transcriptPath" : "subjects/stdlib-nat-zero-lt-suc/transcript.jsonl",
+  "lastWords" : "The command reports success (clean type-check with no errors) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.71,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

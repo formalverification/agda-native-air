@@ -1,0 +1,90 @@
+{
+  "benchmarkId" : "algebras-subalgebras-sup-refl",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Subalgebras.Properties.≥-refl",
+    "target:Function.Base._∘_",
+    "target:Setoid.Subalgebras.Properties.≅→≤",
+    "target:Setoid.Homomorphisms.Isomorphisms.≅-sym"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "≥-refl′",
+  "goal" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra {𝑆 = 𝑆} α ρᵃ} →  𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Subalgebras/Properties.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 5,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 9,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 6,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 8,
+  "wallMs" : 26152,
+  "costUsd" : 0.0730118,
+  "tokens" : {
+    "input" : 18,
+    "output" : 2028,
+    "cacheRead" : 96739,
+    "cacheCreation" : 8337
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "shell",
+    "mcpConnected" : false,
+    "agdaToolsPresented" : [
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "agda-batch" : 1,
+      "library-read" : 5
+    }
+  },
+  "via" : "shell",
+  "verdictVia" : "shell",
+  "agdaExit" : 0,
+  "agdaMs" : 5719,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+    "final" : "{𝓞 𝓥 α ρᵃ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 𝑩 : Algebra α ρᵃ} →\n𝑨 ≅ 𝑩 → 𝑨 ≥ 𝑩",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-subalgebras-sup-refl/final/Subalgebras-sup-refl.agda",
+  "transcriptPath" : "subjects/algebras-subalgebras-sup-refl/transcript.jsonl",
+  "lastWords" : "The type-checking command reports success on the final file (no errors, no warnings).",
+  "rateLimit" : {
+    "maxUtilization" : 0.74,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

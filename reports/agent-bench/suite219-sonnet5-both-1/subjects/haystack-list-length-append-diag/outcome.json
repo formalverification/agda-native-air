@@ -1,0 +1,94 @@
+{
+  "benchmarkId" : "haystack-list-length-append-diag",
+  "difficulty" : "routine",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "length-++-diag",
+  "goal" : "∀ {A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.List.Properties using ( length-++ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Bash" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 29397,
+  "costUsd" : 0.0564448,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1106,
+    "cacheRead" : 92584,
+    "cacheCreation" : 6712
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "both",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      "library-read" : 1
+    }
+  },
+  "via" : "both",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3021,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "final" : "{A : Set} (xs : List A) → length (xs ++ xs) ≡ length xs + length xs",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-list-length-append-diag/final/List-length-append-diag.agda",
+  "transcriptPath" : "subjects/haystack-list-length-append-diag/transcript.jsonl",
+  "lastWords" : "The verdict on the final file is success: it type-checks cleanly with `length-++-diag xs = length-++ xs` using `Data.List.Properties.length-++`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.81,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
