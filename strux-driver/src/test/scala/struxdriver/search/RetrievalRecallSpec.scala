@@ -501,6 +501,19 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
       e.taggedValues("needle:").size should be >= 2
       e.taggedValues("needle:").distinct shouldBe e.taggedValues("needle:")
       e.tags.exists(t => t.startsWith("restates:") || t.startsWith("target:")) shouldBe false
+      // A needle is what the gold applies and what the fixture withholds: its
+      // name is in the gold's text and in none of the obligation's `using`
+      // lists (PR #218 review, "needle-tag validation").
+      val repo   = Paths.get(sys.props("user.dir")).getParent
+      val gold   = Files.readString(repo.resolve(e.goldPath))
+      val listed = Imports.usingNames(Files.readString(repo.resolve(e.obligationPath))).toSet
+      e.taggedValues("needle:").foreach { q =>
+        val short = q.substring(q.lastIndexOf('.') + 1)
+        withClue(s"${e.id}, needle $q: ") {
+          gold.contains(short) shouldBe true
+          listed.contains(short) shouldBe false
+        }
+      }
     }
     comp.map(_.id).toSet shouldBe Set(
       "comp-variety-subalgebra-of-model", "comp-variety-image-of-product",

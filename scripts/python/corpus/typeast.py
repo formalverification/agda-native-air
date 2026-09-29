@@ -251,7 +251,17 @@ def unify(a: Term, b: Term, s: Optional[Subst], rigid: FrozenSet[int] = frozense
         return None
     a, b = walk(a, s), walk(b, s)
     ta, tb = a[0], b[0]
-    if ta == "lvl" or tb == "lvl" or (ta == "sort" and tb == "sort"):
+    # A level is a wildcard against what a level position can hold: another
+    # level expression, a level binder (a meta, left unbound, since `α ⊔ β`
+    # and `β ⊔ α` are one level and no syntactic binding is right), a level
+    # bound inside a premise (a de Bruijn variable), or a level-valued name.
+    # It is not a wildcard against a constructor, a Π, a sort, or a literal,
+    # which no level position holds (PR #218 review).  Argument lists are
+    # paired positionally under one head, so on the corpus a level meets only
+    # a level meta (1,602 of 1,602 times over the `≤-trans` family).
+    if ta == "lvl" or tb == "lvl":
+        return s if {ta, tb} <= {"lvl", "meta", "bv", "def"} else None
+    if ta == "sort" and tb == "sort":
         return s
     if ta == "meta" and tb == "meta" and a[1] == b[1]:
         return _unify_elims(a[2], b[2], s, rigid)

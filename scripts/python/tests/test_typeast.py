@@ -143,6 +143,18 @@ def test_unify_refuses_a_cyclic_solution_and_lets_levels_through() -> None:
     assert unify(("def", "A", ()), ("def", "B", ()), {}) is None
 
 
+def test_a_level_is_a_wildcard_only_against_what_a_level_position_holds() -> None:
+    # A level binder stays unbound (level arithmetic is not syntactic), a
+    # level-valued name and a bound level pass, and a constructor, a sort, or
+    # a Π cannot sit in a level position (PR #218 review).
+    assert unify(("lvl",), m(3), {}) == {}
+    assert unify(m(3), ("lvl",), {"7": ("def", "X", ())}) == {"7": ("def", "X", ())}
+    assert unify(("lvl",), ("bv", 0, ()), {}) == {}
+    assert unify(("lvl",), ("con", "zero", ()), {}) is None
+    assert unify(("lvl",), ("sort",), {}) is None
+    assert unify(("sort",), ("lvl",), {}) is None
+
+
 def test_an_applied_meta_absorbs_a_spine_prefix() -> None:
     # ?S ._≈_ x y  against  𝑨 .Domain ._≈_ x y  binds ?S := 𝑨 .Domain.
     eq = ("proj", "Relation.Binary.Bundles.Setoid._≈_")
