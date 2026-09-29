@@ -1144,6 +1144,13 @@ registry, which places agda-algebras at the flake-pinned store copy, and refused
 in your worktree.  Pass the registry the client's Agda actually reads, as the template
 does; see *Which Agda checks your files* in §13.5.
 
+**`Library 'agda-dojang' not found` on another project**.  Agda found no `.agda-lib`
+above the directory the server runs in (or, for the lane tools, above the file), so it
+fell back to this repository's `$AGDA_DIR/defaults`, which names `agda-dojang`, and the
+registration's registry has no such library.  Start Claude Code
+inside a checkout of the project, and keep scratch modules inside it; see the
+[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).
+
 **"Libraries file not found" on another project**.  The `--library-file` in the
 registration names a path that is gone, usually a gc-root that was never built on this
 machine.  Run the two `nix build` lines in the

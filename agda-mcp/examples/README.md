@@ -87,6 +87,18 @@ Each binding does one job; they are the following:
    Agda; left alone, `make` would run the first `agda` on the server's `PATH`,
    which is this repository's.
 
+Start Claude Code inside an agda-algebras checkout.  Wherever Agda finds no
+`.agda-lib`, it falls back to `$AGDA_DIR/defaults`, and the shell
+`run-server.sh` enters sets that to this repository's, which asks for
+`agda-dojang`.  So a session started anywhere else (the directory holding the
+worktrees, say) gets `Library 'agda-dojang' not found` from `check_file`, and
+the lane tools cannot load a scratch module that sits outside every checkout
+(`get_goal` still answers, through its batch fallback); keep scratch modules
+inside the worktree.  The template does not select `-l standard-library` to
+cover those cases: an `-l` flag makes Agda ignore the worktree's own
+`agda-algebras.agda-lib`, so its modules would resolve only through the
+server's fallback include path and lose the `flags:` line the library sets.
+
 Nothing this registration reads is written by another session, so any number of
 sessions in different worktrees run side by side.  (The template this one
 replaced set `AGDA_ALGEBRAS_ROOT` instead, and every launch rewrote this
