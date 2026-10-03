@@ -35,7 +35,11 @@
 --       remaining ones, with the arguments that follow the section, into its
 --       holes.  How many parameters a name takes is read off the corpus
 --       itself ('parameterCounts'); no Agda is run.
---   3.  Drop qualifiers ('unqualify').
+--   3.  Drop qualifiers ('unqualify'), after giving Agda's builtins the
+--       names the standard library re-exports them under ('builtinNames'):
+--       the printer keeps the builtin's own name, so the corpus prints
+--       @Agda.Builtin.Nat.-@ where every statement writes @∸@, and
+--       @Agda.Builtin.Nat.Nat@ where it writes @ℕ@.
 --
 --   The display form ('writtenDisplay') keeps brackets; the matching key
 --   ('writtenKey') drops them, collapses whitespace, and folds case, and a
@@ -93,6 +97,7 @@ module AgdaMCP.Written
     -- * Rendering
   , unsection
   , unqualify
+  , builtinNames
   , writtenDisplay
   , writtenKey
   , writtenKeys
@@ -324,6 +329,31 @@ qualified t = not ("." `T.isPrefixOf` t) && "." `T.isInfixOf` T.dropEnd 1 t
 qualifierOf :: Text -> Text
 qualifierOf = T.dropEnd 1 . fst . T.breakOnEnd "."
 
+-- | builtinNames: Agda's builtins, as the corpus prints them, to the names
+-- the pinned standard library (2.3) re-exports them under, read off its
+-- @open import Agda.Builtin.* public ... renaming@ lines: Data.Nat.Base
+-- (@Nat@ to @ℕ@, @_-_@ to @_∸_@, @_==_@ to @_≡ᵇ_@, @_<_@ to @_<ᵇ_@),
+-- Data.Integer.Base (@Int@ to @ℤ@), and Data.Product.Base (@fst@ and @snd@
+-- to @proj₁@ and @proj₂@).  Each name in each printed shape: prefix, an
+-- infix part, a postfix projection.  Found by issue #202's arm, whose one
+-- search_by_type call wrote @m + n ∸ o ≡ m + (n ∸ o)@ and matched nothing
+-- while the lemma it described is printed with @Agda.Builtin.Nat.-@.
+builtinNames :: Map Text Text
+builtinNames = Map.fromList
+  [ ("Agda.Builtin.Nat.Nat", "ℕ")
+  , ("Agda.Builtin.Nat._-_", "_∸_"), ("Agda.Builtin.Nat.-", "∸")
+  , ("Agda.Builtin.Nat._==_", "_≡ᵇ_"), ("Agda.Builtin.Nat.==", "≡ᵇ")
+  , ("Agda.Builtin.Nat._<_", "_<ᵇ_"), ("Agda.Builtin.Nat.<", "<ᵇ")
+  , ("Agda.Builtin.Int.Int", "ℤ")
+  , ("Agda.Builtin.Sigma.Σ.fst", "proj₁"), (".Agda.Builtin.Sigma.Σ.fst", ".proj₁")
+  , ("Agda.Builtin.Sigma.Σ.snd", "proj₂"), (".Agda.Builtin.Sigma.Σ.snd", ".proj₂")
+  ]
+
+-- | writtenName: a printed token as a statement writes it: the standard
+-- library's name for a builtin, else the token with its qualifier dropped.
+writtenName :: Text -> Text
+writtenName tok = Map.findWithDefault (unqualify tok) tok builtinNames
+
 -- | unqualify: a token's last dot segment; a postfix projection keeps its
 -- dot (@.Agda.Builtin.Sigma.Σ.fst@ is @.fst@).
 unqualify :: Text -> Text
@@ -500,7 +530,7 @@ renderDisplay = T.intercalate " → " . map segment . arrowSegments
     segment [Grp "(" is ")"]
       | Tok "→" `notElem` is, Tok ":" `notElem` is = renderDisplay is
     segment is = T.unwords (map one is)
-    one (Tok tok) = unqualify tok
+    one (Tok tok) = writtenName tok
     one (Grp "(" [x] ")") = one x
     one (Grp o is c) = o <> renderDisplay is <> c
 
@@ -517,7 +547,7 @@ renderKey :: [Item] -> Text
 renderKey = T.toLower . T.unwords . go
   where
     go = concatMap one
-    one (Tok tok)    = [unqualify tok]
+    one (Tok tok)    = [writtenName tok]
     one (Grp _ is _) = go is
 
 -- | writtenDisplay: a printed type as written, for reading.

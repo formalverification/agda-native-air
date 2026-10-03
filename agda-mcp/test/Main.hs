@@ -152,7 +152,7 @@ import AgdaMCP.Retrieval
   , queryTokensOf, rank, score, splitTopLevelArrows, tokens )
 import qualified Data.Set as Set
 import AgdaMCP.Types
-import AgdaMCP.Written (Item (..), opParts, parseItems, unqualify, writtenTable, writtenDisplay, fragmentKey)
+import AgdaMCP.Written (Item (..), builtinNames, opParts, parseItems, unqualify, writtenTable, writtenDisplay, fragmentKey)
 
 
 -- ---------------------------------------------------------------------------
@@ -2219,8 +2219,8 @@ corpusTests = do
 --     Algebra.Properties.AbelianGroup (and its anonymous module),
 --     Algebra.Properties.Group, Algebra.Bundles.AbelianGroup,
 --     Algebra.Bundles.Group, Algebra.Definitions, Function.Base; and
---     Data.List.Properties.map-∘, Data.Nat.Properties.+-comm and
---     m+n≤o⇒m≤o.
+--     Data.List.Properties.map-∘, Data.Nat.Properties.+-comm,
+--     m+n≤o⇒m≤o, and +-∸-assoc.
 --
 -- The acceptance of #202 is here: queries written as #189's statements are
 -- written find the lemmas its novelty tables cite (⁻¹-∙-comm, conj-∙-hom,
@@ -2338,6 +2338,21 @@ writtenSearchTests = do
               && has "Algebra.Properties.AbelianGroup.⁻¹-∙-comm" "x ⁻¹ ∙ y ⁻¹ ≈ x ∙ y ⁻¹"
               && has "Data.Nat.Properties.+-comm" "commutative _≡_ _+_"
               && has "Data.List.Properties.map-∘" "map g ∘ f ≗ map g ∘ map f" )
+
+    , withWritten writtenStdlibPath "the standard library's names for builtins: ∸ and ℕ, as the arm's one query wrote them" $ \idx ->
+        -- The corpus prints Agda.Builtin.Nat.- and Agda.Builtin.Nat.Nat; the
+        -- subject of #202's arm wrote this, and found nothing before the
+        -- renamings were applied.
+        allOf
+          [ assertEqual "∸"
+              (Right ["Data.Nat.Properties.+-∸-assoc"])
+              (map srPrettyQname <$> typeSearch idx (Just "m + n ∸ o ≡ m + (n ∸ o)") Nothing Nothing Nothing)
+          , assert "ℕ in the written form"
+              (maybe False ("(m : ℕ)" `T.isInfixOf`)
+                 (srWritten =<< listToMaybe (either (const []) id
+                    (typeSearch idx (Just "m + n ≤ o") Nothing Nothing Nothing))))
+          , assertEqual "unqualified otherwise" "∸" (Map.findWithDefault "" "Agda.Builtin.Nat.-" builtinNames)
+          ]
 
     , withWritten writtenStdlibPath "acceptance: ⁻¹-∙-comm from its statement as written, first" $ \idx ->
         case typeSearch idx (Just "x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹") Nothing Nothing Nothing of

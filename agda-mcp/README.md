@@ -1010,8 +1010,8 @@ the stdio transport against the standard-library corpus:
 ```
 
 **What "as written" means**.  The corpus prints every type from outside every
-module, which differs from a statement in two ways, and the rendering
-(`AgdaMCP.Written`) undoes both before matching.
+module, which differs from a statement in three ways, and the rendering
+(`AgdaMCP.Written`) undoes them before matching.
 
 +  **Qualifiers**.  Every name is printed qualified
    (`Algebra.Bundles.AbelianGroup.∙`); the rendering keeps the last segment.
@@ -1032,6 +1032,14 @@ module, which differs from a statement in two ways, and the rendering
    the operation (`Commutative _≈_ _∙_`).  A record field the corpus has no
    row for (the standard library's `Setoid._≈_` in agda-algebras) is known
    by its qualifier, a name some binder is typed by.
++  **Builtins' names**.  The printer keeps a builtin's own name, and the
+   standard library re-exports several under others, so the rendering uses
+   the library's: `Agda.Builtin.Nat.Nat` is `ℕ`, `Agda.Builtin.Nat.-` is
+   `∸`, `_==_` and `_<_` are `_≡ᵇ_` and `_<ᵇ_`, `Int` is `ℤ`, and `fst`
+   and `snd` are `proj₁` and `proj₂` (the `renaming` lines of
+   `Data.Nat.Base`, `Data.Integer.Base`, `Data.Product.Base`).  The re-run
+   arm found this: its one `search_by_type` call wrote
+   `m + n ∸ o ≡ m + (n ∸ o)`, which now finds `+-∸-assoc`.
 
 The matching key then drops brackets, collapses whitespace, and folds case;
 a fragment gets the same key, without the parameter step, and `->` reads as
@@ -1052,7 +1060,7 @@ answered nothing before and 5 now (`hom 𝑨 𝑩 → hom 𝑩 𝑪` finds `∘-
 the five that still find nothing are two names sent to the type tool, a
 fragment with an unclosed bracket, and two statements whose variable names
 or shape are not the library's), and the 23 answers fell from 175,124
-characters to 131,462, because the shortest statements come first.  The
+characters to 131,416, because the shortest statements come first.  The
 rendering is built when the corpus loads: 0.9 s on the agda-algebras corpus
 (2.4 s to 3.3 s) and 2.5 s on the standard library's (5.8 s to 8.3 s), with
 75 MB and 165 MB more resident after the load, most of it the collector's
