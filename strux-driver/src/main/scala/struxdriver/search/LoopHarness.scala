@@ -100,7 +100,8 @@ final case class LoopHarnessConfig(
   proposerKind:  String,
   corpus:        Option[Path],
   retrieval:     RetrievalConfig,
-  scorer:        ScorerSpec = Scorers.default // the ranking behind retrieval, by name (issue #19)
+  scorer:        ScorerSpec = Scorers.default, // the ranking behind retrieval, by name (issue #19)
+  auto:          AutoMode = AutoMode.Off       // Agda's own proof search as a closer (issue #206)
 ) {
   def runRoot: Path = outDir.resolve(runId)
 }
@@ -155,7 +156,8 @@ final case class LoopOutcome(
   retrieval:    Option[Json] = None, // the P2 per-fixture retrieval stats (issue #123)
   source:       String = "",          // the index row's library, for slicing (#129)
   tags:         Vector[String] = Vector.empty, // the index row's tags, likewise
-  goalContext:  Option[Vector[CtxEntry]] = None // the root goal's local context, as get_goal answered it (issue #19)
+  goalContext:  Option[Vector[CtxEntry]] = None, // the root goal's local context, as get_goal answered it (issue #19)
+  auto:         Option[Json] = None // the per-fixture ledger of Agda's own proof search, when on (issue #206)
 ) {
   /** The stratum this outcome reports under: see `LoopOutcome.stratumOf`. */
   def stratum: String = LoopOutcome.stratumOf(source, tags)
@@ -182,6 +184,9 @@ final case class LoopOutcome(
     "wallMs"       -> wallMs.asJson,
     "anomaly"      -> anomaly.asJson,
     "retrieval"    -> retrieval.getOrElse(Json.Null),
+    // Absent when the knob is off, so an off report is the report it was
+    // before #206 field for field.
+    "auto"         -> auto.getOrElse(Json.Null),
     // The root goal's context beside its display, so the offline recall
     // instrument (RetrievalRecall.scala) can rebuild the goal tokens the
     // proposer saw: the context names are exactly what the tokeniser drops.
@@ -231,6 +236,11 @@ object ProofSearchLoop extends IOApp {
       |    [--expand-deps on|off] one-hop get_dependencies expansion (default off)
       |    [--scorer NAME]        the ranking behind retrieval (default token-overlap;
       |                           one of the names Scorers.names lists; issue #19)
+      |    [--auto off|closer|hints]  Agda's own proof search, through the server's
+      |                           auto tool, proposed first at every state: with its
+      |                           default space (closer) or with retrieval's accepted
+      |                           lemmas as hints (hints, which requires --proposer
+      |                           retrieval); default off (issue #206)
       |""".stripMargin
 
   def run(args: List[String]): IO[ExitCode] =
@@ -247,7 +257,7 @@ object ProofSearchLoop extends IOApp {
   private val Keys: Set[String] = Set(
     "index", "ids", "out-dir", "run-id", "server-bin", "agda-flags", "server-timeout", "project-root",
     "beam", "max-depth", "probe-budget", "dedup", "peek",
-    "proposer", "corpus", "retrieve-k", "exclude-target", "expand-deps", "scorer")
+    "proposer", "corpus", "retrieve-k", "exclude-target", "expand-deps", "scorer", "auto")
 
   private[search] def parseArgs(args: List[String]): Either[String, LoopHarnessConfig] = {
     def intOf(m: Map[String, String], key: String, dflt: Int, min: Int): Either[String, Int] =
@@ -286,6 +296,11 @@ object ProofSearchLoop extends IOApp {
       excl   <- onOff(m, "exclude-target", RetrievalConfig.default.excludeTarget)
       deps   <- onOff(m, "expand-deps", RetrievalConfig.default.expandDeps)
       scorer <- m.get("scorer").fold[Either[String, ScorerSpec]](Right(Scorers.default))(Scorers.byName)
+      auto   <- m.get("auto").fold[Either[String, AutoMode]](Right(AutoMode.Off))(AutoMode.parse)
+      // The hints are retrieval's accepted lemmas: without the retrieval
+      // proposer there is no exclusion-checked pool to take them from.
+      _      <- if (auto == AutoMode.Hints && prop != "retrieval")
+                  Left("--auto hints requires --proposer retrieval") else Right(())
     } yield LoopHarnessConfig(
       index         = Paths.get(ix),
       ids           = ids,
@@ -299,7 +314,8 @@ object ProofSearchLoop extends IOApp {
       proposerKind  = prop,
       corpus        = corpus,
       retrieval     = RetrievalConfig.default.copy(topK = topK, excludeTarget = excl, expandDeps = deps),
-      scorer        = scorer
+      scorer        = scorer,
+      auto          = auto
     )
   }
 
@@ -321,13 +337,14 @@ object ProofSearchLoop extends IOApp {
       timeoutSec = cfg.serverTimeout,
       cwd        = cfg.projectRoot,
       stderrLog  = cfg.runRoot.resolve("server-stderr.log"),
-      corpus     = cfg.corpus
+      corpus     = cfg.corpus,
+      auto       = cfg.auto != AutoMode.Off
     )
     for {
       entries <- Scaffold.readIndex(cfg.index, cfg.ids)
       _       <- IO.raiseWhen(entries.isEmpty)(new RuntimeException("no obligations matched"))
       _       <- IO.blocking(Files.createDirectories(cfg.runRoot))
-      _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"} proposer=${cfg.proposerKind}${cfg.corpus.fold("")(c => s" corpus=$c retrieveK=${cfg.retrieval.topK} excludeTarget=${if (cfg.retrieval.excludeTarget) "on" else "off"} scorer=${cfg.scorer.name}")}")
+      _       <- IO.println(s">> proof-search loop: ${entries.size} obligation(s), beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"} proposer=${cfg.proposerKind}${cfg.corpus.fold("")(c => s" corpus=$c retrieveK=${cfg.retrieval.topK} excludeTarget=${if (cfg.retrieval.excludeTarget) "on" else "off"} scorer=${cfg.scorer.name}")}${if (cfg.auto == AutoMode.Off) "" else s" auto=${cfg.auto.tag}"}")
       _       <- IO.println(s">> run root: ${cfg.runRoot}")
       // Hash the corpus and read its provenance sibling BEFORE the sweep: a
       // malformed sibling fails the run here, in seconds, rather than
@@ -412,6 +429,8 @@ object ProofSearchLoop extends IOApp {
       // ledger accumulated BEFORE a mid-fixture raise (#130 review, round 3):
       // the honesty ledger matters most precisely on failed runs.
       retrRef <- Ref.of[IO, Option[RetrievalProposer]](None)
+      // Likewise the ledger of Agda's own proof search (issue #206).
+      autoRef <- Ref.of[IO, Option[AutoCloseProposer]](None)
       // The first goal the loop fetched (the root), kept outside the
       // recovered effect so an anomaly after `get_goal` still reports the
       // root display and its context (PR #152 review, round four).
@@ -461,7 +480,20 @@ object ProofSearchLoop extends IOApp {
                                ).map(Option(_))
                              else IO.pure(Option.empty[RetrievalProposer])
                 _        <- retrRef.set(retriever)
-                proposer  = retriever.getOrElse(base)
+                // #206: Agda's own proof search wraps whichever space is
+                // configured, proposing its term first at every state; with
+                // the knob off nothing is wrapped and the loop is unchanged.
+                closer   <- if (cfg.auto == AutoMode.Off) IO.pure(Option.empty[AutoCloseProposer])
+                            else AutoCloseProposer.create(
+                                   inner    = retriever.getOrElse(base),
+                                   mode     = cfg.auto,
+                                   search   = (ob, hints) =>
+                                     oracle.auto(mkCtx("auto", None), st.workFile, ob, hints).map(_.body),
+                                   hintsFor = goal =>
+                                     retriever.fold(IO.pure(Vector.empty[String]))(_.lemmasFor(goal))
+                                 ).map(Option(_))
+                _        <- autoRef.set(closer)
+                proposer  = closer.getOrElse(retriever.getOrElse(base))
                 hooks    = BeamLoop.Hooks(onGoal = v => rootRef.update(_.orElse(Some(v))), onProbe = { ev =>
                              for {
                                n      <- counter.updateAndGet(_ + 1)
@@ -503,6 +535,7 @@ object ProofSearchLoop extends IOApp {
                 attempts <- rows.get
                 module    = result.rootGoal.flatMap(_.module).getOrElse("")
                 retrStats <- retriever.traverse(_.stats.map(retrievalJson))
+                autoStats <- closer.traverse(_.stats.map(_.toJson(cfg.auto)))
                 outcome   = LoopOutcome(
                               benchmarkId  = entry.id,
                               difficulty   = entry.difficulty.tag,
@@ -517,7 +550,8 @@ object ProofSearchLoop extends IOApp {
                               retrieval    = retrStats,
                               source       = entry.source,
                               tags         = entry.tags,
-                              goalContext  = result.rootGoal.map(_.context)
+                              goalContext  = result.rootGoal.map(_.context),
+                              auto         = autoStats
                             )
               } yield (outcome, fixtureRow(module, Some(result), solvedPath, wallMs, anomalous = false), attempts)
           }
@@ -537,13 +571,14 @@ object ProofSearchLoop extends IOApp {
             // The retrieval ledger accumulated before the raise: every cut
             // already counted stays counted (#130 review, round 3).
             retr     <- retrRef.get.flatMap(_.traverse(_.stats.map(retrievalJson)))
+            autoJs   <- autoRef.get.flatMap(_.traverse(_.stats.map(_.toJson(cfg.auto))))
             root     <- rootRef.get
           } yield (
             LoopOutcome(entry.id, entry.difficulty.tag, root.map(_.goal).getOrElse(entry.typeSig),
               root.flatMap(_.module).getOrElse(""), "anomaly",
               solved = false, Vector.empty, partial, wallMs, Some(e.getMessage),
               retrieval = retr, source = entry.source, tags = entry.tags,
-              goalContext = root.map(_.context)),
+              goalContext = root.map(_.context), auto = autoJs),
             fixtureRow("", None, None, wallMs, anomalous = true),
             attempts
           )
@@ -603,6 +638,13 @@ object ProofSearchLoop extends IOApp {
 
   private val batchPhases     = Set("check_file", "fill_hole", "final_check")
   private val knowledgePhases = Set("get_goal", "type_of", "peek")
+
+  /** The knowledge phases a ledger holds: the lane's three, plus "auto"
+    * (issue #206) when a sweep ran Agda's own proof search, so the split of
+    * a knob-off sweep is the split it was before the knob, key for key.
+    */
+  private def knowledgeOf(rows: Vector[TimingRow]): Set[String] =
+    if (rows.exists(_.phase == "auto")) knowledgePhases + "auto" else knowledgePhases
   private val retrievalPhases = Set("retrieval")
 
   private def aggregate(rows: Vector[TimingRow]): Json = {
@@ -622,10 +664,11 @@ object ProofSearchLoop extends IOApp {
     }
     val proposal = rows.filter(_.phase == "proposal")
     val batchMs  = rows.filter(r => batchPhases(r.phase) && !r.cached).map(_.clientMs).sum
-    val knowMs   = rows.filter(r => knowledgePhases(r.phase) && !r.cached).map(_.clientMs).sum
+    val know     = knowledgeOf(rows)
+    val knowMs   = rows.filter(r => know(r.phase) && !r.cached).map(_.clientMs).sum
     Json.obj(
       "batch"     -> phaseObj(batchPhases),
-      "knowledge" -> phaseObj(knowledgePhases),
+      "knowledge" -> phaseObj(know),
       // P2 (#123): corpus lookups are the proposer's tool calls — its own
       // category in the split, since retrieval is the first proposer whose
       // time can be material.  BeamLoop already subtracts these rows from
@@ -680,7 +723,10 @@ object ProofSearchLoop extends IOApp {
         "excludeTarget" -> cfg.retrieval.excludeTarget.asJson,
         "expandDeps"    -> cfg.retrieval.expandDeps.asJson,
         "scorer"        -> cfg.scorer.name.asJson
-      ),
+      ).deepMerge(
+        // #206's knob, recorded only when on: absent means off, as in every
+        // report before the knob, so an off report reproduces them exactly.
+        if (cfg.auto == AutoMode.Off) Json.obj() else Json.obj("auto" -> cfg.auto.tag.asJson)),
       "corpus" -> corpusInfo.getOrElse(Json.Null),
       "obligations" -> entries.size.asJson,
       "timestamp"   -> java.time.Instant.now().toString.asJson,
@@ -712,12 +758,12 @@ object ProofSearchLoop extends IOApp {
       f"$s%-24s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  (${sel.count(_.searchStatus == "exhausted")} exhausted, ${sel.count(_.searchStatus == "budget_exceeded")} budget, ${sel.count(_.searchStatus == "anomaly")} anomaly)"
     }.mkString("\n|")
     val batch  = ledger.filter(r => batchPhases(r.phase) && !r.cached)
-    val know   = ledger.filter(r => knowledgePhases(r.phase) && !r.cached)
+    val know   = ledger.filter(r => knowledgeOf(ledger)(r.phase) && !r.cached)
     val retr   = ledger.filter(r => retrievalPhases(r.phase) && !r.cached)
     val peeks  = outcomes.map(_.stats.peeks).sum
     val prej   = outcomes.map(_.stats.peekRejects).sum
     f"""
-       |== proof-search loop (beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"}) ==
+       |== proof-search loop (beam=${cfg.loop.beamWidth} depth=${cfg.loop.maxDepth} budget=${cfg.loop.probeBudget} dedup=${cfg.loop.dedup.tag} peek=${if (cfg.loop.peek) "on" else "off"}${if (cfg.auto == AutoMode.Off) "" else s" auto=${cfg.auto.tag}"}) ==
        |$perTier
        |$perStratum
        |solved total: ${outcomes.count(_.solved)}/${outcomes.size}

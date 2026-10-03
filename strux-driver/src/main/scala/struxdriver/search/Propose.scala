@@ -88,6 +88,16 @@ final case class GoalView(goal: String, context: Vector[CtxEntry], module: Optio
   */
 trait Proposer {
   def propose(state: SearchState, target: Obligation, goal: GoalView): IO[Vector[String]]
+
+  /** Whether the loop probes this candidate without the type_of peek.  The
+    * peek is a textual judgement, so it is skipped exactly where it is known
+    * to misjudge and a probe costs no more than the peek: by default the two
+    * nullary closers (#127's measured false rejection).  A proposer whose
+    * candidates Agda itself has already typed at the goal (Agda's own proof
+    * search, issue #206) adds those.  Skipping the peek never skips the
+    * judgement: fill_hole still decides.
+    */
+  def unpeeked(candidate: String): IO[Boolean] = IO.pure(FixedProposer.closers.contains(candidate))
 }
 
 /** One `open import M using ( … )` line of a fixture: the module name and the

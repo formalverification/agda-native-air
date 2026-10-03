@@ -476,6 +476,21 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     proposer2.propose(state0, state0.obligations.head, goal).unsafeRunSync() shouldBe cands
   }
 
+  test("lemmasFor: the goal's accepted renderings in rank order, after exclusion, from the same memo (#206)") {
+    val (p, _, _) = freshProposer()
+    val lemmas = p.lemmasFor(goal).unsafeRunSync()
+    lemmas shouldBe Vector(
+      "+-suc", "Relation.Binary.PropositionalEquality.trans",
+      "Data.Nat.Properties.*-comm", "Data.Nat.Properties.≤-refl")
+    // The excluded target and its record-field projection are never hints.
+    lemmas.exists(_.endsWith("+-comm")) shouldBe false
+    // Asking first changes neither what is proposed nor what the ledger says.
+    val cands  = p.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val (q, _, _) = freshProposer()
+    q.propose(state0, state0.obligations.head, goal).unsafeRunSync() shouldBe cands
+    p.stats.unsafeRunSync() shouldBe q.stats.unsafeRunSync()
+  }
+
   test("propose: the stats ledger names every cut") {
     val (proposer, _, _) = freshProposer()
     proposer.propose(state0, state0.obligations.head, goal).unsafeRunSync()
