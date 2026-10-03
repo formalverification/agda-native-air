@@ -146,6 +146,7 @@ module AgdaMCP.Types
   , CorpusIndex (..)
     -- * Tool parameters (inbound) — search
   , SearchByNameParams (..)
+  , InScopeAt (..)
   , SearchByTypeParams (..)
   , GetDependenciesParams (..)
     -- * Tool results (outbound) — search
@@ -1567,13 +1568,38 @@ data CorpusIndex = CorpusIndex
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- | Parameters for the @search_by_name@ tool.
+--
+-- With @inScopeAt@ (issue #203) the question becomes which of the matching
+-- names a file can write, and how: the call is answered by search_in_scope's
+-- handler, the name pattern its query (see 'AgdaMCP.Tools.Search.inScopeParams').
 data SearchByNameParams = SearchByNameParams
-  { sbnPattern :: Text       -- ^ Substring pattern to match against prettyQname / prettyName.
-  , sbnLimit   :: Maybe Int  -- ^ Maximum results (default: 20).
+  { sbnPattern   :: Text             -- ^ Substring pattern to match against prettyQname / prettyName.
+  , sbnLimit     :: Maybe Int        -- ^ Maximum results (default: 20; 8 accepted names with inScopeAt).
+  , sbnInScopeAt :: Maybe InScopeAt  -- ^ Keep only what this file can write there.
   } deriving (Eq, Show)
 instance FromJSON SearchByNameParams where
   parseJSON = withObject "SearchByNameParams" $ \o ->
-    SearchByNameParams <$> o .: "pattern" <*> o .:? "limit"
+    SearchByNameParams <$> o .: "pattern" <*> o .:? "limit" <*> o .:? "inScopeAt"
+
+-- | Where @search_by_name@'s answer is scoped (issue #203): a file, and
+-- optionally a position in it, whose scope (a hole's, when the position is
+-- inside one) decides which names can be written and how.  The same address
+-- rules as search_in_scope: @column@ or @col@, never both, and either only
+-- with a line.
+data InScopeAt = InScopeAt
+  { isaFilePath :: FilePath
+  , isaLine     :: Maybe Int
+  , isaColumn   :: Maybe Int
+  , isaReload   :: Bool
+  } deriving (Eq, Show)
+instance FromJSON InScopeAt where
+  parseJSON = withObject "InScopeAt" $ \o -> do
+    mLine <- o .:? "line"
+    InScopeAt
+      <$> o .: "filePath"
+      <*> pure mLine
+      <*> scopeColumn mLine o
+      <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @search_by_type@ tool.
 data SearchByTypeParams = SearchByTypeParams

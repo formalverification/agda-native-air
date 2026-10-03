@@ -759,7 +759,7 @@ because env tokens can shadow your stored auth.
 `agda-mcp` is an MCP server that lets AI coding agents (Claude Code, Codex CLI,
 Cursor, etc.) interact with Agda through standard tool calls.
 
-The server exposes **fourteen tools**:
+The server exposes **thirteen tools** by default:
 
 +  **core proof-state tools** (4): `get_goal`, `fill_hole`, `check_file`,
    `get_diagnostics`,
@@ -767,11 +767,13 @@ The server exposes **fourteen tools**:
 +  **live-query tools** answered by a persistent interaction lane (5): `type_of`,
    `normalize`, `resolve_name`, `definition_of`, `exports_of` (issue #75; see
    `docs/agda-mcp/agda-mcp-interaction-lane.md`), all always available,
-+  **corpus-backed tools** (4): the three lookups `search_by_name`,
-   `search_by_type`, `get_dependencies`, and the scope-aware `search_in_scope`
-   (issue #17), which returns only rows the queried file can name, each typed by
-   the interaction lane; all four are registered only when you start the server
-   with `--corpus PATH` (an agda-strux JSONL corpus).
++  **corpus-backed tools** (3): `search_by_name`, `search_by_type`,
+   `get_dependencies`, registered only when you start the server with
+   `--corpus PATH` (an agda-strux JSONL corpus).  `search_by_name` with
+   `inScopeAt: {filePath, line?, column?}` returns only the names that file can
+   write, each typed by the interaction lane in its scope (issue #203); the
+   scope-aware tool behind it, `search_in_scope` (issue #17), is registered too
+   and presented when `--expose` names it.
 
 `--expose NAME,...` presents a subset of them (issue #191).  For the full
 command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`, `--corpus`,
@@ -1071,9 +1073,9 @@ means, and Agda's own exit code, which the verdict is read from).  See
 #### The search corpus
 
 **`--corpus <abs-path>.jsonl` turns on the search tools**.  `search_by_name`,
-`search_by_type`, `get_dependencies`, and `search_in_scope` appear in `tools/list` only
-when a corpus is loaded, so a registration without one shows 10 tools in `/mcp` rather
-than 14; the proof-state tools do not need one.  The released agda-algebras corpus
+`search_by_type`, and `get_dependencies` appear in `tools/list` only when a corpus is
+loaded, so a registration without one shows 10 tools in `/mcp` rather than 13 (14 with
+`search_in_scope` exposed); the proof-state tools do not need one.  The released agda-algebras corpus
 (v0.1: 13,123 rows, taken at agda-algebras commit `4662373d`) is one download:
 
 ```sh

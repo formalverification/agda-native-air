@@ -21,11 +21,14 @@
   *    where the arm has a shell.  A tool presented beyond the arm's set is an
   *    anomaly, so the set has to be exact.
   *  - An arm with the server admits ANY `mcp__agda__` tool rather than a fixed
-  *    list, because the server's surface grows: it exposed thirteen tools when
-  *    the archived arms ran and fourteen since `search_in_scope` landed (PR
-  *    #161, issue #17).  `Subject.agdaToolsRequired` is the floor every such
-  *    arm must have; what was actually presented is recorded per subject, so
-  *    the report says which surface a run measured instead of assuming one.
+  *    list, because the server's surface changes: it exposed thirteen tools
+  *    when the archived arms ran, fourteen once `search_in_scope` landed (PR
+  *    #161, issue #17), and thirteen again by default since issue #203, which
+  *    presents `search_in_scope` only under `--expose` and asks its question
+  *    through `search_by_name`'s `inScopeAt`.  `Subject.agdaToolsRequired` is
+  *    the floor every such arm must have; what was actually presented is
+  *    recorded per subject, so the report says which surface a run measured
+  *    instead of assuming one.
   *  - A run with `--expose` (issue #191) presents a subset, and then the
   *    subset is the exact expectation both ways: every exposed tool must
   *    arrive, and an agda tool outside it is as foreign as Bash on the mcp

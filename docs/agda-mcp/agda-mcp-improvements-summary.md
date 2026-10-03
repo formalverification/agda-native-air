@@ -15,7 +15,7 @@ Status is as of 2026-08-20.
    +  `check_file`, `get_diagnostics`, `get_goal`, and `fill_hole` for one file;
    +  `check_project` for the project's own acceptance gate;
    +  five live-query tools (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`) answered by a persistent `agda --interaction-json` child per project root;
-   +  corpus-backed search tools (`search_by_name`, `search_by_type`, `get_dependencies`) when started with `--corpus`.
+   +  corpus-backed search tools (`search_by_name`, with `inScopeAt` for the names a file can write since issue #203, `search_by_type`, `get_dependencies`) when started with `--corpus`.
 
    Verdict-producing tools call the pinned `agda` binary as a batch subprocess per request; the live queries ride the interaction lane (`docs/agda-mcp/agda-mcp-interaction-lane.md`); Agda-as-a-library is the long-term plan.
 

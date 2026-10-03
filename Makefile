@@ -751,9 +751,11 @@ agda-mcp-test:
 
 # Fast end-to-end sanity: build the server, then drive the real binary with a
 # canned JSON-RPC sequence (initialize + tools/list) and assert it answers and
-# registers all fourteen tools, one name per tool family: proof-state, the
-# project gate, the #75 live queries, search, and the #17 scope-aware
-# retrieval.  Complements agda-mcp-test,
+# presents the thirteen tools of the default surface, one name per tool
+# family: proof-state, the project gate, the #75 live queries, and search,
+# with search_by_name's inScopeAt (#203), which asks the #17 scope-aware
+# question there; search_in_scope itself is presented only when --expose
+# names it.  Complements agda-mcp-test,
 # which exercises the tool handlers directly but not the server's stdio
 # JSON-RPC loop.  No Agda needed.
 agda-mcp-smoke:
@@ -761,8 +763,8 @@ agda-mcp-smoke:
 	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:agda-mcp && \
 	  BIN=$$(cabal list-bin exe:agda-mcp) && \
 	  OUT=$$("$$BIN" --corpus "$(AGDA_MCP_CORPUS)" < "$(AGDA_MCP_SMOKE_INPUT)" || true) && \
-	  if echo "$$OUT" | grep -q serverInfo && echo "$$OUT" | grep -q get_goal && echo "$$OUT" | grep -q check_project && echo "$$OUT" | grep -q resolve_name && echo "$$OUT" | grep -q search_by_name && echo "$$OUT" | grep -q search_in_scope; then \
-	    echo "agda-mcp-smoke: OK: server responds and registers core + project + live-query + search + search_in_scope tools"; \
+	  if echo "$$OUT" | grep -q serverInfo && echo "$$OUT" | grep -q get_goal && echo "$$OUT" | grep -q check_project && echo "$$OUT" | grep -q resolve_name && echo "$$OUT" | grep -q search_by_name && echo "$$OUT" | grep -q inScopeAt; then \
+	    echo "agda-mcp-smoke: OK: server responds and presents core + project + live-query + search tools and inScopeAt"; \
 	  else \
 	    echo "agda-mcp-smoke: FAILED — server did not answer as expected; see its stderr above. stdout was:"; \
 	    echo "$$OUT"; \

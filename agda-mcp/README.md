@@ -2,10 +2,12 @@
 
 # agda-mcp
 
-> **Status: v0.2.0 (M1-3)**.  Fourteen tools over stdio transport: four core
+> **Status: v0.2.0 (M1-3)**.  Thirteen tools over stdio transport: four core
 > proof-state tools, the whole-project gate, five live-query tools answered by
-> a persistent interaction lane (issue #75), plus four corpus-backed tools:
-> three search lookups and the scope-aware `search_in_scope` (issue #17).
+> a persistent interaction lane (issue #75), plus three corpus-backed search
+> tools, of which `search_by_name` also answers which names a file can write
+> (`inScopeAt`, issue #203).  A fourteenth, the scope-aware `search_in_scope`
+> (issue #17), is registered and presented when `--expose` names it.
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
 Agda's proof engine — batch typechecking verdicts, goal introspection, and
@@ -91,10 +93,14 @@ For Claude Code setup and MCP client configuration, see [Configuring MCP Clients
 
 ## Tool Surface
 
-Fourteen tools are implemented: four core proof-state tools (Milestone [M1-2]),
-the whole-project gate (issue #78), five live-query tools over the interaction
-lane (issue #75), three corpus-backed search tools (Milestone [M1-3]), and the
-scope-aware retrieval tool `search_in_scope` (issue #17, phase 1).
+Fourteen tools are implemented, and thirteen are presented by default: four
+core proof-state tools (Milestone [M1-2]), the whole-project gate (issue #78),
+five live-query tools over the interaction lane (issue #75), and three
+corpus-backed search tools (Milestone [M1-3]).  The fourteenth, the
+scope-aware retrieval tool `search_in_scope` (issue #17, phase 1), is presented
+only when `--expose` names it, since issue #203: its question, which names this
+file can write and how, is asked on the default surface through
+`search_by_name`'s `inScopeAt`.
 Navigation tools and neural premise selection are planned for later
 milestones; see [GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
 
@@ -338,14 +344,19 @@ surface.
 
 | Tool | Description |
 |------|-------------|
-| `search_by_name`    | Find definitions whose name matches a substring (case-insensitive). |
+| `search_by_name`    | Find definitions whose name matches a substring (case-insensitive); with `inScopeAt`, only the names a file can write, each with its spelling and type there (issue #203). |
 | `search_by_type`    | Find definitions whose type signature contains a substring. |
 | `get_dependencies`  | Return a definition's dependencies, optionally expanded one hop. |
 
 ### Scope-aware retrieval (issue #17)
 
 The fourth corpus tool is registered with the three lookups and is the one corpus
-tool that also takes the interaction lane.  It answers the question the three
+tool that also takes the interaction lane.  Since issue #203 it is presented only
+when `--expose` names it: offered in 681 archived agent-bench sessions it was
+called once, while its description was 17 % of every turn's `tools/list`, and
+`search_by_name`'s `inScopeAt` now asks its name question with this tool's
+handler.  What only this tool offers is the type-token query, the query derived
+from a hole's goal, exclusions, and the probe budget.  It answers the question the three
 lookups cannot: of the corpus rows that could help *here*, which ones can this
 file actually name, and what does Agda say each one's type is?
 
@@ -393,11 +404,11 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--cwd DIR`          | Working directory to enter before anything else.  Every later relative path (`--corpus`, client file paths, gate discovery) resolves inside it, and the checking `agda` runs there, so Agda's own project discovery (the nearest `*.agda-lib`) anchors to it.  Set it to the client project's checkout root when this server checks a project it is not started in (issue #103).  A directory the server cannot enter is a fatal startup error, reported by name. |
 | `--agda-bin PATH`    | Path to the `agda` binary (default: `agda` on `PATH`). |
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
-| `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the four corpus tools (`search_by_name`, `search_by_type`, `get_dependencies`, `search_in_scope`). |
+| `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the four corpus tools (`search_by_name`, `search_by_type`, `get_dependencies`, `search_in_scope`), the last presented only when `--expose` names it. |
 | `--timeout N`        | Per-typecheck timeout in seconds (default: 300; `0` means no limit).  Enforced: on expiry the `agda` process group is killed and the tool reports a timeout.  Size it for a *cold* first check; see below. |
 | `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect, and nothing this server puts around your gate can mask its exit code.  (A wrapper *script* you name here can still lie about its own; that is what `maskedFailure` catches.)  Without it, `check_project` discovers the gate (see below). |
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
-| `--expose NAMES`     | Present only these tools (comma-separated, issue #191): `tools/list` lists them alone, the `initialize` instructions name them alone, and a call to any other registered tool is refused by name.  A name this configuration does not register (a typo, or a corpus tool without `--corpus`) is a fatal startup error, never a silently smaller surface. |
+| `--expose NAMES`     | Present only these tools (comma-separated, issue #191): `tools/list` lists them alone, the `initialize` instructions name them alone, and a call to any other registered tool is refused by name.  Without it every registered tool is presented but `search_in_scope`, which only this flag presents (issue #203).  A name this configuration does not register (a typo, or a corpus tool without `--corpus`) is a fatal startup error, never a silently smaller surface. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
 
@@ -916,6 +927,39 @@ optional `limit`.
   {"prettyQname": "Homomorphisms.Basic.hom", "type": "...", "module": "Homomorphisms.Basic", "defKind": "function", "hasBody": true}
 ]
 ```
+
+**Which of these can this file write, and how? (`inScopeAt`, issue #203)**.
+Add `inScopeAt: {filePath, line?, column?, reload?}` and the call is
+`search_in_scope`'s with the pattern as its name query (`query: {name}`), on
+the interaction lane: only the names that file can write come back, each with
+`rendering`, the spelling to write (bare when the file opens the module,
+qualified when it only imports it, through the importing module when that is
+how the name reaches the file), and `type`, Agda's printing of that rendering
+in the file's scope, the hole's when `line`/`column` address one.  The answer
+is [`search_in_scope`](#search_in_scope)'s, ledger included, so a negative is
+honest: `hits > 0` with `inScope: 0` means the name exists and the file does
+not import its module.  With `inScopeAt`, `limit` counts accepted names
+(default 8), only definitions are returned (records, data types, and
+constructors are counted in `ledger.nonFunction`), the first call on a file
+pays its lane load, and `verbose: true` restores the lane echo.
+
+```json
+{ "pattern": "≈ⁿ-trans",
+  "inScopeAt": { "filePath": "/abs/data/benchmarks/agda-algebras-composition-v0/obligations/Group-normal-of-equivalent-congruence.agda",
+                 "line": 28, "column": 57 } }
+```
+
+answers `rendering: "Classical.Structures.Group.Congruences.GroupCongruences.≈ⁿ-trans"`,
+the qualified spelling that file can write, where the archived subject's
+`type_of` on the bare `≈ⁿ-trans` had answered `NotInScope`.
+
+Why it is here and not only in its own tool, measured on issue #203 over the 51
+archived agent-bench runs: `search_in_scope` was presented in 681 sessions and
+called once; in the same sessions 286 asked its question some other way
+(`search_by_name` in 103, `exports_of` in 103, `grep` in 137, and 29 calls that
+failed with `NotInScope`), and replayed through it, 17 of those questions got a
+spelling Agda typed in the file's scope (11), an honest "exists, not imported"
+(3), a corpus row the library refused (1), or noise from a short substring (2).
 
 #### `search_by_type`
 

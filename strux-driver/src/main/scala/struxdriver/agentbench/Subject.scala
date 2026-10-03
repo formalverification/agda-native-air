@@ -142,7 +142,8 @@ object Subject {
 
   /** Every tool the server registers with a corpus, as it names them, in its
     * own order: the fourteen of issue #191's surface, and what `--expose` may
-    * name.
+    * name.  Since issue #203 the server presents thirteen of them by default:
+    * `search_in_scope` only when `--expose` names it.
     */
   val serverTools: Vector[String] = Vector(
     "get_goal", "fill_hole", "check_file", "get_diagnostics", "check_project",
