@@ -260,17 +260,21 @@ instance ToJSON CtxEntry where
 -- | parseHoleRef: read the hole address out of a tool call's arguments
 -- (issue #79).
 --
--- The wire spelling is two alternatives — @line@ + @column@ (the position, the
--- handle to prefer) or @holeIndex@ (source-order, shift-prone, kept for
--- backward compatibility) — parsed into the one 'HoleRef' the handlers take.
--- @col@ is accepted in place of @column@ because that is how the hole listings
--- spell it, so a hole entry can be passed back without renaming a key.
+-- The wire spelling is two alternatives, or neither: @line@ + @column@ (the
+-- position, the handle to prefer), @holeIndex@ (source-order, shift-prone,
+-- kept for backward compatibility), or since issue #201 no address key at all;
+-- parsed into the one 'HoleRef' the handlers take.  @col@ is accepted in place
+-- of @column@ because that is how the hole listings spell it, so a hole entry
+-- can be passed back without renaming a key.
 --
--- The accepted shapes are exactly three: @holeIndex@, @line@ + @column@, and
--- @line@ + @col@.  They are the alternatives the tools' input schema advertises
--- as its @oneOf@ (see 'AgdaMCP.Server.addressAlternatives'), so a client that
--- validates its arguments and a client that just sends them get the same answer
--- about what is a legal request.
+-- The accepted shapes are exactly four: @holeIndex@, @line@ + @column@,
+-- @line@ + @col@, and none of the four keys ('Unaddressed').  They are the
+-- alternatives the tools' input schema advertises as its @oneOf@ (see
+-- 'AgdaMCP.Server.addressAlternatives'), so a client that validates its
+-- arguments and a client that just sends them get the same answer about what
+-- is a legal request; the suite checks the two against each other over every
+-- combination of the keys.  A key whose value is @null@ counts as absent, the
+-- rule for every optional argument (issue #184).
 --
 -- Every other combination is a parse failure naming the fix, because each one is
 -- a client that does not know which hole it is asking about:

@@ -1865,6 +1865,17 @@ holeAddressingTests = do
           Left msg -> assert ("message: " <> T.unpack msg)
                         ("Empty.agda has no holes" `T.isInfixOf` msg)
 
+    -- A null counts as an absent key, the rule every optional argument follows
+    -- (pinned for verbose in tier 2h): so an all-null address is a call with
+    -- no address, and a null beside a real spelling is ignored.
+    , runTest "params: a null address key counts as absent (#201)" $
+        assertEqual "refs"
+          [ Right Unaddressed, Right (ByPosition 7 5), Right (ByIndex 0) ]
+          [ decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":null,\"column\":null}"
+          , decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"holeIndex\":null}"
+          , decodeGoalParams "{\"filePath\":\"F.agda\",\"holeIndex\":0,\"col\":null}"
+          ]
+
     , runTest "params: holeIndex alone parses as an index reference" $
         assertEqual "ref" (Right (ByIndex 2))
           (decodeGoalParams "{\"filePath\":\"F.agda\",\"holeIndex\":2}")
