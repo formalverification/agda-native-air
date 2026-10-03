@@ -155,35 +155,66 @@ Add the following to your Emacs configuration (`~/.config/doom/config.el` under
 Doom Emacs, your `init.el` otherwise):
 
 ```elisp
-;; agda-native-air: run the repository's pinned Agda with the library registry
-;; its dev shell writes (agda/libraries at the checkout's root) and its AGDA_DIR,
-;; for files in any checkout, without starting Emacs inside `nix develop'.
+;; Agda per checkout.  One Agda process serves every buffer, and agda-mode
+;; reads `agda2-program-name' and `agda2-program-args' only when it starts
+;; that process, so the process keeps the library registry of the checkout it
+;; was started for.  This picks the program by the buffer's checkout, and
+;; restarts the process when C-c C-l comes from a different checkout:
+;;  + agda-native-air: its pinned Agda, its agda/libraries, and its AGDA_DIR;
+;;  + any checkout whose dev shell writes the wrapper .agda/bin/agda (as
+;;    agda-algebras' does): that wrapper, which names its own registry;
+;;  + anything else: `agda2-program-name' as configured.
 ;; agda-mode starts Agda from the mode's body, before any hook or directory-local
 ;; variable applies, so the settings are bound around `agda2-restart' itself.
-;; One Agda process serves every buffer: after moving between projects, restart
-;; it with C-c C-x C-r.
 (defvar my/air-agda (expand-file-name "~/.cache/agda-native-air/agda/bin/agda")
   "The pinned Agda 2.8.0 of agda-native-air, kept alive by a GC root.")
 
-(defun my/air-agda-restart (restart &rest args)
-  "Around `agda2-restart': in an agda-native-air checkout, use its Agda and registry."
-  (if-let* ((file (buffer-file-name))
-            (root (locate-dominating-file file "agda-dojang/agda-dojang.agda-lib"))
-            (registry (expand-file-name "agda/libraries" root))
-            ((file-exists-p registry)))
-      (let ((agda2-program-name my/air-agda)
-            (agda2-program-args (list (concat "--library-file=" registry)))
-            (process-environment (cons (concat "AGDA_DIR=" (expand-file-name "agda" root))
-                                       process-environment)))
-        (apply restart args))
-    (apply restart args)))
+(defvar my/agda-process-root nil
+  "The checkout the running Agda process was started for, or nil.")
+
+(defun my/agda-checkout (file)
+  "The list (ROOT PROGRAM ARGS AGDA-DIR) for FILE's checkout, or nil."
+  (cond
+   ((when-let* ((root (locate-dominating-file file "agda-dojang/agda-dojang.agda-lib"))
+                (registry (expand-file-name "agda/libraries" root))
+                ((file-exists-p registry)))
+      (list root my/air-agda (list (concat "--library-file=" registry))
+            (expand-file-name "agda" root))))
+   ((when-let* ((root (locate-dominating-file file ".agda/bin/agda")))
+      (list root (expand-file-name ".agda/bin/agda" root) nil
+            (expand-file-name ".agda" root))))))
+
+(defun my/agda-restart (restart &rest args)
+  "Around `agda2-restart': start the Agda of the current buffer's checkout."
+  (let ((checkout (and (buffer-file-name) (my/agda-checkout (buffer-file-name)))))
+    (setq my/agda-process-root (car checkout))
+    (if (null checkout)
+        (apply restart args)
+      (pcase-let ((`(,_root ,program ,program-args ,agda-dir) checkout))
+        (let ((agda2-program-name program)
+              (agda2-program-args program-args)
+              (process-environment (cons (concat "AGDA_DIR=" agda-dir)
+                                         process-environment)))
+          (apply restart args))))))
+
+(defun my/agda-load (load &rest args)
+  "Around `agda2-load': restart Agda first if the buffer is in another checkout."
+  (let ((root (and (buffer-file-name) (car (my/agda-checkout (buffer-file-name))))))
+    (unless (equal root my/agda-process-root)
+      (agda2-restart))
+    (apply load args)))
 
 (with-eval-after-load 'agda2-mode
-  (advice-add 'agda2-restart :around #'my/air-agda-restart))
+  (advice-add 'agda2-restart :around #'my/agda-restart)
+  (advice-add 'agda2-load :around #'my/agda-load))
 ```
 
-Then, in a buffer of the checkout, `C-c C-x C-r` restarts Agda and `C-c C-l`
-loads the file.  The snippet is shaped by the following facts:
+If your configuration has the earlier version of this snippet, whose advice
+was `my/air-agda-restart`, replace it with this one.
+
+Then `C-c C-l` in a buffer of the checkout loads the file, restarting Agda
+first if the running process was started for another checkout; `C-c C-x C-r`
+still restarts it by hand.  The snippet is shaped by the following facts:
 
 +  agda-mode starts Agda from the major mode's own body, before mode hooks or
    directory-local variables apply, so a hook or a `.dir-locals.el` would take
@@ -196,9 +227,17 @@ loads the file.  The snippet is shaped by the following facts:
 +  `AGDA_DIR` points at the checkout's `agda/`, so a file with no `.agda-lib` of
    its own (the standard-library benchmark tiers, for instance) gets the
    registry's defaults, `agda-dojang` and `standard-library`;
-+  one Agda process serves every buffer, so after moving between checkouts, or
-   between this repository and another project, restart it with `C-c C-x C-r`;
-   files outside a checkout keep whatever Agda your configuration already uses.
++  one Agda process serves every buffer, and agda-mode reads the program and
+   its arguments only when it starts that process, so the process keeps the
+   registry of the checkout it was started for; a file from another checkout
+   fails against that registry, with an error that depends on what the
+   registry names (`ModuleDefinedInOtherFile` when it finds the file's module
+   in another worktree, `AmbiguousTopLevelModuleName` when it finds the module
+   in two libraries, `Library 'agda-dojang' not found` when it names no
+   `agda-dojang`), so the snippet records the checkout the process serves and
+   restarts it when `C-c C-l` comes from another;
++  files outside every checkout the snippet recognizes keep whatever Agda your
+   configuration already uses.
 
 agda-mode refuses an Agda whose version differs from its own.  If your Emacs
 has no agda-mode 2.8.0, load the pinned one instead of your own:
@@ -211,6 +250,23 @@ has no agda-mode 2.8.0, load the pinned one instead of your own:
 The same three settings serve any other editor: run
 `~/.cache/agda-native-air/agda/bin/agda` with
 `--library-file=<checkout>/agda/libraries` and `AGDA_DIR=<checkout>/agda`.
+
+### 3. Other Agda projects in the same Emacs
+
+The snippet's second clause serves any project whose dev shell writes, at the
+root of each checkout, a self-contained wrapper `.agda/bin/agda` that runs the
+project's pinned Agda with that checkout's registry; agda-algebras' dev shell
+writes one.  For such a project, two facts apply, as follows:
+
++  enter its dev shell once in each checkout, and again when the checkout's
+   `flake.lock` moves, to write the wrapper;
++  the wrapper calls an Agda in the Nix store by its path, so if garbage
+   collection removes that Agda, agda-mode reports its version as "unknown",
+   and entering the dev shell there again restores it.
+
+For a project with another layout, add a clause to `my/agda-checkout` that
+returns the checkout's root, its Agda, that Agda's arguments, and its
+`AGDA_DIR`.
 
 
 ---
