@@ -637,14 +637,20 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
 -- deliberately narrow, a Copilot catch on PR #99).  Since issue #191 the
 -- detail of which listings report positions, and the literate-coordinate
 -- rule, are said once in 'serverInstructions'.
+--
+-- The one-hole rule and the @addressed@ field (issue #201) are said here
+-- because both tools that take an address share them, and only those two.
 holeAddressing :: Text
 holeAddressing =
   "ADDRESSING: pass EITHER (line, column), from the latest hole list, OR \
-  \holeIndex, never both (the schema's oneOf gives the three legal shapes). \
+  \holeIndex, never both (the schema's oneOf gives the legal shapes). \
   \PREFER THE POSITION: it moves only if a fill before it changes the text's \
   \length or line count, while holeIndex (0-based, source order) is \
   \renumbered by every fill. A position inside no hole is an error listing \
-  \the nearest holes, never a guess."
+  \the nearest holes, never a guess, EXCEPT in a file with exactly one hole, \
+  \where any position on its line, or no address at all, reaches it. Every \
+  \answer carries addressed {line, col, resolvedBy}: the hole used, and how \
+  \(\"span\", \"index\", \"only hole, same line\", or \"only hole\")."
 
 -- | filePathDoc: the resolution rule, at the property that carries the path.
 --
@@ -907,13 +913,15 @@ toolDef name desc props required = toolDefWith name desc props required []
 
 -- | As 'toolDef', with extra JSON Schema keywords merged into the input schema.
 --
--- Exists for one keyword — the @oneOf@ that says a hole must be addressed
--- somehow ('addressAlternatives').  @required@ alone cannot express it: the
--- address is mandatory but its spelling is a choice, so listing any one
--- spelling would be wrong and listing none advertises that a bare @filePath@ is
--- a complete call, which the wire parser rejects (a Copilot review catch on PR
--- #99).  A client that ignores @oneOf@ is no worse off than before; one that
--- honours it now agrees with the parser about what a legal request is.
+-- Exists for one keyword: the @oneOf@ that says which shapes a hole address
+-- may take ('addressAlternatives').  @required@ alone cannot express it: the
+-- spelling of an address is a choice, and before issue #201 a bare @filePath@
+-- was not a complete call, so listing any one spelling was wrong and listing
+-- none advertised a call the wire parser rejected (a Copilot review catch on PR
+-- #99).  Since #201 a bare @filePath@ is legal (it reaches the hole of a
+-- one-hole file) and is the fourth branch.  A client that ignores @oneOf@ is no
+-- worse off; one that honors it agrees with the parser about what a legal
+-- request is.
 toolDefWith :: Text -> Text -> [(Text, Value)] -> [Text] -> [(Text, Value)] -> (Text, Value)
 toolDefWith name desc props required extra = (,) name $ object
   [ "name"        .= name
@@ -929,23 +937,30 @@ toolDefWith name desc props required extra = (,) name $ object
 
 -- | addressAlternatives: the hole address, as JSON Schema.
 --
--- These three branches are exactly the shapes 'AgdaMCP.Types.parseHoleRef'
--- accepts, and @oneOf@ (rather than @anyOf@) is what makes the correspondence
--- exact: a request naming two of them — an index /and/ a position, or both
--- spellings of the column — matches two branches and is therefore invalid here,
--- which is precisely the parser's answer too.  The one rule the schema cannot
--- carry is that a position must be inside a hole; that needs the file.
+-- These four branches are exactly the shapes 'AgdaMCP.Types.parseHoleRef'
+-- accepts: an index, a position under either spelling of its column, and (issue
+-- #201) no address key at all.  The suite checks the correspondence over every
+-- combination of the four keys, and that check is why the index branch forbids
+-- the position keys and the position branches forbid the index: before #201
+-- the index branch alone admitted an index beside half a position, which the
+-- parser refuses.  Both spellings of the column match both position branches,
+-- so @oneOf@ refuses that request, as the parser does; a lone @line@ or a lone
+-- column matches nothing.  The rules the schema cannot carry need the file: a
+-- position must be inside a hole, and an absent or off-span address reaches
+-- only the hole of a one-hole file.
 addressAlternatives :: (Text, Value)
 addressAlternatives =
   ( "oneOf"
   , toJSON
-      [ requiring ["holeIndex"]
-      , requiring ["line", "column"]
-      , requiring ["line", "col"]
+      [ object [ "required" .= ["holeIndex" :: Text], "not" .= anyOfKeys ["line", "column", "col"] ]
+      , object [ "required" .= ["line", "column" :: Text], "not" .= requiring "holeIndex" ]
+      , object [ "required" .= ["line", "col" :: Text],    "not" .= requiring "holeIndex" ]
+      , object [ "not" .= anyOfKeys ["holeIndex", "line", "column", "col"] ]
       ]
   )
   where
-    requiring ks = object ["required" .= (ks :: [Text])]
+    requiring k  = object ["required" .= [k :: Text]]
+    anyOfKeys ks = object ["anyOf" .= map requiring ks]
 
 -- | Build a property definition for the input schema.
 prop :: Text -> Text -> Text -> (Text, Value)

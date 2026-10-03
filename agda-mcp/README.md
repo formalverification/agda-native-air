@@ -281,7 +281,9 @@ One lexical scan serves the scans that are not about holes, too.  The `AgdaDojan
 
 +  A position addresses the hole whose span contains it; a position at the hole's first character counts, one past its last does not.  So both `(22, 5)` and `(22, 7)` name the `{!!}` at line 22 column 5.
 +  A position inside no hole is an **error listing the file's nearest holes** — never a guess at the closest one.  An out-of-range `holeIndex` fails the same way, listing the holes the file does have.
-+  A request carries exactly one address.  Both spellings at once is rejected — they can disagree, and choosing one silently is how a call fills the wrong hole — as are half a position (a `line` with no column) and both `column` and `col` together.  The input schema's `oneOf` names the three shapes a legal request has, so a client that validates its arguments and one that just sends them agree about what is legal.
++  **One hole is the exception (issue #201)**.  In a file with exactly one hole, a position on any line the hole occupies reaches it wherever the column falls, and so does a call that names no hole at all; with no other hole in the file, the wrong-hole answer the strict rule guards against cannot happen.  A file with two or more holes keeps the strict rule, and there a call with no address is refused, listing the holes.  Across the archived agent-bench arms the strict rule refused 39 of 234 `fill_hole` calls and 47 `get_goal` calls, every one in a one-hole file and on the hole's own line, with the column off by one (a 0-based column) to thirteen; replayed against the work files as they stood at each call, all of them now resolve, as do the four `fill_hole` calls that named no hole.
++  **Every answer says which hole it used**: `addressed {line, col, resolvedBy}` is the hole's start, as the hole listings report it, and how the address reached it: `span` (the position fell inside the hole), `index`, `only hole, same line`, or `only hole`.  A caller that meant something else sees it there.
++  A request carries at most one address.  Both spellings at once is rejected (they can disagree, and choosing one silently is how a call fills the wrong hole), as are half a position (a `line` with no column) and both `column` and `col` together.  The input schema's `oneOf` names the four shapes a legal request has (an index, a position under either column spelling, or no address), so a client that validates its arguments and one that just sends them agree about what is legal.
 +  Positions are read in the file as written, so a literate file's holes are addressed in literate-file coordinates and its prose decoys are addressable by nothing.
 
 **Every answer re-anchors**.  `check_file` and `fill_hole` return the full hole list (the same `[{index, line, col, goal}]` shape `get_diagnostics` already returned) so a client never recomputes a position.  `fill_hole`'s list describes the file *as that candidate leaves it*, which is what the client will have once it keeps the candidate; the bytes on disk are restored either way, so until the candidate is written back the file still has the holes it started with.
@@ -501,7 +503,7 @@ agda-mcp/
 
 Given a file path and hole address, return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query.
 
-**Input**.  The hole is addressed by position (preferred) or by index; see [Stable hole handles](#stable-hole-handles-issue-79).
+**Input**.  The hole is addressed by position (preferred) or by index, or, in a file with exactly one hole, not at all; see [Stable hole handles](#stable-hole-handles-issue-79).
 
 ```json
 {
@@ -526,6 +528,7 @@ Given a file path and hole address, return the hole's expected type and its loca
     {"name": "x", "type": "A", "visibility": "visible", "index": 0},
     {"name": "A", "type": "Set₀", "visibility": "hidden", "index": 1}
   ],
+  "addressed": {"line": 7, "col": 8, "resolvedBy": "span"},
   "module": "Fixture01",
   "elapsedMs": 1720,
   "checkedFromSource": true,
@@ -552,7 +555,7 @@ loadElapsedMs?}` in place of `verdict`.
 
 Submit a candidate term for a hole and receive typecheck feedback: success (hole filled, possibly generating new sub-holes) or failure (error message with location).
 
-**Input**.  Addressed like `get_goal`, by position or by index.
+**Input**.  Addressed like `get_goal`: by position, by index, or, in a file with exactly one hole, not at all.
 
 ```json
 {
@@ -568,6 +571,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 {
   "status": "ok",
   "candidate": "x",
+  "addressed": {"line": 7, "col": 8, "resolvedBy": "span"},
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
   "elapsedMs": 1840,
@@ -582,6 +586,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 {
   "status": "type_error",
   "candidate": "tt",
+  "addressed": {"line": 7, "col": 8, "resolvedBy": "span"},
   "message": "A !=< ⊤ when checking that the expression tt has type A",
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
@@ -597,6 +602,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 {
   "status": "timeout",
   "candidate": "foldr-fusion refl",
+  "addressed": {"line": 7, "col": 8, "resolvedBy": "span"},
   "message": "agda timed out after 300s (raise --timeout if this is a cold first check that must build .agdai interfaces for a large library)",
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
@@ -607,7 +613,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
 }
 ```
 
-**Output (no hole at that position)**.  An error response, returned before `agda` is spawned.
+**Output (no hole at that position)**.  An error response, returned before `agda` is spawned.  It arises only in a file with two or more holes, or on a line the only hole does not occupy (issue #201); in the second case the message adds the line that reaches the hole.
 
 ```
 No hole at line 23, column 1 in /abs/TwoHoles.agda (a position addresses the hole
