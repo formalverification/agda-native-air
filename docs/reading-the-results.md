@@ -22,6 +22,9 @@ first has no model in it at all; the other three are one model under three
 configurations.  Two auxiliary instruments measure parts and never solves: the
 recall instrument (§ 4.1), which scores a ranker against known targets, and
 the lane parity replay (§ 4.4), which compares two judgments of one candidate.
+Beneath all four sits a floor that no instrument of this repository earned:
+what Agda's own proof search solves alone (§ 1.6), the denominator for every
+other count.
 
 ### 1.1  The loop
 
@@ -83,7 +86,51 @@ the model's **tool**.  The judge favors no arm; and the loop's numbers and
 the agents' are not judged alike, one more reason the first is no baseline
 for the second.
 
-## 2.  Vocabulary
+### 1.6  The floor: Agda's own proof search
+
+Agda ships a proof search, the one an editor's `C-c C-a` runs; under the
+pinned Agda 2.8.0 it is Mimer, which replaced Agsy in Agda 2.7 (the issues
+that measured it first, [#205] and [#206], say Agsy).  `make auto-floor` runs
+it once at every obligation's hole through `agda-mcp`'s `auto` tool, with
+Agda's default options and no hints, and gives every term it finds to
+`fill_hole` under `--safe` ([`reports/auto-floor/`]).  There is no model, no
+corpus, and no search of the loop's: one call per obligation, a second or
+less each.
+
+**What the floor is for**: a row Agda solves by itself says nothing about the
+loop's searcher or an agent's skill.  A count read against the floor says
+what the instrument added; read without it, it can credit a model with
+Agda's work.
+
+| stratum | n | Agda's search alone |
+|---|---:|---:|
+| agda-stdlib | 22 | 6 |
+| agda-stdlib/haystack | 12 | 0 |
+| agda-algebras/using | 11 | 4 |
+| agda-algebras/wholesale | 10 | 7 |
+| agda-stdlib, hard tier | 6 | 0 |
+| agda-algebras, hard tier | 8 | 0 |
+| agda-algebras/composition | 12 | 1 (2 with every needle as a hint) |
+| **all** | **81** | **18** |
+
+Every term the search found passed `fill_hole`, each after 12 ms of search
+or less, and none names the lemma its row restates.  Read against the
+instruments:
+
++  **The original 55 rows: 17**, against the loop's 8 (fixed space) and 14
+   (retrieval).  The search and retrieval succeed on different rows: the
+   search needs no library lemma and finds none, and retrieval supplies
+   exactly the lemmas it lacks (§ 4.1 measures what the loop gets from
+   both).
++  **The wholesale stratum: 7 of 10**.  That stratum was built so that the
+   fixed space has no `using`-listed lemma to apply and only retrieval could
+   reach one; the loop solves none of it.  Agda's search solves seven from
+   the context and the records' own fields, so the stratum's difficulty for
+   the loop was its vocabulary, not the mathematics.
++  **The hard and composition tiers: 1 of 26**.  Agda alone solves one row
+   of the two tiers built to sit beyond the loop, so the frontier models'
+   counts there owe almost nothing to it.
+
 
 +  **Obligation**: one benchmark module with exactly one hole `{!!}`; 55 of
    them, under `data/benchmarks/`.  Its **gold** is the same module with the
@@ -1001,3 +1048,6 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
 [#220]: https://github.com/formalverification/agda-native-air/pull/220
 [#221]: https://github.com/formalverification/agda-native-air/pull/221
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
+[`reports/auto-floor/`]: ../reports/auto-floor/README.md
