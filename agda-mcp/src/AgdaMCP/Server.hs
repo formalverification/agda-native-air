@@ -427,7 +427,7 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
               [ prop "pattern" "string" "Substring to search for in definition names."
               , prop "limit"   "integer" "Maximum number of results (default: 20; with \
                   \inScopeAt, names returned, default 8)."
-              , propObject "inScopeAt" "Answer for this file: keep only the names it \
+              , propObjectRequiring "inScopeAt" "Answer for this file: keep only the names it \
                   \can write, each with its spelling and type there."
                   [ prop "filePath" "string"  liveFilePathDoc
                   , prop "line"     "integer" "Optional 1-based line; inside a hole, the \
@@ -436,6 +436,7 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
                   , prop "col"      "integer" liveColDoc
                   , prop "reload"   "boolean" liveReloadDoc
                   ]
+                  ["filePath"]
                 -- With inScopeAt the answer carries the lane echo, which
                 -- verbose restores in full (issue #184's rule).
               , prop "verbose" "boolean" verboseDoc
@@ -600,7 +601,7 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \editing a DEPENDENCY of the file, which the lane cannot see."
       , unless' (not (null fileTools)) $
           "A path naming nothing readable is refused, naming the path as \
-          \resolved. EVERY answer \
+          \resolved. EVERY answer about a file \
           \names the tree it used, project {root, rootSource}; a file in \
           \another checkout of a library registered elsewhere is refused with \
           \a rootMismatch naming both roots (unless the registry is missing: \
@@ -951,13 +952,22 @@ prop name typ desc = (name, object ["type" .= typ, "description" .= desc])
 -- (search_in_scope's @query@ and @exclude@, issue #17).  Declared in full so
 -- a client that validates its arguments sees every key the handler accepts.
 propObject :: Text -> Text -> [(Text, Value)] -> (Text, Value)
-propObject name desc props =
+propObject name desc props = propObjectRequiring name desc props []
+
+-- | propObjectRequiring: as 'propObject', with the keys its parser requires
+-- declared as the nested schema's @required@ (search_by_name's @inScopeAt@,
+-- whose @filePath@ the parser reads with @.:@; a Copilot catch on PR #232).
+-- With no keys it is exactly 'propObject', so the objects that require
+-- nothing keep their schema.
+propObjectRequiring :: Text -> Text -> [(Text, Value)] -> [Text] -> (Text, Value)
+propObjectRequiring name desc props required =
   ( name
-  , object
+  , object $
       [ "type"        .= ("object" :: Text)
       , "description" .= desc
       , "properties"  .= object [ Key.fromText k .= v | (k, v) <- props ]
       ]
+      <> [ "required" .= required | not (null required) ]
   )
 
 -- | propArray: an array-valued property whose items share one type.

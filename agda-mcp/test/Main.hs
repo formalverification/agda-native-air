@@ -2397,6 +2397,20 @@ scopeRetrievalTests = do
             (sort (schemaProperties "search_by_name" corpusTools))
         , assertEqual "inScopeAt" ["col", "column", "filePath", "line", "reload"]
             (sort (subProperties "search_by_name" "inScopeAt" corpusTools))
+        , -- The parser reads filePath with .:, so the nested schema says so
+          -- (a Copilot catch on PR #232).
+          assertEqual "inScopeAt requires filePath" (Just (Aeson.toJSON ["filePath" :: Text]))
+            (case KM.lookup "properties" (inputSchemaOf "search_by_name" corpusTools) of
+               Just (Aeson.Object ps) -> case KM.lookup "inScopeAt" ps of
+                 Just (Aeson.Object o) -> KM.lookup "required" o
+                 _                     -> Nothing
+               _ -> Nothing)
+        , assert "an object requiring nothing declares no required (search_in_scope's query)"
+            (case KM.lookup "properties" (inputSchemaOf "search_in_scope" fullTools) of
+               Just (Aeson.Object ps) -> case KM.lookup "query" ps of
+                 Just (Aeson.Object o) -> not (KM.member "required" o)
+                 _                     -> False
+               _ -> False)
         , assertEqual "required" (Just (Aeson.toJSON ["pattern" :: Text]))
             (KM.lookup "required" (inputSchemaOf "search_by_name" corpusTools))
         ]

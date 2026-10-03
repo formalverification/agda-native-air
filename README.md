@@ -99,7 +99,7 @@ agda-native-air/
 
 ## Current status
 
-As of September 2026 the following are built, measured, and in use.
+As of October 2026 the following are built, measured, and in use.
 
 +  **`agda-mcp` v0.2.0**.  Thirteen tools over stdio: four proof-state tools
    (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`), a whole-project
