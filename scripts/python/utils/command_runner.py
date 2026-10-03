@@ -22,11 +22,17 @@ def run_command(
     capture_output: bool = False,
     text: bool = False,
     stdout_file: Optional[Path] = None,
-    stream_output: bool = False  # --- NEW: Parameter to enable live streaming
+    stream_output: bool = False,  # --- NEW: Parameter to enable live streaming
+    input_text: Optional[str] = None
 ) -> Result[subprocess.CompletedProcess, PipelineError]:
     """
     Runs a shell command and returns a Result object.
     Can either capture output or stream it live to the logger.
+
+    input_text, when given, is written to the command's stdin (and stdin is
+    closed after it), for a command driven by a fixed request stream, such as
+    an MCP server answering a batch of JSON-RPC lines.  It requires text=True
+    and is not combined with stream_output.
     """
     command_str = ' '.join(map(str, command))
     logging.debug(f"Running: {command_str}")
@@ -75,7 +81,8 @@ def run_command(
             process = subprocess.run(
                 [str(arg) for arg in command],
                 cwd=cwd, stdout=stdout_target, stderr=subprocess.PIPE,
-                text=text, check=False, encoding='utf-8' if text else None
+                text=text, check=False, encoding='utf-8' if text else None,
+                input=input_text
             )
 
             if process.stderr:

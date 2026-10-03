@@ -1,0 +1,57 @@
+{
+  "runId": "auto-floor-comp-needles-1",
+  "config": {
+    "server": "agda-mcp/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-mcp-0.2.0/x/agda-mcp/build/agda-mcp/agda-mcp",
+    "subjectFlags": [
+      "-i",
+      "agda-dojang/agda",
+      "--library-file=agda/libraries",
+      "-l",
+      "agda-dojang",
+      "-l",
+      "standard-library",
+      "-l",
+      "agda-algebras"
+    ],
+    "judgeFlags": [
+      "-i",
+      "agda-dojang/agda",
+      "--library-file=agda/libraries",
+      "-l",
+      "agda-dojang",
+      "-l",
+      "standard-library",
+      "-l",
+      "agda-algebras",
+      "--safe"
+    ],
+    "hints": "needles",
+    "timeoutMs": null,
+    "tiers": [
+      "agda-algebras-composition-v0"
+    ],
+    "ids": null
+  },
+  "perTier": {
+    "agda-algebras-composition-v0": {
+      "solved": 2,
+      "total": 12,
+      "outcomes": {
+        "error": 2,
+        "found": 2,
+        "no-solution": 7,
+        "out-of-scope": 1
+      }
+    }
+  },
+  "total": {
+    "solved": 2,
+    "total": 12,
+    "outcomes": {
+      "error": 2,
+      "found": 2,
+      "no-solution": 7,
+      "out-of-scope": 1
+    }
+  }
+}
