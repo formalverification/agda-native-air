@@ -6,16 +6,16 @@ File: `agda-native-air/docs/adr/0002-agda-mcp.md`
 
 +  **Status**: Accepted.  Every decision below is landed on `main`; follow-ups each one requires are named in its section and tracked in Milestone 5.
 +  **Date**: 2026-09-07 (the day the [#68] hardening wave was closed as complete; the field record runs 2026-08-21 through 2026-09-04).
-+  **Tracking**: [#148] (this record); [#68] (the wave, closed) and its children [#69]–[#79]; the fixes that followed from it, [#100], [#101], [#103], [#106], [#108], [#114], [#115]; Milestone 5 ([#134]–[#139], [#145]–[#147]) for what is open.
++  **Tracking**: [#148] (this record); [#68] (the wave, closed) and its children [#69]–[#79]; the fixes that followed from it, [#100], [#101], [#103], [#106], [#108], [#114], [#115]; Milestone 5 ([#134]–[#139], [#145]–[#147]) for what is open; [#205], the `auto` tool (decision 25).
 +  **Ancestry**: [#10] (M1-2, the four-tool server, PR [#38]); [#11] (M1-3, the corpus tools, PR [#44]); [#66] (in-place checking, PR [#67]); and [`feedback/flrp-agda-mcp-improvements.md`] (imported by PR [#80]), the field report whose § 7 verification addendum is where most of the decisions below were earned.
 
 ## Executive summary
 
-`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent fourteen tools over the pinned `agda`.
+`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent thirteen tools over the pinned `agda`, a fourteenth on request, and a fifteenth, `auto`, when started with `--auto`.
 
 +  **Proof-state tools**: `check_file`, `get_diagnostics`, `get_goal`, `fill_hole`.
 +  **Whole-project gate**: `check_project`.
-+  **Live queries**: `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`.
++  **Live queries**: `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`; and, registered only with `--auto` ([#205]), `auto`, Agda's own proof search at a hole, which answers a candidate term.
 +  **Corpus tools**: `search_by_name`, `search_by_type`, `get_dependencies`, when started with `--corpus`; `search_by_name`'s `inScopeAt` keeps the names a file can write ([#203]), and the scope-aware `search_in_scope` of [#17] phase 1 behind it is presented when `--expose` names it.
 
 This document is the design record: what was decided, the evidence that earned each decision, and what each one still owes.  The deep notes it distills stay where they are, under `docs/agda-mcp/`, and every decision links to its own note.
@@ -116,6 +116,8 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 +  **Batch lane** (verdicts): the per-file tools `check_file`, `get_diagnostics`, and `fill_hole`, plus `get_goal`'s fallback path, each spawn the real `agda` at the file's real path, patch in place when they must (`fill_hole`'s candidate, the reporting macro), and restore the bytes under `bracket_` on every path, timeout included.  `check_project` runs the project's own gate instead (a `make` target, an operator-configured command, or `agda` on the `Everything` module; § 3), as a bounded subprocess under the same kill ladder, and never patches a file.  The cost is a cold process per call, deliberately: a verdict is always a real batch run's own exit code, Agda's for the per-file tools and the gate's for `check_project`.
 
 +  **Interaction lane** (knowledge): `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`, and since [#108] `get_goal`'s primary path (`Cmd_goal_type_context` returns Agda's own goal display as data, with no file mutation; the response says `source: "interaction-lane"`, and the injected-macro path remains as `source: "injected-macro"` for a lane that cannot serve the file, and as the one path that reports binder visibility).  Interaction mode loads a file with open holes and *succeeds*, which is exactly why it may never decide a verdict; the server says this out loud, since [#191] once for every lane tool in its instructions.
+
++  **Agda's own proof search is a lane tool whose answer is a candidate** ([#205]).  `auto` sends `Cmd_autoOne`, which under Agda 2.8 runs Mimer (Agsy's replacement since 2.7), and answers the term found, joined onto one line, or the search's own message or Agda's refusal, in band.  It is the one lane tool that changes the lane's state: a found term is given into it with force, skipping the termination check, so the server re-loads the file before answering, the reset a give owes ([#163]), and the term is a candidate for `fill_hole` and never a verdict.  It is registered only with `--auto` (decision 25).
 
 +  **A peek is not a call**.  The batch tools may read a warm lane's *stored* load to enrich a response, filling hole listings' `goal` fields ([#108]) and unsolved metas' names and types ([#115]), and only when the lane's recorded load matches the file's current bytes; a cold or stale lane leaves the response byte-identical, and no batch tool ever spawns, loads, or waits on a lane.
 
@@ -375,6 +377,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 21 | In a file with one hole, a position on its line or no address reaches it; every `get_goal` and `fill_hole` answer names the hole it used and how (`addressed`) | Adopted ([#201], PR [#228]) | 86 archived refusals (39 of 234 `fill_hole` calls, 47 `get_goal`), all in one-hole files on the hole's line; all resolve on replay (§ 7) |
 | 22 | `definition_of` quotes what each definition says beside where it is: the declaration's source lines, cut by layout (no Agda query answers a declaration's range), verbatim, bounded by `maxLines` (default 40), naming the range it quotes | Adopted ([#185], PR [#229]) | 0 calls beside a shell in [#162]; 14 answers and 16 reads of the named files on [#189]'s hard tier; 87 of the 92 archived sites fit 40 lines (§ 4) |
 | 24 | `search_in_scope`'s question asked through `search_by_name`'s `inScopeAt` (same handler, the pattern as the name query); `search_in_scope` registered and presented only when `--expose` names it | Adopted ([#203]) | Presented in 681 archived sessions, called once, 17 % of every turn's `tools/list`; 286 sessions asked the question other ways; 17 replays answered by it |
+| 25 | `auto`, Agda's own proof search at a hole, is a lane tool whose answer is a candidate, registered only with `--auto` and so off the default surface; a place there waits for an agent arm that shows it called and useful | Adopted ([#205]) | The surface is an arm's main cost ([#191]: 9,217 tokens a turn after the trim), and `auto`'s entry would add 3,176 characters a turn to the 23,528 of `tools/list` (13.5 %); a tool offered is not a tool used (`search_in_scope`, 681 archived sessions, one call, [#203], decision 24); its measured consumer is the proof-search loop ([#206]); the tool reproduces the hand-driven measurement row for row, 17 of 55 solved by `fill_hole` under `--safe` (§ 2; [`agda-mcp/README.md`]) |
 
 ---
 
@@ -387,6 +390,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
    + the follow-on fixes [#100], [#101], [#103], [#106], [#108], [#114], [#115], [#133];
    + the companions [#83] (M1-7), [#85] (M1-8), [#14] (M1-6);
    + the forward pointer [#17] (M2-3), and [#203] (its scope-aware tool folded into `search_by_name`);
+   + the `auto` tool [#205] (M5-18) and its use in the loop [#206];
    + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147], [#185], [#201];
    + the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
 
@@ -482,7 +486,10 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#163]: https://github.com/formalverification/agda-native-air/issues/163
 [#203]: https://github.com/formalverification/agda-native-air/issues/203
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#164]: https://github.com/formalverification/agda-native-air/issues/164

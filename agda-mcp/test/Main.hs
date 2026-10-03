@@ -127,9 +127,12 @@ import AgdaMCP.Interaction
   , InteractionLanes, LaneFailure (..), ProvenanceStep (..)
   , ScopeCandidate (..), SrcLoc (..)
   , errorCodeOf
+  , AutoAnswer (..), AutoRun (..), autoAt, cmdAutoOne, readAuto
   )
 import AgdaMCP.Server
   (ServerConfig (..), forceResponse, isExposed, registeredToolNames, serverInstructions, toolDefinitions)
+import AgdaMCP.Tools.Auto
+  ( autoOptions, classifyAuto, handleAuto, joinRendering, notInScopeName )
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf )
@@ -1715,6 +1718,7 @@ advertisedTools = toolDefinitions ServerConfig
   , scVersion     = "0"
   , scCorpusIndex = Nothing
   , scExpose      = Nothing
+  , scAuto        = False
   }
 
 holeAddressingTests :: IO [Bool]
@@ -2260,7 +2264,13 @@ corpusConfig = ServerConfig
   , scVersion     = "0"
   , scCorpusIndex = Just (indexOf [])
   , scExpose      = Nothing
+  , scAuto        = False
   }
+
+-- | autoConfig: the corpus configuration with auto registered (@--auto@,
+-- issue #205): the largest surface this server can present.
+autoConfig :: ServerConfig
+autoConfig = corpusConfig { scAuto = True }
 
 -- | toolNamesOf: the names a tools/list value advertises, in order.
 toolNamesOf :: Aeson.Value -> [Text]
@@ -3687,6 +3697,241 @@ surfaceTests = do
         , assert "get_goal still named, among the live queries"
             ("get_goal" `T.isInfixOf` serverInstructions (exposing ["get_goal"]))
         ]
+    ]
+
+-- ---------------------------------------------------------------------------
+-- Tier 1l: auto, Agda's own proof search (issue #205; no Agda)
+--
+-- Every response line below was captured from the pinned Agda 2.8.0 answering
+-- Cmd_autoOne, on test/resources/AutoSearch.agda or on a benchmark obligation
+-- (the row is named beside it), not invented.  These pin the reading, the
+-- join, the attribution of a refusal, the option string, the parameters, and
+-- the tool's place on the surface: registered only with --auto, under the
+-- 2,048 characters a client reads, and named by the instructions only when
+-- exposed.
+-- ---------------------------------------------------------------------------
+
+-- | Captured answers to Cmd_autoOne.
+autoFoundLine, autoMultiLine, autoNoSolutionLine, autoTermNotInScopeLine :: Text
+autoFoundLine =
+  "{\"giveResult\":{\"str\":\"m , n\"},\"interactionPoint\":{\"id\":0,\"range\":[{\"end\":{\"col\":16,\"line\":32,\"pos\":1164},\"start\":{\"col\":12,\"line\":32,\"pos\":1160}}]},\"kind\":\"GiveAction\"}"
+autoMultiLine =
+  "{\"giveResult\":{\"str\":\"theFirstLongHypothesisName ,\\ntheFourthLongHypothesisName ,\\ntheFourthLongHypothesisName , theFourthLongHypothesisName\"},\"interactionPoint\":{\"id\":2,\"range\":[{\"end\":{\"col\":69,\"line\":48,\"pos\":1684},\"start\":{\"col\":65,\"line\":48,\"pos\":1680}}]},\"kind\":\"GiveAction\"}"
+autoNoSolutionLine =
+  "{\"info\":{\"info\":\"No solution found\",\"kind\":\"Auto\"},\"kind\":\"DisplayInfo\"}"
+autoTermNotInScopeLine =
+  "{\"info\":{\"error\":{\"message\":\"1.4-32: error: [NotInScope]\\nNot in scope:\\n  AutoScopeInner.Cell.contents at 1.4-32\\nwhen scope checking AutoScopeInner.Cell.contents\"},\"kind\":\"Error\",\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+
+-- | Captured refusal messages: a hint the scope cannot name, with Agda's
+-- suggestions (haystack-nat-plus-suc-diag, hint +-suc), and a term Agda
+-- printed and could not read back as the type it had found (the first 160
+-- characters, as the reference run kept them, of
+-- comp-group-normal-of-equivalent-congruence's answer).
+autoHintMessage, autoShouldBePiMessage :: Text
+autoHintMessage =
+  "1.1-6: error: [NotInScope]\nNot in scope:\n  +-suc at 1.1-6\n    (did you mean\n       'Data.Nat.Properties.*-suc' or\n       'Data.Nat.Properties.+-suc'?)\nwhen scope checking +-suc"
+autoShouldBePiMessage =
+  "1.1-2: error: [ShouldBePi]\nData.Product.Σ ((𝒢 GroupCongruences.≤ⁿ normalOf θ) 𝑵)\n(λ x → (𝒢 GroupCongruences.≤ⁿ"
+
+-- | autoParamsOf: parse a JSON object of auto arguments.
+autoParamsOf :: Text -> Either String AutoParams
+autoParamsOf t = Aeson.eitherDecodeStrict (TE.encodeUtf8 t)
+
+-- | linesOf: captured lines as the lane would have collected them.
+linesOf :: [Text] -> [IResponse]
+linesOf = mapMaybe parseResponseLine
+
+autoTests :: IO [Bool]
+autoTests = do
+  hPutStrLn stderr "\n── auto: Agda's own proof search (tier 1l: no Agda, #205) ──"
+  let base = AutoParams
+        { apFilePath = "/x/AutoSearch.agda", apHole = ByIndex 0, apHints = []
+        , apHintMode = HintsOnly, apTimeoutMs = Nothing, apSkip = Nothing
+        , apReload = False }
+      autoTools = toolDefinitions autoConfig
+  sequence
+    [ runTest "cmdAutoOne: the IOTCM command, its option string a Haskell literal" $
+        assertEqual "command" "Cmd_autoOne Simplified 3 noRange \"-t 5ms \\8469\""
+          (cmdAutoOne 3 "-t 5ms ℕ")
+
+    , runTest "readAuto: a GiveAction at the asked point is the term, as printed" $ allOf
+        [ assertEqual "one line" (AutoTerm "m , n") (readAuto 0 (linesOf [autoFoundLine]))
+        , assertEqual "three lines, kept as they arrived"
+            (AutoTerm "theFirstLongHypothesisName ,\ntheFourthLongHypothesisName ,\ntheFourthLongHypothesisName , theFourthLongHypothesisName")
+            (readAuto 2 (linesOf [autoMultiLine]))
+        ]
+
+    , -- A term is an answer about the hole asked about and no other.
+      runTest "readAuto: a GiveAction at another point is never a term" $
+        case readAuto 1 (linesOf [autoFoundLine]) of
+          AutoUnexpected m -> assert (T.unpack m) ("point 0, not at 1" `T.isInfixOf` m)
+          other            -> pure (Fail ("read as " <> show other))
+
+    , runTest "readAuto: the search's message, Agda's refusal, and silence" $ allOf
+        [ assertEqual "message" (AutoMessage "No solution found")
+            (readAuto 0 (linesOf [autoNoSolutionLine]))
+        , case readAuto 3 (linesOf [autoTermNotInScopeLine]) of
+            AutoRefusal m -> assert "the error's text" ("AutoScopeInner.Cell.contents at" `T.isInfixOf` m)
+            other         -> pure (Fail ("read as " <> show other))
+        , case readAuto 0 [] of
+            AutoUnexpected _ -> pure Pass
+            other            -> pure (Fail ("silence read as " <> show other))
+        ]
+
+    , -- The trap measured on algebras-inverses-range-to-image: a splice of
+      -- the text as printed ends the declaration at the first continuation.
+      runTest "joinRendering: a term printed across lines becomes one line, and nothing else changes" $ allOf
+        [ assertEqual "joined"
+            "theFirstLongHypothesisName , theFourthLongHypothesisName , theFourthLongHypothesisName , theFourthLongHypothesisName"
+            (joinRendering "theFirstLongHypothesisName ,\ntheFourthLongHypothesisName ,\ntheFourthLongHypothesisName , theFourthLongHypothesisName")
+        , assertEqual "indented continuations"
+            "eq (w .proj₁) (Relation.Binary.IsEquivalence.sym (Setoid.isEquivalence 𝑩) (w .proj₂))"
+            (joinRendering "eq (w .proj₁)\n  (Relation.Binary.IsEquivalence.sym (Setoid.isEquivalence 𝑩)\n   (w .proj₂))")
+        , assertEqual "a one-line term is untouched" "λ z → finj (ginj z)" (joinRendering "λ z → finj (ginj z)")
+        ]
+
+    , runTest "notInScopeName: the name the message says is missing" $ allOf
+        [ assertEqual "a found term's name" (Just "AutoScopeInner.Cell.contents")
+            (notInScopeName "1.4-32: error: [NotInScope]\nNot in scope:\n  AutoScopeInner.Cell.contents at 1.4-32\nwhen scope checking AutoScopeInner.Cell.contents")
+        , assertEqual "a hint, with Agda's suggestions after it" (Just "+-suc") (notInScopeName autoHintMessage)
+        , assertEqual "not a NotInScope" Nothing (notInScopeName autoShouldBePiMessage)
+        ]
+
+    , -- The hints are the only other words Agda reads as names, so a
+      -- NotInScope naming none of them is the found term's.
+      runTest "classifyAuto: each answer as its outcome, and a refusal attributed" $ allOf
+        [ assertEqual "found, joined"
+            (OutcomeFound, Just "a , b", Nothing, Nothing)
+            (classifyAuto [] (AutoTerm "a ,\nb"))
+        , assertEqual "no solution"
+            (OutcomeNoSolution, Nothing, Just "No solution found", Nothing)
+            (classifyAuto [] (AutoMessage "No solution found"))
+        , assertEqual "a hint's fault"
+            (OutcomeError, Just (LiveError "hints" (Just "NotInScope") autoHintMessage))
+            (let (o, _, _, e) = classifyAuto ["+-suc"] (AutoRefusal autoHintMessage) in (o, e))
+        , assertEqual "the same message with no such hint is the term's spelling"
+            (OutcomeOutOfScope, Just "term")
+            (let (o, _, _, e) = classifyAuto ["lemma"] (AutoRefusal autoHintMessage) in (o, lveStage <$> e))
+        , assertEqual "any other refusal"
+            (OutcomeError, Just (Just "ShouldBePi"), Just "auto")
+            (let (o, _, _, e) = classifyAuto [] (AutoRefusal autoShouldBePiMessage)
+             in (o, lveCode <$> e, lveStage <$> e))
+        ]
+
+    , runTest "autoOptions: only what the fields say, and nothing for a call with none" $ allOf
+        [ assertEqual "none" "" (autoOptions base)
+        , assertEqual "every field"
+            "-t 250ms -s 1 -u lemma Data.Nat.Properties.+-suc"
+            (autoOptions base { apTimeoutMs = Just 250, apSkip = Just 1
+                              , apHintMode = HintUnqualified
+                              , apHints = ["lemma", "Data.Nat.Properties.+-suc"] })
+        , assertEqual "module" "-m" (autoOptions base { apHintMode = HintModule })
+        ]
+
+    , runTest "AutoParams: the fields parse, with an address" $
+        case autoParamsOf "{\"filePath\":\"/x/A.agda\",\"line\":3,\"col\":5,\"hints\":[\"lemma\"],\"hintMode\":\"module\",\"timeoutMs\":200,\"skip\":2,\"reload\":true}" of
+          Left e  -> pure (Fail e)
+          Right p -> assertEqual "params"
+            (AutoParams "/x/A.agda" (ByPosition 3 5) ["lemma"] HintModule (Just 200) (Just 2) True) p
+
+    , -- Agda's option reader splits on whitespace and reads -t, -s, -l, -m,
+      -- -c, and -u as options, so a hint that is not one name-shaped word
+      -- would arrive as something else.
+      runTest "AutoParams: a hint Agda would read as something else is refused by name" $ allOf
+        [ case autoParamsOf ("{\"filePath\":\"/x/A.agda\",\"holeIndex\":0,\"hints\":" <> hs <> "}") of
+            Left e  -> assert ("message was: " <> e) (needle `isInfixOf` e)
+            Right _ -> pure (Fail ("accepted " <> T.unpack hs))
+        | (hs, needle) <-
+            [ ("[\"two words\"]", "whitespace")
+            , ("[\"-t\"]", "one of Agda's auto options")
+            , ("[\"(fx)\"]", "not a name")
+            , ("[\"\"]", "empty")
+            ]
+        ]
+
+    , runTest "AutoParams: a bound, a skip, a mode, and an address out of range are refused" $ allOf
+        [ case autoParamsOf ("{\"filePath\":\"/x/A.agda\"" <> rest <> "}") of
+            Left e  -> assert ("message was: " <> e) (needle `isInfixOf` e)
+            Right _ -> pure (Fail ("accepted " <> T.unpack rest))
+        | (rest, needle) <-
+            [ (",\"holeIndex\":0,\"timeoutMs\":0", "positive")
+            , (",\"holeIndex\":0,\"skip\":-1", "0 or more")
+            , (",\"holeIndex\":0,\"hintMode\":\"all\"", "hintMode is one of")
+            , ("", "no hole address")
+            ]
+        ]
+
+    , runTest "AutoResult: each field present exactly with its outcome" $
+        let meta = LiveMeta 1 Nothing (LaneEcho "/r" Nothing False "reused" Nothing Nothing [])
+                     (CommandEcho "agda" [] "/r") (pcOfLibrary Nothing)
+            keysOf r = case Aeson.toJSON r of
+              Aeson.Object o -> sort (map Key.toText (KM.keys o))
+              _              -> []
+            common = ["command", "elapsedMs", "lane", "options", "outcome", "project"]
+        in allOf
+             [ assertEqual "found" (sort (common <> ["resetMs", "searchMs", "term"]))
+                 (keysOf (AutoResult OutcomeFound (Just "m , n") Nothing Nothing "" (Just 3) (Just 90) meta))
+             , assertEqual "no-solution" (sort (common <> ["message", "searchMs"]))
+                 (keysOf (AutoResult OutcomeNoSolution Nothing (Just "No solution found") Nothing "" (Just 2) Nothing meta))
+             , assertEqual "outcome spellings"
+                 (map Aeson.String ["found", "no-solution", "out-of-scope", "error"])
+                 [ Aeson.toJSON o | o <- [OutcomeFound, OutcomeNoSolution, OutcomeOutOfScope, OutcomeError] ]
+             ]
+
+    , runTest "surface: auto is registered only with --auto" $ allOf
+        [ assert "absent without the flag" ("auto" `notElem` registeredToolNames corpusConfig)
+        , assert "present with it" ("auto" `elem` registeredToolNames autoConfig)
+        , assert "the instructions name it only when it is registered"
+            (not (", auto" `T.isInfixOf` serverInstructions corpusConfig)
+             && ", auto" `T.isInfixOf` serverInstructions autoConfig)
+        ]
+
+    , runTest "surface: with auto, every description and the instructions fit in 2,048 characters" $ allOf
+        [ assertEqual "descriptions over the cap (name, length)" []
+            [ (n, T.length d) | (n, d) <- descriptionsOf autoTools, T.length d > clientCap ]
+        , assertEqual "instruction lengths over the cap" []
+            [ l | c <- [autoConfig, autoConfig { scExpose = Just ["auto"] }]
+                , let l = T.length (serverInstructions c), l > clientCap ]
+        ]
+
+    , runTest "surface: auto alone is named among the live queries and the hole tools" $
+        let t = serverInstructions autoConfig { scExpose = Just ["auto"] }
+        in allOf
+             [ assert "KNOWLEDGE names it" ("per project root (auto)" `T.isInfixOf` t)
+             , assert "HOLES is stated for it" ("HOLES" `T.isInfixOf` t)
+             , assert "no verdict paragraph" (not ("VERDICTS" `T.isInfixOf` t))
+             ]
+
+    , -- A hidden tool's description never reaches the client, so auto's may
+      -- point at fill_hole only when fill_hole is exposed (the #193 rule).
+      runTest "surface: auto's description names fill_hole only beside it" $
+        let alone = descriptionOf "auto" (toolDefinitions autoConfig { scExpose = Just ["auto"] })
+            both  = descriptionOf "auto" (toolDefinitions autoConfig { scExpose = Just ["auto", "fill_hole"] })
+        in allOf
+             [ assert "alone: no fill_hole" (not ("fill_hole" `T.isInfixOf` alone))
+             , assert "beside it: judge with fill_hole" ("judge it with fill_hole" `T.isInfixOf` both)
+             , assert "a candidate either way" (all ("CANDIDATE, never a verdict" `T.isInfixOf`) [alone, both])
+             ]
+
+    , -- A client that validates its arguments sends only what the schema
+      -- declares, so every argument the handler reads is a property.
+      runTest "surface: auto's schema declares every key the handler reads, and the address" $
+        let entry = [ d | d <- toolEntries autoTools, KM.lookup "name" d == Just (Aeson.String "auto") ]
+            schemaOf d = case KM.lookup "inputSchema" d of
+              Just (Aeson.Object o) -> Just o
+              _                     -> Nothing
+            propsOf o = case KM.lookup "properties" o of
+              Just (Aeson.Object ps) -> sort (map Key.toText (KM.keys ps))
+              _                      -> []
+        in case mapMaybe schemaOf entry of
+             [o] -> allOf
+               [ assertEqual "properties"
+                   (sort [ "filePath", "line", "column", "col", "holeIndex", "hints"
+                         , "hintMode", "timeoutMs", "skip", "reload", "verbose" ])
+                   (propsOf o)
+               , assert "the address alternatives" (isJust (KM.lookup "oneOf" o))
+               ]
+             _ -> pure (Fail "auto is not listed exactly once")
     ]
 
 -- ---------------------------------------------------------------------------
@@ -5134,6 +5379,56 @@ exposeProcessTests exe = do
         ]
     ]
 
+
+-- ---------------------------------------------------------------------------
+-- Tier 2j: auto on the wire (issue #205)
+--
+-- The flag decides the surface: a server started without --auto neither
+-- lists nor answers auto, refuses to start when --expose names it, and says
+-- why; one started with it lists auto and its instructions name it.
+-- ---------------------------------------------------------------------------
+
+autoProcessTests :: FilePath -> IO [Bool]
+autoProcessTests exe = do
+  hPutStrLn stderr "\n── Process tests (tier 2j: auto on the wire, #205) ──"
+  let reqs = unlines
+        [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+        , "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"auto\",\"arguments\":{\"filePath\":\"/nonexistent/X.agda\",\"holeIndex\":0}}}"
+        ]
+      namesIn out = case resultOf 2 out >>= KM.lookup "tools" of
+        Just ts -> toolNamesOf ts
+        Nothing -> []
+  (offCode, offOut, offErr) <- readProcessWithExitCode exe [] reqs
+  (onCode, onOut, onErr)    <- readProcessWithExitCode exe ["--auto"] reqs
+  (badCode, _, badErr)      <- readProcessWithExitCode exe ["--expose", "auto"] ""
+  sequence
+    [ runTest "wire: both sessions ran and exited cleanly" $ allOf
+        [ assertEqual ("without --auto (stderr: " <> take 300 offErr <> ")") ExitSuccess offCode
+        , assertEqual ("with --auto (stderr: " <> take 300 onErr <> ")") ExitSuccess onCode
+        ]
+
+    , runTest "wire: without --auto, auto is neither listed nor answered, and the refusal names the flag" $ allOf
+        [ assert "not listed" ("auto" `notElem` namesIn offOut)
+        , assert "refused by name" (maybe False ("Start the server with --auto" `T.isInfixOf`) (innerText 3 offOut))
+        ]
+
+    , runTest "wire: with --auto, auto is listed and the instructions name it" $ allOf
+        [ assert "listed" ("auto" `elem` namesIn onOut)
+        , case resultOf 1 onOut >>= KM.lookup "instructions" of
+            Just (Aeson.String t) -> assert "named among the live queries" (", auto)" `T.isInfixOf` t)
+            other                 -> pure (Fail ("instructions were " <> show other))
+        , -- The path refusal arrives as it does for every file tool.
+          assert "a path naming nothing is refused as a path"
+            (maybe False ("/nonexistent/X.agda" `T.isInfixOf`) (innerText 3 onOut))
+        ]
+
+    , runTest "wire: --expose naming auto without --auto refuses to start, naming the flag" $ allOf
+        [ assert "exits non-zero" (badCode /= ExitSuccess)
+        , assert ("stderr was: " <> take 300 badErr)
+            ("does not register: auto" `isInfixOf` badErr && "auto needs --auto" `isInfixOf` badErr)
+        ]
+    ]
 
 probeAgdaEnv :: IO (Maybe (AgdaConfig, FilePath, FilePath))
 probeAgdaEnv = do
@@ -8031,6 +8326,166 @@ scratchDir label = do
 
 -- | fakeLaneBinary: an executable stand-in for agda, for the process-failure
 -- tests.
+-- ---------------------------------------------------------------------------
+-- Tier 3c: auto on the lane (issue #205)
+--
+-- The tool against the pinned Agda on test/resources/AutoSearch.agda, one
+-- hole per answer: a term from the context, no solution, the same hole solved
+-- with a hint, a hint the scope cannot name, a term printed across lines
+-- (joined, and judged by the batch fill_hole both ways, since the join is the
+-- point), and a term printed with a name the file cannot write.  Then the
+-- bounds: a search bound that reaches the server's --timeout is refused before
+-- anything runs, and a lane that hangs in the search is a structured timeout,
+-- driven by a stand-in binary so nothing real has to hang.
+-- ---------------------------------------------------------------------------
+
+autoLaneTests :: AgdaConfig -> FilePath -> IO [Bool]
+autoLaneTests cfg repoRoot = do
+  hPutStrLn stderr "\n── auto on the lane (tier 3c: #205, Agda subprocess) ──"
+  let fixture = repoRoot </> "agda-mcp" </> "test" </> "resources" </> "AutoSearch.agda"
+      at i    = AutoParams
+        { apFilePath = fixture, apHole = ByIndex i, apHints = []
+        , apHintMode = HintsOnly, apTimeoutMs = Nothing, apSkip = Nothing
+        , apReload = False }
+      withAuto lanes p k = do
+        r <- handleAuto lanes cfg p
+        case r of
+          Left err  -> pure (Fail ("tool failure: " <> T.unpack (failureText err)))
+          Right res -> k res
+  lanes <- newInteractionLanes
+  results <- sequence
+    [ runTest "auto: a hole the context solves answers the term, and the reset puts the hole back" $
+        withAuto lanes (at 0) $ \res -> do
+          first <- allOf
+            [ assertEqual "outcome" OutcomeFound (aurOutcome res)
+            , assertEqual "term" (Just "m , n") (aurTerm res)
+            , assertEqual "options" "" (aurOptions res)
+            , assert "a reset was owed and paid" (isJust (aurResetMs res))
+            , assert "no message, no error" (isNothing (aurMessage res) && isNothing (aurError res))
+            ]
+          -- The give consumed the point in the lane's state; were the reset
+          -- missing, the same question would find no hole there now.
+          again <- handleAuto lanes cfg (at 0)
+          second <- case again of
+            Left err  -> pure (Fail (T.unpack (failureText err)))
+            Right r2  -> allOf
+              [ assertEqual "the same answer" (Just "m , n") (aurTerm r2)
+              , assertEqual "from the reset's load" "reused" (lchLoad (lmLane (aurMeta r2)))
+              ]
+          pure (firstFailure [first, second])
+
+    , runTest "auto: no solution is an answer in band, with the search's own message" $
+        withAuto lanes (at 1) $ \res -> allOf
+          [ assertEqual "outcome" OutcomeNoSolution (aurOutcome res)
+          , assertEqual "message" (Just "No solution found") (aurMessage res)
+          , assert "no term, no reset" (isNothing (aurTerm res) && isNothing (aurResetMs res))
+          , assert "a search ran" (isJust (aurSearchMs res))
+          ]
+
+    , runTest "auto: a hint the search may use solves the same hole" $
+        withAuto lanes (at 1) { apHints = ["lemma"] } $ \res -> allOf
+          [ assertEqual "outcome" OutcomeFound (aurOutcome res)
+          , assertEqual "term" (Just "lemma m") (aurTerm res)
+          , assertEqual "options" "lemma" (aurOptions res)
+          ]
+
+    , runTest "auto: a hint the scope cannot name is the hint's error, in band" $
+        withAuto lanes (at 1) { apHints = ["nosuch"] } $ \res -> allOf
+          [ assertEqual "outcome" OutcomeError (aurOutcome res)
+          , assertEqual "stage and code" (Just ("hints", Just "NotInScope"))
+              ((\e -> (lveStage e, lveCode e)) <$> aurError res)
+          ]
+
+    , -- The trap of algebras-inverses-range-to-image, on a fixture: the
+      -- printed term continues at column 1, so a batch splice of the text as
+      -- printed ends the declaration, and the joined term is the one batch
+      -- agda accepts.  Both are judged by fill_hole, the only judge.
+      runTest "auto: a term printed across lines is joined, and only the joined term passes fill_hole" $
+        withAuto lanes (at 2) $ \res -> case aurTerm res of
+          Nothing -> pure (Fail ("no term: " <> show (aurOutcome res)))
+          Just t  -> do
+            -- The search's raw answer, from the protocol layer under the tool,
+            -- on a lane of its own: the text exactly as Agda printed it.
+            raw <- withLane lanes cfg (takeDirectory fixture) $ \lh -> do
+              let flags = agdaFlags cfg <> ["-i", takeDirectory fixture]
+              loaded <- ensureLoaded lh True fixture flags
+              case loaded of
+                Right lr | Right li <- lrOutcome lr, (p : _) <- drop 2 (liPoints li) ->
+                  either (const Nothing) (Just . auAnswer)
+                    <$> autoAt lh fixture flags (ipId p) ""
+                _ -> pure Nothing
+            joined  <- handleFillHole cfg (FillHoleParams fixture (ByIndex 2) t)
+            case raw of
+              Right (Just (AutoTerm printed)) -> do
+                asPrinted <- handleFillHole cfg (FillHoleParams fixture (ByIndex 2) printed)
+                allOf
+                  [ assert "one line" (not ("\n" `T.isInfixOf` t))
+                  , assert "Agda printed it across lines" ("\n" `T.isInfixOf` printed)
+                  , assertEqual "joined: ok" (Right FillOk) (frStatus <$> joined)
+                  , assertEqual "as printed: type_error" (Right FillTypeError) (frStatus <$> asPrinted)
+                  ]
+              other -> pure (Fail ("the raw search answered " <> show other))
+
+    , runTest "auto: a term printed with a name the file cannot write is out-of-scope, named" $
+        withAuto lanes (at 3) $ \res -> allOf
+          [ assertEqual "outcome" OutcomeOutOfScope (aurOutcome res)
+          , assertEqual "stage and code" (Just ("term", Just "NotInScope"))
+              ((\e -> (lveStage e, lveCode e)) <$> aurError res)
+          , assert "the message names the field"
+              (maybe False (("AutoScopeInner.Cell.contents" `T.isInfixOf`) . lveMessage) (aurError res))
+          , assert "no reset: Agda put its state back" (isNothing (aurResetMs res))
+          ]
+
+    , runTest "auto: a search bound that reaches --timeout is refused before anything runs" $ do
+        fresh <- newInteractionLanes
+        r <- handleAuto fresh cfg { agdaTimeout = Just 2 } (at 0) { apTimeoutMs = Just 2000 }
+        shutdownLanes fresh
+        case r of
+          Left (FailMessage m) -> assert (T.unpack m) ("reaches this server's --timeout of 2 s" `T.isInfixOf` m)
+          Left other           -> pure (Fail ("wrong failure: " <> T.unpack (failureText other)))
+          Right _              -> pure (Fail "the search ran")
+    ]
+
+  -- A lane that answers the startup sentinel and the load, then hangs in the
+  -- search: the request's deadline kills it, and the answer is the lane's
+  -- structured timeout, as for every live query.  The stand-in announces the
+  -- fixture's first hole where the lexical scan finds it, so the call gets as
+  -- far as the search before it hangs.
+  src <- TIO.readFile fixture
+  timeoutResults <- case findHoles PlainAgda src of
+    (h : _) -> sequence
+      [ runTest "auto: a search that hangs past the lane's deadline is a structured timeout" $ do
+          let version = "{\"info\":{\"kind\":\"Version\",\"version\":\"9.9\"},\"kind\":\"DisplayInfo\"}"
+              points  = "{\"interactionPoints\":[{\"id\":0,\"range\":[{\"start\":{\"line\":"
+                        <> show (hsLine h) <> ",\"col\":" <> show (hsCol h)
+                        <> "},\"end\":{\"line\":" <> show (hsLine h) <> ",\"col\":"
+                        <> show (hsCol h + 4) <> "}}]}],\"kind\":\"InteractionPoints\"}"
+          script <- fakeLaneBinary "auto-hang" $ unlines
+            [ "#!/bin/sh"
+            , "while IFS= read -r line; do"
+            , "  case \"$line\" in"
+            , "    *Cmd_autoOne*) exec sleep 60 ;;"
+            , "    *Cmd_load*) printf '%s\\n' '" <> points <> "' ;;"
+            , "    *Cmd_show_version*) printf '%s\\n' '" <> version <> "' ;;"
+            , "  esac"
+            , "done"
+            ]
+          fresh <- newInteractionLanes
+          r <- handleAuto fresh cfg { agdaBin = script, agdaTimeout = Just 2 } (at 0)
+          shutdownLanes fresh
+          case r of
+            Left (FailInteraction xf) -> allOf
+              [ assertEqual "event" "timeout" (xfEvent xf)
+              , assert "the search it sent is echoed" (any ("Cmd_autoOne" `T.isInfixOf`) (xfIotcm xf))
+              ]
+            Left other -> pure (Fail ("wrong failure shape: " <> T.unpack (failureText other)))
+            Right res  -> pure (Fail ("answered: " <> show (aurOutcome res)))
+      ]
+    [] -> pure [False]
+
+  shutdownLanes lanes
+  pure (results <> timeoutResults)
+
 fakeLaneBinary :: String -> String -> IO FilePath
 fakeLaneBinary label body = do
   dir <- scratchDir label
@@ -8445,6 +8900,8 @@ main = do
   surfaceResults <- surfaceTests
   -- Tier 1l: a declaration's extent and its quote (#185).
   declResults <- declarationTests
+  -- Tier 1l: auto, Agda's own proof search, the pure half and its surface (#205).
+  autoResults <- autoTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -8478,6 +8935,13 @@ main = do
         "\n── Process tests (tier 2i: --expose, #191): SKIPPED (executable not built or cabal absent) ──"
       pure []
     Just exe -> exposeProcessTests exe
+  -- Tier 2j: auto on the wire (#205), same gate as tier 2g.
+  autoWireResults <- case mExe of
+    Nothing -> do
+      hPutStrLn stderr
+        "\n── Process tests (tier 2j: auto on the wire, #205): SKIPPED (executable not built or cabal absent) ──"
+      pure []
+    Just exe -> autoProcessTests exe
   -- Tier 3: the interaction lane (#75) — same gate as tier 2.
   laneResults <- case mEnv of
     Nothing -> do
@@ -8496,14 +8960,21 @@ main = do
       hPutStrLn stderr "\n── search_in_scope (tier 3b: #17): SKIPPED ──"
       pure []
     Just (cfg, _fixture, repoRoot) -> searchInScopeLaneTests cfg repoRoot
+  -- Tier 3c: auto on the lane (#205), same gate.
+  autoLaneResults <- case mEnv of
+    Nothing -> do
+      hPutStrLn stderr "\n── auto on the lane (tier 3c: #205): SKIPPED ──"
+      pure []
+    Just (cfg, _fixture, repoRoot) -> autoLaneTests cfg repoRoot
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
           <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
-          <> declResults
+          <> declResults <> autoResults
           <> integrationResults <> cwdResults <> leanWireResults <> exposeWireResults
-          <> laneResults <> definitionResults <> scopeLaneResults
+          <> autoWireResults
+          <> laneResults <> definitionResults <> scopeLaneResults <> autoLaneResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

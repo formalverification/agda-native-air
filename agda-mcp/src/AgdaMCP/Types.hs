@@ -180,6 +180,11 @@ module AgdaMCP.Types
   , DefinitionOfResult (..)
   , ExportsOfResult (..)
   , InteractionFailure (..)
+    -- * Agda's own proof search (issue #205): auto
+  , AutoHintMode (..)
+  , AutoParams (..)
+  , AutoOutcome (..)
+  , AutoResult (..)
     -- * Scope-aware retrieval (issue #17): search_in_scope
   , Rung (..)
   , ScopeImport (..)
@@ -201,8 +206,9 @@ import Data.Aeson
 import Data.Aeson.Key (Key)
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types (Object, Pair, Parser)
+import Data.Char (isSpace)
 import Data.Map.Strict (Map)
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -2219,6 +2225,138 @@ instance ToJSON InteractionFailure where
     , "command"    .= xfCommand f
     , "project"    .= xfProject f
     ]
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- § Agda's own proof search (issue #205): auto
+--
+-- Mimer (Agda 2.8's @Cmd_autoOne@, which replaced Agsy in 2.7) run at one
+-- hole on the interaction lane.  A knowledge tool under the two-lane policy:
+-- what it answers is a candidate term, and nothing here carries @success@ or
+-- @verdict@.  The options are declared fields, never a free string, so every
+-- word Agda's option reader sees was built here ('AgdaMCP.Tools.Auto').
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | AutoHintMode: which definitions, beyond the hole's context, its
+-- constructors, record projections, the file's where-functions and the hints,
+-- the search may use.  'HintsOnly' is Agda's default; the other two are its
+-- @-m@ (the definitions of the file's own module) and @-u@ (every name the
+-- hole's scope can write unqualified), as @Agda.Mimer.Options@ reads them.
+data AutoHintMode = HintsOnly | HintModule | HintUnqualified
+  deriving (Eq, Show)
+
+-- | Parameters for the @auto@ tool.
+data AutoParams = AutoParams
+  { apFilePath  :: FilePath
+  , apHole      :: HoleRef           -- ^ Which hole, by position or index (#79).
+  , apHints     :: [Text]            -- ^ Names the search may use, each as the
+                                     --   hole's scope writes it.
+  , apHintMode  :: AutoHintMode
+  , apTimeoutMs :: Maybe Int         -- ^ Agda's @-t@, in milliseconds of CPU
+                                     --   time; 'Nothing' leaves Agda's default
+                                     --   (1000 ms).
+  , apSkip      :: Maybe Int         -- ^ Agda's @-s@: skip this many solutions.
+  , apReload    :: Bool
+  } deriving (Eq, Show)
+
+instance FromJSON AutoParams where
+  parseJSON = withObject "AutoParams" $ \o -> do
+    hints <- o .:? "hints" .!= []
+    mapM_ checkHint hints
+    mode  <- o .:? "hintMode" >>= traverse hintModeOf
+    tms   <- o .:? "timeoutMs"
+    case tms of
+      Just n | n <= 0 -> fail "timeoutMs must be a positive number of milliseconds"
+      _               -> pure ()
+    skip  <- o .:? "skip"
+    case skip of
+      Just n | n < 0 -> fail "skip must be 0 or more"
+      _              -> pure ()
+    AutoParams <$> o .: "filePath" <*> parseHoleRef o <*> pure hints
+               <*> pure (fromMaybe HintsOnly mode) <*> pure tms <*> pure skip
+               <*> (o .:? "reload" .!= False)
+    where
+      hintModeOf :: Text -> Parser AutoHintMode
+      hintModeOf t = case t of
+        "none"        -> pure HintsOnly
+        "module"      -> pure HintModule
+        "unqualified" -> pure HintUnqualified
+        _ -> fail "hintMode is one of \"none\", \"module\", \"unqualified\""
+
+-- | checkHint: a hint must be one word of the option string and read as a
+-- name, or Agda's option reader would read it as something else.
+--
+-- The reader splits the string on whitespace and takes @-t@, @-s@ (each with
+-- the next word), @-l@, @-m@, @-c@, and @-u@ as options; every other word is
+-- a hint.  So a hint with whitespace in it would arrive as two hints, a hint
+-- spelled like an option would arrive as that option, and a hint holding a
+-- character no Agda name can hold (the lexer reserves parentheses, braces,
+-- semicolons, and quotes) could only be an expression, which Agda's reader
+-- parses and then silently drops when it is not a name.  All three are
+-- refused here, by name, before anything is sent.
+checkHint :: Text -> Parser ()
+checkHint h
+  | T.null h = fail "a hint is empty"
+  | T.any isSpace h = fail ("hint " <> show h <> " holds whitespace; give one name per hint")
+  | h `elem` ["-t", "-s", "-l", "-m", "-c", "-u"] =
+      fail ("hint " <> show h <> " is one of Agda's auto options, not a name")
+  | T.any (`elem` ("(){};\"" :: String)) h =
+      fail ("hint " <> show h <> " is not a name: names never hold ( ) { } ; or \"")
+  | otherwise = pure ()
+
+-- | AutoOutcome: what the search came to, in four words.
+--
+-- 'OutcomeFound' is a term at the hole, and the only outcome with one.
+-- 'OutcomeNoSolution' is the search's own message: it ran out of time or of
+-- search space, and Agda's message is the same in both cases.
+-- 'OutcomeOutOfScope' is a term the search found and Agda printed with a name
+-- the file cannot write, so Agda could not read it back (@NotInScope@ naming
+-- no hint; error stage @term@).  'OutcomeError' is every other refusal: a
+-- hint the scope cannot name (stage @hints@), any other refusal of the
+-- command, the search's or its term's (stage @auto@), or the file not
+-- loading (stage @load@).
+data AutoOutcome = OutcomeFound | OutcomeNoSolution | OutcomeOutOfScope | OutcomeError
+  deriving (Eq, Show)
+
+instance ToJSON AutoOutcome where
+  toJSON o = String $ case o of
+    OutcomeFound      -> "found"
+    OutcomeNoSolution -> "no-solution"
+    OutcomeOutOfScope -> "out-of-scope"
+    OutcomeError      -> "error"
+
+-- | Result of @auto@.  @term@ is present exactly when the outcome is
+-- @found@, @message@ exactly when it is @no-solution@, and @error@ exactly
+-- for the other two.
+--
+-- 'aurSearchMs' is the search's round trip on the lane, absent when no search
+-- ran (the file did not load); 'aurResetMs' is the re-load a found term owes
+-- (Agda gave it into the lane's state), present exactly when one ran.  Both
+-- are beside @elapsedMs@, the whole call, because a search costs milliseconds
+-- and a reset can cost a second, and a caller budgeting either needs to see
+-- which it paid.
+data AutoResult = AutoResult
+  { aurOutcome  :: AutoOutcome
+  , aurTerm     :: Maybe Text
+  , aurMessage  :: Maybe Text
+  , aurError    :: Maybe LiveError
+  , aurOptions  :: Text             -- ^ The hole contents the search was given.
+  , aurSearchMs :: Maybe Int
+  , aurResetMs  :: Maybe Int
+  , aurMeta     :: LiveMeta
+  } deriving (Eq, Show)
+
+instance ToJSON AutoResult where
+  toJSON r = object $
+    [ "outcome" .= aurOutcome r
+    , "options" .= aurOptions r
+    ]
+    <> maybe [] (\t -> ["term"     .= t]) (aurTerm r)
+    <> maybe [] (\m -> ["message"  .= m]) (aurMessage r)
+    <> maybe [] (\e -> ["error"    .= e]) (aurError r)
+    <> maybe [] (\n -> ["searchMs" .= n]) (aurSearchMs r)
+    <> maybe [] (\n -> ["resetMs"  .= n]) (aurResetMs r)
+    <> liveMetaPairs (aurMeta r)
 
 
 -- ═══════════════════════════════════════════════════════════════════════════

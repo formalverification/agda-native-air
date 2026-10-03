@@ -6,6 +6,8 @@ cabal-version: 3.0
 -- Description:
 --   Cabal package definition for the agda-mcp MCP server.
 --
+--   issue #205 (M5-18): adds auto, Agda's own proof search (Mimer) at a hole on
+--   the interaction lane, registered with --auto (AgdaMCP.Tools.Auto).
 --   issue #17 (M2-3, phase 1): adds search_in_scope, scope-aware retrieval
 --   over the corpus index with every rendering validated by the interaction
 --   lane (AgdaMCP.Scope, AgdaMCP.Retrieval, AgdaMCP.Tools.SearchInScope).
@@ -60,6 +62,7 @@ library
     AgdaMCP.Corpus
     AgdaMCP.Scope
     AgdaMCP.Retrieval
+    AgdaMCP.Tools.Auto
     AgdaMCP.Tools.CheckProject
     AgdaMCP.Tools.LiveQueries
     AgdaMCP.Tools.ProofState

@@ -108,7 +108,10 @@ As of October 2026 the following are built, measured, and in use.
    and three corpus-backed tools (`search_by_name`, whose `inScopeAt` keeps the
    names a file can write and says how, `search_by_type`, `get_dependencies`),
    which the server registers only when it is started with a corpus; a
-   fourteenth, `search_in_scope`, is presented when `--expose` names it.  Every verdict on a file is the exit code of the `agda` run that
+   fourteenth, `search_in_scope`, is presented when `--expose` names it; and,
+   with `--auto`, a fifteenth, `auto`, Agda's own proof search at a hole (issue
+   [#205](https://github.com/formalverification/agda-native-air/issues/205)), whose
+   answer is a candidate term for `fill_hole` to judge.  Every verdict on a file is the exit code of the `agda` run that
    produced it, `check_project` reports the exit code of the project's own gate
    without misreporting it, every response about a file names the tree it
    checked, and a server pointed at the wrong checkout refuses rather than

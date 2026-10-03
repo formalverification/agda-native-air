@@ -111,7 +111,9 @@ MCP tool interface.
    when a corpus is supplied).  `search_by_name`'s `inScopeAt` keeps the names
    a file can write, each typed by the interaction lane in that file's scope;
    the scope-aware `search_in_scope` behind it is presented when `--expose`
-   names it (issue #203).  Verdict-producing tools shell out to the `agda`
+   names it (issue #203).  With `--auto`, a fifteenth tool, `auto`, runs Agda's
+   own proof search (Mimer) at a hole and answers a candidate term, never a
+   verdict (issue #205).  Verdict-producing tools shell out to the `agda`
    binary once per call; the live queries are answered by a persistent
    `agda --interaction-json` child per project root (issue #75,
    `docs/agda-mcp/agda-mcp-interaction-lane.md`); an Agda-as-a-library API is future work.

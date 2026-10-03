@@ -64,6 +64,17 @@
 --     ('optInTools'): offered in 681 archived agent sessions and called once,
 --     its description was 17 % of every turn's tools/list.  @--expose@ that
 --     names it presents it, with its type-token and goal-derived queries.
+--
+-- Issue #205 addition:
+--   * auto: Agda's own proof search (Mimer, @Cmd_autoOne@) at a hole, on the
+--     interaction lane, answering a candidate term.  Registered only when the
+--     server starts with @--auto@ ('scAuto'), as the corpus tools are only
+--     with @--corpus@: issue #191 measured the tool surface as a server arm's
+--     main cost and issue #203 a tool offered in 681 archived sessions and
+--     called once, so a place on the default surface waits for an arm that
+--     shows an agent using it (ADR 0002, decision 25).  The proof-search
+--     loop, the tool's first measured consumer, starts its server with the
+--     flag.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -105,6 +116,7 @@ import AgdaMCP.Declaration (defaultQuoteLines)
 import AgdaMCP.Gate (GateConfig)
 import AgdaMCP.Interaction
   (InteractionLanes, newInteractionLanes, shutdownLanes)
+import AgdaMCP.Tools.Auto (handleAuto)
 import AgdaMCP.Tools.CheckProject (handleCheckProject)
 import AgdaMCP.Tools.LiveQueries
 import AgdaMCP.Tools.ProofState
@@ -137,6 +149,9 @@ data ServerConfig = ServerConfig
     -- ^ The tools to present (@--expose@, issue #191); 'Nothing' presents
     --   every registered tool.  Main refuses a name this configuration does
     --   not register, so every name here is one 'registeredToolNames' lists.
+  , scAuto        :: Bool
+    -- ^ Register the auto tool (@--auto@, issue #205); off by default, so
+    --   the default surface is unchanged.
   } deriving (Show)
 
 
@@ -210,8 +225,8 @@ optInTools = ["search_in_scope"]
 
 -- | Every tool this configuration registers, as (name, definition).
 --
--- Proof-state and live-query tools are always registered; the corpus tools
--- only when a corpus is loaded.
+-- Proof-state and live-query tools are always registered; auto only with
+-- @--auto@ (issue #205); the corpus tools only when a corpus is loaded.
 --
 -- How the text is laid out (issue #191).  A client puts every tool's
 -- description and schema in its model's context on EVERY turn, so a sentence
@@ -226,7 +241,7 @@ optInTools = ["search_in_scope"]
 -- lane's re-load vocabulary) lives in the README, for people.  The PR for
 -- issue #191 lists which sentence went where.
 registeredTools :: ServerConfig -> [(Text, Value)]
-registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
+registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTools
   where
     proofStateTools =
       [ toolDefWith "get_goal"
@@ -428,6 +443,31 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
           ["filePath", "module"]
       ]
 
+    -- Agda's own proof search (issue #205), behind --auto.  Its answer is a
+    -- candidate term, which is said here; that it informs and never decides,
+    -- and the lane's cost, are said once in 'serverInstructions', which name
+    -- it among the live queries.
+    autoTools
+      | scAuto cfg =
+          [ toolDefWith "auto"
+              (autoNote (shown "fill_hole"))
+              [ prop "filePath"  "string"  filePathDoc
+              , prop "line"      "integer" lineDoc
+              , prop "column"    "integer" columnDoc
+              , prop "col"       "integer" colDoc
+              , prop "holeIndex" "integer" holeIndexDoc
+              , propArray "hints" "string" autoHintsDoc
+              , propEnum "hintMode" ["none", "module", "unqualified"] autoHintModeDoc
+              , prop "timeoutMs" "integer" autoTimeoutDoc
+              , prop "skip"      "integer" autoSkipDoc
+              , prop "reload"    "boolean" liveReloadDoc
+              , prop "verbose"   "boolean" verboseDoc
+              ]
+              ["filePath"]
+              [addressAlternatives]
+          ]
+      | otherwise = []
+
     searchTools
       | isJust (scCorpusIndex cfg) =
           [ toolDef "search_by_name" searchByNameNote
@@ -566,11 +606,11 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
     batch       = among ["check_file", "get_diagnostics", "fill_hole"]
     -- search_by_name rides the lane only with inScopeAt (issue #203), so it
     -- is named that way, whenever search_by_name is shown.
-    lane        = among ["type_of", "normalize", "resolve_name", "definition_of", "exports_of", "search_in_scope", "get_goal"]
+    lane        = among ["type_of", "normalize", "resolve_name", "definition_of", "exports_of", "search_in_scope", "get_goal", "auto"]
                   <> [ "search_by_name's inScopeAt" | "search_by_name" `elem` shown ]
     -- search_by_name takes a file in its inScopeAt (issue #203), so it is one.
     fileTools   = filter (`notElem` ["search_by_type", "get_dependencies"]) shown
-    holeTools   = among ["check_file", "get_diagnostics", "fill_hole", "get_goal"]
+    holeTools   = among ["check_file", "get_diagnostics", "fill_hole", "get_goal", "auto"]
     listers     = among ["check_file", "get_diagnostics", "fill_hole"]
     one xs       = length xs == 1
     unless' c t = if c then t else ""
@@ -893,6 +933,51 @@ searchByNameNote =
   \in ledger.nonFunction), the first call on a file loads it (seconds), \
   \and the answer informs and never decides."
 
+-- | autoNote: the contract of auto (issue #205), stated where the client
+-- reads it: that the answer is a candidate and why, the four outcomes and
+-- what each carries, what the search may use, and the two timings.  Mimer's
+-- option grammar, the join, and how a refusal is attributed are in the
+-- README and in 'AgdaMCP.Tools.Auto'.
+autoNote :: Bool -> Text
+autoNote fillHoleShown =
+  "Agda's own proof search at one hole (Mimer, the search an editor's C-c C-a \
+  \runs), without editing the file. The answer is a CANDIDATE, never a \
+  \verdict: Agda accepts a found term into the live lane without its \
+  \termination check, and the term comes back as printed text"
+  <> (if fillHoleShown then ", so judge it with fill_hole before you keep it" else "")
+  <> ". " <> holeAddressing
+  <> " outcome is 'found', with term (Agda's rendering, joined onto one \
+     \line); 'no-solution', with Agda's message (nothing found in the \
+     \search's space or time; the message does not say which); \
+     \'out-of-scope', when Agda found a term but printed it with a name this \
+     \file cannot write (error.code NotInScope names it); or 'error' {stage, \
+     \code?, message}: stage 'hints' for a hint this scope cannot name, \
+     \'auto' for any other refusal, 'load' when the file does not load. The \
+     \search uses the hole's context, constructors, record fields, the \
+     \file's where-functions, and hints; hintMode adds more. options echoes \
+     \what Agda was sent; searchMs is the search and resetMs the re-load a \
+     \found term costs, both within elapsedMs."
+
+autoHintsDoc :: Text
+autoHintsDoc =
+  "Names the search may use, one name each, as this file's scope writes it \
+  \(e.g. Data.Nat.Properties.+-suc)."
+
+autoHintModeDoc :: Text
+autoHintModeDoc =
+  "Default 'none'. 'module' adds the definitions of the file's own module \
+  \(Agda's -m); 'unqualified' adds every name the scope can write \
+  \unqualified (Agda's -u)."
+
+autoTimeoutDoc :: Text
+autoTimeoutDoc =
+  "The search's bound in milliseconds of CPU time (Agda's -t; default 1000), \
+  \checked between search steps; must be below this server's --timeout."
+
+autoSkipDoc :: Text
+autoSkipDoc =
+  "Skip this many solutions and answer the next (Agda's -s; default 0)."
+
 -- | searchLineDoc: the anchor's contract for search_in_scope.
 searchLineDoc :: Text
 searchLineDoc =
@@ -1003,6 +1088,19 @@ propObjectRequiring name desc props required =
       , "properties"  .= object [ Key.fromText k .= v | (k, v) <- props ]
       ]
       <> [ "required" .= required | not (null required) ]
+  )
+
+-- | propEnum: a string-valued property with a closed set of values (auto's
+-- @hintMode@, issue #205), declared so a client that validates its
+-- arguments refuses what the handler would.
+propEnum :: Text -> [Text] -> Text -> (Text, Value)
+propEnum name values desc =
+  ( name
+  , object
+      [ "type"        .= ("string" :: Text)
+      , "enum"        .= values
+      , "description" .= desc
+      ]
   )
 
 -- | propArray: an array-valued property whose items share one type.
@@ -1340,6 +1438,16 @@ dispatchTool cfg lanes v "exports_of" args =
   case Aeson.fromJSON args of
     Aeson.Success p -> failureToMcp v <$> handleExportsOf lanes (scAgdaConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
+
+-- Agda's own proof search (issue #205), registered with --auto.  A server
+-- without the flag answers a call by name, as it does a corpus tool without
+-- --corpus.
+dispatchTool cfg lanes v "auto" args
+  | not (scAuto cfg) = pure $ toolError
+      "The auto tool is not registered.  Start the server with --auto."
+  | otherwise = case Aeson.fromJSON args of
+      Aeson.Success p -> failureToMcp v <$> handleAuto lanes (scAgdaConfig cfg) p
+      Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 -- Unknown tool
 dispatchTool _ _ _ name _ =

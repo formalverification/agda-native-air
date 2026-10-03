@@ -76,6 +76,7 @@ module AgdaMCP.Tools.LiveQueries
   , withLiveFile
   , liveMeta
   , scopeFor
+  , pointForHole
   , inferredTypeOf
   , whyInScopeMessageOf
   , queryError
@@ -105,7 +106,7 @@ import System.Directory (getCurrentDirectory)
 
 import AgdaMCP.Agda (AgdaConfig (..))
 import AgdaMCP.Declaration (quoteDeclaration)
-import AgdaMCP.Holes (flavourOf)
+import AgdaMCP.Holes (HoleSpan (..), LiterateFlavour, findHoles, flavourOf)
 import AgdaMCP.Interaction
 import AgdaMCP.Path (readRegularFile, withSourceFile)
 import AgdaMCP.Project
@@ -279,6 +280,25 @@ scopeFor mLine mCol lr = case (mLine, lrOutcome lr) of
           <> " is inside no goal)"
         )
   _ -> (Toplevel, "toplevel")
+
+-- | pointForHole: the interaction point that IS the addressed hole, or
+-- 'Nothing' when the lane cannot vouch for one.
+--
+-- The hole index is the lexical scan's (a caller has validated it with
+-- 'AgdaMCP.Holes.resolveHoleRef'), and the tier-3 parity tests pin that scan
+-- to Agda's interaction points across the fixture matrix; but the point at
+-- that index must also sit where the scanned hole starts, since if either
+-- enumeration carried an extra or missing point before the index,
+-- correspondence by index alone would answer about a different hole (a
+-- Copilot catch on the #108 review).  Shared by get_goal's lane path and the
+-- auto tool (issue #205), so the two can never disagree about which point a
+-- hole is.
+pointForHole :: LiterateFlavour -> Text -> Int -> [IPoint] -> Maybe IPoint
+pointForHole flav src idx points =
+  case (drop idx points, drop idx (findHoles flav src)) of
+    (p : _, h : _)
+      | Just r <- ipRange p, irLine r == hsLine h, irCol r == hsCol h -> Just p
+    _ -> Nothing
 
 -- | runShaped: send one query and shape its responses, converting a lane
 -- failure with full context.

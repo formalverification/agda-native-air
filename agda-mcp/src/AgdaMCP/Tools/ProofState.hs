@@ -180,7 +180,7 @@ import AgdaMCP.Interaction
 import AgdaMCP.Project
   ( fileDirIncludeFlags, projectExtraFlags, resolveProject, withEffectiveFlags )
 import AgdaMCP.Tools.LiveQueries
-  ( interactionFailure, laneCommandEcho, laneEchoFrom )
+  ( interactionFailure, laneCommandEcho, laneEchoFrom, pointForHole )
 import AgdaMCP.Types
 
 -- ---------------------------------------------------------------------------
@@ -325,10 +325,9 @@ injectedGoal cfg pc absPath origBytes src idx = do
 -- surfaces as the same structured failure the live-query tools raise.
 --
 -- The hole index is the lexical scan's (already validated by
--- 'resolveHoleRef'), and the tier-3 parity tests pin that scan to Agda's
--- interaction points across the fixture matrix; the length guard below
--- covers the day they disagree, by declining rather than answering about
--- the wrong hole.
+-- 'resolveHoleRef'), and 'pointForHole' holds the point at that index to the
+-- scanned hole's coordinates, which covers the day the two enumerations
+-- disagree, by declining rather than answering about the wrong hole.
 laneGoal
   :: InteractionLanes -> AgdaConfig -> ProjectContext -> FilePath -> Text
   -> Bool -> Int -> IO (Either ToolFailure (Maybe GoalInfo))
@@ -340,16 +339,11 @@ laneGoal lanes cfg pc absPath src reload idx = do
       Left lf  -> pure (Left lf)
       Right lr -> case lrOutcome lr of
         Left _   -> pure (Right Nothing)
-        Right li -> case drop idx (liPoints li) of
-          []      -> pure (Right Nothing)
-          (p : _)
-            -- The selected point must BE the addressed hole, not merely
-            -- exist: if either enumeration carried an extra or missing
-            -- point before idx, index correspondence alone would answer
-            -- about a different hole.  Coordinates decide (a Copilot catch
-            -- on the #108 review); any mismatch declines to the fallback.
-            | not (pointMatchesSpan p) -> pure (Right Nothing)
-          (p : _) -> do
+        -- The selected point must BE the addressed hole, not merely exist;
+        -- any mismatch declines to the fallback.
+        Right li -> case pointForHole (flavourOf absPath) src idx (liPoints li) of
+          Nothing -> pure (Right Nothing)
+          Just p  -> do
             rs <- runQuery lh absPath (cmdGoalTypeContext (ipId p))
             case rs of
               Left lf     -> pure (Left lf)
@@ -392,11 +386,6 @@ laneGoal lanes cfg pc absPath src reload idx = do
     Right (Left lf)     -> surfaceOrDecline startNs lf
     Left lf             -> surfaceOrDecline startNs lf
   where
-    pointMatchesSpan p = case (ipRange p, drop idx spans) of
-      (Just r, (h : _)) -> irLine r == hsLine h && irCol r == hsCol h
-      _                 -> False
-    spans = findHoles (flavourOf absPath) src
-
     surfaceOrDecline startNs lf
       | lfEvent lf == LaneTimeout =
           Left . FailInteraction <$> interactionFailure pc cfg startNs lf
