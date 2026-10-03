@@ -5,11 +5,17 @@
 -- Description:
 --   Corpus loading and search operations for the agda-mcp search tools (M1-3).
 --
---   This module provides:
---   1. 'loadCorpus'    — read an agda-strux JSONL file into a 'CorpusIndex'.
---   2. 'searchByName'  — case-insensitive substring search on prettyQname/prettyName.
---   3. 'searchByType'  — case-insensitive substring search on the type signature.
---   4. 'getDeps'       — dependency lookup with optional 1-hop expansion.
+--   This module provides the following:
+--   1. 'loadCorpus': read an agda-strux JSONL file into a 'CorpusIndex'.
+--   2. 'searchByName': case-insensitive substring search on prettyQname and
+--      prettyName.
+--   3. 'searchByTypeWritten': every fragment in the type as a statement
+--      writes it (issue #202; 'AgdaMCP.Written'), the shortest statements
+--      first.
+--   4. 'searchByType': every fragment a case-insensitive substring of the
+--      printed type, in name order: the match before #202, and
+--      search_by_type's @qualified: true@.
+--   5. 'getDeps': dependency lookup with optional 1-hop expansion.
 --
 --   All search functions are pure (operate on the in-memory 'CorpusIndex').
 --   The index is loaded once at server startup via the @--corpus@ CLI flag.
@@ -40,6 +46,7 @@ module AgdaMCP.Corpus
     -- * Search (pure)
   , searchByName
   , searchByType
+  , searchByTypeWritten
   , getDeps
     -- * Utilities
   , entryToSearchResult
@@ -50,12 +57,14 @@ import Data.Aeson (eitherDecodeStrict')
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map.Strict as Map
+import Data.List (sortOn)
 import Data.Text (Text)
 import qualified Data.Text as T
 import System.IO (hPutStrLn, stderr)
 
 import AgdaMCP.Retrieval (tokenIndex)
 import AgdaMCP.Types
+import AgdaMCP.Written (fragmentKey, writtenDisplay, writtenKeys)
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -110,13 +119,19 @@ loadCorpus path = do
 
 -- | corpusIndexOf: the index over a map of entries, its token index built
 -- here so every 'CorpusIndex' carries one (issue #17's search_in_scope reads
--- it; see 'AgdaMCP.Retrieval.tokenIndex').  The one way to build an index.
+-- it; see 'AgdaMCP.Retrieval.tokenIndex'), and its written forms, which
+-- search_by_type matches (issue #202; see 'AgdaMCP.Written.writtenKeys').
+-- The one way to build an index.
 corpusIndexOf :: Map.Map Text CorpusEntry -> CorpusIndex
 corpusIndexOf entryMap = CorpusIndex
-  { ciEntries = entryMap
-  , ciSize    = Map.size entryMap
-  , ciTokens  = tokenIndex entryMap
+  { ciEntries      = entryMap
+  , ciSize         = Map.size entryMap
+  , ciTokens       = tokenIndex entryMap
+  , ciWrittenTable = table
+  , ciWrittenKeys  = keys
   }
+  where
+    (table, keys) = writtenKeys entryMap
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -148,13 +163,15 @@ searchByName pattern limit idx =
 -- § Search by type
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- | Find definitions whose pretty-printed @type@ contains the given pattern
--- (case-insensitive substring match).
+-- | Find definitions whose pretty-printed @type@ contains every given pattern
+-- (case-insensitive substring match), in name order.
 --
--- This is string-level matching for M1-3.  Structural matching via @typeAst@
--- is an M2 goal (see roadmap.md M2-3).
-searchByType :: Text -> Maybe Int -> CorpusIndex -> [SearchResult]
-searchByType pattern limit idx =
+-- This is the M1-3 match, unchanged for one pattern: search_by_type answers
+-- with it under @qualified: true@, and the proof-search loop's retrieval
+-- proposer asks for it (strux-driver's Oracle), so the loop's pool is the one
+-- its published runs measured.
+searchByType :: [Text] -> Maybe Int -> CorpusIndex -> [SearchResult]
+searchByType patterns limit idx =
   take lim
     . map entryToSearchResult
     . filter matchesType
@@ -162,9 +179,32 @@ searchByType pattern limit idx =
     $ ciEntries idx
   where
     lim      = maybe 20 (max 1) limit
-    patLower = T.toLower pattern
+    lowered  = map T.toLower patterns
     matchesType e =
-      patLower `T.isInfixOf` T.toLower (ceType e)
+      let ty = T.toLower (ceType e)
+      in  all (`T.isInfixOf` ty) lowered
+
+-- | Find definitions whose type, as a statement writes it, contains every
+-- given fragment, as a fragment writes it (issue #202; 'AgdaMCP.Written'
+-- has the rules): the shortest written types first, then by name, so the
+-- statements a fragment most nearly is come before the long ones that merely
+-- mention it.  Each hit carries its written form.  A fragment whose key is
+-- empty (brackets or spaces alone) would match every row, so it is refused.
+searchByTypeWritten :: [Text] -> Maybe Int -> CorpusIndex -> Either Text [SearchResult]
+searchByTypeWritten fragments limit idx
+  | null keys = Left "search_by_type needs pattern or patterns: a fragment of a type, written as a statement writes it."
+  | any T.null keys = Left "search_by_type: a fragment with nothing but brackets or spaces in it would match every row; name a symbol or a name."
+  | otherwise = Right
+      . take lim
+      . map hit
+      . sortOn (\(e, k) -> (T.length k, cePrettyQname e))
+      . filter (\(_, k) -> all (`T.isInfixOf` k) keys)
+      $ Map.elems (Map.intersectionWith (,) (ciEntries idx) (ciWrittenKeys idx))
+  where
+    lim  = maybe 20 (max 1) limit
+    keys = map fragmentKey fragments
+    hit (e, _) = (entryToSearchResult e)
+      { srWritten = Just (writtenDisplay (ciWrittenTable idx) (ceType e)) }
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -206,6 +246,7 @@ entryToSearchResult e = SearchResult
   , srDefKind     = ceDefKind e
   , srModule      = cePrettyModule e
   , srHasBody     = ceHasBody e
+  , srWritten     = Nothing
   }
 
 -- | Resolve a dependency token to matching corpus entries.

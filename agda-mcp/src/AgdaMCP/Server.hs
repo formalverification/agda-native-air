@@ -453,12 +453,20 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
               ]
               ["pattern"]
 
-          , toolDef "search_by_type"
-              "Find definitions whose type signature contains the given pattern (case-insensitive substring match)."
-              [ prop "pattern" "string" "Substring to search for in type signatures."
-              , prop "limit"   "integer" "Maximum number of results (default: 20)."
+          -- The contract of issue #202: the match as written, the rule and
+          -- an example of each part, so a model reads when to reach for it.
+          , toolDefWith "search_by_type" searchByTypeNote
+              [ prop "pattern"   "string"  "One fragment of a type, written as a statement \
+                  \writes it (x ∙ y ≈ y ∙ x)."
+              , propArray "patterns" "string" "Several fragments; every one must occur in the \
+                  \same type."
+              , prop "limit"     "integer" "Maximum number of results (default: 20)."
+              , prop "qualified" "boolean" "Default false. True matches a case-insensitive \
+                  \substring of the printed type, in name order, with no written field."
               ]
-              ["pattern"]
+              []
+              [ ( "anyOf"
+                , toJSON [ requiring ["pattern"], requiring ["patterns"] ] ) ]
 
           , toolDef "get_dependencies"
               "Retrieve the dependency neighborhood of a definition. Returns dependency tokens and optionally expands them to full entries."
@@ -893,6 +901,33 @@ searchByNameNote =
   \in ledger.nonFunction), the first call on a file loads it (seconds), \
   \and the answer informs and never decides."
 
+-- | searchByTypeNote: the contract of search_by_type (issue #202).  What a
+-- model needs to write a query that matches: the rule (both sides as
+-- written, and what that drops), an example of each part, what is NOT
+-- normalized, the conjunction, the order and the bound, the answer's fields,
+-- and qualified: true for a query in the corpus's own spelling.  The
+-- parameter rules themselves are in AgdaMCP.Written and the README.
+searchByTypeNote :: Text
+searchByTypeNote =
+  "Find corpus definitions whose type contains every fragment, written the \
+  \way a statement is written: x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹, [ x ⸴ y ], \
+  \Commutative _≈_ _∙_, hom 𝑨 𝑩 → hom 𝑩 𝑪. AS WRITTEN: both sides are \
+  \compared with module qualifiers dropped (Algebra.Bundles.Group.∙ is ∙) \
+  \and with each name's module parameters dropped, which the corpus prints \
+  \as a first argument (x ∙ y ≈ y ∙ x is printed (G ≈ (G ∙ x) y) ((G ∙ y) \
+  \x)); brackets, spacing, and case are ignored, and -> is →. NOT \
+  \normalized: variable names are the library's (x y, not a b), and a \
+  \syntax declaration is not applied (conj-syntax g x, not x ^ g). pattern \
+  \is one fragment; patterns are several, ALL of which must occur in one \
+  \type; give either or both. Results: [{prettyQname, type, written, \
+  \module, defKind, hasBody}], the SHORTEST statements first, at most \
+  \limit (default 20): type is the corpus's printing, written is the type \
+  \as the fragments were matched against it. qualified: true matches the \
+  \printing instead, a case-insensitive substring of type in name order, \
+  \with no written field: use it for a qualified spelling (Group-Op.∙, \
+  \Algebra.Definitions.Commutative), which the default reads as its last \
+  \segment. No fragment, or one of brackets alone, is refused."
+
 -- | searchLineDoc: the anchor's contract for search_in_scope.
 searchLineDoc :: Text
 searchLineDoc =
@@ -970,14 +1005,18 @@ addressAlternatives =
   ( "oneOf"
   , toJSON
       [ object [ "required" .= ["holeIndex" :: Text], "not" .= anyOfKeys ["line", "column", "col"] ]
-      , object [ "required" .= ["line", "column" :: Text], "not" .= requiring "holeIndex" ]
-      , object [ "required" .= ["line", "col" :: Text],    "not" .= requiring "holeIndex" ]
+      , object [ "required" .= ["line", "column" :: Text], "not" .= requiring ["holeIndex"] ]
+      , object [ "required" .= ["line", "col" :: Text],    "not" .= requiring ["holeIndex"] ]
       , object [ "not" .= anyOfKeys ["holeIndex", "line", "column", "col"] ]
       ]
   )
   where
-    requiring k  = object ["required" .= [k :: Text]]
-    anyOfKeys ks = object ["anyOf" .= map requiring ks]
+    anyOfKeys ks = object ["anyOf" .= map (requiring . pure) ks]
+
+-- | requiring: a schema object that requires these keys (the hole address's
+-- @not@ clauses, the @anyOf@ of search_by_type's fragments).
+requiring :: [Text] -> Value
+requiring ks = object ["required" .= ks]
 
 -- | Build a property definition for the input schema.
 prop :: Text -> Text -> Text -> (Text, Value)

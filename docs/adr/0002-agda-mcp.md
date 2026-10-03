@@ -269,13 +269,19 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 10.  Corpus tools
 
-(See also [#11] (M1-3) and [`agda-mcp/README.md`].)
+(See also [#11] (M1-3), [#202], and [`agda-mcp/README.md`].)
 
-**Decision**.  Three pure lookups over an in-memory index of an `agda-strux` JSONL corpus, registered only when the server starts with `--corpus`, and never invoking Agda: `search_by_name` (case-insensitive substring over names), `search_by_type` (substring over printed types), and `get_dependencies` (a definition's dependency list, optionally expanded one hop).  Since phase 1 of [#17] (the status below) a fourth corpus tool, `search_in_scope`, reads the same index and validates every result through the interaction lane, so it is a corpus tool and a lane tool at once; the three lookups remain pure.
+**Decision**.  Three pure lookups over an in-memory index of an `agda-strux` JSONL corpus, registered only when the server starts with `--corpus`, and never invoking Agda: `search_by_name` (case-insensitive substring over names), `search_by_type` (fragments of the type as a statement writes it, since [#202]; below), and `get_dependencies` (a definition's dependency list, optionally expanded one hop).  Since phase 1 of [#17] (the status below) a fourth corpus tool, `search_in_scope`, reads the same index and validates every result through the interaction lane, so it is a corpus tool and a lane tool at once; the three lookups remain pure.
 
 **Evidence**.  At library scale (the published agda-algebras v0 corpus, `docs/corpora/`), 11,666 rows and 185 MB of JSONL load in about 1.4 s to a 308 MB resident footprint, because the index keeps only the fields the tools serve and drops `typeAst` and proof bodies; `hasBody` tells an agent a term exists to go and read.  Two consequences are documented for query writers: dependency tokens are fully qualified, and 655 `prettyQname` keys are shared by more than one row.  `make corpus-mcp-smoke` drives the three lookups over the transport.
 
 **Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.  Its phase 1 landed on 2026-09-15 (PR [#161]): `search_in_scope`, the fourteenth tool, reads the file's import surface off the code-only view, ranks the in-scope rows of the index with the driver's token-overlap scorer, and returns only renderings the interaction lane has typed in the file's scope, with an honesty ledger on every response; the contract is the issue's comment of that date, and phase 2 (`search_term`) stays open on [#17].
+
+**Matching a type as written ([#202])**.  `search_by_type` matched one case-insensitive substring against each row's printed type, which is printed from outside every module: fully qualified, and with each definition's module parameter, or a record field's bundle, as its first explicit argument, which Agda's printer puts in an operator's first hole (the statement `x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹`, inside `open AbelianGroup G`, is printed `(G ≈ (G ∙ (G ⁻¹) x) ((G ⁻¹) y)) ((G ⁻¹) ((G ∙ x) y))`).  A query written as a statement reads therefore matched almost nothing, and dropping qualifiers alone, the issue's first plan, would not have changed that.
+
++  **Decision**.  By default each fragment, and each type, is compared as written: qualifiers dropped; each name's module parameters dropped where it is applied, and an operator's remaining arguments put back in its holes; brackets, spacing, and case ignored.  How many parameters a name takes is read off the corpus (the leading binders every function row of its module shares, half of them for a record module, counted up to the first operation parameter such as `Algebra.Definitions`'s `_≈_`, which statements pass explicitly), so it is a derived answer in the sense of § 4, used only to match and order rows and never to name or judge anything.  `patterns` requires several fragments in one type; hits come shortest first and carry `written`, the type as matched; `qualified: true` is the old match, which the proof-search loop's retrieval proposer now asks for, so its pool is the one its published runs measured.
++  **Evidence**.  The 23 `search_by_type` calls in the archived agent-bench arms, replayed against their rows' corpora: 11 answered nothing on the archived server and 5 on this one (`hom 𝑨 𝑩 → hom 𝑩 𝑪` finds `∘-hom`, `m + n ≤ o` finds `m+n≤o⇒m≤o`), and the answers fell from 175,124 characters to 131,462.  The novelty tables of [#189] are met: `x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹` finds `Algebra.Properties.AbelianGroup.⁻¹-∙-comm` first, `[ x ⸴ y ]` the six lemmas stated with `Commutator.[_⸴_]`, and `conj` with `x ∙ y` exactly `Conjugation.conj-∙-hom`, each pinned by a test on fixtures cut from the pinned corpora, and each finding nothing under `qualified: true`.  The cost is at load: 0.9 s on the agda-algebras corpus and 2.5 s on the standard library's, and `tools/list` grew by 1,522 characters (24,094 to 25,616) for the contract and its examples.
++  **Status**.  Adopted ([#202]).  Not normalized, and stated in the description: variable names, `syntax` declarations (the corpus does not carry them), and grouping (brackets are ignored).  Whether a model now reaches for the tool is the re-run arm's question, on [#202].
 
 **Search in scope, folded into search by name ([#203])**.  `search_in_scope` answers a question no other tool can, which names this file can write and how, and over the 51 archived agent-bench runs it was presented in 681 sessions and called once, while its `tools/list` entry was 4,056 of the 24,094 characters every server session carries on every turn (17 %).  Its description opened with the answer's field list and never named that question.
 
@@ -374,6 +380,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5; arms cost 17 to 19 % less; four tools alone read the library instead of searching it and cited less (§ 3) |
 | 21 | In a file with one hole, a position on its line or no address reaches it; every `get_goal` and `fill_hole` answer names the hole it used and how (`addressed`) | Adopted ([#201], PR [#228]) | 86 archived refusals (39 of 234 `fill_hole` calls, 47 `get_goal`), all in one-hole files on the hole's line; all resolve on replay (§ 7) |
 | 22 | `definition_of` quotes what each definition says beside where it is: the declaration's source lines, cut by layout (no Agda query answers a declaration's range), verbatim, bounded by `maxLines` (default 40), naming the range it quotes | Adopted ([#185], PR [#229]) | 0 calls beside a shell in [#162]; 14 answers and 16 reads of the named files on [#189]'s hard tier; 87 of the 92 archived sites fit 40 lines (§ 4) |
+| 23 | `search_by_type` matches fragments of the type as a statement writes it (qualifiers and each name's module parameters dropped, read off the corpus); `patterns` for several at once; shortest first, with `written`; `qualified: true` keeps the old match, which the loop asks for | Adopted ([#202]) | 11 of 23 archived calls answered nothing before, 5 after; [#189]'s cited lemmas found from their statements; load +0.9 s and +2.5 s |
 | 24 | `search_in_scope`'s question asked through `search_by_name`'s `inScopeAt` (same handler, the pattern as the name query); `search_in_scope` registered and presented only when `--expose` names it | Adopted ([#203]) | Presented in 681 archived sessions, called once, 17 % of every turn's `tools/list`; 286 sessions asked the question other ways; 17 replays answered by it |
 
 ---
@@ -386,7 +393,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
    + its children [#69], [#70], [#71], [#72], [#73], [#74], [#75], [#76], [#77], [#78], [#79];
    + the follow-on fixes [#100], [#101], [#103], [#106], [#108], [#114], [#115], [#133];
    + the companions [#83] (M1-7), [#85] (M1-8), [#14] (M1-6);
-   + the forward pointer [#17] (M2-3), and [#203] (its scope-aware tool folded into `search_by_name`);
+   + the forward pointer [#17] (M2-3), [#202] (search by type as written), and [#203] (its scope-aware tool folded into `search_by_name`);
    + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147], [#185], [#201];
    + the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
 
@@ -481,7 +488,9 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#202]: https://github.com/formalverification/agda-native-air/issues/202
 [#203]: https://github.com/formalverification/agda-native-air/issues/203
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#189]: https://github.com/formalverification/agda-native-air/issues/189

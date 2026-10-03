@@ -190,7 +190,10 @@ def check_hits(doc, what, pattern, field):
         absent = REQUIRED - set(hit)
         if absent:
             fail(f"{what} result is missing {sorted(absent)}", hit)
-    # The server promises a substring match; hold it to that.
+    # The server promises a substring match for search_by_name, and for a
+    # one-word search_by_type fragment, which the type as written keeps
+    # (issue #202 drops qualifiers and parameters, never a word's letters);
+    # hold it to that.
     lowered = pattern.lower()
     if not any(lowered in str(hit.get(field, "")).lower() for hit in hits):
         fail(f"no {what} result actually contains {pattern!r} in its {field}", hits)

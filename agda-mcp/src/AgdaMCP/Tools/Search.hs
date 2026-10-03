@@ -9,10 +9,12 @@
 --   agda-strux corpus index without calling Agda.  They are pure lookups
 --   on the in-memory 'CorpusIndex' loaded at server startup.
 --
---   Tools:
---   * search_by_name   — substring match on prettyQname / prettyName
---   * search_by_type   — substring match on the type signature
---   * get_dependencies — dependency list + optional 1-hop expansion
+--   The tools are as follows:
+--   * search_by_name: substring match on prettyQname and prettyName;
+--   * search_by_type: every fragment in the type as a statement writes it
+--     (issue #202), or, with qualified: true, a substring of the corpus's
+--     printing;
+--   * get_dependencies: dependency list and an optional 1-hop expansion.
 --
 -- See also:
 --   AgdaMCP.Corpus     — the search/index logic.
@@ -30,7 +32,7 @@ module AgdaMCP.Tools.Search
 
 import Data.Text (Text)
 
-import AgdaMCP.Corpus (searchByName, searchByType, getDeps)
+import AgdaMCP.Corpus (searchByName, searchByType, searchByTypeWritten, getDeps)
 import AgdaMCP.Types
 
 
@@ -75,12 +77,22 @@ inScopeParams p at = SearchInScopeParams
 
 -- | Handle the @search_by_type@ tool call.
 --
--- Searches the corpus for definitions whose type signature contains the pattern.
+-- The fragments are @pattern@ and every member of @patterns@; a call with
+-- neither is refused.  By default each fragment is matched against the type
+-- as a statement writes it ('searchByTypeWritten'); @qualified: true@ is the
+-- match from before issue #202, a substring of the printed type, which for
+-- one pattern answers exactly as the tool did then ('searchByType').
 -- Returns a JSON array of 'SearchResult' objects.
 handleSearchByType :: CorpusIndex -> SearchByTypeParams -> Either Text [SearchResult]
-handleSearchByType idx params =
-  let results = searchByType (sbtPattern params) (sbtLimit params) idx
-  in Right results
+handleSearchByType idx params
+  | null fragments =
+      Left "search_by_type needs pattern or patterns: a fragment of a type, written as a statement writes it."
+  | sbtQualified params == Just True =
+      Right (searchByType fragments (sbtLimit params) idx)
+  | otherwise =
+      searchByTypeWritten fragments (sbtLimit params) idx
+  where
+    fragments = maybe [] pure (sbtPattern params) <> maybe [] id (sbtPatterns params)
 
 
 -- ═══════════════════════════════════════════════════════════════════════════

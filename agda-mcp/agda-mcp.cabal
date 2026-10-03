@@ -60,6 +60,7 @@ library
     AgdaMCP.Corpus
     AgdaMCP.Scope
     AgdaMCP.Retrieval
+    AgdaMCP.Written
     AgdaMCP.Tools.CheckProject
     AgdaMCP.Tools.LiveQueries
     AgdaMCP.Tools.ProofState

@@ -204,9 +204,15 @@ final class Oracle private (
     corpusCall[Vector[SearchHit]](ctx, "search_by_name",
       Json.obj("pattern" -> pattern.asJson, "limit" -> limit.asJson))
 
+  /** `qualified: true` keeps the match the loop's runs were measured with: a
+    * case-insensitive substring of the printed type, in name order (agda-mcp
+    * issue #202 made the type as written the server's default).  The recall
+    * instrument's in-memory corpus (`RetrievalRecall.InMemoryCorpus.byType`)
+    * mirrors this match, so the two stay one rule.
+    */
   def searchByType(ctx: CallCtx, pattern: String, limit: Int): IO[Vector[SearchHit]] =
     corpusCall[Vector[SearchHit]](ctx, "search_by_type",
-      Json.obj("pattern" -> pattern.asJson, "limit" -> limit.asJson))
+      Json.obj("pattern" -> pattern.asJson, "limit" -> limit.asJson, "qualified" -> true.asJson))
 
   def dependenciesOf(ctx: CallCtx, prettyQname: String): IO[Vector[SearchHit]] =
     corpusCall[DependenciesBody](ctx, "get_dependencies",
