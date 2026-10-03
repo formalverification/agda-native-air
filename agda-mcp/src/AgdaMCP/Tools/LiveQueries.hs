@@ -83,13 +83,13 @@ module AgdaMCP.Tools.LiveQueries
   , opaqueAnswer
     -- * Exposed for testing
   , candidateFrom
+  , quoteSites
   , defSiteFrom
   , pageExports
   ) where
 
-import Control.Exception (IOException, catch, try)
+import Control.Exception (IOException, catch)
 import Data.Aeson (Value (..))
-import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as Map
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
@@ -107,7 +107,7 @@ import AgdaMCP.Agda (AgdaConfig (..))
 import AgdaMCP.Declaration (quoteDeclaration)
 import AgdaMCP.Holes (flavourOf)
 import AgdaMCP.Interaction
-import AgdaMCP.Path (withSourceFile)
+import AgdaMCP.Path (readRegularFile, withSourceFile)
 import AgdaMCP.Project
   ( fileDirIncludeFlags, projectExtraFlags, resolveProject, withEffectiveFlags )
 import AgdaMCP.Types
@@ -645,9 +645,10 @@ handleDefinitionOf lanes cfg0 p =
 -- declaration's source lines, quoted from the file the site names, at most
 -- @maxLines@ of them ('Nothing': the whole declaration).
 --
--- Each file is read once per call, however many candidates it holds, and a
--- file that cannot be read gives each of its sites the reason instead of a
--- quote.  The read is of the file as it is on disk now; the site came from
+-- Each file is read once per call, however many candidates it holds, through
+-- 'AgdaMCP.Path.readRegularFile', so a path that names anything but a regular
+-- file is never opened; a file that cannot be read gives each of its sites the
+-- reason instead of a quote.  The read is of the file as it is on disk now; the site came from
 -- the lane's load of it, so after an edit to that file without @reload@ the
 -- two can disagree, and the quote's line range is what a reader checks.
 quoteSites :: Maybe Int -> [DefSite] -> IO [DefSite]
@@ -657,12 +658,16 @@ quoteSites maxLines sites = do
   where
     byFile = Map.fromList [ (dsFile d, ()) | d <- sites ]
 
+    -- The failure's first line names the path and the problem ("is not a
+    -- regular file, it is a named pipe (FIFO)"); the rest of the path
+    -- failure's text is advice to a client about a path it sent, which this
+    -- path is not.
     readSource :: FilePath -> IO (Either Text Text)
     readSource f = do
-      r <- try (BS.readFile f)
+      r <- readRegularFile "definition" f
       pure $ case r of
-        Left (e :: IOException) -> Left ("could not read " <> T.pack f <> ": " <> T.pack (show e))
-        Right bytes -> case TE.decodeUtf8' bytes of
+        Left failure -> Left (T.takeWhile (/= '\n') (pathFailureMessage failure))
+        Right bytes  -> case TE.decodeUtf8' bytes of
           Left _    -> Left (T.pack f <> " is not UTF-8 text")
           Right src -> Right src
 

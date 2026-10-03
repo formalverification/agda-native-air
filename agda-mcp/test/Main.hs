@@ -52,6 +52,7 @@ module Main (main) where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket_, catch, try, SomeException)
+import System.Timeout (timeout)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
@@ -137,7 +138,7 @@ import AgdaMCP.Tools.ProofState
   , ensureDebugImport, moduleNameOf, errorTagsOf, onlyOpenHoleErrors )
 import AgdaMCP.Tools.LiveQueries
   ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
-  , handleTypeOf, pageExports )
+  , handleTypeOf, pageExports, quoteSites )
 import AgdaMCP.Tools.Search
   ( handleSearchByName, handleSearchByType, handleGetDependencies, inScopeParams )
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope, needsIdentityCheck, probeBudget)
@@ -8213,6 +8214,48 @@ declarationTests = do
                   (valueAt ["declarationEndLine"] (Aeson.toJSON (SourceQuoted q)))
               ]
         ]
+
+    -- A CRLF file is quoted as written: the text is the file's own bytes
+    -- for the range, carriage returns included (Copilot, PR #229).
+    , runTest "quote: a CRLF file's text is its bytes for the range, CR included" $ do
+        let crlf = T.replace "\n" "\r\n" declSrc
+            -- lines 5 to 7 (double), up to but not including line 7's LF
+            expect = T.intercalate "\r\n"
+                       (take 3 (drop 4 (T.splitOn "\r\n" crlf))) <> "\r"
+        case quoteDeclaration 0 PlainAgda crlf 5 1 7 of
+          Nothing -> pure (Fail "no quote")
+          Just q  -> allOf
+            [ assertEqual "range" (5, 7, 7) (dqStartLine q, dqEndLine q, dqDeclEndLine q)
+            , assertEqual "text" expect (dqText q)
+            , assert "a substring of the file" (dqText q `T.isInfixOf` crlf)
+            ]
+
+    -- A definition site that is not a regular file is never opened: the quote
+    -- is an error naming what is there (Copilot, PR #229).  A FIFO with no
+    -- writer reads as an empty file, so before the guard this came back as a
+    -- quote that looked like a success (lines 1 to 1, empty text), measured in
+    -- a repl against the old read; the timeout keeps a regression from
+    -- hanging the suite.
+    , runTest "quoteSites: a site naming a FIFO is refused by type, not read" $ do
+        tmp <- getTemporaryDirectory
+        let dir  = tmp </> "agda-mcp-quote-fifo"
+            fifo = dir </> "Fifo.agda"
+        removeDirectoryRecursive dir `catch` \(_ :: SomeException) -> pure ()
+        createDirectoryIfMissing True dir
+        createNamedPipe fifo (ownerReadMode `unionFileModes` ownerWriteMode)
+        let site = DefSite { dsQualified = Just "Fifo.x", dsFile = fifo, dsLine = 1
+                           , dsCol = 1, dsEndLine = 1, dsEndCol = 2, dsSource = Nothing }
+        r <- timeout 10000000 (quoteSites (Just defaultQuoteLines) [site])
+        removeDirectoryRecursive dir `catch` \(_ :: SomeException) -> pure ()
+        case r of
+          Nothing -> pure (Fail "quoteSites did not return within 10 s")
+          Just [d] -> case dsSource d of
+            Just (SourceUnread why) -> allOf
+              [ assert ("names the file type: " <> T.unpack why) ("named pipe" `T.isInfixOf` why)
+              , assert "names the path" (T.pack fifo `T.isInfixOf` why)
+              ]
+            other -> pure (Fail ("expected an unread source, got " <> show other))
+          Just ds -> pure (Fail ("expected one site, got " <> show (length ds)))
 
     , runTest "quote: a line past the end of the file quotes nothing" $
         assertEqual "past the end" Nothing (quoteDeclaration 0 PlainAgda declSrc 99 1 2)

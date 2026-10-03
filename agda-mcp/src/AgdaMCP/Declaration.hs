@@ -46,8 +46,8 @@
 --     more (@maxLines@, 0 for the whole declaration).  Over the 92 distinct
 --     sites the archived agent-bench arms asked @definition_of@ about, the
 --     declarations ran to a median of 2 lines (135 characters), 15 lines at
---     the 90th percentile, 29 at the 95th, and one record to 686 lines; 40
---     lines quotes 96 % of them whole.
+--     the 90th percentile, 29 at the 95th, and one module to 686 lines; 40
+--     lines quotes 87 of the 92 whole.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -71,9 +71,13 @@ import AgdaMCP.Holes (HoleSpan (..), LiterateFlavour, codeWithHoles, findHoles)
 -- the declaration itself runs to 'dqDeclEndLine', so the quote stopped short
 -- exactly when the two differ.
 data DeclQuote = DeclQuote
-  { dqStartLine   :: Int   -- ^ First quoted line (1-based): the binding site's.
+  { dqStartLine   :: Int   -- ^ First quoted line (1-based): the one the
+                           --   declaration opens on.
   , dqEndLine     :: Int   -- ^ Last quoted line.
-  , dqText        :: Text  -- ^ Those lines, verbatim, joined by newlines.
+  , dqText        :: Text  -- ^ Those lines, byte for byte: the file's text
+                           --   from the start of the first to the end of the
+                           --   last, its line endings (CRLF included) as
+                           --   written, without the last line's newline.
   , dqDeclEndLine :: Int   -- ^ The declaration's last line, by the layout rule.
   } deriving (Eq, Show)
 
@@ -99,7 +103,9 @@ quoteDeclaration maxLines flav src line col endCol = do
     , dqDeclEndLine = end
     }
   where
-    raw = map (T.dropWhileEnd (== '\r')) (T.splitOn "\n" src)
+    -- Split on LF alone and rejoin with it, so a CRLF file's carriage returns
+    -- stay where they were and the quote is the file's own text for the range.
+    raw = T.splitOn "\n" src
 
 -- | declarationLines: the first and last lines of the declaration the binding
 -- site at @(line, col)@ to @endCol@ opens, by the layout rule of the module
