@@ -8436,6 +8436,23 @@ autoLaneTests cfg repoRoot = do
           , assert "no reset: Agda put its state back" (isNothing (aurResetMs res))
           ]
 
+    , -- A found term owes a re-load, and a re-load of a file with open holes
+      -- re-typechecks it; the answer's checkedFromSource must say so even
+      -- when the load the search ran on was reused (a Copilot catch on PR
+      -- #230: the answer reported the first load's false).
+      runTest "auto: checkedFromSource counts the reset's re-check, not only the first load's" $ do
+        fresh <- newInteractionLanes
+        _      <- handleAuto fresh cfg (at 0)
+        second <- handleAuto fresh cfg (at 0)
+        shutdownLanes fresh
+        case second of
+          Left err  -> pure (Fail (T.unpack (failureText err)))
+          Right res -> allOf
+            [ assertEqual "the search ran on a reused load" "reused" (lchLoad (lmLane (aurMeta res)))
+            , assert "and a reset ran" (isJust (aurResetMs res))
+            , assertEqual "so the call re-typechecked its file" (Just True) (lmCheckedFromSource (aurMeta res))
+            ]
+
     , runTest "auto: a search bound that reaches --timeout is refused before anything runs" $ do
         fresh <- newInteractionLanes
         r <- handleAuto fresh cfg { agdaTimeout = Just 2 } (at 0) { apTimeoutMs = Just 2000 }
@@ -8480,6 +8497,48 @@ autoLaneTests cfg repoRoot = do
               ]
             Left other -> pure (Fail ("wrong failure shape: " <> T.unpack (failureText other)))
             Right res  -> pure (Fail ("answered: " <> show (aurOutcome res)))
+
+      , -- The re-load a found term owes can itself fail (a dependency edited
+        -- between the search and the reset, say).  The term is then moot,
+        -- and the answer must say the file no longer loads rather than hand
+        -- back a found term (a Copilot catch on PR #230).  The stand-in
+        -- loads once, gives a term, and refuses the second load.
+        runTest "auto: a found term whose re-load fails is answered as the load's error, naming the term" $ do
+          let version = "{\"info\":{\"kind\":\"Version\",\"version\":\"9.9\"},\"kind\":\"DisplayInfo\"}"
+              range   = "[{\"start\":{\"line\":" <> show (hsLine h) <> ",\"col\":" <> show (hsCol h)
+                        <> "},\"end\":{\"line\":" <> show (hsLine h) <> ",\"col\":"
+                        <> show (hsCol h + 4) <> "}}]"
+              points  = "{\"interactionPoints\":[{\"id\":0,\"range\":" <> range <> "}],\"kind\":\"InteractionPoints\"}"
+              give    = "{\"giveResult\":{\"str\":\"m , n\"},\"interactionPoint\":{\"id\":0,\"range\":" <> range
+                        <> "},\"kind\":\"GiveAction\"}"
+              refused = "{\"info\":{\"error\":{\"message\":\"AutoSearch.agda:1.1-2: error: [ParseError] stand-in refusal\"},\"kind\":\"Error\",\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+          script <- fakeLaneBinary "auto-reset-fails" $ unlines
+            [ "#!/bin/sh"
+            , "loads=0"
+            , "while IFS= read -r line; do"
+            , "  case \"$line\" in"
+            , "    *Cmd_autoOne*) printf '%s\\n' '" <> give <> "' ;;"
+            , "    *Cmd_load*) loads=$((loads + 1))"
+            , "      if [ \"$loads\" -eq 1 ]; then printf '%s\\n' '" <> points <> "';"
+            , "      else printf '%s\\n' '" <> refused <> "'; fi ;;"
+            , "    *Cmd_show_version*) printf '%s\\n' '" <> version <> "' ;;"
+            , "  esac"
+            , "done"
+            ]
+          fresh <- newInteractionLanes
+          r <- handleAuto fresh cfg { agdaBin = script, agdaTimeout = Just 10 } (at 0)
+          shutdownLanes fresh
+          case r of
+            Left err  -> pure (Fail ("tool failure: " <> T.unpack (failureText err)))
+            Right res -> allOf
+              [ assertEqual "outcome" OutcomeError (aurOutcome res)
+              , assertEqual "no term is handed back" Nothing (aurTerm res)
+              , assertEqual "stage" (Just "load") (lveStage <$> aurError res)
+              , assert "the message names the term found and the load's error"
+                  (maybe False (\e -> "m , n" `T.isInfixOf` lveMessage e
+                                     && "stand-in refusal" `T.isInfixOf` lveMessage e) (aurError res))
+              , assert "the reset still ran" (isJust (aurResetMs res))
+              ]
       ]
     [] -> pure [False]
 

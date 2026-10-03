@@ -47,7 +47,9 @@
 --
 --   The lane is left describing the file after a found term ('runConsuming'
 --   re-loads it, the reset a give owes), and an answer says what that cost
---   ('aurResetMs').
+--   ('aurResetMs'), counts its re-check in @checkedFromSource@
+--   ('withResetEvidence'), and turns into the load's error if the re-load
+--   failed ('resetAware').
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -58,6 +60,8 @@ module AgdaMCP.Tools.Auto
   , joinRendering
   , notInScopeName
   , classifyAuto
+  , resetAware
+  , withResetEvidence
   ) where
 
 import Data.Maybe (listToMaybe)
@@ -101,9 +105,12 @@ handleAuto lanes cfg0 p = case boundProblem of
                                <$> interactionFailure (lcProject ctx) (lcConfig ctx)
                                                       (lcStartNs ctx) lf
                   Right run -> do
-                    meta <- liveMeta ctx
-                    let (outcome, term, message, err) =
-                          classifyAuto (apHints p) (auAnswer run)
+                    meta0 <- liveMeta ctx
+                    let meta = meta0
+                          { lmCheckedFromSource = withResetEvidence
+                              (lmCheckedFromSource meta0) (lrCheckedFromSource <$> auReset run) }
+                        (outcome, term, message, err) =
+                          resetAware (auReset run) (classifyAuto (apHints p) (auAnswer run))
                     pure . Right $ AutoResult
                       { aurOutcome  = outcome
                       , aurTerm     = term
@@ -127,6 +134,44 @@ handleAuto lanes cfg0 p = case boundProblem of
         \that long could only end in the lane being killed. Ask for less than "
         <> T.pack (show (secs * 1000)) <> " ms."
       _ -> Nothing
+
+-- | resetAware: the answer, once the re-load a found term owes is known.
+--
+-- A found term consumes the hole in the lane's state, and 'autoAt' re-loads
+-- the file to put it back.  That re-load can fail (a dependency edited
+-- between the search and the reset, say).  The term was found against the
+-- state the search ran on, which the file no longer loads into, so it is
+-- moot: the answer is the load's error, in band, naming the term it found,
+-- rather than a found term the caller would judge against a file that does
+-- not load (a Copilot catch on PR #230).  The lane is not left stale: a
+-- failed load is retried on the next request ('ensureLoaded').
+resetAware
+  :: Maybe LoadReport
+  -> (AutoOutcome, Maybe Text, Maybe Text, Maybe LiveError)
+  -> (AutoOutcome, Maybe Text, Maybe Text, Maybe LiveError)
+resetAware reset answer = case (reset, answer) of
+  (Just lr, (OutcomeFound, Just t, _, _)) | Left msg <- lrOutcome lr ->
+    ( OutcomeError, Nothing, Nothing
+    , Just (loadError msg)
+        { lveMessage = "the search found `" <> t <> "`, and re-loading the file \
+                       \afterwards failed, so the term is moot; the lane re-loads \
+                       \the file on the next call. Agda: " <> msg } )
+  _ -> answer
+
+-- | withResetEvidence: whether the call re-typechecked its file, counting
+-- the reset.  A re-load of a file with open holes re-typechecks it, so a call
+-- whose search ran on a reused load (@false@) and then reset did re-check the
+-- file; reporting the first load's @false@ would contradict the field's own
+-- meaning (a Copilot catch on PR #230).  Positive evidence from either load
+-- wins; with no reset the first load's answer stands; otherwise unknown
+-- evidence on either side leaves the field unknown, never a guess.
+withResetEvidence :: Maybe Bool -> Maybe (Maybe Bool) -> Maybe Bool
+withResetEvidence first reset = case (first, reset) of
+  (_, Nothing)                -> first
+  (Just True, _)              -> Just True
+  (_, Just (Just True))       -> Just True
+  (Just False, Just (Just False)) -> Just False
+  _                           -> Nothing
 
 -- | autoOptions: the hole contents Agda's option reader is given.
 --

@@ -345,7 +345,7 @@ rule), and they carry their whole echo whether or not the call asked for it.
 
 ### Agda's own proof search (issue #205)
 
-A sixth lane tool, registered only when the server starts with `--auto`
+A lane tool registered only when the server starts with `--auto`
 (ADR 0002, decision 25: issue #191 measured the tool surface as an agent
 arm's main cost, and issue #203 found a tool offered in 681 archived
 sessions and called once, so a place on the default surface waits for an
@@ -1178,7 +1178,7 @@ ran out of time at 1,005 ms on another.
 | `found` | `term` | A term at the hole, Agda's rendering joined onto one line. |
 | `no-solution` | `message` | Agda's own message (`No solution found`): the search exhausted its space or its time, and the message does not say which. |
 | `out-of-scope` | `error` (`stage: "term"`, `code: "NotInScope"`) | The search found a term and Agda printed it with a name the file cannot write (a record field of a module the file never imports, spelled by its full internal name), so Agda could not read its own term back. |
-| `error` | `error {stage, code?, message}` | `hints`: a hint the hole's scope cannot name (Agda reads hints before searching, and refuses the call); `auto`: any other refusal, such as a term Agda printed and could not read back as the type it found (`ShouldBePi`, measured on one composition row); `load`: the file does not load. |
+| `error` | `error {stage, code?, message}` | `hints`: a hint the hole's scope cannot name (Agda reads hints before searching, and refuses the call); `auto`: any other refusal, such as a term Agda printed and could not read back as the type it found (`ShouldBePi`, measured on one composition row); `load`: the file does not load, before the search or in the re-load after a found term (then the message names the term, which is moot). |
 
 A `NotInScope` is attributed by name: when the name Agda says is missing is
 one of the call's hints, the hint is at fault; otherwise it can only be the
@@ -1196,6 +1196,11 @@ lines joined with one space; the search builds no layout block (`let`,
 **The reset**.  A found term consumes the hole in the lane's state, so the
 server re-loads the file before answering (`resetMs`, beside the search's own
 `searchMs`; both within `elapsedMs`), as after any give (issue #163).
+`checkedFromSource` counts that re-load, which re-typechecks a file with open
+holes, so a search on a reused load followed by a reset reports `true`.  If
+the re-load fails (a dependency edited in between, say), the answer is the
+load's error, naming the term found, since a term judged against a file that
+no longer loads is moot; the lane retries the load on the next call.
 `no-solution` and a refusal need none: the search runs in a local copy of
 Agda's state, and Agda's interaction loop puts back the state it held before
 a failed command.

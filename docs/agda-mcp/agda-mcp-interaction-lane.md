@@ -147,7 +147,7 @@ Probed on this session's hardware, disk-warm `.agdai` interfaces throughout (the
 
 ## 5.  The tools, mapped to the protocol
 
-All five take `filePath` (absolute; resolved and refused exactly as the batch tools do, per #101) and `verbose` (issue #184), and answer with the echo of § 3, lean unless `verbose` is true.
+Each of the six below takes `filePath` (absolute; resolved and refused exactly as the batch tools do, per #101) and `verbose` (issue #184), and answers with the echo of § 3, lean unless `verbose` is true; `get_goal` and `search_in_scope` take the lane too and are documented with their own tools.
 
 +  `type_of(filePath, expr, line?, column?)` → `Cmd_infer` at the goal whose range contains the position when one does, else `Cmd_infer_toplevel`; `Normalised` rewrite.  Answers for expressions not present in the file.  The optional column decides between two goals sharing a line, whose scopes can differ (probed: `(\ m -> {!!}) {!!}` binds `m` in the first hole only); a line alone selects the earliest goal on it.
 +  `normalize(filePath, expr, line?, column?)` → `Cmd_compute` / `Cmd_compute_toplevel`, `DefaultCompute`.
@@ -157,4 +157,4 @@ All five take `filePath` (absolute; resolved and refused exactly as the batch to
 
 `auto(filePath, line+column | holeIndex, hints?, hintMode?, timeoutMs?, skip?)` (issue #205, registered only with `--auto`) → `Cmd_autoOne Simplified` at the goal the address names, the hole matched to its interaction point by index and coordinates as `get_goal` matches it, with the options built from the declared fields; a found term is joined onto one line and the file re-loaded before the answer, whose `resetMs` says what that cost.  The answer is a candidate for `fill_hole`, never a verdict.
 
-`scope_at(filePath, line)` — the sixth proposed tool — is **not protocol-backed**: no interaction command enumerates the names in scope (the module-contents command lists one module's members, not the environment; the goal commands answer point questions).  Per the issue's own bar (§ 2.2 of the feedback document: ship only where the server beats the shell), it is omitted rather than approximated with grep, and the finding is recorded on issue #75.
+`scope_at(filePath, line)`, the sixth tool issue #75 proposed, is **not protocol-backed**: no interaction command enumerates the names in scope (the module-contents command lists one module's members, not the environment; the goal commands answer point questions).  Per the issue's own bar (§ 2.2 of the feedback document: ship only where the server beats the shell), it is omitted rather than approximated with grep, and the finding is recorded on issue #75.
