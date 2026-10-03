@@ -189,13 +189,15 @@ Doom Emacs, your `init.el` otherwise):
   (let ((checkout (and (buffer-file-name) (my/agda-checkout (buffer-file-name)))))
     (setq my/agda-process-root (car checkout))
     (if (null checkout)
-        (apply restart args)
+        (prog1 (apply restart args)
+          (setq my/agda-process-root nil))
       (pcase-let ((`(,_root ,program ,program-args ,agda-dir) checkout))
         (let ((agda2-program-name program)
               (agda2-program-args program-args)
               (process-environment (cons (concat "AGDA_DIR=" agda-dir)
                                          process-environment)))
-          (apply restart args))))))
+          (prog1 (apply restart args)
+            (setq my/agda-process-root (car checkout))))))
 
 (defun my/agda-load (load &rest args)
   "Around `agda2-load': restart Agda first if the buffer is in another checkout."
