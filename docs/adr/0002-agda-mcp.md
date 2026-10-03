@@ -176,7 +176,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Evidence for the source quote**.  The arms of [#162] measured the gap it closes: given the server and a shell, the subject called `definition_of` 0 times (19 in the server-only arm) and read library sources through the shell instead; and on the hard tier of [#189], the server arm's 14 `definition_of` answers were followed by 16 `Read` calls of a file an answer had named.  Over the 92 distinct sites the archived arms asked about, the declarations ran to a median of 2 lines (135 characters), 15 lines at the 90th percentile, 29 at the 95th, and one module to 686; 40 lines quotes 87 of the 92 whole.
 
-**Status**.  Adopted (PRs [#105], [#110], [#116]; the source quote in PR [#PR185]).  No open follow-up; the rule is the review question for every new field.
+**Status**.  Adopted (PRs [#105], [#110], [#116]; the source quote in PR [#229]).  No open follow-up; the rule is the review question for every new field.
 
 ---
 
@@ -373,7 +373,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
 | 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5; arms cost 17 to 19 % less; four tools alone read the library instead of searching it and cited less (§ 3) |
 | 21 | In a file with one hole, a position on its line or no address reaches it; every `get_goal` and `fill_hole` answer names the hole it used and how (`addressed`) | Adopted ([#201], PR [#228]) | 86 archived refusals (39 of 234 `fill_hole` calls, 47 `get_goal`), all in one-hole files on the hole's line; all resolve on replay (§ 7) |
-| 22 | `definition_of` quotes what each definition says beside where it is: the declaration's source lines, cut by layout (no Agda query answers a declaration's range), verbatim, bounded by `maxLines` (default 40), naming the range it quotes | Adopted ([#185], PR [#PR185]) | 0 calls beside a shell in [#162]; 14 answers and 16 reads of the named files on [#189]'s hard tier; 87 of the 92 archived sites fit 40 lines (§ 4) |
+| 22 | `definition_of` quotes what each definition says beside where it is: the declaration's source lines, cut by layout (no Agda query answers a declaration's range), verbatim, bounded by `maxLines` (default 40), naming the range it quotes | Adopted ([#185], PR [#229]) | 0 calls beside a shell in [#162]; 14 answers and 16 reads of the named files on [#189]'s hard tier; 87 of the 92 archived sites fit 40 lines (§ 4) |
 | 24 | `search_in_scope`'s question asked through `search_by_name`'s `inScopeAt` (same handler, the pattern as the name query); `search_in_scope` registered and presented only when `--expose` names it | Adopted ([#203]) | Presented in 681 archived sessions, called once, 17 % of every turn's `tools/list`; 286 sessions asked the question other ways; 17 replays answered by it |
 
 ---
