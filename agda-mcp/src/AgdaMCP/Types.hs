@@ -169,6 +169,7 @@ module AgdaMCP.Types
   , LiveMeta (..)
   , LiveError (..)
   , DefSite (..)
+  , SourceQuote (..)
   , ProvenanceEcho (..)
   , NameCandidate (..)
   , ExportEntry (..)
@@ -206,6 +207,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import AgdaMCP.Declaration (DeclQuote (..), defaultQuoteLines)
 import AgdaMCP.Holes (HoleRef (..), HoleSpan (..), ResolvedHole (..), resolvedByText)
 
 
@@ -1795,21 +1797,32 @@ instance FromJSON ResolveNameParams where
                       <*> scopeColumn mLine o
                       <*> (o .:? "reload" .!= False)
 
--- | Parameters for the @definition_of@ tool: where is this name defined?
+-- | Parameters for the @definition_of@ tool: where is this name defined, and
+-- what does its definition say (issue #185)?
 data DefinitionOfParams = DefinitionOfParams
   { dopFilePath :: FilePath
   , dopName     :: Text
   , dopLine     :: Maybe Int
   , dopColumn   :: Maybe Int
   , dopReload   :: Bool
+  , dopMaxLines :: Maybe Int  -- ^ Lines of each definition's source to quote;
+                              --   'Nothing' means the whole declaration.
   } deriving (Eq, Show)
 
+-- | An absent @maxLines@ is 'AgdaMCP.Declaration.defaultQuoteLines', and a
+-- non-positive one means the whole declaration: the spelling @exports_of@'s
+-- @limit@ and @maxDiagnostics@ use.
 instance FromJSON DefinitionOfParams where
   parseJSON = withObject "DefinitionOfParams" $ \o -> do
     mLine <- o .:? "line"
+    mMax  <- o .:? "maxLines"
     DefinitionOfParams <$> o .: "filePath" <*> o .: "name" <*> pure mLine
                        <*> scopeColumn mLine o
                        <*> (o .:? "reload" .!= False)
+                       <*> pure (case mMax of
+                             Nothing            -> Just defaultQuoteLines
+                             Just n | n <= 0    -> Nothing
+                                    | otherwise -> Just n)
 
 -- | Parameters for the @exports_of@ tool: the public surface of a module, as
 -- seen from a file whose scope can name it.  The empty string names the
@@ -1949,7 +1962,8 @@ instance ToJSON LiveError where
 
 -- | DefSite: a definition's location — file plus a 1-based (line, col) range
 -- in that file's own coordinates — optionally with the qualified name it
--- locates.
+-- locates, and, in a @definition_of@ answer, what the definition says there
+-- (issue #185).
 data DefSite = DefSite
   { dsQualified :: Maybe Text
   , dsFile      :: FilePath
@@ -1957,6 +1971,9 @@ data DefSite = DefSite
   , dsCol       :: Int
   , dsEndLine   :: Int
   , dsEndCol    :: Int
+  , dsSource    :: Maybe SourceQuote  -- ^ Set by @definition_of@ alone; the
+                                      --   resolve_name and provenance sites
+                                      --   locate without quoting.
   } deriving (Eq, Show)
 
 instance ToJSON DefSite where
@@ -1968,6 +1985,30 @@ instance ToJSON DefSite where
     , "endCol"  .= dsEndCol d
     ]
     <> maybe [] (\q -> ["qualified" .= q]) (dsQualified d)
+    <> maybe [] (\q -> ["source" .= q])    (dsSource d)
+
+-- | SourceQuote: what a definition says, quoted from its file (issue #185).
+--
+-- On the wire, @{startLine, endLine, text, truncated}@: the lines quoted,
+-- verbatim, and whether the declaration runs past them, in which case
+-- @declarationEndLine@ says where it ends, so the rest is a known range of a
+-- known file.  When the file named by the site cannot be read, or has no such
+-- line, @{error}@ says so instead of a quote: absent text is never silent.
+data SourceQuote
+  = SourceQuoted DeclQuote
+  | SourceUnread Text
+  deriving (Eq, Show)
+
+instance ToJSON SourceQuote where
+  toJSON (SourceUnread why) = object ["error" .= why]
+  toJSON (SourceQuoted q)   = object $
+    [ "startLine" .= dqStartLine q
+    , "endLine"   .= dqEndLine q
+    , "text"      .= dqText q
+    , "truncated" .= truncated
+    ]
+    <> [ "declarationEndLine" .= dqDeclEndLine q | truncated ]
+    where truncated = dqEndLine q < dqDeclEndLine q
 
 -- | ProvenanceEcho: one step of a name's provenance chain — @its definition@,
 -- @the opening of M@, @the application of M@ — with its location when Agda's

@@ -175,10 +175,12 @@ These answer read-only questions from a persistent `agda --interaction-json` chi
 | `type_of`       | Infer the type of an expression in a file's scope — the expression need not appear in the file (Agda's `C-c C-d`). |
 | `normalize`     | Evaluate an expression to normal form in a file's scope (Agda's `C-c C-n`). |
 | `resolve_name`  | Every candidate a name resolves to, with provenance chains — the `AmbiguousName` answer, through re-exports and module applications grep cannot see. |
-| `definition_of` | The defining file and position of every candidate, chased through barrels to the origin. |
+| `definition_of` | The defining file and position of every candidate, chased through barrels to the origin, and what the definition says there: its declaration's source, quoted and bounded (issue #185). |
 | `exports_of`    | A module's public surface, one page at a time: the first `limit` members (default 20) with their types, the names of the rest, and the total; `pattern` narrows it by name, and `""` names the file's own top-level module. |
 
 An optional `line` argument scopes the question to the goal whose range contains it, which makes local variables visible and, on a hole-free file, recovers opened names the completed top-level scope loses.  `scope_at` — the sixth query the issue proposed — has no interaction-protocol backing (no command enumerates the names in scope) and is deliberately not approximated with grep; the finding is recorded on issue #75.
+
+**What a definition says (issue #185)**.  Beside each located definition, `definition_of` quotes the declaration its binding site opens: `source {startLine, endLine, text, truncated, declarationEndLine?}`, the lines of the defining file as written (the signature and its clauses, a `where` block included), at most `maxLines` of them (default 40; `0` for the whole declaration), with `declarationEndLine` saying where a truncated declaration ends.  It is a read of the file, not a query and not an elaboration: no interaction command answers a declaration's range, so the extent is cut by Agda's layout rule over the source (`AgdaMCP.Declaration`; see [Ask Agda rather than re-derive](#ask-agda-rather-than-re-derive-issue-106)), and the quote names its line range so a reader can check it against the tree.  The elaborated body is issue #164.  A file that cannot be read gives `source {error}` in place of a quote, and a definition reached by two routes (an import and an opened module) is listed once.  Over the 92 distinct sites the archived agent-bench arms asked `definition_of` about, the declarations ran to a median of 2 lines (135 characters), 15 lines at the 90th percentile and 29 at the 95th, and one module to 686; 40 lines quotes 87 of the 92 whole.
 
 ### Which file gets checked: the path rule (issue #101)
 
@@ -1300,6 +1302,18 @@ would have rested on a silence the server caused: `checkedFromSource` in
 both lanes, and `check_project`'s `modulesChecked`.  The rule that
 generalizes: before inferring anything from what Agda did *not* say, check
 that the channel it would have said it on was open.
+
+One derived answer is derived by design: `definition_of`'s source quote
+(issue #185).  The binding site Agda reports is the range of the name
+alone, and no interaction command answers the range of the declaration
+around it, so the extent is cut by Agda's layout rule over the source
+(`AgdaMCP.Declaration`): deeper lines, clauses of the same name, and lines
+inside a hole continue a declaration, and the first other line at its
+indentation ends it.  What keeps the derivation honest is that it is
+checkable: the quote is verbatim and names its line range, so a reader
+compares it with the file instead of trusting it.  A declaration that does
+not follow the usual layout can be quoted short or long, and the range says
+which lines were quoted.
 
 
 ### Future: Agda-as-a-library

@@ -165,15 +165,16 @@ what answers them:
 |---|---|---|
 | `get_goal` | the interaction lane | the hole's goal type and context |
 | `type_of`, `normalize` | the lane | a type, a normal form |
-| `resolve_name`, `definition_of`, `exports_of` | the lane | candidates; **the file and position** of a definition; a module's surface |
+| `resolve_name`, `definition_of`, `exports_of` | the lane | candidates; **the file and position** of a definition (and since [#185] its source); a module's surface |
 | `search_by_name`, `search_by_type`, `get_dependencies` | the corpus JSONL | matching rows |
 | `search_in_scope` | corpus plus lane | rows the file can name, typed |
 
 Two facts about this split that the results turn on.  The **loop** uses one
 verdict tool (`fill_hole`, plus `check_file` for the final claim) and three
 knowledge tools (`get_goal`, `type_of` for the peek, and `search_by_name` /
-`search_by_type` for retrieval).  And `definition_of` returns *where* a
-definition is, not what it says; § 5 is where that matters.
+`search_by_type` for retrieval).  And in every archived run below,
+`definition_of` returned *where* a definition is, not what it says; § 5 is
+where that matters, and since [#185] it quotes the declaration too.
 
 ### 3.1  The fixed space
 

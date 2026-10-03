@@ -55,7 +55,7 @@ import Control.Exception (bracket_, catch, try, SomeException)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
-import Data.Char (isAlphaNum, isDigit)
+import Data.Char (isAlphaNum, isDigit, isSpace)
 import Data.Either (isLeft)
 import Data.List (find, isInfixOf, nub, sort, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
@@ -92,6 +92,7 @@ import AgdaMCP.Agda
   , agdaModuleNameOf , parseCheckingLine , progressModules
   , progressChannelMuted , traceImportsLevel
   )
+import AgdaMCP.Declaration
 import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
   , HoleSpan (..) , findHoles , findNthHole
@@ -6820,6 +6821,7 @@ interactionLaneTests cfg repoRoot = do
                , dopLine     = Nothing
                , dopColumn   = Nothing
                , dopReload   = False
+               , dopMaxLines = Just defaultQuoteLines
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -7122,6 +7124,7 @@ interactionLaneTests cfg repoRoot = do
                , dopLine     = Nothing
                , dopColumn   = Nothing
                , dopReload   = False
+               , dopMaxLines = Just defaultQuoteLines
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -8037,6 +8040,300 @@ fakeLaneBinary label body = do
   pure script
 
 
+-- ---------------------------------------------------------------------------
+-- Tier 1l: a declaration's extent and its quote (issue #185), no Agda
+--
+-- definition_of quotes the declaration a binding site opens, cut by the
+-- layout rule of AgdaMCP.Declaration.  Each shape the rule names is one
+-- declaration below, located by its name the way Agda's binding site locates
+-- it (the line, and the name's columns on it), and the expected range is
+-- written beside the source.
+-- ---------------------------------------------------------------------------
+
+-- | A plain source with one declaration per shape of the layout rule.
+declSrc :: Text
+declSrc = T.intercalate "\n"
+  [ "module D where"                         -- 1
+  , ""                                       -- 2
+  , "open import Agda.Builtin.Nat"           -- 3
+  , ""                                       -- 4
+  , "double : Nat → Nat"                     -- 5
+  , "double zero    = zero"                  -- 6
+  , "double (suc n) = suc (suc (double n))"  -- 7
+  , ""                                       -- 8
+  , "-- between declarations"                -- 9
+  , "quadruple : Nat → Nat"                  -- 10
+  , "quadruple n = twice (twice n)"          -- 11
+  , "  where"                                -- 12
+  , "  twice : Nat → Nat"                    -- 13
+  , "  twice = double"                       -- 14
+  , ""                                       -- 15
+  , "_⊕_ : Nat → Nat → Nat"                  -- 16
+  , "zero  ⊕ n = n"                          -- 17
+  , "-- between clauses"                     -- 18
+  , "suc m ⊕ n = suc (m ⊕ n)"                -- 19
+  , ""                                       -- 20
+  , "_≼_"                                    -- 21
+  , "  _AtMost_ : Nat → Nat → Nat"           -- 22
+  , "m AtMost n = m ⊕ n"                     -- 23
+  , "m ≼ n = n ⊕ m"                          -- 24
+  , ""                                       -- 25
+  , "data Color : Set where"                 -- 26
+  , "  red green : Color"                    -- 27
+  , "  blue      : Color"                    -- 28
+  , ""                                       -- 29
+  , "record Pair : Set where"                -- 30
+  , "  constructor pair"                     -- 31
+  , "  field"                                -- 32
+  , "    first  : Nat"                       -- 33
+  , "    second : Nat"                       -- 34
+  , ""                                       -- 35
+  , "step : Nat → Nat"                       -- 36
+  , "step n with n"                          -- 37
+  , "... | zero  = zero"                     -- 38
+  , "... | suc m = m"                        -- 39
+  , ""                                       -- 40
+  , "holey : Nat"                            -- 41
+  , "holey ="                                -- 42
+  , "  {!!}"                                 -- 43
+  , ""                                       -- 44
+  , "spread : Nat"                           -- 45
+  , "spread = {! suc"                        -- 46
+  , "zero !}"                                -- 47
+  , "lastOne : Nat"                          -- 48
+  , "lastOne = zero"                         -- 49
+  , ""                                       -- 50
+  ]
+
+-- | A literate source: prose that reads like Agda (a clause of foo at column
+-- 1) sits between two code blocks and must end foo's quote, not extend it.
+declLiterateSrc :: Text
+declLiterateSrc = T.intercalate "\n"
+  [ "# Title"                                -- 1
+  , ""                                       -- 2
+  , "Prose naming foo : Nat in passing."     -- 3
+  , ""                                       -- 4
+  , "```agda"                                -- 5
+  , "module L where"                         -- 6
+  , ""                                       -- 7
+  , "open import Agda.Builtin.Nat"           -- 8
+  , ""                                       -- 9
+  , "foo : Nat"                              -- 10
+  , "foo = zero"                             -- 11
+  , "```"                                    -- 12
+  , ""                                       -- 13
+  , "foo = suc foo, the prose says."         -- 14
+  , ""                                       -- 15
+  , "```agda"                                -- 16
+  , "bar : Nat"                              -- 17
+  , "bar = foo"                              -- 18
+  , "```"                                    -- 19
+  ]
+
+-- | quoteNamed: the quote of the declaration whose binding site is @name@'s
+-- first occurrence on @line@, as (first quoted line, last quoted line, the
+-- declaration's last line).
+quoteNamed :: Int -> LiterateFlavour -> Text -> Int -> Text -> Maybe (Int, Int, Int)
+quoteNamed maxLines flav src line name = do
+  l <- listToMaybe (drop (line - 1) (T.splitOn "\n" src))
+  let (before, at) = T.breakOn name l
+  if T.null at then Nothing else do
+    let col = T.length before + 1
+    q <- quoteDeclaration maxLines flav src line col (col + T.length name)
+    pure (dqStartLine q, dqEndLine q, dqDeclEndLine q)
+
+declarationTests :: IO [Bool]
+declarationTests = do
+  hPutStrLn stderr "\n── Declaration extent (tier 1l: no Agda, #185) ──"
+  let whole = quoteNamed 0 PlainAgda declSrc
+  sequence
+    [ runTest "extent: a signature and its clauses, not the next declaration" $
+        assertEqual "double" (Just (5, 7, 7)) (whole 5 "double")
+
+    , runTest "extent: a where block belongs to its clause" $
+        assertEqual "quadruple" (Just (10, 14, 14)) (whole 10 "quadruple")
+
+    , runTest "extent: a where-bound definition ends with its parent's block" $
+        assertEqual "twice" (Just (13, 14, 14)) (whole 13 "twice")
+
+    , runTest "extent: infix clauses of a mixfix name, a comment between them" $
+        assertEqual "_⊕_" (Just (16, 19, 19)) (whole 16 "_⊕_")
+
+    , runTest "extent: a signature naming two things, broken before its colon" $ allOf
+        [ assertEqual "from the first name"  (Just (21, 24, 24)) (whole 21 "_≼_")
+        , assertEqual "from the second name" (Just (21, 24, 24)) (whole 22 "_AtMost_")
+        ]
+
+    , runTest "extent: a data type with its constructors, and one constructor alone" $ allOf
+        [ assertEqual "Color" (Just (26, 28, 28)) (whole 26 "Color")
+        , assertEqual "red"    (Just (27, 27, 27)) (whole 27 "red")
+        ]
+
+    , runTest "extent: a record with its fields, and one field alone" $ allOf
+        [ assertEqual "Pair"  (Just (30, 34, 34)) (whole 30 "Pair")
+        , assertEqual "first" (Just (33, 33, 33)) (whole 33 "first")
+        ]
+
+    , runTest "extent: with-clauses continue the definition" $
+        assertEqual "step" (Just (36, 39, 39)) (whole 36 "step")
+
+    , runTest "extent: a line holding only a hole is code, not a blank" $
+        assertEqual "holey" (Just (41, 43, 43)) (whole 41 "holey")
+
+    , runTest "extent: a hole across lines has no layout inside it" $
+        assertEqual "spread" (Just (45, 47, 47)) (whole 45 "spread")
+
+    , runTest "extent: the last declaration ends at the last line of code" $
+        assertEqual "lastOne" (Just (48, 49, 49)) (whole 48 "lastOne")
+
+    , runTest "extent: literate prose between code blocks ends a declaration" $
+        assertEqual "foo" (Just (10, 11, 11)) (quoteNamed 0 LiterateMd declLiterateSrc 10 "foo")
+
+    , runTest "quote: the text is the file's lines, verbatim" $
+        assertEqual "text"
+          (Just "_≼_\n  _AtMost_ : Nat → Nat → Nat\nm AtMost n = m ⊕ n\nm ≼ n = n ⊕ m")
+          (dqText <$> quoteDeclaration 0 PlainAgda declSrc 22 3 11)
+
+    , runTest "quote: maxLines stops short and says where the declaration ends" $ allOf
+        [ assertEqual "range" (Just (10, 11, 14)) (quoteNamed 2 PlainAgda declSrc 10 "quadruple")
+        , case quoteDeclaration 2 PlainAgda declSrc 10 1 10 of
+            Nothing -> pure (Fail "no quote")
+            Just q  -> allOf
+              [ assertEqual "truncated on the wire" (Just (Aeson.Bool True))
+                  (valueAt ["truncated"] (Aeson.toJSON (SourceQuoted q)))
+              , assertEqual "where it ends" (Just (Aeson.Number 14))
+                  (valueAt ["declarationEndLine"] (Aeson.toJSON (SourceQuoted q)))
+              ]
+        , case quoteDeclaration 0 PlainAgda declSrc 10 1 10 of
+            Nothing -> pure (Fail "no quote")
+            Just q  -> allOf
+              [ assertEqual "whole: not truncated" (Just (Aeson.Bool False))
+                  (valueAt ["truncated"] (Aeson.toJSON (SourceQuoted q)))
+              , assertEqual "whole: no end line to point at" Nothing
+                  (valueAt ["declarationEndLine"] (Aeson.toJSON (SourceQuoted q)))
+              ]
+        ]
+
+    , runTest "quote: a line past the end of the file quotes nothing" $
+        assertEqual "past the end" Nothing (quoteDeclaration 0 PlainAgda declSrc 99 1 2)
+
+    , runTest "params: maxLines defaults to 40; 0 or less means the whole declaration" $
+        assertEqual "parsed"
+          [Right (Just defaultQuoteLines), Right Nothing, Right Nothing, Right (Just 5)]
+          [ fmap dopMaxLines (Aeson.eitherDecode (defArgs extra))
+          | extra <- ["", ",\"maxLines\":0", ",\"maxLines\":-3", ",\"maxLines\":5"] ]
+    ]
+  where
+    defArgs :: LBS.ByteString -> LBS.ByteString
+    defArgs extra = "{\"filePath\":\"F.agda\",\"name\":\"x\"" <> extra <> "}"
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 3c: definition_of quotes what a definition says (issue #185), on the
+-- interaction lane, gated like tier 3.
+--
+-- The committed fixture DefinitionText.agda holds one declaration per shape,
+-- and the expected ranges are read off the fixture itself (the line that opens
+-- each declaration and the line that ends it), so a comment edit above them
+-- cannot silently invalidate an assertion.  The acceptance case is the
+-- benchmark's own: definition_of on the lemma of a gold fixture, and on a
+-- library lemma an obligation imports.
+-- ---------------------------------------------------------------------------
+
+definitionTextLaneTests :: AgdaConfig -> FilePath -> IO [Bool]
+definitionTextLaneTests cfg repoRoot = do
+  hPutStrLn stderr "\n── definition_of source (tier 3c: #185, Agda subprocess) ──"
+  let fixture = repoRoot </> "agda-mcp" </> "test" </> "resources" </> "DefinitionText.agda"
+      stdlibV0 = repoRoot </> "data" </> "benchmarks" </> "agda-stdlib-v0"
+      gold       = stdlibV0 </> "gold" </> "Nat-plus-comm.agda"
+      obligation = stdlibV0 </> "obligations" </> "Nat-plus-comm.agda"
+  lanes <- newInteractionLanes
+  src <- TIO.readFile fixture
+  let lineOf p = listToMaybe [ i | (i, l) <- zip [1 :: Int ..] (T.lines src), p l ]
+      linesOf a b = T.intercalate "\n" (take (b - a + 1) (drop (a - 1) (T.lines src)))
+      -- The one quote definition_of returns for a name, or why not.
+      quoteOf file name maxLines = do
+        r <- handleDefinitionOf lanes cfg DefinitionOfParams
+               { dopFilePath = file, dopName = name, dopLine = Nothing
+               , dopColumn = Nothing, dopReload = False, dopMaxLines = maxLines }
+        pure $ case r of
+          Left err -> Left (T.unpack (failureText err))
+          Right res -> case dorDefinitions res of
+            [d] -> case dsSource d of
+              Just (SourceQuoted q) -> Right (d, q)
+              other -> Left ("no quote: " <> show other)
+            ds -> Left ("expected one definition, got " <> show (length ds))
+      -- The fixture's declaration of name runs from the line `from` matches
+      -- to the line `to` matches; the quote must be exactly those lines.
+      quotes name from to = runTest ("definition_of quotes " <> T.unpack name <> " whole (#185)") $
+        case (lineOf from, lineOf to) of
+          (Just a, Just b) -> do
+            r <- quoteOf fixture name (Just defaultQuoteLines)
+            case r of
+              Left m -> pure (Fail m)
+              Right (_, q) -> allOf
+                [ assertEqual "range" (a, b, b) (dqStartLine q, dqEndLine q, dqDeclEndLine q)
+                , assertEqual "text" (linesOf a b) (dqText q)
+                ]
+          _ -> pure (Fail "fixture lines not found")
+  results <- sequence
+    [ quotes "double"   ("double :" `T.isPrefixOf`)   ("double (suc n)" `T.isPrefixOf`)
+    , quotes "_⊕_"      ("_⊕_ :" `T.isPrefixOf`)      ("suc m ⊕ n" `T.isPrefixOf`)
+    , quotes "_AtMost_" (== "_≼_")                    ("m ≼ n" `T.isPrefixOf`)
+    , quotes "Color"    ("data Color" `T.isPrefixOf`) ("  blue" `T.isPrefixOf`)
+    , quotes "Pair"     ("record Pair" `T.isPrefixOf`) ("    second" `T.isPrefixOf`)
+
+    , runTest "definition_of: maxLines stops a quote short and says where it ends (#185)" $
+        case (lineOf ("quadruple :" `T.isPrefixOf`), lineOf ("  twice = double" ==)) of
+          (Just a, Just b) -> do
+            r <- quoteOf fixture "quadruple" (Just 2)
+            case r of
+              Left m -> pure (Fail m)
+              Right (_, q) -> assertEqual "range" (a, a + 1, b)
+                                (dqStartLine q, dqEndLine q, dqDeclEndLine q)
+          _ -> pure (Fail "fixture lines not found")
+
+    -- The acceptance case: a benchmark gold's own lemma, its signature and
+    -- every clause, the where block included, with the file and line range.
+    , runTest "definition_of: a gold fixture's lemma, signature to where block (#185)" $ do
+        goldSrc <- TIO.readFile gold
+        let ls    = zip [1 :: Int ..] (T.lines goldSrc)
+            start = listToMaybe [ i | (i, l) <- ls, "+-comm :" `T.isPrefixOf` l ]
+            end   = listToMaybe (reverse [ i | (i, l) <- ls, not (T.all isSpace l) ])
+        r <- quoteOf gold "+-comm" (Just defaultQuoteLines)
+        case (r, start, end) of
+          (Right (d, q), Just a, Just b) -> allOf
+            [ assertEqual "file" gold (dsFile d)
+            , assertEqual "range" (a, b, b) (dqStartLine q, dqEndLine q, dqDeclEndLine q)
+            , assertEqual "text"
+                (T.intercalate "\n" (take (b - a + 1) (drop (a - 1) (T.lines goldSrc))))
+                (dqText q)
+            , assert "the where block is in it" ("open ≡-Reasoning" `T.isInfixOf` dqText q)
+            ]
+          (Left m, _, _) -> pure (Fail m)
+          _ -> pure (Fail "gold lines not found")
+
+    -- And a library lemma the obligation imports: the quote is the library
+    -- file's own lines at the range it names, wherever the store put it.
+    , runTest "definition_of: a library lemma an obligation imports, quoted from its file (#185)" $ do
+        r <- quoteOf obligation "+-suc" (Just defaultQuoteLines)
+        case r of
+          Left m -> pure (Fail m)
+          Right (d, q) -> do
+            libSrc <- TIO.readFile (dsFile d)
+            let a = dqStartLine q; b = dqEndLine q
+            allOf
+              [ assert "starts at its signature" ("+-suc : " `T.isPrefixOf` dqText q)
+              , assert "carries a clause" (b > a)
+              , assertEqual "not truncated" (dqDeclEndLine q) b
+              , assertEqual "the library file's own lines"
+                  (T.intercalate "\n" (take (b - a + 1) (drop (a - 1) (T.lines libSrc))))
+                  (dqText q)
+              ]
+    ]
+  shutdownLanes lanes
+  pure results
+
 main :: IO ()
 main = do
   hPutStrLn stderr "agda-mcp test suite"
@@ -8069,6 +8366,8 @@ main = do
   leanResults <- leanAnswerTests
   -- Tier 1k: the tool surface and --expose (#191).
   surfaceResults <- surfaceTests
+  -- Tier 1l: a declaration's extent and its quote (#185).
+  declResults <- declarationTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -8108,6 +8407,12 @@ main = do
       hPutStrLn stderr "\n── Interaction lane (tier 3: #75): SKIPPED ──"
       pure []
     Just (cfg, _fixture, repoRoot) -> interactionLaneTests cfg repoRoot
+  -- Tier 3c: definition_of quotes what a definition says (#185), same gate.
+  definitionResults <- case mEnv of
+    Nothing -> do
+      hPutStrLn stderr "\n── definition_of source (tier 3c: #185): SKIPPED ──"
+      pure []
+    Just (cfg, _fixture, repoRoot) -> definitionTextLaneTests cfg repoRoot
   -- Tier 3b: search_in_scope on the lane (#17), same gate.
   scopeLaneResults <- case mEnv of
     Nothing -> do
@@ -8119,8 +8424,9 @@ main = do
         pureResults <> diagResults <> holeResults <> corpusResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
           <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
+          <> declResults
           <> integrationResults <> cwdResults <> leanWireResults <> exposeWireResults
-          <> laneResults <> scopeLaneResults
+          <> laneResults <> definitionResults <> scopeLaneResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

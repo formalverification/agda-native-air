@@ -52,6 +52,7 @@ library
     AgdaMCP.Agda
     AgdaMCP.Diagnostics
     AgdaMCP.Holes
+    AgdaMCP.Declaration
     AgdaMCP.Interaction
     AgdaMCP.Path
     AgdaMCP.Project

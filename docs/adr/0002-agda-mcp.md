@@ -162,7 +162,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 ## 4.  Ask Agda, don't re-derive
 
-(See also [#100], [#106], and [`agda-mcp/agda-mcp-ask-agda-audit.md`].)
+(See also [#100], [#106], [#185], and [`agda-mcp/agda-mcp-ask-agda-audit.md`].)
 
 **Decision**.  `answer = whatAgdaSaid <|> whatWeDerived`.  When Agda can answer a question, in output a call already captures or through a lane query, Agda's answer is the authority; a local derivation from source text is a pre-flight approximation and a fallback, and a change in Agda's output degrades a field to the derived value, never to a wrong value.  The rule is written where a new tool's author will read it, in the README's architecture notes, and [#106] audited it across every derived answer in the server.
 
@@ -170,10 +170,13 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 +  **The inventory's verdicts**.  Delegated: goal type and context ([#108]), the module name ([#100], [#108]), goal-scoped hole answers ([#75]).  Subordinated rather than substituted: the batch listings' hole positions and spans, which the scan still computes on every call because the splicing engine structurally needs a source view; their warrant is the parity suite (tier 2d against batch Agda, tier 3 against the lane's interaction points), not a per-call answer, and the audit records that residue accurately.  Stays local by measurement: project resolution, because no Agda query answers "what libraries and include paths apply to this file" and the lane is a consumer of that answer, not a source.  Out of scope: the gate discovery in `AgdaMCP.Gate`, which is not Agda's question.
 +  **Measurement 1 refuted the strong conjecture**.  Driving `agda --interaction-json` over the § 5 error corpus showed the protocol carries the same prose batch prints, in a JSON envelope: the envelope retires the parser's segmentation layer in principle (block splitting, banner dedup, severity classification) and none of its content extraction (codes, ranges, `involved` payloads).  So [#74]'s parser stays, transport-independent, and a lane-sourced diagnostics tool would run the same parser on the same prose.  The one class where the protocol carries more than the prose, unsolved metas with names and types as data, became [#115].
 +  **Measurement 2 found a hole in the rule's own application**, and became [#114] (§ 8).
++  **One answer is derived by design: what a definition says ([#185])**.  `definition_of` answered where a definition is (the file and the range of the name at its binding site, which is what Agda's WhyInScope answer carries), and since [#185] it also quotes the declaration that site opens: `source {startLine, endLine, text, truncated, declarationEndLine?}`, the defining file's own lines (the signature and its clauses, a `where` block included), at most `maxLines` of them (40 by default).  No interaction command answers a declaration's range, so the extent is cut by Agda's layout rule over the source (`AgdaMCP.Declaration`): deeper lines, further clauses of the same name, and the interior of a hole continue a declaration, and the first other line at its indentation ends it.  The derivation is kept honest by being checkable rather than by being authoritative: the text is verbatim and names its line range.  It is not elaborated; the elaborated body, which Agda could answer as a library, is [#164].
 
 **Evidence**.  Four module-name shapes measured on [#106] (Agda's answer against the scan's); the per-class table in the audit's § 3, one fixture per § 5 error class driven three ways; and the acceptance item that asked [#75] to say it "retires" the scanner and the injection, recorded as overtaken because the scanner splices and the injection reports visibility on purpose.
 
-**Status**.  Adopted (PRs [#105], [#110], [#116]).  No open follow-up; the rule is the review question for every new field.
+**Evidence for the source quote**.  The arms of [#162] measured the gap it closes: given the server and a shell, the subject called `definition_of` 0 times (19 in the server-only arm) and read library sources through the shell instead; and on the hard tier of [#189], the server arm's 14 `definition_of` answers were followed by 16 `Read` calls of a file an answer had named.  Over the 92 distinct sites the archived arms asked about, the declarations ran to a median of 2 lines (135 characters), 15 lines at the 90th percentile, 29 at the 95th, and one module to 686; 40 lines quotes 87 of the 92 whole.
+
+**Status**.  Adopted (PRs [#105], [#110], [#116]; the source quote in PR [#PR185]).  No open follow-up; the rule is the review question for every new field.
 
 ---
 
@@ -370,6 +373,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
 | 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5; arms cost 17 to 19 % less; four tools alone read the library instead of searching it and cited less (§ 3) |
 | 21 | In a file with one hole, a position on its line or no address reaches it; every `get_goal` and `fill_hole` answer names the hole it used and how (`addressed`) | Adopted ([#201], PR [#228]) | 86 archived refusals (39 of 234 `fill_hole` calls, 47 `get_goal`), all in one-hole files on the hole's line; all resolve on replay (§ 7) |
+| 22 | `definition_of` quotes what each definition says beside where it is: the declaration's source lines, cut by layout (no Agda query answers a declaration's range), verbatim, bounded by `maxLines` (default 40), naming the range it quotes | Adopted ([#185], PR [#PR185]) | 0 calls beside a shell in [#162]; 14 answers and 16 reads of the named files on [#189]'s hard tier; 87 of the 92 archived sites fit 40 lines (§ 4) |
 | 24 | `search_in_scope`'s question asked through `search_by_name`'s `inScopeAt` (same handler, the pattern as the name query); `search_in_scope` registered and presented only when `--expose` names it | Adopted ([#203]) | Presented in 681 archived sessions, called once, 17 % of every turn's `tools/list`; 286 sessions asked the question other ways; 17 replays answered by it |
 
 ---
@@ -383,7 +387,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
    + the follow-on fixes [#100], [#101], [#103], [#106], [#108], [#114], [#115], [#133];
    + the companions [#83] (M1-7), [#85] (M1-8), [#14] (M1-6);
    + the forward pointer [#17] (M2-3), and [#203] (its scope-aware tool folded into `search_by_name`);
-   + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147], [#201];
+   + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147], [#185], [#201];
    + the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
 
 +  **PRs**: [#38] (M1-2), [#44] (M1-3), [#67] ([#66]), [#80] (the field report), [#81] ([#69]), [#82] ([#70]), [#88] ([#71], [#73]), [#89] ([#77]), [#94] ([#74]), [#95] ([#72], [#76]), [#98] ([#78]), [#99] ([#79]), [#102] ([#101]), [#104] ([#103]), [#105] ([#100]), [#107] ([#75]), [#110] ([#108]), [#116] ([#106]), [#117] ([#114]), [#118] ([#115]), [#228] ([#201]).
@@ -481,6 +485,8 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#203]: https://github.com/formalverification/agda-native-air/issues/203
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#164]: https://github.com/formalverification/agda-native-air/issues/164
+[#185]: https://github.com/formalverification/agda-native-air/issues/185
 [#201]: https://github.com/formalverification/agda-native-air/issues/201
 [#228]: https://github.com/formalverification/agda-native-air/pull/228
 [#222]: https://github.com/formalverification/agda-native-air/pull/222

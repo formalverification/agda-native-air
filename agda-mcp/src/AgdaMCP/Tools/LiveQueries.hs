@@ -45,6 +45,12 @@
 --   @recovered@ field names the route taken, so a client can tell a first-class
 --   answer from a reconstructed one.
 --
+--   definition_of answers what each definition says beside where it is (issue
+--   #185): the declaration's source lines, quoted verbatim from the defining
+--   file and bounded ('quoteSites', over 'AgdaMCP.Declaration').  The lane
+--   says where; the file on disk says what; the quote names its line range so
+--   a reader can check it against the tree.
+--
 --   exports_of answers one page of a module's surface ('pageExports', issue
 --   #184): a bounded number of members with their types, the names of the
 --   rest, and the count, because a library module's surface printed whole was
@@ -81,19 +87,25 @@ module AgdaMCP.Tools.LiveQueries
   , pageExports
   ) where
 
-import Control.Exception (IOException, catch)
+import Control.Exception (IOException, catch, try)
 import Data.Aeson (Value (..))
+import qualified Data.ByteString as BS
+import qualified Data.Map.Strict as Map
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Vector as V
+import Data.List (nub)
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Data.Word (Word64)
 import GHC.Clock (getMonotonicTimeNSec)
 import System.Directory (getCurrentDirectory)
 
 import AgdaMCP.Agda (AgdaConfig (..))
+import AgdaMCP.Declaration (quoteDeclaration)
+import AgdaMCP.Holes (flavourOf)
 import AgdaMCP.Interaction
 import AgdaMCP.Path (withSourceFile)
 import AgdaMCP.Project
@@ -363,6 +375,7 @@ defSiteFrom qual loc = DefSite
   , dsCol       = slCol loc
   , dsEndLine   = slEndLine loc
   , dsEndCol    = slEndCol loc
+  , dsSource    = Nothing
   }
 
 -- | candidateFrom: one WhyInScope bullet as the wire's 'NameCandidate'.
@@ -601,10 +614,14 @@ handleDefinitionOf lanes cfg0 p =
           Left tf  -> pure (Left tf)
           Right res -> do
             meta <- liveMeta ctx
-            let located   = mapMaybe ncDefinition (resCandidates res)
-                unlocated = [ ncDescription c
+            let unlocated = [ ncDescription c
                             | c <- resCandidates res
                             , Nothing <- [ncDefinition c] ]
+            -- One quote per definition: a name in scope by two routes (an
+            -- import and the opened module, say) arrives as two candidates
+            -- with the same site, and repeating its text says nothing more.
+            located <- quoteSites (dopMaxLines p)
+                         (nub (mapMaybe ncDefinition (resCandidates res)))
             pure . Right $ DefinitionOfResult
               { dorName        = dopName p
               , dorScope       = resScopeTxt res
@@ -622,6 +639,43 @@ handleDefinitionOf lanes cfg0 p =
                   _ -> resError res
               , dorMeta        = meta
               }
+
+
+-- | quoteSites: each located definition with what it says (issue #185): its
+-- declaration's source lines, quoted from the file the site names, at most
+-- @maxLines@ of them ('Nothing': the whole declaration).
+--
+-- Each file is read once per call, however many candidates it holds, and a
+-- file that cannot be read gives each of its sites the reason instead of a
+-- quote.  The read is of the file as it is on disk now; the site came from
+-- the lane's load of it, so after an edit to that file without @reload@ the
+-- two can disagree, and the quote's line range is what a reader checks.
+quoteSites :: Maybe Int -> [DefSite] -> IO [DefSite]
+quoteSites maxLines sites = do
+  srcs <- Map.fromList <$> mapM (\f -> (,) f <$> readSource f) (Map.keys byFile)
+  pure [ d { dsSource = Just (quoteOf (Map.lookup (dsFile d) srcs) d) } | d <- sites ]
+  where
+    byFile = Map.fromList [ (dsFile d, ()) | d <- sites ]
+
+    readSource :: FilePath -> IO (Either Text Text)
+    readSource f = do
+      r <- try (BS.readFile f)
+      pure $ case r of
+        Left (e :: IOException) -> Left ("could not read " <> T.pack f <> ": " <> T.pack (show e))
+        Right bytes -> case TE.decodeUtf8' bytes of
+          Left _    -> Left (T.pack f <> " is not UTF-8 text")
+          Right src -> Right src
+
+    quoteOf :: Maybe (Either Text Text) -> DefSite -> SourceQuote
+    quoteOf mSrc d = case mSrc of
+      Nothing          -> SourceUnread ("no source read for " <> T.pack (dsFile d))
+      Just (Left why)  -> SourceUnread why
+      Just (Right src) ->
+        case quoteDeclaration (fromMaybe 0 maxLines) (flavourOf (dsFile d)) src
+               (dsLine d) (dsCol d) (dsEndCol d) of
+          Just q  -> SourceQuoted q
+          Nothing -> SourceUnread $ T.pack (dsFile d) <> " has no line "
+                       <> T.pack (show (dsLine d)) <> " now"
 
 
 -- ---------------------------------------------------------------------------
