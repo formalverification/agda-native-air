@@ -226,7 +226,7 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Evidence for the one-hole rule**.  Across the archived agent-bench arms of [#154], [#162], [#184], [#191], and [#189] (and their cost runs), the strict rule refused 39 of 234 `fill_hole` calls and 47 `get_goal` calls, and four more `fill_hole` calls named no hole.  All 86 refusals were in a file with exactly one hole, on the line it sits on, with the column off by one (21 of the 39 `fill_hole` refusals: a 0-based column) to thirteen; each cost a turn retrying at the position the refusal listed.  Replayed through the new server against the work files as they stood at each call (rebuilt from the subjects' own reads and edits), all 90 resolve: the 86 as `only hole, same line`, each at the hole its refusal listed, and the four as `only hole`; Agda then judged 38 of the 43 `fill_hole` candidates `ok` and 5 type errors, and answered all 47 goals.
 
-**Status**.  Adopted (PRs [#82], [#88], [#99]); the one-hole rule since PR [#PR201] ([#201]).  Open: `fill_hole` restores the file even when the candidate is accepted, so every accepted candidate is re-applied by hand, and [#136] ([M5-3]) chooses between an opt-in `apply` and a returned patch.
+**Status**.  Adopted (PRs [#82], [#88], [#99]); the one-hole rule since PR [#228] ([#201]).  Open: `fill_hole` restores the file even when the candidate is accepted, so every accepted candidate is re-applied by hand, and [#136] ([M5-3]) chooses between an opt-in `apply` and a returned patch.
 
 ---
 
@@ -369,7 +369,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 18 | Corpus tools are pure in-memory lookups, registered only with `--corpus` | Adopted ([#11], PR [#44]) | 1.4 s load, 308 MB resident at library scale |
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
 | 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5; arms cost 17 to 19 % less; four tools alone read the library instead of searching it and cited less (§ 3) |
-| 21 | In a file with one hole, a position on its line or no address reaches it; every `get_goal` and `fill_hole` answer names the hole it used and how (`addressed`) | Adopted ([#201], PR [#PR201]) | 86 archived refusals (39 of 234 `fill_hole` calls, 47 `get_goal`), all in one-hole files on the hole's line; all resolve on replay (§ 7) |
+| 21 | In a file with one hole, a position on its line or no address reaches it; every `get_goal` and `fill_hole` answer names the hole it used and how (`addressed`) | Adopted ([#201], PR [#228]) | 86 archived refusals (39 of 234 `fill_hole` calls, 47 `get_goal`), all in one-hole files on the hole's line; all resolve on replay (§ 7) |
 | 24 | `search_in_scope`'s question asked through `search_by_name`'s `inScopeAt` (same handler, the pattern as the name query); `search_in_scope` registered and presented only when `--expose` names it | Adopted ([#203]) | Presented in 681 archived sessions, called once, 17 % of every turn's `tools/list`; 286 sessions asked the question other ways; 17 replays answered by it |
 
 ---
@@ -386,7 +386,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
    + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147], [#201];
    + the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
 
-+  **PRs**: [#38] (M1-2), [#44] (M1-3), [#67] ([#66]), [#80] (the field report), [#81] ([#69]), [#82] ([#70]), [#88] ([#71], [#73]), [#89] ([#77]), [#94] ([#74]), [#95] ([#72], [#76]), [#98] ([#78]), [#99] ([#79]), [#102] ([#101]), [#104] ([#103]), [#105] ([#100]), [#107] ([#75]), [#110] ([#108]), [#116] ([#106]), [#117] ([#114]), [#118] ([#115]).
++  **PRs**: [#38] (M1-2), [#44] (M1-3), [#67] ([#66]), [#80] (the field report), [#81] ([#69]), [#82] ([#70]), [#88] ([#71], [#73]), [#89] ([#77]), [#94] ([#74]), [#95] ([#72], [#76]), [#98] ([#78]), [#99] ([#79]), [#102] ([#101]), [#104] ([#103]), [#105] ([#100]), [#107] ([#75]), [#110] ([#108]), [#116] ([#106]), [#117] ([#114]), [#118] ([#115]), [#228] ([#201]).
 
 +  **Docs**:
 
@@ -482,6 +482,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#201]: https://github.com/formalverification/agda-native-air/issues/201
+[#228]: https://github.com/formalverification/agda-native-air/pull/228
 [#222]: https://github.com/formalverification/agda-native-air/pull/222
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
