@@ -179,10 +179,32 @@ final case class ImportScope(modules: Vector[ImportedModule]) {
       .headOption
 }
 
-/** The obligation's own identity, for the exclusion policy. */
+/** The obligation's own identity, for the exclusion policy.
+  *
+  * The name rule compares a row's bare name with the hole's, and with the
+  * hole's name less any trailing primes (`stem`).  An obligation whose
+  * original its fixture opens must be renamed to live beside it, and the
+  * benchmark renames by appending a prime: 18 of the 21 agda-algebras
+  * obligations are `X′` for an original `X` (`Imagef∋f′` restates
+  * `Imagef∋f`).  Compared exactly, the rule never fired on any of them; the
+  * lane-form statement rule caught one original, and the others reached the
+  * accepted pool whenever ranking put them there.  Retrieval's own shapes
+  * never committed one, so the gap was latent until Agda's own proof search
+  * (issue #206), handed the accepted pool as hints, closed
+  * `algebras-inverses-image-f-f` by citing `Imagef∋f`.
+  *
+  * The stem errs toward excluding, the safe side for an anti-gaming rule (it
+  * can cost a solve, never fake one), and every exclusion is named in the
+  * ledger.  Its one known false shape is a library lemma whose own name ends
+  * in a prime: `stdlib-dec-map`'s hole is the library's `map′`, and the stem
+  * would also set aside rows named `map`.
+  */
 final case class TargetExclusion(holeName: String, statement: String) {
+  val stem: String = holeName.reverse.dropWhile(c => c == '′' || c == '\'').reverse
+
   def reasonFor(hit: SearchHit): Option[String] =
-    if (hit.bareName == holeName) Some(s"name:${hit.prettyQname}")
+    if (hit.bareName == holeName || (stem.nonEmpty && hit.bareName == stem))
+      Some(s"name:${hit.prettyQname}")
     else if (Statements.normalize(hit.tpe) == Statements.normalize(statement))
       Some(s"statement:${hit.prettyQname}")
     else None

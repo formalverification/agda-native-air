@@ -430,6 +430,22 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     exclusion.reasonFor(mulComm) shouldBe None
   }
 
+  test("exclusion: the name rule sees through the prime an obligation is renamed with (#206)") {
+    // 18 of the 21 agda-algebras obligations are their original's name plus a
+    // prime, and the exact comparison let every original through.
+    val primed = TargetExclusion("Imagef∋f′", "irrelevant to the name rule")
+    def row(q: String) = plusComm.copy(prettyQname = q)
+    primed.stem shouldBe "Imagef∋f"
+    primed.reasonFor(row("Setoid.Functions.Inverses.Imagef∋f")) shouldBe
+      Some("name:Setoid.Functions.Inverses.Imagef∋f")
+    primed.reasonFor(row("Setoid.Functions.Inverses.Imagef∋f′")) shouldBe
+      Some("name:Setoid.Functions.Inverses.Imagef∋f′")
+    primed.reasonFor(row("Setoid.Functions.Inverses.Imagef∋f′′")) shouldBe None
+    // An unprimed hole is compared exactly, as before.
+    exclusion.stem shouldBe "+-comm"
+    exclusion.reasonFor(mulComm) shouldBe None
+  }
+
   test("exclusion: the statement rule catches an alpha-equal restatement under another name") {
     val alias = SearchHit("Data.Nat.Properties.comm′", "(x y : ℕ) → x + y ≡ y + x",
       "function", "Data.Nat.Properties", hasBody = true)
