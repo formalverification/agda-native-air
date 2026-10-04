@@ -270,7 +270,7 @@ One lexical scan serves the scans that are not about holes, too.  The `AgdaDojan
 
 ### Stable hole handles (issue #79)
 
-`get_goal` and `fill_hole` accept two spellings of "which hole", and they are not equal alternatives.
+`get_goal` and `fill_hole` accept two spellings of "which hole", and they are not equal alternatives; a file with exactly one hole needs neither (below).
 
 | Spelling | What a fill does to it |
 |----------|------------------------|
@@ -283,8 +283,8 @@ One lexical scan serves the scans that are not about holes, too.  The `AgdaDojan
 +  A position inside no hole is an **error listing the file's nearest holes** — never a guess at the closest one.  An out-of-range `holeIndex` fails the same way, listing the holes the file does have.
 +  **One hole is the exception (issue #201)**.  In a file with exactly one hole, a position on any line the hole occupies reaches it wherever the column falls, and so does a call that names no hole at all; with no other hole in the file, the wrong-hole answer the strict rule guards against cannot happen.  A file with two or more holes keeps the strict rule, and there a call with no address is refused, listing the holes.  Across the archived agent-bench arms the strict rule refused 39 of 234 `fill_hole` calls and 47 `get_goal` calls, every one in a one-hole file and on the hole's own line, with the column off by one (a 0-based column) to thirteen; replayed against the work files as they stood at each call, all of them now resolve, as do the four `fill_hole` calls that named no hole.
 +  **Every answer says which hole it used**: `addressed {line, col, resolvedBy}` is the hole's start, as the hole listings report it, and how the address reached it: `span` (the position fell inside the hole), `index`, `only hole, same line`, or `only hole`.  A caller that meant something else sees it there.  Every `fill_hole` answer carries it, whatever its `status` (`timeout` and `crash` included); a `get_goal` failure is an `isError` rather than an answer, and the one about the hole itself, the fallback's timeout, names the hole in its text.
-+  An address key whose value is `null` counts as absent, the rule for every optional argument: `{line: null, column: null}` is a call with no address.
-+  A request carries at most one address.  Both spellings at once is rejected (they can disagree, and choosing one silently is how a call fills the wrong hole), as are half a position (a `line` with no column) and both `column` and `col` together.  The input schema's `oneOf` names the four shapes a legal request has (an index, a position under either column spelling, or no address), so a client that validates its arguments and one that just sends them agree about what is legal.
++  An address key whose value is `null` counts as absent, the leniency every optional argument has: `{line: null, column: null}` is a call with no address.  The input schema, which declares integers, does not advertise it; it describes what to send.
++  A request carries at most one address.  Both spellings at once is rejected (they can disagree, and choosing one silently is how a call fills the wrong hole), as are half a position (a `line` with no column) and both `column` and `col` together.  The input schema's `oneOf` names the four shapes a legal request has (an index, a position under either column spelling, or no address): every request it admits parses to the address it describes, and every combination of the keys it refuses, the parser refuses too (the suite checks all sixteen).
 +  Positions are read in the file as written, so a literate file's holes are addressed in literate-file coordinates and its prose decoys are addressable by nothing.
 
 **Every answer re-anchors**.  `check_file` and `fill_hole` return the full hole list (the same `[{index, line, col, goal}]` shape `get_diagnostics` already returned) so a client never recomputes a position.  `fill_hole`'s list describes the file *as that candidate leaves it*, which is what the client will have once it keeps the candidate; the bytes on disk are restored either way, so until the candidate is written back the file still has the holes it started with.
@@ -502,7 +502,7 @@ agda-mcp/
 
 #### `get_goal`
 
-Given a file path and hole address, return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query.
+Given a file path and hole address (none is needed in a file with one hole), return the hole's expected type and its local context (bound variables with types); this is the primary "what am I trying to prove?" query.
 
 **Input**.  The hole is addressed by position (preferred) or by index, or, in a file with exactly one hole, not at all; see [Stable hole handles](#stable-hole-handles-issue-79).
 

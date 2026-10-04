@@ -71,11 +71,12 @@
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
 --
---   @get_goal@ and @fill_hole@ address a hole by a 'AgdaMCP.Holes.HoleRef' —
---   either a @(line, column)@ position in the file as written or the older
---   0-based @holeIndex@ (issue #79).  The two are parsed into one field, so a
---   request carries exactly one address and no handler has to decide which of a
---   disagreeing pair was meant.  @fill_hole@ and @check_file@ answer with the
+--   @get_goal@ and @fill_hole@ address a hole by a 'AgdaMCP.Holes.HoleRef':
+--   a @(line, column)@ position in the file as written, the older 0-based
+--   @holeIndex@ (issue #79), or, in a file with exactly one hole, no address at
+--   all (issue #201).  They are parsed into one field, so a request carries at
+--   most one address and no handler has to decide which of a disagreeing pair
+--   was meant.  @fill_hole@ and @check_file@ answer with the
 --   full hole list ('HoleInfo'), the same shape @get_diagnostics@ already
 --   returned, so a client re-anchors on positions without a second call.  Both
 --   are additive: @holeIndex@ still parses and every pre-existing key keeps its
@@ -270,11 +271,15 @@ instance ToJSON CtxEntry where
 -- The accepted shapes are exactly four: @holeIndex@, @line@ + @column@,
 -- @line@ + @col@, and none of the four keys ('Unaddressed').  They are the
 -- alternatives the tools' input schema advertises as its @oneOf@ (see
--- 'AgdaMCP.Server.addressAlternatives'), so a client that validates its
--- arguments and a client that just sends them get the same answer about what
--- is a legal request; the suite checks the two against each other over every
--- combination of the keys.  A key whose value is @null@ counts as absent, the
--- rule for every optional argument (issue #184).
+-- 'AgdaMCP.Server.addressAlternatives'): every request the schema admits
+-- parses, to the address it describes, and every combination of the keys
+-- with integer values that the schema refuses, the parser refuses too; the
+-- suite checks the two against each other over all sixteen.  Beyond the
+-- schema, a key whose value is @null@ counts as absent, the leniency every
+-- optional argument of this server has (issue #184).  The schema, which
+-- declares integers, does not advertise it: it describes what to send, so a
+-- client that validates never sends a null, and the leniency only ever
+-- accepts a request the schema would have refused, never the reverse.
 --
 -- Every other combination is a parse failure naming the fix, because each one is
 -- a client that does not know which hole it is asking about:
@@ -313,7 +318,8 @@ parseHoleRef o = do
 -- | Parameters for the @get_goal@ tool.
 data GetGoalParams = GetGoalParams
   { ggFilePath :: FilePath
-  , ggHole     :: HoleRef     -- ^ Which hole, by position or by index (#79).
+  , ggHole     :: HoleRef     -- ^ Which hole: by position or by index (#79),
+                              --   or none in a one-hole file (#201).
   , ggReload   :: Bool        -- ^ Force a fresh lane load first — the same
                               --   dependency-staleness escape hatch the
                               --   live-query tools expose (#108); the
@@ -329,7 +335,8 @@ instance FromJSON GetGoalParams where
 -- | Parameters for the @fill_hole@ tool.
 data FillHoleParams = FillHoleParams
   { fhFilePath  :: FilePath
-  , fhHole      :: HoleRef    -- ^ Which hole, by position or by index (#79).
+  , fhHole      :: HoleRef    -- ^ Which hole: by position or by index (#79),
+                              --   or none in a one-hole file (#201).
   , fhCandidate :: Text       -- ^ The candidate proof term to try.
   } deriving (Eq, Show)
 

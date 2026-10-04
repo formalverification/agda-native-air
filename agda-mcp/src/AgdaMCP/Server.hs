@@ -940,7 +940,10 @@ toolDefWith name desc props required extra = (,) name $ object
 -- These four branches are exactly the shapes 'AgdaMCP.Types.parseHoleRef'
 -- accepts: an index, a position under either spelling of its column, and (issue
 -- #201) no address key at all.  The suite checks the correspondence over every
--- combination of the four keys, and that check is why the index branch forbids
+-- combination of the four keys with integer values (the parser's one leniency
+-- beyond it, a @null@ read as an absent key, is the rule for every optional
+-- argument and is not advertised here, so a validating client never relies on
+-- it), and that check is why the index branch forbids
 -- the position keys and the position branches forbid the index: before #201
 -- the index branch alone admitted an index beside half a position, which the
 -- parser refuses.  Both spellings of the column match both position branches,
