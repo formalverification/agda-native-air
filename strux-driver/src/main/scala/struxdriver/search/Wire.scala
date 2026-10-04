@@ -180,6 +180,71 @@ object TypeOfBody {
     } yield TypeOfBody(tpe, err, elapsed)
 }
 
+/** auto (issue #205): Agda's own proof search at one hole, on the lane.
+  * The search is Mimer under Agda 2.8, and its answer is a CANDIDATE: the
+  * loop judges a found term with fill_hole like any other (issue #206).
+  *
+  * `outcome` is one of four, and each carries exactly its own field, checked
+  * here so a drifted shape fails the decode instead of bending a sweep:
+  * `found` carries `term` (Agda's rendering, joined onto one line by the
+  * server), `no-solution` carries `message`, and `out-of-scope` and `error`
+  * carry `error`.  `elapsedMs` (the whole call, the reset included) and
+  * `options` (the string built for the search, which reached Agda only when
+  * `searchMs` is present) are required; `searchMs` and `resetMs` are read
+  * for the ledger when present.
+  */
+final case class AutoError(stage: String, code: Option[String], message: String)
+object AutoError {
+  implicit val decoder: Decoder[AutoError] = (c: HCursor) =>
+    for {
+      stage <- c.get[String]("stage")
+      code  <- c.get[Option[String]]("code")
+      msg   <- c.get[String]("message")
+    } yield AutoError(stage, code, msg)
+}
+
+final case class AutoBody(
+  outcome:   String,
+  term:      Option[String],
+  message:   Option[String],
+  error:     Option[AutoError],
+  options:   String,
+  searchMs:  Option[Long],
+  resetMs:   Option[Long],
+  elapsedMs: Long
+) {
+  /** The term, when the search found one. */
+  def found: Option[String] = if (outcome == AutoBody.Found) term else None
+}
+object AutoBody {
+  val Found      = "found"
+  val NoSolution = "no-solution"
+  val OutOfScope = "out-of-scope"
+  val Error      = "error"
+
+  implicit val decoder: Decoder[AutoBody] = (c: HCursor) =>
+    for {
+      outcome <- c.get[String]("outcome")
+      term    <- c.get[Option[String]]("term")
+      message <- c.get[Option[String]]("message")
+      error   <- c.get[Option[AutoError]]("error")
+      expect   = outcome match {
+                   case Found              => Some((true, false, false))
+                   case NoSolution         => Some((false, true, false))
+                   case OutOfScope | Error => Some((false, false, true))
+                   case _                  => None
+                 }
+      _       <- Either.cond(expect.contains((term.isDefined, message.isDefined, error.isDefined)), (),
+                   DecodingFailure(
+                     s"auto drift: outcome=$outcome with term=${term.isDefined} message=${message.isDefined} error=${error.isDefined}",
+                     c.history))
+      options <- c.get[String]("options")
+      search  <- c.get[Option[Long]]("searchMs")
+      reset   <- c.get[Option[Long]]("resetMs")
+      elapsed <- c.get[Long]("elapsedMs")
+    } yield AutoBody(outcome, term, message, error, options, search, reset, elapsed)
+}
+
 /** fill_hole, the oracle's judgement of one candidate.  `holes` describes the
   * file as the candidate would leave it; the file on disk is restored either
   * way, which is what makes every fill_hole a probe.

@@ -451,7 +451,7 @@ help:
 	@echo "  make proof-search-single-step    - Proof-search P0: k stub candidates vs one M1-5 obligation (PROOF_SEARCH_ID)"
 	@echo "  make proof-search-split          - Proof-search P0: full M1-5 sweep + oracle-vs-proposal timing split (issue 113)"
 	@echo "  make proof-search-it             - Proof-search P0: live two-obligation regression vs the real agda-mcp"
-	@echo "  make proof-search-loop           - Proof-search P1/P2: M1-5 beam search, per-tier solve counts (issues 122/123)"
+	@echo "  make proof-search-loop           - Proof-search P1/P2: M1-5 beam search, per-tier solve counts (issues 122/123; PROOF_SEARCH_AUTO=closer|hints, issue 206)"
 	@echo "                                     P2 knobs: PROOF_SEARCH_PROPOSER=retrieval PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RETRIEVE_K=8 PROOF_SEARCH_EXCLUDE=on PROOF_SEARCH_SCORER=token-overlap"
 	@echo "  make proof-search-recall         - Proof-search: offline recall@k of each row's target lemmas per scorer, no server (issue 19)"
 	@echo "                                     PROOF_SEARCH_RECALL_REPORT=<run>/report.json PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RECALL_SCORERS=a,b"
@@ -1773,15 +1773,20 @@ PROOF_SEARCH_SCORER   ?= token-overlap
 # fixed baseline drives the identical ten-tool server P1 measured against.
 PROOF_SEARCH_CORPUS_ARGS = $(if $(filter retrieval,$(PROOF_SEARCH_PROPOSER)),--corpus $(abspath $(PROOF_SEARCH_CORPUS)) --retrieve-k $(PROOF_SEARCH_RETRIEVE_K) --exclude-target $(PROOF_SEARCH_EXCLUDE) --expand-deps $(PROOF_SEARCH_EXPAND_DEPS) --scorer $(PROOF_SEARCH_SCORER),)
 PROOF_SEARCH_LOOP_IDS ?= --all
+# Agda's own proof search in the loop (issue #206): off, closer (its term
+# proposed first at every state, from Agda's default space), or hints (the
+# same with retrieval's accepted lemmas as hints; needs PROPOSER=retrieval).
+# The server is started with --auto only when it is on.
+PROOF_SEARCH_AUTO     ?= off
 
 .PHONY: proof-search-loop proof-search-loop-it proof-search-retrieval-it
 
 # The full M1-5 beam sweep (or --ids via PROOF_SEARCH_LOOP_IDS="--ids id1,id2").
 proof-search-loop: _check-sbt
 	@set -e; $(RESOLVE_AGDA_MCP_BIN); \
-	echo ">> [proof-search-loop] M1-5 beam search (beam=$(PROOF_SEARCH_BEAM) depth=$(PROOF_SEARCH_DEPTH) budget=$(PROOF_SEARCH_BUDGET) dedup=$(PROOF_SEARCH_DEDUP) peek=$(PROOF_SEARCH_PEEK) proposer=$(PROOF_SEARCH_PROPOSER)) against $$AGDA_MCP_BIN"; \
+	echo ">> [proof-search-loop] M1-5 beam search (beam=$(PROOF_SEARCH_BEAM) depth=$(PROOF_SEARCH_DEPTH) budget=$(PROOF_SEARCH_BUDGET) dedup=$(PROOF_SEARCH_DEDUP) peek=$(PROOF_SEARCH_PEEK) proposer=$(PROOF_SEARCH_PROPOSER) auto=$(PROOF_SEARCH_AUTO)) against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.search.ProofSearchLoop --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --beam $(PROOF_SEARCH_BEAM) --max-depth $(PROOF_SEARCH_DEPTH) --probe-budget $(PROOF_SEARCH_BUDGET) --dedup $(PROOF_SEARCH_DEDUP) --peek $(PROOF_SEARCH_PEEK) --proposer $(PROOF_SEARCH_PROPOSER) $(PROOF_SEARCH_CORPUS_ARGS)"
+	  "runMain struxdriver.search.ProofSearchLoop --index $(CURDIR)/$(BENCHMARK_INDEX) $(PROOF_SEARCH_LOOP_IDS) --out-dir $(CURDIR)/$(PROOF_SEARCH_OUT_DIR) --run-id $(PROOF_SEARCH_RUN_ID) --server-bin $$AGDA_MCP_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --beam $(PROOF_SEARCH_BEAM) --max-depth $(PROOF_SEARCH_DEPTH) --probe-budget $(PROOF_SEARCH_BUDGET) --dedup $(PROOF_SEARCH_DEDUP) --peek $(PROOF_SEARCH_PEEK) --proposer $(PROOF_SEARCH_PROPOSER) $(PROOF_SEARCH_CORPUS_ARGS) --auto $(PROOF_SEARCH_AUTO)"
 
 # The live full-search regression (LoopIntegrationSpec) against the real
 # server; the pure twins run in plain `make test`.

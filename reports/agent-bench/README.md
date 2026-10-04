@@ -254,14 +254,25 @@ this column, and none has more than one agda-algebras row.  The [#191] runs
 were judged with it.
 
 Per stratum, solved and restated (first arms), beside the loop's fixed space
-and retrieval under exclusion on `main`:
+and retrieval under exclusion on `main`, and beside the floor: what Agda's own
+proof search solves at the hole with no model and no corpus, each term judged
+by `fill_hole` under `--safe` ([`reports/auto-floor/`](../auto-floor/README.md),
+issue [#205]):
 
-| stratum | n | loop fixed | loop retrieval | Sonnet 5 | Opus 5 |
-|---|---|---|---|---|---|
-| agda-stdlib | 22 | 6 | 6 | 21 solved | 22 solved |
-| agda-stdlib/haystack | 12 | 0 | 6 | 12 solved | 12 solved |
-| agda-algebras/using | 11 | 2 | 2 | 9 solved, 2 restated | 11 solved |
-| agda-algebras/wholesale | 10 | 0 | 0 | 4 solved, 6 restated | 9 solved, 1 restated |
+| stratum | n | Agda's search alone | loop fixed | loop retrieval | Sonnet 5 | Opus 5 |
+|---|---|---|---|---|---|---|
+| agda-stdlib | 22 | 6 | 6 | 6 | 21 solved | 22 solved |
+| agda-stdlib/haystack | 12 | 0 | 0 | 6 | 12 solved | 12 solved |
+| agda-algebras/using | 11 | 4 | 2 | 2 | 9 solved, 2 restated | 11 solved |
+| agda-algebras/wholesale | 10 | 7 | 0 | 0 | 4 solved, 6 restated | 9 solved, 1 restated |
+
+Agda's search alone solves 17 of the 55, so an arm's count is read against
+that floor.  On the wholesale stratum, where the loop finds nothing, Agda
+solves seven rows from the context and the records' own fields; four of the
+six rows the Sonnet arm restated there are among them, and so is the one row
+both Opus seeds restate (`algebras-homs-mon-to-hom`).  So most of those
+restatements cited a lemma for a row that Agda's own search, which no arm
+was offered, proves by itself.
 
 The two Opus seeds solve the same 54 rows and restate the same one
 (`algebras-homs-mon-to-hom`); 44 of their 55 final files are byte-identical,
@@ -939,6 +950,7 @@ new run gets a new run id.
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
 [#197]: https://github.com/formalverification/agda-native-air/pull/197
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
 [#220]: https://github.com/formalverification/agda-native-air/pull/220

@@ -349,23 +349,21 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, entry, recorded, fixtureSource).unsafeRunSync()
     fr.contextSource shouldBe "reconstructed"
     fr.goalTokens shouldBe Vector("Image", "∋")          // F and b are context names
-    // The syntactic statement rule fires on the original: its corpus type and
-    // the index prose differ in notation, so only the name rule could, and
-    // the hole carries a prime.  So the original stays IN the excluded pool;
-    // that is exactly what the lane-form rule exists to catch, and exactly
-    // what the instrument must report rather than hide.
-    fr.pool.excluded shouldBe empty
+    // The hole carries a prime (the obligation is the original renamed to
+    // live beside it), and the name rule compares the hole's stem too, so
+    // the original leaves the excluded pool by name.  Before #206 it stayed
+    // in, left to the lane-form statement rule, which misses an original
+    // restated with its binders made explicit; Agda's own proof search,
+    // handed the pool as hints, then cited one (`Imagef∋f`).
+    fr.pool.excluded.map(_._1) shouldBe Vector("name:Setoid.Functions.Inverses.IsInRange→IsInImage")
     // Overture.Basic.ℓ₁ is out of scope (no Overture import) and never
-    // enters the pool; the two Setoid.Functions rows the goal tokens touch
-    // tie at 4 (two overlaps, ± the name bonus and the `∈` misfit for the
-    // original) and split on arity, and 𝑖𝑑 trails at 0.
+    // enters the pool; Inv leads on the goal tokens and 𝑖𝑑 trails at 0.
     fr.pool.ranked.map(_.prettyQname) shouldBe Vector(
-      "Setoid.Functions.Inverses.IsInRange→IsInImage",
       "Setoid.Functions.Inverses.Inv",
       "Setoid.Functions.Basic.𝑖𝑑")
     fr.targets.map(t => (t.qname, t.status, t.rank, t.detail)) shouldBe Vector(
       ("Setoid.Functions.Inverses.Image_∋_.eq", "non-function", None, Some("constructor")),
-      ("Setoid.Functions.Inverses.Inv",          "ranked",       Some(2), None),
+      ("Setoid.Functions.Inverses.Inv",          "ranked",       Some(1), None),
       ("Relation.Binary.Bundles.Setoid.sym",     "not-in-corpus", None, None),
       ("Setoid.Homomorphisms.Basic.𝒾𝒹",          "out-of-scope", None, Some("Setoid.Homomorphisms.Basic")))
     fr.restates.map(t => (t.qname, t.status, t.rank)) shouldBe Vector(
@@ -398,8 +396,9 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, composed, recorded, fixtureSource).unsafeRunSync()
     fr.targets shouldBe empty
     fr.restates shouldBe empty
+    // Rank 1: the row's hole is primed, so the original is excluded by name.
     fr.needles.map(t => (t.qname, t.role, t.status, t.rank, t.detail)) shouldBe Vector(
-      ("Setoid.Functions.Inverses.Inv", "needle", "ranked",       Some(2), None),
+      ("Setoid.Functions.Inverses.Inv", "needle", "ranked",       Some(1), None),
       ("Setoid.Homomorphisms.Basic.𝒾𝒹", "needle", "out-of-scope", None,    Some("Setoid.Homomorphisms.Basic")))
     // A needle that the exclusion rules remove is reported as excluded, with the rule.
     val clashing = composed.copy(hole = "Inv")
@@ -414,7 +413,7 @@ final class RetrievalRecallSpec extends AnyFunSuite with Matchers {
     val composed = entry.copy(tags = Vector("stratum:composition", "needle:Setoid.Functions.Inverses.Inv"))
     val fr = RetrievalRecall.evaluate(cfg(exclude = true), corpus, TokenOverlapScorer, composed, recorded, fixtureSource).unsafeRunSync()
     fr.toJson.hcursor.downField("needles").downN(0).get[String]("role") shouldBe Right("needle")
-    fr.toJson.hcursor.downField("needles").downN(0).get[Int]("rank") shouldBe Right(2)
+    fr.toJson.hcursor.downField("needles").downN(0).get[Int]("rank") shouldBe Right(1)
   }
 
   test("evaluate: a recorded context is used as is, and the reconstruction is checked against it") {

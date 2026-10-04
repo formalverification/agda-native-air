@@ -22,6 +22,9 @@ first has no model in it at all; the other three are one model under three
 configurations.  Two auxiliary instruments measure parts and never solves: the
 recall instrument (§ 4.1), which scores a ranker against known targets, and
 the lane parity replay (§ 4.4), which compares two judgments of one candidate.
+Beneath all four sits a floor that no instrument of this repository earned:
+what Agda's own proof search solves alone (§ 1.6), the denominator for every
+other count.
 
 ### 1.1  The loop
 
@@ -83,7 +86,51 @@ the model's **tool**.  The judge favors no arm; and the loop's numbers and
 the agents' are not judged alike, one more reason the first is no baseline
 for the second.
 
-## 2.  Vocabulary
+### 1.6  The floor: Agda's own proof search
+
+Agda ships a proof search, the one an editor's `C-c C-a` runs; under the
+pinned Agda 2.8.0 it is Mimer, which replaced Agsy in Agda 2.7 (the issues
+that measured it first, [#205] and [#206], say Agsy).  `make auto-floor` runs
+it once at every obligation's hole through `agda-mcp`'s `auto` tool, with
+Agda's default options and no hints, and gives every term it finds to
+`fill_hole` under `--safe` ([`reports/auto-floor/`]).  There is no model, no
+corpus, and no search of the loop's: one call per obligation, a second or
+less each.
+
+**What the floor is for**: a row Agda solves by itself says nothing about the
+loop's searcher or an agent's skill.  A count read against the floor says
+what the instrument added; read without it, it can credit a model with
+Agda's work.
+
+| stratum | n | Agda's search alone |
+|---|---:|---:|
+| agda-stdlib | 22 | 6 |
+| agda-stdlib/haystack | 12 | 0 |
+| agda-algebras/using | 11 | 4 |
+| agda-algebras/wholesale | 10 | 7 |
+| agda-stdlib, hard tier | 6 | 0 |
+| agda-algebras, hard tier | 8 | 0 |
+| agda-algebras/composition | 12 | 1 (2 with every needle as a hint) |
+| **all** | **81** | **18** |
+
+Every term the search found passed `fill_hole`, each after 12 ms of search
+or less, and none names the lemma its row restates.  Read against the
+instruments:
+
++  **The original 55 rows: 17**, against the loop's 8 (fixed space) and 14
+   (retrieval).  The search and retrieval succeed on different rows: the
+   search needs no library lemma and finds none, and retrieval supplies
+   exactly the lemmas it lacks (§ 4.1 measures what the loop gets from
+   both).
++  **The wholesale stratum: 7 of 10**.  That stratum was built so that the
+   fixed space has no `using`-listed lemma to apply and only retrieval could
+   reach one; the loop solves none of it.  Agda's search solves seven from
+   the context and the records' own fields, so the stratum's difficulty for
+   the loop was its vocabulary, not the mathematics.
++  **The hard and composition tiers: 1 of 26**.  Agda alone solves one row
+   of the two tiers built to sit beyond the loop, so the frontier models'
+   counts there owe almost nothing to it.
+
 
 +  **Obligation**: one benchmark module with exactly one hole `{!!}`; 55 of
    them, under `data/benchmarks/`.  Its **gold** is the same module with the
@@ -241,12 +288,23 @@ and where the two differ, the header-free number is the one quoted (§ 4.6).
 | `idf-unfold`, 43-suite, exclusion on | **9/43** (`using` 3/11) | loop, retrieval, `idf-unfold` | `k19r2-idf-unfold-a` | § 9, idf-unfold table |
 | `idf-unfold`, exclusion off (control) | 10/43 | loop | `k19r2-idf-unfold-b` | same |
 | Ranking recall, offline | targets in top 8: `token-overlap` **1/33**, `idf-unfold` **9/33** | recall instrument, no server | `recall-ctx1-r2` | § 9, scorer table |
+| Agda's own search alone, the floor | **17/55** (stdlib 6/22, haystack 0/12, agda-algebras 11/21); 18/81 with the hard and composition tiers | `make auto-floor`, no loop, no corpus | `auto-floor-1` | § 1.6, [`reports/auto-floor/`] |
+| Fixed space with Agda's search as a closer, 43-suite | **18/43**: the floor's 17 plus `algebras-homs-id-hom`, 221 probes | loop, `--auto closer` | `auto206-fixed-closer` | [ADR 0001] § 9, Agda's-search table |
+| Retrieval with retrieved lemmas as Agda's hints, 43-suite | **18/43**, the same rows, 528 probes | loop, retrieval, `--auto hints`, corrected name rule | `auto206-retrieval-hints`, `auto206fix-alg-retrieval-hints` | same |
+| The same, haystack tier | 6/12, retrieval's six; `closer` likewise 6/12 | loop, retrieval, `--auto hints` | `auto206-hay-retrieval-hints` | same |
 
 **How "8 of 55 and 14 of 55" are composed**.  The two loop columns in the
 agent table are sums over strata: fixed space 8/43 + 0/12 = **8/55**;
 retrieval 8/43 + 6/12 = **14/55**.  So the whole of retrieval's gain, all six
 rows, is the haystack tier.  On the other 43 obligations retrieval added
-**zero** solves under exclusion.
+**zero** solves under exclusion.  With Agda's own search composed in
+([#206]), retrieval with hints solves 18/43 + 6/12 = **24/55**: Agda's
+search carries the 43 and retrieval the haystack, and the one row past
+their union (23) is `algebras-homs-id-hom`, where the fixed space commits a
+pair and the search closes both halves.  The first such run also showed the
+target exclusion blind to the agda-algebras tier's renamed obligations (18
+of 21), and Agda's search cited one original through the gap; the rule is
+corrected and the count is the corrected run's ([ADR 0001] § 7).
 
 **What the haystack six mean**.  Before that tier, retrieval had never solved
 a row under exclusion.  The tier was built so that the fixed space cannot
@@ -563,7 +621,9 @@ binaries.  On this tier the headers carried a `Source:` line, sometimes
 naming a lemma to use, and a `Strategy:` line sketching the proof ("one
 direction is cong of g; the other is injectivity of g"); PR [#220] moved
 both into the tiers' READMEs.  n is fourteen and there is one seed per arm
-and per condition, so a difference of a row or two is not a finding.
+and per condition, so a difference of a row or two is not a finding.  Agda's
+own proof search solves none of the fourteen by itself (§ 1.6): the tier's
+counts owe Agda's search nothing.
 
 | | `shell`, hints | `shell`, header-free | `mcp`, hints | `mcp`, header-free | `both`, hints | `both`, header-free |
 |---|---:|---:|---:|---:|---:|---:|
@@ -768,6 +828,18 @@ refuses a root lemma whose middle point is an unsolved meta; the tier's
 README (`data/benchmarks/agda-algebras-composition-v0/README.md`) keeps
 those gates and each row's needles, novelty record, and gold.
 
+Agda's own proof search (§ 1.6) solves one row by itself, and two when it is
+handed every needle of every row as a hint, so finding the lemmas is not
+the whole of the tier's difficulty for a term search.  Composed into the
+loop ([#206]), it closes the same one row from the fixed space, and the
+second when retrieval ranked with `idf-unfold` hands it that row's two
+needles: `comp-homomorphism-isomorph-is-image` by its gold, `HomImage-≅'
+IdHomImage A≅B`, where the search fills the middle point by unification
+(runs `auto206-comp-fixed-closer`, `auto206-comp-idf-hints`; `token-overlap`
+ranks no needle into a hint set and stays at one).  The tier's zero is the
+loop as built; with Agda's search composed in, the loop reaches the floor's
+upper bound.
+
 The agents ran on header-free fixtures, one seed per arm, at the hard tier's
 caps (60 turns, 1,800 s, USD 6.00), parallelism 2, from one frozen copy of
 the server and the extractor and one snapshot of the driver's classes,
@@ -958,9 +1030,10 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 +  [`agda-mcp/README.md`]: the tool contracts.
 +  Make targets: `make proof-search-loop` (knobs `PROOF_SEARCH_PROPOSER`,
    `PROOF_SEARCH_CORPUS`, `PROOF_SEARCH_RETRIEVE_K`, `PROOF_SEARCH_EXCLUDE`,
-   `PROOF_SEARCH_SCORER`), `make proof-search-recall`, `make agent-bench`
-   (`AGENT_BENCH_MODEL`, `AGENT_BENCH_ARM=shell|mcp|both`),
-   `make agent-bench-rejudge`, `make lane-give-parity`.
+   `PROOF_SEARCH_SCORER`, `PROOF_SEARCH_AUTO=off|closer|hints`),
+   `make proof-search-recall`, `make agent-bench` (`AGENT_BENCH_MODEL`,
+   `AGENT_BENCH_ARM=shell|mcp|both`), `make agent-bench-rejudge`,
+   `make lane-give-parity`.
 
 [ADR 0001]: adr/0001-proof-search-on-agda-mcp.md
 [ADR 0002]: adr/0002-agda-mcp.md
@@ -1001,3 +1074,6 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
 [#220]: https://github.com/formalverification/agda-native-air/pull/220
 [#221]: https://github.com/formalverification/agda-native-air/pull/221
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
+[`reports/auto-floor/`]: ../reports/auto-floor/README.md

@@ -32,6 +32,36 @@ final class WireSpec extends AnyFunSuite with Matchers {
       case other                  => fail(s"$name did not unwrap to a reply: $other")
     }
 
+  test("auto: each of the four outcomes decodes from a live capture, carrying exactly its own field (#206)") {
+    val found = replyOf("wire-auto-found.json", 1).decodeAs[AutoBody].toOption.get
+    found.outcome shouldBe AutoBody.Found
+    found.found shouldBe Some("m , n")
+    found.resetMs.isDefined shouldBe true
+    val joined = replyOf("wire-auto-found-joined.json", 3).decodeAs[AutoBody].toOption.get
+    joined.found.exists(_.contains("\n")) shouldBe false   // the server joined Agda's three lines
+    val none = replyOf("wire-auto-no-solution.json", 2).decodeAs[AutoBody].toOption.get
+    (none.outcome, none.message, none.found) shouldBe ((AutoBody.NoSolution, Some("No solution found"), None))
+    val oos = replyOf("wire-auto-out-of-scope.json", 4).decodeAs[AutoBody].toOption.get
+    (oos.outcome, oos.error.map(_.stage), oos.error.flatMap(_.code)) shouldBe
+      ((AutoBody.OutOfScope, Some("term"), Some("NotInScope")))
+    val hint = replyOf("wire-auto-hint-error.json", 5).decodeAs[AutoBody].toOption.get
+    (hint.outcome, hint.error.map(_.stage), hint.options) shouldBe ((AutoBody.Error, Some("hints"), "nosuch"))
+  }
+
+  test("auto: an outcome without its field, or an unknown outcome, is drift (#206)") {
+    def body(fields: (String, io.circe.Json)*): ToolReply =
+      ToolReply(isError = false, io.circe.Json.obj((Seq(
+        "options"   -> io.circe.Json.fromString(""),
+        "elapsedMs" -> io.circe.Json.fromInt(3)) ++ fields): _*).noSpaces)
+    body("outcome" -> io.circe.Json.fromString("found")).decodeAs[AutoBody].isLeft shouldBe true
+    body("outcome" -> io.circe.Json.fromString("no-solution"), "term" -> io.circe.Json.fromString("t"))
+      .decodeAs[AutoBody].isLeft shouldBe true
+    body("outcome" -> io.circe.Json.fromString("maybe"), "message" -> io.circe.Json.fromString("m"))
+      .decodeAs[AutoBody].isLeft shouldBe true
+    body("outcome" -> io.circe.Json.fromString("found"), "term" -> io.circe.Json.fromString("refl"))
+      .decodeAs[AutoBody].map(_.found) shouldBe Right(Some("refl"))
+  }
+
   test("check_file: open hole makes the batch verdict red, and the hole list is the obligation set") {
     val body = replyOf("wire-check-file-open-hole.json", 2).decodeAs[CheckFileBody].toOption.get
     body.success shouldBe false          // an open hole is not green — the verdict discipline

@@ -143,6 +143,31 @@ final class Oracle private (
       _     <- record(ctx, timed, body.toOption.map(_.elapsedMs), None)
     } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
 
+  /** auto on the interaction lane (issue #205): Agda's own proof search at
+    * one obligation, with `hints` as the names it may use (none: Agda's
+    * default space).  Phase "auto" in the ledger, a knowledge call: the
+    * answer is a candidate the loop still judges with fill_hole, never a
+    * verdict.  Not memoised, like type_of, since the lane re-load a found
+    * term owes is part of what a sweep measures.  A reply-level failure
+    * degrades to a Left (the proposer then proposes nothing from it), and
+    * wire drift on a normal reply raises, as for every decoder.
+    */
+  def auto(ctx: CallCtx, file: Path, ob: Obligation, hints: Vector[String]): IO[OracleAnswer[Either[String, AutoBody]]] =
+    for {
+      timed <- client.callTool("auto", Json.obj(
+                 (Vector(
+                   "filePath" -> file.toString.asJson,
+                   "line"     -> ob.line.asJson,
+                   "column"   -> ob.col.asJson
+                 ) ++ (if (hints.isEmpty) Vector.empty else Vector("hints" -> hints.asJson))): _*))
+      body  <- if (timed.value.isError)
+                 IO.pure(Left(timed.value.text.take(400)): Either[String, AutoBody])
+               else
+                 IO.fromEither(timed.value.decodeAs[AutoBody].leftMap(new RuntimeException(_)))
+                   .map(b => Right(b): Either[String, AutoBody])
+      _     <- record(ctx, timed, body.toOption.map(_.elapsedMs), None)
+    } yield OracleAnswer(body, timed.value.text, timed.clientMs, cached = false)
+
   /** The memo's answer for a probe, when it already holds one — the same
     * cached ledger row and zero-cost semantics as a memo hit inside `probe`,
     * without ever risking an Agda call.  Exists as its own door so the P1
