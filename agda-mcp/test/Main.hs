@@ -2300,6 +2300,11 @@ writtenSearchTests = do
           ["x ∙ y ⁻¹", "commutative _≈_ _∙_", "hom 𝑨 𝑩 → hom 𝑩 𝑪"]
           (map fragmentKey ["(x ∙ y)⁻¹", "Algebra.Definitions.Commutative  _≈_ _∙_", "hom 𝑨 𝑩 -> hom 𝑩 𝑪"])
 
+    , runTest "fragmentKey: an unmatched bracket drops as a matched one does" $
+        assertEqual "keys"
+          ["magmahomomorphism a b", "r : magmahomomorphism a b", "y ⁻¹ ≈ x", ""]
+          (map fragmentKey ["MagmaHomomorphism A B)", "(r : MagmaHomomorphism A B", "y)⁻¹ ≈ x", "( {"])
+
     , runTest "a section with its parameter in the first hole reads as written" $
         assertEqual "lemma"
           "(G : Rec) (x : Carrier) → (x ⁻¹) ≈ x"
