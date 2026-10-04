@@ -301,6 +301,16 @@ object ProofSearchLoop extends IOApp {
       // proposer there is no exclusion-checked pool to take them from.
       _      <- if (auto == AutoMode.Hints && prop != "retrieval")
                   Left("--auto hints requires --proposer retrieval") else Right(())
+      // The loop sends no search bound, so each search runs Agda's default,
+      // which the server refuses when it reaches the server's own deadline:
+      // under a 1 s --server-timeout every search would fail, and the sweep
+      // would run without the closer it asked for (a Copilot catch on PR
+      // #233).
+      _      <- if (auto != AutoMode.Off && tmo * 1000 <= AutoCloseProposer.defaultSearchMs)
+                  Left(s"--auto needs a --server-timeout above ${AutoCloseProposer.defaultSearchMs / 1000} s: " +
+                    s"each search runs Agda's default bound of ${AutoCloseProposer.defaultSearchMs} ms, which the " +
+                    s"server refuses under a deadline of $tmo s")
+                else Right(())
     } yield LoopHarnessConfig(
       index         = Paths.get(ix),
       ids           = ids,
@@ -758,7 +768,8 @@ object ProofSearchLoop extends IOApp {
       f"$s%-24s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  (${sel.count(_.searchStatus == "exhausted")} exhausted, ${sel.count(_.searchStatus == "budget_exceeded")} budget, ${sel.count(_.searchStatus == "anomaly")} anomaly)"
     }.mkString("\n|")
     val batch  = ledger.filter(r => batchPhases(r.phase) && !r.cached)
-    val know   = ledger.filter(r => knowledgeOf(ledger)(r.phase) && !r.cached)
+    val known  = knowledgeOf(ledger) // once, not per row (a Copilot catch on PR #233)
+    val know   = ledger.filter(r => known(r.phase) && !r.cached)
     val retr   = ledger.filter(r => retrievalPhases(r.phase) && !r.cached)
     val peeks  = outcomes.map(_.stats.peeks).sum
     val prej   = outcomes.map(_.stats.peekRejects).sum

@@ -149,6 +149,13 @@ final class AutoCloseProposer private (
 
 object AutoCloseProposer {
 
+  /** The search's bound when a call names none: Agda's own, 1,000 ms of CPU
+    * time (`optTimeout` in `Agda.Mimer.Options`).  The loop names none, so
+    * this is every search's bound, and the server refuses a search whose
+    * bound reaches its --timeout.
+    */
+  val defaultSearchMs: Int = 1000
+
   /** A term as a candidate: parenthesized when it is more than one token,
     * the convention of every proposer here, and bare otherwise so that
     * `refl` found by the search and `refl` proposed as a closer are one
