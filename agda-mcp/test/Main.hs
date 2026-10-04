@@ -127,7 +127,7 @@ import AgdaMCP.Interaction
   , errorCodeOf
   )
 import AgdaMCP.Server
-  (ServerConfig (..), forceResponse, registeredToolNames, serverInstructions, toolDefinitions)
+  (ServerConfig (..), forceResponse, isExposed, registeredToolNames, serverInstructions, toolDefinitions)
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf )
@@ -138,7 +138,7 @@ import AgdaMCP.Tools.LiveQueries
   ( handleDefinitionOf, handleExportsOf, handleNormalize, handleResolveName
   , handleTypeOf, pageExports )
 import AgdaMCP.Tools.Search
-  ( handleSearchByName, handleSearchByType, handleGetDependencies )
+  ( handleSearchByName, handleSearchByType, handleGetDependencies, inScopeParams )
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope, needsIdentityCheck, probeBudget)
 import AgdaMCP.Scope
   ( bareNameOf, bareRenderingOf, importingModulesOf, parseImports, renderings )
@@ -2020,7 +2020,7 @@ corpusTests = do
           Right dep -> assert "no neighbors" (null (depNeighbors dep))
       -- Tool handler layer
     , withCorpus "handleSearchByName: 'Term' finds ≥2" $ \idx ->
-        let params = SearchByNameParams { sbnPattern = "Term", sbnLimit = Just 10 }
+        let params = SearchByNameParams { sbnPattern = "Term", sbnLimit = Just 10, sbnInScopeAt = Nothing }
         in case handleSearchByName idx params of
              Left err -> pure (Fail $ T.unpack err)
              Right rs -> assert ("got " <> show (length rs)) (length rs >= 2)
@@ -2083,8 +2083,17 @@ indexOf es = corpusIndexOf (Map.fromList [ (cePrettyQname e, e) | e <- es ])
 corpusTools :: Aeson.Value
 corpusTools = toolDefinitions corpusConfig
 
--- | corpusConfig: a server with a corpus loaded and every tool exposed, the
--- configuration the agent bench's subjects are given.
+-- | fullTools / fullConfig: as 'corpusTools' and 'corpusConfig', with every
+-- registered tool exposed, search_in_scope included, which since issue #203
+-- a server presents only when --expose names it.
+fullTools :: Aeson.Value
+fullTools = toolDefinitions fullConfig
+
+fullConfig :: ServerConfig
+fullConfig = corpusConfig { scExpose = Just (registeredToolNames corpusConfig) }
+
+-- | corpusConfig: a server with a corpus loaded and every tool on the default
+-- surface exposed, the configuration the agent bench's subjects are given.
 corpusConfig :: ServerConfig
 corpusConfig = ServerConfig
   { scAgdaConfig  = defaultConfig
@@ -2349,23 +2358,25 @@ scopeRetrievalTests = do
         in  assertEqual "ranked" ["L.+-comm"] (map (cePrettyQname . rkEntry) (poolRanked pool))
 
     , -- The tool as a client sees it.
-      runTest "tools/list: fourteen tools with a corpus, search_in_scope last; ten without" $ allOf
-        [ assertEqual "with corpus" 14 (length (toolNamesOf corpusTools))
-        , assertEqual "last" (Just "search_in_scope") (listToMaybe (reverse (toolNamesOf corpusTools)))
+      runTest "tools/list: thirteen tools with a corpus by default; fourteen with search_in_scope exposed, last; ten without" $ allOf
+        [ assertEqual "with corpus, by default" 13 (length (toolNamesOf corpusTools))
+        , assert "search_in_scope off the default surface (#203)" ("search_in_scope" `notElem` toolNamesOf corpusTools)
+        , assertEqual "every registered tool exposed" 14 (length (toolNamesOf fullTools))
+        , assertEqual "last" (Just "search_in_scope") (listToMaybe (reverse (toolNamesOf fullTools)))
         , assertEqual "without" 10 (length (toolNamesOf advertisedTools))
         , assert "absent without a corpus" ("search_in_scope" `notElem` toolNamesOf advertisedTools)
         ]
     , runTest "search_in_scope schema: every accepted argument is a declared property" $ allOf
         [ assertEqual "properties"
             ["col", "column", "exclude", "filePath", "limit", "line", "maxProbes", "query", "reload", "verbose"]
-            (sort (schemaProperties "search_in_scope" corpusTools))
-        , assertEqual "query" ["name", "tokens"] (subProperties "search_in_scope" "query" corpusTools)
-        , assertEqual "exclude" ["names", "statement"] (subProperties "search_in_scope" "exclude" corpusTools)
+            (sort (schemaProperties "search_in_scope" fullTools))
+        , assertEqual "query" ["name", "tokens"] (subProperties "search_in_scope" "query" fullTools)
+        , assertEqual "exclude" ["names", "statement"] (subProperties "search_in_scope" "exclude" fullTools)
         , assertEqual "required" (Just (Aeson.toJSON ["filePath" :: Text]))
-            (KM.lookup "required" (inputSchemaOf "search_in_scope" corpusTools))
+            (KM.lookup "required" (inputSchemaOf "search_in_scope" fullTools))
         ]
     , runTest "search_in_scope description: carries the contract's load-bearing sentences" $
-        let d = descriptionOf "search_in_scope" corpusTools
+        let d = descriptionOf "search_in_scope" fullTools
         in  allOf
           [ assert "informs, never decides" ("INFORMS AND NEVER DECIDES" `T.isInfixOf` d)
           , assert "every rendering typed" ("EVERY rendering was typed" `T.isInfixOf` d)
@@ -2377,9 +2388,73 @@ scopeRetrievalTests = do
           -- registered only with --corpus is the README's, since a client
           -- that sees the tool already has it.
           , assert "the lane note, in the instructions"
-              ("--interaction-json process per project root (" `T.isInfixOf` serverInstructions corpusConfig
-               && "search_in_scope" `T.isInfixOf` serverInstructions corpusConfig)
+              ("--interaction-json process per project root (" `T.isInfixOf` serverInstructions fullConfig
+               && "search_in_scope" `T.isInfixOf` serverInstructions fullConfig)
           ]
+    , -- Issue #203: search_in_scope's question, asked through search_by_name.
+      runTest "search_by_name schema: pattern required; inScopeAt declares the address and reload" $ allOf
+        [ assertEqual "properties" ["inScopeAt", "limit", "pattern", "verbose"]
+            (sort (schemaProperties "search_by_name" corpusTools))
+        , assertEqual "inScopeAt" ["col", "column", "filePath", "line", "reload"]
+            (sort (subProperties "search_by_name" "inScopeAt" corpusTools))
+        , -- The parser reads filePath with .:, so the nested schema says so
+          -- (a Copilot catch on PR #232).
+          assertEqual "inScopeAt requires filePath" (Just (Aeson.toJSON ["filePath" :: Text]))
+            (case KM.lookup "properties" (inputSchemaOf "search_by_name" corpusTools) of
+               Just (Aeson.Object ps) -> case KM.lookup "inScopeAt" ps of
+                 Just (Aeson.Object o) -> KM.lookup "required" o
+                 _                     -> Nothing
+               _ -> Nothing)
+        , assert "an object requiring nothing declares no required (search_in_scope's query)"
+            (case KM.lookup "properties" (inputSchemaOf "search_in_scope" fullTools) of
+               Just (Aeson.Object ps) -> case KM.lookup "query" ps of
+                 Just (Aeson.Object o) -> not (KM.member "required" o)
+                 _                     -> False
+               _ -> False)
+        , assertEqual "required" (Just (Aeson.toJSON ["pattern" :: Text]))
+            (KM.lookup "required" (inputSchemaOf "search_by_name" corpusTools))
+        ]
+    , runTest "search_by_name description: names the question, what to write, and what a negative means" $
+        let d = descriptionOf "search_by_name" corpusTools
+        in  allOf
+          [ assert "the question" ("CAN THIS FILE WRITE IT, AND HOW?" `T.isInfixOf` d)
+          , assert "the spelling" ("rendering, the spelling to write" `T.isInfixOf` d)
+          , assert "the negative" ("hits > 0 with inScope 0" `T.isInfixOf` d)
+          , assert "informs, never decides" ("informs and never decides" `T.isInfixOf` d)
+          , assert "under the cap" (T.length d <= 2048)
+          ]
+    , runTest "instructions: search_by_name's inScopeAt is named among the lane's answers, search_in_scope only when exposed" $ allOf
+        [ assert "inScopeAt" ("search_by_name's inScopeAt" `T.isInfixOf` serverInstructions corpusConfig)
+        , assert "no hidden tool" (not ("search_in_scope" `T.isInfixOf` serverInstructions corpusConfig))
+        , assert "under the cap" (T.length (serverInstructions fullConfig) <= 2048)
+        ]
+    , runTest "isExposed: search_in_scope only when --expose names it" $ allOf
+        [ assert "hidden by default" (not (isExposed corpusConfig "search_in_scope"))
+        , assert "search_by_name shown" (isExposed corpusConfig "search_by_name")
+        , assert "named alone" (isExposed (exposing ["search_in_scope"]) "search_in_scope")
+        , assert "registered either way" ("search_in_scope" `elem` registeredToolNames corpusConfig)
+        ]
+    , runTest "SearchByNameParams: inScopeAt parses with the address rules; without it, none" $ allOf
+        [ assertEqual "no inScopeAt" (Just Nothing)
+            (sbnInScopeAt <$> (Aeson.decode "{\"pattern\":\"twice\"}" :: Maybe SearchByNameParams))
+        , assertEqual "an address"
+            (Just (Just (InScopeAt "F.agda" (Just 23) (Just 11) False)))
+            (sbnInScopeAt <$> (Aeson.decode
+              "{\"pattern\":\"twice\",\"inScopeAt\":{\"filePath\":\"F.agda\",\"line\":23,\"col\":11}}"
+              :: Maybe SearchByNameParams))
+        , assertEqual "both column spellings" Nothing
+            (Aeson.decode "{\"pattern\":\"x\",\"inScopeAt\":{\"filePath\":\"F\",\"line\":1,\"col\":2,\"column\":3}}"
+              :: Maybe SearchByNameParams)
+        , assertEqual "a column without a line" Nothing
+            (Aeson.decode "{\"pattern\":\"x\",\"inScopeAt\":{\"filePath\":\"F\",\"column\":3}}"
+              :: Maybe SearchByNameParams)
+        ]
+    , runTest "inScopeParams: the pattern is the query's name, the address the anchor, the limit the accepted count" $
+        assertEqual "params"
+          (SearchInScopeParams "F.agda" (Just 23) (Just 11) (Just (SearchQuery (Just "twice") []))
+             (Just 3) Nothing Nothing True)
+          (inScopeParams (SearchByNameParams "twice" (Just 3) Nothing)
+                         (InScopeAt "F.agda" (Just 23) (Just 11) True))
     , runTest "SearchInScopeParams: an empty query is refused; both column spellings are refused" $ allOf
         [ assert "empty query" (isLeft (decodeScopeParams "{\"filePath\":\"f\",\"query\":{}}"))
         , assert "two columns" (isLeft (decodeScopeParams "{\"filePath\":\"f\",\"line\":1,\"col\":2,\"column\":3}"))
@@ -3173,7 +3248,7 @@ echoTools :: [Text]
 echoTools =
   [ "get_goal", "fill_hole", "check_file", "get_diagnostics", "check_project"
   , "type_of", "normalize", "resolve_name", "definition_of", "exports_of"
-  , "search_in_scope" ]
+  , "search_by_name", "search_in_scope" ]
 
 -- | propertyType: the declared JSON type of one input property.
 propertyType :: Text -> Text -> Aeson.Value -> Maybe Aeson.Value
@@ -3266,14 +3341,15 @@ leanAnswerTests = do
 
     , runTest "schema: every tool whose answer carries an echo declares verbose, a boolean" $
         let tools = advertisedTools
-            corpus = corpusTools
-            typeOf t = propertyType t "verbose" (if t == "search_in_scope" then corpus else tools)
+            typeOf t = propertyType t "verbose"
+              (if t == "search_in_scope" then fullTools else if t == "search_by_name" then corpusTools else tools)
         in  assertEqual "tools without a boolean verbose" []
               [ t | t <- echoTools, typeOf t /= Just (Aeson.String "boolean") ]
 
     , runTest "schema: the corpus lookups, whose answers carry no echo, do not declare verbose" $
+        -- search_by_name does since #203: with inScopeAt it answers on the lane.
         assertEqual "lookups declaring verbose" []
-          [ t | t <- ["search_by_name", "search_by_type", "get_dependencies"]
+          [ t | t <- ["search_by_type", "get_dependencies"]
               , "verbose" `elem` schemaProperties t corpusTools ]
 
     , runTest "exports_of schema: every accepted argument is a declared property" $
@@ -3364,8 +3440,13 @@ surfaceTests = do
               ]
 
     , runTest "expose: a paragraph whose tools are all hidden is left out" $ allOf
-        [ assertEqual "corpus lookups alone: no instructions" ""
-            (serverInstructions (exposing ["search_by_name"]))
+        [ assertEqual "the pure corpus lookups alone: no instructions" ""
+            (serverInstructions (exposing ["search_by_type", "get_dependencies"]))
+        , -- search_by_name's inScopeAt takes a file and the lane (#203).
+          assert "search_by_name alone: the lane and path paragraphs, no verdict or hole paragraph"
+            (let t = serverInstructions (exposing ["search_by_name"])
+             in  "search_by_name's inScopeAt" `T.isInfixOf` t && "A path naming nothing" `T.isInfixOf` t
+                 && not ("VERDICTS" `T.isInfixOf` t) && not ("HOLES" `T.isInfixOf` t))
         , assert "type_of alone: no verdict or hole paragraph"
             (let t = serverInstructions (exposing ["type_of"])
              in  "KNOWLEDGE" `T.isInfixOf` t && not ("VERDICTS" `T.isInfixOf` t)
@@ -4824,6 +4905,16 @@ exposeProcessTests exe = do
     ["--corpus", corpusFixturePath, "--expose", "check_file,type_of"] reqs
   (badCode, _, badErr) <- readProcessWithExitCode exe ["--expose", "check_file,search_by_name"] ""
   (bareCode, bareOut, bareErr) <- readProcessWithExitCode exe ["--expose"] reqs
+  -- The default surface (issue #203): no --expose at all.
+  (_, defaultOut, _) <- readProcessWithExitCode exe ["--corpus", corpusFixturePath] $ unlines
+    [ "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+    , "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}"
+    , "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"search_in_scope\",\"arguments\":{\"filePath\":\"/nonexistent/X.agda\",\"query\":{\"name\":\"x\"}}}}"
+    , "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"search_by_name\",\"arguments\":{\"pattern\":\"twice\",\"inScopeAt\":{\"filePath\":\"/nonexistent/X.agda\"}}}}"
+    ]
+  let defaultNames = case resultOf 2 defaultOut >>= KM.lookup "tools" of
+        Just ts -> toolNamesOf ts
+        Nothing -> []
   let instr = resultOf 1 out >>= KM.lookup "instructions"
       names = case resultOf 2 out >>= KM.lookup "tools" of
         Just ts -> toolNamesOf ts
@@ -4863,6 +4954,20 @@ exposeProcessTests exe = do
         , assert ("stderr was: " <> take 300 bareErr) ("--expose names no tool" `isInfixOf` bareErr)
         , assertEqual "no answer on stdout" "" bareOut
         ]
+
+    , runTest "wire: by default search_in_scope is not presented, and a call to it says how to expose it (#203)" $ allOf
+        [ assertEqual "thirteen tools" 13 (length defaultNames)
+        , assert "not listed" ("search_in_scope" `notElem` defaultNames)
+        , assert ("text was: " <> show (innerText 3 defaultOut))
+            (maybe False ("presents it only when --expose names it" `T.isInfixOf`) (innerText 3 defaultOut))
+        ]
+
+    , runTest "wire: search_by_name with inScopeAt takes the lane's path rules (#203)" $
+        -- A path naming nothing is refused by the lane tools' own refusal,
+        -- which a pure name lookup never reaches.
+        case innerText 4 defaultOut of
+          Just t  -> assert ("text was: " <> T.unpack (T.take 300 t)) ("/nonexistent/X.agda" `T.isInfixOf` t)
+          Nothing -> pure (Fail "no response for id 4")
 
     , runTest "wire: --expose naming a tool this configuration does not register refuses to start" $ allOf
         [ assert "exits non-zero" (badCode /= ExitSuccess)
@@ -7482,6 +7587,28 @@ searchInScopeLaneTests cfg repoRoot = do
                   assertEqual "lane calls" 9 (slLaneCalls l)
                 , assert "no error" (isNothing (sirError res))
                 ]
+
+        , runTest "search_by_name with inScopeAt: the query search_in_scope answers, through inScopeParams (#203)" $ do
+            r <- call (inScopeParams (SearchByNameParams "twice" Nothing Nothing)
+                                     (InScopeAt fixture (Just 23) (Just 11) False))
+            withRes r $ \res -> allOf
+              [ assertEqual "query echo" (Just (SearchQuery (Just "twice") [], "given")) (sirQuery res)
+              , assert ("renderings " <> show (map srowRendering (sirResults res)))
+                  ("twice" `elem` map srowRendering (sirResults res))
+              , assert "every row typed" (all (not . T.null . srowType) (sirResults res))
+              ]
+
+        , runTest "search_by_name with inScopeAt: a blank pattern is the in-band query error, saying so (#203)" $ do
+            -- The plain search_by_name lists every name for "", but in scope
+            -- a match-all would spend the probe budget on arbitrary rows.
+            r <- call (inScopeParams (SearchByNameParams "  " Nothing Nothing)
+                                     (InScopeAt fixture Nothing Nothing False))
+            withRes r $ \res -> allOf
+              [ assertEqual "stage" (Just "query") (lveStage <$> sirError res)
+              , assert ("message: " <> show (lveMessage <$> sirError res))
+                  (maybe False (("name pattern is blank" `T.isInfixOf`) . lveMessage) (sirError res))
+              , assertEqual "no results" [] (sirResults res)
+              ]
 
         , runTest "search_in_scope: no query at a hole derives the tokens from the goal" $ do
             r <- call atHole

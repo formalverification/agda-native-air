@@ -23,6 +23,7 @@
 
 module AgdaMCP.Tools.Search
   ( handleSearchByName
+  , inScopeParams
   , handleSearchByType
   , handleGetDependencies
   ) where
@@ -45,6 +46,27 @@ handleSearchByName :: CorpusIndex -> SearchByNameParams -> Either Text [SearchRe
 handleSearchByName idx params =
   let results = searchByName (sbnPattern params) (sbnLimit params) idx
   in Right results
+
+
+-- | inScopeParams: a @search_by_name@ call with @inScopeAt@, as the
+-- search_in_scope query it is (issue #203): the name pattern is the query,
+-- the address is the anchor, and the limit counts accepted names.  Nothing
+-- else of search_in_scope's is offered here (type tokens, the goal-derived
+-- query, exclusions, the probe budget); a server started with @--expose@
+-- naming search_in_scope presents those.  The server routes such a call to
+-- 'AgdaMCP.Tools.SearchInScope.handleSearchInScope', since it needs the
+-- interaction lane, which this module's pure handlers never touch.
+inScopeParams :: SearchByNameParams -> InScopeAt -> SearchInScopeParams
+inScopeParams p at = SearchInScopeParams
+  { sipFilePath  = isaFilePath at
+  , sipLine      = isaLine at
+  , sipColumn    = isaColumn at
+  , sipQuery     = Just (SearchQuery (Just (sbnPattern p)) [])
+  , sipLimit     = sbnLimit p
+  , sipMaxProbes = Nothing
+  , sipExclude   = Nothing
+  , sipReload    = isaReload at
+  }
 
 
 -- ═══════════════════════════════════════════════════════════════════════════

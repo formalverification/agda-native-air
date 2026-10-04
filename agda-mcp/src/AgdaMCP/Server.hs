@@ -56,6 +56,14 @@
 --   * @--expose NAME,...@ ('scExpose'): present only the named tools.
 --     tools/list lists those alone, the instructions name those alone, and a
 --     call to a registered tool that was not exposed is refused by name.
+--
+-- Issue #203 additions:
+--   * search_by_name takes @inScopeAt@ and answers with search_in_scope's
+--     handler: which matching names a file can write, and how.
+--   * search_in_scope is registered but off the default surface
+--     ('optInTools'): offered in 681 archived agent sessions and called once,
+--     its description was 17 % of every turn's tools/list.  @--expose@ that
+--     names it presents it, with its type-token and goal-derived queries.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -65,6 +73,8 @@ module AgdaMCP.Server
     -- * Exposed for testing
   , toolDefinitions
   , registeredToolNames
+  , isExposed
+  , optInTools
   , serverInstructions
   , forceResponse
   ) where
@@ -100,7 +110,8 @@ import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope)
 import AgdaMCP.Types
-  (CorpusIndex, ToolFailure (..), Verbosity (..), answerAt, defaultExportsLimit)
+  ( CorpusIndex, SearchByNameParams (..), ToolFailure (..), Verbosity (..)
+  , answerAt, defaultExportsLimit )
 
 -- ---------------------------------------------------------------------------
 -- Configuration
@@ -183,9 +194,18 @@ exposedTools :: ServerConfig -> [(Text, Value)]
 exposedTools cfg = filter (isExposed cfg . fst) (registeredTools cfg)
 
 -- | isExposed: whether this server presents (and answers) the named tool.
--- Without @--expose@ every registered tool is exposed.
+-- Without @--expose@ every registered tool is exposed but the opt-in ones;
+-- with it, exactly the tools it names.
 isExposed :: ServerConfig -> Text -> Bool
-isExposed cfg name = maybe True (name `elem`) (scExpose cfg)
+isExposed cfg name = maybe (name `notElem` optInTools) (name `elem`) (scExpose cfg)
+
+-- | optInTools: registered tools a server presents only when @--expose@
+-- names them (issue #203).  search_in_scope's question is answered on the
+-- default surface by search_by_name's @inScopeAt@; the tool itself, with the
+-- type-token and goal-derived queries @inScopeAt@ does not offer, stays one
+-- flag away.
+optInTools :: [Text]
+optInTools = ["search_in_scope"]
 
 -- | Every tool this configuration registers, as (name, definition).
 --
@@ -403,10 +423,26 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
 
     searchTools
       | isJust (scCorpusIndex cfg) =
-          [ toolDef "search_by_name"
-              "Find definitions matching a name pattern (case-insensitive substring on qualified/unqualified name)."
-              [ prop "pattern" "string" "Substring to search for in definition names."
-              , prop "limit"   "integer" "Maximum number of results (default: 20)."
+          [ toolDef "search_by_name" searchByNameNote
+              [ prop "pattern" "string" "Substring to search for in definition names; \
+                  \with inScopeAt it must not be blank (refused in band, \
+                  \error.stage 'query': a match-all would spend the lane's probes \
+                  \on arbitrary rows)."
+              , prop "limit"   "integer" "Maximum number of results (default: 20; with \
+                  \inScopeAt, names returned, default 8)."
+              , propObjectRequiring "inScopeAt" "Answer for this file: keep only the names it \
+                  \can write, each with its spelling and type there."
+                  [ prop "filePath" "string"  liveFilePathDoc
+                  , prop "line"     "integer" "Optional 1-based line; inside a hole, the \
+                      \hole's scope (its local names, its opens), else the file's top level."
+                  , prop "column"   "integer" liveColumnDoc
+                  , prop "col"      "integer" liveColDoc
+                  , prop "reload"   "boolean" liveReloadDoc
+                  ]
+                  ["filePath"]
+                -- With inScopeAt the answer carries the lane echo, which
+                -- verbose restores in full (issue #184's rule).
+              , prop "verbose" "boolean" verboseDoc
               ]
               ["pattern"]
 
@@ -515,15 +551,18 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
   where
     shown       = map fst (exposedTools cfg)
     among names = filter (`elem` shown) names
-    listed      = T.intercalate ", " . among
     -- The file tools whose answer is a verdict.  get_goal's fallback runs
     -- batch agda too, but its exitCode is normally non-zero on a correct goal
     -- (the injected macro leaves an interaction point) and judges nothing, as
     -- its own description says, so it is not listed here (a Copilot catch on
     -- PR #193).
     batch       = among ["check_file", "get_diagnostics", "fill_hole"]
+    -- search_by_name rides the lane only with inScopeAt (issue #203), so it
+    -- is named that way, whenever search_by_name is shown.
     lane        = among ["type_of", "normalize", "resolve_name", "definition_of", "exports_of", "search_in_scope", "get_goal"]
-    fileTools   = filter (`notElem` ["search_by_name", "search_by_type", "get_dependencies"]) shown
+                  <> [ "search_by_name's inScopeAt" | "search_by_name" `elem` shown ]
+    -- search_by_name takes a file in its inScopeAt (issue #203), so it is one.
+    fileTools   = filter (`notElem` ["search_by_type", "get_dependencies"]) shown
     holeTools   = among ["check_file", "get_diagnostics", "fill_hole", "get_goal"]
     listers     = among ["check_file", "get_diagnostics", "fill_hole"]
     one xs       = length xs == 1
@@ -555,7 +594,7 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           <> "."
       , unless' (not (null lane)) $
           "KNOWLEDGE comes from one persistent agda --interaction-json process \
-          \per project root (" <> listed lane <> "): a first question about a \
+          \per project root (" <> T.intercalate ", " lane <> "): a first question about a \
           \file costs one load (seconds); further questions about the \
           \unchanged file take milliseconds; another file \
           \re-loads (lane.load says why). These answers inform and NEVER \
@@ -565,7 +604,7 @@ serverInstructions cfg = T.unwords (filter (not . T.null) paragraphs)
           \editing a DEPENDENCY of the file, which the lane cannot see."
       , unless' (not (null fileTools)) $
           "A path naming nothing readable is refused, naming the path as \
-          \resolved. EVERY answer \
+          \resolved. EVERY answer about a file \
           \names the tree it used, project {root, rootSource}; a file in \
           \another checkout of a library registered elsewhere is refused with \
           \a rootMismatch naming both roots (unless the registry is missing: \
@@ -810,6 +849,30 @@ searchInScopeNote fillHoleShown =
   \corpus and the library disagree. timing {poolMs, laneMs}. In-band errors: \
   \error.stage 'load' (the file does not load) or 'query' (no usable query)."
 
+-- | searchByNameNote: the contract of search_by_name, and since issue #203
+-- of its @inScopeAt@, which answers search_in_scope's question where the
+-- archived subjects asked it (103 of 681 sessions used search_by_name;
+-- search_in_scope was called once).  It names the question first, then what
+-- to write, what a negative means, and the three ways the answer differs
+-- with @inScopeAt@ (limit, definitions only, the first call's load).
+searchByNameNote :: Text
+searchByNameNote =
+  "Find corpus definitions whose qualified or unqualified name contains \
+  \pattern, ignoring case: [{prettyQname, type, defKind, module, hasBody}] \
+  \in name order, at most limit (default 20). CAN THIS FILE WRITE IT, AND \
+  \HOW? Add inScopeAt {filePath, line?, column?}: the answer keeps only \
+  \the names that file can write, each with rendering, the spelling to \
+  \write (bare when the file opens its module, qualified when it only \
+  \imports it), and type, Agda's printing of it there (in the hole's scope \
+  \when line/column addresses one): {results [{prettyQname, rendering, \
+  \type, via, module, defKind, hasBody, corpusType, score}], ledger {hits, \
+  \inScope, outOfScope, accepted, laneRejected, ...}}. hits > 0 with \
+  \inScope 0 means the name exists and the file does not import its \
+  \module. With inScopeAt, limit counts names returned (default 8), only \
+  \definitions are returned (records, data types, constructors are counted \
+  \in ledger.nonFunction), the first call on a file loads it (seconds), \
+  \and the answer informs and never decides."
+
 -- | searchLineDoc: the anchor's contract for search_in_scope.
 searchLineDoc :: Text
 searchLineDoc =
@@ -892,13 +955,22 @@ prop name typ desc = (name, object ["type" .= typ, "description" .= desc])
 -- (search_in_scope's @query@ and @exclude@, issue #17).  Declared in full so
 -- a client that validates its arguments sees every key the handler accepts.
 propObject :: Text -> Text -> [(Text, Value)] -> (Text, Value)
-propObject name desc props =
+propObject name desc props = propObjectRequiring name desc props []
+
+-- | propObjectRequiring: as 'propObject', with the keys its parser requires
+-- declared as the nested schema's @required@ (search_by_name's @inScopeAt@,
+-- whose @filePath@ the parser reads with @.:@; a Copilot catch on PR #232).
+-- With no keys it is exactly 'propObject', so the objects that require
+-- nothing keep their schema.
+propObjectRequiring :: Text -> Text -> [(Text, Value)] -> [Text] -> (Text, Value)
+propObjectRequiring name desc props required =
   ( name
-  , object
+  , object $
       [ "type"        .= ("object" :: Text)
       , "description" .= desc
       , "properties"  .= object [ Key.fromText k .= v | (k, v) <- props ]
       ]
+      <> [ "required" .= required | not (null required) ]
   )
 
 -- | propArray: an array-valued property whose items share one type.
@@ -1091,9 +1163,12 @@ dispatchToolGuarded cfg lanes name args = do
     dispatch
       | name `elem` registeredToolNames cfg && not (isExposed cfg name) =
           pure . toolError $
-            "agda-mcp: the " <> name <> " tool is not exposed by this server, \
-            \which was started with --expose " <> maybe "" (T.intercalate ",") (scExpose cfg)
-            <> " and presents only those tools."
+            "agda-mcp: the " <> name <> " tool is not exposed by this server, "
+            <> maybe ("which presents it only when --expose names it (search_by_name's \
+                      \inScopeAt asks its question on the default surface).")
+                     (\ns -> "which was started with --expose " <> T.intercalate "," ns
+                              <> " and presents only those tools.")
+                     (scExpose cfg)
       | otherwise = case verbosityOf args of
           Left msg        -> pure $ toolError ("Invalid arguments: " <> msg)
           Right verbosity -> dispatchTool cfg lanes verbosity name args
@@ -1169,13 +1244,16 @@ dispatchTool cfg _lanes v "check_project" args =
       failureToMcp v <$> handleCheckProject (scAgdaConfig cfg) (scGateConfig cfg) p
     Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
--- Search tools (new M1-3)
-dispatchTool cfg _lanes v "search_by_name" args =
+-- Search tools (new M1-3).  search_by_name with inScopeAt is search_in_scope's
+-- question (issue #203), so it takes the lane and that handler.
+dispatchTool cfg lanes v "search_by_name" args =
   case scCorpusIndex cfg of
     Nothing  -> pure $ toolError "No corpus loaded.  Start the server with --corpus <path.jsonl>."
     Just idx ->
       case Aeson.fromJSON args of
-        Aeson.Success p -> pure . eitherToMcp v $ handleSearchByName idx p
+        Aeson.Success p -> case sbnInScopeAt p of
+          Nothing -> pure . eitherToMcp v $ handleSearchByName idx p
+          Just at -> failureToMcp v <$> handleSearchInScope lanes (scAgdaConfig cfg) idx (inScopeParams p at)
         Aeson.Error e   -> pure $ toolError ("Invalid arguments: " <> T.pack e)
 
 dispatchTool cfg _lanes v "search_by_type" args =

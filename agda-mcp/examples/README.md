@@ -79,9 +79,9 @@ Each binding does one job; they are the following:
    library; the worktree's own library comes from the `.agda-lib` in the working
    directory.  `-i .../agda-dojang/agda` makes the `AgdaDojang.Debug` module
    that `get_goal` splices in visible to agda-algebras's Agda.
-+  `--corpus`: turns on the four search tools (`search_by_name`,
-   `search_by_type`, `get_dependencies`, `search_in_scope`).  Without it the
-   server registers 10 tools, not 14.
++  `--corpus`: turns on the search tools (`search_by_name`, `search_by_type`,
+   `get_dependencies`, and `search_in_scope`, which `--expose` must name).
+   Without it the server presents 10 tools, not 13.
 +  `--check-command`: agda-algebras's own gate, `make check`, which regenerates
    the `Everything` aggregators and checks them.  `AGDA=` points it at the same
    Agda; left alone, `make` would run the first `agda` on the server's `PATH`,

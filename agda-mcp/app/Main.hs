@@ -160,7 +160,7 @@ main = do
     Just n | n > 0 -> show n <> "s per project check"
     _              -> "(none)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
-  hPutStrLn stderr $ "  exposed: " <> maybe "(every registered tool)" (T.unpack . T.intercalate ",") (scExpose serverCfg)
+  hPutStrLn stderr $ "  exposed: " <> maybe "(every registered tool but search_in_scope, which --expose can name)" (T.unpack . T.intercalate ",") (scExpose serverCfg)
   hPutStrLn stderr   "  transport: stdio"
   hPutStrLn stderr   "  Waiting for MCP client..."
   runServer serverCfg

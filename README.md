@@ -99,15 +99,16 @@ agda-native-air/
 
 ## Current status
 
-As of September 2026 the following are built, measured, and in use.
+As of October 2026 the following are built, measured, and in use.
 
-+  **`agda-mcp` v0.2.0**.  Fourteen tools over stdio: four proof-state tools
++  **`agda-mcp` v0.2.0**.  Thirteen tools over stdio: four proof-state tools
    (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`), a whole-project
    gate (`check_project`), five live queries answered by a persistent interaction
    lane (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`),
-   and four corpus-backed tools (`search_by_name`, `search_by_type`,
-   `get_dependencies`, and the scope-aware `search_in_scope`), which the server
-   registers only when it is started with a corpus.  Every verdict on a file is the exit code of the `agda` run that
+   and three corpus-backed tools (`search_by_name`, whose `inScopeAt` keeps the
+   names a file can write and says how, `search_by_type`, `get_dependencies`),
+   which the server registers only when it is started with a corpus; a
+   fourteenth, `search_in_scope`, is presented when `--expose` names it.  Every verdict on a file is the exit code of the `agda` run that
    produced it, `check_project` reports the exit code of the project's own gate
    without misreporting it, every response about a file names the tree it
    checked, and a server pointed at the wrong checkout refuses rather than

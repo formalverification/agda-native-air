@@ -11,12 +11,12 @@ File: `agda-native-air/docs/adr/0002-agda-mcp.md`
 
 ## Executive summary
 
-`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent fourteen tools over the pinned `agda`.
+`agda-mcp` is a small Haskell server that speaks the Model Context Protocol over stdio and gives a coding agent thirteen tools over the pinned `agda`, and a fourteenth on request.
 
 +  **Proof-state tools**: `check_file`, `get_diagnostics`, `get_goal`, `fill_hole`.
 +  **Whole-project gate**: `check_project`.
 +  **Live queries**: `type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`.
-+  **Corpus tools**: `search_by_name`, `search_by_type`, `get_dependencies`, and since [#17] phase 1 the scope-aware `search_in_scope`, when started with `--corpus`.
++  **Corpus tools**: `search_by_name`, `search_by_type`, `get_dependencies`, when started with `--corpus`; `search_by_name`'s `inScopeAt` keeps the names a file can write ([#203]), and the scope-aware `search_in_scope` of [#17] phase 1 behind it is presented when `--expose` names it.
 
 This document is the design record: what was decided, the evidence that earned each decision, and what each one still owes.  The deep notes it distills stay where they are, under `docs/agda-mcp/`, and every decision links to its own note.
 
@@ -271,6 +271,12 @@ Issue [#103] made a second consumer project (fls) a client with its own toolchai
 
 **Status**.  Adopted (PR [#44]), unchanged by the [#68] wave.  The forward pointer is [#17] ([M2-3]): corpus-backed retrieval *as server tools*, scope-aware and returning checked terms, whose design map is in that issue's comments and is argued from the consumer-side document's four requirements (checked terms only; scope-awareness through the checker; honest negatives with stated bounds; latency that beats grep-plus-read).  That design is not part of this record.  Its phase 1 landed on 2026-09-15 (PR [#161]): `search_in_scope`, the fourteenth tool, reads the file's import surface off the code-only view, ranks the in-scope rows of the index with the driver's token-overlap scorer, and returns only renderings the interaction lane has typed in the file's scope, with an honesty ledger on every response; the contract is the issue's comment of that date, and phase 2 (`search_term`) stays open on [#17].
 
+**Search in scope, folded into search by name ([#203])**.  `search_in_scope` answers a question no other tool can, which names this file can write and how, and over the 51 archived agent-bench runs it was presented in 681 sessions and called once, while its `tools/list` entry was 4,056 of the 24,094 characters every server session carries on every turn (17 %).  Its description opened with the answer's field list and never named that question.
+
++  **Decision**.  The question moves to the search tool subjects already call: `search_by_name` takes `inScopeAt: {filePath, line?, column?, reload?}`, and with it the call is `search_in_scope`'s, the pattern its name query, answered by the same handler on the interaction lane (only the names the file can write, each rendering typed there, and the ledger).  `search_in_scope` stays registered and leaves the default surface: a server presents it only when `--expose` names it, with the type-token and goal-derived queries, exclusions, and probe budget that `inScopeAt` does not offer and that phase 2 of [#17] builds on.  A rewrite of its description would have kept the per-turn cost and bet on wording; a removal would have dropped the answer while subjects kept failing `NotInScope` probes.
++  **Evidence**.  Of the 681 sessions, 286 asked the question some other way: `search_by_name` in 103, `exports_of` in 103, `grep` in 137, and 29 calls failed with `NotInScope`.  17 of those questions, replayed through `search_in_scope` at their obligations' holes with the subjects' flags and corpora, got a spelling Agda typed in the file's scope (11, three of them only qualified, which is what the `NotInScope` probes had missed), the honest "exists, not imported" (3), a corpus row the library refused (1), or noise from a three- to six-letter pattern (2); the answers were no larger than `search_by_name`'s (median 2,675 characters against 3,535), and the first call paid the lane's load, 0.8 to 11.4 s.  Through `search_by_name` with `inScopeAt` the same calls answer field for field as `search_in_scope` did, but for `checkedFromSource`, which a second call on a loaded file reads as false.  The default surface fell from fourteen tools to thirteen and from 24,094 characters of `tools/list` to 21,946 (the instructions from 1,981 to 2,005, naming `search_by_name`'s `inScopeAt` among the lane's answers and scoping "every answer names the tree" to answers about a file).  Evidence comment on [#203].
++  **Status**.  Adopted ([#203]).  Whether `inScopeAt` is used is the re-run arm's question, on [#203].
+
 ---
 
 ## 11.  Environment and registration
@@ -360,6 +366,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 | 18 | Corpus tools are pure in-memory lookups, registered only with `--corpus` | Adopted ([#11], PR [#44]) | 1.4 s load, 308 MB resident at library scale |
 | 19 | A hand-rolled stdio transport (`initialize`, `tools/list`, `tools/call`) rather than the `mcp-server` package | Adopted; reason revisited | The GHC-floor reason expired; kept because it is small |
 | 20 | What every tool shares is stated once, in the `initialize` instructions; each description carries its own contract, under the 2,048 characters a client reads; `--expose` presents a subset | Adopted ([#191], PR [#193]) | Claude Code 2.1.282 cut 11 of 14 descriptions (27,808 characters unseen); the surface fell from 16,230 to 9,217 tokens a turn on Sonnet 5; arms cost 17 to 19 % less; four tools alone read the library instead of searching it and cited less (§ 3) |
+| 24 | `search_in_scope`'s question asked through `search_by_name`'s `inScopeAt` (same handler, the pattern as the name query); `search_in_scope` registered and presented only when `--expose` names it | Adopted ([#203]) | Presented in 681 archived sessions, called once, 17 % of every turn's `tools/list`; 286 sessions asked the question other ways; 17 replays answered by it |
 
 ---
 
@@ -371,7 +378,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
    + its children [#69], [#70], [#71], [#72], [#73], [#74], [#75], [#76], [#77], [#78], [#79];
    + the follow-on fixes [#100], [#101], [#103], [#106], [#108], [#114], [#115], [#133];
    + the companions [#83] (M1-7), [#85] (M1-8), [#14] (M1-6);
-   + the forward pointer [#17] (M2-3);
+   + the forward pointer [#17] (M2-3), and [#203] (its scope-aware tool folded into `search_by_name`);
    + Milestone 5, [#134], [#135], [#136], [#137], [#138], [#139], [#145], [#146], [#147];
    + the ancestry [#10] (M1-2), [#11] (M1-3), [#66].
 
@@ -467,6 +474,7 @@ The field record is a set of sessions in which an agent chose what to do; § 12'
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
 [#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#203]: https://github.com/formalverification/agda-native-air/issues/203
 [#193]: https://github.com/formalverification/agda-native-air/pull/193
 [#222]: https://github.com/formalverification/agda-native-air/pull/222
 [#148]: https://github.com/formalverification/agda-native-air/issues/148
