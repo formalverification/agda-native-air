@@ -239,6 +239,8 @@ figures the new runs replace.
 | `cost-answers-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 2 | 2 | 0 | 0 of 1 | 0 | 14 | 12 | 0.17 | the cost pairs on [#185] and [#201] |
 | `hard-answers-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-10-03 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 127 | 113 | 6.34 | [#185], [#201], PRs [#228] and [#229] |
 | `suite-answers-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 55 | 47 | 6 | 5 of 15 | 0 | 332 | 277 | 3.56 | [#185], [#201], PRs [#228] and [#229] |
+| `cost202-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 2 | 1 | 1 | 0 of 0 | 0 | 10 | 8 | 0.20 | the cost pair on [#202], [#203] |
+| `arm202-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 55 | 43 | 9 | 3 of 11 | 0 | 317 | 262 | 3.54 | [#202], [#203], PRs [#231], [#232] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -791,6 +793,70 @@ run was resumed after the reset with the same protocol.
    spread of the older pair (48 and 45, 7 and 8): one seed each, the solve
    counts are within it, the tool mix is not.
 
+## The search-surface arm (2026-10-03, [#202], [#203])
+
+One Sonnet 5 `mcp` arm on the 55 rows of the header-free arms, with a server
+that carries both changes: `search_by_type` matching a type as a statement
+writes it, with `patterns` and `qualified` ([#202], PR [#231]), and
+`search_in_scope`'s question asked through `search_by_name`'s `inScopeAt`,
+with `search_in_scope` itself off the default surface ([#203], PR [#232]).
+The server was built from `main` with the two branches merged locally (at
+`a18002c2` and `b7ae7730`), which the suite passes, 524 of 524; it predates
+[#202]'s later commit that gives builtins the standard library's names, which
+this arm's one `search_by_type` call is what found.  After a two-row cost pair
+with a clean isolation audit, at parallelism 3, the caps of every 55-row arm,
+and client 2.1.282.
+
+Against `suite219-sonnet5-mcp-1` the server is the only variable: the
+prompts (`5dae33ff`, `6ea5a0b3`), the index (`62092c1d`), the corpora, the
+judge's extractor (`004b79b6`), the caps, the client, and the read roots are
+that run's, and nothing else in the server or the harness changed on `main`
+between the two.  Against the two [#191] seeds (`arm-surface-mcp-1`, `-2`)
+the fixture headers differ as well: those ran with the hints [#219] removed,
+on the index `ace10e29`.
+
+| | `arm-surface-mcp-1` | `arm-surface-mcp-2` | `suite219-sonnet5-mcp-1` | `arm202-sonnet5-mcp-1` |
+|---|---:|---:|---:|---:|
+| header hints | in view | in view | none | none |
+| tools presented | 14 | 14 | 14 | 13 |
+| `tools/list` characters | 24,094 | 24,094 | 24,094 | 23,468 |
+| first-turn context (tokens, median) | 13,037 | 13,037 | 13,124 | 12,835 |
+| cached tokens per turn | 15,503 | 14,293 | 15,491 | 14,433 |
+| solved / restated | 48 / 7 | 45 / 8 | 44 / 9 | 43 / 9 |
+| turns / tool calls | 345 / 290 | 349 / 294 | 347 / 292 | 317 / 262 |
+| USD | 3.83 | 3.74 | 3.99 | 3.54 |
+| `search_by_type`: sessions / calls | 2 / 3 | 2 / 2 | 2 / 2 | 1 / 1 |
+| `search_by_name`: sessions / calls | 15 / 23 | 13 / 20 | 17 / 21 | 8 / 10 |
+| of which with `inScopeAt` | not offered | not offered | not offered | 2 / 2 |
+| `search_in_scope`: calls | 0 | 0 | 0 | not presented |
+
++  **`search_by_type` is still not reached for**: one session of 55 called
+   it, where two had in each of the three runs before.  That one call wrote
+   a statement as the standard library writes it, `m + n ∸ o ≡ m + (n ∸ o)`,
+   on `haystack-nat-plus-monus-assoc`, and found nothing, because the corpus
+   prints `∸` by its builtin name (`Agda.Builtin.Nat.-`); the subject then
+   found `+-∸-assoc` by name and solved the row.  PR [#231]'s later commit
+   renders the standard library's names for builtins, and the same query
+   now finds exactly that lemma.  The matching works on the query a model
+   wrote; how often a model writes one is unchanged by it.
++  **`inScopeAt` was used where `search_in_scope` was not**: two of the ten
+   `search_by_name` calls carried it (`∷-injective` on
+   `haystack-list-cons-injective-head`, `*-mono-≤` on
+   `haystack-nat-mul-mono-sq`), against no call of `search_in_scope` in the
+   baseline and one in the 681 archived sessions it was offered in.
++  **The surface is smaller and the arm cheaper, within one seed's noise**:
+   289 fewer tokens in the first turn's context, about a thousand fewer
+   cached tokens a turn, 30 fewer turns, and USD 0.45 less than the
+   baseline.  `search_by_name` was called half as often (10 against 21),
+   which one seed cannot separate from chance.
++  **The verdicts are the baseline's, within a seed**: 43 solved and 9
+   restated against 44 and 9; 12 of 12 haystack rows and 11 of 21
+   agda-algebras rows solved, as in the baseline, though one row moved each
+   way there (`algebras-kernels-ker-in-con` now solved,
+   `algebras-inverses-inv-inverse-l` now restated); and the one row fewer
+   is a third preservation gate (`stdlib-nat-plus-comm`, an edited `using`
+   list, beside the two the baseline also had).
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -882,3 +948,7 @@ new run gets a new run id.
 [#201]: https://github.com/formalverification/agda-native-air/issues/201
 [#228]: https://github.com/formalverification/agda-native-air/pull/228
 [#229]: https://github.com/formalverification/agda-native-air/pull/229
+[#202]: https://github.com/formalverification/agda-native-air/issues/202
+[#203]: https://github.com/formalverification/agda-native-air/issues/203
+[#231]: https://github.com/formalverification/agda-native-air/pull/231
+[#232]: https://github.com/formalverification/agda-native-air/pull/232

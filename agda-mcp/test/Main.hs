@@ -12,7 +12,9 @@
 --      flavours) and the code-only view every declaration scan reads
 --      (issue #100: the module name each fixture declares, and the plain
 --      .agda one whose block comment declares another); 1b: corpus loading,
---      search_by_name, search_by_type, get_dependencies; 1c: `--timeout`
+--      search_by_name, search_by_type, get_dependencies; 1l: search_by_type
+--      as a statement is written (#202), on two fixtures cut from the pinned
+--      corpora; 1c: `--timeout`
 --      enforcement (subprocess, but no *Agda*), driven by the
 --      `fake-slow-agda.sh` stand-in binary so it runs anywhere; 1d: the
 --      response echo and root resolution (#72/#76);
@@ -154,6 +156,7 @@ import AgdaMCP.Retrieval
   , queryTokensOf, rank, score, splitTopLevelArrows, tokens )
 import qualified Data.Set as Set
 import AgdaMCP.Types
+import AgdaMCP.Written (Item (..), builtinNames, opParts, parseItems, unqualify, writtenTable, writtenDisplay, fragmentKey)
 
 
 -- ---------------------------------------------------------------------------
@@ -2135,17 +2138,17 @@ corpusTests = do
         in assert ("got " <> show (length results)) (length results >= 3)
       -- search_by_type
     , withCorpus "search_by_type: 'Algebra' in type finds ≥10" $ \idx ->
-        let results = searchByType "Algebra" Nothing idx
+        let results = searchByType ["Algebra"] Nothing idx
         in assert ("got " <> show (length results)) (length results >= 10)
     , withCorpus "search_by_type: '→ Domain' finds ≥1" $ \idx ->
-        let results = searchByType "→ Domain" Nothing idx
+        let results = searchByType ["→ Domain"] Nothing idx
         in assert ("got " <> show (length results)) (length results >= 1)
     , withCorpus "search_by_type: 'Monad' finds 0" $ \idx ->
-        let results = searchByType "Monad" Nothing idx
+        let results = searchByType ["Monad"] Nothing idx
         in assert "should be empty" (null results)
     , withCorpus "search_by_type: case insensitive" $ \idx ->
-        let upper = searchByType "SET" Nothing idx
-            lower = searchByType "set" Nothing idx
+        let upper = searchByType ["SET"] Nothing idx
+            lower = searchByType ["set"] Nothing idx
         in assertEqual "count should match" (length upper) (length lower)
       -- get_dependencies
     , withCorpus "get_dependencies: ∘-hom depends on Algebra and hom" $ \idx ->
@@ -2188,7 +2191,8 @@ corpusTests = do
              Left err -> pure (Fail $ T.unpack err)
              Right rs -> assert ("got " <> show (length rs)) (length rs >= 2)
     , withCorpus "handleSearchByType: 'Pred' finds ≥1" $ \idx ->
-        let params = SearchByTypeParams { sbtPattern = "Pred", sbtLimit = Just 5 }
+        let params = SearchByTypeParams
+              { sbtPattern = Just "Pred", sbtPatterns = Nothing, sbtLimit = Just 5, sbtQualified = Nothing }
         in case handleSearchByType idx params of
              Left err -> pure (Fail $ T.unpack err)
              Right rs -> assert ("got " <> show (length rs)) (length rs >= 1)
@@ -2199,6 +2203,273 @@ corpusTests = do
              Left err -> pure (Fail $ T.unpack err)
              Right dep -> assert "should depend on Term"
                ("Term" `elem` depDependencies dep)
+    ]
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 1l: search_by_type as a statement is written (issue #202), no Agda
+--
+-- Two fixtures cut from the pinned corpora, each every row of the modules
+-- named below (the parameter count is read off a module's own rows, so a
+-- module is taken whole) plus a few single rows, with typeAst and body
+-- dropped:
+--
+--   corpus-written-algebras.jsonl, from agda-algebras v0.1 (SHA-256 af864432):
+--     Group-Op, Commutator, Conjugate, AbelianGroup-Op (Classical.Structures.
+--     Group.*), Classical.Structures.Group.Basic, Setoid.Algebras.Basic; and
+--     Legacy.Base.Homomorphisms.Properties.∘-hom, Setoid.Functions.Basic.𝑖𝑑
+--     (the binder that makes Relation.Binary.Bundles.Setoid a record here,
+--     as other rows do in the whole corpus).
+--   corpus-written-stdlib.jsonl, from agda-stdlib v0 (SHA-256 14e0d47e):
+--     Algebra.Properties.AbelianGroup (and its anonymous module),
+--     Algebra.Properties.Group, Algebra.Bundles.AbelianGroup,
+--     Algebra.Bundles.Group, Algebra.Definitions, Function.Base; and
+--     Data.List.Properties.map-∘, Data.Nat.Properties.+-comm,
+--     m+n≤o⇒m≤o, and +-∸-assoc.
+--
+-- The acceptance of #202 is here: queries written as #189's statements are
+-- written find the lemmas its novelty tables cite (⁻¹-∙-comm, conj-∙-hom,
+-- and the lemmas stated with [_⸴_]), and the same queries find nothing
+-- under qualified: true, the match from before.
+-- ---------------------------------------------------------------------------
+
+writtenAlgebrasPath, writtenStdlibPath :: FilePath
+writtenAlgebrasPath = "test/resources/corpus-written-algebras.jsonl"
+writtenStdlibPath   = "test/resources/corpus-written-stdlib.jsonl"
+
+-- | Load one written fixture and run a test against its index.
+withWritten :: FilePath -> String -> (CorpusIndex -> IO TestResult) -> IO Bool
+withWritten path name f = runTest name $ do
+  result <- loadCorpus path
+  case result of
+    Left err  -> pure (Fail $ "loadCorpus failed: " <> T.unpack err)
+    Right idx -> f idx
+
+-- | A search_by_type call through the handler, as the wire parses it.
+typeSearch :: CorpusIndex -> Maybe Text -> Maybe [Text] -> Maybe Int -> Maybe Bool
+            -> Either Text [SearchResult]
+typeSearch idx p ps lim q = handleSearchByType idx (SearchByTypeParams p ps lim q)
+
+-- | The bare names of a list of hits.
+bareNames :: [SearchResult] -> [Text]
+bareNames = map (snd . T.breakOnEnd "." . srPrettyQname)
+
+-- | A one-row entry for an in-memory corpus.
+writtenEntry :: Text -> Text -> Text -> Text -> CorpusEntry
+writtenEntry m n kind ty = CorpusEntry
+  { ceFile = "M.agda", ceModule = m, ceName = n, ceQname = m <> "." <> n
+  , cePrettyModule = m, cePrettyName = n, cePrettyQname = m <> "." <> n
+  , ceType = ty, ceTypeAstVer = "0.3-v0", ceDefKind = kind
+  , ceDependencies = [], ceAstSize = T.length ty, ceHasBody = True }
+
+-- | A small corpus with one parameterized module (Q, parameter G : R.Rec),
+-- whose operator _⁻¹ takes the parameter, and a record R.Rec with no rows
+-- of its own, whose field operator the rendering has to recognize by its
+-- qualifier alone.
+syntheticTable :: WrittenTable
+syntheticTable = writtenTable
+  [ writtenEntry "Q" "_⁻¹" "function" "(G : R.Rec) → R.Rec.Carrier G → R.Rec.Carrier G"
+  , writtenEntry "Q" "lemma" "function" "(G : R.Rec) (x : R.Rec.Carrier G) → (G R.Rec.≈ (G Q.⁻¹) x) x"
+  , writtenEntry "Q" "other" "function" "(G : R.Rec) → R.Rec.Carrier G"
+  , writtenEntry "F" "F" "function" "{A : Set} → A → A → Set"
+  ]
+
+writtenSearchTests :: IO [Bool]
+writtenSearchTests = do
+  hPutStrLn stderr "\n── search_by_type as written (tier 1l: no Agda, #202) ──"
+  sequence
+    [ runTest "opParts: infix, closed, postfix; a plain name and bare holes are not operators" $
+        assertEqual "parts"
+          [ Just [Hole, Name "∙", Hole], Just [Name "[", Hole, Name "⸴", Hole, Name "]"]
+          , Just [Hole, Name "⁻¹"], Nothing, Nothing, Nothing ]
+          (map opParts ["_∙_", "[_⸴_]", "_⁻¹", "conj", "_", "__"])
+
+    , runTest "unqualify: the last segment; a postfix projection keeps its dot" $
+        assertEqual "bare"
+          ["∙", ".fst", "x", "_≈_", "𝓞"]
+          (map unqualify ["Algebra.Bundles.Group.∙", ".Agda.Builtin.Sigma.Σ.fst", "x"
+                         , "Algebra.Bundles.Group._≈_", "𝑆.𝓞"])
+
+    , runTest "parseItems: an unmatched bracket either way is kept as a token" $
+        assertEqual "items"
+          [ [Tok "(", Tok "a"], [Tok "a", Tok ")"], [Grp "(" [Tok "a", Grp "{" [Tok "b"] "}"] ")"] ]
+          (map (parseItems . tokens) ["( a", "a )", "(a {b})"])
+
+    , runTest "fragmentKey: brackets, qualifiers, spacing, case, and -> fold away" $
+        assertEqual "keys"
+          ["x ∙ y ⁻¹", "commutative _≈_ _∙_", "hom 𝑨 𝑩 → hom 𝑩 𝑪"]
+          (map fragmentKey ["(x ∙ y)⁻¹", "Algebra.Definitions.Commutative  _≈_ _∙_", "hom 𝑨 𝑩 -> hom 𝑩 𝑪"])
+
+    , runTest "fragmentKey: an unmatched bracket drops as a matched one does" $
+        assertEqual "keys"
+          ["magmahomomorphism a b", "r : magmahomomorphism a b", "y ⁻¹ ≈ x", ""]
+          (map fragmentKey ["MagmaHomomorphism A B)", "(r : MagmaHomomorphism A B", "y)⁻¹ ≈ x", "( {"])
+
+    , runTest "a section with its parameter in the first hole reads as written" $
+        assertEqual "lemma"
+          "(G : Rec) (x : Carrier) → (x ⁻¹) ≈ x"
+          (writtenDisplay syntheticTable "(G : R.Rec) (x : R.Rec.Carrier G) → (G R.Rec.≈ (G Q.⁻¹) x) x")
+
+    , runTest "a section passed as an argument takes no argument after it" $
+        -- (G Q.⁻¹) is F's first argument, so z is F's second, not ⁻¹'s.
+        assertEqual "partial"
+          "F _⁻¹ z"
+          (writtenDisplay syntheticTable "F.F (G Q.⁻¹) z")
+
+    , runTest "a one-row module nested in a record's module takes the record value; any other keeps its argument" $
+        -- R.Rec.Eq has one function row, as DecStrictPartialOrder.Eq does in
+        -- the standard library; Q2 has one too and nests in no record, so
+        -- nothing says where its telescope ends (a Copilot catch on PR #231:
+        -- the stated limit).
+        let t = writtenTable
+              [ writtenEntry "R.Rec" "Carrier" "function" "(r : R.Rec) → Set"
+              , writtenEntry "R.Rec" "op" "function" "(r : R.Rec) → Set"
+              , writtenEntry "R.Rec.Eq" "decSetoid" "function" "(r : R.Rec) → D.D"
+              , writtenEntry "Q2" "f" "function" "(G : R.Rec) → D.D"
+              ]
+        in  assertEqual "written"
+              ["decSetoid", "f G"]
+              (map (writtenDisplay t) ["R.Rec.Eq.decSetoid r", "Q2.f G"])
+
+    , runTest "a shape the rules do not know is left as printed, never dropped" $
+        -- An operator with an empty operand cannot be a section.
+        assertEqual "as printed"
+          "(≈ x) y"
+          (writtenDisplay syntheticTable "(R.Rec.≈ x) y")
+
+    , withWritten writtenAlgebrasPath "parameterCounts: Group-Op, Commutator, conj-syntax take 𝒢; 𝕌[_] takes nothing" $ \idx ->
+        let ps q = niParams <$> Map.lookup q (wtNames (ciWrittenTable idx))
+        in  assertEqual "counts"
+              [Just 1, Just 1, Just 1, Just 0]
+              (map ps [ "Classical.Structures.Group.Basic.Group-Op._∙_"
+                      , "Classical.Structures.Group.Commutator.Commutator.[_⸴_]"
+                      , "Classical.Structures.Group.Conjugation.Conjugate.conj-syntax"
+                      , "Setoid.Algebras.Basic.𝕌[_]" ])
+
+    , withWritten writtenStdlibPath "parameterCounts: a bundle's fields take it; an operation parameter and _∘_ are kept" $ \idx ->
+        let ps q = niParams <$> Map.lookup q (wtNames (ciWrittenTable idx))
+        in  assertEqual "counts"
+              [Just 1, Just 1, Just 0, Just 0]
+              (map ps [ "Algebra.Bundles.AbelianGroup._≈_"
+                      , "Algebra.Bundles.Group._∙_"
+                      , "Algebra.Definitions.Commutative"
+                      , "Function.Base._∘_" ])
+
+    , withWritten writtenStdlibPath "every row has a key, and the statements read as written" $ \idx ->
+        let key q = Map.lookup q (ciWrittenKeys idx)
+            has q k = maybe False (k `T.isInfixOf`) (key q)
+        in  assert "keys"
+              ( Map.size (ciWrittenKeys idx) == ciSize idx
+              && has "Algebra.Properties.AbelianGroup.⁻¹-∙-comm" "x ⁻¹ ∙ y ⁻¹ ≈ x ∙ y ⁻¹"
+              && has "Data.Nat.Properties.+-comm" "commutative _≡_ _+_"
+              && has "Data.List.Properties.map-∘" "map g ∘ f ≗ map g ∘ map f" )
+
+    , withWritten writtenStdlibPath "the standard library's names for builtins: ∸ and ℕ, as the arm's one query wrote them" $ \idx ->
+        -- The corpus prints Agda.Builtin.Nat.- and Agda.Builtin.Nat.Nat; the
+        -- subject of #202's arm wrote this, and found nothing before the
+        -- renamings were applied.
+        allOf
+          [ assertEqual "∸"
+              (Right ["Data.Nat.Properties.+-∸-assoc"])
+              (map srPrettyQname <$> typeSearch idx (Just "m + n ∸ o ≡ m + (n ∸ o)") Nothing Nothing Nothing)
+          , assert "ℕ in the written form"
+              (maybe False ("(m : ℕ)" `T.isInfixOf`)
+                 (srWritten =<< listToMaybe (either (const []) id
+                    (typeSearch idx (Just "m + n ≤ o") Nothing Nothing Nothing))))
+          , assertEqual "unqualified otherwise" "∸" (Map.findWithDefault "" "Agda.Builtin.Nat.-" builtinNames)
+          ]
+
+    , withWritten writtenStdlibPath "acceptance: ⁻¹-∙-comm from its statement as written, first" $ \idx ->
+        case typeSearch idx (Just "x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹") Nothing Nothing Nothing of
+          Left err -> pure (Fail (T.unpack err))
+          Right rs -> assertEqual "first hit"
+            (Just ("Algebra.Properties.AbelianGroup.⁻¹-∙-comm", True))
+            (fmap (\r -> (srPrettyQname r, isJust (srWritten r))) (listToMaybe rs))
+
+    , withWritten writtenStdlibPath "acceptance: row 3's two fragments together find ⁻¹-∙-comm" $ \idx ->
+        case typeSearch idx Nothing (Just ["(x ∙ y) ⁻¹", "x ⁻¹ ∙ y ⁻¹"]) Nothing Nothing of
+          Left err -> pure (Fail (T.unpack err))
+          Right rs -> assert ("got " <> show (map srPrettyQname rs))
+            ("Algebra.Properties.AbelianGroup.⁻¹-∙-comm" `elem` map srPrettyQname rs)
+
+    , withWritten writtenStdlibPath "acceptance: the same statement finds nothing under qualified: true" $ \idx ->
+        assertEqual "qualified"
+          (Right [])
+          (map srPrettyQname <$> typeSearch idx (Just "x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹") Nothing Nothing (Just True))
+
+    , withWritten writtenStdlibPath "qualified: true is the old substring match, in name order, with no written field" $ \idx ->
+        let pat = "Algebra.Definitions.Commutative"
+            expected = [ cePrettyQname e | e <- Map.elems (ciEntries idx)
+                       , T.toLower pat `T.isInfixOf` T.toLower (ceType e) ]
+        in  case typeSearch idx (Just pat) Nothing (Just 2000) (Just True) of
+              Left err -> pure (Fail (T.unpack err))
+              Right rs -> assert ("got " <> show (map srPrettyQname rs))
+                (not (null expected) && map srPrettyQname rs == expected
+                 && all (isNothing . srWritten) rs)
+
+    , withWritten writtenStdlibPath "Commutative _≈_ _∙_ meets the bundle's printing (_≈_ G) (_∙_ G)" $ \idx ->
+        case typeSearch idx (Just "Commutative _≈_ _∙_") Nothing Nothing Nothing of
+          Left err -> pure (Fail (T.unpack err))
+          Right rs -> assert ("got " <> show (map srPrettyQname rs))
+            ("Algebra.Properties.Group.comm⇒\\\\≗flip-//" `elem` map srPrettyQname rs)
+
+    , withWritten writtenAlgebrasPath "acceptance: [ x ⸴ y ] finds every lemma stated with the commutator" $ \idx ->
+        case typeSearch idx (Just "[ x ⸴ y ]") Nothing Nothing Nothing of
+          Left err -> pure (Fail (T.unpack err))
+          Right rs -> assertEqual "lemmas"
+            (sort [ "commutator-cong", "commutator-εʳ", "commutator-εˡ", "commutator≈ε→commutes"
+                  , "commutes→commutator≈ε", "¬commutes→commutator≉ε" ])
+            (sort (bareNames rs))
+
+    , withWritten writtenAlgebrasPath "acceptance: [ x ⸴ y ] under qualified: true finds none; Commutator.[ finds the same six" $ \idx ->
+        assertEqual "counts"
+          (Right 0, Right 6)
+          ( length <$> typeSearch idx (Just "[ x ⸴ y ]") Nothing Nothing (Just True)
+          , length <$> typeSearch idx (Just "Commutator.[") Nothing Nothing (Just True) )
+
+    , withWritten writtenAlgebrasPath "acceptance: conj with x ∙ y is conj-∙-hom alone" $ \idx ->
+        assertEqual "hits"
+          (Right ["Classical.Structures.Group.Conjugation.Conjugate.conj-∙-hom"])
+          (map srPrettyQname <$> typeSearch idx Nothing (Just ["conj", "x ∙ y"]) Nothing Nothing)
+
+    , withWritten writtenAlgebrasPath "the issue's example: x ∙ y ≈ y ∙ x finds the commutative law" $ \idx ->
+        assertEqual "hits"
+          (Right ["Classical.Structures.Group.AbelianGroup.AbelianGroup-Op.comm-law"])
+          (map srPrettyQname <$> typeSearch idx (Just "x ∙ y ≈ y ∙ x") Nothing Nothing Nothing)
+
+    , withWritten writtenAlgebrasPath "the shortest statements come first, and limit bounds the answer" $ \idx ->
+        case ( typeSearch idx (Just "≈") Nothing (Just 1000) Nothing
+             , typeSearch idx (Just "≈") Nothing (Just 3) Nothing ) of
+          (Right allRs, Right three) ->
+            let len r = maybe 0 T.length (Map.lookup (srPrettyQname r) (ciWrittenKeys idx))
+                lens  = map len allRs
+            in  assert ("lengths " <> show (take 6 lens) <> ", limited " <> show (length three))
+                  (lens == sort lens && length three == 3 && three == take 3 allRs)
+          (a, b) -> pure (Fail (show (fmap length a, fmap length b)))
+
+    , withWritten writtenAlgebrasPath "refusals: no fragment, and a fragment of brackets alone" $ \idx ->
+        assert "both refused"
+          ( isLeft (typeSearch idx Nothing Nothing Nothing Nothing)
+          && isLeft (typeSearch idx Nothing (Just []) Nothing Nothing)
+          && isLeft (typeSearch idx (Just "( )") Nothing Nothing Nothing) )
+
+    , runTest "SearchByTypeParams: patterns and qualified parse; a non-boolean qualified is refused" $
+        let ok  = Aeson.decode "{\"patterns\":[\"a\",\"b\"],\"qualified\":true,\"limit\":3}" :: Maybe SearchByTypeParams
+            bad = Aeson.decode "{\"pattern\":\"a\",\"qualified\":\"yes\"}" :: Maybe SearchByTypeParams
+        in  assertEqual "parsed"
+              (Just (SearchByTypeParams Nothing (Just ["a", "b"]) (Just 3) (Just True)), Nothing)
+              (ok, bad)
+
+    , withWritten writtenStdlibPath "the answer: written after type, absent from search_by_name's hits" $ \idx ->
+        case typeSearch idx (Just "m + n ≤ o") Nothing Nothing Nothing of
+          Right (r : _) ->
+            let keysOf v = case v of
+                  Aeson.Object o -> map Key.toText (KM.keys o)
+                  _              -> []
+            in  assert "keys"
+                  ( "written" `elem` keysOf (Aeson.toJSON r)
+                  && all (notElem "written" . keysOf . Aeson.toJSON) (searchByName "comm" Nothing idx) )
+          other -> pure (Fail (show (fmap (map srPrettyQname) other)))
     ]
 
 
@@ -9073,6 +9344,8 @@ main = do
   holeResults <- holeModelTests
   -- Tier 1b: corpus / search tests (no Agda, but needs fixture file).
   corpusResults <- corpusTests
+  -- Tier 1l: search_by_type as a statement is written (#202).
+  writtenResults <- writtenSearchTests
   -- Tier 1c: timeout enforcement, driven by a fake agda (no real Agda needed).
   timeoutResults <- timeoutTests
   -- Tier 1d: the response echo and root resolution (#72/#76).  Runs *after*
@@ -9163,7 +9436,7 @@ main = do
     Just (cfg, _fixture, repoRoot) -> autoLaneTests cfg repoRoot
 
   let allResults =
-        pureResults <> diagResults <> holeResults <> corpusResults
+        pureResults <> diagResults <> holeResults <> corpusResults <> writtenResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
           <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
           <> declResults <> autoResults
