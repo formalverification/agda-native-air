@@ -9,7 +9,9 @@
 --
 --   * pair: solved from the context alone, as m , n.
 --   * plusZero: no solution, since the search does no induction; with the
---     hint lemma it answers lemma m.
+--     hint lemma it answers lemma m.  Its other hints are the ones the tool
+--     refuses before the search runs: m, a variable of the hole's context,
+--     and one, a pattern synonym, both of which the search would drop.
 --   * spread: the term Agda prints runs past its line width, so it arrives
 --     across three lines with each continuation at column 1, which a splice
 --     as printed cannot absorb.
@@ -37,6 +39,8 @@ cong f refl = refl
 lemma : (n : Nat) → n + 0 ≡ n
 lemma zero    = refl
 lemma (suc n) = cong suc (lemma n)
+
+pattern one = suc zero
 
 plusZero : (m : Nat) → m + 0 ≡ m
 plusZero m = {!!}

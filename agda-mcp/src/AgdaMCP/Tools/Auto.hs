@@ -26,6 +26,9 @@
 --
 --   * The options are built from declared fields ('autoOptions'), so no free
 --     text reaches Agda's option reader, and the string sent is echoed back.
+--   * Each hint is put to Agda's scope query at the hole before the search
+--     runs ('checkHints'), and a hint the search would drop without a word,
+--     or could not read at all, refuses the call by name.
 --   * A found term is joined onto one line ('joinRendering').  Agda's printer
 --     breaks a long term across lines and starts each continuation at column
 --     1, and a batch splice of the text as printed ends the declaration at
@@ -60,10 +63,12 @@ module AgdaMCP.Tools.Auto
   , joinRendering
   , notInScopeName
   , classifyAuto
+  , unusableHint
   , resetAware
   , withResetEvidence
   ) where
 
+import Data.List (nub)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -72,8 +77,8 @@ import AgdaMCP.Agda (AgdaConfig (..))
 import AgdaMCP.Holes (ResolvedHole (..), flavourOf, resolveHoleRef)
 import AgdaMCP.Interaction
 import AgdaMCP.Tools.LiveQueries
-  ( LiveCtx (..), interactionFailure, liveMeta, loadError, pointForHole
-  , withLiveFile )
+  ( LiveCtx (..), interactionFailure, liveMeta, loadError, opaqueAnswer
+  , pointForHole, queryError, runShaped, whyInScopeMessageOf, withLiveFile )
 import AgdaMCP.Types
 
 -- | handleAuto: run the search at the addressed hole and shape the answer.
@@ -98,31 +103,41 @@ handleAuto lanes cfg0 p = case boundProblem of
                 \at hole " <> T.pack (show idx) <> " of " <> T.pack (lcAbsPath ctx)
                 <> ", so the search was not run rather than run at another hole"
               Just point -> do
-                ran <- autoAt (lcHandle ctx) (lcAbsPath ctx)
-                         (agdaFlags (lcConfig ctx)) (ipId point) opts
-                case ran of
-                  Left lf -> Left . FailInteraction
-                               <$> interactionFailure (lcProject ctx) (lcConfig ctx)
-                                                      (lcStartNs ctx) lf
-                  Right run -> do
-                    meta0 <- liveMeta ctx
-                    let meta = meta0
-                          { lmCheckedFromSource = withResetEvidence
-                              (lmCheckedFromSource meta0) (lrCheckedFromSource <$> auReset run) }
-                        (outcome, term, message, err) =
-                          resetAware (auReset run) (classifyAuto (apHints p) (auAnswer run))
-                    pure . Right $ AutoResult
-                      { aurOutcome  = outcome
-                      , aurTerm     = term
-                      , aurMessage  = message
-                      , aurError    = err
-                      , aurOptions  = opts
-                      , aurSearchMs = Just (auSearchUs run `div` 1000)
-                      , aurResetMs  = (`div` 1000) <$> auResetUs run
-                      , aurMeta     = meta
-                      }
+                checked <- checkHints ctx (ipId point) (apHints p)
+                case checked of
+                  Left tf -> pure (Left tf)
+                  Right (Just refusal) -> do
+                    meta <- liveMeta ctx
+                    pure . Right $ AutoResult OutcomeError Nothing Nothing
+                      (Just refusal) opts Nothing Nothing meta
+                  Right Nothing -> search ctx point
   where
     opts = autoOptions p
+
+    search ctx point = do
+      ran <- autoAt (lcHandle ctx) (lcAbsPath ctx)
+               (agdaFlags (lcConfig ctx)) (ipId point) opts
+      case ran of
+        Left lf -> Left . FailInteraction
+                     <$> interactionFailure (lcProject ctx) (lcConfig ctx)
+                                            (lcStartNs ctx) lf
+        Right run -> do
+          meta0 <- liveMeta ctx
+          let meta = meta0
+                { lmCheckedFromSource = withResetEvidence
+                    (lmCheckedFromSource meta0) (lrCheckedFromSource <$> auReset run) }
+              (outcome, term, message, err) =
+                resetAware (auReset run) (classifyAuto (apHints p) (auAnswer run))
+          pure . Right $ AutoResult
+            { aurOutcome  = outcome
+            , aurTerm     = term
+            , aurMessage  = message
+            , aurError    = err
+            , aurOptions  = opts
+            , aurSearchMs = Just (auSearchUs run `div` 1000)
+            , aurResetMs  = (`div` 1000) <$> auResetUs run
+            , aurMeta     = meta
+            }
 
     -- The search's bound must end before the lane's own deadline does; a
     -- missing or non-positive --timeout is no deadline, the batch lane's
@@ -134,6 +149,78 @@ handleAuto lanes cfg0 p = case boundProblem of
         \that long could only end in the lane being killed. Ask for less than "
         <> T.pack (show (secs * 1000)) <> " ms."
       _ -> Nothing
+
+-- | checkHints: the first hint the search could not use, asked of the lane
+-- at the hole before the search runs; 'Nothing' when every hint is usable.
+--
+-- Mimer reads each hint as an expression in the hole's scope and keeps it
+-- only when it is a defined name, a constructor, or a record field
+-- (@hintExprToQName@ in @Agda.Mimer.Options@); it drops anything else
+-- without a word, so a call whose hint was dropped answered as if the hint
+-- had been used.  A hint Agda cannot read as a name at all (@λ@, @let@)
+-- fails the whole command with an error that does not name it.  Both were
+-- measured (a Copilot catch on PR #230).  So each hint is first put to
+-- Agda's own scope query at the hole (@Cmd_why_in_scope@, the question
+-- resolve_name asks), and the call is refused in band, stage @hints@,
+-- naming the first hint that the query cannot read as a name (Agda's error,
+-- with its code), or that 'unusableHint' finds the search would drop.
+--
+-- A hint not in scope at all is left to the search, whose own @NotInScope@
+-- names it with Agda's suggestions ('classifyAuto').  An ambiguous name is
+-- left to Agda too, whose rules for overloaded constructors and fields the
+-- query does not restate.  Each query is one lane round trip and changes
+-- no state.
+checkHints :: LiveCtx -> Int -> [Text] -> IO (Either ToolFailure (Maybe LiveError))
+checkHints _ _ [] = pure (Right Nothing)
+checkHints ctx gid (h : hs) =
+  runShaped ctx (cmdWhyInScopeAtGoal gid h) $ \resps ->
+    case whyInScopeMessageOf resps of
+      Just msg -> case unusableHint h msg of
+        Just why -> pure (Right (Just (LiveError "hints" Nothing why)))
+        Nothing  -> checkHints ctx gid hs
+      Nothing -> pure . Right . Just $ case queryError "hints" resps of
+        Just err -> err { lveMessage = "hint `" <> h <> "` is not a name Agda \
+                                       \can read in this hole's scope. Agda: "
+                                       <> lveMessage err }
+        Nothing  -> opaqueAnswer "hints" resps
+
+-- | unusableHint: why a hint Agda's scope query found is one the search
+-- would drop, from the query's answer; 'Nothing' when the search can use it,
+-- and when the answer says the hint is not in scope (the search names that
+-- itself).
+--
+-- A variable of the hole's context is read before any definition of the
+-- same name, so a hint naming one is a variable, which the search drops
+-- (it searches the context already).  Otherwise the hint is usable when
+-- one of its candidates is a kind Mimer keeps: a defined name of any sort
+-- (Agda's kinds @defined name@, @data type@, @record type@, @postulate@,
+-- @primitive function@), a constructor, or a record field.  A name in
+-- scope only as a pattern synonym, a macro, a module, or a generalizable
+-- variable is dropped.
+unusableHint :: Text -> Text -> Maybe Text
+unusableHint h msg = case parseWhyInScope msg of
+  Nothing -> Nothing
+  Just cands
+    | any ((== "a variable") . scDescription) cands -> Just $
+        "hint `" <> h <> "` names a variable of the hole's context, and the \
+        \search drops a variable as a hint (it searches the context already); \
+        \a hint is a defined name, a constructor, or a record field"
+    | null cands || any ((`elem` kept) . kindOf) cands -> Nothing
+    | otherwise -> Just $
+        "hint `" <> h <> "` is in scope only as "
+        <> T.intercalate " and " (nub (map (("a " <>) . kindOf) cands))
+        <> ", which the search drops; a hint is a defined name, a \
+           \constructor, or a record field"
+  where
+    kept =
+      [ "defined name", "data type", "record type", "postulate"
+      , "primitive function", "constructor", "coinductive constructor"
+      , "record field" ]
+    -- "a defined name M.x" is the kind "defined name": the article and the
+    -- name dropped (Agda's names hold no spaces).
+    kindOf c = case T.words (scDescription c) of
+      (_ : ws@(_ : _ : _)) -> T.unwords (init ws)
+      _                    -> scDescription c
 
 -- | resetAware: the answer, once the re-load a found term owes is known.
 --

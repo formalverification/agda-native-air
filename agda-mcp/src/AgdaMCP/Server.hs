@@ -951,7 +951,7 @@ autoNote fillHoleShown =
      \search's space or time; the message does not say which); \
      \'out-of-scope', when Agda found a term but printed it with a name this \
      \file cannot write (error.code NotInScope names it); or 'error' {stage, \
-     \code?, message}: stage 'hints' for a hint this scope cannot name, \
+     \code?, message}: stage 'hints' for a hint the search cannot use, \
      \'auto' for any other refusal, 'load' when the file does not load. The \
      \search uses the hole's context, constructors, record fields, the \
      \file's where-functions, and hints; hintMode adds more. options echoes \
@@ -961,7 +961,8 @@ autoNote fillHoleShown =
 autoHintsDoc :: Text
 autoHintsDoc =
   "Names the search may use, one name each, as this file's scope writes it \
-  \(e.g. Data.Nat.Properties.+-suc)."
+  \(e.g. Data.Nat.Properties.+-suc): defined names, constructors, record \
+  \fields. Any other hint is refused before the search runs."
 
 autoHintModeDoc :: Text
 autoHintModeDoc =

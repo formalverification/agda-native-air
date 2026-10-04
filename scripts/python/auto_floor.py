@@ -339,6 +339,13 @@ def parse_options(argv: Sequence[str]) -> Options:
     p.add_argument("--ids", default="")
     p.add_argument("--timeout-ms", type=int, default=None)
     a = p.parse_args(argv)
+    # The server refuses a bound outside these on every call, so a run with
+    # one would write a row of tool failures per obligation and a summary
+    # of 0 solved; refuse it here, before anything runs.
+    ceiling = SERVER_TIMEOUT_SECONDS * 1000
+    if a.timeout_ms is not None and not 0 < a.timeout_ms < ceiling:
+        p.error(f"--timeout-ms must be a positive number of milliseconds below the "
+                f"server's --timeout of {SERVER_TIMEOUT_SECONDS} s ({ceiling} ms); got {a.timeout_ms}")
     repo = a.repo.resolve()
     return Options(repo=repo, index=repo / a.index, server=(repo / a.server).resolve(),
                    out_dir=repo / a.out_dir, run_id=a.run_id, hints=a.hints,

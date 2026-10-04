@@ -132,7 +132,8 @@ import AgdaMCP.Interaction
 import AgdaMCP.Server
   (ServerConfig (..), forceResponse, isExposed, registeredToolNames, serverInstructions, toolDefinitions)
 import AgdaMCP.Tools.Auto
-  ( autoOptions, classifyAuto, handleAuto, joinRendering, notInScopeName )
+  ( autoOptions, classifyAuto, handleAuto, joinRendering, notInScopeName
+  , unusableHint )
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf )
@@ -3733,6 +3734,13 @@ autoHintMessage =
 autoShouldBePiMessage =
   "1.1-2: error: [ShouldBePi]\nData.Product.Σ ((𝒢 GroupCongruences.≤ⁿ normalOf θ) 𝑵)\n(λ x → (𝒢 GroupCongruences.≤ⁿ"
 
+-- | keptKinds: the kinds of name Agda's scope answer prints that Mimer keeps
+-- as hints (a defined name of any sort, a constructor, a record field).
+keptKinds :: [Text]
+keptKinds =
+  [ "defined name", "data type", "record type", "postulate", "primitive function"
+  , "constructor", "coinductive constructor", "record field" ]
+
 -- | autoParamsOf: parse a JSON object of auto arguments.
 autoParamsOf :: Text -> Either String AutoParams
 autoParamsOf t = Aeson.eitherDecodeStrict (TE.encodeUtf8 t)
@@ -3817,6 +3825,29 @@ autoTests = do
             (let (o, _, _, e) = classifyAuto [] (AutoRefusal autoShouldBePiMessage)
              in (o, lveCode <$> e, lveStage <$> e))
         ]
+
+    , -- The kinds Mimer keeps as hints, read off Agda's own scope answer in
+      -- the grammar 'explainWhyInScope' prints (the variable and the pattern
+      -- synonym are the tier-3c fixture's, there asked of the lane itself).
+      runTest "unusableHint: a variable, or a name only of a kind the search drops, and nothing else" $
+        let named k = "x is in scope as\n  * a " <> k <> " M.x brought into scope by\n    - its definition at /x/M.agda:3.1-2"
+            moduleToo k = named k <> "\n  * a module M.x brought into scope by\n    - its definition at /x/M.agda:3.1-2"
+            refused = maybe False (const True)
+        in allOf
+          [ assert "a variable" (maybe False ("variable of the hole's context" `T.isInfixOf`)
+              (unusableHint "m" "m is in scope as\n  * a variable bound at /x/M.agda:46.10-11"))
+          , assert "a pattern synonym, named in the message"
+              (maybe False ("only as a pattern synonym," `T.isInfixOf`) (unusableHint "x" (named "pattern synonym")))
+          , assert "a macro" (refused (unusableHint "x" (named "macro name")))
+          , assert "a module alone"
+              (maybe False ("only as a module," `T.isInfixOf`)
+                (unusableHint "x" "x is in scope as\n  * a module M.x brought into scope by\n    - its definition at /x/M.agda:3.1-2"))
+          , assertEqual "each kind the search keeps"
+              [ (k, Nothing) | k <- keptKinds ]
+              [ (k, unusableHint "x" (named k)) | k <- keptKinds ]
+          , assertEqual "a record type that is also a module" Nothing (unusableHint "x" (moduleToo "record type"))
+          , assertEqual "not in scope: the search names it" Nothing (unusableHint "nosuch" "nosuch is not in scope.")
+          ]
 
     , runTest "autoOptions: only what the fields say, and nothing for a call with none" $ allOf
         [ assertEqual "none" "" (autoOptions base)
@@ -8331,7 +8362,9 @@ scratchDir label = do
 --
 -- The tool against the pinned Agda on test/resources/AutoSearch.agda, one
 -- hole per answer: a term from the context, no solution, the same hole solved
--- with a hint, a hint the scope cannot name, a term printed across lines
+-- with a hint, a hint the scope cannot name, hints refused before the search
+-- (a variable, a pattern synonym, words Agda cannot read as names), a term
+-- printed across lines
 -- (joined, and judged by the batch fill_hole both ways, since the join is the
 -- point), and a term printed with a name the file cannot write.  Then the
 -- bounds: a search bound that reaches the server's --timeout is refused before
@@ -8395,6 +8428,31 @@ autoLaneTests cfg repoRoot = do
           , assertEqual "stage and code" (Just ("hints", Just "NotInScope"))
               ((\e -> (lveStage e, lveCode e)) <$> aurError res)
           ]
+
+    , -- Mimer drops a hint that is not a defined name, a constructor, or a
+      -- record field without a word, and a hint it cannot read as a name at
+      -- all fails the command with an error that does not name it (a
+      -- Copilot catch on PR #230).  Each is refused by name before the
+      -- search runs, after a usable hint, so the check walks the list.
+      runTest "auto: a hint the search would drop or cannot read is refused by name, before any search" $ do
+        let refused (h, code, phrase) =
+              withAuto lanes (at 1) { apHints = ["lemma", h] } $ \res -> allOf
+                [ assertEqual (T.unpack h <> ": outcome") OutcomeError (aurOutcome res)
+                , assertEqual (T.unpack h <> ": stage and code") (Just ("hints", code))
+                    ((\e -> (lveStage e, lveCode e)) <$> aurError res)
+                , assert (T.unpack h <> ": the message names the hint and why: " <> show (lveMessage <$> aurError res))
+                    (maybe False (\e -> ("`" <> h <> "`") `T.isInfixOf` lveMessage e
+                                        && phrase `T.isInfixOf` lveMessage e) (aurError res))
+                , assert (T.unpack h <> ": no search ran") (isNothing (aurSearchMs res))
+                ]
+        rs <- mapM refused
+          [ ("m",   Nothing,                               "a variable of the hole's context")
+          , ("one", Nothing,                               "only as a pattern synonym")
+          , ("_",   Just "Interaction.ExpectedIdentifier", "not a name Agda can read")
+          , ("0",   Just "Interaction.ExpectedIdentifier", "not a name Agda can read")
+          , ("λ",   Just "ParseError",                     "not a name Agda can read")
+          ]
+        pure (firstFailure rs)
 
     , -- The trap of algebras-inverses-range-to-image, on a fixture: the
       -- printed term continues at column 1, so a batch splice of the text as

@@ -10,9 +10,10 @@ function of the index, and the rows are a function of the answers.  These
 pin the hole line (code before a line comment only), the JSON-RPC batch, the
 reading of an answer (JSON inside the text, or prose for a refusal), the
 needle filter (only names Agda typed at the hole are passed on), the call
-each phase makes, a row for each outcome, and the per-tier summary.  The
-answers below are shaped as agda-mcp answered them on the benchmark (issue
-#205), trimmed to the fields the script reads.
+each phase makes, a bound the server would refuse refused up front, a row
+for each outcome, and the per-tier summary.  The answers below are shaped
+as agda-mcp answered them on the benchmark (issue #205), trimmed to the
+fields the script reads.
 
 Usage
 -----
@@ -24,6 +25,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
+import pytest
 from typing import Any, Dict
 
 from scripts.python.auto_floor import (
@@ -38,6 +41,7 @@ from scripts.python.auto_floor import (
     nameable_needles,
     needle_calls,
     obligation_of,
+    parse_options,
     record_of,
     rpc_input,
     selected,
@@ -129,6 +133,18 @@ def test_auto_call_sends_only_what_is_set() -> None:
     assert auto_call(o, (), None) == ("auto", {"filePath": str(o.path), "holeIndex": 0})
     assert auto_call(o, ("A.f",), 500)[1] == {"filePath": str(o.path), "holeIndex": 0,
                                               "hints": ["A.f"], "timeoutMs": 500}
+
+
+def test_timeout_outside_the_servers_bounds_is_refused_before_running() -> None:
+    # The server refuses each of these on every call, so a run would write a
+    # tool failure per row and a summary of 0 solved (measured, PR #230).
+    base = ["--server", "bin/agda-mcp", "--run-id", "t"]
+    for bad in ("0", "-5", "300000"):
+        with pytest.raises(SystemExit) as exit_info:
+            parse_options(base + [f"--timeout-ms={bad}"])
+        assert exit_info.value.code == 2, bad
+    assert parse_options(base + ["--timeout-ms", "299999"]).timeout_ms == 299999
+    assert parse_options(base).timeout_ms is None
 
 
 def test_found_term_and_its_judgment() -> None:

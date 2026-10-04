@@ -2293,7 +2293,9 @@ instance FromJSON AutoParams where
 -- character no Agda name can hold (the lexer reserves parentheses, braces,
 -- semicolons, and quotes) could only be an expression, which Agda's reader
 -- parses and then silently drops when it is not a name.  All three are
--- refused here, by name, before anything is sent.
+-- refused here, by name, before anything is sent.  What a word that passes
+-- names is a question for the hole's scope, which the handler puts to Agda
+-- before the search ('AgdaMCP.Tools.Auto.checkHints').
 checkHint :: Text -> Parser ()
 checkHint h
   | T.null h = fail "a hint is empty"
@@ -2312,7 +2314,7 @@ checkHint h
 -- 'OutcomeOutOfScope' is a term the search found and Agda printed with a name
 -- the file cannot write, so Agda could not read it back (@NotInScope@ naming
 -- no hint; error stage @term@).  'OutcomeError' is every other refusal: a
--- hint the scope cannot name (stage @hints@), any other refusal of the
+-- hint the search cannot use (stage @hints@), any other refusal of the
 -- command, the search's or its term's (stage @auto@), or the file not
 -- loading (stage @load@).
 data AutoOutcome = OutcomeFound | OutcomeNoSolution | OutcomeOutOfScope | OutcomeError

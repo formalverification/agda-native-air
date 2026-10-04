@@ -1145,9 +1145,20 @@ context, data constructors, record projections, the definition's own
 `where`-functions, recursive calls of the function being defined, and the
 call's `hints`.  `hintMode` adds the definitions of the file's own module
 (`module`, Agda's `-m`) or every name the hole's scope can write unqualified
-(`unqualified`, `-u`).  A hint is parsed in the hole's scope and kept only
-when it is a name (a definition, constructor, or projection); Mimer drops any
-other expression silently, so the tool accepts only name-shaped hints.
+(`unqualified`, `-u`).  Mimer parses each hint in the hole's scope and keeps
+it only when it is a defined name, a constructor, or a record field; it drops
+anything else without a word, and a word it cannot read as a name at all
+(`λ`, `let`) fails the whole command with an error that does not name it.
+So before the search runs, the tool puts each hint to Agda's scope query at
+the hole (`Cmd_why_in_scope`, the question `resolve_name` asks, one lane round
+trip and no state change) and refuses the call, `error.stage: "hints"`,
+naming the first hint that is not a name Agda can read (`_`, `0`, `λ`; the
+query's own error and code), that names a variable of the hole's context
+(Agda reads the variable first, and the search drops it), or that is in
+scope only as a kind the search drops (a pattern synonym, a macro, a
+module).  A hint not in scope at all is left to the search, whose own
+`NotInScope` names it with Agda's suggestions; an ambiguous name is left to
+Agda's rules for overloading.
 
 **The option string**.  Agda reads the hole's contents with
 `Agda.Mimer.Options`: it splits them on whitespace and takes `-t T`
@@ -1178,7 +1189,7 @@ ran out of time at 1,005 ms on another.
 | `found` | `term` | A term at the hole, Agda's rendering joined onto one line. |
 | `no-solution` | `message` | Agda's own message (`No solution found`): the search exhausted its space or its time, and the message does not say which. |
 | `out-of-scope` | `error` (`stage: "term"`, `code: "NotInScope"`) | The search found a term and Agda printed it with a name the file cannot write (a record field of a module the file never imports, spelled by its full internal name), so Agda could not read its own term back. |
-| `error` | `error {stage, code?, message}` | `hints`: a hint the hole's scope cannot name (Agda reads hints before searching, and refuses the call); `auto`: any other refusal, such as a term Agda printed and could not read back as the type it found (`ShouldBePi`, measured on one composition row); `load`: the file does not load, before the search or in the re-load after a found term (then the message names the term, which is moot). |
+| `error` | `error {stage, code?, message}` | `hints`: a hint the search cannot use, refused before the search runs (above), or one the hole's scope cannot name (Agda reads hints before searching, and refuses the call with `NotInScope`); `auto`: any other refusal, such as a term Agda printed and could not read back as the type it found (`ShouldBePi`, measured on one composition row); `load`: the file does not load, before the search or in the re-load after a found term (then the message names the term, which is moot). |
 
 A `NotInScope` is attributed by name: when the name Agda says is missing is
 one of the call's hints, the hint is at fault; otherwise it can only be the

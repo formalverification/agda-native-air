@@ -74,6 +74,7 @@ module AgdaMCP.Tools.LiveQueries
   , LiveCtx (..)
   , QueryScope (..)
   , withLiveFile
+  , runShaped
   , liveMeta
   , scopeFor
   , pointForHole
