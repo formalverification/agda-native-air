@@ -305,8 +305,9 @@ object ProofSearchLoop extends IOApp {
       // which the server refuses when it reaches the server's own deadline:
       // under a 1 s --server-timeout every search would fail, and the sweep
       // would run without the closer it asked for (a Copilot catch on PR
-      // #233).
-      _      <- if (auto != AutoMode.Off && tmo * 1000 <= AutoCloseProposer.defaultSearchMs)
+      // #233).  Compared in Long: the flag takes any Int, whose milliseconds
+      // overflow an Int past 2,147,483 s and would wrap into a refusal.
+      _      <- if (auto != AutoMode.Off && tmo.toLong * 1000L <= AutoCloseProposer.defaultSearchMs)
                   Left(s"--auto needs a --server-timeout above ${AutoCloseProposer.defaultSearchMs / 1000} s: " +
                     s"each search runs Agda's default bound of ${AutoCloseProposer.defaultSearchMs} ms, which the " +
                     s"server refuses under a deadline of $tmo s")

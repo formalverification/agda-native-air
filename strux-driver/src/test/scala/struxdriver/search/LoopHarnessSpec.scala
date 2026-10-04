@@ -129,6 +129,11 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     ProofSearchLoop.parseArgs(base ++ List("--auto", "closer", "--server-timeout", "2")).map(_.auto) shouldBe
       Right(AutoMode.Closer)
     ProofSearchLoop.parseArgs(base ++ List("--server-timeout", "1")).map(_.serverTimeout) shouldBe Right(1)
+    // A timeout whose milliseconds do not fit in an Int is accepted, not
+    // wrapped negative and refused (a Copilot catch on PR #233).
+    for (big <- List("2147484", Int.MaxValue.toString))
+      ProofSearchLoop.parseArgs(base ++ List("--auto", "closer", "--server-timeout", big)).map(_.auto) shouldBe
+        Right(AutoMode.Closer)
   }
 
   test("the report outcome carries the auto ledger only when the knob is on (#206)") {
