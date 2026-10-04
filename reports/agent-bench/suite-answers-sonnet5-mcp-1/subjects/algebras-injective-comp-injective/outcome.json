@@ -1,0 +1,105 @@
+{
+  "benchmarkId" : "algebras-injective-comp-injective",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:using",
+    "restates:Setoid.Functions.Injective.⊙-injective",
+    "target:Function.Base._∘_"
+  ],
+  "stratum" : "agda-algebras/using",
+  "hole" : "⊙-injective′",
+  "goal" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →  IsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+  "solved" : false,
+  "restated" : true,
+  "restatementEvidence" : [
+    "ref Setoid.Functions.Injective.⊙-injective"
+  ],
+  "original" : {
+    "file" : "/nix/store/0mkdwhwzshgsa7xknd81r8hvdp6gbmr6-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Injective.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 3,
+    "reads" : 1,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+    "open import Setoid.Functions using ( ⊙-injective )"
+  ],
+  "terminal" : "completed",
+  "turns" : 11,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__definition_of" : 3,
+    "mcp__agda__exports_of" : 1,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 10,
+  "wallMs" : 43283,
+  "costUsd" : 0.11289239999999999,
+  "tokens" : {
+    "input" : 18,
+    "output" : 2575,
+    "cacheRead" : 166612,
+    "cacheCreation" : 13446
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3118,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+    "final" : "{α ρᵃ β ρᵇ γ ρᶜ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{𝑪 : Setoid γ ρᶜ} (f : Func 𝑨 𝑩) (g : Func 𝑩 𝑪) →\nIsInjective f → IsInjective g → IsInjective (g ⊙ f)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-injective-comp-injective/final/Injective-comp-injective.agda",
+  "transcriptPath" : "subjects/algebras-injective-comp-injective/transcript.jsonl",
+  "lastWords" : "check_file reports success (exitCode 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.37,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "benchmarkId" : "hard-group-surjective-image-commutative",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "surjective-image-commutative",
+  "goal" : "(f : A → B) → IsGroupHomomorphism f → Surjective _≈₁_ _≈₂_ f → Commutative _≈₁_ _∙₁_ → Commutative _≈₂_ _∙₂_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product.Base         using ( proj₁ ; proj₂ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__definition_of" : 1,
+    "mcp__agda__type_of" : 1,
+    "mcp__agda__exports_of" : 1,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 86005,
+  "costUsd" : 0.4322204999999999,
+  "tokens" : {
+    "input" : 16,
+    "output" : 7233,
+    "cacheRead" : 156691,
+    "cacheCreation" : 17297
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__search_in_scope",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 757,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+    "final" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-surjective-image-commutative/final/Group-surjective-image-commutative.agda",
+  "transcriptPath" : "subjects/hard-group-surjective-image-commutative/transcript.jsonl",
+  "lastWords" : "check_file reports success (exit code 0, no diagnostics, no holes) on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.24,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

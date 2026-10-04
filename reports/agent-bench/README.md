@@ -235,6 +235,10 @@ figures the new runs replace.
 | `comp-sonnet5-both-1` | `both` | `claude-sonnet-5` | 2026-09-29 | none | 12 (composition) | 5 | 0 | no original | 0 | 179 | 167 | 3.39 | the guide's § 4.7, [#160] |
 | `hard219-opus5-shell-1` | `shell` | `claude-opus-5` | 2026-09-29 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 148 | 134 | 6.31 | the guide's § 4.5, the site, [#219] |
 | `hard219-opus5-both-1` | `both` | `claude-opus-5` | 2026-09-29 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 174 | 160 | 6.56 | the guide's § 4.5, the site, [#219] |
+| `cost-answers-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-10-03 | none | 2 (hard tier) | 2 | 0 | no original | 0 | 32 | 30 | 2.42 | the cost pairs on [#185] and [#201] |
+| `cost-answers-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 2 | 2 | 0 | 0 of 1 | 0 | 14 | 12 | 0.17 | the cost pairs on [#185] and [#201] |
+| `hard-answers-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-10-03 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 127 | 113 | 6.34 | [#185], [#201], PRs [#228] and [#229] |
+| `suite-answers-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 55 | 47 | 6 | 5 of 15 | 0 | 332 | 277 | 3.56 | [#185], [#201], PRs [#228] and [#229] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -724,6 +728,69 @@ per-row accounts are on [#160] (the composition tier: each row's route per
 arm and where each needle came from) and [#219] (the hard tier, against the
 hinted runs).
 
+## The server-answer arms (2026-10-03, [#201], [#185])
+
+The header-free `mcp` arms of [#219], run again with two changes to the
+server (PRs [#228] and [#229], built together from the second's branch):
+`fill_hole` and `get_goal` reach the hole of a one-hole file from any
+position on its line, or from no address, and say how in `addressed`
+([#201]); and `definition_of` quotes each definition's source beside its
+site ([#185]).  Everything else is the protocol of `hard219-opus5-mcp-1` and
+`suite219-sonnet5-mcp-1`, byte for byte: the index (81 rows), both corpora,
+the prompts, the caps, the read roots (Agda's primitive modules included,
+since PR [#200]), the client (2.1.282), and the judge's extractor (the same
+frozen binary, digest `85beae1f`).  Against the older baselines below
+(`hard-opus5-mcp-1`, `arm-surface-mcp-1` and `-2`) the header hints, the
+index, and the primitive read roots differ as well.  Zero anomalies.  The
+first attempt at `cost-answers-opus5-mcp-1` met a full five-hour usage
+window (one subject refused at USD 0.27, outside the report's totals); the
+run was resumed after the reset with the same protocol.
+
+| | hard, Opus 5: `hard-opus5` | `hard219-opus5` | **`hard-answers`** | 55 rows, Sonnet 5: `arm-surface` 1 / 2 | `suite219` | **`suite-answers`** |
+|---|---:|---:|---:|---:|---:|---:|
+| solved | 14 | 14 | 14 | 48 / 45 | 44 | 47 |
+| restated | 0 | 0 | 0 | 7 / 8 | 9 | 6 |
+| turns | 143 | 139 | 127 | 345 / 349 | 347 | 332 |
+| tool calls | 129 | 125 | 113 | 290 / 294 | 292 | 277 |
+| USD | 7.82 | 7.71 | 6.34 | 3.83 / 3.74 | 3.99 | 3.56 |
+| cached tokens read per turn | 23,291 | 24,406 | 20,053 | 15,503 / 14,293 | 15,491 | 14,968 |
+| `definition_of` calls | 14 | 18 | 22 | 16 / 12 | 11 | 47 |
+| `Read` of a file a `definition_of` answer had named | 16 | 19 | 11 | 11 / 8 | 8 | 8 |
+| every `Read` outside the work file | 35 | 31 | 23 | 13 / 11 | 11 | 9 |
+| `fill_hole` and `get_goal` refused for the address | 2 | 3 | 0 | 5 / 7 | 3 | 0 |
+| addresses the one-hole rule reached | | | 2 | | | 8 |
+
++  **The refusals are gone, and the turns they cost with them**.  Every
+   address the new arms sent reached its hole: 10 of them by the one-hole
+   rule (7 `fill_hole`, 3 `get_goal`), each of which the old server would
+   have refused, against 3 refusals in each header-free baseline.
++  **Sonnet adopted `definition_of`**: 47 calls in 25 of the 55 sessions,
+   against 11 calls in 8 sessions (and 16 and 12 in the two older seeds),
+   at 1,100 characters an answer.  It took them from the other knowledge
+   tools rather than adding them: `exports_of` 8 calls against 23,
+   `type_of` 7 against 23, `search_by_name` 14 against 21, so the knowledge
+   calls overall stayed level (81 against 85).  The reads it made of a file
+   an answer had named did not grow with the calls (8 and 8).
++  **Opus read less**.  It called `definition_of` a little more (22 against
+   18 and 14), followed fewer of the answers with a `Read` of the named file
+   (11 against 19 and 16), and read the library less overall (23 against 31
+   and 35).  Every quote came back whole (28 of 28), and the reads that
+   remain are of the module around a definition, 50 to 200 lines at a time
+   and twice the whole file: the neighborhood, not the definition.  Its arm
+   cost 18 % less than its header-free baseline, USD 1.37, of which 0.78 is
+   cache writes (what the tools returned entering the context, 319 thousand
+   characters against 440), 0.43 cache reads, and 0.16 output
+   (`cost-split.py`).
++  **The restated rows fell by three, and the instrument is part of why**.
+   Four agda-algebras rows moved from restated to solved, each with two or
+   three `definition_of` calls in the new arm.  On one
+   (`algebras-homs-mon-to-intohom`) the quote of the original lemma came
+   back and the subject wrote its proof out, which the judge counts as
+   solved with the original in view; on another the original arrived by a
+   `Read`; on two nothing showed it.  Read the 47 and 6 beside the seed
+   spread of the older pair (48 and 45, 7 and 8): one seed each, the solve
+   counts are within it, the tool mix is not.
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -811,3 +878,7 @@ new run gets a new run id.
 [#220]: https://github.com/formalverification/agda-native-air/pull/220
 [#221]: https://github.com/formalverification/agda-native-air/pull/221
 [#200]: https://github.com/formalverification/agda-native-air/pull/200
+[#185]: https://github.com/formalverification/agda-native-air/issues/185
+[#201]: https://github.com/formalverification/agda-native-air/issues/201
+[#228]: https://github.com/formalverification/agda-native-air/pull/228
+[#229]: https://github.com/formalverification/agda-native-air/pull/229

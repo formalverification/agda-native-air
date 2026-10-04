@@ -101,6 +101,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS8
 import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, BufferMode (..), isEOF)
 
 import AgdaMCP.Agda (AgdaConfig)
+import AgdaMCP.Declaration (defaultQuoteLines)
 import AgdaMCP.Gate (GateConfig)
 import AgdaMCP.Interaction
   (InteractionLanes, newInteractionLanes, shutdownLanes)
@@ -383,13 +384,19 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
           ["filePath", "name"]
 
       , toolDef "definition_of"
-          "Where is this name defined? Answers {definitions: [{qualified, file, \
-          \line, col, endLine, endCol}]}, the defining file and position of \
-          \every candidate the name resolves to, chased through re-exports and \
-          \barrel modules to the original definition. unlocated lists \
-          \candidates whose site Agda's answer did not carry, so a partial \
-          \answer is never mistaken for a total one."
-          (nameProps "The name to locate, qualified or not.")
+          "Where is this name defined, and what does the definition say? \
+          \Answers {definitions: [{qualified, file, line, col, endLine, endCol, \
+          \source}]}, every candidate the name resolves to, chased through \
+          \re-exports and barrel modules to the original definition. source \
+          \{startLine, endLine, text, truncated, declarationEndLine?} quotes \
+          \the declaration from that file as written (its signature and \
+          \clauses, a where block included; not elaborated): at most maxLines \
+          \lines, and when truncated, the declaration runs on to \
+          \declarationEndLine. {error} in its place says why the file gave no \
+          \text. unlocated lists candidates whose site Agda's answer did not \
+          \carry, so a partial answer is never mistaken for a total one."
+          (nameProps "The name to locate, qualified or not."
+             <> [prop "maxLines" "integer" maxLinesDoc])
           ["filePath", "name"]
 
       , toolDef "exports_of"
@@ -793,6 +800,13 @@ liveColDoc = "column, spelled as the hole lists spell it."
 -- to ask for more, is said once in 'serverInstructions'.
 verboseDoc :: Text
 verboseDoc = "Default false; true adds the full echo."
+
+-- | maxLinesDoc: how much of each definition @definition_of@ quotes (issue
+-- #185), in the spelling of @exports_of@'s @limit@.
+maxLinesDoc :: Text
+maxLinesDoc =
+  "Default " <> T.pack (show defaultQuoteLines) <> ": lines of each \
+  \definition's source to quote. 0 or less quotes the whole declaration."
 
 -- | exportsLimitDoc / exportsOffsetDoc / exportsPatternDoc: the @exports_of@
 -- page (issue #184).

@@ -84,6 +84,8 @@ module AgdaMCP.Path
     -- * Resolution on its own (exposed for @check_project@ and for testing)
   , resolveRequestedFile
   , resolveRequestedAnchor
+    -- * A guarded read of a path the server derived (issue #185)
+  , readRegularFile
     -- * Failure classification (pure; exposed for testing)
   , ioProblem
     -- * Decoding
@@ -328,6 +330,24 @@ readGuarded rp = do
     -- @stat@ and this read raises @ENOENT@ here, and it is missing rather than
     -- unreadable.
     Left (e :: IOException) -> Left (failureOf rp (ioProblem e))
+
+-- | readRegularFile: the bytes of a path this server derived rather than
+-- received, under the same two guards 'withSourceFile' applies to a client's
+-- path: it must name a regular file, and the read's failure is a value.
+--
+-- For @definition_of@'s source quote (issue #185), whose path is the defining
+-- file Agda named.  That path did not come from the client, but the rule that
+-- only regular files are ever opened is the server's, not the client's: a
+-- FIFO or a device at that path would otherwise be read like a file, which on
+-- a pipe with no writer quietly yields no text and on one with a writer, or on
+-- a device, an unbounded stream.  @param@ names the role the path plays, for
+-- the failure's text.
+readRegularFile :: Text -> FilePath -> IO (Either PathFailure BS.ByteString)
+readRegularFile param path = do
+  resolved <- resolveFile param path
+  case resolved of
+    Left failure -> pure (Left failure)
+    Right rp     -> readGuarded rp
 
 -- | decodeError: a structured error for a file whose bytes are not valid UTF-8.
 --

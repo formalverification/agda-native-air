@@ -58,6 +58,7 @@ module AgdaMCP.Holes
   , flavourOf
   , maskNonCode
   , codeOnly
+  , codeWithHoles
     -- * Hole spans
   , HoleSpan (..)
   , findHoles
@@ -538,6 +539,19 @@ findHoles flav src =
 codeOnly :: LiterateFlavour -> Text -> Text
 codeOnly flav src =
   blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked ]
+  where
+    masked = maskNonCode flav src
+
+-- | codeWithHoles: 'codeOnly' with the holes left in place: literate prose,
+-- comments, and pragmas blanked, every character position preserved.
+--
+-- The view a /layout/ scan reads (issue #185's declaration extent,
+-- 'AgdaMCP.Declaration').  A layout question is not a declaration question: a
+-- line holding only @{!!}@ is a line of code whose indentation counts, where
+-- 'codeOnly' would make it blank and let a declaration's last line vanish.
+codeWithHoles :: LiterateFlavour -> Text -> Text
+codeWithHoles flav src =
+  blankSpans masked [ (lxStart s, lxEnd s) | s <- lexSpans masked, lxKind s /= LexHole ]
   where
     masked = maskNonCode flav src
 
