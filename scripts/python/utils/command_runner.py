@@ -22,14 +22,31 @@ def run_command(
     capture_output: bool = False,
     text: bool = False,
     stdout_file: Optional[Path] = None,
-    stream_output: bool = False  # --- NEW: Parameter to enable live streaming
+    stream_output: bool = False,  # --- NEW: Parameter to enable live streaming
+    input_text: Optional[str] = None
 ) -> Result[subprocess.CompletedProcess, PipelineError]:
     """
     Runs a shell command and returns a Result object.
     Can either capture output or stream it live to the logger.
+
+    input_text, when given, is written to the command's stdin (and stdin is
+    closed after it), for a command driven by a fixed request stream, such as
+    an MCP server answering a batch of JSON-RPC lines.  It requires text=True
+    and is not combined with stream_output, and either misuse is refused
+    before anything runs: the streaming branch never connects stdin, so the
+    input would be dropped in silence, and subprocess.run refuses a str input
+    in bytes mode with an exception this function would report as an opaque
+    command failure.
     """
     command_str = ' '.join(map(str, command))
     logging.debug(f"Running: {command_str}")
+
+    if input_text is not None and (stream_output or not text):
+        return Result.err(PipelineError(
+            error_type=ErrorType.INVALID_CONFIG,
+            message="input_text requires text=True and cannot be combined with stream_output",
+            context={"command": command_str, "text": text, "stream_output": stream_output}
+        ))
 
     try:
         # --- NEW: Logic to handle live streaming output ---
@@ -75,7 +92,8 @@ def run_command(
             process = subprocess.run(
                 [str(arg) for arg in command],
                 cwd=cwd, stdout=stdout_target, stderr=subprocess.PIPE,
-                text=text, check=False, encoding='utf-8' if text else None
+                text=text, check=False, encoding='utf-8' if text else None,
+                input=input_text
             )
 
             if process.stderr:

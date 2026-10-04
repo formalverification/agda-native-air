@@ -7,7 +7,9 @@
 > a persistent interaction lane (issue #75), plus three corpus-backed search
 > tools, of which `search_by_name` also answers which names a file can write
 > (`inScopeAt`, issue #203).  A fourteenth, the scope-aware `search_in_scope`
-> (issue #17), is registered and presented when `--expose` names it.
+> (issue #17), is registered and presented when `--expose` names it.  With
+> `--auto`, a fifteenth: `auto`, Agda's own proof search at a hole (issue
+> #205).
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
 Agda's proof engine — batch typechecking verdicts, goal introspection, and
@@ -100,7 +102,8 @@ corpus-backed search tools (Milestone [M1-3]).  The fourteenth, the
 scope-aware retrieval tool `search_in_scope` (issue #17, phase 1), is presented
 only when `--expose` names it, since issue #203: its question, which names this
 file can write and how, is asked on the default surface through
-`search_by_name`'s `inScopeAt`.
+`search_by_name`'s `inScopeAt`.  A server started with `--auto` registers and
+presents a fifteenth, `auto`, Agda's own proof search at a hole (issue #205).
 Navigation tools and neural premise selection are planned for later
 milestones; see [GITHUB_PROJECT.md](../docs/GITHUB_PROJECT.md).
 
@@ -340,6 +343,18 @@ timeout, crash) are structured `isError` payloads naming the event, root, wire
 lines, and the child's last stderr lines, never a bare `-32603` (issue #101's
 rule), and they carry their whole echo whether or not the call asked for it.
 
+### Agda's own proof search (issue #205)
+
+A lane tool registered only when the server starts with `--auto`
+(ADR 0002, decision 25: issue #191 measured the tool surface as an agent
+arm's main cost, and issue #203 found a tool offered in 681 archived
+sessions and called once, so a place on the default surface waits for an
+arm that shows an agent using it).
+
+| Tool | Description |
+|------|-------------|
+| `auto` | Agda's own proof search (Mimer, the search an editor's `C-c C-a` runs) at one hole, without editing the file.  Answers a **candidate** term, joined onto one line, or the search's own message, in band; never a verdict.  See [`auto`](#auto) below. |
+
 ### Corpus-backed search tools (Milestone 1 [M1-3])
 
 These let the agent discover relevant definitions from an agda-strux JSONL corpus
@@ -401,7 +416,7 @@ import, which is [issue #165](https://github.com/formalverification/agda-native-
 agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
          [--corpus PATH]  [--timeout N] [--verbose]
          [--check-command "CMD ARGS ..."] [--check-timeout N]
-         [--expose NAME,NAME,...]
+         [--expose NAME,NAME,...] [--auto]
 ```
 
 | Flag | Description |
@@ -414,6 +429,7 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--check-command "..."` | The project's acceptance gate, for `check_project`.  Split on whitespace and run **directly, with no shell**, so it can contain neither a pipeline nor a redirect, and nothing this server puts around your gate can mask its exit code.  (A wrapper *script* you name here can still lie about its own; that is what `maskedFailure` catches.)  Without it, `check_project` discovers the gate (see below). |
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
 | `--expose NAMES`     | Present only these tools (comma-separated, issue #191): `tools/list` lists them alone, the `initialize` instructions name them alone, and a call to any other registered tool is refused by name.  Without it every registered tool is presented but `search_in_scope`, which only this flag presents (issue #203).  A name this configuration does not register (a typo, or a corpus tool without `--corpus`) is a fatal startup error, never a silently smaller surface. |
+| `--auto`             | Register the `auto` tool, Agda's own proof search at a hole (issue #205).  Off by default; `--expose` may name `auto` only when this flag registers it. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
 
@@ -494,6 +510,7 @@ agda-mcp/
 │           ├── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
 │           ├── CheckProject.hs  ← check_project: run the gate, never misreport its exit code
 │           ├── LiveQueries.hs   ← type_of, normalize, resolve_name, definition_of, exports_of
+│           ├── Auto.hs          ← auto: Agda's own proof search at a hole, a candidate term
 │           ├── Search.hs        ← search_by_name, search_by_type, get_dependencies
 │           └── SearchInScope.hs ← search_in_scope: the pool, the ladder on the lane, the ledger
 └── test/
@@ -1095,6 +1112,134 @@ load, 5.6 to 6.4 s for that obligation, paid once per file and shared with
 every live-query tool.  The full table is on issue #17.  Phase 2 of the issue,
 `search_term` (bounded synthesis at a hole, committed-checkable terms only), is
 not part of this tool.
+
+### Agda's own proof search (issue #205)
+
+#### `auto`
+
+Runs Agda's own proof search at one hole on the interaction lane and answers
+the term it found, as a candidate for `fill_hole` to judge.  Registered only
+with `--auto`.  Under the pinned Agda 2.8.0 the search is **Mimer**, which
+replaced Agsy in Agda 2.7 (the 2.7.0 release notes: "Mimer, a
+re-implementation of the 'auto' term synthesizer, replaces Agsy"); the
+command is `Cmd_autoOne`, the one an editor's `C-c C-a` sends, with the
+`Simplified` rendering the reference measurement used.
+
+**Why the answer is a candidate**.  Three facts, each read off Agda's source
+or measured:
+
++  When the search succeeds, Agda gives the term into the lane's state
+   `WithForce`, which skips the termination check and the double check of the
+   give (`Agda.Interaction.BasicOps.giveExpr`), and the search can build
+   recursive calls of the function being defined.
++  The term comes back as Agda's printed text, read back in the hole's scope;
+   what a batch check reads is that text in the file.
++  The lane answers a different question from a batch check on a partial fill
+   (issue #163; ADR 0002 § 2).
+
+So `fill_hole`, a batch `agda` on the file, is the only judge of a found
+term, as of any other candidate.
+
+**What the search uses**.  By default (Mimer's `NoHints` mode): the hole's
+context, data constructors, record projections, the definition's own
+`where`-functions, recursive calls of the function being defined, and the
+call's `hints`.  `hintMode` adds the definitions of the file's own module
+(`module`, Agda's `-m`) or every name the hole's scope can write unqualified
+(`unqualified`, `-u`).  Mimer parses each hint in the hole's scope and keeps
+it only when it is a defined name, a constructor, or a record field; it drops
+any other expression without a word, and a word it cannot read as an
+expression at all (`λ`, `let`) fails the whole command with an error that
+does not name it.  So before the search runs, the tool puts each hint to
+Agda's scope query at the hole (`Cmd_why_in_scope`, the question
+`resolve_name` asks, one lane round trip and no state change) and refuses
+the call, `error.stage: "hints"`, naming the first hint that is not a name
+Agda can read (`_`, `0`, `λ`; the query's own error and code), that names a
+variable of the hole's context (Agda reads the variable first, and the
+search drops it), or that is in scope only as a kind the search cannot use:
+a pattern synonym or a macro, which it drops; a module, which Agda reported
+as `NotInScope` though it is in scope; a generalizable variable, which Agda
+refuses outside a signature.  A hint not in scope at all is left to the
+search, whose own `NotInScope` names it with Agda's suggestions; an
+ambiguous name is left to Agda's rules for overloading.
+
+**The option string**.  Agda reads the hole's contents with
+`Agda.Mimer.Options`: it splits them on whitespace and takes `-t T`
+(the bound), `-s N` (skip solutions), `-l` (list solutions instead of
+giving one), `-m`, `-u`, and `-c` (read and ignored: Mimer does no case
+splitting), and every other word as a hint.  The tool never sends free text:
+it builds the string from declared fields (`timeoutMs` as `-t <n>ms`, `skip`
+as `-s <n>`, `hintMode`, and `hints`), refuses a hint holding whitespace, one
+spelled like an option, or one holding a character no name holds
+(`( ) { } ; "`), and echoes the string it built as `options`.  The string
+reaches Agda only when a search runs, which `searchMs` marks: a call refused
+before the search (a hint the scope check refuses, a file that does not
+load) echoes the string it would have sent, and has no `searchMs`.  `-l` and
+`-c` are not offered: the first changes what an answer is, and the second
+does nothing.
+
+**The bound**.  `-t` is CPU time, in milliseconds when written `<n>ms` (a
+bare number is seconds), Agda's default 1000 ms, and Mimer checks it between
+search steps, so a search can overrun it by one step.  The server's
+`--timeout` bounds the whole call; a bound that reaches it is refused before
+anything runs, Agda's default included when the call names none (so on a
+server started with `--timeout 1` a call must ask for less than 1000 ms), and
+a call that outlives it is a lane timeout, an `isError` like any lane
+tool's.  A row whose search needs close to the bound
+can come out differently on a loaded machine: one benchmark row,
+`algebras-kernels-quotient-proj-hom`, found its term in 523 ms on one run and
+ran out of time at 1,005 ms on another.
+
+**The answer**.  `outcome` is one of four.
+
+| `outcome` | carries | meaning |
+|---|---|---|
+| `found` | `term` | A term at the hole, Agda's rendering joined onto one line. |
+| `no-solution` | `message` | Agda's own message (`No solution found`): the search exhausted its space or its time, and the message does not say which. |
+| `out-of-scope` | `error` (`stage: "term"`, `code: "NotInScope"`) | The search found a term and Agda printed it with a name the file cannot write (a record field of a module the file never imports, spelled by its full internal name), so Agda could not read its own term back. |
+| `error` | `error {stage, code?, message}` | `hints`: a hint the search cannot use, refused before the search runs (above), or one the hole's scope cannot name (Agda reads hints before searching, and refuses the call with `NotInScope`); `auto`: any other refusal, such as a term Agda printed and could not read back as the type it found (`ShouldBePi`, measured on one composition row); `load`: the file does not load, before the search or in the re-load after a found term (then the message names the term, which is moot). |
+
+Every answer, whatever its outcome, carries `addressed {line, col,
+resolvedBy}`, the hole searched and how the address reached it, and the
+one-hole rule holds as for every hole tool: in a file with exactly one hole,
+no address, or a position on its line, reaches it (see
+[Stable hole handles](#stable-hole-handles-issue-79), issue #201).
+
+A `NotInScope` is attributed by name: when the name Agda says is missing is
+one of the call's hints, the hint is at fault; otherwise it can only be the
+found term's, since the hints are the only other words Agda reads as names.
+
+**The join**.  Agda's printer breaks a long term across lines and starts some
+continuations at column 1; spliced as printed, the first such line ends the
+declaration, and `fill_hole` answers `type_error`.  Measured on
+`algebras-inverses-range-to-image` (refused until joined) and pinned on the
+suite's `AutoSearch.agda` fixture, where the term as printed is a
+`type_error` and the joined term is `ok`.  Each line is stripped and the
+lines joined with one space; the search builds no layout block (`let`,
+`where`, `do`), so nothing else changes.
+
+**The reset**.  A found term consumes the hole in the lane's state, so the
+server re-loads the file before answering (`resetMs`, beside the search's own
+`searchMs`; both within `elapsedMs`), as after any give (issue #163).
+`checkedFromSource` counts that re-load, which re-typechecks a file with open
+holes, so a search on a reused load followed by a reset reports `true`.  If
+the re-load fails (a dependency edited in between, say), the answer is the
+load's error, naming the term found, since a term judged against a file that
+no longer loads is moot; the lane retries the load on the next call.  The
+answer's `lane.load` and `loadElapsedMs` describe the load the search ran on,
+as for every live query; the reset is reported by `resetMs`, and with
+`verbose` its `Cmd_load` is in `lane.iotcm`.  The next call on the file
+reuses the reset's load (`lane.load: "reused"`).  `no-solution` and a
+refusal need none: the search runs in a local copy of
+Agda's state, and Agda's interaction loop puts back the state it held before
+a failed command.
+
+**Measured** (issue #205; `make auto-floor`, rows under
+[`reports/auto-floor/`](../reports/auto-floor/)).  On the benchmark's original
+55 rows the tool reproduces the reference measurement (`agsy-suite.py`, a lane
+driven by hand) row for row: 17 of 55 solved by `fill_hole` under `--safe`
+(agda-stdlib 6 of 22, the haystack 0 of 12, agda-algebras 11 of 21), each
+search 12 ms or less; every term found was accepted.  The one row of 81 where the two disagree is the
+bound row above, which neither solves.
 
 ---
 

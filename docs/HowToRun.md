@@ -775,9 +775,15 @@ The server exposes **thirteen tools** by default:
    scope-aware tool behind it, `search_in_scope` (issue #17), is registered too
    and presented when `--expose` names it.
 
+A fifteenth, `auto` (issue #205), runs Agda's own proof search (Mimer, an
+editor's `C-c C-a`) at a hole and answers the term it finds as a candidate for
+`fill_hole` to judge; it is registered only when you start the server with
+`--auto`.
+
 `--expose NAME,...` presents a subset of them (issue #191).  For the full
 command-line reference (`--cwd`, `--agda-bin`, `--agda-flags`, `--corpus`,
-`--timeout`, `--check-command`, `--check-timeout`, `--expose`, `--verbose`), see
+`--timeout`, `--check-command`, `--check-timeout`, `--expose`, `--auto`,
+`--verbose`), see
 [`agda-mcp/README.md`](../agda-mcp/README.md#command-line-options).
 
 `check_project` runs the project's own acceptance gate (the nearest Makefile's

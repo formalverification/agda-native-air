@@ -1,0 +1,102 @@
+{
+  "runId": "auto-floor-1",
+  "config": {
+    "server": "agda-mcp/dist-newstyle/build/x86_64-linux/ghc-9.10.3/agda-mcp-0.2.0/x/agda-mcp/build/agda-mcp/agda-mcp",
+    "subjectFlags": [
+      "-i",
+      "agda-dojang/agda",
+      "--library-file=agda/libraries",
+      "-l",
+      "agda-dojang",
+      "-l",
+      "standard-library",
+      "-l",
+      "agda-algebras"
+    ],
+    "judgeFlags": [
+      "-i",
+      "agda-dojang/agda",
+      "--library-file=agda/libraries",
+      "-l",
+      "agda-dojang",
+      "-l",
+      "standard-library",
+      "-l",
+      "agda-algebras",
+      "--safe"
+    ],
+    "hints": "none",
+    "timeoutMs": null,
+    "tiers": null,
+    "ids": null
+  },
+  "perTier": {
+    "agda-stdlib-v0": {
+      "solved": 6,
+      "total": 22,
+      "outcomes": {
+        "found": 6,
+        "no-solution": 16
+      },
+      "unjudged": 0
+    },
+    "agda-algebras-v0": {
+      "solved": 11,
+      "total": 21,
+      "outcomes": {
+        "found": 11,
+        "no-solution": 8,
+        "out-of-scope": 2
+      },
+      "unjudged": 0
+    },
+    "agda-stdlib-haystack-v0": {
+      "solved": 0,
+      "total": 12,
+      "outcomes": {
+        "no-solution": 12
+      },
+      "unjudged": 0
+    },
+    "agda-stdlib-hard-v0": {
+      "solved": 0,
+      "total": 6,
+      "outcomes": {
+        "no-solution": 6
+      },
+      "unjudged": 0
+    },
+    "agda-algebras-hard-v0": {
+      "solved": 0,
+      "total": 8,
+      "outcomes": {
+        "no-solution": 7,
+        "out-of-scope": 1
+      },
+      "unjudged": 0
+    },
+    "agda-algebras-composition-v0": {
+      "solved": 1,
+      "total": 12,
+      "outcomes": {
+        "error": 1,
+        "found": 1,
+        "no-solution": 9,
+        "out-of-scope": 1
+      },
+      "unjudged": 0
+    }
+  },
+  "total": {
+    "solved": 18,
+    "total": 81,
+    "outcomes": {
+      "error": 1,
+      "found": 18,
+      "no-solution": 58,
+      "out-of-scope": 4
+    },
+    "unjudged": 0
+  },
+  "unmeasured": []
+}
