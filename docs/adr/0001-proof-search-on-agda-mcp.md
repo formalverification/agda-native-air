@@ -114,7 +114,7 @@ Four lessons from [#112] are load-bearing and reappear as decisions below: repor
 
 **Evidence**.  `ProposeSpec` pins the imports parser, the splitter on live-captured renderings, the proposal order, and the lane-rejection rule; the P1 baseline in § 9 saturates the ceiling exactly.
 
-**Agda's own proof search composes around any space** ([#206]).  `--auto closer` wraps the configured proposer: at every expanded state it asks the server's `auto` tool at the selected obligation before any other proposal, and proposes the term first; `--auto hints` gives the search, as hint names, the retrieval proposer's accepted lemmas for the goal, after the exclusion.  The term is a candidate judged by `fill_hole` like any other.  It skips the `type_of` peek through one seam method, `Proposer.unpeeked`, whose default is exactly the earlier rule (the two closers): Agda has just typed the term at this goal, and the peek's textual match misjudges terms equal to the goal only up to unfolding, the same reason the closers are exempt (§ 6).  Off, nothing is wrapped and the report gains no key.
+**Agda's own proof search composes around any space** ([#206]).  `--auto closer` wraps the configured proposer: at every expanded state it asks the server's `auto` tool at the selected obligation before any other proposal, and proposes the term first; `--auto hints` gives the search, as hint names, the retrieval proposer's accepted lemmas for the goal, after the exclusion.  The term is a candidate judged by `fill_hole` like any other.  It skips the `type_of` peek through one seam method, `Proposer.unpeeked(state, target, candidate)`, whose default is exactly the earlier rule (the two closers): Agda has just typed the term at this goal, and the peek's textual match misjudges terms equal to the goal only up to unfolding, the same reason the closers are exempt (§ 6).  The exemption holds at the state and obligation the term was found for and nowhere else; the same text proposed at another goal is peeked like any other candidate (a Copilot catch on [#233], where an exemption that outlived its proposal let it through).  Off, nothing is wrapped and the report gains no key.
 
 **Status**.  Adopted (P1); the seam survived P2 unchanged, and gained `unpeeked` with Agda's own search ([#206]), its default the closers' exemption.
 
@@ -527,6 +527,7 @@ Run ids are `auto206-<stratum>-<space>-<knob>`, and the agda-algebras rows of th
 [#205]: https://github.com/formalverification/agda-native-air/issues/205
 [#206]: https://github.com/formalverification/agda-native-air/issues/206
 [#230]: https://github.com/formalverification/agda-native-air/pull/230
+[#233]: https://github.com/formalverification/agda-native-air/pull/233
 
 [`proof-search/overview.md`]: ../proof-search/overview.md
 [`agda-mcp/agda-mcp-interaction-lane.md`]: ../agda-mcp/agda-mcp-interaction-lane.md

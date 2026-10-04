@@ -189,8 +189,9 @@ object TypeOfBody {
   * `found` carries `term` (Agda's rendering, joined onto one line by the
   * server), `no-solution` carries `message`, and `out-of-scope` and `error`
   * carry `error`.  `elapsedMs` (the whole call, the reset included) and
-  * `options` (what Agda was sent) are required; `searchMs` and `resetMs` are
-  * read for the ledger when present.
+  * `options` (the string built for the search, which reached Agda only when
+  * `searchMs` is present) are required; `searchMs` and `resetMs` are read
+  * for the ledger when present.
   */
 final case class AutoError(stage: String, code: Option[String], message: String)
 object AutoError {
