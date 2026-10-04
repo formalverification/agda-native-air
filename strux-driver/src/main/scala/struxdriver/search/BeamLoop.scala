@@ -260,18 +260,23 @@ object BeamLoop {
             // candidate (assumptions included) was measured to reprobe the
             // context at every expansion and give back the peek's entire
             // savings (833 probes vs 193 on the same suite).
-            if (!cfg.peek || FixedProposer.closers.contains(cand)) IO.pure((st, Peek.Verdict.Keep))
-            else
-              oracle.typeOf(mkCtx("peek", Some(rank)), workFile, Peek.metaForm(cand),
-                            Some((target.line, target.col)))
-                .map(ans => Peek.judge(view.goal, ans.body))
-                .map {
-                  case Peek.Verdict.Keep      =>
-                    (st.copy(stats = st.stats.copy(peeks = st.stats.peeks + 1)), Peek.Verdict.Keep: Peek.Verdict)
-                  case r: Peek.Verdict.Reject =>
-                    (st.copy(stats = st.stats.copy(
-                      peeks = st.stats.peeks + 1, peekRejects = st.stats.peekRejects + 1)), r: Peek.Verdict)
-                }
+            // The proposer names the rest of the exemption (`unpeeked`): by
+            // default exactly the closers, and, under Agda's own proof
+            // search (issue #206), the terms Agda found at this very goal.
+            proposer.unpeeked(state, target, cand).flatMap { exempt =>
+              if (!cfg.peek || exempt) IO.pure((st, Peek.Verdict.Keep: Peek.Verdict))
+              else
+                oracle.typeOf(mkCtx("peek", Some(rank)), workFile, Peek.metaForm(cand),
+                              Some((target.line, target.col)))
+                  .map(ans => Peek.judge(view.goal, ans.body))
+                  .map {
+                    case Peek.Verdict.Keep      =>
+                      (st.copy(stats = st.stats.copy(peeks = st.stats.peeks + 1)), Peek.Verdict.Keep: Peek.Verdict)
+                    case r: Peek.Verdict.Reject =>
+                      (st.copy(stats = st.stats.copy(
+                        peeks = st.stats.peeks + 1, peekRejects = st.stats.peekRejects + 1)), r: Peek.Verdict)
+                  }
+            }
           peeked.flatMap {
             case (st1, Peek.Verdict.Reject(_)) =>
               probeCands(state, target, view, fp, rest, st1, acc)

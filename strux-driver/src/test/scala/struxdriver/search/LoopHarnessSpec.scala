@@ -106,6 +106,39 @@ final class LoopHarnessSpec extends AnyFunSuite with Matchers {
     ProofSearchLoop.parseArgs(base ++ List("--ids", "x")).left.toOption.get should include ("not both")
   }
 
+  test("--auto: off by default, closer with any space, hints only over retrieval (#206)") {
+    val base = List("--index", "i", "--out-dir", "o", "--server-bin", "b", "--project-root", ".", "--all")
+    ProofSearchLoop.parseArgs(base).map(_.auto) shouldBe Right(AutoMode.Off)
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "closer")).map(_.auto) shouldBe Right(AutoMode.Closer)
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "hints")).left.toOption.get should include ("requires --proposer retrieval")
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "hints", "--proposer", "retrieval", "--corpus", "c"))
+      .map(_.auto) shouldBe Right(AutoMode.Hints)
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "on")).left.toOption.get should include ("off|closer|hints")
+  }
+
+  test("--auto: refused under a 1 s --server-timeout, which Agda's default search bound reaches (#206)") {
+    // The loop sends no search bound, so each search runs Agda's default of
+    // 1,000 ms, which the server refuses under a 1 s deadline: every call
+    // would fail and the sweep would run without the closer it asked for
+    // (a Copilot catch on PR #233).
+    val base = List("--index", "i", "--out-dir", "o", "--server-bin", "b", "--project-root", ".", "--all")
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "closer", "--server-timeout", "1")).left.toOption.get should
+      include ("--server-timeout")
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "hints", "--proposer", "retrieval", "--corpus", "c",
+      "--server-timeout", "1")).isLeft shouldBe true
+    ProofSearchLoop.parseArgs(base ++ List("--auto", "closer", "--server-timeout", "2")).map(_.auto) shouldBe
+      Right(AutoMode.Closer)
+    ProofSearchLoop.parseArgs(base ++ List("--server-timeout", "1")).map(_.serverTimeout) shouldBe Right(1)
+  }
+
+  test("the report outcome carries the auto ledger only when the knob is on (#206)") {
+    val base = LoopOutcome("id", "routine", "G", "M", "exhausted", solved = false, Vector.empty, LoopStats(), 1L, None)
+    base.toJson.hcursor.downField("auto").focus shouldBe None
+    val on = base.copy(auto = Some(AutoLedger().record(Vector.empty, Left("lane timeout")).toJson(AutoMode.Closer)))
+    on.toJson.hcursor.downField("auto").get[String]("mode") shouldBe Right("closer")
+    on.toJson.hcursor.downField("auto").downField("outcomes").get[Int]("failed") shouldBe Right(1)
+  }
+
   test("the report outcome carries the root goal's context when the loop recorded one (#19)") {
     // The offline recall instrument rebuilds the proposer's goal tokens from
     // this field; it is additive, and absent when no root goal was reached.

@@ -430,6 +430,22 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     exclusion.reasonFor(mulComm) shouldBe None
   }
 
+  test("exclusion: the name rule sees through the prime an obligation is renamed with (#206)") {
+    // 18 of the 21 agda-algebras obligations are their original's name plus a
+    // prime, and the exact comparison let every original through.
+    val primed = TargetExclusion("Imagef∋f′", "irrelevant to the name rule")
+    def row(q: String) = plusComm.copy(prettyQname = q)
+    primed.stem shouldBe "Imagef∋f"
+    primed.reasonFor(row("Setoid.Functions.Inverses.Imagef∋f")) shouldBe
+      Some("name:Setoid.Functions.Inverses.Imagef∋f")
+    primed.reasonFor(row("Setoid.Functions.Inverses.Imagef∋f′")) shouldBe
+      Some("name:Setoid.Functions.Inverses.Imagef∋f′")
+    primed.reasonFor(row("Setoid.Functions.Inverses.Imagef∋f′′")) shouldBe None
+    // An unprimed hole is compared exactly, as before.
+    exclusion.stem shouldBe "+-comm"
+    exclusion.reasonFor(mulComm) shouldBe None
+  }
+
   test("exclusion: the statement rule catches an alpha-equal restatement under another name") {
     val alias = SearchHit("Data.Nat.Properties.comm′", "(x y : ℕ) → x + y ≡ y + x",
       "function", "Data.Nat.Properties", hasBody = true)
@@ -474,6 +490,21 @@ final class RetrieveSpec extends AnyFunSuite with Matchers {
     // Determinism: a second proposer over the same world proposes the same.
     val (proposer2, _, _) = freshProposer()
     proposer2.propose(state0, state0.obligations.head, goal).unsafeRunSync() shouldBe cands
+  }
+
+  test("lemmasFor: the goal's accepted renderings in rank order, after exclusion, from the same memo (#206)") {
+    val (p, _, _) = freshProposer()
+    val lemmas = p.lemmasFor(goal).unsafeRunSync()
+    lemmas shouldBe Vector(
+      "+-suc", "Relation.Binary.PropositionalEquality.trans",
+      "Data.Nat.Properties.*-comm", "Data.Nat.Properties.≤-refl")
+    // The excluded target and its record-field projection are never hints.
+    lemmas.exists(_.endsWith("+-comm")) shouldBe false
+    // Asking first changes neither what is proposed nor what the ledger says.
+    val cands  = p.propose(state0, state0.obligations.head, goal).unsafeRunSync()
+    val (q, _, _) = freshProposer()
+    q.propose(state0, state0.obligations.head, goal).unsafeRunSync() shouldBe cands
+    p.stats.unsafeRunSync() shouldBe q.stats.unsafeRunSync()
   }
 
   test("propose: the stats ledger names every cut") {
