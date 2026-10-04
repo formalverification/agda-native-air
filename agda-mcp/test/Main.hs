@@ -3963,6 +3963,36 @@ autoTests = do
                , assert "the address alternatives" (isJust (KM.lookup "oneOf" o))
                ]
              _ -> pure (Fail "auto is not listed exactly once")
+
+    , -- The schema states the bounds the handler enforces, so a client that
+      -- validates its arguments refuses what the handler would (a Copilot
+      -- catch on PR #230: it had said only "integer" and "string").
+      runTest "surface: auto's schema states the bounds the handler enforces" $
+        let propOf cfg name = listToMaybe
+              [ p | d <- toolEntries (toolDefinitions cfg)
+                  , KM.lookup "name" d == Just (Aeson.String "auto")
+                  , Just (Aeson.Object sch) <- [KM.lookup "inputSchema" d]
+                  , Just (Aeson.Object ps)  <- [KM.lookup "properties" sch]
+                  , Just (Aeson.Object p)   <- [KM.lookup (Key.fromText name) ps] ]
+            bound cfg name k = propOf cfg name >>= KM.lookup k
+            itemBound = case propOf autoConfig "hints" >>= KM.lookup "items" of
+              Just (Aeson.Object i) -> KM.lookup "minLength" i
+              _                     -> Nothing
+            noTimeout = autoConfig { scAgdaConfig = (scAgdaConfig autoConfig) { agdaTimeout = Nothing } }
+            refused t = either (const True) (const False)
+              (autoParamsOf ("{\"filePath\":\"/x/A.agda\",\"holeIndex\":0," <> t <> "}"))
+        in allOf
+          [ assertEqual "timeoutMs from 1" (Just (Aeson.Number 1)) (bound autoConfig "timeoutMs" "minimum")
+          , assertEqual "timeoutMs below the server's --timeout of 300 s"
+              (Just (Aeson.Number 299999)) (bound autoConfig "timeoutMs" "maximum")
+          , assertEqual "no ceiling without a --timeout" Nothing (bound noTimeout "timeoutMs" "maximum")
+          , assertEqual "skip from 0" (Just (Aeson.Number 0)) (bound autoConfig "skip" "minimum")
+          , assertEqual "a hint is nonempty" (Just (Aeson.Number 1)) itemBound
+          , assert "the handler refuses below each minimum and accepts at it" $
+              refused "\"timeoutMs\":0" && not (refused "\"timeoutMs\":1")
+              && refused "\"skip\":-1" && not (refused "\"skip\":0")
+              && refused "\"hints\":[\"\"]" && not (refused "\"hints\":[\"h\"]")
+          ]
     ]
 
 -- ---------------------------------------------------------------------------

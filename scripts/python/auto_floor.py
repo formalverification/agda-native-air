@@ -40,7 +40,12 @@ Description: The proof-search floor of the benchmark (issues #205, #206):
       [--tiers agda-algebras-composition-v0] [--timeout-ms 1000]
 
   Output: <out-dir>/<run-id>/rows.jsonl (one record per obligation, in index
-  order) and summary.json (the configuration and the per-tier counts).
+  order) and summary.json (the configuration and the per-tier counts).  A
+  row the run could not measure names why: `failure` for a search with no
+  usable answer (outcome `tool-failure`), `judgeFailure` for a found term the
+  judge never ruled on (counted per tier as `unjudged`).  Both files are
+  written either way, and the exit status is 1 when any row is unmeasured,
+  since the counts are then not a floor.
 
   fill_hole patches each obligation in place and restores it, so nothing
   else may run against the fixtures meanwhile.
@@ -150,8 +155,14 @@ def rpc_input(calls: Sequence[Call]) -> str:
 
 def answer_of(response: Mapping[str, Any]) -> Answer:
     """A tools/call response as an Answer.  The payload is JSON inside the
-    content's text, except for refusals the server words as prose."""
-    result = response.get("result", {})
+    content's text, except for refusals the server words as prose.  A
+    JSON-RPC error (no result at all) is an error answer carrying its
+    message, not an empty success."""
+    if "error" in response or not isinstance(response.get("result"), dict):
+        err = response.get("error")
+        return Answer(is_error=True, body=(err.get("message") if isinstance(err, dict) else None)
+                      or f"no result in the response: {json.dumps(response)[:300]}")
+    result = response["result"]
     text = (result.get("content") or [{}])[0].get("text", "")
     try:
         body: Any = json.loads(text)
@@ -160,9 +171,21 @@ def answer_of(response: Mapping[str, Any]) -> Answer:
     return Answer(is_error=bool(result.get("isError")), body=body)
 
 
+def json_object(line: str) -> Optional[Dict[str, Any]]:
+    """A line as a JSON object, or None when it is not one."""
+    try:
+        value = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def answers_of(stdout: str) -> Dict[int, Answer]:
-    """Every tools/call answer in a phase's output, by request id."""
-    responses = (json.loads(ln) for ln in stdout.splitlines() if ln.strip())
+    """Every tools/call answer in a phase's output, by request id.  A line
+    that is not a JSON object (a server cut off mid-line, say) answers
+    nothing, so the call it was answering becomes a row's named failure
+    rather than a traceback that loses the whole phase."""
+    responses = (r for r in (json_object(ln) for ln in stdout.splitlines() if ln.strip()) if r is not None)
     return {r["id"]: answer_of(r) for r in responses if isinstance(r.get("id"), int) and r["id"] > 0}
 
 
@@ -205,18 +228,36 @@ def judge_call(ob: Obligation, term: str) -> Call:
     return ("fill_hole", {"filePath": str(ob.path), "holeIndex": 0, "candidate": f"({term})"})
 
 
+def failure_of(phase: str, answer: Optional[Answer], field: str) -> Optional[str]:
+    """Why a phase's answer carries no usable `field`, or None when it does:
+    no answer at all, a failed call, or an answer without the field."""
+    if answer is None:
+        return f"the {phase} phase's server gave no answer for this obligation"
+    if answer.is_error:
+        return (answer.body if isinstance(answer.body, str) else json.dumps(answer.body))[:500]
+    if not isinstance(answer.body, dict) or field not in answer.body:
+        return f"the {phase} answer has no {field}: {json.dumps(answer.body)[:300]}"
+    return None
+
+
 def record_of(ob: Obligation, hints: Sequence[str], searched: Optional[Answer],
               judged: Optional[Answer]) -> Dict[str, Any]:
     """One obligation's row: what the search said, and what the judge said of
-    the term it found."""
-    body = searched.body if searched is not None and isinstance(searched.body, dict) else {}
+    the term it found.  Every failure is named in the row: a search with no
+    usable answer is a `tool-failure` with its `failure`, and a found term
+    the judge never ruled on carries `judgeFailure`, so it is never read as
+    a term the judge refused."""
+    search_failure = failure_of("search", searched, "outcome")
+    body = searched.body if search_failure is None and searched is not None else {}
     err = body.get("error") or {}
-    status = judged.body.get("status") if judged is not None and isinstance(judged.body, dict) else None
+    term = body.get("term") if body.get("outcome") == "found" else None
+    judge_failure = failure_of("judge", judged, "status") if term is not None else None
+    status = judged.body["status"] if term is not None and judge_failure is None and judged is not None else None
     rec: Dict[str, Any] = {
         "id": ob.id, "tier": ob.tier, "source": ob.source, "difficulty": ob.difficulty,
         "hints": list(hints),
         "unnamedHints": [nd for nd in ob.needles if nd not in hints],
-        "outcome": body.get("outcome") if not (searched is None or searched.is_error) else "tool-failure",
+        "outcome": body["outcome"] if search_failure is None else "tool-failure",
         "term": body.get("term"),
         "message": body.get("message"),
         "errorStage": err.get("stage"),
@@ -226,9 +267,17 @@ def record_of(ob: Obligation, hints: Sequence[str], searched: Optional[Answer],
         "fillHole": status,
         "solved": status == "ok",
     }
-    if searched is not None and searched.is_error:
-        rec["failure"] = searched.body if isinstance(searched.body, str) else json.dumps(searched.body)[:500]
+    if search_failure is not None:
+        rec["failure"] = search_failure
+    if judge_failure is not None:
+        rec["judgeFailure"] = judge_failure
     return rec
+
+
+def failed_rows(records: Sequence[Mapping[str, Any]]) -> List[str]:
+    """The rows a run could not measure: a search with no usable answer, or
+    a found term the judge never ruled on.  A run with any is not a floor."""
+    return [r["id"] for r in records if "failure" in r or "judgeFailure" in r]
 
 
 def summary_of(opts: Options, records: Sequence[Mapping[str, Any]], server: str) -> Dict[str, Any]:
@@ -236,7 +285,8 @@ def summary_of(opts: Options, records: Sequence[Mapping[str, Any]], server: str)
     tiers = list(dict.fromkeys(r["tier"] for r in records))
     def counts(rs: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         return {"solved": sum(1 for r in rs if r["solved"]), "total": len(rs),
-                "outcomes": dict(sorted(Counter(r["outcome"] for r in rs).items()))}
+                "outcomes": dict(sorted(Counter(r["outcome"] for r in rs).items())),
+                "unjudged": sum(1 for r in rs if "judgeFailure" in r)}
     return {
         "runId": opts.run_id,
         "config": {
@@ -370,6 +420,11 @@ def main(argv: Sequence[str]) -> int:
         sys.stderr.write(f"  {tier:32} {c['solved']:3} / {c['total']:3}  {c['outcomes']}\n")
     t = summary["total"]
     sys.stderr.write(f"auto_floor: {t['solved']} / {t['total']} solved; rows in {out}\n")
+    failed = failed_rows(records)
+    if failed:
+        sys.stderr.write(f"auto_floor: {len(failed)} row(s) not measured (a tool failure or an "
+                         f"unjudged term), so these counts are not a floor: {', '.join(failed)}\n")
+        return 1
     return 0
 
 

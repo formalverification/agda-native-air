@@ -11,9 +11,10 @@ pin the hole line (code before a line comment only), the JSON-RPC batch, the
 reading of an answer (JSON inside the text, or prose for a refusal), the
 needle filter (only names Agda typed at the hole are passed on), the call
 each phase makes, a bound the server would refuse refused up front, a row
-for each outcome, and the per-tier summary.  The answers below are shaped
-as agda-mcp answered them on the benchmark (issue #205), trimmed to the
-fields the script reads.
+for each outcome, every failure named in its row and never read as a
+verdict, and the per-tier summary.  The answers below are shaped as
+agda-mcp answered them on the benchmark (issue #205), trimmed to the fields
+the script reads.
 
 Usage
 -----
@@ -35,6 +36,7 @@ from scripts.python.auto_floor import (
     Options,
     answers_of,
     auto_call,
+    failed_rows,
     found_term,
     hole_line,
     judge_call,
@@ -116,6 +118,19 @@ def test_answers_of_decodes_json_and_keeps_prose() -> None:
     assert got[2].is_error and isinstance(got[2].body, str)
 
 
+def test_answers_of_reads_a_cut_line_and_an_rpc_error_as_no_answer_and_a_failure() -> None:
+    # A server cut off mid-line must not cost the phase a traceback, and a
+    # JSON-RPC error is a failure, not an empty success (PR #230).
+    out = "\n".join([
+        response(1, {"outcome": "found", "term": "refl"}),
+        json.dumps({"jsonrpc": "2.0", "id": 2, "error": {"code": -32602, "message": "bad params"}}),
+        '{"jsonrpc":"2.0","id":3,"res',
+    ])
+    got = answers_of(out)
+    assert set(got) == {1, 2}
+    assert got[2] == Answer(True, "bad params")
+
+
 def test_needles_pass_only_when_typed_at_the_hole() -> None:
     a = ob("a", needles=("A.f", "A.g"))
     b = ob("b", needles=("B.h",))
@@ -174,15 +189,38 @@ def test_record_of_each_outcome() -> None:
     assert failed["outcome"] == "tool-failure" and "timed out" in failed["failure"]
 
 
+def test_record_of_names_every_failure_and_never_reads_one_as_a_verdict() -> None:
+    # Measured before the fix: each of these rows carried no reason, and the
+    # two judge failures read as a found term the judge had refused (PR #230).
+    o = ob()
+    found = Answer(False, {"outcome": "found", "term": "refl"})
+    missing = record_of(o, (), None, None)
+    assert missing["outcome"] == "tool-failure" and "no answer" in missing["failure"]
+    shapeless = record_of(o, (), Answer(False, {"lane": {}}), None)
+    assert shapeless["outcome"] == "tool-failure" and "no outcome" in shapeless["failure"]
+    refused = record_of(o, (), found, Answer(True, "Invalid arguments: no hole"))
+    assert (refused["outcome"], refused["fillHole"], refused["solved"]) == ("found", None, False)
+    assert refused["judgeFailure"] == "Invalid arguments: no hole"
+    unanswered = record_of(o, (), found, None)
+    assert "no answer" in unanswered["judgeFailure"]
+    judged = record_of(o, (), found, Answer(False, {"status": "type_error"}))
+    assert "judgeFailure" not in judged and "failure" not in judged
+    nothing_to_judge = record_of(o, (), Answer(False, {"outcome": "no-solution"}), None)
+    assert "judgeFailure" not in nothing_to_judge
+    assert failed_rows([missing, refused, unanswered, judged, nothing_to_judge]) == ["comp-x"] * 3
+
+
 def test_summary_counts_per_tier_in_order() -> None:
     rows = [
         {"tier": "agda-stdlib-v0", "solved": True, "outcome": "found"},
         {"tier": "agda-stdlib-v0", "solved": False, "outcome": "no-solution"},
         {"tier": "agda-algebras-v0", "solved": False, "outcome": "out-of-scope"},
+        {"tier": "agda-algebras-v0", "solved": False, "outcome": "found", "judgeFailure": "no answer"},
     ]
     s = summary_of(options(), rows, "bin/agda-mcp")
     assert list(s["perTier"]) == ["agda-stdlib-v0", "agda-algebras-v0"]
-    assert s["perTier"]["agda-stdlib-v0"] == {"solved": 1, "total": 2,
+    assert s["perTier"]["agda-stdlib-v0"] == {"solved": 1, "total": 2, "unjudged": 0,
                                               "outcomes": {"found": 1, "no-solution": 1}}
-    assert s["total"]["solved"] == 1 and s["total"]["total"] == 3
+    assert s["perTier"]["agda-algebras-v0"]["unjudged"] == 1
+    assert s["total"]["solved"] == 1 and s["total"]["total"] == 4
     assert s["config"]["server"] == "bin/agda-mcp" and "--safe" in s["config"]["judgeFlags"]

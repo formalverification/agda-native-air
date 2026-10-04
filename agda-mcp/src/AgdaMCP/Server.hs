@@ -111,7 +111,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS8
 
 import System.IO (hFlush, hPutStrLn, hSetBuffering, stdin, stdout, stderr, BufferMode (..), isEOF)
 
-import AgdaMCP.Agda (AgdaConfig)
+import AgdaMCP.Agda (AgdaConfig (..))
 import AgdaMCP.Declaration (defaultQuoteLines)
 import AgdaMCP.Gate (GateConfig)
 import AgdaMCP.Interaction
@@ -456,10 +456,10 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
               , prop "column"    "integer" columnDoc
               , prop "col"       "integer" colDoc
               , prop "holeIndex" "integer" holeIndexDoc
-              , propArray "hints" "string" autoHintsDoc
+              , propNames "hints" autoHintsDoc
               , propEnum "hintMode" ["none", "module", "unqualified"] autoHintModeDoc
-              , prop "timeoutMs" "integer" autoTimeoutDoc
-              , prop "skip"      "integer" autoSkipDoc
+              , propBounded "timeoutMs" 1 autoTimeoutCeiling autoTimeoutDoc
+              , propBounded "skip"      0 Nothing autoSkipDoc
               , prop "reload"    "boolean" liveReloadDoc
               , prop "verbose"   "boolean" verboseDoc
               ]
@@ -467,6 +467,12 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
               [addressAlternatives]
           ]
       | otherwise = []
+
+    -- The handler refuses a search bound that reaches the server's own
+    -- --timeout (none when it is absent or not positive).
+    autoTimeoutCeiling = case agdaTimeout (scAgdaConfig cfg) of
+      Just secs | secs > 0 -> Just (fromIntegral secs * 1000 - 1)
+      _                    -> Nothing
 
     searchTools
       | isJust (scCorpusIndex cfg) =
@@ -954,9 +960,10 @@ autoNote fillHoleShown =
      \code?, message}: stage 'hints' for a hint the search cannot use, \
      \'auto' for any other refusal, 'load' when the file does not load. The \
      \search uses the hole's context, constructors, record fields, the \
-     \file's where-functions, and hints; hintMode adds more. options echoes \
-     \what Agda was sent; searchMs is the search and resetMs the re-load a \
-     \found term costs, both within elapsedMs."
+     \file's where-functions, and hints; hintMode adds more. options is the \
+     \string built for the search, sent only when searchMs is present; \
+     \searchMs is the search and resetMs the re-load a found term costs, \
+     \both within elapsedMs."
 
 autoHintsDoc :: Text
 autoHintsDoc =
@@ -1101,6 +1108,33 @@ propEnum name values desc =
       [ "type"        .= ("string" :: Text)
       , "enum"        .= values
       , "description" .= desc
+      ]
+  )
+
+-- | propBounded: an integer property with the bounds its handler enforces
+-- (auto's @timeoutMs@ and @skip@, issue #205), declared so a client that
+-- validates its arguments refuses what the handler would (a Copilot catch
+-- on PR #230: the schema had said only "integer").
+propBounded :: Text -> Integer -> Maybe Integer -> Text -> (Text, Value)
+propBounded name lo hi desc =
+  ( name
+  , object $
+      [ "type"        .= ("integer" :: Text)
+      , "minimum"     .= lo
+      , "description" .= desc
+      ]
+      <> maybe [] (\h -> ["maximum" .= h]) hi
+  )
+
+-- | propNames: an array of nonempty strings (auto's @hints@), declared as
+-- the handler reads it, which refuses an empty hint by name.
+propNames :: Text -> Text -> (Text, Value)
+propNames name desc =
+  ( name
+  , object
+      [ "type"        .= ("array" :: Text)
+      , "description" .= desc
+      , "items"       .= object [ "type" .= ("string" :: Text), "minLength" .= (1 :: Int) ]
       ]
   )
 

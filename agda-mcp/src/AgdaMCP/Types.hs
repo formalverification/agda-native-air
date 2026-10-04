@@ -2332,7 +2332,9 @@ instance ToJSON AutoOutcome where
 -- for the other two.
 --
 -- 'aurSearchMs' is the search's round trip on the lane, absent when no search
--- ran (the file did not load); 'aurResetMs' is the re-load a found term owes
+-- ran (the file did not load, or a hint was refused before the search), and
+-- so the mark of whether 'aurOptions' reached Agda; 'aurResetMs' is the
+-- re-load a found term owes
 -- (Agda gave it into the lane's state), present exactly when one ran.  Both
 -- are beside @elapsedMs@, the whole call, because a search costs milliseconds
 -- and a reset can cost a second, and a caller budgeting either needs to see
@@ -2342,7 +2344,8 @@ data AutoResult = AutoResult
   , aurTerm     :: Maybe Text
   , aurMessage  :: Maybe Text
   , aurError    :: Maybe LiveError
-  , aurOptions  :: Text             -- ^ The hole contents the search was given.
+  , aurOptions  :: Text             -- ^ The hole contents built for the search,
+                                    --   sent only when 'aurSearchMs' is present.
   , aurSearchMs :: Maybe Int
   , aurResetMs  :: Maybe Int
   , aurMeta     :: LiveMeta

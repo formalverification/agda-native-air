@@ -1170,9 +1170,12 @@ splitting), and every other word as a hint.  The tool never sends free text:
 it builds the string from declared fields (`timeoutMs` as `-t <n>ms`, `skip`
 as `-s <n>`, `hintMode`, and `hints`), refuses a hint holding whitespace, one
 spelled like an option, or one holding a character no name holds
-(`( ) { } ; "`), and echoes the string sent as `options`.  `-l` and `-c` are
-not offered: the first changes what an answer is, and the second does
-nothing.
+(`( ) { } ; "`), and echoes the string it built as `options`.  The string
+reaches Agda only when a search runs, which `searchMs` marks: a call refused
+before the search (a hint the scope check refuses, a file that does not
+load) echoes the string it would have sent, and has no `searchMs`.  `-l` and
+`-c` are not offered: the first changes what an answer is, and the second
+does nothing.
 
 **The bound**.  `-t` is CPU time, in milliseconds when written `<n>ms` (a
 bare number is seconds), Agda's default 1000 ms, and Mimer checks it between
@@ -1213,8 +1216,12 @@ server re-loads the file before answering (`resetMs`, beside the search's own
 holes, so a search on a reused load followed by a reset reports `true`.  If
 the re-load fails (a dependency edited in between, say), the answer is the
 load's error, naming the term found, since a term judged against a file that
-no longer loads is moot; the lane retries the load on the next call.
-`no-solution` and a refusal need none: the search runs in a local copy of
+no longer loads is moot; the lane retries the load on the next call.  The
+answer's `lane.load` and `loadElapsedMs` describe the load the search ran on,
+as for every live query; the reset is reported by `resetMs`, and with
+`verbose` its `Cmd_load` is in `lane.iotcm`.  The next call on the file
+reuses the reset's load (`lane.load: "reused"`).  `no-solution` and a
+refusal need none: the search runs in a local copy of
 Agda's state, and Agda's interaction loop puts back the state it held before
 a failed command.
 

@@ -38,7 +38,10 @@ first 300 characters, the search's milliseconds, the hints sent and any
 dropped, `fill_hole`'s status, and `solved`), and `summary.json`, the
 configuration and the per-tier counts.  Each run was made twice, the second
 time into this directory; the two agree on every outcome, term, code, and
-status.
+status.  A row the script could not measure names why (`failure` for a
+search with no usable answer, `judgeFailure` for a found term the judge
+never ruled on, counted per tier as `unjudged` by the current script), and
+the script then exits 1; neither run here has such a row.
 
 ## The floor
 
