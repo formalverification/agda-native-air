@@ -22,14 +22,24 @@
 --   tools built on this lane say in their descriptions that they inform and never
 --   decide.
 --
---   One function here does change the child's state and reads its answer in
---   fill_hole's vocabulary: 'giveCandidate', the @Cmd_give@ of issue #163.
---   It is reachable from no tool and from no handler; it exists so that the
---   lane's reading of a candidate can be measured against the batch verdict
---   for the same candidate (the harness is @agda-mcp/parity/Main.hs@), and
---   its 'GiveClass' is a reading of what Agda did, never a verdict.  Whether
---   the lane may judge is a decision for a reader of that measurement, and
---   until one is taken the policy above is unchanged.
+--   Two functions here change the child's state, because the command each
+--   sends can consume an interaction point, and both leave the lane
+--   describing the file again before they return ('runConsuming').
+--
+--   * 'giveCandidate', the @Cmd_give@ of issue #163, reads its answer in
+--     fill_hole's vocabulary.  It is reachable from no tool and from no
+--     handler; it exists so that the lane's reading of a candidate can be
+--     measured against the batch verdict for the same candidate (the harness
+--     is @agda-mcp/parity/Main.hs@), and its 'GiveClass' is a reading of what
+--     Agda did, never a verdict.  Whether the lane may judge is a decision for
+--     a reader of that measurement, and until one is taken the policy above is
+--     unchanged.
+--   * 'autoAt', the @Cmd_autoOne@ of issue #205, runs Agda's own proof search
+--     (Mimer, which replaced Agsy in Agda 2.7) at a hole and reports what it
+--     found.  The auto tool calls it; what it answers is a candidate term,
+--     which Agda gives into its own state (with force, skipping the
+--     termination check) when the search succeeds, and which only a batch
+--     check may judge.
 --
 --   Design notes, briefly (each is probed, none is assumed):
 --
@@ -129,6 +139,10 @@ module AgdaMCP.Interaction
   , cmdShowVersion
   , cmdGive
   , GiveForce (..)
+  , cmdAutoOne
+    -- * Commands that may consume an interaction point
+  , Consumed (..)
+  , runConsuming
     -- * Giving a candidate to a hole (issue #163; no tool registers this)
   , GiveClass (..)
   , GiveReading (..)
@@ -138,6 +152,11 @@ module AgdaMCP.Interaction
   , readGive
   , giveErrorsOf
   , giveCandidate
+    -- * Agda's own proof search at a hole (issue #205)
+  , AutoAnswer (..)
+  , readAuto
+  , AutoRun (..)
+  , autoAt
     -- * Provenance prose (pure; exposed for testing)
   , SrcLoc (..)
   , ProvenanceStep (..)
@@ -590,6 +609,20 @@ cmdGive force gid expr =
     forceName = case force of
       WithoutForce -> "WithoutForce"
       WithForce    -> "WithForce"
+
+-- | cmdAutoOne: run Agda's own proof search at an interaction point, with the
+-- hole's contents set to the given option string (issue #205).
+--
+-- Under Agda 2.8 this is Mimer, which replaced Agsy in 2.7 (the 2.7.0 release
+-- notes; @Agda.Mimer.Options@ is the grammar the string is read with: @-t T@,
+-- @-s N@, @-l@, @-m@, @-u@, @-c@, and any other word a hint name).  On success
+-- Agda gives the term it found into its own state, with force, exactly as an
+-- editor's @C-c C-a@ does, so a found term consumes the point and a reset is
+-- owed ('autoAt').  @Simplified@ is the rendering the reference measurement
+-- used (@agsy-suite.py@); an editor's unprefixed @C-c C-a@ sends @AsIs@.
+cmdAutoOne :: Int -> Text -> Text
+cmdAutoOne gid opts =
+  "Cmd_autoOne Simplified " <> T.pack (show gid) <> " noRange " <> hsShow opts
 
 
 -- ---------------------------------------------------------------------------
@@ -1626,28 +1659,161 @@ giveCandidate
   -> GiveForce
   -> Text        -- ^ The candidate expression.
   -> IO (Either LaneFailure GiveOutcome)
-giveCandidate lh path flags gid force expr = do
+giveCandidate lh path flags gid force expr =
+  fmap outcome <$> runConsuming lh path flags (cmdGive force gid expr)
+  where
+    outcome c =
+      GiveOutcome (readGive gid (cnResponses c)) (cnSentUs c) (cnReset c) (cnResetUs c)
+
+-- | Consumed: one command that may have consumed an interaction point, its
+-- responses, what it cost, and the reset it was owed.
+--
+-- 'cnReset' is 'Nothing' exactly when no @GiveAction@ arrived: a refused
+-- give, a search that found nothing, and an error all leave the file's
+-- interaction points where they were.  An error leaves the rest of Agda's
+-- state where it was too, since the interaction loop puts back the state it
+-- held before a failed command (@handleCommand@ in Agda's
+-- @Interaction.InteractionTop@), so no reset is owed for one.  The timings are
+-- in microseconds, for the reason 'GiveOutcome' gives.
+data Consumed = Consumed
+  { cnResponses :: [IResponse]
+  , cnSentUs    :: Int
+  , cnReset     :: Maybe LoadReport
+  , cnResetUs   :: Maybe Int
+  } deriving (Eq, Show)
+
+-- | runConsuming: send a command that can consume an interaction point (a
+-- give, a proof search), and leave the lane describing the file again.
+--
+-- The caller has already run 'ensureLoaded' (nothing is loaded before the
+-- command, so the command is timed against a state the caller chose).
+-- Afterwards, if and only if a @GiveAction@ arrived, the file is re-loaded
+-- with @force@: an accepted give leaves the child holding a module whose hole
+-- is gone while the bytes on disk still have it, and every other reader of
+-- this lane (the next give, the next search, and the stamp-gated peek
+-- 'peekLoadedGoals' that fills the batch tools' goal fields) would otherwise
+-- be answered from that state without any evidence that it had changed, since
+-- the file itself never did.  Any @GiveAction@ counts, wherever it landed: a
+-- give that consumed some other point still consumed one.
+runConsuming
+  :: LaneHandle
+  -> FilePath    -- ^ The loaded file; the IOTCM names it.
+  -> [String]    -- ^ The effective flags of that load, for the reset.
+  -> Text        -- ^ The command.
+  -> IO (Either LaneFailure Consumed)
+runConsuming lh path flags cmd = do
   t0   <- getMonotonicTimeNSec
-  sent <- runQuery lh path (cmdGive force gid expr)
+  sent <- runQuery lh path cmd
   t1   <- getMonotonicTimeNSec
   case sent of
-    Left lf  -> pure (Left lf)
-    Right rs -> do
-      let reading = readGive gid rs
-          giveUs  = elapsedUsBetween t0 t1
-      if not (grGiven reading)
-        then pure . Right $ GiveOutcome reading giveUs Nothing Nothing
-        else do
+    Left lf -> pure (Left lf)
+    Right rs
+      | null [() | IGiveAction _ _ <- rs] ->
+          pure . Right $ Consumed rs (elapsedUsBetween t0 t1) Nothing Nothing
+      | otherwise -> do
           reset <- ensureLoaded lh True path flags
           t2    <- getMonotonicTimeNSec
-          case reset of
-            Left lf  -> pure (Left lf)
-            Right lr -> pure . Right $
-              GiveOutcome reading giveUs (Just lr) (Just (elapsedUsBetween t1 t2))
+          pure $ (\lr -> Consumed rs (elapsedUsBetween t0 t1) (Just lr)
+                                  (Just (elapsedUsBetween t1 t2)))
+                 <$> reset
 
 elapsedUsBetween :: Word64 -> Word64 -> Int
 elapsedUsBetween start end =
   fromIntegral ((end - start) `div` 1_000)
+
+
+-- ---------------------------------------------------------------------------
+-- Agda's own proof search at a hole (issue #205)
+-- ---------------------------------------------------------------------------
+--
+-- What @Cmd_autoOne@ answers, probed under the pinned Agda 2.8.0 on the
+-- benchmark's obligations and on the suite's AutoSearch fixture:
+--
+-- * A term found: a top-level @GiveAction@ at the asked point, whose
+--   @giveResult.str@ is Mimer's own rendering (Agda's pretty printer, which
+--   breaks a long term across lines and starts a continuation at column 1),
+--   followed by an @InteractionPoints@ list from which the point is gone.
+-- * Nothing found, within the search's time or its space: a @DisplayInfo@
+--   whose @info.kind@ is @Auto@ and whose @info.info@ is the message (@No
+--   solution found@ in both cases).
+-- * A refusal: a @DisplayInfo@ @Error@, its text under @info.error.message@.
+--   Two sources are measured.  A hint the hole's scope cannot name is read
+--   (and refused) before the search runs.  A term the search found is
+--   printed and then read back in the hole's scope before it is given, and
+--   a term printed with a name the file cannot write (a record field of a
+--   module the file never imports, spelled by its full internal name) is
+--   refused there, as @NotInScope@.
+
+-- | AutoAnswer: what one @Cmd_autoOne@ said, read as data.
+--
+-- The term is Agda's rendering as it arrived, line breaks included; joining
+-- it onto one line is the tool's business, so the reading keeps the evidence.
+data AutoAnswer
+  = AutoTerm Text         -- ^ A @GiveAction@ at the asked point, with its text.
+  | AutoMessage Text      -- ^ The search's own @Auto@ message.
+  | AutoRefusal Text      -- ^ Agda's @Error@ message.
+  | AutoUnexpected Text   -- ^ None of those; what did arrive, described.
+  deriving (Eq, Show)
+
+-- | readAuto: classify one @Cmd_autoOne@'s responses, given the point it was
+-- aimed at.
+--
+-- A term is an answer only about the hole that was asked about, so a
+-- @GiveAction@ that names another point, or none, or carries no text (the
+-- parenthesization forms of Agda's @GiveResult@) is 'AutoUnexpected', never a
+-- term; 'runConsuming' has re-loaded the file whichever point it consumed.
+-- An error outranks a message, since a refusal is the more specific report.
+readAuto :: Int -> [IResponse] -> AutoAnswer
+readAuto expected rs = case gives of
+  ((Just i, Just t) : _) | i == expected -> AutoTerm t
+  ((mi, _) : _) -> AutoUnexpected $
+    "agda gave a term at interaction point "
+    <> maybe "(no id)" (T.pack . show) mi <> ", not at "
+    <> T.pack (show expected)
+  [] -> case (mapMaybe errorMessageOf rs, autoMessages) of
+    (e : _, _) -> AutoRefusal e
+    ([], m : _) -> AutoMessage m
+    ([], [])    -> AutoUnexpected $
+      "agda answered with neither a term, a message, nor an error; kinds seen: "
+      <> T.intercalate ", " (map kindOf rs)
+  where
+    gives        = [ (mi, mt) | IGiveAction mi mt <- rs ]
+    autoMessages = [ m | IDisplayInfo "Auto" (Object io) <- rs
+                       , Just m <- [textField "info" io] ]
+    kindOf r = case r of
+      IDisplayInfo k _     -> "DisplayInfo/" <> k
+      IInteractionPoints _ -> "InteractionPoints"
+      IRunningInfo _       -> "RunningInfo"
+      IGiveAction _ _      -> "GiveAction"
+      IOther k _           -> k
+      IUnreadable _        -> "unreadable"
+
+-- | AutoRun: one search, read, with what it cost and the reset it was owed.
+data AutoRun = AutoRun
+  { auAnswer   :: AutoAnswer
+  , auSearchUs :: Int               -- ^ The @Cmd_autoOne@ round trip.
+  , auReset    :: Maybe LoadReport  -- ^ Present exactly when a term was given.
+  , auResetUs  :: Maybe Int
+  } deriving (Eq, Show)
+
+-- | autoAt: run the search at one interaction point of the lane's currently
+-- loaded file, read the answer, and leave the lane describing the file again
+-- ('runConsuming').
+--
+-- The option string is sent as the hole's contents, as an editor would send
+-- what the user typed into the hole; the tool layer builds it from declared
+-- fields, so no free text ever reaches Agda's option reader.
+autoAt
+  :: LaneHandle
+  -> FilePath    -- ^ The loaded file; the IOTCM names it.
+  -> [String]    -- ^ The effective flags of that load, for the reset.
+  -> Int         -- ^ The interaction point to search at.
+  -> Text        -- ^ The options, as the hole's contents.
+  -> IO (Either LaneFailure AutoRun)
+autoAt lh path flags gid opts =
+  fmap run <$> runConsuming lh path flags (cmdAutoOne gid opts)
+  where
+    run c = AutoRun (readAuto gid (cnResponses c)) (cnSentUs c) (cnReset c) (cnResetUs c)
 
 
 -- ---------------------------------------------------------------------------

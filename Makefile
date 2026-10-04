@@ -321,7 +321,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  test-scripts-python \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
                  agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-serve agda-mcp-clean \
-                 lane-give-parity \
+                 lane-give-parity auto-floor \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
                  etl-agda-algebras-smoke train-retrieval-smoke eval-proof-completion-smoke-retrieval \
@@ -442,6 +442,7 @@ help:
 	@echo "  make agda-mcp-test               - Full agda-mcp cabal test (unit + corpus + Agda integration)"
 	@echo "  make agda-mcp-build / -serve / -clean - Build / launch / clean the agda-mcp server"
 	@echo "  make lane-give-parity            - Replay committed candidates through both lanes (issue #163)"
+	@echo "  make auto-floor                  - Agda's own proof search on every obligation, judged by fill_hole (issue 205)"
 	@echo "  make project-update              - Refresh docs/GITHUB_PROJECT.md generated regions from GitHub"
 	@echo "  make project-update-check        - Report whether docs/GITHUB_PROJECT.md is stale (no write)"
 	@echo "  make project-lint                - Validate docs/GITHUB_PROJECT.md structure (offline)"
@@ -806,6 +807,26 @@ lane-give-parity:
 	  "$$BIN" --root "$(PROJECT_ROOT)" --agda-flags "$(LANE_PARITY_FLAGS)" \
 	    $(if $(LANE_PARITY_CASES),--cases "$(LANE_PARITY_CASES)",) \
 	    --out "$(LANE_PARITY_OUT)")
+
+# The proof-search floor (issue #205): Agda's own proof search (Mimer, through
+# agda-mcp's auto tool, started with --auto) at every benchmark obligation's
+# hole, each term it finds judged by fill_hole under --safe, with no model and
+# no ranking.  Writes rows.jsonl and summary.json under
+# reports/auto-floor/<run-id>/.  Run inside nix develop .#backend with the
+# server built (make agda-mcp-build); fill_hole patches each obligation in
+# place and restores it, so run nothing else against the fixtures meanwhile.
+# AUTO_FLOOR_ARGS takes the script's own options: --tiers or --ids to narrow
+# the run, --hints needles to pass each row's needle: tags (the ones Agda types
+# at the hole) as hints, --timeout-ms for the search's bound.
+AUTO_FLOOR_BIN    ?= $(shell cd "$(AGDA_MCP_DIR)" && cabal list-bin exe:agda-mcp 2>/dev/null)
+AUTO_FLOOR_RUN_ID ?= floor-$(shell date -u +%Y%m%d)
+AUTO_FLOOR_ARGS   ?=
+
+auto-floor:
+	@test -x "$(AUTO_FLOOR_BIN)" || { echo "ERROR: build the server first (make agda-mcp-build), or set AUTO_FLOOR_BIN"; exit 1; }
+	@echo ">> [auto-floor] $(AUTO_FLOOR_BIN) -> reports/auto-floor/$(AUTO_FLOOR_RUN_ID) $(AUTO_FLOOR_ARGS)"
+	@$(CORPUS_PY) scripts/python/auto_floor.py --server "$(AUTO_FLOOR_BIN)" \
+	  --run-id "$(AUTO_FLOOR_RUN_ID)" $(AUTO_FLOOR_ARGS)
 #
 #
 # -------------------------------------------------------------------------------

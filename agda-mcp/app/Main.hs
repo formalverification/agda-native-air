@@ -24,7 +24,7 @@
 --   agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 --            [--corpus PATH]  [--timeout N] [--verbose]
 --            [--check-command "CMD ARGS ..."] [--check-timeout N]
---            [--expose NAME,NAME,...]
+--            [--expose NAME,NAME,...] [--auto]
 --
 -- M1-3 additions:
 --   --corpus PATH   Load agda-strux JSONL corpus for search tools.
@@ -38,6 +38,12 @@
 --                   is refused.  A name this configuration does not register
 --                   (a typo, or a corpus tool without --corpus) is a fatal
 --                   configuration error, never a silently smaller surface.
+--
+-- Issue #205 addition:
+--   --auto          Register the auto tool (Agda's own proof search, Mimer,
+--                   at a hole).  Off by default: a place on the default
+--                   surface waits for an arm that shows an agent using it
+--                   (ADR 0002, decision 25).
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -66,6 +72,7 @@ data CliOpts = CliOpts
   , cliCorpusPath :: Maybe FilePath
   , cliCwd        :: Maybe FilePath
   , cliExpose     :: Maybe [String]
+  , cliAuto       :: Bool
   } deriving (Show)
 
 defaultCliOpts :: CliOpts
@@ -75,6 +82,7 @@ defaultCliOpts = CliOpts
   , cliCorpusPath = Nothing
   , cliCwd        = Nothing
   , cliExpose     = Nothing
+  , cliAuto       = False
   }
 
 
@@ -127,6 +135,7 @@ main = do
         , scVersion     = "0.2.0"
         , scCorpusIndex = corpusIdx
         , scExpose      = map T.pack <$> cliExpose opts
+        , scAuto        = cliAuto opts
         }
   -- --expose names tools of THIS configuration (issue #191): a name it does
   -- not register would otherwise present a smaller surface than asked for,
@@ -143,7 +152,7 @@ main = do
         hPutStrLn stderr $ "agda-mcp: --expose names tools this server does not register: "
           <> T.unpack (T.intercalate ", " unknown)
           <> " (registered: " <> T.unpack (T.intercalate ", " registered)
-          <> "; the corpus tools need --corpus)."
+          <> "; the corpus tools need --corpus, auto needs --auto)."
         exitFailure
 
   cwdNow <- getCurrentDirectory
@@ -160,6 +169,7 @@ main = do
     Just n | n > 0 -> show n <> "s per project check"
     _              -> "(none)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
+  hPutStrLn stderr $ "  auto: " <> if cliAuto opts then "registered" else "(not registered; --auto)"
   hPutStrLn stderr $ "  exposed: " <> maybe "(every registered tool but search_in_scope, which --expose can name)" (T.unpack . T.intercalate ",") (scExpose serverCfg)
   hPutStrLn stderr   "  transport: stdio"
   hPutStrLn stderr   "  Waiting for MCP client..."
@@ -177,6 +187,7 @@ main = do
 --   --check-command "..." The project gate check_project runs (no shell).
 --   --check-timeout N     Per-project-check timeout in seconds (default: 1800; 0 = none).
 --   --expose NAMES        Present only these tools, comma-separated (issue #191).
+--   --auto                Register the auto tool (issue #205).
 --   --verbose             Emit debug output to stderr.
 --   --help                Print usage and exit.
 parseArgs :: [String] -> CliOpts -> CliOpts
@@ -210,6 +221,8 @@ parseArgs ["--expose"] opts =
   opts { cliExpose = Just [] }
 parseArgs ("--expose" : names : rest) opts =
   parseArgs rest opts { cliExpose = Just (filter (not . null) (map T.unpack (map T.strip (T.splitOn "," (T.pack names))))) }
+parseArgs ("--auto" : rest) opts =
+  parseArgs rest opts { cliAuto = True }
 parseArgs ("--verbose" : rest) opts =
   parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaVerbose = True } }
 parseArgs (_ : rest) opts = parseArgs rest opts
@@ -261,6 +274,9 @@ usage = unlines
   , "                        instructions name them alone, and a call to any"
   , "                        other registered tool is refused.  A name this"
   , "                        configuration does not register is an error."
+  , "  --auto                Register the auto tool: Agda's own proof search"
+  , "                        (Mimer, an editor's C-c C-a) at a hole, answering"
+  , "                        a candidate term.  Off by default."
   , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""
