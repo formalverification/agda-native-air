@@ -288,12 +288,23 @@ and where the two differ, the header-free number is the one quoted (§ 4.6).
 | `idf-unfold`, 43-suite, exclusion on | **9/43** (`using` 3/11) | loop, retrieval, `idf-unfold` | `k19r2-idf-unfold-a` | § 9, idf-unfold table |
 | `idf-unfold`, exclusion off (control) | 10/43 | loop | `k19r2-idf-unfold-b` | same |
 | Ranking recall, offline | targets in top 8: `token-overlap` **1/33**, `idf-unfold` **9/33** | recall instrument, no server | `recall-ctx1-r2` | § 9, scorer table |
+| Agda's own search alone, the floor | **17/55** (stdlib 6/22, haystack 0/12, agda-algebras 11/21); 18/81 with the hard and composition tiers | `make auto-floor`, no loop, no corpus | `auto-floor-1` | § 1.6, [`reports/auto-floor/`] |
+| Fixed space with Agda's search as a closer, 43-suite | **18/43**: the floor's 17 plus `algebras-homs-id-hom`, 221 probes | loop, `--auto closer` | `auto206-fixed-closer` | [ADR 0001] § 9, Agda's-search table |
+| Retrieval with retrieved lemmas as Agda's hints, 43-suite | **18/43**, the same rows, 528 probes | loop, retrieval, `--auto hints`, corrected name rule | `auto206-retrieval-hints`, `auto206fix-alg-retrieval-hints` | same |
+| The same, haystack tier | 6/12, retrieval's six; `closer` likewise 6/12 | loop, retrieval, `--auto hints` | `auto206-hay-retrieval-hints` | same |
 
 **How "8 of 55 and 14 of 55" are composed**.  The two loop columns in the
 agent table are sums over strata: fixed space 8/43 + 0/12 = **8/55**;
 retrieval 8/43 + 6/12 = **14/55**.  So the whole of retrieval's gain, all six
 rows, is the haystack tier.  On the other 43 obligations retrieval added
-**zero** solves under exclusion.
+**zero** solves under exclusion.  With Agda's own search composed in
+([#206]), retrieval with hints solves 18/43 + 6/12 = **24/55**: Agda's
+search carries the 43 and retrieval the haystack, and the one row past
+their union (23) is `algebras-homs-id-hom`, where the fixed space commits a
+pair and the search closes both halves.  The first such run also showed the
+target exclusion blind to the agda-algebras tier's renamed obligations (18
+of 21), and Agda's search cited one original through the gap; the rule is
+corrected and the count is the corrected run's ([ADR 0001] § 7).
 
 **What the haystack six mean**.  Before that tier, retrieval had never solved
 a row under exclusion.  The tier was built so that the fixed space cannot
@@ -610,7 +621,9 @@ binaries.  On this tier the headers carried a `Source:` line, sometimes
 naming a lemma to use, and a `Strategy:` line sketching the proof ("one
 direction is cong of g; the other is injectivity of g"); PR [#220] moved
 both into the tiers' READMEs.  n is fourteen and there is one seed per arm
-and per condition, so a difference of a row or two is not a finding.
+and per condition, so a difference of a row or two is not a finding.  Agda's
+own proof search solves none of the fourteen by itself (§ 1.6): the tier's
+counts owe Agda's search nothing.
 
 | | `shell`, hints | `shell`, header-free | `mcp`, hints | `mcp`, header-free | `both`, hints | `both`, header-free |
 |---|---:|---:|---:|---:|---:|---:|
@@ -814,6 +827,18 @@ space and under retrieval with both scorers (`comp160-fixed-1`,
 refuses a root lemma whose middle point is an unsolved meta; the tier's
 README (`data/benchmarks/agda-algebras-composition-v0/README.md`) keeps
 those gates and each row's needles, novelty record, and gold.
+
+Agda's own proof search (§ 1.6) solves one row by itself, and two when it is
+handed every needle of every row as a hint, so finding the lemmas is not
+the whole of the tier's difficulty for a term search.  Composed into the
+loop ([#206]), it closes the same one row from the fixed space, and the
+second when retrieval ranked with `idf-unfold` hands it that row's two
+needles: `comp-homomorphism-isomorph-is-image` by its gold, `HomImage-≅'
+IdHomImage A≅B`, where the search fills the middle point by unification
+(runs `auto206-comp-fixed-closer`, `auto206-comp-idf-hints`; `token-overlap`
+ranks no needle into a hint set and stays at one).  The tier's zero is the
+loop as built; with Agda's search composed in, the loop reaches the floor's
+upper bound.
 
 The agents ran on header-free fixtures, one seed per arm, at the hard tier's
 caps (60 turns, 1,800 s, USD 6.00), parallelism 2, from one frozen copy of
