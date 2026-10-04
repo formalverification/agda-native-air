@@ -1030,9 +1030,10 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 +  [`agda-mcp/README.md`]: the tool contracts.
 +  Make targets: `make proof-search-loop` (knobs `PROOF_SEARCH_PROPOSER`,
    `PROOF_SEARCH_CORPUS`, `PROOF_SEARCH_RETRIEVE_K`, `PROOF_SEARCH_EXCLUDE`,
-   `PROOF_SEARCH_SCORER`), `make proof-search-recall`, `make agent-bench`
-   (`AGENT_BENCH_MODEL`, `AGENT_BENCH_ARM=shell|mcp|both`),
-   `make agent-bench-rejudge`, `make lane-give-parity`.
+   `PROOF_SEARCH_SCORER`, `PROOF_SEARCH_AUTO=off|closer|hints`),
+   `make proof-search-recall`, `make agent-bench` (`AGENT_BENCH_MODEL`,
+   `AGENT_BENCH_ARM=shell|mcp|both`), `make agent-bench-rejudge`,
+   `make lane-give-parity`.
 
 [ADR 0001]: adr/0001-proof-search-on-agda-mcp.md
 [ADR 0002]: adr/0002-agda-mcp.md
