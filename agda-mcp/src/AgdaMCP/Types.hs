@@ -71,11 +71,12 @@
 --   agda-dojang/python/tools/policy_contract.py, ensuring interoperability
 --   between the Haskell MCP server and the Python evaluator/policy backends.
 --
---   @get_goal@ and @fill_hole@ address a hole by a 'AgdaMCP.Holes.HoleRef' —
---   either a @(line, column)@ position in the file as written or the older
---   0-based @holeIndex@ (issue #79).  The two are parsed into one field, so a
---   request carries exactly one address and no handler has to decide which of a
---   disagreeing pair was meant.  @fill_hole@ and @check_file@ answer with the
+--   @get_goal@ and @fill_hole@ address a hole by a 'AgdaMCP.Holes.HoleRef':
+--   a @(line, column)@ position in the file as written, the older 0-based
+--   @holeIndex@ (issue #79), or, in a file with exactly one hole, no address at
+--   all (issue #201).  They are parsed into one field, so a request carries at
+--   most one address and no handler has to decide which of a disagreeing pair
+--   was meant.  @fill_hole@ and @check_file@ answer with the
 --   full hole list ('HoleInfo'), the same shape @get_diagnostics@ already
 --   returned, so a client re-anchors on positions without a second call.  Both
 --   are additive: @holeIndex@ still parses and every pre-existing key keeps its
@@ -123,6 +124,8 @@ module AgdaMCP.Types
   , TimeoutFailure (..)
   , GoalInfo (..)
   , HoleInfo (..)
+  , HoleAddressed (..)
+  , addressedOf
   , FillResult (..)
   , FillStatus (..)
   , Diagnostic (..)
@@ -203,7 +206,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import AgdaMCP.Holes (HoleRef (..))
+import AgdaMCP.Holes (HoleRef (..), HoleSpan (..), ResolvedHole (..), resolvedByText)
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -258,17 +261,25 @@ instance ToJSON CtxEntry where
 -- | parseHoleRef: read the hole address out of a tool call's arguments
 -- (issue #79).
 --
--- The wire spelling is two alternatives — @line@ + @column@ (the position, the
--- handle to prefer) or @holeIndex@ (source-order, shift-prone, kept for
--- backward compatibility) — parsed into the one 'HoleRef' the handlers take.
--- @col@ is accepted in place of @column@ because that is how the hole listings
--- spell it, so a hole entry can be passed back without renaming a key.
+-- The wire spelling is two alternatives, or neither: @line@ + @column@ (the
+-- position, the handle to prefer), @holeIndex@ (source-order, shift-prone,
+-- kept for backward compatibility), or since issue #201 no address key at all;
+-- parsed into the one 'HoleRef' the handlers take.  @col@ is accepted in place
+-- of @column@ because that is how the hole listings spell it, so a hole entry
+-- can be passed back without renaming a key.
 --
--- The accepted shapes are exactly three: @holeIndex@, @line@ + @column@, and
--- @line@ + @col@.  They are the alternatives the tools' input schema advertises
--- as its @oneOf@ (see 'AgdaMCP.Server.addressAlternatives'), so a client that
--- validates its arguments and a client that just sends them get the same answer
--- about what is a legal request.
+-- The accepted shapes are exactly four: @holeIndex@, @line@ + @column@,
+-- @line@ + @col@, and none of the four keys ('Unaddressed').  They are the
+-- alternatives the tools' input schema advertises as its @oneOf@ (see
+-- 'AgdaMCP.Server.addressAlternatives'): every request the schema admits
+-- parses, to the address it describes, and every combination of the keys
+-- with integer values that the schema refuses, the parser refuses too; the
+-- suite checks the two against each other over all sixteen.  Beyond the
+-- schema, a key whose value is @null@ counts as absent, the leniency every
+-- optional argument of this server has (issue #184).  The schema, which
+-- declares integers, does not advertise it: it describes what to send, so a
+-- client that validates never sends a null, and the leniency only ever
+-- accepts a request the schema would have refused, never the reverse.
 --
 -- Every other combination is a parse failure naming the fix, because each one is
 -- a client that does not know which hole it is asking about:
@@ -276,8 +287,12 @@ instance ToJSON CtxEntry where
 -- * an index /and/ a position — they can disagree, and picking one silently is
 --   exactly the wrong-hole answer this addressing model exists to prevent;
 -- * both @column@ and @col@ — one hole, one spelling, for the same reason;
--- * a lone @line@ or a lone column — half a position is not a position;
--- * /neither/ — there is nothing to address.
+-- * a lone @line@ or a lone column: half a position is not a position.
+--
+-- /No/ address at all parses, as 'Unaddressed' (issue #201): it names the hole
+-- of a file with exactly one, and 'AgdaMCP.Holes.resolveHoleRef' refuses it,
+-- listing the holes, in any other file.  The parser cannot see the file, so
+-- that rule is the resolver's.
 parseHoleRef :: Object -> Parser HoleRef
 parseHoleRef o = do
   mIndex  <- o .:? "holeIndex"
@@ -298,15 +313,13 @@ parseHoleRef o = do
       "line was given without column; a position needs both"
     (Nothing, Nothing, Just _) -> fail
       "column was given without line; a position needs both"
-    (Nothing, Nothing, Nothing) -> fail
-      "no hole address: pass (line, column) — the handle to prefer, as reported \
-      \by get_diagnostics.holes, check_file.holes, and every fill_hole response \
-      \— or the older 0-based holeIndex"
+    (Nothing, Nothing, Nothing) -> pure Unaddressed
 
 -- | Parameters for the @get_goal@ tool.
 data GetGoalParams = GetGoalParams
   { ggFilePath :: FilePath
-  , ggHole     :: HoleRef     -- ^ Which hole, by position or by index (#79).
+  , ggHole     :: HoleRef     -- ^ Which hole: by position or by index (#79),
+                              --   or none in a one-hole file (#201).
   , ggReload   :: Bool        -- ^ Force a fresh lane load first — the same
                               --   dependency-staleness escape hatch the
                               --   live-query tools expose (#108); the
@@ -322,7 +335,8 @@ instance FromJSON GetGoalParams where
 -- | Parameters for the @fill_hole@ tool.
 data FillHoleParams = FillHoleParams
   { fhFilePath  :: FilePath
-  , fhHole      :: HoleRef    -- ^ Which hole, by position or by index (#79).
+  , fhHole      :: HoleRef    -- ^ Which hole: by position or by index (#79),
+                              --   or none in a one-hole file (#201).
   , fhCandidate :: Text       -- ^ The candidate proof term to try.
   } deriving (Eq, Show)
 
@@ -958,13 +972,17 @@ data GoalInfo = GoalInfo
                                                 --   @interaction-lane@ or @injected-macro@.
   , giLane              :: Maybe LaneEcho       -- ^ The lane echo, on a lane-sourced
                                                 --   answer (#108).
+  , giAddressed         :: Maybe HoleAddressed  -- ^ The hole this goal is for, and
+                                                --   how the address reached it
+                                                --   (#201); set by the handler.
   } deriving (Eq, Show)
 
 instance ToJSON GoalInfo where
   toJSON g = object $
     [ "goal"    .= giGoal g
     , "context" .= giContext g
-    ] <> maybe [] (\m -> ["module"            .= m]) (giModule g)
+    ] <> maybe [] (\a -> ["addressed"         .= a]) (giAddressed g)
+      <> maybe [] (\m -> ["module"            .= m]) (giModule g)
       <> maybe [] (\m -> ["elapsedMs"         .= m]) (giElapsedMs g)
       <> maybe [] (\b -> ["checkedFromSource" .= b]) (giCheckedFromSource g)
       <> maybe [] (\v -> ["verdict"           .= v]) (giVerdict g)
@@ -999,6 +1017,36 @@ instance ToJSON HoleInfo where
     , "goal"  .= hiGoal h
     ]
 
+-- | The hole a @get_goal@ or @fill_hole@ call addressed, and how the address
+-- reached it (issue #201): its 1-based position in the file as written, and
+-- 'AgdaMCP.Holes.resolvedByText' of the rule that applied (@span@,
+-- @only hole, same line@, @only hole@, or @index@).
+--
+-- It is on every answer of both tools, not only on the tolerant ones, so that
+-- the field has one shape and a caller can always check that the hole it
+-- reached is the hole it meant.  A position is reported as the hole's start,
+-- the pair the hole listings report, whatever position inside it was sent.
+data HoleAddressed = HoleAddressed
+  { haLine       :: Int   -- ^ 1-based line of the hole's first character.
+  , haCol        :: Int   -- ^ 1-based column of the hole's first character.
+  , haResolvedBy :: Text  -- ^ How the address reached it.
+  } deriving (Eq, Show)
+
+instance ToJSON HoleAddressed where
+  toJSON a = object
+    [ "line"       .= haLine a
+    , "col"        .= haCol a
+    , "resolvedBy" .= haResolvedBy a
+    ]
+
+-- | addressedOf: the wire form of a resolved address.
+addressedOf :: ResolvedHole -> HoleAddressed
+addressedOf r = HoleAddressed
+  { haLine       = hsLine (rhSpan r)
+  , haCol        = hsCol (rhSpan r)
+  , haResolvedBy = resolvedByText (rhBy r)
+  }
+
 -- | Outcome of a @fill_hole@ attempt.
 data FillStatus = FillOk | FillTypeError | FillTimeout | FillCrash
   deriving (Eq, Show)
@@ -1028,6 +1076,8 @@ instance FromJSON FillStatus where
 data FillResult = FillResult
   { frStatus    :: FillStatus
   , frCandidate :: Text           -- ^ The candidate that was tried.
+  , frAddressed :: HoleAddressed  -- ^ The hole it was tried in, and how the
+                                  --   address reached it (#201).
   , frMessage   :: Maybe Text     -- ^ Agda error message on failure; Nothing on success.
   , frRemainingHoles :: Maybe Int -- ^ Number of remaining holes after filling (if determinable).
   , frHoles     :: [HoleInfo]     -- ^ Those holes, with index and (line, col) (#79).
@@ -1044,6 +1094,7 @@ instance ToJSON FillResult where
   toJSON r = object $
     [ "status"            .= frStatus r
     , "candidate"         .= frCandidate r
+    , "addressed"         .= frAddressed r
     , "holes"             .= frHoles r
     , "elapsedMs"         .= frElapsedMs r
     , "verdict"           .= frVerdict r

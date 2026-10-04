@@ -57,7 +57,7 @@ import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
 import Data.Char (isAlphaNum, isDigit)
 import Data.Either (isLeft)
-import Data.List (find, isInfixOf, nub, sort, sortOn)
+import Data.List (find, isInfixOf, nub, sort, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text)
@@ -95,7 +95,7 @@ import AgdaMCP.Agda
 import AgdaMCP.Holes
   ( LiterateFlavour (..) , flavourOf , maskNonCode , codeOnly
   , HoleSpan (..) , findHoles , findNthHole
-  , HoleRef (..) , offsetOfPosition , resolveHoleRef
+  , HoleRef (..) , ResolvedBy (..) , ResolvedHole (..) , offsetOfPosition , resolveHoleRef
   , injectReportExpr , substituteHole
   )
 import AgdaMCP.Corpus (corpusIndexOf, loadCorpus, searchByName, searchByType, getDeps)
@@ -1556,11 +1556,16 @@ holeModelTests = do
 -- runs everywhere the pure tests do — including the misses, which is where the
 -- issue's contract actually bites: a position that names no hole must produce
 -- an error listing the file's holes, never a silent guess at the nearest one.
+-- The one exception is a file with exactly one hole (issue #201), where an
+-- off-span position on the hole's line, or no address at all, reaches it
+-- because there is no other hole to guess; those tests sit here too, beside
+-- the multi-hole misses that must stay misses.
 --
 -- The parse tests belong here for the same reason.  "Which hole did you mean?"
--- is answered at the wire boundary, and a request that carries both spellings,
--- half a position, or none at all is a client that does not know — so it is
--- rejected there rather than resolved by a rule nobody wrote down.
+-- is answered at the wire boundary, and a request that carries both spellings
+-- or half a position is a client that does not know, so it is rejected there
+-- rather than resolved by a rule nobody wrote down.  A request with no address
+-- parses, and the resolver, which can see the file, decides (#201).
 -- ---------------------------------------------------------------------------
 
 -- | A three-hole source with a multi-character hole in the middle, so a
@@ -1580,9 +1585,37 @@ addressingSrc = T.unlines
   , "c = ?"                       -- 10: hole 2 at (10, 5), span 10.5-10.6
   ]
 
--- | resolveIn: resolve a reference against 'addressingSrc'.
+-- | resolveIn: resolve a reference against 'addressingSrc', to the index.
 resolveIn :: HoleRef -> Either Text Int
-resolveIn = resolveHoleRef "Addressing.agda" PlainAgda addressingSrc
+resolveIn = fmap rhIndex . resolveHoleRef "Addressing.agda" PlainAgda addressingSrc
+
+-- | A one-hole source (issue #201): the file where an address that misses the
+-- span, or no address at all, still cannot mean another hole.
+oneHoleSrc :: Text
+oneHoleSrc = T.unlines
+  [ "module One where"            -- 1
+  , ""                            -- 2
+  , "a : Nat"                     -- 3
+  , "a = {!!}"                    -- 4: the only hole, at (4, 5), span 4.5-4.9
+  ]
+
+-- | The same with its one hole written across two lines.
+oneHoleMultilineSrc :: Text
+oneHoleMultilineSrc = T.unlines
+  [ "module OneMultiline where"   -- 1
+  , ""                            -- 2
+  , "a : Nat"                     -- 3
+  , "a = {! suc"                  -- 4: the only hole starts at (4, 5)
+  , "      zero !}"               -- 5: and ends at (5, 14)
+  , ""                            -- 6
+  ]
+
+-- | resolveOne: resolve a reference against a one-hole source, to the index,
+-- the hole's position, and the rule that applied.
+resolveOne :: Text -> HoleRef -> Either Text (Int, (Int, Int), ResolvedBy)
+resolveOne src =
+  fmap (\r -> (rhIndex r, (hsLine (rhSpan r), hsCol (rhSpan r)), rhBy r))
+  . resolveHoleRef "One.agda" PlainAgda src
 
 -- | decodeGoalParams: what the wire parser makes of a @get_goal@ argument
 -- object — the hole reference, or the message it refuses with.
@@ -1603,6 +1636,7 @@ addressShapes =
   [ (["holeIndex"],      "{\"filePath\":\"F.agda\",\"holeIndex\":0}")
   , (["line", "column"], "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5}")
   , (["line", "col"],    "{\"filePath\":\"F.agda\",\"line\":7,\"col\":5}")
+  , ([],                 "{\"filePath\":\"F.agda\"}")   -- issue #201
   ]
 
 -- | The tools that take a hole address.
@@ -1632,19 +1666,41 @@ schemaProperties name v =
     _                         -> []
 
 -- | schemaAlternatives: the @required@ list of each @oneOf@ branch — the shapes
--- the schema says a legal request has.
+-- the schema says a legal request has.  A branch with no @required@ (the
+-- no-address branch of issue #201) is the empty shape.
 schemaAlternatives :: Text -> Aeson.Value -> [[Text]]
 schemaAlternatives name v =
-  case KM.lookup "oneOf" (inputSchemaOf name v) of
-    Just alts -> case Aeson.fromJSON alts :: Aeson.Result [Aeson.Object] of
-      Aeson.Success bs ->
-        [ ks
-        | b <- bs
-        , Just req <- [KM.lookup "required" b]
-        , Aeson.Success ks <- [Aeson.fromJSON req :: Aeson.Result [Text]]
-        ]
-      Aeson.Error _ -> []
-    _ -> []
+  [ maybe [] id (requiredOf b) | b <- oneOfBranches (inputSchemaOf name v) ]
+
+-- | oneOfBranches / anyOfBranches: a schema object's @oneOf@ or @anyOf@ list.
+oneOfBranches, anyOfBranches :: Aeson.Object -> [Aeson.Object]
+oneOfBranches = branchesAt "oneOf"
+anyOfBranches = branchesAt "anyOf"
+
+branchesAt :: Key.Key -> Aeson.Object -> [Aeson.Object]
+branchesAt k o = case KM.lookup k o of
+  Just alts | Aeson.Success bs <- Aeson.fromJSON alts -> bs
+  _                                                   -> []
+
+-- | requiredOf: a schema object's @required@ list, when it has one.
+requiredOf :: Aeson.Object -> Maybe [Text]
+requiredOf b = case KM.lookup "required" b of
+  Just req | Aeson.Success ks <- Aeson.fromJSON req -> Just ks
+  _                                                 -> Nothing
+
+-- | branchAdmits: whether a schema object admits a request carrying exactly
+-- these keys, reading the three keywords the address branches use:
+-- @required@, @anyOf@, and @not@.
+branchAdmits :: [Text] -> Aeson.Object -> Bool
+branchAdmits present b = requiredOk && anyOfOk && notOk
+  where
+    requiredOk = maybe True (all (`elem` present)) (requiredOf b)
+    anyOfOk = case KM.lookup "anyOf" b of
+      Just _  -> any (branchAdmits present) (anyOfBranches b)
+      Nothing -> True
+    notOk = case KM.lookup "not" b of
+      Just (Aeson.Object n) -> not (branchAdmits present n)
+      _                     -> True
 
 -- | advertisedTools: the tool definitions a client receives, with no corpus
 -- loaded (so the four proof-state tools and the project gate, and no search
@@ -1722,7 +1778,7 @@ holeAddressingTests = do
 
     , runTest "resolveHoleRef: a file with no holes says exactly that" $
         case resolveHoleRef "Empty.agda" PlainAgda "x = 1\n" (ByPosition 1 1) of
-          Right i  -> pure (Fail $ "expected a miss, got hole " <> show i)
+          Right r  -> pure (Fail $ "expected a miss, got hole " <> show (rhIndex r))
           Left msg -> assert "says the file has no holes"
                         ("Empty.agda has no holes" `T.isInfixOf` msg)
 
@@ -1734,12 +1790,91 @@ holeAddressingTests = do
           ([h], Just (ln, col)) -> allOf
             [ assertEqual "the fixture's own hole position" (ln, col) (hsLine h, hsCol h)
             , assertEqual "resolves by that position" (Right 0)
-                (resolveHoleRef "LiterateMd.lagda.md" LiterateMd mdSrc (ByPosition ln col))
+                (rhIndex <$> resolveHoleRef "LiterateMd.lagda.md" LiterateMd mdSrc (ByPosition ln col))
             , assert "a prose decoy position is a miss"
                 (isLeft (resolveHoleRef "LiterateMd.lagda.md" LiterateMd mdSrc
                           (ByPosition (proseDecoyLine mdSrc) (proseDecoyCol mdSrc))))
             ]
           (hs, _) -> pure . Fail $ "expected 1 hole, got " <> show (length hs)
+
+    -- The one-hole rule (issue #201).  The archived refusals were a column off
+    -- on the right line, by one (a 0-based column) or by up to seven; every
+    -- one of these reaches the hole and says which rule did.
+    , runTest "resolveHoleRef: one hole, an off-span position on its line reaches it (#201)" $
+        assertEqual "resolutions"
+          [ Right (0, (4, 5), ResolvedByOnlyHoleLine) | _ <- [4, 1, 9, 99, 0 :: Int] ]
+          [ resolveOne oneHoleSrc (ByPosition 4 c) | c <- [4, 1, 9, 99, 0] ]
+
+    , runTest "resolveHoleRef: one hole, a position in its span is still a span hit (#201)" $
+        assertEqual "resolution" (Right (0, (4, 5), ResolvedBySpan))
+          (resolveOne oneHoleSrc (ByPosition 4 6))
+
+    , runTest "resolveHoleRef: one hole, no address reaches it (#201)" $
+        assertEqual "resolution" (Right (0, (4, 5), ResolvedByOnlyHole))
+          (resolveOne oneHoleSrc Unaddressed)
+
+    , runTest "resolveHoleRef: one hole, holeIndex 0 is resolved by index (#201)" $
+        assertEqual "resolution" (Right (0, (4, 5), ResolvedByIndex))
+          (resolveOne oneHoleSrc (ByIndex 0))
+
+    , runTest "resolveHoleRef: one hole, another line is still a miss, naming the rule (#201)" $
+        case resolveOne oneHoleSrc (ByPosition 3 5) of
+          Right r  -> pure (Fail $ "expected a miss, got " <> show r)
+          Left msg -> allOf
+            [ assert "says no hole is there" ("No hole at line 3, column 5" `T.isInfixOf` msg)
+            , assert "names the line that reaches it"
+                ("any position on line 4, or no address at all, reaches it" `T.isInfixOf` msg)
+            ]
+
+    , runTest "resolveHoleRef: one hole across two lines, either line reaches it (#201)" $ allOf
+        [ assertEqual "its second line, past the span"
+            (Right (0, (4, 5), ResolvedByOnlyHoleLine))
+            (resolveOne oneHoleMultilineSrc (ByPosition 5 20))
+        , assertEqual "its first line, before the span"
+            (Right (0, (4, 5), ResolvedByOnlyHoleLine))
+            (resolveOne oneHoleMultilineSrc (ByPosition 4 1))
+        , case resolveOne oneHoleMultilineSrc (ByPosition 6 1) of
+            Right r  -> pure (Fail $ "expected a miss, got " <> show r)
+            Left msg -> assert ("message: " <> T.unpack msg)
+                          ("any position on lines 4 to 5" `T.isInfixOf` msg)
+        ]
+
+    -- With two or more holes nothing changes: the column-off position that a
+    -- one-hole file forgives is a miss, and so is no address at all.
+    , runTest "resolveHoleRef: several holes, one column before a hole is still a miss (#201)" $
+        case resolveIn (ByPosition 4 4) of
+          Right i  -> pure (Fail $ "expected a miss, got hole " <> show i)
+          Left msg -> allOf
+            [ assert "says no hole is there" ("No hole at line 4, column 4" `T.isInfixOf` msg)
+            , assert "offers no one-hole rule" (not ("With one hole" `T.isInfixOf` msg))
+            ]
+
+    , runTest "resolveHoleRef: several holes, no address is refused, listing them (#201)" $
+        case resolveIn Unaddressed of
+          Right i  -> pure (Fail $ "expected a refusal, got hole " <> show i)
+          Left msg -> allOf
+            [ assert "says why" ("No hole address, and Addressing.agda has more than one" `T.isInfixOf` msg)
+            , assert "lists the holes" (all (`T.isInfixOf` msg)
+                [ "index 0 at line 4, column 5", "index 1 at line 7, column 5"
+                , "index 2 at line 10, column 5" ])
+            ]
+
+    , runTest "resolveHoleRef: no holes, no address is refused (#201)" $
+        case resolveHoleRef "Empty.agda" PlainAgda "x = 1\n" Unaddressed of
+          Right r  -> pure (Fail $ "expected a refusal, got hole " <> show (rhIndex r))
+          Left msg -> assert ("message: " <> T.unpack msg)
+                        ("Empty.agda has no holes" `T.isInfixOf` msg)
+
+    -- A null counts as an absent key, the rule every optional argument follows
+    -- (pinned for verbose in tier 2h): so an all-null address is a call with
+    -- no address, and a null beside a real spelling is ignored.
+    , runTest "params: a null address key counts as absent (#201)" $
+        assertEqual "refs"
+          [ Right Unaddressed, Right (ByPosition 7 5), Right (ByIndex 0) ]
+          [ decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":null,\"column\":null}"
+          , decodeGoalParams "{\"filePath\":\"F.agda\",\"line\":7,\"column\":5,\"holeIndex\":null}"
+          , decodeGoalParams "{\"filePath\":\"F.agda\",\"holeIndex\":0,\"col\":null}"
+          ]
 
     , runTest "params: holeIndex alone parses as an index reference" $
         assertEqual "ref" (Right (ByIndex 2))
@@ -1775,13 +1910,11 @@ holeAddressingTests = do
             Left msg -> assert ("message: " <> msg) ("without line" `isInfixOf` msg)
         ]
 
-    , runTest "params: no address at all is refused, naming both spellings" $
-        case decodeGoalParams "{\"filePath\":\"F.agda\"}" of
-          Right r  -> pure (Fail $ "expected a parse failure, got " <> show r)
-          Left msg -> allOf
-            [ assert ("message: " <> msg) ("line, column" `isInfixOf` msg)
-            , assert ("message: " <> msg) ("holeIndex"    `isInfixOf` msg)
-            ]
+    -- No address is a request the parser cannot judge, since the rule needs
+    -- the file: it parses, and the resolver decides (issue #201).
+    , runTest "params: no address at all parses, as Unaddressed (#201)" $
+        assertEqual "ref" (Right Unaddressed)
+          (decodeGoalParams "{\"filePath\":\"F.agda\"}")
 
     , runTest "params: fill_hole reads the same two spellings" $
         assertEqual "refs" (Right (ByPosition 7 5), Right (ByIndex 1))
@@ -1809,14 +1942,37 @@ holeAddressingTests = do
 
     -- `required` cannot say "address it somehow", so without the oneOf the
     -- schema advertised a bare {filePath} as a complete call while the parser
-    -- refused it.  These are the same three shapes, from the same list.
+    -- refused it.  These are the same shapes, from the same list (four since
+    -- issue #201, whose no-address shape is legal).
     , runTest "schema: oneOf advertises exactly the shapes that parse (#79)" $ allOf
         [ assertEqual ("oneOf for " <> T.unpack tool)
             (sort (map (sort . fst) addressShapes))
             (sort (map sort (schemaAlternatives tool advertisedTools)))
         | tool <- addressTools
         ]
+
+    -- Exactness over every combination of the four address keys: a request
+    -- matches exactly one oneOf branch if and only if the parser accepts it.
+    -- The no-address branch (#201) is a `not`, so this is what shows a lone
+    -- line or a lone column still matches nothing.
+    , runTest "schema: oneOf admits exactly the requests that parse (#201)" $ allOf
+        [ assertEqual ("disagreements for " <> T.unpack tool) []
+            [ (present, admitted, parses)
+            | present <- subsequences ["holeIndex", "line", "column", "col"]
+            , let admitted = length (filter (branchAdmits present)
+                                       (oneOfBranches (inputSchemaOf tool advertisedTools))) == 1
+                  parses   = not (isLeft (decodeGoalParams (requestWith present)))
+            , admitted /= parses
+            ]
+        | tool <- addressTools
+        ]
     ]
+
+-- | requestWith: a @get_goal@ request carrying exactly these address keys.
+requestWith :: [Text] -> LBS.ByteString
+requestWith keys = Aeson.encode . Aeson.object $
+  ("filePath" Aeson..= ("F.agda" :: Text))
+    : [ Key.fromText k Aeson..= (if k == "holeIndex" then 0 else 5 :: Int) | k <- keys ]
 
 -- | proseDecoyLine / proseDecoyCol: the position of the first @{!!}@ token in
 -- the .lagda.md fixture's prose — a token that looks like a hole, sits above
@@ -3198,7 +3354,7 @@ neverDropped :: [[Text]]
 neverDropped =
   [ ["success"], ["status"], ["verdict", "exitCode"], ["timedOut"], ["maskedFailure"]
   , ["holes"], ["holesCount"], ["remainingHoles"], ["diagnostics"], ["diagnosticsTotal"]
-  , ["errors"], ["warnings"], ["message"], ["candidate"], ["elapsedMs"]
+  , ["errors"], ["warnings"], ["message"], ["candidate"], ["addressed"], ["elapsedMs"]
   , ["checkedFromSource"], ["gate"], ["source"], ["goal"], ["context"], ["type"]
   , ["project", "root"], ["project", "rootSource"], ["project", "librariesFileMissing"]
   , ["lane", "load"], ["lane", "loadElapsedMs"]
@@ -5934,7 +6090,7 @@ holeAddressingIntegrationTests cfg = do
                         (isLeft (resolveHoleRef twoHoles flav patched
                                    (ByPosition (hsLine h1) (hsCol h1))))
                     , assertEqual "the re-anchored position does" (Right 0)
-                        (resolveHoleRef twoHoles flav patched
+                        (rhIndex <$> resolveHoleRef twoHoles flav patched
                            (ByPosition (hsLine h1 + 1) (hsCol h1)))
                     ]
               (hs, _) -> pure . Fail $ "expected exactly 2 holes, got " <> show (length hs)
@@ -5957,6 +6113,61 @@ holeAddressingIntegrationTests cfg = do
                     (all (\h -> ("line " <> T.pack (show (hsLine h)) <> ", column "
                                   <> T.pack (show (hsCol h))) `T.isInfixOf` msg) holes)
                 ]
+
+        -- The one-hole rule end to end (issue #201), on HolePlain.agda, whose
+        -- only hole sits at (15, 5): the two archived failure shapes, a column
+        -- one short and no address at all, each reach the hole, the answer
+        -- says how, and the verdict is Agda's as before.
+        , runTest "fill_hole: one column before the only hole fills it and says so (#201)" $ do
+            result <- handleFillHole cfg FillHoleParams
+              { fhFilePath = plainTwin, fhHole = ByPosition 15 4, fhCandidate = "zero" }
+            withRight result $ \fr -> allOf
+              [ assertEqual "status" FillOk (frStatus fr)
+              , assertEqual "addressed" (HoleAddressed 15 5 "only hole, same line") (frAddressed fr)
+              , assertEqual "the hole is closed" [] (frHoles fr)
+              ]
+
+        , runTest "fill_hole: no address fills the only hole and says so (#201)" $ do
+            result <- handleFillHole cfg FillHoleParams
+              { fhFilePath = plainTwin, fhHole = Unaddressed, fhCandidate = "zero" }
+            withRight result $ \fr -> allOf
+              [ assertEqual "status" FillOk (frStatus fr)
+              , assertEqual "addressed" (HoleAddressed 15 5 "only hole") (frAddressed fr)
+              ]
+
+        , runTest "fill_hole: a position in the span says span (#201)" $ do
+            result <- handleFillHole cfg FillHoleParams
+              { fhFilePath = plainTwin, fhHole = ByPosition 15 8, fhCandidate = "zero" }
+            withRight result $ \fr ->
+              assertEqual "addressed" (HoleAddressed 15 5 "span") (frAddressed fr)
+
+        , runTest "get_goal: one column before the only hole answers its goal (#201)" $ do
+            result <- handleGetGoal injLanes cfg GetGoalParams
+              { ggFilePath = plainTwin, ggHole = ByPosition 15 4, ggReload = False }
+            withRight result $ \gi -> allOf
+              [ assertEqual "goal" "Nat" (giGoal gi)
+              , assertEqual "addressed" (Just (HoleAddressed 15 5 "only hole, same line"))
+                  (giAddressed gi)
+              ]
+
+        -- And the strict rule where it still applies: with two holes, the
+        -- same near misses are refused before Agda runs.
+        , runTest "fill_hole: two holes, a position between them is still refused (#201)" $ do
+            between <- handleFillHole cfg FillHoleParams
+              { fhFilePath = twoHoles, fhHole = ByPosition 23 1, fhCandidate = "zero" }
+            short   <- handleFillHole cfg FillHoleParams
+              { fhFilePath = twoHoles, fhHole = ByPosition 22 4, fhCandidate = "zero" }
+            none    <- handleFillHole cfg FillHoleParams
+              { fhFilePath = twoHoles, fhHole = Unaddressed, fhCandidate = "zero" }
+            let refusedWith needle r = case r of
+                  Left e  -> assert ("message: " <> T.unpack (failureText e))
+                               (needle `T.isInfixOf` failureText e)
+                  Right _ -> pure (Fail "expected a refusal, got an answer")
+            allOf
+              [ refusedWith "No hole at line 23, column 1" between
+              , refusedWith "No hole at line 22, column 4" short
+              , refusedWith "has more than one" none
+              ]
         ]
       after    <- mapM BS.readFile fixtures
       restored <- runTest "hole-addressing tests restore their fixtures byte-exactly" $

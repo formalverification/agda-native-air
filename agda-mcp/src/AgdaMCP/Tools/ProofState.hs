@@ -22,7 +22,10 @@
 --     the handle to prefer.  A fill renumbers every index after it whether or
 --     not any text moved, while it moves a position only when the candidate
 --     changes the text above it.  A position inside no hole is an error
---     naming the file's holes, never a guess at the nearest one.  Because
+--     naming the file's holes, never a guess at the nearest one, except in a
+--     file with exactly one hole, where a position on its line or no address
+--     at all reaches it (issue #201), and both answers say which hole they
+--     used and how (@addressed@).  Because
 --     neither handle survives an arbitrary edit, fill_hole and check_file answer
 --     with the full hole list, the shape get_diagnostics already returned, so
 --     the next address comes from the last response rather than from the
@@ -164,8 +167,8 @@ import AgdaMCP.Agda
 import AgdaMCP.Diagnostics
   ( attachUnsolvedMetas, capDiagnostics, parseDiagnostics )
 import AgdaMCP.Holes
-  ( HoleSpan (..), LiterateFlavour, codeOnly, findHoles, flavourOf
-  , injectReportExpr, resolveHoleRef, substituteHole
+  ( HoleSpan (..), LiterateFlavour, ResolvedHole (..), codeOnly, findHoles
+  , flavourOf, injectReportExpr, resolveHoleRef, substituteHole
   )
 import AgdaMCP.Path (withSourceFile)
 import AgdaMCP.Interaction
@@ -222,7 +225,11 @@ handleGetGoal lanes cfg0 params =
     withProject cfg0 absPath $ \pc cfg ->
         case resolveHoleRef absPath (flavourOf absPath) src (ggHole params) of
           Left miss -> pure (Left (FailMessage miss))
-          Right idx -> do
+          Right rh -> do
+            -- Whichever path answers, the answer names the hole it is for and
+            -- how the address reached it (issue #201).
+            let idx         = rhIndex rh
+                withAddress = fmap (\gi -> gi { giAddressed = Just (addressedOf rh) })
             -- The lane first (issue #108): Agda's own goal display, no file
             -- mutation, answered from the warm child when one serves this
             -- root.  Falls back to the injection below whenever the lane
@@ -231,9 +238,10 @@ handleGetGoal lanes cfg0 params =
             -- full run.
             viaLane <- laneGoal lanes cfg pc absPath src (ggReload params) idx
             case viaLane of
-              Right (Just info) -> pure (Right info)
+              Right (Just info) -> pure (withAddress (Right info))
               Left tf           -> pure (Left tf)
-              Right Nothing     -> injectedGoal cfg pc absPath origBytes src idx
+              Right Nothing     ->
+                withAddress <$> injectedGoal cfg pc absPath origBytes src idx
 
 -- | injectedGoal: the original reporting-macro mechanism, now the fallback
 -- path of @get_goal@ (issue #108) — unchanged in behavior, and the only path
@@ -300,6 +308,7 @@ injectedGoal cfg pc absPath origBytes src idx = do
                         , giProject = Just pc
                         , giSource  = Just "injected-macro"
                         , giLane    = Nothing
+                        , giAddressed = Nothing
                         }
 
 
@@ -376,6 +385,7 @@ laneGoal lanes cfg pc absPath src reload idx = do
                     , giProject = Just pc
                     , giSource  = Just "interaction-lane"
                     , giLane    = Just lane
+                    , giAddressed = Nothing
                     }
   case out of
     Right (Right mInfo) -> pure (Right mInfo)
@@ -417,8 +427,9 @@ handleFillHole cfg0 params =
     withProject cfg0 absPath $ \pc cfg ->
         case resolveHoleRef absPath (flavourOf absPath) src (fhHole params) of
           Left miss -> pure (Left (FailMessage miss))
-          Right idx -> do
-            let label = holeLabel (flavourOf absPath) src idx
+          Right rh -> do
+            let idx   = rhIndex rh
+                label = holeLabel (flavourOf absPath) src idx
             case substituteHole (flavourOf absPath) idx (fhCandidate params) src of
               -- Unreachable in practice: 'resolveHoleRef' validated the index
               -- against the same scan of the same text.
@@ -454,6 +465,7 @@ handleFillHole cfg0 params =
                 pure . Right $ FillResult
                   { frStatus    = status
                   , frCandidate = fhCandidate params
+                  , frAddressed = addressedOf rh
                   , frMessage   = msg
                   , frRemainingHoles = Just (length remaining)
                   , frHoles     = remaining

@@ -37,7 +37,10 @@
 --   moves only when an edit above it moves the text, while every index after a
 --   filled hole is renumbered whether or not anything moved — and
 --   'resolveHoleRef' turns either spelling into an index, or into an error that
---   names the file's holes rather than guessing.
+--   names the file's holes rather than guessing.  The one exception is a file
+--   with exactly one hole (issue #201): there a position on the hole's line, or
+--   no address at all, reaches it, because there is no other hole to guess, and
+--   the resolution says which rule applied.
 --
 --   The functions here are pure; AgdaMCP.Tools.ProofState combines them with
 --   the Agda subprocess layer in AgdaMCP.Agda.  The long-term plan (issue
@@ -61,6 +64,9 @@ module AgdaMCP.Holes
   , findNthHole
     -- * Hole addressing (issue #79)
   , HoleRef (..)
+  , ResolvedBy (..)
+  , resolvedByText
+  , ResolvedHole (..)
   , offsetOfPosition
   , holeIndexAtOffset
   , resolveHoleRef
@@ -581,10 +587,46 @@ findNthHole flav n src
 -- Positions are 1-based coordinates in the file /as written/ — literate-file
 -- coordinates for literate sources, exactly what 'HoleSpan' reports and what
 -- @get_diagnostics@, @check_file@, and @fill_hole@ list back.
+--
+-- 'Unaddressed' is a call that names no hole (issue #201).  It resolves only
+-- in a file with exactly one hole, where it cannot mean another.
 data HoleRef
   = ByIndex Int        -- ^ 0-based index into the source-order hole list.
   | ByPosition Int Int -- ^ 1-based line and column in the file as written.
+  | Unaddressed        -- ^ No address at all (issue #201).
   deriving (Eq, Show)
+
+-- | How a 'HoleRef' reached its hole (issue #201), reported back to the caller
+-- as @addressed.resolvedBy@ so that a call that meant something else sees it.
+--
+-- Two of the four are the strict rule of issue #79 ('ResolvedBySpan',
+-- 'ResolvedByIndex').  The other two apply only to a file with exactly one
+-- hole, where the wrong-hole failure the strict rule guards against cannot
+-- happen: there is no other hole to answer with.
+data ResolvedBy
+  = ResolvedBySpan          -- ^ The position fell inside the hole's span.
+  | ResolvedByOnlyHoleLine  -- ^ One hole in the file; the position named a
+                            --   line the hole occupies, outside its span.
+  | ResolvedByOnlyHole      -- ^ One hole in the file; no address was given.
+  | ResolvedByIndex         -- ^ The 0-based @holeIndex@ named it.
+  deriving (Eq, Show)
+
+-- | The wire spelling of a 'ResolvedBy', the values issue #201 names.
+resolvedByText :: ResolvedBy -> Text
+resolvedByText r = case r of
+  ResolvedBySpan         -> "span"
+  ResolvedByOnlyHoleLine -> "only hole, same line"
+  ResolvedByOnlyHole     -> "only hole"
+  ResolvedByIndex        -> "index"
+
+-- | A resolved address: the hole's index (what the splicing functions take),
+-- its span (where it sits, which is what a response reports back), and how the
+-- address reached it.
+data ResolvedHole = ResolvedHole
+  { rhIndex :: Int
+  , rhSpan  :: HoleSpan
+  , rhBy    :: ResolvedBy
+  } deriving (Eq, Show)
 
 -- | The 0-based character offset of a 1-based @(line, column)@ position, or
 -- @Nothing@ when the text has no such position.
@@ -629,12 +671,23 @@ describeHole i h = T.concat
 -- holes behind an out-of-range index — so the caller's next call can be right
 -- rather than merely different.
 --
--- The result is an /index/ because that is what the splicing functions take;
--- resolution is the only place the two spellings meet.
-resolveHoleRef :: FilePath -> LiterateFlavour -> Text -> HoleRef -> Either Text Int
+-- The result carries an /index/ because that is what the splicing functions
+-- take; resolution is the only place the spellings meet.  It also carries the
+-- hole's span and how the address reached it, which the tools report back.
+--
+-- The one-hole rule (issue #201).  Across the archived agent-bench arms, 39 of
+-- 234 @fill_hole@ calls and 47 @get_goal@ calls were refused in a file with
+-- exactly one hole, each on the line that hole sits on, with the column off
+-- (most often by one: a 0-based column).  With one hole in the file a miss
+-- cannot be answered with a plausible wrong hole, because there is no other
+-- hole, so there a position on a line the hole occupies resolves to it, and so
+-- does a call with no address.  With two or more holes nothing changes: the
+-- position must fall inside a span.
+resolveHoleRef
+  :: FilePath -> LiterateFlavour -> Text -> HoleRef -> Either Text ResolvedHole
 resolveHoleRef path flav src ref = case ref of
   ByIndex i
-    | i >= 0, i < length holes -> Right i
+    | i >= 0, i < length holes -> Right (ResolvedHole i (holes !! i) ResolvedByIndex)
     | otherwise -> Left $ T.concat
         [ "Hole index ", tshow i, " not found in ", T.pack path
         , " (holeIndex is a 0-based index into the source-order hole list, and"
@@ -643,19 +696,46 @@ resolveHoleRef path flav src ref = case ref of
         , addressingHint
         ]
   ByPosition ln col ->
-    case offsetOfPosition ln col src >>= holeIndexAtOffset holes of
-      Just i  -> Right i
-      Nothing -> Left $ T.concat
+    case (offsetOfPosition ln col src >>= holeIndexAtOffset holes, holes) of
+      (Just i, _) -> Right (ResolvedHole i (holes !! i) ResolvedBySpan)
+      (Nothing, [h]) | ln `elem` linesOf h -> Right (ResolvedHole 0 h ResolvedByOnlyHoleLine)
+      (Nothing, _) -> Left $ T.concat
         [ "No hole at line ", tshow ln, ", column ", tshow col
         , " in ", T.pack path
         , " (a position addresses the hole whose span contains it; starting at"
         , " it counts).\n"
         , census "nearest holes" (nearestTo ln col)
+        , onlyHoleHint
+        , addressingHint
+        ]
+  Unaddressed -> case holes of
+    [h] -> Right (ResolvedHole 0 h ResolvedByOnlyHole)
+    _   -> Left $ T.concat
+        [ "No hole address, and ", T.pack path
+        , if null holes then " has no holes" else " has more than one"
+        , " (a call with no address reaches the hole only in a file with exactly"
+        , " one).\n"
+        , census "the holes it has" (take maxListed indexed)
         , addressingHint
         ]
   where
     holes   = findHoles flav src
     indexed = zip [0 ..] holes
+
+    -- The lines a hole occupies: one for @?@ and @{!!}@, several for a
+    -- @{! … !}@ written across lines.
+    linesOf h = [hsLine h .. lastLineOf h]
+    lastLineOf h =
+      hsLine h + T.count "\n" (T.take (hsEnd h - hsStart h) (T.drop (hsStart h) src))
+
+    -- A miss in a one-hole file can only be on another line; say what reaches it.
+    onlyHoleHint = case holes of
+      [h] -> "  With one hole in the file, any position on " <> lineRange h
+               <> ", or no address at all, reaches it.\n"
+      _   -> ""
+    lineRange h
+      | lastLineOf h == hsLine h = "line " <> tshow (hsLine h)
+      | otherwise = "lines " <> tshow (hsLine h) <> " to " <> tshow (lastLineOf h)
 
     -- Enough holes to orient a caller, few enough not to bury the message in a
     -- file with hundreds of them.
