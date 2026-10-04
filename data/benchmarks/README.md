@@ -313,6 +313,16 @@ row was checked four ways, as follows:
 +  `grep` over both libraries' sources for the conclusion's head symbols
    together: the files containing all of them, then the lines.
 
+Since issue [#202] `search_by_type` matches a fragment against each type as a
+statement writes it, module qualifiers and parameters dropped, and takes
+several fragments at once (`patterns`), which is the first and third search
+above in one call: `x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹` finds
+`Algebra.Properties.AbelianGroup.⁻¹-∙-comm`, and `[ x ⸴ y ]` the lemmas
+stated with the commutator.  The counts recorded in the tiers' READMEs were
+taken with the match that tool had then, which is now `qualified: true`, and
+they reproduce under it (`Algebra.Definitions.Commutative` 611,
+`Conjugate.IsNormal` 113, `Commutator.[` 7).
+
 The verdicts are defined as follows:
 
 +  **absent**: nothing on disk proves the statement; the nearest lemma is a
@@ -511,4 +521,5 @@ library, which carries its own (MIT) license and is not vendored here.  See the
 [#139]: https://github.com/formalverification/agda-native-air/issues/139
 [#160]: https://github.com/formalverification/agda-native-air/issues/160
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#202]: https://github.com/formalverification/agda-native-air/issues/202
 [#219]: https://github.com/formalverification/agda-native-air/issues/219

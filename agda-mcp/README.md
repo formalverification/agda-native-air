@@ -350,7 +350,7 @@ surface.
 | Tool | Description |
 |------|-------------|
 | `search_by_name`    | Find definitions whose name matches a substring (case-insensitive); with `inScopeAt`, only the names a file can write, each with its spelling and type there (issue #203). |
-| `search_by_type`    | Find definitions whose type signature contains a substring. |
+| `search_by_type`    | Find definitions whose type contains every fragment, written as a statement writes it (issue #202); `qualified: true` matches the printed type instead. |
 | `get_dependencies`  | Return a definition's dependencies, optionally expanded one hop. |
 
 ### Scope-aware retrieval (issue #17)
@@ -490,6 +490,7 @@ agda-mcp/
 │       ├── Corpus.hs            ← In-memory corpus index + search/lookup
 │       ├── Scope.hs             ← The import surface off the code-only view; the rendering ladder
 │       ├── Retrieval.hs         ← Tokens, statement normalization, the scorer, the pool pipeline
+│       ├── Written.hs           ← A corpus type as a statement writes it, for search_by_type
 │       └── Tools/
 │           ├── ProofState.hs    ← get_goal, fill_hole, check_file, get_diagnostics
 │           ├── CheckProject.hs  ← check_project: run the gate, never misreport its exit code
@@ -975,8 +976,110 @@ spelling Agda typed in the file's scope (11), an honest "exists, not imported"
 
 #### `search_by_type`
 
-Same shape as `search_by_name`, but matches the substring against each
-definition's type signature; useful for "what returns an `Algebra`?" queries.
+Which corpus definitions have a type containing every fragment, written the
+way a statement is written?  Since issue #202 the fragments and the types are
+both compared *as written*, so a query copied from a statement finds the
+lemmas that state it: `x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹`, `[ x ⸴ y ]`,
+`Commutative _≈_ _∙_`, `hom 𝑨 𝑩 → hom 𝑩 𝑪`.
+
+**Input**.  At least one of `pattern` and `patterns`.
+
+```json
+{ "patterns": ["(x ∙ y) ⁻¹", "x ⁻¹ ∙ y ⁻¹"], "limit": 20 }
+```
+
+| Property | Meaning |
+|----------|---------|
+| `pattern` | One fragment. |
+| `patterns` | Several fragments, every one of which must occur in the same type; given with `pattern`, all of them must. |
+| `limit` | Results to return (default 20); the answer is cut after the sort. |
+| `qualified` | Default false.  `true` is the match from before #202: each fragment a case-insensitive substring of the printed type, in name order, and no `written` field.  With one `pattern` it answers exactly as the tool did then. |
+
+**Output**.  An array, the shortest statements first (by the length of the
+statement as matched, the written form with its brackets and spacing set
+aside, since the rendering adds brackets of its own; then by name), each hit
+the `search_by_name` fields plus `written`, the type as the fragments were
+matched against it.  Captured over the stdio transport against the
+standard-library corpus:
+
+```json
+[
+  { "prettyQname": "Algebra.Properties.AbelianGroup.⁻¹-∙-comm",
+    "type": "{a ℓ : Agda.Primitive.Level} (G : Algebra.Bundles.AbelianGroup a ℓ)\n(x y : G .Algebra.Bundles.AbelianGroup.Carrier) →\n(G Algebra.Bundles.AbelianGroup.≈\n (G Algebra.Bundles.AbelianGroup.∙\n  (G Algebra.Bundles.AbelianGroup.⁻¹) x)\n ((G Algebra.Bundles.AbelianGroup.⁻¹) y))\n((G Algebra.Bundles.AbelianGroup.⁻¹)\n ((G Algebra.Bundles.AbelianGroup.∙ x) y))",
+    "written": "{a ℓ : Level} (G : AbelianGroup a ℓ) (x y : G .Carrier) → ((x ⁻¹) ∙ (y ⁻¹)) ≈ ((x ∙ y) ⁻¹)",
+    "defKind": "function", "module": "Algebra.Properties.AbelianGroup", "hasBody": true }
+]
+```
+
+**What "as written" means**.  The corpus prints every type from outside every
+module, which differs from a statement in three ways, and the rendering
+(`AgdaMCP.Written`) undoes them before matching.
+
++  **Qualifiers**.  Every name is printed qualified
+   (`Algebra.Bundles.AbelianGroup.∙`); the rendering keeps the last segment.
++  **Module parameters**.  A definition of a parameterized module, and a
+   record field, takes the module's parameter (the bundle) as its first
+   explicit argument, and Agda's printer puts it in an operator's first hole
+   and moves the operator's own last argument outside the brackets: the
+   statement `x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹`, inside `open AbelianGroup G`, is
+   printed as above, `(G ≈ (G ∙ (G ⁻¹) x) ((G ⁻¹) y)) …`, and
+   `Commutator.[_⸴_]` applied to `x` and `y` is printed `[ 𝒢 ⸴ x ] y`.  The
+   rendering drops each name's parameters where it is applied and puts the
+   remaining arguments back in the holes.  How many parameters a name takes
+   is read off the corpus: the leading binders every function row of its
+   module shares (a record module, whose `Carrier` takes the record unnamed,
+   needs only half of them), counted up to the first one named like an
+   operator, since a module parameterized by an operation
+   (`Algebra.Definitions`'s `_≈_`) is used unapplied and its statements pass
+   the operation (`Commutative _≈_ _∙_`).  A module with one function row
+   shows no such prefix, so its row takes no parameter unless the module is
+   nested in a record's module and the row's first explicit argument is a
+   value of that record (`DecStrictPartialOrder.Eq.decSetoid`), which is
+   then the parameter.  Any other such row keeps its arguments:
+   `Relation.Binary.Morphism.Definitions`, parameterized by two carriers,
+   has `Homomorphic₂` alone, so a statement using it is written
+   `Homomorphic₂ (A .Carrier) (B .Carrier) _≈_ _≈_ ⟦ r ⟧`, which
+   `_≈_ _≈_ ⟦ r ⟧` finds and `Homomorphic₂ _≈_ _≈_ ⟦ r ⟧` does not.  In the
+   standard library's corpus, 17 names of this kind occur in 626 rows'
+   types, against 7 names in 1,333 that the nesting rule covers.  A record
+   field the corpus has no
+   row for (the standard library's `Setoid._≈_` in agda-algebras) is known
+   by its qualifier, a name some binder is typed by.
++  **Builtins' names**.  The printer keeps a builtin's own name, and the
+   standard library re-exports several under others, so the rendering uses
+   the library's: `Agda.Builtin.Nat.Nat` is `ℕ`, `Agda.Builtin.Nat.-` is
+   `∸`, `_==_` and `_<_` are `_≡ᵇ_` and `_<ᵇ_`, `Int` is `ℤ`, and `fst`
+   and `snd` are `proj₁` and `proj₂` (the `renaming` lines of
+   `Data.Nat.Base`, `Data.Integer.Base`, `Data.Product.Base`).  The re-run
+   arm found this: its one `search_by_type` call wrote
+   `m + n ∸ o ≡ m + (n ∸ o)`, which now finds `+-∸-assoc`.
+
+The matching key then drops brackets, collapses whitespace, and folds case;
+a fragment gets the same key, without the parameter step, and `->` reads as
+`→`.  A fragment's brackets drop whether they match or not, so a piece cut
+from a longer statement (`MagmaHomomorphism A B)`) still finds it.  Three
+things are not normalized, and the description says so: variable names are the
+library's (`x y`, not `a b`); a `syntax` declaration is not applied, since the
+corpus does not carry them (conjugation matches as `conj-syntax g x`, not
+`x ^ g`); and since brackets are ignored, a fragment can match across a
+grouping it did not mean (`x ∙ y` occurs in `(z ∙ x) ∙ y`).  A qualified
+fragment is read by its last segment, so `Commutator.[` is just `[` here: a
+query in the corpus's own spelling belongs under `qualified: true`.  No
+fragment, or one of brackets and spaces alone (which would match every row),
+is refused in band.
+
+**Measured** (issue #202).  The 23 archived agent-bench calls, replayed on
+the archived server and on this one, each against its row's corpus: 11
+answered nothing before and 4 now (`hom 𝑨 𝑩 → hom 𝑩 𝑪` finds `∘-hom`,
+`≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪` finds `≤-trans`, `m + n ≤ o` finds `m+n≤o⇒m≤o`,
+and `IsEpi 𝑨 (𝑨 ╱`, cut off inside a bracket, finds `pepi`; the four that
+still find nothing are two names sent to the type tool and two statements
+whose variable names or shape are not the library's), and the 23 answers
+fell from 175,124 characters to 132,097, because the shortest statements
+come first.  The rendering is built when the corpus loads: 0.9 s on the
+agda-algebras corpus (2.4 s to 3.3 s) and 2.5 s on the standard library's
+(5.8 s to 8.3 s), with 75 MB and 165 MB more resident after the load, most of
+it the collector's headroom over the load's peak rather than live data.
 
 #### `get_dependencies`
 

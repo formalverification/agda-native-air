@@ -147,6 +147,9 @@ module AgdaMCP.Types
     -- * Corpus types (agda-strux JSONL schema)
   , CorpusEntry (..)
   , CorpusIndex (..)
+  , Part (..)
+  , NameInfo (..)
+  , WrittenTable (..)
     -- * Tool parameters (inbound) — search
   , SearchByNameParams (..)
   , InScopeAt (..)
@@ -1605,7 +1608,9 @@ instance ToJSON CorpusEntry where
 -- type carries it, so a token query is a union of posting lists rather than
 -- a tokenization of every row (measured on the agda-algebras corpus: a
 -- four-token pool fell from about 150 ms to well under the issue's 100 ms
--- figure).  Build it with 'AgdaMCP.Corpus.corpusIndexOf', never by hand.
+-- figure).  'ciWrittenKeys' is each row's type as a statement writes it,
+-- built for @search_by_type@ (issue #202; 'AgdaMCP.Written').  Build it with
+-- 'AgdaMCP.Corpus.corpusIndexOf', never by hand.
 data CorpusIndex = CorpusIndex
   { ciEntries :: Map Text CorpusEntry
     -- ^ All entries, keyed by @prettyQname@.
@@ -1613,6 +1618,41 @@ data CorpusIndex = CorpusIndex
     -- ^ Number of entries (cached for diagnostics).
   , ciTokens  :: Map Text (Set Text)
     -- ^ Bare type token, to the @prettyQname@s whose type carries it.
+  , ciWrittenTable :: WrittenTable
+    -- ^ What rendering a type as written consults (issue #202).
+  , ciWrittenKeys  :: Map Text Text
+    -- ^ By @prettyQname@: the type as written, brackets dropped, whitespace
+    --   collapsed, case folded: what @search_by_type@ matches by default.
+    --   The display form is rendered for the hits alone, which keeps the
+    --   index about half the size it would be with both.
+  } deriving (Eq, Show)
+
+-- | A mixfix name's parts: @_∙_@ is hole, ∙, hole ('AgdaMCP.Written').
+data Part = Hole | Name Text
+  deriving (Eq, Show)
+
+-- | What rendering a type as written knows about a name: its parts when it
+-- is an operator, and how many explicit module parameters it takes.
+data NameInfo = NameInfo
+  { niParts  :: Maybe [Part]
+  , niParams :: Int
+  } deriving (Eq, Show)
+
+-- | WrittenTable: everything 'AgdaMCP.Written.unsection' consults, built
+-- once per corpus by 'AgdaMCP.Written.writtenTable'.
+data WrittenTable = WrittenTable
+  { wtNames   :: Map Text NameInfo
+    -- ^ By @prettyQname@: a name printed prefix (@Group-Op.ε@, or
+    --   @Algebra.Bundles.Group._∙_@ partially applied).
+  , wtFirsts  :: Map Text NameInfo
+    -- ^ By qualifier and first name part (@…Group-Op.∙@,
+    --   @…Commutator.[@): an operator printed mixfix.
+  , wtParts   :: Set Text
+    -- ^ Every name part of every operator, so an argument scan stops at
+    --   the next part of an enclosing operator (@⸴@, @]@).
+  , wtRecords :: Set Text
+    -- ^ Qualified names some binder is typed by: a token qualified by one
+    --   of these that the corpus has no row for is a record field.
   } deriving (Eq, Show)
 
 
@@ -1655,13 +1695,24 @@ instance FromJSON InScopeAt where
       <*> (o .:? "reload" .!= False)
 
 -- | Parameters for the @search_by_type@ tool.
+--
+-- Since issue #202 a call names one fragment (@pattern@), several
+-- (@patterns@, every one of which must occur in one type), or both; the
+-- handler refuses a call with none.  @qualified: true@ selects the match the
+-- tool had before #202, over the corpus's own printing.
 data SearchByTypeParams = SearchByTypeParams
-  { sbtPattern :: Text       -- ^ Substring pattern to match against the type signature.
-  , sbtLimit   :: Maybe Int  -- ^ Maximum results (default: 20).
+  { sbtPattern   :: Maybe Text    -- ^ One fragment.
+  , sbtPatterns  :: Maybe [Text]  -- ^ Fragments that must all occur in one type.
+  , sbtLimit     :: Maybe Int     -- ^ Maximum results (default: 20).
+  , sbtQualified :: Maybe Bool    -- ^ True: match the printed type as it is.
   } deriving (Eq, Show)
 instance FromJSON SearchByTypeParams where
   parseJSON = withObject "SearchByTypeParams" $ \o ->
-    SearchByTypeParams <$> o .: "pattern" <*> o .:? "limit"
+    SearchByTypeParams
+      <$> o .:? "pattern"
+      <*> o .:? "patterns"
+      <*> o .:? "limit"
+      <*> o .:? "qualified"
 
 -- | Parameters for the @get_dependencies@ tool.
 data GetDependenciesParams = GetDependenciesParams
@@ -1684,15 +1735,20 @@ data SearchResult = SearchResult
   , srDefKind      :: Text    -- ^ function | data | record | ...
   , srModule       :: Text    -- ^ Module the definition lives in.
   , srHasBody      :: Bool    -- ^ Whether a body/proof is available.
+  , srWritten      :: Maybe Text
+    -- ^ The type as written, what @search_by_type@ matched (issue #202);
+    --   absent from every other answer, and from @qualified: true@.
   } deriving (Eq, Show)
 instance ToJSON SearchResult where
-  toJSON r = object
+  toJSON r = object $
     [ "prettyQname" .= srPrettyQname r
     , "type"        .= srType r
-    , "defKind"     .= srDefKind r
-    , "module"      .= srModule r
-    , "hasBody"     .= srHasBody r
     ]
+    <> [ "written" .= w | Just w <- [srWritten r] ]
+    <> [ "defKind"     .= srDefKind r
+       , "module"      .= srModule r
+       , "hasBody"     .= srHasBody r
+       ]
 
 -- | Result of @get_dependencies@.
 data DependenciesResult = DependenciesResult

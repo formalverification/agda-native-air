@@ -174,6 +174,23 @@ def payload(rid, what):
 
 REQUIRED = {"prettyQname", "type", "defKind", "module", "hasBody"}
 
+def written_key(text):
+    """search_by_type's matching key, as its contract states it (issue #202):
+    brackets dropped, whitespace collapsed, case folded, each token's module
+    qualifier dropped (a postfix projection keeps its dot), and -> read as →.
+    The server also gives Agda's builtins the standard library's names
+    (Agda.Builtin.Nat.- is ∸); that is not mirrored here, so a smoke pattern
+    should not be spelled with Agda.Builtin names."""
+    for d in "(){}⦃⦄":
+        text = text.replace(d, " ")
+    def bare(t):
+        if t == "->":
+            return "→"
+        if t.startswith(".") and len(t) > 1:
+            return "." + bare(t[1:])
+        return t.rsplit(".", 1)[-1] if "." in t[:-1] else t
+    return " ".join(bare(t) for t in text.split()).lower()
+
 def check_hits(doc, what, pattern, field):
     # The search tools answer with a bare JSON array of results; accept an
     # object with a "results" key too, so a later envelope does not silently
@@ -187,16 +204,26 @@ def check_hits(doc, what, pattern, field):
     if not hits:
         fail(f"{what} for {pattern!r} found nothing in a real corpus", doc)
     for hit in hits:
-        absent = REQUIRED - set(hit)
+        absent = (REQUIRED | ({field} if field == "written" else set())) - set(hit)
         if absent:
             fail(f"{what} result is missing {sorted(absent)}", hit)
-    # The server promises a substring match; hold it to that.
-    lowered = pattern.lower()
-    if not any(lowered in str(hit.get(field, "")).lower() for hit in hits):
-        fail(f"no {what} result actually contains {pattern!r} in its {field}", hits)
+    # Hold each tool to its promise.  search_by_name: a case-insensitive
+    # substring of the name.  search_by_type, by default (issue #202): the
+    # pattern's key in EVERY hit's key of the type as written, which the hit
+    # carries as `written`; its printed `type` need not contain a
+    # statement-shaped pattern at all.
+    if field == "written":
+        want = written_key(pattern)
+        bad = [h for h in hits if want not in written_key(str(h.get(field, "")))]
+        if bad:
+            fail(f"a {what} result's {field} does not contain {pattern!r} as written", bad)
+    else:
+        lowered = pattern.lower()
+        if not any(lowered in str(hit.get(field, "")).lower() for hit in hits):
+            fail(f"no {what} result actually contains {pattern!r} in its {field}", hits)
     return hits
 
-type_hits = check_hits(payload(3, "search_by_type"), "search_by_type", type_pattern, "type")
+type_hits = check_hits(payload(3, "search_by_type"), "search_by_type", type_pattern, "written")
 name_hits = check_hits(payload(4, "search_by_name"), "search_by_name", name_pattern, "prettyQname")
 
 print(f"corpus-mcp-smoke: search_by_type {type_pattern!r} -> {len(type_hits)} hits, "
