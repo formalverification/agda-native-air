@@ -2348,6 +2348,8 @@ data AutoResult = AutoResult
                                     --   sent only when 'aurSearchMs' is present.
   , aurSearchMs :: Maybe Int
   , aurResetMs  :: Maybe Int
+  , aurAddressed :: HoleAddressed   -- ^ The hole searched and how the address
+                                    --   reached it, on every answer (#201).
   , aurMeta     :: LiveMeta
   } deriving (Eq, Show)
 
@@ -2361,6 +2363,7 @@ instance ToJSON AutoResult where
     <> maybe [] (\e -> ["error"    .= e]) (aurError r)
     <> maybe [] (\n -> ["searchMs" .= n]) (aurSearchMs r)
     <> maybe [] (\n -> ["resetMs"  .= n]) (aurResetMs r)
+    <> ["addressed" .= aurAddressed r]
     <> liveMetaPairs (aurMeta r)
 
 

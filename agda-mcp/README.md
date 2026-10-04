@@ -1198,6 +1198,12 @@ ran out of time at 1,005 ms on another.
 | `out-of-scope` | `error` (`stage: "term"`, `code: "NotInScope"`) | The search found a term and Agda printed it with a name the file cannot write (a record field of a module the file never imports, spelled by its full internal name), so Agda could not read its own term back. |
 | `error` | `error {stage, code?, message}` | `hints`: a hint the search cannot use, refused before the search runs (above), or one the hole's scope cannot name (Agda reads hints before searching, and refuses the call with `NotInScope`); `auto`: any other refusal, such as a term Agda printed and could not read back as the type it found (`ShouldBePi`, measured on one composition row); `load`: the file does not load, before the search or in the re-load after a found term (then the message names the term, which is moot). |
 
+Every answer, whatever its outcome, carries `addressed {line, col,
+resolvedBy}`, the hole searched and how the address reached it, and the
+one-hole rule holds as for every hole tool: in a file with exactly one hole,
+no address, or a position on its line, reaches it (see
+[Stable hole handles](#stable-hole-handles-issue-79), issue #201).
+
 A `NotInScope` is attributed by name: when the name Agda says is missing is
 one of the call's hints, the hint is at fault; otherwise it can only be the
 found term's, since the hints are the only other words Agda reads as names.

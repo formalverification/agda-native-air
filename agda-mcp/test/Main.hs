@@ -3895,7 +3895,7 @@ autoTests = do
             ]
         ]
 
-    , runTest "AutoParams: a bound, a skip, a mode, and an address out of range are refused" $ allOf
+    , runTest "AutoParams: a bound, a skip, a mode, and two addresses at once are refused" $ allOf
         [ case autoParamsOf ("{\"filePath\":\"/x/A.agda\"" <> rest <> "}") of
             Left e  -> assert ("message was: " <> e) (needle `isInfixOf` e)
             Right _ -> pure (Fail ("accepted " <> T.unpack rest))
@@ -3903,7 +3903,7 @@ autoTests = do
             [ (",\"holeIndex\":0,\"timeoutMs\":0", "positive")
             , (",\"holeIndex\":0,\"skip\":-1", "0 or more")
             , (",\"holeIndex\":0,\"hintMode\":\"all\"", "hintMode is one of")
-            , ("", "no hole address")
+            , (",\"holeIndex\":0,\"line\":3,\"column\":5", "not both")
             ]
         ]
 
@@ -3913,12 +3913,13 @@ autoTests = do
             keysOf r = case Aeson.toJSON r of
               Aeson.Object o -> sort (map Key.toText (KM.keys o))
               _              -> []
-            common = ["command", "elapsedMs", "lane", "options", "outcome", "project"]
+            addressed = HoleAddressed 3 8 "index"
+            common = ["addressed", "command", "elapsedMs", "lane", "options", "outcome", "project"]
         in allOf
              [ assertEqual "found" (sort (common <> ["resetMs", "searchMs", "term"]))
-                 (keysOf (AutoResult OutcomeFound (Just "m , n") Nothing Nothing "" (Just 3) (Just 90) meta))
+                 (keysOf (AutoResult OutcomeFound (Just "m , n") Nothing Nothing "" (Just 3) (Just 90) addressed meta))
              , assertEqual "no-solution" (sort (common <> ["message", "searchMs"]))
-                 (keysOf (AutoResult OutcomeNoSolution Nothing (Just "No solution found") Nothing "" (Just 2) Nothing meta))
+                 (keysOf (AutoResult OutcomeNoSolution Nothing (Just "No solution found") Nothing "" (Just 2) Nothing addressed meta))
              , assertEqual "outcome spellings"
                  (map Aeson.String ["found", "no-solution", "out-of-scope", "error"])
                  [ Aeson.toJSON o | o <- [OutcomeFound, OutcomeNoSolution, OutcomeOutOfScope, OutcomeError] ]
@@ -8498,6 +8499,24 @@ autoLaneTests cfg repoRoot = do
           , ("λ",   Just "ParseError",                     "not a name Agda can read")
           ]
         pure (firstFailure rs)
+
+    , -- The one-hole rule of issue #201 holds for auto as for the other hole
+      -- tools (the shared addressing text promises it): no address, or a
+      -- position a column short on the line, reaches HolePlain's only hole,
+      -- and every answer says which hole it searched and how it got there.
+      runTest "auto: no address reaches the only hole, and every answer says which and how (#201)" $ do
+        let plain = repoRoot </> "agda-mcp" </> "test" </> "resources" </> "HolePlain.agda"
+            ask ref = handleAuto lanes cfg (at 0) { apFilePath = plain, apHole = ref }
+        rs <- mapM ask [Unaddressed, ByPosition 15 4, ByIndex 0]
+        case sequence rs of
+          Left err        -> pure (Fail ("tool failure: " <> T.unpack (failureText err)))
+          Right [a, b, c] -> allOf
+            [ assertEqual "no address" (HoleAddressed 15 5 "only hole") (aurAddressed a)
+            , assertEqual "a column short" (HoleAddressed 15 5 "only hole, same line") (aurAddressed b)
+            , assertEqual "by index" (HoleAddressed 15 5 "index") (aurAddressed c)
+            , assert "the search ran each time" (all (isJust . aurSearchMs) [a, b, c])
+            ]
+          Right other     -> pure (Fail ("expected three answers, got " <> show (length other)))
 
     , -- The trap of algebras-inverses-range-to-image, on a fixture: the
       -- printed term continues at column 1, so a batch splice of the text as

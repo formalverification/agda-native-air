@@ -94,13 +94,13 @@ handleAuto lanes cfg0 p = case searchBoundProblem (agdaTimeout cfg0) (apTimeoutM
   Just msg -> pure (Left (FailMessage msg))
   Nothing  ->
     withLiveFile lanes cfg0 (apFilePath p) (apReload p) $ \ctx ->
-      case rhIndex <$> resolveHoleRef (lcAbsPath ctx) (flavourOf (lcAbsPath ctx)) (lcSource ctx) (apHole p) of
+      case resolveHoleRef (lcAbsPath ctx) (flavourOf (lcAbsPath ctx)) (lcSource ctx) (apHole p) of
         Left miss -> pure (Left (FailMessage miss))
-        Right idx -> case lrOutcome (lcLoad ctx) of
+        Right rh -> let idx = rhIndex rh; addressed = addressedOf rh in case lrOutcome (lcLoad ctx) of
           Left loadMsg -> do
             meta <- liveMeta ctx
             pure . Right $ AutoResult OutcomeError Nothing Nothing
-              (Just (loadError loadMsg)) opts Nothing Nothing meta
+              (Just (loadError loadMsg)) opts Nothing Nothing addressed meta
           Right li ->
             case pointForHole (flavourOf (lcAbsPath ctx)) (lcSource ctx) idx (liPoints li) of
               Nothing -> pure . Left . FailMessage $
@@ -114,12 +114,12 @@ handleAuto lanes cfg0 p = case searchBoundProblem (agdaTimeout cfg0) (apTimeoutM
                   Right (Just refusal) -> do
                     meta <- liveMeta ctx
                     pure . Right $ AutoResult OutcomeError Nothing Nothing
-                      (Just refusal) opts Nothing Nothing meta
-                  Right Nothing -> search ctx point
+                      (Just refusal) opts Nothing Nothing addressed meta
+                  Right Nothing -> search ctx point addressed
   where
     opts = autoOptions p
 
-    search ctx point = do
+    search ctx point addressed = do
       ran <- autoAt (lcHandle ctx) (lcAbsPath ctx)
                (agdaFlags (lcConfig ctx)) (ipId point) opts
       case ran of
@@ -141,6 +141,7 @@ handleAuto lanes cfg0 p = case searchBoundProblem (agdaTimeout cfg0) (apTimeoutM
             , aurOptions  = opts
             , aurSearchMs = Just (auSearchUs run `div` 1000)
             , aurResetMs  = (`div` 1000) <$> auResetUs run
+            , aurAddressed = addressed
             , aurMeta     = meta
             }
 
