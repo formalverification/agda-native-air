@@ -14,7 +14,8 @@
 --   > (G Algebra.Bundles.AbelianGroup.≈
 --   >  (G Algebra.Bundles.AbelianGroup.∙ (G Algebra.Bundles.AbelianGroup.⁻¹) x)
 --   >  ((G Algebra.Bundles.AbelianGroup.⁻¹) y))
---   > ((G Algebra.Bundles.AbelianGroup.⁻¹) ((G Algebra.Bundles.AbelianGroup.∙ x) y))
+--   > ((G Algebra.Bundles.AbelianGroup.⁻¹)
+--   >  ((G Algebra.Bundles.AbelianGroup.∙ x) y))
 --
 --   Two things separate the printing from the statement.  Every name is
 --   qualified; and every definition of a parameterized module, and every
@@ -56,11 +57,16 @@
 --   parameters), cubical @hcomp-@ and @transp-@ rows, and @constructor@ rows.
 --   A record module takes the prefix at least half its rows share, since its
 --   @Carrier@ field takes the record unnamed; any other module needs the
---   prefix every function row starts with.  A row's count is its explicit
---   binders inside that prefix, stopping at the first one named like an
---   operator: a module parameterized by an operation (@Algebra.Definitions@'s
---   @_≈_@) is used unapplied, and statements pass the operation explicitly
---   (@Commutative _≈_ _∙_@), whereas a module parameterized by a bundle is
+--   prefix every function row starts with; a module with one function row
+--   gives no such evidence, so its row takes no parameter unless the module
+--   is nested in a record's module and the row's first explicit argument is
+--   a value of that record (@DecStrictPartialOrder.Eq.decSetoid@), and any
+--   other one-row module's arguments stay in the written form.  A row's
+--   count is its explicit binders inside that prefix, stopping at the first
+--   one named like an operator: a module parameterized by an operation
+--   (@Algebra.Definitions@'s @_≈_@) is used unapplied, and statements pass
+--   the operation explicitly (@Commutative _≈_ _∙_@), whereas a module
+--   parameterized by a bundle is
 --   opened applied (@open Group-Op 𝒢@).  A two-row module could share a
 --   prefix by coincidence, so there an operator's count is capped at its
 --   explicit arity less its holes.  A record field the corpus has no row for
@@ -115,7 +121,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 
 import AgdaMCP.Retrieval (tokens)
-import AgdaMCP.Types (CorpusEntry (..), NameInfo (..), Part (..), WrittenTable (..))
+import AgdaMCP.Types
+  (CorpusEntry (..), NameInfo (..), Part (..), WrittenTable (..))
 
 
 -- ---------------------------------------------------------------------------
@@ -255,8 +262,21 @@ parameterCounts records entries =
           in case opParts (cePrettyName e) of
                Just ps | not record, length evidence < 3 ->
                  min p (max 0 (shArity sh - holes ps))
+               _ | length evidence < 2, nestedInRecord sh -> 1
                _ -> p
         isOperation b = maybe False (const True) (opParts (bName b))
+        -- A module with one function row gives no evidence of where its
+        -- telescope ends.  One case is safe all the same: a module nested in
+        -- a record's module (DecStrictPartialOrder.Eq, IsCongruent.Eq₁) whose
+        -- row takes, as its first explicit argument, a value of that record:
+        -- the record value is the parameter, as it is for the record's own
+        -- fields.  Any other one-row module keeps its arguments (a stated
+        -- limit; a Copilot catch on PR #231).
+        nestedInRecord sh = case [ h | (b, h) <- shBinders sh, bExplicit b ] of
+          Just h : _ -> h `elem` enclosing
+          _          -> False
+        enclosing = filter (`Set.member` records)
+          [ T.intercalate "." (take k segs) | let segs = T.splitOn "." m, k <- [1 .. length segs - 1] ]
 
 -- | The longest binder prefix that every sequence starts with.
 commonPrefix :: [[Binder]] -> [Binder]

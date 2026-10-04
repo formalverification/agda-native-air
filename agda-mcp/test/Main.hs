@@ -2306,6 +2306,21 @@ writtenSearchTests = do
           "F _⁻¹ z"
           (writtenDisplay syntheticTable "F.F (G Q.⁻¹) z")
 
+    , runTest "a one-row module nested in a record's module takes the record value; any other keeps its argument" $
+        -- R.Rec.Eq has one function row, as DecStrictPartialOrder.Eq does in
+        -- the standard library; Q2 has one too and nests in no record, so
+        -- nothing says where its telescope ends (a Copilot catch on PR #231:
+        -- the stated limit).
+        let t = writtenTable
+              [ writtenEntry "R.Rec" "Carrier" "function" "(r : R.Rec) → Set"
+              , writtenEntry "R.Rec" "op" "function" "(r : R.Rec) → Set"
+              , writtenEntry "R.Rec.Eq" "decSetoid" "function" "(r : R.Rec) → D.D"
+              , writtenEntry "Q2" "f" "function" "(G : R.Rec) → D.D"
+              ]
+        in  assertEqual "written"
+              ["decSetoid", "f G"]
+              (map (writtenDisplay t) ["R.Rec.Eq.decSetoid r", "Q2.f G"])
+
     , runTest "a shape the rules do not know is left as printed, never dropped" $
         -- An operator with an empty operand cannot be a section.
         assertEqual "as printed"

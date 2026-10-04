@@ -186,7 +186,9 @@ searchByType patterns limit idx =
 
 -- | Find definitions whose type, as a statement writes it, contains every
 -- given fragment, as a fragment writes it (issue #202; 'AgdaMCP.Written'
--- has the rules): the shortest written types first, then by name, so the
+-- has the rules): the shortest first, by the length of the key a fragment
+-- is matched against (the written form with brackets and spacing set aside,
+-- since the rendering adds brackets of its own), then by name, so the
 -- statements a fragment most nearly is come before the long ones that merely
 -- mention it.  Each hit carries its written form.  A fragment whose key is
 -- empty (brackets or spaces alone) would match every row, so it is refused.

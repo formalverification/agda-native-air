@@ -996,9 +996,11 @@ lemmas that state it: `x ⁻¹ ∙ y ⁻¹ ≈ (x ∙ y) ⁻¹`, `[ x ⸴ y ]`,
 | `qualified` | Default false.  `true` is the match from before #202: each fragment a case-insensitive substring of the printed type, in name order, and no `written` field.  With one `pattern` it answers exactly as the tool did then. |
 
 **Output**.  An array, the shortest statements first (by the length of the
-written form, then by name), each hit the `search_by_name` fields plus
-`written`, the type as the fragments were matched against it.  Captured over
-the stdio transport against the standard-library corpus:
+statement as matched, the written form with its brackets and spacing set
+aside, since the rendering adds brackets of its own; then by name), each hit
+the `search_by_name` fields plus `written`, the type as the fragments were
+matched against it.  Captured over the stdio transport against the
+standard-library corpus:
 
 ```json
 [
