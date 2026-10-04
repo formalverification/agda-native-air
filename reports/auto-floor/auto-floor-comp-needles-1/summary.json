@@ -41,7 +41,8 @@
         "found": 2,
         "no-solution": 7,
         "out-of-scope": 1
-      }
+      },
+      "unjudged": 0
     }
   },
   "total": {
@@ -52,6 +53,8 @@
       "found": 2,
       "no-solution": 7,
       "out-of-scope": 1
-    }
-  }
+    },
+    "unjudged": 0
+  },
+  "unmeasured": []
 }

@@ -216,11 +216,19 @@ def auto_call(ob: Obligation, hints: Sequence[str], timeout_ms: Optional[int]) -
     return ("auto", args)
 
 
+def usable_term(body: Mapping[str, Any]) -> Optional[str]:
+    """A found answer's term when it is one the judge can be given: a
+    nonempty string.  A `found` without one is a malformed answer, never a
+    term to judge."""
+    term = body.get("term")
+    return term if body.get("outcome") == "found" and isinstance(term, str) and term.strip() else None
+
+
 def found_term(a: Optional[Answer]) -> Optional[str]:
-    """The term an auto answer found, when it found one."""
+    """The term an auto answer found, when it found a usable one."""
     if a is None or a.is_error or not isinstance(a.body, dict):
         return None
-    return a.body.get("term") if a.body.get("outcome") == "found" else None
+    return usable_term(a.body)
 
 
 def judge_call(ob: Obligation, term: str) -> Call:
@@ -245,13 +253,19 @@ def record_of(ob: Obligation, hints: Sequence[str], searched: Optional[Answer],
               judged: Optional[Answer]) -> Dict[str, Any]:
     """One obligation's row: what the search said, and what the judge said of
     the term it found.  Every failure is named in the row: a search with no
-    usable answer is a `tool-failure` with its `failure`, and a found term
-    the judge never ruled on carries `judgeFailure`, so it is never read as
-    a term the judge refused."""
+    usable answer (a `found` with no nonempty term included) is a
+    `tool-failure` with its `failure`, and a found term the judge never ruled
+    on carries `judgeFailure`, so it is never read as a term the judge
+    refused."""
     search_failure = failure_of("search", searched, "outcome")
     body = searched.body if search_failure is None and searched is not None else {}
+    if body.get("outcome") == "found" and usable_term(body) is None:
+        # A found answer the judge could not be given: the floor counts every
+        # found term judged, so this is a failure, not an unsolved row.
+        search_failure = f"the search answer says found with no usable term: {json.dumps(body)[:300]}"
+        body = {}
     err = body.get("error") or {}
-    term = body.get("term") if body.get("outcome") == "found" else None
+    term = usable_term(body)
     judge_failure = failure_of("judge", judged, "status") if term is not None else None
     status = judged.body["status"] if term is not None and judge_failure is None and judged is not None else None
     rec: Dict[str, Any] = {

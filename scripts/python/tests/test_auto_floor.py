@@ -210,6 +210,21 @@ def test_record_of_names_every_failure_and_never_reads_one_as_a_verdict() -> Non
     assert failed_rows([missing, refused, unanswered, judged, nothing_to_judge]) == ["comp-x"] * 3
 
 
+def test_a_found_answer_without_a_usable_term_is_a_failure_never_judged() -> None:
+    # The floor counts every found term judged, so a `found` with no term,
+    # an empty one, or a non-string one is a named failure, and found_term
+    # never hands it to the judge (Copilot's final review of PR #230).
+    o = ob()
+    for body in ({"outcome": "found"}, {"outcome": "found", "term": ""},
+                 {"outcome": "found", "term": "  "}, {"outcome": "found", "term": 7}):
+        rec = record_of(o, (), Answer(False, body), None)
+        assert rec["outcome"] == "tool-failure", body
+        assert "no usable term" in rec["failure"], body
+        assert found_term(Answer(False, body)) is None, body
+    assert failed_rows([record_of(o, (), Answer(False, {"outcome": "found"}), None)]) == ["comp-x"]
+    assert found_term(Answer(False, {"outcome": "found", "term": "refl"})) == "refl"
+
+
 def test_summary_counts_per_tier_in_order() -> None:
     rows = [
         {"tier": "agda-stdlib-v0", "solved": True, "outcome": "found"},

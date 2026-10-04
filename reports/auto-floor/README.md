@@ -37,12 +37,18 @@ order (the outcome, the term or the message, the error's stage, code and
 first 300 characters, the search's milliseconds, the hints sent and any
 dropped, `fill_hole`'s status, and `solved`), and `summary.json`, the
 configuration and the per-tier counts.  Each run was made twice, the second
-time into this directory; the two agree on every outcome, term, code, and
-status.  A row the script could not measure names why (`failure` for a
-search with no usable answer, `judgeFailure` for a found term the judge
-never ruled on, counted per tier as `unjudged` by the current script, which
-also lists every such row in the summary as `unmeasured`), and the script
-then exits 1; neither run here has such a row.
+time into this directory, and was regenerated on 2026-10-04 the same way
+with the script and server as they stand after review (the summary's
+`unjudged` and `unmeasured` fields date from then).  The regenerated runs
+agree with the first ones on every outcome, term, code, and status, and so
+do all four runs of the composition tier with needles; one regeneration
+pass of the whole suite differed on one row, the bound-sensitive
+`algebras-kernels-quotient-proj-hom` below.  A row the script could not
+measure names why (`failure` for a search with no usable answer, a `found`
+with no term included, `judgeFailure` for a found term the judge never
+ruled on, counted per tier as `unjudged` and listed in the summary as
+`unmeasured`), and the script then exits 1; neither run here has such a
+row.
 
 ## The floor
 
@@ -68,10 +74,12 @@ What the table says:
    `driving-agda-mcp` skill): the same 17 rows, the same 17 terms.  The one
    row of 81 where the two differed is not a solve:
    `algebras-kernels-quotient-proj-hom` printed a term it could not read back
-   (out of scope) after 486 and 523 ms of search in this tool's two runs, and
-   ran out of its 1,000 ms CPU bound in the reference run; the issue's own
-   first measurement saw the out-of-scope answer.  A search that needs half
-   its bound can come out either way on a busy machine.
+   (out of scope) after 486 and 523 ms of search in this tool's two first
+   runs and after 977 ms in the regenerated one here, and ran out of its
+   1,000 ms CPU bound in the reference run and in one regeneration pass; the
+   issue's own first measurement saw the out-of-scope answer.  A search that
+   needs half its bound can come out either way on a busy machine, and
+   neither way is a solve.
 +  **No solved term names the lemma its row restates**.
    `algebras-homs-mon-to-hom` is solved from the record's own fields,
    `m .Overture.proj₁ Setoid.Algebras., m .proj₂ .IsMon.isHom` (a qualified

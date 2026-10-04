@@ -37,7 +37,8 @@
       "outcomes": {
         "found": 6,
         "no-solution": 16
-      }
+      },
+      "unjudged": 0
     },
     "agda-algebras-v0": {
       "solved": 11,
@@ -46,21 +47,24 @@
         "found": 11,
         "no-solution": 8,
         "out-of-scope": 2
-      }
+      },
+      "unjudged": 0
     },
     "agda-stdlib-haystack-v0": {
       "solved": 0,
       "total": 12,
       "outcomes": {
         "no-solution": 12
-      }
+      },
+      "unjudged": 0
     },
     "agda-stdlib-hard-v0": {
       "solved": 0,
       "total": 6,
       "outcomes": {
         "no-solution": 6
-      }
+      },
+      "unjudged": 0
     },
     "agda-algebras-hard-v0": {
       "solved": 0,
@@ -68,7 +72,8 @@
       "outcomes": {
         "no-solution": 7,
         "out-of-scope": 1
-      }
+      },
+      "unjudged": 0
     },
     "agda-algebras-composition-v0": {
       "solved": 1,
@@ -78,7 +83,8 @@
         "found": 1,
         "no-solution": 9,
         "out-of-scope": 1
-      }
+      },
+      "unjudged": 0
     }
   },
   "total": {
@@ -89,6 +95,8 @@
       "found": 18,
       "no-solution": 58,
       "out-of-scope": 4
-    }
-  }
+    },
+    "unjudged": 0
+  },
+  "unmeasured": []
 }
