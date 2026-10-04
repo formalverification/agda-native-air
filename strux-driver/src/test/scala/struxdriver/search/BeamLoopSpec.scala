@@ -399,13 +399,13 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     // goal; the textual peek would reject this one (its canned type is not
     // the goal's), so only the seam's exemption gets it to the oracle, and
     // the oracle, not the exemption, decides it.
-    val types = Map("found term" -> Json.obj(
+    val types = Map("(found term)" -> Json.obj(
       "type" -> Json.fromString("NotTheGoal"), "elapsedMs" -> Json.fromInt(1)).noSpaces)
     val world = Map((3, 8, "(found term)") -> fillOk("(found term)", Vector.empty))
     val searchLike = new Proposer {
       def propose(state: SearchState, target: Obligation, goal: GoalView): IO[Vector[String]] =
         IO.pure(Vector("(found term)", "tt"))
-      override def unpeeked(candidate: String): IO[Boolean] =
+      override def unpeeked(state: SearchState, target: Obligation, candidate: String): IO[Boolean] =
         IO.pure(candidate == "(found term)" || FixedProposer.closers.contains(candidate))
     }
     val (result, log) = runLoop(world, Vector.empty, LoopConfig.default.copy(peek = true), types,
@@ -417,9 +417,38 @@ final class BeamLoopSpec extends AnyFunSuite with Matchers {
     result.stats.peeks shouldBe 0
   }
 
+  test("peek: Agda's term skips the peek only at the state and obligation it was found for (#206)") {
+    // The search finds `x y` at the root and nothing at the child, and the
+    // inner space proposes the same text at both.  At the root it is Agda's
+    // own term, so it skips the peek and is probed; at the child Agda found
+    // nothing, so it is an ordinary candidate there: peeked, rejected (its
+    // canned type is not the goal's), and never probed.  An exemption that
+    // outlived its proposal let it through at the child (a Copilot catch
+    // on PR #233).
+    val types = Map(
+      "(x y)"    -> Json.obj("type" -> Json.fromString("NotTheGoal"), "elapsedMs" -> Json.fromInt(1)).noSpaces,
+      "pair _ _" -> Json.obj("type" -> Json.fromString("_p_1"), "elapsedMs" -> Json.fromInt(1)).noSpaces)
+    val inner = stubProposer(Vector("pair {!!} {!!}", "(x y)"))
+    val atRootOnly: (Obligation, Vector[String]) => IO[Either[String, AutoBody]] = (ob, _) =>
+      IO.pure(Right(
+        if (ob == ob0) AutoBody(AutoBody.Found, Some("x y"), None, None, "", Some(2L), Some(90L), 95L)
+        else AutoBody(AutoBody.NoSolution, None, Some("No solution found"), None, "", Some(1L), None, 3L)))
+    val closer = AutoCloseProposer.create(inner, AutoMode.Closer, atRootOnly, _ => IO.pure(Vector.empty))
+      .unsafeRunSync()
+    val (_, log) = runLoop(pairWorld, Vector.empty, LoopConfig.default.copy(peek = true, maxDepth = 2),
+      types, proposer = Some(closer))
+    val probesOfTerm = log.collect { case ("fill_hole", a)
+      if a.hcursor.get[String]("candidate").toOption.contains("(x y)") =>
+        (a.hcursor.get[Int]("line").toOption.get, a.hcursor.get[Int]("column").toOption.get) }
+    probesOfTerm shouldBe Vector((3, 8))
+    log.collect { case ("type_of", a) => a.hcursor.get[String]("expr").toOption.get }
+      .filter(_ == "(x y)") shouldBe Vector("(x y)")
+  }
+
   test("peek: the default exemption is exactly the closers, as before the seam named it (#206)") {
     val plain = stubProposer(Vector.empty)
-    FixedProposer.closers.map(c => plain.unpeeked(c).unsafeRunSync()) shouldBe Vector(true, true)
-    plain.unpeeked("(pair {!!} {!!})").unsafeRunSync() shouldBe false
+    val s0    = SearchState.initial(content0, Vector(ob0))
+    FixedProposer.closers.map(c => plain.unpeeked(s0, ob0, c).unsafeRunSync()) shouldBe Vector(true, true)
+    plain.unpeeked(s0, ob0, "(pair {!!} {!!})").unsafeRunSync() shouldBe false
   }
 }

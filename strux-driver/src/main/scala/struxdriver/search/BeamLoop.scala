@@ -263,7 +263,7 @@ object BeamLoop {
             // The proposer names the rest of the exemption (`unpeeked`): by
             // default exactly the closers, and, under Agda's own proof
             // search (issue #206), the terms Agda found at this very goal.
-            proposer.unpeeked(cand).flatMap { exempt =>
+            proposer.unpeeked(state, target, cand).flatMap { exempt =>
               if (!cfg.peek || exempt) IO.pure((st, Peek.Verdict.Keep: Peek.Verdict))
               else
                 oracle.typeOf(mkCtx("peek", Some(rank)), workFile, Peek.metaForm(cand),

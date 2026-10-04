@@ -41,7 +41,11 @@
   *      misjudge terms whose type is the goal's only up to definitional
   *      equality (`refl` at `lift ∘ lower ≡ 𝑖𝑑 (Lift b A)`, #127), which is
   *      what a search that works up to unfolding returns.  The peek only
-  *      ever saves a probe; the probe still runs.
+  *      ever saves a probe; the probe still runs.  The exemption holds at
+  *      the state and obligation the term was found for and nowhere else:
+  *      the same text proposed at another goal is an ordinary candidate
+  *      there, peeked like any other (a Copilot catch on PR #233, where an
+  *      exemption that outlived its proposal let it through).
   *  A multi-token term is parenthesized, the convention every proposer
   *  follows (a hole is an argument position as often as a right-hand side);
   *  a single token is left bare so it deduplicates with the closers.
@@ -120,7 +124,7 @@ final class AutoCloseProposer private (
   mode:     AutoMode,
   search:   (Obligation, Vector[String]) => IO[Either[String, AutoBody]],
   hintsFor: GoalView => IO[Vector[String]],
-  found:    Ref[IO, Set[String]],
+  found:    Ref[IO, Map[(SearchState, Obligation), String]], // the term found for each goal asked
   ledger:   Ref[IO, AutoLedger]
 ) extends Proposer {
 
@@ -131,13 +135,16 @@ final class AutoCloseProposer private (
       hints  <- if (mode == AutoMode.Hints) hintsFor(goal) else IO.pure(Vector.empty[String])
       answer <- search(target, hints)
       term    = answer.toOption.flatMap(_.found).map(AutoCloseProposer.shaped)
-      _      <- term.traverse_(t => found.update(_ + t))
+      _      <- term.traverse_(t => found.update(_.updated((state, target), t)))
       _      <- ledger.update(_.record(hints, answer))
       rest   <- inner.propose(state, target, goal)
     } yield (term.toVector ++ rest).distinct
 
-  override def unpeeked(candidate: String): IO[Boolean] =
-    found.get.flatMap(fs => if (fs.contains(candidate)) IO.pure(true) else inner.unpeeked(candidate))
+  override def unpeeked(state: SearchState, target: Obligation, candidate: String): IO[Boolean] =
+    found.get.flatMap { fs =>
+      if (fs.get((state, target)).contains(candidate)) IO.pure(true)
+      else inner.unpeeked(state, target, candidate)
+    }
 }
 
 object AutoCloseProposer {
@@ -157,7 +164,7 @@ object AutoCloseProposer {
     hintsFor: GoalView => IO[Vector[String]]
   ): IO[AutoCloseProposer] =
     for {
-      found  <- Ref.of[IO, Set[String]](Set.empty)
+      found  <- Ref.of[IO, Map[(SearchState, Obligation), String]](Map.empty)
       ledger <- Ref.of[IO, AutoLedger](AutoLedger())
     } yield new AutoCloseProposer(inner, mode, search, hintsFor, found, ledger)
 }

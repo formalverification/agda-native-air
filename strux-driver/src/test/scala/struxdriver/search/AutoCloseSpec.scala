@@ -12,7 +12,8 @@
   *  token, bare so a found `refl` and the closer `refl` are one candidate);
   *  hints sent in `hints` mode only, and taken from the goal's own pool; a
   *  failed reply or an empty search leaving the inner space untouched; the
-  *  peek exemption for exactly the terms the search found; and the ledger.
+  *  peek exemption for exactly the terms the search found, at the goal it
+  *  found each for; and the ledger.
   *
   *  ============================================================================
   */
@@ -60,9 +61,19 @@ final class AutoCloseSpec extends AnyFunSuite with Matchers {
     val (p, sent) = withSearch(AutoMode.Closer, found("m , n"))
     p.propose(st, ob, goal).unsafeRunSync() shouldBe Vector("(m , n)", "refl", "tt", "(lemma {!!})")
     sent.get.unsafeRunSync() shouldBe Vector(Vector.empty)   // the default space: no hints
-    p.unpeeked("(m , n)").unsafeRunSync() shouldBe true
-    p.unpeeked("(lemma {!!})").unsafeRunSync() shouldBe false
-    p.unpeeked("refl").unsafeRunSync() shouldBe true          // the inner rule still holds
+    p.unpeeked(st, ob, "(m , n)").unsafeRunSync() shouldBe true
+    p.unpeeked(st, ob, "(lemma {!!})").unsafeRunSync() shouldBe false
+    p.unpeeked(st, ob, "refl").unsafeRunSync() shouldBe true  // the inner rule still holds
+  }
+
+  test("closer: the exemption is for the goal the term was found at, and no other") {
+    val (p, _) = withSearch(AutoMode.Closer, found("m , n"))
+    p.propose(st, ob, goal).unsafeRunSync()
+    val other = Obligation(4, 8, "G")
+    val later = SearchState.initial("module M where\ng : G\ng = {!!}\nh : G\nh = {!!}\n", Vector(other))
+    p.unpeeked(later, other, "(m , n)").unsafeRunSync() shouldBe false  // another state's goal
+    p.unpeeked(st, other, "(m , n)").unsafeRunSync() shouldBe false     // another obligation
+    p.unpeeked(later, other, "refl").unsafeRunSync() shouldBe true      // closers, everywhere
   }
 
   test("closer: a one-token term is the closer it equals, proposed once") {
@@ -81,7 +92,7 @@ final class AutoCloseSpec extends AnyFunSuite with Matchers {
     p1.propose(st, ob, goal).unsafeRunSync() shouldBe Vector("refl", "tt", "(lemma {!!})")
     val (p2, _) = withSearch(AutoMode.Closer, Left("lane timeout"))
     p2.propose(st, ob, goal).unsafeRunSync() shouldBe Vector("refl", "tt", "(lemma {!!})")
-    p2.unpeeked("(lemma {!!})").unsafeRunSync() shouldBe false
+    p2.unpeeked(st, ob, "(lemma {!!})").unsafeRunSync() shouldBe false
   }
 
   test("the ledger: calls, outcomes, distinct terms and hint sets, and the two timings") {
