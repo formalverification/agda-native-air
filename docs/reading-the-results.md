@@ -413,8 +413,10 @@ agda-algebras columns measure, in part, access to the disk.
 
 The column counts the proof shown, not the file opened.  A call that names
 the original's file without showing the proof does not count: a
-`definition_of` answer, which says where and not what; a Read of a range
-that stops short of the proof; a grep for another name in the file.  That
+`definition_of` answer in these runs, which said where and not what (since
+[#185] an answer quotes the source, and a quote that shows the proof
+counts); a Read of a range that stops short of the proof; a grep for
+another name in the file.  That
 is why the counts sit below the script readings they replace (16, 6, and 16
 on the three [#162] arms, 5 and 15 on the two [#184] arms).  Six solves
 differ, one `definition_of` answer on `arm162-mcp-1` and five reads that
@@ -518,8 +520,10 @@ at all is a decision not yet taken (§ 6).
 +  **The knowledge tools, as built: a loss**.  Beside a shell they collapse
    (header-free, `definition_of` 0 calls against 11 without a shell,
    `search_by_name` 4 against 21), because `grep` over the source needs no
-   prior knowledge of where a thing is while `definition_of` answers where
-   and not what.  Tracked as [#185].
+   prior knowledge of where a thing is while `definition_of` answered where
+   and not what.  [#185] made it quote the source: re-run without a shell,
+   Sonnet called it 47 times against 11 (`suite-answers-sonnet5-mcp-1`,
+   [`reports/agent-bench/README.md`]); no `both` arm has run with it yet.
 +  **`both` beats `shell` by one row**, header-free (48 and 47) as with the
    hints (51 and 50): within noise; not a claim.
 
@@ -619,8 +623,11 @@ under it.
    not written itself, or a line of a tier README.
 +  **Which tools, given the server**.  The `mcp` arms located definitions
    with `definition_of` (14 calls with the hints, 18 without) and then read
-   the files it named (49 and 45 `Read` calls): the tool answers where and
-   not what, so every answer was followed by a read, which is [#185].  They
+   the files it named: 16 and 19 of their `Read` calls (49 and 45 in all,
+   the work file's included) were of a file an answer had named, after 8 of
+   the 14 answers and 10 of the 18.  The tool answered where and not what,
+   which is [#185]; re-run with the quote, the header-free arm read a named
+   file 11 times after 22 answers (`hard-answers-opus5-mcp-1`).  They
    took every verdict from `check_file`, probed candidates with `fill_hole`
    (5 and 5), and used `search_by_name` (7 and 10), `exports_of` (7 and 8),
    `type_of` (5 and 1), `normalize` (3 and 0), and `get_goal` (2 and 2);
@@ -914,10 +921,12 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 +  **A locator beside the four tools, and a `definition_of` that returns
    the text**.  The four-tool arm's 111 and 97 failed library reads are
    what a subject does without `definition_of`, which the fourteen-tool
-   arms had and used (16 and 12 calls) and which answers where a definition
-   is and not what it says.  No arm has run the subset with a locator added
-   to it, and none has run with the content-returning `definition_of` of
-   [#185]; the two are separate variables.
+   arms had and used (16 and 12 calls) and which, in those arms, answered
+   where a definition is and not what it says.  No arm has run the subset
+   with a locator added to it.  The content-returning `definition_of` of
+   [#185] has run only in the full fourteen-tool `mcp` arms
+   (`suite-answers-sonnet5-mcp-1`, `hard-answers-opus5-mcp-1`), not in the
+   four-tool subset; the two are separate variables.
 +  **Construction, tools against no tools**.  The archived arms could not
    read the originals and the [#162] arms could (§ 4.3), so no run compares
    the tools with their absence on rows the subject cannot copy.  The
