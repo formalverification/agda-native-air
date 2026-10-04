@@ -7598,6 +7598,18 @@ searchInScopeLaneTests cfg repoRoot = do
               , assert "every row typed" (all (not . T.null . srowType) (sirResults res))
               ]
 
+        , runTest "search_by_name with inScopeAt: a blank pattern is the in-band query error, saying so (#203)" $ do
+            -- The plain search_by_name lists every name for "", but in scope
+            -- a match-all would spend the probe budget on arbitrary rows.
+            r <- call (inScopeParams (SearchByNameParams "  " Nothing Nothing)
+                                     (InScopeAt fixture Nothing Nothing False))
+            withRes r $ \res -> allOf
+              [ assertEqual "stage" (Just "query") (lveStage <$> sirError res)
+              , assert ("message: " <> show (lveMessage <$> sirError res))
+                  (maybe False (("name pattern is blank" `T.isInfixOf`) . lveMessage) (sirError res))
+              , assertEqual "no results" [] (sirResults res)
+              ]
+
         , runTest "search_in_scope: no query at a hole derives the tokens from the goal" $ do
             r <- call atHole
             withRes r $ \res -> allOf

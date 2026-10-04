@@ -941,7 +941,10 @@ honest: `hits > 0` with `inScope: 0` means the name exists and the file does
 not import its module.  With `inScopeAt`, `limit` counts accepted names
 (default 8), only definitions are returned (records, data types, and
 constructors are counted in `ledger.nonFunction`), the first call on a file
-pays its lane load, and `verbose: true` restores the lane echo.
+pays its lane load, and `verbose: true` restores the lane echo.  A blank
+`pattern` is refused in band there (`error.stage: "query"`), where the plain
+lookup lists every name: a match-all over the scope would spend the probe
+budget on arbitrary rows, which `search_in_scope` refuses by design.
 
 ```json
 { "pattern": "≈ⁿ-trans",

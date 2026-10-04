@@ -189,6 +189,23 @@ handleSearchInScope lanes cfg0 idx p =
                   , sirMeta    = meta
                   }
 
+-- | noSignalMessage: why a well-formed query selects nothing, in the terms of
+-- what was sent.  A blank name pattern with no tokens is what search_by_name's
+-- @inScopeAt@ sends for @pattern: ""@ (its pattern is always the name query;
+-- a Copilot catch on PR #232).  The refusal is deliberate there as here: a
+-- match-all over the scope would spend the probe budget on arbitrary rows,
+-- where the plain search_by_name only lists names.
+noSignalMessage :: SearchQuery -> Text
+noSignalMessage q = case sqName q of
+  Just n | T.null (T.strip n) && null (sqTokens q) ->
+    "the name pattern is blank, which would select every row this file can \
+    \write and spend the probe budget on arbitrary ones; pass a name"
+  _ ->
+    "the query carries no retrieval signal: its tokens reduce to nothing once \
+    \a name's outer underscores are stripped (the reduction the corpus side \
+    \uses, so `_+_` meets `+`), and no non-blank name pattern stands beside \
+    \them; pass a name, or tokens that survive it"
+
 -- | resolveQuery: the caller's query, or one derived from the goal at the
 -- anchor, or the in-band error that neither exists.  A lane process failure
 -- while reading the goal is the structured failure, as everywhere on the lane.
@@ -204,10 +221,7 @@ resolveQuery ctx counters mQuery scope = case (mQuery, scope) of
     | otherwise -> pure . Right . Left $ LiveError
         { lveStage   = "query"
         , lveCode    = Nothing
-        , lveMessage = "the query carries no retrieval signal: its tokens \
-            \reduce to nothing once a name's outer underscores are stripped \
-            \(the reduction the corpus side uses, so `_+_` meets `+`), and no \
-            \name pattern was given; pass a name, or tokens that survive it"
+        , lveMessage = noSignalMessage q
         }
   (Nothing, Toplevel) -> pure . Right . Left $ LiveError
     { lveStage   = "query"

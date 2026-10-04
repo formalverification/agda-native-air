@@ -424,7 +424,10 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> searchTools
     searchTools
       | isJust (scCorpusIndex cfg) =
           [ toolDef "search_by_name" searchByNameNote
-              [ prop "pattern" "string" "Substring to search for in definition names."
+              [ prop "pattern" "string" "Substring to search for in definition names; \
+                  \with inScopeAt it must not be blank (refused in band, \
+                  \error.stage 'query': a match-all would spend the lane's probes \
+                  \on arbitrary rows)."
               , prop "limit"   "integer" "Maximum number of results (default: 20; with \
                   \inScopeAt, names returned, default 8)."
               , propObjectRequiring "inScopeAt" "Answer for this file: keep only the names it \
