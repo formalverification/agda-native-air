@@ -1057,7 +1057,7 @@ module, which differs from a statement in three ways, and the rendering
    has `Homomorphic₂` alone, so a statement using it is written
    `Homomorphic₂ (A .Carrier) (B .Carrier) _≈_ _≈_ ⟦ r ⟧`, which
    `_≈_ _≈_ ⟦ r ⟧` finds and `Homomorphic₂ _≈_ _≈_ ⟦ r ⟧` does not.  In the
-   standard library's corpus, 18 names of this kind occur in 817 rows'
+   standard library's corpus, 17 names of this kind occur in 626 rows'
    types, against 7 names in 1,333 that the nesting rule covers.  A record
    field the corpus has no
    row for (the standard library's `Setoid._≈_` in agda-algebras) is known
