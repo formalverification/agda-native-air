@@ -132,8 +132,8 @@ import AgdaMCP.Interaction
 import AgdaMCP.Server
   (ServerConfig (..), forceResponse, isExposed, registeredToolNames, serverInstructions, toolDefinitions)
 import AgdaMCP.Tools.Auto
-  ( autoOptions, classifyAuto, handleAuto, joinRendering, notInScopeName
-  , unusableHint )
+  ( autoDefaultTimeoutMs, autoOptions, classifyAuto, handleAuto, joinRendering
+  , notInScopeName, searchBoundProblem, unusableHint )
 import AgdaMCP.Tools.CheckProject
   ( handleCheckProject, failingModuleOf, gateFailureLines, maxTailLines
   , outputTailOf )
@@ -3848,6 +3848,21 @@ autoTests = do
           , assertEqual "a record type that is also a module" Nothing (unusableHint "x" (moduleToo "record type"))
           , assertEqual "not in scope: the search names it" Nothing (unusableHint "nosuch" "nosuch is not in scope.")
           ]
+
+    , -- The bound checked is the one the search will run with: a call that
+      -- names none runs Agda's default, which a 1 s --timeout cannot hold
+      -- either (a Copilot catch on PR #230).
+      runTest "searchBoundProblem: the effective bound, Agda's default included, against --timeout" $ allOf
+        [ assertEqual "Agda's default" 1000 autoDefaultTimeoutMs
+        , assert "no timeoutMs under a 1 s --timeout is refused, naming the default"
+            (maybe False ("Agda's default search bound of 1000 ms" `T.isInfixOf`) (searchBoundProblem (Just 1) Nothing))
+        , assert "an asked bound that reaches it is refused, naming it"
+            (maybe False ("timeoutMs 1000 reaches" `T.isInfixOf`) (searchBoundProblem (Just 1) (Just 1000)))
+        , assertEqual "an asked bound below it runs" Nothing (searchBoundProblem (Just 1) (Just 999))
+        , assertEqual "the default under a 2 s --timeout runs" Nothing (searchBoundProblem (Just 2) Nothing)
+        , assertEqual "no --timeout, no deadline" Nothing (searchBoundProblem Nothing (Just 5000000))
+        , assertEqual "a non-positive --timeout, no deadline" Nothing (searchBoundProblem (Just 0) Nothing)
+        ]
 
     , runTest "autoOptions: only what the fields say, and nothing for a call with none" $ allOf
         [ assertEqual "none" "" (autoOptions base)
@@ -8547,6 +8562,20 @@ autoLaneTests cfg repoRoot = do
         shutdownLanes fresh
         case r of
           Left (FailMessage m) -> assert (T.unpack m) ("reaches this server's --timeout of 2 s" `T.isInfixOf` m)
+          Left other           -> pure (Fail ("wrong failure: " <> T.unpack (failureText other)))
+          Right _              -> pure (Fail "the search ran")
+
+    , -- The same with no timeoutMs: the search would run Agda's default,
+      -- which a 1 s deadline cannot hold (a Copilot catch on PR #230).  The
+      -- refusal comes before any lane exists, so nothing is spawned.
+      runTest "auto: with no timeoutMs, Agda's default bound is checked against --timeout too" $ do
+        fresh <- newInteractionLanes
+        r <- handleAuto fresh cfg { agdaTimeout = Just 1 } (at 0)
+        shutdownLanes fresh
+        case r of
+          Left (FailMessage m) -> assert (T.unpack m)
+            ("Agda's default search bound of 1000 ms" `T.isInfixOf` m
+             && "--timeout of 1 s" `T.isInfixOf` m)
           Left other           -> pure (Fail ("wrong failure: " <> T.unpack (failureText other)))
           Right _              -> pure (Fail "the search ran")
     ]

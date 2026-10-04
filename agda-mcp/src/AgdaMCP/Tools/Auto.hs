@@ -45,9 +45,11 @@
 --     back as the type it found, @ShouldBePi@, was measured on one
 --     composition row).
 --   * The search's own time bound (Agda's @-t@, CPU milliseconds, checked
---     between search steps) must sit inside the lane's deadline, the server's
---     @--timeout@; a request whose bound reaches that deadline could only end
---     in the lane being killed, so it is refused before anything is sent.
+--     between search steps; Agda's default when the call names none) must
+--     sit inside the lane's deadline, the server's @--timeout@; a request
+--     whose bound reaches that deadline could only end in the lane being
+--     killed, so it is refused before anything is sent
+--     ('searchBoundProblem').
 --
 --   The lane is left describing the file after a found term ('runConsuming'
 --   re-loads it, the reset a give owes), and an answer says what that cost
@@ -65,12 +67,14 @@ module AgdaMCP.Tools.Auto
   , notInScopeName
   , classifyAuto
   , unusableHint
+  , searchBoundProblem
+  , autoDefaultTimeoutMs
   , resetAware
   , withResetEvidence
   ) where
 
 import Data.List (nub)
-import Data.Maybe (listToMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -86,7 +90,7 @@ import AgdaMCP.Types
 handleAuto
   :: InteractionLanes -> AgdaConfig -> AutoParams
   -> IO (Either ToolFailure AutoResult)
-handleAuto lanes cfg0 p = case boundProblem of
+handleAuto lanes cfg0 p = case searchBoundProblem (agdaTimeout cfg0) (apTimeoutMs p) of
   Just msg -> pure (Left (FailMessage msg))
   Nothing  ->
     withLiveFile lanes cfg0 (apFilePath p) (apReload p) $ \ctx ->
@@ -140,16 +144,36 @@ handleAuto lanes cfg0 p = case boundProblem of
             , aurMeta     = meta
             }
 
-    -- The search's bound must end before the lane's own deadline does; a
-    -- missing or non-positive --timeout is no deadline, the batch lane's
-    -- convention, and leaves nothing to check against.
-    boundProblem = case (apTimeoutMs p, agdaTimeout cfg0) of
-      (Just ms, Just secs) | secs > 0, ms >= secs * 1000 -> Just $
-        "timeoutMs " <> T.pack (show ms) <> " reaches this server's --timeout of "
-        <> T.pack (show secs) <> " s, which bounds the whole call; a search \
-        \that long could only end in the lane being killed. Ask for less than "
-        <> T.pack (show (secs * 1000)) <> " ms."
-      _ -> Nothing
+
+-- | autoDefaultTimeoutMs: the search's bound when a call names none, Agda's
+-- own (@optTimeout@ in @Agda.Mimer.Options@, 1,000 ms of CPU time).
+autoDefaultTimeoutMs :: Int
+autoDefaultTimeoutMs = 1000
+
+-- | searchBoundProblem: why a search with this bound cannot run under this
+-- server's @--timeout@ (seconds), or 'Nothing' when it can.
+--
+-- The search's bound must end before the lane's own deadline does, or the
+-- call could only end in the lane being killed.  The bound is the effective
+-- one: a call that names no @timeoutMs@ searches for Agda's default, so a
+-- server whose @--timeout@ is 1 s cannot run a default search either (a
+-- Copilot catch on PR #230: only a bound the call named was checked).  A
+-- missing or non-positive @--timeout@ is no deadline, the batch lane's
+-- convention, and leaves nothing to check against.
+searchBoundProblem :: Maybe Int -> Maybe Int -> Maybe Text
+searchBoundProblem serverSecs asked = case serverSecs of
+  Just secs | secs > 0, bound >= secs * 1000 -> Just $
+    which <> " reaches this server's --timeout of " <> T.pack (show secs)
+    <> " s, which bounds the whole call; a search that long could only end \
+       \in the lane being killed. Ask for less than "
+    <> T.pack (show (secs * 1000)) <> " ms with timeoutMs."
+  _ -> Nothing
+  where
+    bound = fromMaybe autoDefaultTimeoutMs asked
+    which = case asked of
+      Just ms -> "timeoutMs " <> T.pack (show ms)
+      Nothing -> "Agda's default search bound of " <> T.pack (show autoDefaultTimeoutMs)
+                 <> " ms (the call names no timeoutMs)"
 
 -- | checkHints: the first hint the search could not use, asked of the lane
 -- at the hole before the search runs; 'Nothing' when every hint is usable.

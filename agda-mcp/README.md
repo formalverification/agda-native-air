@@ -1180,9 +1180,11 @@ does nothing.
 **The bound**.  `-t` is CPU time, in milliseconds when written `<n>ms` (a
 bare number is seconds), Agda's default 1000 ms, and Mimer checks it between
 search steps, so a search can overrun it by one step.  The server's
-`--timeout` bounds the whole call; a `timeoutMs` that reaches it is refused
-before anything runs, and a call that outlives it is a lane timeout, an
-`isError` like any lane tool's.  A row whose search needs close to the bound
+`--timeout` bounds the whole call; a bound that reaches it is refused before
+anything runs, Agda's default included when the call names none (so on a
+server started with `--timeout 1` a call must ask for less than 1000 ms), and
+a call that outlives it is a lane timeout, an `isError` like any lane
+tool's.  A row whose search needs close to the bound
 can come out differently on a loaded machine: one benchmark row,
 `algebras-kernels-quotient-proj-hom`, found its term in 523 ms on one run and
 ran out of time at 1,005 ms on another.

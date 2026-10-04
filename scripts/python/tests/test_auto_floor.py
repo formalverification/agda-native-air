@@ -215,12 +215,13 @@ def test_summary_counts_per_tier_in_order() -> None:
         {"tier": "agda-stdlib-v0", "solved": True, "outcome": "found"},
         {"tier": "agda-stdlib-v0", "solved": False, "outcome": "no-solution"},
         {"tier": "agda-algebras-v0", "solved": False, "outcome": "out-of-scope"},
-        {"tier": "agda-algebras-v0", "solved": False, "outcome": "found", "judgeFailure": "no answer"},
+        {"id": "x4", "tier": "agda-algebras-v0", "solved": False, "outcome": "found", "judgeFailure": "no answer"},
     ]
     s = summary_of(options(), rows, "bin/agda-mcp")
     assert list(s["perTier"]) == ["agda-stdlib-v0", "agda-algebras-v0"]
     assert s["perTier"]["agda-stdlib-v0"] == {"solved": 1, "total": 2, "unjudged": 0,
                                               "outcomes": {"found": 1, "no-solution": 1}}
     assert s["perTier"]["agda-algebras-v0"]["unjudged"] == 1
+    assert s["unmeasured"] == ["x4"]
     assert s["total"]["solved"] == 1 and s["total"]["total"] == 4
     assert s["config"]["server"] == "bin/agda-mcp" and "--safe" in s["config"]["judgeFlags"]

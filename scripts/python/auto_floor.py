@@ -43,9 +43,10 @@ Description: The proof-search floor of the benchmark (issues #205, #206):
   order) and summary.json (the configuration and the per-tier counts).  A
   row the run could not measure names why: `failure` for a search with no
   usable answer (outcome `tool-failure`), `judgeFailure` for a found term the
-  judge never ruled on (counted per tier as `unjudged`).  Both files are
-  written either way, and the exit status is 1 when any row is unmeasured,
-  since the counts are then not a floor.
+  judge never ruled on (counted per tier as `unjudged`), and the summary
+  lists every such row as `unmeasured`.  Both files are written either way,
+  for the evidence they hold, and the exit status is 1 when any row is
+  unmeasured, since the counts are then not a floor.
 
   fill_hole patches each obligation in place and restores it, so nothing
   else may run against the fixtures meanwhile.
@@ -297,6 +298,9 @@ def summary_of(opts: Options, records: Sequence[Mapping[str, Any]], server: str)
         },
         "perTier": {t: counts([r for r in records if r["tier"] == t]) for t in tiers},
         "total": counts(records),
+        # The rows the run could not measure; nonempty means these counts are
+        # not a floor, said in the file itself so no reader of it can miss it.
+        "unmeasured": failed_rows(records),
     }
 
 
