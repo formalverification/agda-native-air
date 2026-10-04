@@ -1031,7 +1031,18 @@ module, which differs from a statement in three ways, and the rendering
    needs only half of them), counted up to the first one named like an
    operator, since a module parameterized by an operation
    (`Algebra.Definitions`'s `_≈_`) is used unapplied and its statements pass
-   the operation (`Commutative _≈_ _∙_`).  A record field the corpus has no
+   the operation (`Commutative _≈_ _∙_`).  A module with one function row
+   shows no such prefix, so its row takes no parameter unless the module is
+   nested in a record's module and the row's first explicit argument is a
+   value of that record (`DecStrictPartialOrder.Eq.decSetoid`), which is
+   then the parameter.  Any other such row keeps its arguments:
+   `Relation.Binary.Morphism.Definitions`, parameterized by two carriers,
+   has `Homomorphic₂` alone, so a statement using it is written
+   `Homomorphic₂ (A .Carrier) (B .Carrier) _≈_ _≈_ ⟦ r ⟧`, which
+   `_≈_ _≈_ ⟦ r ⟧` finds and `Homomorphic₂ _≈_ _≈_ ⟦ r ⟧` does not.  In the
+   standard library's corpus, 18 names of this kind occur in 817 rows'
+   types, against 7 names in 1,333 that the nesting rule covers.  A record
+   field the corpus has no
    row for (the standard library's `Setoid._≈_` in agda-algebras) is known
    by its qualifier, a name some binder is typed by.
 +  **Builtins' names**.  The printer keeps a builtin's own name, and the
@@ -1045,28 +1056,30 @@ module, which differs from a statement in three ways, and the rendering
 
 The matching key then drops brackets, collapses whitespace, and folds case;
 a fragment gets the same key, without the parameter step, and `->` reads as
-`→`.  Three things are not normalized, and the description says so: variable
-names are the library's (`x y`, not `a b`); a `syntax` declaration is not
-applied, since the corpus does not carry them (conjugation matches as
-`conj-syntax g x`, not `x ^ g`); and since brackets are ignored, a fragment
-can match across a grouping it did not mean (`x ∙ y` occurs in
-`(z ∙ x) ∙ y`).  A qualified fragment is read by its last segment, so
-`Commutator.[` is just `[` here: a query in the corpus's own spelling
-belongs under `qualified: true`.  No fragment, or one of brackets and spaces
-alone (which would match every row), is refused in band.
+`→`.  A fragment's brackets drop whether they match or not, so a piece cut
+from a longer statement (`MagmaHomomorphism A B)`) still finds it.  Three
+things are not normalized, and the description says so: variable names are the
+library's (`x y`, not `a b`); a `syntax` declaration is not applied, since the
+corpus does not carry them (conjugation matches as `conj-syntax g x`, not
+`x ^ g`); and since brackets are ignored, a fragment can match across a
+grouping it did not mean (`x ∙ y` occurs in `(z ∙ x) ∙ y`).  A qualified
+fragment is read by its last segment, so `Commutator.[` is just `[` here: a
+query in the corpus's own spelling belongs under `qualified: true`.  No
+fragment, or one of brackets and spaces alone (which would match every row),
+is refused in band.
 
 **Measured** (issue #202).  The 23 archived agent-bench calls, replayed on
 the archived server and on this one, each against its row's corpus: 11
-answered nothing before and 5 now (`hom 𝑨 𝑩 → hom 𝑩 𝑪` finds `∘-hom`,
-`≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪` finds `≤-trans`, `m + n ≤ o` finds `m+n≤o⇒m≤o`;
-the five that still find nothing are two names sent to the type tool, a
-fragment with an unclosed bracket, and two statements whose variable names
-or shape are not the library's), and the 23 answers fell from 175,124
-characters to 131,416, because the shortest statements come first.  The
-rendering is built when the corpus loads: 0.9 s on the agda-algebras corpus
-(2.4 s to 3.3 s) and 2.5 s on the standard library's (5.8 s to 8.3 s), with
-75 MB and 165 MB more resident after the load, most of it the collector's
-headroom over the load's peak rather than live data.
+answered nothing before and 4 now (`hom 𝑨 𝑩 → hom 𝑩 𝑪` finds `∘-hom`,
+`≤ 𝑩 → 𝑩 ≤ 𝑪 → 𝑨 ≤ 𝑪` finds `≤-trans`, `m + n ≤ o` finds `m+n≤o⇒m≤o`,
+and `IsEpi 𝑨 (𝑨 ╱`, cut off inside a bracket, finds `pepi`; the four that
+still find nothing are two names sent to the type tool and two statements
+whose variable names or shape are not the library's), and the 23 answers
+fell from 175,124 characters to 132,097, because the shortest statements
+come first.  The rendering is built when the corpus loads: 0.9 s on the
+agda-algebras corpus (2.4 s to 3.3 s) and 2.5 s on the standard library's
+(5.8 s to 8.3 s), with 75 MB and 165 MB more resident after the load, most of
+it the collector's headroom over the load's peak rather than live data.
 
 #### `get_dependencies`
 

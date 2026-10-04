@@ -588,9 +588,13 @@ writtenKeys entries =
 
 -- | fragmentKey: a query fragment's key.  A fragment is written as a
 -- statement already is, so it is not unsectioned; @->@ is read as @→@, as
--- Agda reads it.
+-- Agda reads it.  Its brackets are dropped before parsing, matched or not:
+-- a key has none, and a fragment cut from a longer statement
+-- (@MagmaHomomorphism A B)@) often leaves one unmatched, which 'parseItems'
+-- would keep as a token that no key contains.
 fragmentKey :: Text -> Text
-fragmentKey = renderKey . parseItems . map arrow . tokens
+fragmentKey = renderKey . parseItems . map arrow . filter (not . bracket) . tokens
   where
     arrow "->" = "→"
     arrow x    = x
+    bracket t  = Map.member t closerOf || t `elem` Map.elems closerOf
