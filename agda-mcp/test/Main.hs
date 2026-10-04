@@ -3829,7 +3829,7 @@ autoTests = do
     , -- The kinds Mimer keeps as hints, read off Agda's own scope answer in
       -- the grammar 'explainWhyInScope' prints (the variable and the pattern
       -- synonym are the tier-3c fixture's, there asked of the lane itself).
-      runTest "unusableHint: a variable, or a name only of a kind the search drops, and nothing else" $
+      runTest "unusableHint: a variable, or a name only of a kind the search cannot use, and nothing else" $
         let named k = "x is in scope as\n  * a " <> k <> " M.x brought into scope by\n    - its definition at /x/M.agda:3.1-2"
             moduleToo k = named k <> "\n  * a module M.x brought into scope by\n    - its definition at /x/M.agda:3.1-2"
             refused = maybe False (const True)
@@ -8429,12 +8429,12 @@ autoLaneTests cfg repoRoot = do
               ((\e -> (lveStage e, lveCode e)) <$> aurError res)
           ]
 
-    , -- Mimer drops a hint that is not a defined name, a constructor, or a
-      -- record field without a word, and a hint it cannot read as a name at
-      -- all fails the command with an error that does not name it (a
-      -- Copilot catch on PR #230).  Each is refused by name before the
-      -- search runs, after a usable hint, so the check walks the list.
-      runTest "auto: a hint the search would drop or cannot read is refused by name, before any search" $ do
+    , -- Mimer drops a variable or a pattern synonym as a hint without a
+      -- word, and a hint it cannot read as a name at all fails the command
+      -- with an error that does not name it (a Copilot catch on PR #230).
+      -- Each is refused by name before the search runs, after a usable
+      -- hint, so the check walks the list.
+      runTest "auto: a hint the search cannot use or cannot read is refused by name, before any search" $ do
         let refused (h, code, phrase) =
               withAuto lanes (at 1) { apHints = ["lemma", h] } $ \res -> allOf
                 [ assertEqual (T.unpack h <> ": outcome") OutcomeError (aurOutcome res)

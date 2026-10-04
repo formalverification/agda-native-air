@@ -27,8 +27,9 @@
 --   * The options are built from declared fields ('autoOptions'), so no free
 --     text reaches Agda's option reader, and the string sent is echoed back.
 --   * Each hint is put to Agda's scope query at the hole before the search
---     runs ('checkHints'), and a hint the search would drop without a word,
---     or could not read at all, refuses the call by name.
+--     runs ('checkHints'), and a hint the search could not use (one it would
+--     drop without a word, or one it could not read at all) refuses the call
+--     by name.
 --   * A found term is joined onto one line ('joinRendering').  Agda's printer
 --     breaks a long term across lines and starts each continuation at column
 --     1, and a batch splice of the text as printed ends the declaration at
@@ -155,7 +156,7 @@ handleAuto lanes cfg0 p = case boundProblem of
 --
 -- Mimer reads each hint as an expression in the hole's scope and keeps it
 -- only when it is a defined name, a constructor, or a record field
--- (@hintExprToQName@ in @Agda.Mimer.Options@); it drops anything else
+-- (@hintExprToQName@ in @Agda.Mimer.Options@); it drops any other expression
 -- without a word, so a call whose hint was dropped answered as if the hint
 -- had been used.  A hint Agda cannot read as a name at all (@λ@, @let@)
 -- fails the whole command with an error that does not name it.  Both were
@@ -163,7 +164,7 @@ handleAuto lanes cfg0 p = case boundProblem of
 -- Agda's own scope query at the hole (@Cmd_why_in_scope@, the question
 -- resolve_name asks), and the call is refused in band, stage @hints@,
 -- naming the first hint that the query cannot read as a name (Agda's error,
--- with its code), or that 'unusableHint' finds the search would drop.
+-- with its code), or that 'unusableHint' finds the search cannot use.
 --
 -- A hint not in scope at all is left to the search, whose own @NotInScope@
 -- names it with Agda's suggestions ('classifyAuto').  An ambiguous name is
@@ -185,18 +186,21 @@ checkHints ctx gid (h : hs) =
         Nothing  -> opaqueAnswer "hints" resps
 
 -- | unusableHint: why a hint Agda's scope query found is one the search
--- would drop, from the query's answer; 'Nothing' when the search can use it,
--- and when the answer says the hint is not in scope (the search names that
--- itself).
+-- cannot use, from the query's answer; 'Nothing' when the search can use
+-- it, and when the answer says the hint is not in scope (the search names
+-- that itself).
 --
 -- A variable of the hole's context is read before any definition of the
 -- same name, so a hint naming one is a variable, which the search drops
 -- (it searches the context already).  Otherwise the hint is usable when
 -- one of its candidates is a kind Mimer keeps: a defined name of any sort
 -- (Agda's kinds @defined name@, @data type@, @record type@, @postulate@,
--- @primitive function@), a constructor, or a record field.  A name in
--- scope only as a pattern synonym, a macro, a module, or a generalizable
--- variable is dropped.
+-- @primitive function@), a constructor, or a record field.  The other
+-- kinds fail in one of two ways, both measured or read in Agda 2.8.0's
+-- source: a pattern synonym or a macro reads as an expression Mimer drops
+-- without a word; a module reads as no expression at all, so Agda
+-- answered NotInScope for a name that is in scope, and a generalizable
+-- variable outside a signature is Agda's @GeneralizeNotSupportedHere@.
 unusableHint :: Text -> Text -> Maybe Text
 unusableHint h msg = case parseWhyInScope msg of
   Nothing -> Nothing
@@ -209,7 +213,7 @@ unusableHint h msg = case parseWhyInScope msg of
     | otherwise -> Just $
         "hint `" <> h <> "` is in scope only as "
         <> T.intercalate " and " (nub (map (("a " <>) . kindOf) cands))
-        <> ", which the search drops; a hint is a defined name, a \
+        <> ", which the search cannot use; a hint is a defined name, a \
            \constructor, or a record field"
   where
     kept =

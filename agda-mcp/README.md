@@ -1147,18 +1147,20 @@ call's `hints`.  `hintMode` adds the definitions of the file's own module
 (`module`, Agda's `-m`) or every name the hole's scope can write unqualified
 (`unqualified`, `-u`).  Mimer parses each hint in the hole's scope and keeps
 it only when it is a defined name, a constructor, or a record field; it drops
-anything else without a word, and a word it cannot read as a name at all
-(`λ`, `let`) fails the whole command with an error that does not name it.
-So before the search runs, the tool puts each hint to Agda's scope query at
-the hole (`Cmd_why_in_scope`, the question `resolve_name` asks, one lane round
-trip and no state change) and refuses the call, `error.stage: "hints"`,
-naming the first hint that is not a name Agda can read (`_`, `0`, `λ`; the
-query's own error and code), that names a variable of the hole's context
-(Agda reads the variable first, and the search drops it), or that is in
-scope only as a kind the search drops (a pattern synonym, a macro, a
-module).  A hint not in scope at all is left to the search, whose own
-`NotInScope` names it with Agda's suggestions; an ambiguous name is left to
-Agda's rules for overloading.
+any other expression without a word, and a word it cannot read as an
+expression at all (`λ`, `let`) fails the whole command with an error that
+does not name it.  So before the search runs, the tool puts each hint to
+Agda's scope query at the hole (`Cmd_why_in_scope`, the question
+`resolve_name` asks, one lane round trip and no state change) and refuses
+the call, `error.stage: "hints"`, naming the first hint that is not a name
+Agda can read (`_`, `0`, `λ`; the query's own error and code), that names a
+variable of the hole's context (Agda reads the variable first, and the
+search drops it), or that is in scope only as a kind the search cannot use:
+a pattern synonym or a macro, which it drops; a module, which Agda reported
+as `NotInScope` though it is in scope; a generalizable variable, which Agda
+refuses outside a signature.  A hint not in scope at all is left to the
+search, whose own `NotInScope` names it with Agda's suggestions; an
+ambiguous name is left to Agda's rules for overloading.
 
 **The option string**.  Agda reads the hole's contents with
 `Agda.Mimer.Options`: it splits them on whitespace and takes `-t T`
