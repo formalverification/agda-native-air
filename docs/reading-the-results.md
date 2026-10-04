@@ -172,9 +172,10 @@ what answers them:
 Two facts about this split that the results turn on.  The **loop** uses one
 verdict tool (`fill_hole`, plus `check_file` for the final claim) and three
 knowledge tools (`get_goal`, `type_of` for the peek, and `search_by_name` /
-`search_by_type` for retrieval).  And in every archived run below,
-`definition_of` returned *where* a definition is, not what it says; § 5 is
-where that matters, and since [#185] it quotes the declaration too.
+`search_by_type` for retrieval).  And in the archived runs below, except
+the two [#185] re-runs (§ 4.3 and § 4.5 name them), `definition_of`
+returned *where* a definition is, not what it says; since [#185] it quotes
+the declaration too, and § 4.3 is where the difference shows.
 
 ### 3.1  The fixed space
 
@@ -870,8 +871,8 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 | question | look at | it is a win for the tools when |
 |---|---|---|
 | Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count (header-free, 47 with a shell against 44 with the server; with the hints, 50 against 47); the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5, with the hints and without them) and the composition tier (§ 4.7), with nothing to copy, every final file of Opus 5, and on the composition tier of Sonnet 5, checks with or without the server**. |
-| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; the shell arm restates fewer (4 against 9 header-free, 0 against 6 with the hints), with the original in view for most of its solves**. |
-| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no, by 17 % header-free (USD 3.99 against 3.42), from 83 % in the first control.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
+| Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; the shell arm restates fewer (4 against 9 header-free, and against 6 for the server since [#185] quotes definitions; 0 against 6 with the hints), with the original in view for most of its solves**. |
+| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no, by 4 % header-free with the current server (USD 3.56 against 3.42, `suite-answers-sonnet5-mcp-1`, after [#185] and [#201]), 17 % before it (3.99), from 83 % in the first control.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
 | Did the fixture headers' hints change what the agents did? | § 4.6 | the header-free arms differ from the hinted ones by more than a seed's spread.  **The haystack tier's route, yes (3 rows solved with no query before the final check, against 8 to 11); about three agda-algebras rows per Sonnet arm written out rather than cited, in the same direction in every arm; the rows with no original, no** |
@@ -987,6 +988,7 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 [#175]: https://github.com/formalverification/agda-native-air/pull/175
 [#184]: https://github.com/formalverification/agda-native-air/issues/184
 [#185]: https://github.com/formalverification/agda-native-air/issues/185
+[#201]: https://github.com/formalverification/agda-native-air/issues/201
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
 [#193]: https://github.com/formalverification/agda-native-air/pull/193

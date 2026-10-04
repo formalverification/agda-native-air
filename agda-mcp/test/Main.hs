@@ -8257,6 +8257,40 @@ declarationTests = do
             other -> pure (Fail ("expected an unread source, got " <> show other))
           Just ds -> pure (Fail ("expected one site, got " <> show (length ds)))
 
+    -- The count is compared before it is added (Copilot, PR #229): at
+    -- maxBound, which the wire accepts, the old sum wrapped, the end line
+    -- went negative, and a second wrap made the text the rest of the file.
+    , runTest "quote: a maxLines at maxBound quotes the declaration, no more" $
+        case quoteDeclaration maxBound PlainAgda declSrc 10 1 10 of
+          Nothing -> pure (Fail "no quote")
+          Just q  -> allOf
+            [ assertEqual "range" (10, 14, 14) (dqStartLine q, dqEndLine q, dqDeclEndLine q)
+            , assertEqual "text" (dqText <$> quoteDeclaration 0 PlainAgda declSrc 10 1 10)
+                (Just (dqText q))
+            ]
+
+    -- A let on a line of its own opens local definitions; it is not the
+    -- first line of a split signature, so a local's quote starts at the
+    -- local's own signature and does not take in its neighbors (Copilot,
+    -- PR #229; reached end to end through a goal-scoped definition_of).
+    , runTest "extent: a local in a standalone let block is quoted alone" $ do
+        let letSrc = T.intercalate "\n"
+              [ "module L where"                -- 1
+              , "open import Agda.Builtin.Nat"  -- 2
+              , "f : Nat"                       -- 3
+              , "f ="                           -- 4
+              , "  let"                         -- 5
+              , "    a : Nat"                   -- 6
+              , "    a = zero"                  -- 7
+              , "    b : Nat"                   -- 8
+              , "    b = a"                     -- 9
+              , "  in b"                        -- 10
+              ]
+        allOf
+          [ assertEqual "a" (Just (6, 7, 7)) (quoteNamed 0 PlainAgda letSrc 6 "a")
+          , assertEqual "b" (Just (8, 9, 9)) (quoteNamed 0 PlainAgda letSrc 8 "b")
+          ]
+
     , runTest "quote: a line past the end of the file quotes nothing" $
         assertEqual "past the end" Nothing (quoteDeclaration 0 PlainAgda declSrc 99 1 2)
 

@@ -93,9 +93,11 @@ quoteDeclaration
   :: Int -> LiterateFlavour -> Text -> Int -> Int -> Int -> Maybe DeclQuote
 quoteDeclaration maxLines flav src line col endCol = do
   (start, end) <- declarationLines flav src line col endCol
+  -- Compared before it is added, so a huge maxLines (the wire accepts any
+  -- Int, maxBound included) cannot overflow past the declaration's end.
   let quotedEnd
-        | maxLines > 0 = min end (start + maxLines - 1)
-        | otherwise    = end
+        | maxLines > 0, maxLines <= end - start = start + maxLines - 1
+        | otherwise                              = end
   pure DeclQuote
     { dqStartLine   = start
     , dqEndLine     = quotedEnd
@@ -172,7 +174,10 @@ namesAlone l = case tokens l of
   []         -> False
 
 -- | The words that open a declaration with no clauses of its own: everything
--- it holds is indented deeper.
+-- it holds is indented deeper.  @let@ is among them for the same reason: a
+-- @let@ on a line of its own opens a block of local definitions, and is never
+-- the first line of a signature that breaks before its colon, so a local's
+-- quote must not walk back to it (Copilot, PR #229).
 keywords :: [Text]
 keywords =
   [ "data", "record", "module", "open", "import", "postulate", "field"
@@ -180,7 +185,7 @@ keywords =
   , "instance", "private", "abstract", "mutual", "macro", "variable"
   , "interleaved", "opaque", "unfolding", "primitive", "unquoteDecl"
   , "unquoteDef", "eta-equality", "no-eta-equality", "inductive"
-  , "coinductive"
+  , "coinductive", "let"
   ]
 
 -- | The names a signature declares: the words before its first @ : @, read
