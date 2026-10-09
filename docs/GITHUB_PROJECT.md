@@ -881,7 +881,7 @@ In a "Claude Code on the web" container, Nix is not preinstalled and the usual i
 
 ---
 
-### Issue M0-14: plan file: two headings claim M0-13, so project-lint is permanently red (#172)
+### Issue M0-14: plan file: two headings claim M0-13, so project-lint is permanently red (#172, closed)
 
 **Labels:** `infrastructure`, `cleanup`, `M0: migration + infrastructure`
 
@@ -958,7 +958,7 @@ That is a different defect from an id collision, so it is recorded here rather t
 
 ---
 
-### Issue M0-15: ci.yml: pull-request lanes receive the write-capable Cachix token (#187)
+### Issue M0-15: ci.yml: pull-request lanes receive the write-capable Cachix token (#187, closed)
 
 **Labels:** `ci`, `infrastructure`
 
@@ -1062,6 +1062,45 @@ Its banner echoes `WHEEL_LD_LIBRARY_PATH` (flake.nix:528), but `exportWheelRunti
 
 +  #76 (closed by PR #95) is where this surfaced; that PR fixed the stray-`agda/` half of the environment problem and guarded only its own new variable.
 +  #54 and #55 (Agda-Nix Phases 3 and 4) concern *which* libraries the shells provision and how they are pinned; this is about the shell snippets' own hygiene, so it is deliberately filed separately rather than folded into either.
+
+---
+
+### Issue M0-17: Move to Agda 2.9.0, pre-release, with the patched standard library 2.3 (#234)
+
+**Labels:** `agda-mcp`, `agda-strux`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
+
+## Description
+
+Move the repository's Agda from 2.8.0 to Agda 2.9.0, not yet released, at agda/agda `da66a8c` (the `nightly` of 2026-10-05), with standard-library 2.3 patched to check under it ([formalverification/agda-stdlib][stdlib], tag `v2.3-agda-2.9.0`), pinned by Nix as agda-algebras pinned them in [ualib/agda-algebras#598][aa598].  It is William's decision of 2026-10-07: all of his Agda projects run one Agda now, by Nix pins, until Agda 2.9.0 and a standard library for it are released.
+
+agda-mcp is the reason to do it soon.  Sessions in agda-algebras run the server against `master`, which now checks under 2.9.0, while the server still runs 2.8.0; and one Emacs runs one agda-mode version, so the editor cannot serve both repositories until they agree.
+
+**The pins**, as in agda-algebras' `flake.nix`: an `agda` input at the commit, built by Agda's own flake (its `base` package); nixpkgs' Agda package set rebuilt around it (`agdaPackages.override { Agda = agda.packages.${system}.base; }`); and the standard library's `src` moved to the fork's tag, pinned by commit and hash.  The flake then needs Nix 2.28 or later: Nix 2.26.3 drops the empty submodule directories of Agda's tree and locks another hash, which newer Nix rejects.  `agda-algebras-src` stays at `4662373d`, the commit the corpus and the benchmark fixtures were cut from.
+
+**What may need work** is the following:
+
++  **agda-mcp parses Agda's output**.  Agda 2.9.0 rewords some errors (an `UnequalTerms` reads "The terms … and … are not equal at type …", where 2.8.0 printed "0 != 1 of type Nat"), and it answers a give made without a range with `{"paren": false}` where 2.8.0 gave the reprinted expression.  `AgdaMCP.Diagnostics`, `AgdaMCP.Interaction` and the fixtures in `agda-mcp/test/Main.hs` may need both shapes.
++  **agda-strux links Agda as a library**: `agda-strux/agda-json.cabal` depends on `Agda == 2.8.0`, through the `backend` shell's GHC package set.  Moving it to 2.9.0's library is a port of its own, so decide, with evidence, whether it moves now or stays on 2.8.0 beside a 2.9.0 command line.
++  **CI pulls and never pushes** on a pull request, so the new shells must be pushed to the formalverification cache from a workstation first, or each lane has to build Agda within its 20 minutes.
+
+## Tasks
+
++  [ ] `flake.nix` and `flake.lock`: the `agda` input, the package set rebuilt around it for `pkgsAgda`, the standard library's override; `mkAgdaEnv`, `mkAgdaAlgebrasPkg` (and its `_build/2.8.0` comment) and `mkAgdaShellSetup`'s callers; the shells' guards and banners.
++  [ ] agda-mcp under 2.9.0: `make agda-mcp-smoke`, `make agda-mcp-test` and `make lane-give-parity`, fixing what the new wording and give answer break while keeping 2.8.0's shapes.
++  [ ] agda-dojang under 2.9.0: `make test-agda-dojang-all`.
++  [ ] agda-strux: the decision above, and its tests under whichever Agda it keeps.
++  [ ] Push the shells' closures to the cache before CI runs.
++  [ ] The documents that name the toolchain as current, with the caveat that, until the releases, the toolchain is available only through `nix develop`; dated records, such as the agent-bench reports and the audits, stay.
+
+## Acceptance criteria
+
++  [ ] `nix develop` reports Agda 2.9.0 and standard-library `2.3-agda-2.9.0`, and `nix build .#agda .#agda-algebras` succeeds.
++  [ ] agda-mcp's tests and the give-parity lane pass under 2.9.0.
++  [ ] CI passes, with the toolchain fetched from the cache.
++  [ ] No current document names Agda 2.8.0 as the toolchain, except for a component that stays on it by the decision above.
+
+[aa598]: https://github.com/ualib/agda-algebras/pull/598
+[stdlib]: https://github.com/formalverification/agda-stdlib
 
 <!-- END GENERATED: milestone-0 -->
 
@@ -2445,7 +2484,7 @@ On the 34 rows with no original to copy (stdlib and haystack) the arms are withi
 
 ---
 
-### Issue M1-40: benchmarks: a hard tier with no proof on disk, and its first run (#189)
+### Issue M1-40: benchmarks: a hard tier with no proof on disk, and its first run (#189, closed)
 
 **Labels:** `eval`, `M1: agda-dojang/mcp`
 
@@ -2483,6 +2522,329 @@ This is the shortest instrument: a small tier of statements that have no proof o
 [#160]: https://github.com/formalverification/agda-native-air/issues/160
 [#162]: https://github.com/formalverification/agda-native-air/issues/162
 [#186]: https://github.com/formalverification/agda-native-air/pull/186
+
+---
+
+### Issue M1-41: agent-bench: compare against another Agda MCP server (DreamLinuxer/agda-mcp) (#210)
+
+**Labels:** `agda-mcp`, `eval`, `M1: agda-dojang/mcp`
+
+# Context
+
+[DreamLinuxer/agda-mcp](https://github.com/DreamLinuxer/agda-mcp) (at `b9e2b30`, 2026-03-16) is a single-file Python MCP server (898 lines, FastMCP) that keeps one `agda --interaction-json` process and exposes about thirty of Agda's interaction commands as 30 tools.  It is simpler than ours and covers more of Agda's interactive features.  Whether it is better for an agent is an empirical question, and it needs a test that holds both to the same truths.
+
+A first pass, run 2026-09-27 with both servers driven over MCP stdio on fixtures whose answers batch `agda` fixes:
+
+| probe | truth | DreamLinuxer | ours |
+|---|---|---|---|
+| a file with an unsolved implicit meta | batch `agda` exits 42 | `Checked. No errors, warnings, or goals.` | `success: false`, `UnsolvedMetaVariables` |
+| `agda_give` / `fill_hole` on the file | DL's description: "replace the hole in the source file" | the file is unchanged, and a reload brings the hole back | the file is restored, as documented |
+| go-to-definition below lines holding `→` | `quad` defined at 12:1 | "No symbol" (line/column converted to a byte offset where Agda counts characters) | `definition_of quad` at 12:1 (by name) |
+| a query after the file changed on disk | `k : Bool` | `Nat` (the stale load) | `Bool` |
+| a module's contents | each member typed | every type `?` (it reads `type`; Agda sends `term`) | typed |
+| a scope error | `NotInScope` at 6:7 | Agda's prose | structured: code, range, did-you-mean candidates |
+| case split, auto, helper signature, check against the goal | | all work | none exists |
+| `tools/list`, characters | | 21,530 for 30 tools | 18,760 for 10 (24,094 for 14 with a corpus) |
+
+Also from reading the source: one process serves every project and file, started with no flags, so library resolution is whatever the user's global configuration gives; a timed-out read leaves the process running and its late output queued for the next command; and the repository removed its license (`1def853`), so it can be run for a comparison and must not be vendored.
+
+And a floor no server needs: Agda's own proof search (Agsy), run on every obligation through the lane, solves 16 / 55 with each term confirmed by `fill_hole` ([#205]).
+
+# Work
+
++  **A contract suite, no model**: the fixtures above and more (literate files, a timeout, a second project in one session, an error inside a hole), each with batch `agda`'s answer as the truth, and a driver that runs any MCP server over stdio (the server command is an argument) and scores each probe against the truth.  Under `scripts/python/` in the house style, with a Make target, and its results for both servers committed under `reports/`.
++  **An agent arm on the other server**: the harness learns an external server (its MCP config, its tool floor for the isolation audit, and a prompt variant naming its tools), recorded in `protocol.json` like `--expose`.  DreamLinuxer's process runs plain `agda --interaction-json` with `Cmd_load` flags `[]`, so the work directory needs an `.agda-lib` depending on the benchmark's libraries and `AGDA_DIR` pointing at a registry that names them; probe that first.  Then one Sonnet 5 arm at the [#162] caps, against `arm-surface-mcp-*` ([#191]).
++  **What to report**: solved and restated; false greens (subjects that stopped on a clean `agda_load` the judge then refused); use of the interactive tools (case split, auto, refine); cost; and Agsy's 16 / 55 as the row a model has to beat.
+
+# Acceptance
+
++  The contract suite committed, runnable against both servers, with its table on this issue.
++  One archived arm on the external server, compared with the `arm-surface-mcp-*` arms on this issue.
+
+# Relations
+
++  [#162] and [#191], whose protocol this reuses; [#205] (`auto`), [#206] (Agsy in the loop), [#207] (`case_split`), [#208] (`SearchAbout`), and [#209] (refinement) are the capabilities the comparison showed this server lacks.
+
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
+[#207]: https://github.com/formalverification/agda-native-air/issues/207
+[#208]: https://github.com/formalverification/agda-native-air/issues/208
+[#209]: https://github.com/formalverification/agda-native-air/issues/209
+
+---
+
+### Issue M1-42: benchmarks: fixture headers give hints; strip and re-run arms (#219, closed)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+# Context
+
+A subject's work file is a byte-for-byte copy of its obligation, comments included: every arm stages through `Scaffold.stage` (`strux-driver/src/main/scala/struxdriver/search/Scaffold.scala`, called from `agentbench/Run.scala`).  The suite's fixture template puts hints in that header, as follows:
+
++  **Every tier**: a `Strategy:` line sketching the proof, from `refl` and "case split on the boolean; each branch is refl" to the hard tiers' "one direction is cong of g; the other is injectivity of g".
++  **The mined and hard tiers**: a `Source:` line naming a library module.  On the mined tiers it is the original's own module, which only 3 of the 21 agda-algebras fixtures import directly (the rest import a module that re-exports it), so the line points at the file that holds the proof.
++  **The haystack tier** ([#129]): `Haystack:` and `Needle:` lines naming the module and the very lemma the tier exists to make a searcher find (`-- Needle: Data.Bool.Properties.∧-assoc`), a `Note:` line naming it again, and a paragraph on the tier's design (52 lines over the 12 files).
++  **The stdlib tier**: six `Note:` lines, some naming the key move ("`*-distribʳ-+` is the non-local lemma that unlocks the suc case").
+
+Every archived subject had its header in context: the `Strategy:` line is in 55 of 55 transcripts of `agent-opus5-1` and of `agent-sonnet5-1`, and in 14 of 14 of each [#189] arm.  The archive keeps no thinking text, but three subjects used the header in their visible text: `agent-opus5-2` on `haystack-bool-and-assoc-diag` (`the needle named qualified`; no prompt says "needle", the header says it three times), `arm-surface-both-1` on `algebras-overture-lower-lift` (`Given strategy hint "refl", let's just try it`), and `arm-verdict-mcp-2` on `algebras-subalgebras-sup-refl` (`composing is allowed per "Strategy: composition"`).  The other 754 transcripts of the sixteen full arms cite no header line, which bounds only what visible text shows.  The haystack rows are consistent with wider use: in each of the eleven 55-row arms with a search tool, the subject wrote the needle into a tool call before making any search call on 12 of the 12 rows (11 of 12 in `agent-opus5-1`).  Memory of the standard library would explain that too; only a run without the header can tell the two apart.  On the mined tiers the `Source:` line did not obviously steer [#188]'s "original in view" reads: in [#162]'s `shell` and `both` arms, 16 of the 18 and 17 of the 17 rows whose original came into view did so after a search call.
+
+Neither the loop nor the judge reads comments.  The loop parses only `open import` lines (`Imports` in `search/Propose.scala`), and the judge strips comments before it compares (`agentbench/Statement.scala`), so no loop number moves and no archived verdict would change under a re-judge; what changes is what a subject is told.  PR [#218] has already stripped the composition tier ([#160]), whose `Source:` line named every needle and whose `Strategy:` line named the middle point.
+
+# Work
+
++  **Strip the hint lines** from the obligations and golds of the five older tiers: `Source:`, `Strategy:`, `Haystack:`, `Needle:`, and `Note:`, and every free-text header line that describes the proof or the tier's design (the haystack tier's 52 and the stdlib tier's 7, each read by hand).  Keep the file name, the `File:` line, the obligation id, and any sentence that only restates the statement.  Move what is removed into each tier's README, per row, as PR [#218] does.
++  **The stdlib tier's freeze**.  `agda-stdlib-v0` "only ever grows by whole new tiers, never by edits", and its fixtures are byte-identical to the P1 and P2 baselines' ([#113]).  A comment-only edit leaves every loop number byte-identical but ends the byte-identity, so this needs William's decision: amend the freeze to the code lines (recommended, with a fixed-space sweep of the tier shown identical to `main`'s, outcome for outcome), or leave the tier as it is and record that its headers still carry hints.
++  **A guard**: a spec over the committed index asserting that no obligation's header carries any of those keys, so a new tier cannot bring them back.
++  **The answer key stays on disk**.  The golds, the index (`goldTerm`), and the tier READMEs remain readable by a shell subject; `gold-leak.py` should also flag reads of the index and of a tier README.
++  **The convention**: the fixture template in `CLAUDE.md` (claude-tooling), the `authoring-a-benchmark-obligation` skill, and `data/benchmarks/README.md` stop asking for a source module and a strategy.
++  **The re-runs** below, then the prose: the archive README's run table records which runs had the hints, and ADR 0001 § 9, ADR 0002 § 12, the guide (§ 4.3, § 4.5), `README.md`, and the site's figures (`scripts/python/demo/numbers.py` reads `agent-sonnet5-1` and `agent-opus5-1`) quote the new runs where they replace old ones.
+
+# Which arms to re-run
+
+Not all of them.  Two runs measure the hints' effect cleanly, because today's server, client (Claude Code 2.1.282), and `mcp` prompts are byte-identical to what their baselines ran with, so only the headers differ.  Three more restate numbers the documents quote.  Costs are the archived arms' own (list USD).
+
+| # | arm | model | rows | compared with | why | about |
+|---|---|---|---|---|---|---|
+| 1 | `mcp` | Sonnet 5 | 55 | `arm-surface-mcp-1` (48), `arm-surface-mcp-2` (45) | clean A/B; the two seeds give the run-to-run spread, and the haystack rows are where a difference would show | 3.80 |
+| 2 | `mcp` | Opus 5 | 14 (hard) | `hard-opus5-mcp-1` (14) | clean A/B on posed rows, where the `Strategy:` lines are real proof sketches | 7.80 |
+| 3 | `shell`, `both` | Opus 5 | 14 (hard) | `hard-opus5-shell-1`, `hard-opus5-both-1` (8, 8 re-judged) | the hard tier's three-arm picture, which [#160]'s stage two (stripped headers) compares against; also carries PR [#200]'s prompt change, so a re-baseline, not an A/B | 13.00 |
+| 4 | `shell`, `both` | Sonnet 5 | 55 | `arm162-shell-1`, `arm162-both-1` (50, 51) | [#162]'s attribution without hints, with run 1 as its `mcp` arm (ADR 0001 § 9, ADR 0002 § 12) | 6.50 |
+| 5 | `mcp` | Opus 5 | 55 | `agent-opus5-1`, `agent-opus5-2` (54, 54) | the headline `README.md` and ADR 0001 § 9 quote; Opus is at the ceiling there, so the least likely to move | 9.10 |
+
+About USD 40 in all, plus a cost pair per new arm.  Run 1 and 2 first: they answer whether the hints moved anything.  If both land inside the seed spread, the quoted numbers stand with a caveat, and 3 to 5 become a re-baseline that can share [#160]'s stage-two window; if either moves, run 3 to 5 before quoting anything again.
+
+Not re-run, with a caveat in the archive README instead, are the following:
+
++  `agent-sonnet5-1` and `arm162-mcp-1`: replaced by run 1 (their servers predate [#184] and [#191], so they cannot be repeated as they were anyway).
++  `agent-opus5-2`: its finding is run-to-run variance, which the hints do not bear on.
++  `arm184-mcp-1`, `arm184-both-1`, `arm-surface-both-1`, `arm-verdict-mcp-1`, `arm-verdict-mcp-2`: their findings compare arms that all had the same headers (bytes per call, cost, tool mix).  The tool-adoption counts behind [#202] and [#203] came from these transcripts, where a needle was handed out on 12 of 55 rows; re-read those counts on run 1.
++  The cost pairs, `smoke-haiku-1`, and `iso184-1`: protocol checks, not findings.
+
+# Acceptance
+
++  No obligation header in the index carries `Source:`, `Strategy:`, `Haystack:`, `Needle:`, or `Note:` (the spec above), unless William keeps the stdlib tier's freeze, and each tier's README keeps what was removed.
++  `make eval-benchmark` passes every row, and `verify-gold.sh` gives every edited row statement equal.
++  A fixed-space and a retrieval loop sweep over the edited tiers, identical to `main`'s outcome for outcome.
++  Runs 1 and 2 reported against their baselines with the seed spread, and the decision on 3 to 5 recorded here.
+
+# Relations
+
++  [#160] and PR [#218]: the composition tier, stripped first at William's review of its rows.
++  [#154], [#162], [#184], [#188], [#189], and [#191]: the arms whose subjects had the headers in view.
++  [#202] and [#203]: tool-adoption counts to re-read on run 1.
++  [#113]: the P1 baseline the stdlib tier is frozen for.
+
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#129]: https://github.com/formalverification/agda-native-air/issues/129
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#160]: https://github.com/formalverification/agda-native-air/issues/160
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#202]: https://github.com/formalverification/agda-native-air/issues/202
+[#200]: https://github.com/formalverification/agda-native-air/pull/200
+[#203]: https://github.com/formalverification/agda-native-air/issues/203
+[#218]: https://github.com/formalverification/agda-native-air/pull/218
+
+---
+
+### Issue M1-43: other models on the bench: Kimi K3, GPT-6.1 Sol, Sonnet 5.5 and a local model, measured against the suite (tracking) (#235)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+Every published number of the agent-in-the-loop evaluation ([#154], the arms of [#162], the header-free re-runs of [#219]) comes from one vendor's models: Opus 5 and Sonnet 5, with one Haiku smoke run.  Nothing public measures models on Agda.  The closest proxy, Vals AI's ProofBench (graduate-level Lean 4 proofs, run of 2026-10-01), sorts the field with Opus 5.5 and Sonnet 5.5 at 100%, GPT-6.1 Sol at 99% for $0.23 a problem, Kimi K3 at 87% as the best open-weight model, Sonnet 5 at 77%, MiMo-V2.6-Pro at 70% and the DeepSeek V4 models at 50 to 56%.  Whether that order holds on Agda, and what each model costs on this suite, is what this tracking issue measures.  The write-up is a website post in progress ([website#160], private repository); the record of each arm lives here, in `reports/agent-bench/` and `docs/mcp-field-reports.md`, as for every quoted run.
+
+## The arms, in order
+
++  [#243] The field report of Copilot CLI and Codex CLI driving the server on an ordinary task.  It comes first because it costs nothing and shows whether the server and the skills are reachable from those harnesses at all.
++  [#236] Sonnet 5.5 and Opus 5.5 on the three tiers: the current Anthropic models, which the archive does not have, and the cheapest comparison to run.
++  [#237] The harness changes every other arm needs: `protocol.json` records the endpoint, and a run's cost is priced from its tokens beside the client's list-price figure, which is not another provider's bill.
++  [#238] Kimi K3 through Moonshot's Anthropic-compatible endpoint: no code, two environment variables, the two-row cost pair first.
++  [#239] A Codex subject, for GPT-6.1 Sol and GPT-6 Astra, which have no Anthropic-compatible endpoint; it compares harness plus model, and its report says so.  It needs the launcher's `--cwd` default, [#242].
++  [#240] A local model on the Orin as a bench row, through Ollama's Anthropic API, as the floor; it needs the Orin set up as a model server, [#241].
+
+## What every arm records
+
++  The protocol as `protocol.json` has it (model id, client version, caps, the frozen server and extractor), plus the endpoint once [#237] lands.
++  The verdicts per tier with the restated and gate counts, and the per-tool call counts, turns, wall and tokens from `report.json`.
++  The cost from the provider's own usage page beside the client's figure.
++  The archive under `reports/agent-bench/<run-id>/` through `make agent-bench-archive`, and a paragraph in `docs/mcp-field-reports.md` for whatever the transcripts show that a number does not.
+
+## Acceptance criteria
+
+- [ ] Each arm above has an archived run on the 55 library obligations, and on the hard and composition tiers where the model is worth it.
+- [ ] `docs/reading-the-results.md` says which instrument produced each new number and how it compares with the Opus 5 and Sonnet 5 runs.
+- [ ] The README's "agent in the loop, measured" paragraph names the models beyond Anthropic's, with their counts.
+
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
+[#236]: https://github.com/formalverification/agda-native-air/issues/236
+[#237]: https://github.com/formalverification/agda-native-air/issues/237
+[#238]: https://github.com/formalverification/agda-native-air/issues/238
+[#239]: https://github.com/formalverification/agda-native-air/issues/239
+[#240]: https://github.com/formalverification/agda-native-air/issues/240
+[#241]: https://github.com/formalverification/agda-native-air/issues/241
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
+[#242]: https://github.com/formalverification/agda-native-air/issues/242
+[website#160]: https://github.com/williamdemeo/website/issues/160
+
+---
+
+### Issue M1-44: agent-bench: Sonnet 5.5 and Opus 5.5 arms on the three tiers (#236)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+The archived arms are Opus 5 and Sonnet 5 ([#219] for the header-free runs).  Sonnet 5.5 scores 100% on ProofBench at $0.56 a problem, against Opus 5.5's 100% at $0.96 and Sonnet 5's 77%, so it may be the cheapest model that solves the composition tier, where Sonnet 5 solved 3 of 12 and nine files failed the statement-preservation gate.  Opus 5.5 is the current Opus and costs less than Opus 5 ($4 / $20 per million tokens against $5 / $25).  Both run with the existing harness and `AGENT_BENCH_MODEL`; nothing changes but the model id.
+
+## Tasks
+
+- [ ] The two-row cost pair for each model, and the usage-window check, as the running-proof-search-sweeps skill prescribes.
+- [ ] Sonnet 5.5: the `mcp` arm on the 55 library obligations, then the composition tier (12) and the hard tier (14).
+- [ ] Opus 5.5: the same three tiers, `mcp` arm.
+- [ ] Archive the quoted runs, and compare them with `suite219-opus5-mcp-1`, `suite219-sonnet5-mcp-1`, the `comp-*` and the `hard219-*` arms through `arm-compare.py`.
+
+## Acceptance criteria
+
+- [ ] Solved, restated and gate counts per tier for both models, archived, with the cost of each arm.
+- [ ] One sentence in `docs/reading-the-results.md` on whether Sonnet 5.5 closes Sonnet 5's composition-tier gap.
+
+Part of [#235].
+
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+
+---
+
+### Issue M1-45: agent-bench: record the endpoint in protocol.json, and price a run from its tokens beside the client's figure (#237)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+`Subject.scala` strips only `CLAUDE*` variables from a subject's environment, so an exported `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` reach the subject and point it at another provider's Anthropic-compatible endpoint (Moonshot's for Kimi K3, an Ollama server for a local model).  Two things then go wrong silently.  `protocol.json` does not record the endpoint, so a run cannot say which provider served it, and a `--resume` under a changed endpoint is not refused the way a changed model is.  And the client's `costUsd` is Anthropic list-price arithmetic over the token counts (cache writes at the one-hour rate, twice the input price), which is not the provider's bill, and may be meaningless for a model the client has no price for.  The `jq` one-liner in the running-proof-search-sweeps skill reproduces `costUsd` for the archived Opus 5 runs from `outcomes[].tokens` and is the check for whatever replaces it.
+
+## Tasks
+
+- [ ] Record `ANTHROPIC_BASE_URL` (or its absence) in `protocol.json` and in each subject's `subject.json`; refuse a `--resume` under a changed endpoint, naming the field.
+- [ ] A pricing step in the report: input, cache-write, cache-read and output tokens per subject and per arm, priced at a table the run names (`--prices <file>`, with Anthropic's list prices as the default), kept beside the client's figure rather than replacing it.
+- [ ] Decide what `--max-budget-usd` means under another provider, since the client enforces it on its own figure, and document it.
+- [ ] A unit test: the priced total equals `costUsd` for an archived report under Anthropic's prices.
+
+## Acceptance criteria
+
+- [ ] A run under another endpoint names it in `protocol.json`, and its report carries a priced cost that the provider's usage page can be checked against.
+
+Part of [#235]; needed by [#238], [#239] and [#240].
+
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+[#238]: https://github.com/formalverification/agda-native-air/issues/238
+[#239]: https://github.com/formalverification/agda-native-air/issues/239
+[#240]: https://github.com/formalverification/agda-native-air/issues/240
+
+---
+
+### Issue M1-46: agent-bench: a Kimi K3 arm through Moonshot's Anthropic-compatible endpoint (#238)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+Kimi K3 (Moonshot; 2.8T parameters, 104B active; open weights since 2026-07-27 under the Kimi K3 License) is the strongest open-weight model on ProofBench at 87%, the only one above Sonnet 5 and 13 points below the frontier.  Moonshot's API speaks Anthropic's Messages protocol and its agent-support page names Claude Code as a supported client, so the arm needs no code once [#237] lands: `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` exported around `make agent-bench`, with K3's model id in `AGENT_BENCH_MODEL`.  Self-hosting is out: the weights are about 1.5 TB at four bits.  List price is $3 / $0.30 / $15 per million tokens (input, cached input, output); the archived Opus 5 library-tier token profile prices at about $3.30 at those rates, a first estimate only, since another model spends its own tokens.
+
+## Tasks
+
+- [ ] A Moonshot API key on a pay-as-you-go account; the endpoint and the model id from the agent-support page, written in the run's notes until [#237] records them.
+- [ ] One persisted subject first (`AGENT_BENCH_PERSIST=on`) to confirm that the server connected, that the tools were presented eagerly, and that nothing the subject needs calls Anthropic's own servers.
+- [ ] The two-row cost pair, priced from Moonshot's usage page beside the client's figure.
+- [ ] The `mcp` arm on the 55 library obligations, then the composition tier, then the hard tier.
+- [ ] Read the gates: K3 is expected to lean harder on statement preservation, the escape-hatch check and the restated check than Claude does, so every gate failure gets its per-row account (`row-account.py`).
+
+## Acceptance criteria
+
+- [ ] An archived run per tier, with the endpoint and Moonshot's bill beside the client's figure.
+- [ ] A field-report paragraph on what K3 did differently with the tools (the call mix, `check_file` use, restatements).
+
+Part of [#235].
+
+[#237]: https://github.com/formalverification/agda-native-air/issues/237
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+
+---
+
+### Issue M1-47: agent-bench: a Codex subject, for GPT-6.1 Sol and GPT-6 Astra (#239)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+OpenAI's models have no Anthropic-compatible endpoint, so they cannot ride the environment-variable route of [#238].  Codex CLI is open source, has a headless mode, `codex exec --json`, that streams events, and registers a stdio MCP server as an `[mcp_servers.<name>]` table in `config.toml`.  GPT-6.1 Sol scores 99% on ProofBench at $0.23 a problem (list price $2 / $0.10 / $10 per million tokens, the archived Opus 5 library-tier profile at about $1.79); GPT-6 Astra ($10 / $50) is the heavier sibling for the hard tier.  A Codex subject compares harness plus model rather than the model alone, and the report must say so.
+
+## What the subject has to replace
+
+| The subject needs | `claude -p` today | Codex |
+| --- | --- | --- |
+| the model | `--model M` | `--model gpt-6.1-sol` |
+| the server, and only it | `--mcp-config`, `--strict-mcp-config` | an `mcp_servers` table in a per-run config |
+| tool limits | `--allowedTools` | `--sandbox`, `--ask-for-approval never` |
+| a transcript | `--output-format stream-json` | `--json` |
+| a cost cap | `--max-budget-usd` | none found; price from tokens ([#237]) |
+
+## Tasks
+
+- [ ] A `Subject` variant in `strux-driver/src/main/scala/struxdriver/agentbench/` that spawns `codex exec`, with the same work directory, read roots, caps and environment scrubbing (`OPENAI*` and `CODEX*` variables, as the Claude subject strips `CLAUDE*`).
+- [ ] The server registered for the subject through a generated per-run config that uses the launcher's `--cwd` default of [#242], because Codex may not expand `${PWD}`.
+- [ ] A transcript adapter from Codex's event stream to the fields the judge and `arm-compare.py` read (tool calls per tool, turns, tokens); the judge itself does not change.
+- [ ] A persisted smoke subject on `stdlib-nat-plus-comm`, then the cost pair, then GPT-6.1 Sol on the three tiers and GPT-6 Astra on the hard tier.
+- [ ] `protocol.json` names the harness and its version beside the model.
+
+## Acceptance criteria
+
+- [ ] An archived GPT-6.1 Sol run per tier whose report names Codex and its version, with a priced cost.
+- [ ] `docs/reading-the-results.md` says that a Codex row measures harness plus model, and how its tool counts map onto the Claude subject's.
+
+Part of [#235]; needs [#237] and [#242].
+
+[#237]: https://github.com/formalverification/agda-native-air/issues/237
+[#238]: https://github.com/formalverification/agda-native-air/issues/238
+[#242]: https://github.com/formalverification/agda-native-air/issues/242
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+
+---
+
+### Issue M1-48: agent-bench: a local model on the Orin as a bench row, through Ollama's Anthropic API (#240)
+
+**Labels:** `eval`, `local-models`, `M1: agda-dojang/mcp`
+
+## Context
+
+Ollama serves Anthropic's Messages API, so Claude Code and the bench can drive a model on the Jetson AGX Orin with `ANTHROPIC_BASE_URL=http://<orin>:11434` and nothing else changed.  A local row is the floor of the comparison rather than a contender: the models that fit the Orin's 64 GB (Qwen3.6 35B-A3B, gpt-oss-20b, Gemma 4 31B, at about 20 GB or less at 4.5 bits) sit far below the frontier on ProofBench (Qwen 3.8 27B scores 16%), and they decode at perhaps 20 to 60 tokens a second.  It needs the Orin set up as a server ([#241]) and the endpoint record of [#237].
+
+## Tasks
+
+- [ ] Pick the model from [#241]'s measurements: the largest that fits with a 64k context and decodes at a usable rate.
+- [ ] One persisted subject, to see whether the model calls the server's tools at all under Ollama's tool calling; a model that never calls `check_file` is a finding, not a run.
+- [ ] The two-row cost pair (cost is wall time and watts here; record both), then the 55 library obligations at a parallelism the Orin sustains, with the wall cap raised to fit the decode rate.
+- [ ] Record the Ollama version, the model tag and quantization, the context length and the measured tokens per second beside the run.
+
+## Acceptance criteria
+
+- [ ] An archived run on the library tier naming the model, the quantization and the device, with turns, tool calls and wall time per row.
+- [ ] The floor stated in `docs/reading-the-results.md` beside the frontier counts.
+
+Part of [#235]; needs [#241] and [#237].
+
+[#237]: https://github.com/formalverification/agda-native-air/issues/237
+[#241]: https://github.com/formalverification/agda-native-air/issues/241
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
 
 <!-- END GENERATED: milestone-1 -->
 
@@ -3177,7 +3539,7 @@ Part of [#113]; found by the [#129] tier, PR [#150].
 
 ---
 
-### Issue M2-18: benchmarks: a composition tier, golds that string several corpus lemmas together (#160)
+### Issue M2-18: benchmarks: composition tier stringing corpus lemmas (#160, closed)
 
 **Labels:** `M2: retrieval + local models`
 
@@ -3332,6 +3694,290 @@ Related: [#17] phase 1 shipped the limitation and its documentation; [#19] is th
 [#17]: https://github.com/formalverification/agda-native-air/issues/17
 [#19]: https://github.com/formalverification/agda-native-air/issues/19
 [#161]: https://github.com/formalverification/agda-native-air/pull/161
+
+---
+
+### Issue M2-21: agda-strux: `agda-json` dies on a file whose hole is still open (`Rules/LHS.hs:751`) (#204)
+
+**Labels:** `bug`, `agda-strux`, `M2: retrieval + local models`
+
+# Context
+
+`agda-json` (agda-strux) stops with an internal error of Agda's on any file whose `{!!}` hole is still open:
+
+```
+An internal error has occurred. Please report this as a bug.
+Location of the error: impossible, called at src/full/Agda/TypeChecking/Rules/LHS.hs:751:95 in Agda-2.8.0-…:Agda.TypeChecking.Rules.LHS
+```
+
+Reproduced on `data/benchmarks/agda-stdlib-v0/obligations/Nat-plus-comm.agda` (exit 154).  When [#189] checked, it failed on 72 of the 73 committed obligations, every one whose hole stays open; the exception, `Unit-trivial`, has a `⊤` hole that Agda fills by eta.
+
+This matters beyond extraction.  The agent-bench judge reads a statement from `agda-json`'s `typeAst` (gate 1b), so it can read one only from a gold, and a posed obligation without a gold cannot be judged.  [#189]'s "gold-less path" was closed for this reason.  The work-around is to extract a copy of the obligation whose hole is replaced by a postulated `TODO`.
+
+# Work
+
++  Find where the traversal meets the interaction meta (most likely a clause whose right-hand side is the hole) and stop it from reaching `impossible`.
++  Emit the holed definition's row with its signature and `typeAst`, and a body marked as a hole rather than elaborated.
+
+# What it does not do
+
+It does not change what a solved file extracts to.
+
+# Acceptance
+
++  `agda-json` extracts every committed obligation.
++  The holed definition's `typeAst` equals its gold's with binder names removed, which is gate 1b's comparison, pinned by a spec on a committed obligation.
++  The judge's gold-less path can then be reconsidered on [#189].
+
+# Relations
+
++  [#128]: a different internal error (`Monad/Context.hs:542`) on four standard-library modules.  [#164]: Agda as a library, which would own this traversal.  [#189]: where the crash closed a path.
+
+[#128]: https://github.com/formalverification/agda-native-air/issues/128
+[#164]: https://github.com/formalverification/agda-native-air/issues/164
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+
+---
+
+### Issue M2-22: proof search: Agsy as closer (#206, closed)
+
+**Labels:** `eval`, `retrieval`, `M2: retrieval + local models`
+
+# Context
+
+Agda's own proof search (Agsy, `Cmd_autoOne`) solves 16 of the 55 benchmark obligations, each confirmed by `fill_hole` and none by citing the restated lemma, in 10 ms or less per row (measured 2026-09-27; the table is on [#205]).  The loop's published results, on the same suite ([`docs/reading-the-results.md`] § 4.1):
+
+| | fixed space | retrieval | Agsy |
+|---|---:|---:|---:|
+| the 43 rows outside the haystack | 8 | 8 | 16 |
+| the 12 haystack rows | 0 | 6 | 0 |
+| total | 8 | 14 | 16 |
+
+Agsy and retrieval succeed on disjoint tiers: Agsy needs no corpus and fails where a library lemma is required, and retrieval supplies exactly the lemma names Agsy lacks.  Agsy accepts hint names in the hole's contents, so the combination is direct: run it with the top retrieved names as hints.
+
+# Work
+
++  Agsy as a closer at every search state, before any proposal, since it costs milliseconds.
++  Agsy with hints: the retrieval proposer's top-k names passed as the hole's contents, on every row.
++  A sweep of both against the published `p2` runs, per stratum, with the exclusion ledger read as for every retrieval run (a hint set that includes the restated lemma must be excluded like any other proposal).
+
+# Acceptance
+
++  A report with the two new configurations beside the fixed space and retrieval, per stratum; the union bound (22 / 55 if nothing overlaps) either reached or explained.
++  ADR 0001's proposer section updated with the result.
+
+# Relations
+
++  [#113] (the loop), [#122] (P1), [#123] (P2, retrieval).
++  [#205] is the server tool; [#207], case split, would lift the term-mode ceiling that caps both.
+
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#122]: https://github.com/formalverification/agda-native-air/issues/122
+[#123]: https://github.com/formalverification/agda-native-air/issues/123
+[`docs/reading-the-results.md`]: https://github.com/formalverification/agda-native-air/blob/main/docs/reading-the-results.md
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#207]: https://github.com/formalverification/agda-native-air/issues/207
+
+---
+
+### Issue M2-23: proof search: probe on the interaction lane, claim by batch (#211)
+
+**Labels:** `agda-mcp`, `eval`, `M2: retrieval + local models`
+
+# Context
+
+[#163] measured a judgment by `Cmd_give` on the interaction lane against the batch `fill_hole` and found the two in agreement on 80 of 80 committed candidates, twice, the second time under `--safe` ([`reports/lane-give-parity/`], PR [#174]).  Measured in one session, a give costs 1.6 ms on a standard-library obligation and 9.7 ms on an agda-algebras one, and a give plus the reload an accepted candidate owes costs 103 ms and 402 ms, against 648 ms and 4,873 ms for the batch `fill_hole` on the same files ([`docs/reading-the-results.md`]).
+
+William's decision on [#163] (2026-09-25) reads: "The lane may judge progress, never the claim."  It schedules the second half "after the hard-tier measurement": `probe: true` on `fill_hole` (or a sibling tool), the loop's lane-probe mode with batch confirmation of terminal candidates, and the paragraph in ADR 0001 and ADR 0002.  The hard tier has since been measured ([#189], PR [#197]) and [#163] is closed, so no open issue carries the second half; this one does.
+
+The loop is where it pays.  Its budget is 60 batch probes per obligation because a probe cost 2.6 to 3.5 s: on the 43-obligation suite the loop made 307 batch calls in 1,080.7 s ([ADR 0001] § 9).  The structural changes proposed for the search in [#212] and [#213] are worth little while one transition costs seconds.
+
+# Work
+
++  `probe: true` on `fill_hole`, or a sibling tool: the candidate judged by `giveCandidate` on the lane, the answer given in `fill_hole`'s vocabulary with the lane's hole list, and a `where`-shaped candidate sent to batch, since `[Interaction.UnexpectedWhere]` is a protocol limit and not a verdict.
++  The loop's lane-probe mode: every probe made on the lane, a candidate that leaves no hole confirmed by the batch `fill_hole` before it is committed, and the claim still the final batch `check_file`, so [ADR 0001] decision 1 is unchanged.
++  The ledger split: lane probes and batch confirmations counted separately in `timing.jsonl` and `report.json`, the batch budget kept at 60 so runs stay comparable, and a lane budget added beside it.
++  The paragraphs in [ADR 0001] § 4 and [ADR 0002] § 2.
+
+# Acceptance
+
++  The 55 obligations swept at the published knobs in both modes, with the same solve set, and with batch calls and wall clock reported per fixture; a lane `ok` whose batch confirmation refuses is an anomaly, reported with its row.
++  One more sweep in lane-probe mode at a raised lane budget, reported beside the first, so that what cheap transitions buy is measured rather than assumed.
+
+# Relations
+
++  [#163] measured the lane's judgment and recorded the decision this issue implements; [#113] is the loop.
++  [#212] and [#213] assume this mode.
+
+[#163]: https://github.com/formalverification/agda-native-air/issues/163
+[`reports/lane-give-parity/`]: https://github.com/formalverification/agda-native-air/tree/main/reports/lane-give-parity
+[#174]: https://github.com/formalverification/agda-native-air/pull/174
+[`docs/reading-the-results.md`]: https://github.com/formalverification/agda-native-air/blob/main/docs/reading-the-results.md
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#197]: https://github.com/formalverification/agda-native-air/pull/197
+[ADR 0001]: https://github.com/formalverification/agda-native-air/blob/main/docs/adr/0001-proof-search-on-agda-mcp.md
+[#212]: https://github.com/formalverification/agda-native-air/issues/212
+[#213]: https://github.com/formalverification/agda-native-air/issues/213
+[ADR 0002]: https://github.com/formalverification/agda-native-air/blob/main/docs/adr/0002-agda-mcp.md
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+
+---
+
+### Issue M2-24: proof search: identify states by their goals, and prune paths that return to one (#212)
+
+**Labels:** `eval`, `M2: retrieval + local models`
+
+# Context
+
+The loop identifies a state by `StateKey(contentFingerprint, script)` and deduplicates its frontier on that key ([ADR 0001] § 3, decision 5).  The key has never fired: content-only and script-inclusive dedup gave identical sweeps with zero skips at P1 and again at P2, because in this action space every candidate splices distinct text at the first open obligation ([#113], the P1 comment).
+
+What repeats is the goal, not the text.  P1's four budget-burners were "chains that refine forever without progress (`sym`-flipping on plus-comm, mul-comm, and mul-distrib-r; `id`-wrapping on list-map-id)" ([ADR 0001] § 9).  `(sym {!!})` at `m + n ≡ n + m` leaves `n + m ≡ m + n`, and a second `(sym {!!})` leaves the first goal again, in a file whose text is new at every step.  The peek turned those chains into depth-capped exhaustion (plus-comm from 60 probes to 6), but a chain still spends the depth bound.
+
+Keying on goals is how Harmonic's Aristotle turns its search tree into a graph: states equal in goal expressions, local context, and variable names are one node ([Aristotle] § 2.1.2).
+
+# Work
+
++  A goal key for each open obligation, built from the goal display and context the loop already reads with `get_goal` at every expansion; a state's key is the multiset of its obligations' keys.
++  Dominance pruning: a child whose key multiset contains the key multiset of an ancestor on its own path is skipped and counted, since any proof of the child proves that ancestor's goals in the same contexts.  This stops the `sym` chain at its first repeat.
++  A per-fixture table from a goal key to the candidates that closed it, consulted first when the key recurs.  The table orders proposals and decides nothing: every reuse is judged by the oracle like any other candidate.
++  The key's limit, stated where the key is defined: a printed goal omits hidden arguments, so two different goals can print alike.  A collision can misorder or wrongly prune, and it cannot admit a wrong proof, because every commit is judged.
+
+# Acceptance
+
++  The 55 obligations at the published knobs with and without goal keys: the same solve set, or each difference explained; dominance skips, probes, depth reached, and wall clock per fixture, with the four P1 budget-burners named.
++  A spec pinning the key and the dominance rule on live-captured goals.
+
+# Relations
+
++  [#113] is the loop and [#122] is where the chains were measured.
++  [#211] makes transitions cheap, which makes the depth this saves worth more.
++  [#213] merges subproblems on this key.
+
+[ADR 0001]: https://github.com/formalverification/agda-native-air/blob/main/docs/adr/0001-proof-search-on-agda-mcp.md
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[Aristotle]: https://arxiv.org/abs/2510.01346
+[#122]: https://github.com/formalverification/agda-native-air/issues/122
+[#211]: https://github.com/formalverification/agda-native-air/issues/211
+[#213]: https://github.com/formalverification/agda-native-air/issues/213
+
+---
+
+### Issue M2-25: proof search: AND/OR search over independent holes, with proof-number selection (#213)
+
+**Labels:** `eval`, `M2: retrieval + local models`
+
+# Context
+
+The loop's state is the whole file, and each expansion works on the first open obligation, a simplification that [ADR 0001] states and pins (§ 4, decision 6).  When a move leaves several holes, the beam solves them one after another along one path, so the alternatives for the first hole multiply with the alternatives for the second, and a hole that cannot be closed is found only after its siblings have been paid for.  [ADR 0001] § 10 records a richer selection policy as an option to take "if multi-hole fixtures ever make selection order matter under budget".  On the published record they have not: the one solve whose move leaves two holes is `stdlib-prod-mk-pair`'s `(_,_ {!!} {!!})`, closed by an assumption in each.
+
+Three changes make it worth measuring now, as follows.
+
++  The composition tier ([#160]) is built from golds that string several lemmas together, so a committed `(trans {!!} {!!})` or a `where`-bound intermediate leaves several holes by design.
++  A case split ([#207]) produces one clause per constructor, each with its own hole, which is an AND node by construction.
++  Lane probes ([#211]) move a transition from seconds to milliseconds, the regime in which the shape of the search, rather than the oracle's cost, decides what is found.
+
+Harmonic's Aristotle is the reference design ([Aristotle] § 2.1.1 and § 2.1.3).  Goals are split into separate states unless they share metavariables; a state is proved if any action succeeds and an action only if all its resulting states are; selection takes the most promising action, then that action's hardest state.  Aristotle's selection runs on a learned value, which this loop does not have.  The model-free counterpart is proof-number search ([Allis et al. 1994]): expand the most-proving node, the one whose proof needs the fewest further leaves, with disproof numbers kept symmetrically.
+
+# Work
+
++  Independence read off the wire: holes whose goal types mention no other unsolved meta become separate subproblems, and holes that share a meta stay one state, as Aristotle keeps goals with metavariables together.  The facts are already available: the lane's goal displays, `AllGoalsWarnings` (PR [#118]), and `fill_hole`'s refusal of blocked-constraint sub-holes (the `wire-fill-hole-blocked-*` captures, [ADR 0001] § 7).
++  An AND/OR graph over [#212]'s goal keys: a subproblem solved once serves every parent that needs it, and a subproblem refuted (every proposal refused, or its space exhausted) refutes the actions that produced it.
++  Proof and disproof numbers for selection, in place of first-open-obligation and fewer-obligations-first; the beam stays available as the control.
++  The claim unchanged: the solved subproblems are assembled into one file, and that file passes the final batch check.
+
+# Acceptance
+
++  On the composition tier ([#160]) and the hard tier ([#189]), at equal budgets, AND/OR against the beam: solves, probes, and wall clock per row.
++  On the 55 obligations, the same solve set as the beam's, or each difference explained.
++  [ADR 0001] § 4 and § 10 updated with the result, whichever way it goes.
+
+# Relations
+
++  [#113] is the loop; [#211] and [#212] are prerequisites.
++  [#160] and [#207] are where multi-hole states come from.
++  [#206], Agsy as a closer, is a natural leaf solver for independent subproblems.
+
+[ADR 0001]: https://github.com/formalverification/agda-native-air/blob/main/docs/adr/0001-proof-search-on-agda-mcp.md
+[#160]: https://github.com/formalverification/agda-native-air/issues/160
+[#207]: https://github.com/formalverification/agda-native-air/issues/207
+[#211]: https://github.com/formalverification/agda-native-air/issues/211
+[Aristotle]: https://arxiv.org/abs/2510.01346
+[Allis et al. 1994]: https://doi.org/10.1016/0004-3702(94)90004-3
+[#118]: https://github.com/formalverification/agda-native-air/pull/118
+[#212]: https://github.com/formalverification/agda-native-air/issues/212
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
+
+---
+
+### Issue M2-26: proof search: the moves after a case split, a recursive call and cong over a hole (#214)
+
+**Labels:** `eval`, `M2: retrieval + local models`
+
+# Context
+
+ADR 0001 § 5 and § 10: term mode caps the standard-library tier at 6 / 22, and 13 of the 16 unreachable golds are structural inductions of one shape, `f zero … = refl; f (suc n) … = cong g (f n …)`.  [#207] adds the case split those golds begin with.  A split alone does not finish them; measured on 2026-09-27 ([#207]'s comment):
+
++  Agda's own proof search (Agsy, [#205]), with `-c` and with the function's own name and `cong` as hints, proves none of the 16.
++  After a split made by hand on `Nat-plus-identityR`, Agsy closes the base case at once (`refl`) but not the step case (`cong suc (+-identityʳ n)`), even with `-t 10 cong suc +-identityʳ` as hints.
++  The loop's fixed action space cannot propose the step either: it applies the fixture's imported lemmas and the goal context's assumptions, and the function being defined is neither.
+
+# Work
+
++  Two moves for the state after a split, proposed through the `Proposer` seam and judged by the oracle like any other candidate:
+   +  **A recursive call**: the function being defined, applied to the clause's structurally smaller pattern variables (with a fresh `{!!}` per remaining argument), in the clause whose pattern was split;
+   +  **`cong f {!!}`**: for a step goal whose two sides share an outermost constructor or function `f` (`suc (n + 0) ≡ suc n`), `cong f` over a hole for the inner equation.
++  Termination is Agda's to judge: a recursive call on a non-smaller argument is refused by batch `fill_hole`'s termination checker, and the loop must read that refusal as a failed move.
++  A sweep on the 16 ceiling rows with [#207]'s tool: how many of the 13 inductions close, at what probe cost, beside the published P1 and P2 runs.
+
+# Acceptance
+
++  The two moves, with tests on committed fixtures, and the ceiling sweep's table on this issue.
++  ADR 0001 § 10 updated with the result.
+
+# Relations
+
++  [#207] (the split, a prerequisite), [#213] (AND/OR search, where a split's clauses become separate goals), [#212] (goal keys, which a recursive call's goals will exercise), [#211] (lane probes, which make the sweep cheap), [#113] (the loop).
+
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#207]: https://github.com/formalverification/agda-native-air/issues/207
+[#211]: https://github.com/formalverification/agda-native-air/issues/211
+[#212]: https://github.com/formalverification/agda-native-air/issues/212
+[#213]: https://github.com/formalverification/agda-native-air/issues/213
+
+---
+
+### Issue M2-27: Jetson AGX Orin as a model server: JetPack 7, Ollama, the containers, and what it serves at what speed (#241)
+
+**Labels:** `local-models`, `infrastructure`, `M2: retrieval + local models`
+
+## Context
+
+The Orin (64 GB of unified memory at 204.8 GB/s; Ampere, so no FP8 or FP4 tensor cores) is the device the roadmap names for the specialist models ([#18], [#19], [#20]) and for the stretch goal of a local prover (Milestone 4).  Nothing has run on it for this project yet; `scripts/setup_gpu_venv.sh` was archived as premature.  JetPack 7 (Ubuntu 24.04, CUDA 13) now covers the Orin as well as Thor, and NVIDIA's Jetson AI Lab publishes vLLM and llama.cpp containers for the current open models (gpt-oss-20b, Qwen3.5 and 3.6, Nemotron Nano, Gemma 4).  Decoding is bandwidth-bound: the ceiling is 204.8 GB/s over the bytes read per token, about 100 tokens a second for 3.6B active parameters at 4.5 bits and 12 for a dense 31B, and practice lands near half; those are estimates for `llama-bench` to replace.
+
+## Tasks
+
+- [ ] Back up, then flash JetPack 7 (confirm the exact Orin release); record the JetPack, CUDA, kernel and Ubuntu versions in a dated note under `docs/notes/`.
+- [ ] Ollama on the device, serving on the LAN; confirm that `ANTHROPIC_BASE_URL` from a Claude Code session on the workstation reaches it and that tool calling works.
+- [ ] `llama-bench` on three or four models that fit (gpt-oss-20b, Qwen3.6 35B-A3B, Gemma 4 31B, Nemotron Nano 30B-A3B): prefill and decode tokens per second at the quantization used, with the power mode noted.
+- [ ] The PyTorch container from the Jetson AI Lab, and whether PEFT, TRL, sentence-transformers and an aarch64 bitsandbytes work in it, for [#18] and the LoRA work; a one-epoch timing on a small contrastive set.
+- [ ] A note on what does not fit (gpt-oss-120b, Leanstral 1.5 and Nemotron Super at 66 to 68 GB need a 128 GB Thor or DGX Spark), so that the question is not reopened.
+
+## Acceptance criteria
+
+- [ ] A dated table in `docs/notes/` of measured decode and prefill rates per model and quantization on the Orin.
+- [ ] A model served on the LAN that a Claude Code session on the workstation uses through `ANTHROPIC_BASE_URL`, which [#240] then measures.
+- [ ] A working training container with the measured epoch time, for [#18].
+
+Related: [#235].
+
+[#18]: https://github.com/formalverification/agda-native-air/issues/18
+[#19]: https://github.com/formalverification/agda-native-air/issues/19
+[#20]: https://github.com/formalverification/agda-native-air/issues/20
+[#240]: https://github.com/formalverification/agda-native-air/issues/240
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
 
 <!-- END GENERATED: milestone-2 -->
 
@@ -3805,7 +4451,7 @@ This is a defect in the answers, not in the idea, and it is the most likely reas
 
 ---
 
-### Issue M5-13: `definition_of` should return what a definition says, not only where it is (#185)
+### Issue M5-13: `definition_of` should return what a definition says, not only where it is (#185, closed)
 
 **Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
 
@@ -3890,6 +4536,321 @@ No answer changes shape (`answerAt` and the `exports_of` page are [#190]'s and s
 [#188]: https://github.com/formalverification/agda-native-air/issues/188
 [#189]: https://github.com/formalverification/agda-native-air/issues/189
 [#190]: https://github.com/formalverification/agda-native-air/pull/190
+
+---
+
+### Issue M5-15: `fill_hole`: an address in a file with one hole should reach that hole (#201, closed)
+
+**Labels:** `enhancement`, `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+`fill_hole` addresses a hole by `(line, column)`, and the position must fall inside the hole's span; anything else is refused before `agda` runs, with the nearest holes listed (`AgdaMCP.Holes.resolveHoleRef`).  The rule is strict on purpose: after an edit moves lines, a tolerant rule could answer with a plausible wrong hole.
+
+Across the archived agent-bench arms, subjects made 234 `fill_hole` calls, and 39 of them (17 %) were refused with "No hole at line L, column C".  In **all 39 the file had exactly one hole, on the line the subject named**; only the column was off, by one in 21 calls (a 0-based column where the server counts from 1) and by two to seven in the rest.  Four more calls named no hole at all.  Every refusal was followed by a retry at the listed position, so each costs a turn and nothing else: about one turn in every six `fill_hole` calls, in every arm from [#154] to [#189].
+
+# Work
+
++  **One hole, any position on its line**.  When the file has exactly one hole and the position names that hole's line, resolve the position to it.  With no other hole in the file, the wrong-hole failure the strict rule guards against cannot happen.
++  **One hole, no address**.  When the call names no hole and the file has exactly one, fill it.
++  **Say so**.  The response records how the address was resolved (`resolvedBy`: `span`, `only hole, same line`, or `only hole`) beside the position actually used, so a caller that meant something else sees it.  With two or more holes nothing changes: the position must fall inside a span, and the refusal lists the nearest holes.
+
+# What it does not do
+
+It does not choose among several holes, and it does not reinterpret columns in general (0-based, or byte offsets): a file with two holes keeps the strict rule.
+
+# Acceptance
+
++  Tests on a one-hole file: a position one column before the hole, and a call with no address, each fill the hole and state `resolvedBy`.  On a two-hole file, a position between the holes is still refused.
++  The 39 archived refusals, replayed against their staged obligations, all resolve.
++  The new field appears in the tool's README contract and description, beside the fields it sits with.
+
+# Relations
+
++  [#71] and its PR set the strict hole model this refines; [#136] is the other open `fill_hole` change (apply the candidate, or return a patch).
++  The count comes from the archived runs of [#154], [#162], [#184], [#191], and [#189].
+
+[#71]: https://github.com/formalverification/agda-native-air/issues/71
+[#136]: https://github.com/formalverification/agda-native-air/issues/136
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+
+---
+
+### Issue M5-16: `search_by_type`: match a type as it is written, and several fragments at once (#202, closed)
+
+**Labels:** `enhancement`, `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+`search_by_type` matches one case-insensitive substring against each corpus row's printed type ("the same shape as `search_by_name`, but matches the substring against each definition's type signature", `agda-mcp/README.md`).  The corpus prints a type fully qualified and broken across lines (`Algebra.Bundles.Group.Carrier G`, `(Group-Op 𝒢 Group-Op.∙ x) y`).  A query written the way a statement reads (`x ∙ y ≈ y ∙ x`, `Commutative _≈_ _∙_`) therefore matches almost nothing unless it is spelled in the corpus's own printing.
+
++  **Adoption**: offered in 591 archived agent sessions, used in 14 (2.4 %), 15 calls in all; `search_by_name`, in the same sessions, was used in 79 (13.4 %), 136 calls.
++  **The novelty check of [#189]** had to write every fragment in the corpus's spelling (`Group-Op.∙ x) y)`, `Algebra.Definitions.Commutative`).  It also needed a conjunctive search, every fragment in one row's type, which no tool offers; it was run by hand over the corpus file.
+
+# Work
+
++  **Match a type as it is written**.  Compare the query with each type after dropping module qualifiers and collapsing whitespace, in both.  Keep today's exact match behind `qualified: true`.
++  **Several fragments at once**.  Accept `patterns: [...]`, all of which must occur in one type, and report which fragments each hit matched.
++  **State the rule in the contract**, with an example of each, so a model reads when to reach for the tool.
+
+# What it does not do
+
+It does not rank by meaning or unify types: premise selection and neural retrieval are [#19] and [#21].
+
+# Acceptance
+
++  Queries from the novelty tables of [#189], written as the statements are written, find the lemmas those tables cite (`Commutator.[_⸴_]`, `Conjugation.conj-∙-hom`, `Algebra.Properties.AbelianGroup.⁻¹-∙-comm`), pinned by tests on a committed corpus fixture.
++  A re-run arm reports the tool's adoption beside 2.4 %.
+
+# Relations
+
++  [#17]: the corpus tools.  [#19], [#21]: ranking and neural search, which this does not replace.  [#189]: the novelty check that needed this.
+
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
+[#19]: https://github.com/formalverification/agda-native-air/issues/19
+[#21]: https://github.com/formalverification/agda-native-air/issues/21
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+
+---
+
+### Issue M5-17: `search_in_scope`: offered in 426 agent sessions, called in none (#203, closed)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+PR [#161] added `search_in_scope`, the one corpus tool that also takes the interaction lane: which names in scope at a file's position match a query, the question the other corpus lookups cannot answer ([#17]).  Every archived arm since has offered it.  **In 426 agent sessions across 16 runs, no subject called it once**.  In the same sessions, `search_by_name` was used in 13 % and `definition_of` in 11 %.
+
+[#191] measured the tool surface as the main cost of a server arm (every description is re-read every turn), so a tool no subject calls is pure cost.
+
+# Work
+
++  **Find out why**.  Read what its description tells a model, and when a model would prefer it to `search_by_name` or `definition_of`.  Sample the arm transcripts where a subject answered a scope question by other means (`exports_of`, `search_by_name`, `grep`), and replay those questions through `search_in_scope` on the real server, comparing the answers.
++  **Then one of three**, decided on that evidence: rewrite its description to name the question it answers, and re-measure; fold it into `search_by_name` as an option (`inScopeAt: {filePath, line}`), which removes one description from the surface; or take it off the default surface and keep it behind `--expose`.
++  **Record the decision** in ADR 0002 with the counts.
+
+# Acceptance
+
++  The decision and its evidence are recorded.  After a rewrite, a re-run arm shows calls; after a fold or a removal, the surface is one description shorter and every place that states the tool count is updated.
+
+# Relations
+
++  [#165]: its re-export recall gap.  [#191] and PR [#193]: the surface's cost.  [#185]: the "where, not what" gap it shares with `definition_of`.
+
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
+[#161]: https://github.com/formalverification/agda-native-air/pull/161
+[#165]: https://github.com/formalverification/agda-native-air/issues/165
+[#185]: https://github.com/formalverification/agda-native-air/issues/185
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#193]: https://github.com/formalverification/agda-native-air/pull/193
+
+---
+
+### Issue M5-18: agda-mcp: `auto` as query tool (#205, closed)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+Evaluating [DreamLinuxer/agda-mcp](https://github.com/DreamLinuxer/agda-mcp), a Python MCP server wrapping about thirty `agda --interaction-json` commands, turned up a capability this server has never used: Agda's own proof search, `Cmd_autoOne` (Agsy).  Measured on the benchmark (2026-09-27; the pinned Agda 2.8.0; the lane's per-load flags; every term Agsy found judged by our `fill_hole` under `--safe`, so a solve is batch `agda`'s verdict):
+
+| tier | Agsy (default options, then `-t 10`) |
+|---|---:|
+| agda-stdlib | 6 / 22 |
+| agda-stdlib/haystack | 0 / 12 |
+| agda-algebras | 10 / 21 |
+| total | 16 / 55 |
+
++  Every solve took 10 ms or less, and `-t 10` added nothing.
++  No term names the lemma its row restates.  `algebras-homs-mon-to-hom`, restated by every Sonnet subject in every [#191] arm, is built from the record's fields: `m .proj₁ , m .proj₂ .IsMon.isHom`.
++  On the 43 rows outside the haystack tier the proof-search loop solves 8 ([#122], [#123]); Agsy solves 16.
++  The haystack tier needs library lemmas Agsy is not given ([#206]).
+
+# Work
+
++  A live-query tool (`auto`, the name to settle) taking a file, a hole address, and optional Agsy options (hint names, `-t`, `-m`), answering the term Agsy found (Agda's rendering, from `GiveAction`) or Agsy's own no-solution message, in band.
++  Its contract: it informs and never decides.  A found term is a candidate for `fill_hole`, which judges it, because Agsy's term is accepted by the lane's give, which tolerates what batch refuses ([#163]'s finding).
++  It writes nothing: `Cmd_autoOne` gives into the lane's state, so the hole is reset after the call, as after a give; writing an accepted term back is [#136]'s question.
++  A bound: Agsy's own `-t` inside the lane's deadline.
++  The description under the 2,048-character cap, the instructions naming it among the live queries, and `--expose` knowing it ([#193]).
+
+# Acceptance
+
++  The tool reproduces 16 / 55 on the suite, each solve confirmed by `fill_hole`, from a script or Make target committed beside the numbers.
++  Tests: a solvable hole, an unsolvable one (the message in band, no `isError`), hints, and a timeout.
+
+# Relations
+
++  [#206] is the loop's use of Agsy; [#210] the comparison with DreamLinuxer/agda-mcp that found it.
++  [#136] decides whether an accepted term is written back; [#163] is the lane-give contract this inherits.
+
+[#122]: https://github.com/formalverification/agda-native-air/issues/122
+[#123]: https://github.com/formalverification/agda-native-air/issues/123
+[#136]: https://github.com/formalverification/agda-native-air/issues/136
+[#163]: https://github.com/formalverification/agda-native-air/issues/163
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#193]: https://github.com/formalverification/agda-native-air/pull/193
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
+[#210]: https://github.com/formalverification/agda-native-air/issues/210
+
+---
+
+### Issue M5-19: agda-mcp: `case_split`, Agda's clause generation, as a live-query tool (#207)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+ADR 0001 names the proof-search loop's largest known limit: "No case splits and no `with` means clause-restructuring golds are unreachable by any proposer.  On the standard-library tier that is 16 of 22", and calls raising that ceiling "the largest known win".  Agda has the command for it, `Cmd_make_case`, and this server has never sent it.  [DreamLinuxer/agda-mcp](https://github.com/DreamLinuxer/agda-mcp) does; probed 2026-09-27, splitting `n` in `double n = {!!}` answers `double zero = ?` and `double (suc n) = ?`.
+
+# Work
+
++  A live-query tool (`case_split`) taking a file, a hole address, and the variables to split, answering the clauses Agda generates (the `MakeCase` response, function clauses or an extended lambda) and the source range they replace.  That range is the whole clause containing the hole, not the hole, which a client must know to apply the result.
++  It writes nothing; applying the clauses is [#136]'s design (an opt-in apply, or a returned patch), and the answer carries what a patch needs.
++  The new holes' positions, in file coordinates as the clauses would leave the file, so a client re-anchors as it does after `fill_hole`.
++  The description under the cap, the instructions, and `--expose` ([#193]).
+
+# Acceptance
+
++  Tests: a split on a natural number, a list, and a variable of an indexed type; a split Agda refuses (the message in band).
++  A probe over the 16 unreachable standard-library golds: for how many is the gold's first step the split Agda generates.
+
+# Relations
+
++  [#113] can then search over splits; [#136] decides writing; [#205] and [#206], Agda's auto, are capped by the same ceiling; [#210] is the comparison that found it.
+
+[#113]: https://github.com/formalverification/agda-native-air/issues/113
+[#136]: https://github.com/formalverification/agda-native-air/issues/136
+[#193]: https://github.com/formalverification/agda-native-air/pull/193
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#206]: https://github.com/formalverification/agda-native-air/issues/206
+[#210]: https://github.com/formalverification/agda-native-air/issues/210
+
+---
+
+### Issue M5-20: agda-mcp: Agda's `SearchAbout` as the scope authority for search (#208)
+
+**Labels:** `agda-mcp`, `retrieval`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+`search_in_scope` derives a file's scope from its import lines, because (ADR 0002 § 2) "no interaction command enumerates the names in scope", and then validates every rendering with `type_of`; [#165] records the recall that derivation loses on public re-exports.  Agda has a scope-aware search that this server has never sent: `Cmd_search_about_toplevel` (and `Cmd_search_about` inside a goal), which answers the names in scope whose types mention every given name, from Agda's own scope.  Probed 2026-09-27 on the benchmark with the lane's flags:
+
++  `Nat-plus-comm`, query `_+_ _≡_`: `+-comm : (m n : ℕ) → m + n ≡ n + m` and `+-suc : (m n : ℕ) → m + suc n ≡ suc (m + n)`, in 1 ms.
++  `Homs-mon-to-hom`, query `IsMon`: nothing, since no name in that file's scope mentions it.
++  The answer is `{name, term}`, the type under `term`.  [DreamLinuxer/agda-mcp](https://github.com/DreamLinuxer/agda-mcp) reads a `type` key there and prints every type as `?`, which is the mistake to avoid.
+
+It does not enumerate a scope, so ADR 0002's decision about `scope_at` stands, but it answers `search_in_scope`'s pool question, "which names this file can write mention these", by the checker, with re-exports included and no corpus.
+
+# Work
+
++  Measure first: over the benchmark's goals, compare SearchAbout's answers with `search_in_scope`'s accepted rows: the rows both find, the rows only SearchAbout finds (the [#165] gap expected here), and the rows only the corpus finds (outside the file's scope, which SearchAbout cannot see).
++  Then choose on that evidence: a rung in `search_in_scope` (Agda's scope first, the derived surface as the fallback), or a lean tool of its own.
++  ADR 0002 § 2 and § 4: the `scope_at` sentence says what SearchAbout does and does not answer, and the ask-Agda inventory gains it.
+
+# Acceptance
+
++  The measurement table, on this issue.
++  The chosen form shipped with tests, and the README and ADR updated.
+
+# Relations
+
++  [#17] (retrieval as server tools), [#165] (the re-export recall gap), [#203] (`search_in_scope` offered in 426 sessions and called in none: whatever form this takes must be one an agent actually calls), [#202] (`search_by_type`'s matching), [#191] (the four-tool arm spent 111 and 97 failed reads hunting for library files; a cheap scope search is one remedy), [#210] (the comparison that found it).
+
+[#17]: https://github.com/formalverification/agda-native-air/issues/17
+[#165]: https://github.com/formalverification/agda-native-air/issues/165
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#202]: https://github.com/formalverification/agda-native-air/issues/202
+[#203]: https://github.com/formalverification/agda-native-air/issues/203
+[#210]: https://github.com/formalverification/agda-native-air/issues/210
+
+---
+
+### Issue M5-21: agda-mcp: goal-directed refinement: `refine`, `intro`, and a helper's signature (#209)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+# Context
+
+[DreamLinuxer/agda-mcp](https://github.com/DreamLinuxer/agda-mcp) exposes Agda's goal-directed editing commands, none of which this server sends: `Cmd_refine` (apply a function, leaving its arguments as new holes), `Cmd_intro` (a constructor or a lambda), `Cmd_refine_or_intro`, and `Cmd_helper_function` (the type signature a helper for the goal would need).  Probed 2026-09-27: `helper_function` on `double n = {!!}` with `h n` answers `h : (n : Nat) → Nat`, the lemma signature with the right context.
+
+Two uses here.  The proof-search loop builds `f {!!} {!!}` candidates by hand and pre-checks them with a textual match on `type_of`'s answer, which rejects correct candidates whose inferred type begins with a trailing implicit binder ([#151]); `Cmd_refine` elaborates the application itself, arity and implicit arguments included.  And an agent decomposing a proof wants a helper's exact type, which is otherwise hand-derived from the goal's context.
+
+# Work
+
++  Live-query tools, or one tool with a mode, for refine, intro, and the helper signature, answering Agda's result text and the new holes' positions, and writing nothing.
++  The new points come in the two populations [#163] measured for a give (new holes in the candidate's coordinates, old ones in the file's); the answer must say which is which.
+
+# Acceptance
+
++  Tests for each command, including a refine that introduces implicit arguments and an intro with several possible constructors (Agda's own `IntroConstructorUnknown`).
+
+# Relations
+
++  [#163] (the lane-give facts these inherit), [#151] (the trailing-implicit rejection), [#136] (writing a result back), [#210] (the comparison that found them).
+
+[#136]: https://github.com/formalverification/agda-native-air/issues/136
+[#151]: https://github.com/formalverification/agda-native-air/issues/151
+[#163]: https://github.com/formalverification/agda-native-air/issues/163
+[#210]: https://github.com/formalverification/agda-native-air/issues/210
+
+---
+
+### Issue M5-22: run-server.sh: default --cwd to the launcher's working directory, for a harness that does not expand ${PWD} (#242)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+Every registration of the server passes `--cwd ${PWD}`, which Claude Code expands at launch: the server spawns with the launch directory as its working directory, so `${PWD}` resolves to the checkout root (claude-tooling's discovery rules 8 to 10).  Codex CLI keeps its MCP registrations in `config.toml` and may not expand `${PWD}`; Copilot CLI's behavior is unverified.  A server that receives the literal string, or no `--cwd` at all, should still anchor at the right checkout, or refuse in a way that names the problem.
+
+## Tasks
+
+- [ ] `scripts/run-server.sh` and `agda-mcp` default `--cwd` to the process's working directory when the flag is absent, and refuse a `--cwd` value that is not an existing directory with a message that names it (the literal `${PWD}` would otherwise be a silent miss).
+- [ ] The README's registration examples show the flag as optional and say what the default is.
+- [ ] A test: the launcher started from a checkout root without `--cwd` answers `check_project` against that checkout.
+
+## Acceptance criteria
+
+- [ ] A Codex `config.toml` entry with no `--cwd` connects to the right checkout, verified from a `codex` session at a checkout root.
+
+Needed by [#239] and [#243]; part of the work tracked in [#235].
+
+[#239]: https://github.com/formalverification/agda-native-air/issues/239
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+
+---
+
+### Issue M5-23: field report: Copilot CLI and Codex CLI driving agda-mcp on an ordinary task (#243)
+
+**Labels:** `agda-mcp`, `docs`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+The server has only ever been driven by Claude Code (`docs/mcp-field-reports.md`).  GitHub Copilot's CLI offers GPT-6.1 Sol and Kimi K3 under an existing plan, reads Agent Skills from `.claude/skills` and `.agents/skills`, and takes stdio MCP servers; Codex CLI does the same on a ChatGPT plan.  Before any measured arm, one ordinary formalization task in each harness says whether the server connects, whether its tools get called, and whether the project skills load, at no cost.  The question of the first field report, whether the model calls `check_file` or runs `agda` from a shell instead, is the one to ask again.
+
+## Tasks
+
+- [ ] Register the server in Copilot CLI and in Codex CLI for an agda-algebras checkout, with the `--cwd` default of [#242] if `${PWD}` is not expanded.
+- [ ] The same task in each: a small lemma in agda-algebras with the server's tools; GPT-6.1 Sol and Kimi K3 in Copilot, GPT-6.1 Sol in Codex.
+- [ ] Record, per session: whether `check_file` was called or `agda` run from a shell instead, which tools were called, whether the project skills loaded and were followed, and anything the tool descriptions caused.
+- [ ] The report as a dated section of `docs/mcp-field-reports.md`, in the format the existing sections use.
+
+## Acceptance criteria
+
+- [ ] A field-report section per harness, naming the harness version, the model and the task, with the tool-use findings.
+- [ ] Any server defect it surfaces filed as its own issue.
+
+Part of [#235].  The harness-side setup (the second link targets for skills, `AGENTS.md`, a generated Codex registration) is tracked in williamdemeo/claude-tooling, [claude-tooling#27].
+
+[#242]: https://github.com/formalverification/agda-native-air/issues/242
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+[claude-tooling#27]: https://github.com/williamdemeo/claude-tooling/issues/27
 
 <!-- END GENERATED: milestone-5 -->
 
@@ -3993,7 +4954,7 @@ The demo is reachable from the site nav and opens in a palette that does not fig
 
 ---
 
-### Issue M6-3: site: write the landing page, and curate a nav over docs/ (#171)
+### Issue M6-3: site: write landing page and curate nav over docs (#171, closed)
 
 **Labels:** `docs`, `M6: docs + dissemination`
 
@@ -4249,6 +5210,8 @@ Whatever address the site ends up at, anything meant to be cited (the benchmark,
 4.  [#177] `[M6-7]`: the custom domain cutover, if the domain is bought.
 5.  [#178] `[M6-8]`: a link from `formalverification.io`.
 6.  [#179] `[M6-9]`: a demo comparing the arms, batch type-checking alone against `agda-mcp` without and with the agda-algebras corpus.
+7.  [#182] `[M6-10]`: an ADR for the project site, and its companion note under `docs/`.
+8.  [#215] `[M6-11]`: the demo page's framing, brought up to the record the shell control ([#162]) and the later arms established.
 
 # Done
 
@@ -4267,6 +5230,9 @@ Every issue above is closed; a stranger can reach the site cold, learn what the 
 [#177]: https://github.com/formalverification/agda-native-air/issues/177
 [#178]: https://github.com/formalverification/agda-native-air/issues/178
 [#179]: https://github.com/formalverification/agda-native-air/issues/179
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#182]: https://github.com/formalverification/agda-native-air/issues/182
+[#215]: https://github.com/formalverification/agda-native-air/issues/215
 
 ---
 
@@ -4410,6 +5376,105 @@ The ADR and the companion note are merged and linked from `docs/README.md`; ever
 [#177]: https://github.com/formalverification/agda-native-air/issues/177
 [#180]: https://github.com/formalverification/agda-native-air/issues/180
 [#181]: https://github.com/formalverification/agda-native-air/pull/181
+
+---
+
+### Issue M6-11: demo: framing predates shell control (#215, closed)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+# Context
+
+The demo page ([#85], PR [#166]) replays five real sessions from the committed archive and prints the 55-row table they belong to.  It was built on 2026-09-20 from the [#154] arms, before any measurement compared the tools with their absence, and it is live at https://formalverification.github.io/agda-native-air/demo/.  Four measurements have landed since, as follows:
+
++  [#162] (PR [#175]): with a shell and no server, Sonnet 5 solves 50 of 55 and restates none, against 47 and 6 with the server; given both, it takes every verdict from `check_file`.
++  [#188] (PR [#192]): with the libraries' sources readable, the shell arm had the original lemma's proof in view for 15 of its 18 agda-algebras solves; the restated rule catches citing, not transcribing.
++  [#184] and [#191] (PRs [#190], [#193]): lean answers and a trimmed surface cut a server arm's cost; the tool mix and the solve counts stayed within the runs' spread.
++  [#189] (PR [#197]): on fourteen posed statements with no proof on disk, every Opus 5 arm proves every row.
+
+`docs/reading-the-results.md` was written because tables like the demo's were being misread, and the page does three things the guide exists to stop, without linking the guide, as follows:
+
++  **The header** prints 55 obligations, 54 solved by Opus 5, 46 by Sonnet 5, and 14 by the search loop, side by side.  The loop is a different instrument with no model in it; the guide's § 1 says it is not a baseline for the agents.
++  **The intro** frames the [#154] arms as the answer: "To find out whether that helps, 55 proof obligations were each handed to one fresh ... session with those thirteen tools ... and nothing else: no shell".  The measurement of that effect is [#162], and it went against the server as shipped.
++  **The restated section** presents the rule as settling the question ("nothing in the difference is a matter of opinion") without its limit.
+
+# Work
+
++  The loop's count leaves the header; the [#154] counts never appear as the tools' effect without the control beside them; the intro says what the five sessions are evidence of and links the guide's § 4.3 for whether the tools help; the restated section states its limit and reads what the judge's `original` column shows for the replayed sessions (every one `inView: false`: those arms' reads of the library were refused, so the sessions are construction).
++  The control's numbers are read from `arm162-*/report.json` and checked against ADR 0001 § 9's attribution table by `numbers.py`, as the agent table is today, so a drift fails `make demo-check`.
++  The later findings are linked, not restated; no figure on the page is typed by hand.
+
+# Done
+
+The page's framing matches the record and links the guide; `make demo-check` checks the control's numbers against the ADR; the five sessions are unchanged; the suites pass with tests that pin the new rules.
+
+# Relations
+
++  Tracked by [M6-6] ([#180]); before [#178] (the link from the org site), so strangers are not invited to a page that states a comparison the record no longer supports.
++  Before [#170], which edits the same generator and tests.
++  Kick-off: `~/claude-kickoff-prompts/kickoff-61-air-m6-11-demo-framing.md`.
+
+[#85]: https://github.com/formalverification/agda-native-air/issues/85
+[#154]: https://github.com/formalverification/agda-native-air/issues/154
+[#162]: https://github.com/formalverification/agda-native-air/issues/162
+[#166]: https://github.com/formalverification/agda-native-air/pull/166
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#175]: https://github.com/formalverification/agda-native-air/pull/175
+[#178]: https://github.com/formalverification/agda-native-air/issues/178
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+[#184]: https://github.com/formalverification/agda-native-air/issues/184
+[#188]: https://github.com/formalverification/agda-native-air/issues/188
+[#189]: https://github.com/formalverification/agda-native-air/issues/189
+[#190]: https://github.com/formalverification/agda-native-air/pull/190
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#192]: https://github.com/formalverification/agda-native-air/pull/192
+[#193]: https://github.com/formalverification/agda-native-air/pull/193
+[#197]: https://github.com/formalverification/agda-native-air/pull/197
+
+---
+
+### Issue M6-12: demo: the composition tier, where the needles came from and the two models' routes (#224, closed)
+
+**Labels:** `docs`, `M6: docs + dissemination`
+
+**Reframed 2026-09-29, after PR [#225]** (see the comment below and the guide's § 4.7).  On the composition tier the instruments do not differ in what the subject proved: all 72 final files type-check under the judge with their statements kept, in every arm of both models, and each row missing from a solved count lost a gate (19 Sonnet rows to the preservation gate, every one an edited `using` list; 7 rows to the isolation gate) after a correct proof.  The tier sits at both models' ceiling, as the hard tier sits at Opus 5's.  What the demo should show is therefore not a row one configuration proves and another cannot, but what the tier alone shows: where each needle came from (a tool answer, a source read, never memory, on all but three), the two models' different routes on one row (row 10: Sonnet's `≤ⁿ-trans` and `normalOf-mono` against Opus 5's `λ p → φ≤N (θ⊆φ p)`), and, shown honestly as the mined demo shows a refusal, a file that checks and lost a gate.  The "Context" and "Work" below are the original filing; the kick-off supersedes them where they say the instruments differ.
+
+# Context
+
+The demo page replays five header-free sessions from the mined suite (PR [#223]) and says of them, in "What this is", that they "are not evidence that the tools help", since every instrument scores about the same on rows whose proofs are on disk.  The composition tier ([#160], PR [#218]) is the instrument built to sit below that ceiling: twelve agda-algebras rows mined so that the proof-search loop provably cannot assemble them.  Its six arms, and the hard tier's header-free re-run ([#219]'s runs 2 and 3), ran on 2026-09-29 and are being archived and written up (kickoff 64).  As run, before any re-judge:
+
+| tier | Opus 5: server, shell, both | Sonnet 5: server, shell, both |
+|---|---|---|
+| composition (12) | 12, 10, 10 | 3, 6, 5 |
+| hard (14), header-free | 14, 10, in progress | not run |
+
+The rows on which the instruments differ exist now, and the demo shows none of them.  Two kinds are already in the runs: a row Opus 5 solved with the server and not with a shell (`comp-group-normal-of-equivalent-congruence`: server yes, shell no, both no; `comp-congruence-meet-below-join`: server yes, shell no, both yes), and a row Sonnet 5 solved with a shell and not with the server (`comp-congruence-monolith-below-member`: shell yes, both yes, server no).  On the same tier Sonnet did better with a shell than with the server, which is the opposite of the demo's present framing and belongs on the page whichever way the re-judge leaves it.
+
+# Work
+
++  **Replays from the composition tier**, chosen because the instruments differ on the row: at least one of each kind above, replayed by the existing mechanism (`scripts/python/demo/`) with every answer in full, the judge's verdict, and one reading the mined rows never needed: where each needle came from (a search answer, a source read, or memory with no search before it), since the tier's ground truth is its `needle:` tags.
++  **The numbers section** gains the composition table, per arm and model, read from the archived reports and checked against ADR 0001 § 9 the way the mined table is, once kickoff 64's write-up puts it there; the loop's 0 of 12 in three sweeps beside it, since that is the tier's construction.
++  **The framing**.  "They are not evidence that the tools help" keeps its truth for the mined rows and gains its complement: the tier on which the count moved, with the numbers and the one-seed caveat.  The landing page's "Whether the tools help … is still open" paragraph moves to what the tier showed; kickoff 64's PR may take the landing page, so coordinate rather than duplicate.
++  **[#179]'s three-instrument panel**.  The header-free 55-row arms and the composition arms now supply `shell`, `mcp`, and `both` on the same rows, so two of its three arms exist for every row; the server-without-a-corpus arm is still unmeasured.  William's personal site already ships a same-row, three-instrument replay of one lemma generated from this archive (https://williamdemeo.org/demo/, `build_demo_data.py` in his website repository), and its framing of the three instruments is worth reusing here.
+
+# Acceptance
+
++  The demo replays at least two composition rows on which the instruments differ, from archived runs, and says why each row was chosen.
++  The composition table on the page is validated against the ADR like the mined table; `make demo-check`, `make site-test`, `make site`, and `make site-check` pass; no figure is typed.
++  The page's framing says what the composition tier showed, with run ids and the seed caveat.
+
+# Relations
+
++  Depends on kickoff 64's PR (the archive and the write-up of [#160]'s stage two and [#219]'s runs 2 and 3).
++  [#160], PR [#218], [#219], PR [#223], [#179], [#170]; tracked by [#180].
+
+[#160]: https://github.com/formalverification/agda-native-air/issues/160
+[#170]: https://github.com/formalverification/agda-native-air/issues/170
+[#179]: https://github.com/formalverification/agda-native-air/issues/179
+[#180]: https://github.com/formalverification/agda-native-air/issues/180
+[#218]: https://github.com/formalverification/agda-native-air/pull/218
+[#219]: https://github.com/formalverification/agda-native-air/issues/219
+[#223]: https://github.com/formalverification/agda-native-air/pull/223
 
 <!-- END GENERATED: milestone-6 -->
 
