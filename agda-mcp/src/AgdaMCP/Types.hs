@@ -1157,9 +1157,11 @@ instance ToJSON DiagRange where
 -- +---------------------------+------------------------------------------------+
 -- | Code                      | Payload                                        |
 -- +===========================+================================================+
--- | @UnequalTerms@ and other  | 'invActual' and 'invExpected': the two sides   |
--- | mismatches                | of Agda's @A != B@ / @A !=< B@ line, in that   |
--- |                           | order (Agda prints the actual type first).     |
+-- | @UnequalTerms@,           | 'invActual' and 'invExpected': the two sides   |
+-- | @UnequalTypes@ (Agda      | of Agda's @A != B@ / @A !=< B@ line (2.8.0),   |
+-- | 2.9.0), and other         | or of its "The type(s)/terms … and / is not a  |
+-- | mismatches                | subtype of …" layout (2.9.0), in that order    |
+-- |                           | (Agda prints the actual side first).           |
 -- +---------------------------+------------------------------------------------+
 -- | @NotInScope@              | 'invCandidates': the "did you mean" names,     |
 -- |                           | qualified as Agda prints them (so the module   |
@@ -2215,7 +2217,7 @@ instance ToJSON DefinitionOfResult where
 -- (@contents@, here @exports@) and exported nested modules (@names@, here
 -- @modules@ — a datatype or record induces one, and @module M = N@ creates
 -- one), so a barrel that re-exports a module is not silently omitted.  The
--- wire also carries a @telescope@; under the pinned Agda 2.8.0 it is empty
+-- wire also carries a @telescope@; under Agda 2.8.0 it is empty
 -- in every probed shape — a parameterized module's binders arrive folded
 -- into each member's printed type instead — so it is passed through
 -- verbatim only if some future shape populates it, never dropped.
