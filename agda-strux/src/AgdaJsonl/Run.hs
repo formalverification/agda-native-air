@@ -65,7 +65,7 @@ import System.IO
 import qualified AgdaJsonl.Extract as Extract
 import qualified AgdaJsonl.Cli     as Cli
 
--- Agda imports (2.8.0)
+-- Agda imports (2.9.0; every one of them is unchanged from 2.8.0, issue #234)
 import Agda.Interaction.Imports (parseSource, typeCheckMain, Mode(..))
 import Agda.Interaction.Options (CommandLineOptions(..), defaultOptions)
 import Agda.Main (runAgdaWithOptions, runTCMPrettyErrors)

@@ -78,7 +78,7 @@ import Agda.TypeChecking.Monad.Base
   , Defn(..)
   , iSignature
   , iModuleName
-  , funClauses        -- IMPORTANT: selector on Defn (Agda 2.8.x) :contentReference[oaicite:2]{index=2}
+  , funClauses        -- IMPORTANT: selector on Defn (Agda 2.8 and 2.9)
   )
 import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 import qualified Agda.Syntax.Internal as I
@@ -206,8 +206,8 @@ ppDefnBody = \case
   AbstractDefn d ->
     ppDefnBody d
 
-  -- IMPORTANT (Agda 2.8.x):
-  -- `funClauses` is a selector on Defn, not on FunctionData. :contentReference[oaicite:3]{index=3}
+  -- IMPORTANT (Agda 2.8 and 2.9):
+  -- `funClauses` is a selector on Defn, not on FunctionData.
   --
   -- So we must keep the whole Defn around (d@...) and call funClauses d.
   d@FunctionDefn{} -> do
@@ -270,7 +270,7 @@ dumpCheckResultAsJsonl h file cr fmt = do
       sig :: Signature
       sig = iSignature iface
 
-      -- Agda 2.8.x: Signature exposes `_sigDefinitions`
+      -- Agda 2.8 and 2.9: Signature exposes `_sigDefinitions`
       defsAll = HM.toList (_sigDefinitions sig)
 
       mainMod :: T.Text

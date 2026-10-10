@@ -59,7 +59,22 @@ object Proc {
     else if (s.forall(ch => ch.isLetterOrDigit || "-._/:=@".contains(ch))) s
     else "'" + s.replace("'", "'\"'\"'") + "'"
 
+  /** Variables no child inherits.
+    *
+    * The default and all dev shells export LD_LIBRARY_PATH for pip wheels,
+    * with nixos-24.05's libstdc++ first on it, and agda-json does not start
+    * under that export: it links Agda 2.9.0's library, hence ICU, built
+    * against a newer libstdc++ ("version `CXXABI_1.3.15' not found").  The
+    * children run here are Nix-built and find their libraries through their
+    * RPATH, so the variable can only do them harm.  The flake's `agda`
+    * wrapper unsets it for the same reason; the agent-bench judge reuses this
+    * list for its own agda-json (issue #234).
+    */
+  val scrubbedEnv: Vector[String] = Vector("LD_LIBRARY_PATH")
+
   private def renderRepro(cmd: Seq[String], env: Map[String, String], cwd: Path): String = {
+    val unsetPart = scrubbedEnv.map(v => s"-u $v").mkString("env ", " ", " ")
+
     val envPart =
       if (env.isEmpty) ""
       else env.toVector.sortBy(_._1).map { case (k, v) => s"$k=${shQuote(v)}" }.mkString("", " ", " ")
@@ -72,7 +87,7 @@ object Proc {
         |cwd:  ${cwd.toAbsolutePath.normalize()}
         |env:  ${env.toVector.sortBy(_._1).map { case (k, v) => s"$k=$v" }.mkString(", ")}
         |REPRO:
-        |${envPart}${cmdPart}
+        |${unsetPart}${envPart}${cmdPart}
         |----------------
         |""".stripMargin
   }
@@ -94,6 +109,7 @@ object Proc {
           pb.redirectErrorStream(true) // merge stderr into stdout
 
           val penv = pb.environment()
+          scrubbedEnv.foreach(v => penv.remove(v))
           env.foreach { case (k, v) => penv.put(k, v) }
 
           pb.start()

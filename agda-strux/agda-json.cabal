@@ -17,7 +17,7 @@ library
       AgdaJsonl.StructAst
   build-depends:
       base >= 4.17.2.0 && < 5
-    , Agda == 2.8.0
+    , Agda == 2.9.0
     , containers
     , directory
     , filepath
