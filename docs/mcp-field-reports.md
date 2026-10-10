@@ -379,3 +379,267 @@ was a batch verdict on a whole module in a worktree the server did not own;
 the MCP's advantage (warm interaction lane, structured diagnostics) never had
 a chance to apply.  Net: for multi-worktree stacked-PR work the server needs
 per-call roots before it can replace the CLI.
+
+## 2026-10-10, agda-native-air issue #243: Copilot CLI on the one-step subgroup test (GPT-6.1 Sol, Kimi K3)
+
+The first sessions run with a harness other than Claude Code ([#243]).  They
+ask, of two more harnesses, the question the first field report asked (§ 2 of
+[`flrp-agda-mcp-improvements.md`]): does the model call `check_file`, or run
+`agda` from a shell?  Through Copilot the answer is the server, for both
+models: GPT-6.1 Sol ran every check of its module through it, and Kimi K3 its
+one module check, leaving the whole-library gate to the shell as the
+instruction file orders.  Through Codex (the next section) the answer is the
+shell, and the reason is the harness.
+
+A Claude Code session (Opus 5.5) set the trials up, ran them headless, read
+their transcripts and ran the gates; it wrote this report, and the trial
+sessions did not.  Claims are graded as the first report graded its own:
+**observed** in a transcript, a harness's own listing, or its debug log of the
+requests it sent; **measured** by the reporting session outside the trials;
+**inferred** where neither, and marked so.  Unmarked claims are observed.
+
+**The task**, given verbatim to every session with nothing else (no sketch, no
+tool names, no mention of the server): create the literate module
+`src/Classical/Structures/Group/SubgroupTest.lagda.md` holding the declaration
+below, its type signature as written, with a complete proof (no holes, no
+postulates); follow the project's conventions for a new module; done when the
+new module and the whole library type-check; commit if you like, but do not
+push or open a pull request.  The lemma is in neither the library nor the
+benchmark, and a reference proof written for this report checks in ten lines
+(measured).
+
+```agda
+module _ (𝑮 : Group α ρ) where
+  open Setoid 𝔻[ proj₁ 𝑮 ] using ( _≈_ )
+  open Group-Op 𝑮 using ( _∙_ ; ε ; _⁻¹ )
+
+  one-step-subgroup : {B : Pred 𝕌[ proj₁ 𝑮 ] ℓ}
+    →  B Respects _≈_
+    →  ε ∈ B
+    →  (∀ {x y} → x ∈ B → y ∈ B → x ∙ y ⁻¹ ∈ B)
+    →  IsSubgroup 𝑮 B
+```
+
+**The setup**, the same for all three sessions, is as follows:
+
++  **One commit, one worktree per session**.  agda-algebras `ee830bea9`, the
+   last master commit on Agda 2.8.0 (the next merge,
+   [ualib/agda-algebras#598], moved to 2.9.0), because the registration runs
+   agda-algebras' Agda 2.8.0 wrapper (`agda --version` on it: 2.8.0).
+   `make check` passes there under 2.8.0 (measured: 352 modules, 4 min 47 s
+   cold), and so do the four other gates below.  Each worktree got a copy of
+   that run's `_build`, so no session paid for a cold library.
++  **One server**.  The registration in claude-tooling's
+   `projects/agda-algebras/mcp.json` (the 2.8.0 wrapper, the agda-algebras
+   v0.1 corpus, `make check` as the `check_project` gate), running agda-mcp
+   built from agda-native-air `55781f9d` (main that day), selected with
+   `AGDA_MCP_BIN`: thirteen tools.  The build the launcher otherwise finds in
+   the main checkout dates from 2026-09-28 and lacks 23 server commits merged
+   since (listed in [#249]); nothing rebuilds it when main moves.  [#242] is
+   merged, so the launcher supplies `--cwd` and substitutes `${PWD}`.
++  **The same instructions and skills**.  claude-tooling [claude-tooling#27]
+   is not merged, but its branch's installer ran on 2026-10-09 and linked, in
+   every agda-algebras checkout, `AGENTS.md` to the agda-algebras `CLAUDE.md`
+   and `.agents/skills` to the project skills, and linked
+   `~/.copilot/copilot-instructions.md` and `~/.codex/AGENTS.md` to the global
+   `CLAUDE.md`.  The trial worktrees got the same two per-checkout links by
+   hand.  So the trials ran with that branch's links, before it merged.
++  **Headless runs**.  Copilot CLI 1.0.95 and Codex CLI 0.162.1, already
+   installed (npm).  `copilot -p` ran with `COPILOT_ALLOW_ALL=true` (every
+   tool allowed and the working directory trusted; its path check stays on),
+   `git push` and `gh` denied, and `GIT_SSH_COMMAND=false`.  GPT-6.1 Sol ran
+   at `xhigh` reasoning effort in both harnesses (the configured Codex
+   default), Kimi K3 at `max`, its highest (it refuses `xhigh`).
++  **The transcripts** are each CLI's own.  Copilot keeps a session as
+   `~/.copilot/session-state/<session id>/events.jsonl`, and with
+   `--log-level debug` its log under `~/.copilot/logs/` holds every request
+   it sent, which is where the claims below about what a model was shown come
+   from.  The prompt, the launch script, the server binary, every session's
+   events, the probes and the gate logs are kept outside the repository, in
+   `~/git/formalverification/agda-native-air/field-test-243/` on the machine
+   that ran them.
++  **The gate** is the project's own, run by the reporting session on each
+   session's final state inside the checkout's `nix develop` (Agda 2.8.0):
+   `make check`, `unused-imports`, `check-links`, `docstrings` and
+   `corpus-stats-check`.  Two checks of the final file go with it: the stated
+   declaration is present as given, and no escape hatch is used (no
+   `postulate`, hole, unsafe pragma, or `OPTIONS` without `--safe`).
+
+### GPT-6.1 Sol: every check through the server
+
++  **The numbers**.  8 min 39 s, 17 model turns, one premium request, and 32
+   tool calls: 11 `view`, 7 `bash`, 3 `apply_patch`, 2 `skill`, 2 `glob`,
+   2 `read_bash`, and 5 to the server.
++  **The server calls, in order**.  `definition_of` (15.5 s, to find the
+   standard library's `⁻¹-involutive`); a first draft with the proof left as
+   `?`; `get_goal` on it (1.3 s); `fill_hole` with the whole proof (17.4 s,
+   `status: ok` for the first candidate); the accepted text written into the
+   file; `check_file` (16.9 s, `success: true`); and `check_project`, which
+   ran the library's `make check` (140 s, `success: true`).  That is the
+   hole-driven loop the agda-algebras instruction file asks for, ending with
+   the server's own gate.
++  **The shell** ran no `agda` on a file: one
+   `nix develop --command bash -c 'command -v agda && agda --version'` to
+   learn the toolchain, `make gen-links corpus-stats`, and
+   `nix develop --command make unused-imports check-links docstrings
+   corpus-stats-check site` for the gates the server does not run.
++  **Skills and instructions**.  Its first two calls invoked the project
+   skills `scaffolding-a-module` and `typechecking-agda`, and it did what they
+   say: it re-exported the module from the `Classical.Structures.Group`
+   barrel and regenerated `docs/_links.md` and the corpus count.  It read the
+   instruction file: it went to append its field report to agda-native-air's
+   `docs/mcp-field-reports.md`, Copilot's path check refused the read, and it
+   kept the report in its session files instead.
++  **What the tool answers caused**.  The session's report says of
+   `get_goal`: "The goal itself was concise, but the context expanded the
+   carrier and operations into lengthy interpretation terms."  Measured on
+   the same hole, the context `get_goal` returned (Agda's `Normalised`
+   display) is 1,326 characters against 168 in the `Simplified` display an
+   editor uses, with `𝑮 : Group α ρ` unfolded into a 528-character Σ type;
+   filed as [#248].
++  **The result**.  Left uncommitted (the prompt allowed either).  The gates
+   pass, the statement is as given, and no escape hatch is used.
+
+### Kimi K3: the server for the module, the shell for the library
+
++  **The numbers**.  19 min 27 s, 33 model turns, one premium request, and 42
+   tool calls: 25 `bash`, 5 `grep`, 5 `view`, 2 `skill`, 2 `edit`,
+   1 `create`, 1 `tool_search_tool`, and 1 to the server.  Most of the time
+   was the model's (989 s of API time at `max`).
++  **Finding the server**.  Copilot gave K3 a deferred tool surface: its
+   first request carried 22 tools, none of them the server's, and a reminder
+   naming the 13 `agda` tools and telling it to search before calling one.
+   K3's second call was `tool_search_tool` with the query `+agda`: the
+   instruction file's Claude Code line (`run ToolSearch with query "+agda"`)
+   carried out in Copilot's terms.  The next request carried 35 tools.
++  **The server call**.  After seven minutes of reading `Subgroups`, `Basic`,
+   `Cosets` and `Centralizer`, it wrote the module whole and called
+   `check_file` once (5.0 s, `success: true` on the first draft).  It used no
+   other server tool.
++  **The shell** ran the library gate: `nix develop --command make check`,
+   twice, the documentation gates, and the strict `make site`.  Between the
+   two `make check` runs it saw deprecation warnings naming the base
+   checkout's paths, traced them to the `_build` the reporting session had
+   copied from that checkout (an interface keeps its warnings' paths),
+   deleted three interfaces, and re-ran to see its module checked from its
+   own path.  The diagnosis is right, and the artifact is the setup's, not
+   the server's.
++  **Skills and instructions**.  It invoked `scaffolding-a-module` and
+   `typechecking-agda` and did what they say, scanned its files for em-dashes
+   (the house style), and committed in the form the attribution order asks
+   for: author William, no co-author trailer, the body ending
+   `🤖 AI-assisted development: Kimi K3 (Moonshot AI)`; the attribution hooks
+   ([claude-tooling#34]) refused nothing.  It appended its field report to
+   agda-native-air main's `docs/mcp-field-reports.md` with a shell `cat >>`,
+   which Copilot's path check let through; the reporting session removed the
+   appended text from main afterwards and kept it with the apparatus.
++  **The result**.  The gates pass, the statement is as given, and no escape
+   hatch is used.
+
+### What Copilot did on its side
+
++  **It waits for the server**.  Each session's first model request went out
+   after the server connected, 15.5 s and 5.2 s after launch.  The launcher's
+   `nix develop` is most of that (measured: the same binary run directly
+   answers at once), filed as [#249].
++  **It drops a skill whose frontmatter is not strict YAML**.
+   `copilot skill list` at a trial worktree loaded 29 skills and refused 17
+   ("mapping values are not allowed in this context"), three of them this
+   project's (`porting-base-to-setoid`, `writing-a-corpus-linter`,
+   `writing-a-docstring-pass`): their descriptions hold an unquoted colon,
+   which [claude-tooling#27]'s branch quotes.  The two skills this task
+   needed loaded.
++  **It shows a model the server's instructions only in part, or not at
+   all**.  No request to GPT-6.1 Sol carried the server's `initialize`
+   instructions; Copilot sends them only for allowlisted servers, or under
+   `--allow-all-mcp-server-instructions`.  K3's deferred-tools reminder
+   carried their first 157 characters, cut mid-word.  Both models had the
+   verdict contract from the tool descriptions, which state it per tool.
++  **Its path check is per tool**.  It refused `view` on the `.mcp.json`
+   link (whose target lies outside the checkout) and on agda-native-air's
+   field-report file, and passed a shell redirection to that same file.
++  **Verdict**.  Through Copilot, both models used the server for module
+   checks with nothing but the instruction file to tell them to, and both
+   kept the whole-library gate where the instruction file puts it (Sol through
+   `check_project`, K3 through `make check`).  The task was easy: every first
+   draft checked, so no session met the diagnostics a failed check returns.
+
+## 2026-10-10, agda-native-air issue #243: Codex CLI on the one-step subgroup test (GPT-6.1 Sol)
+
+The same task, commit, server build, instructions and gates as the Copilot
+section above, in Codex CLI 0.162.1 with GPT-6.1 Sol at `xhigh`, run as
+`codex exec --json`.  The answer here is the shell, and the reason is the
+harness: the model looked for the server first, 8 ms before Codex had its
+tools.
+
++  **The setup's differences**.  The registration is a hand-written
+   `[mcp_servers.agda]` table in the worktree's `.codex/config.toml`: the
+   agda-algebras registration with no `--cwd` and no `cwd` key, allowing 120 s
+   to start and 7,200 s per call, and trusted for the run with
+   `-c projects=…`.  The server's start-up banner put it at the checkout
+   (`cwd: …/air243-trial-codex-sol`), which is [#242]'s acceptance check for
+   Codex.  Codex's Linux sandbox does not start on this machine (every
+   command fails with `bwrap: loopback: Failed RTM_NEWADDR: Operation not
+   permitted`, as it did that morning in an interactive Codex session here,
+   which escalated each command), so the run used
+   `--dangerously-bypass-approvals-and-sandbox`, with `GIT_SSH_COMMAND=false`
+   and an empty `GH_CONFIG_DIR` against a push.  The transcript is Codex's
+   rollout, `~/.codex/sessions/<yyyy>/<mm>/<dd>/rollout-<time>-<id>.jsonl`,
+   beside the `--json` event stream.
++  **The numbers**.  4 min 29 s; 19 code-mode `exec` steps holding 30 shell
+   commands and 5 file edits; no server call; 1.26 M input tokens (1.17 M of
+   them cached) and 9.7 k output (4.1 k of it reasoning).
++  **Why no server call**.  Codex 0.162.1 shows a model MCP tools only
+   through its code mode's `ALL_TOOLS` array: the description the model
+   reads names 14 built-in tools and none of the server's (the feature
+   `tool_search_always_defer_mcp_tools` is fixed on), and the server's
+   instructions are not sent (observed in a trace-level log of a probe
+   session).  `codex exec` also sends its first request without waiting for
+   a server.  The model looked in its first step:
+   `ALL_TOOLS.filter(x=>/agda/i.test(…))` returned `[]` at 18:00:53.862, and
+   Codex's log shows the server's 13 tools entering its catalog at
+   18:00:53.870, 8 ms later, when Codex next resolved a step's tools (the
+   server had been ready for 3.4 s).  The model wrote "No Agda MCP tools are
+   exposed in this session, so I'll use the CLI loop" and did not look
+   again.  Measured afterwards: with `required = true` in the table,
+   `codex exec` held its first request until the server was up.
++  **The shell** did the work the first field report predicted:
+   `nix develop --command agda src/Classical/Structures/Group/SubgroupTest.lagda.md`
+   (green on the first draft), `make gen-links corpus-stats`, `make check`,
+   the documentation gates with the strict site, and a last `agda` on the
+   module and `make check`.
++  **Skills and instructions**.  Codex lists all nine project skills (with
+   shortened descriptions); the model read `typechecking-agda`,
+   `scaffolding-a-module` and `typechecking-agda-under-nix` with `cat` and did
+   what they say (barrel, links, corpus count).  It read the instruction
+   file: it looked for a ToolSearch capability, scanned for em-dashes, and
+   appended a field report to agda-native-air main's
+   `docs/mcp-field-reports.md` (removed afterwards and kept with the
+   apparatus), which says "No agda-mcp tools were exposed in this session,
+   and no ToolSearch capability was available."
++  **The commit**.  `feat: add the one-step subgroup test`, author and
+   committer William, no co-author trailer, the body ending
+   `🤖 AI-assisted development: GPT-6 (OpenAI)` (the model named itself
+   GPT-6, not GPT-6.1 Sol).  Codex's own attribution instruction was off
+   (`git_attribution: false` in its rollout), and the hooks refused nothing.
++  **The result**.  The gates pass, the statement is as given, and no escape
+   hatch is used.  The proof is the same argument, nearly line for line, as
+   the two Copilot sessions'.
++  **Verdict**.  The session ran the CLI loop because the server's tools
+   reached its model late and only behind `ALL_TOOLS`, not because the model
+   preferred the shell: it checked for them first.  Three changes would let a
+   Codex session find the server: `required = true` in the generated Codex
+   registration and an instruction-file line naming each harness's way to
+   find a server's tools (both for [claude-tooling#27]), and a launcher that
+   starts in under a second ([#249]).  Whether GPT-6.1 Sol then uses the
+   server in Codex as it did in Copilot is a question for the next trial;
+   the Copilot run suggests it would (inferred).
+
+[#242]: https://github.com/formalverification/agda-native-air/issues/242
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
+[#248]: https://github.com/formalverification/agda-native-air/issues/248
+[#249]: https://github.com/formalverification/agda-native-air/issues/249
+[claude-tooling#27]: https://github.com/williamdemeo/claude-tooling/issues/27
+[claude-tooling#34]: https://github.com/williamdemeo/claude-tooling/pull/34
+[ualib/agda-algebras#598]: https://github.com/ualib/agda-algebras/pull/598
+[`flrp-agda-mcp-improvements.md`]: feedback/flrp-agda-mcp-improvements.md
