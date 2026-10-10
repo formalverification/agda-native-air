@@ -46,8 +46,30 @@
 #   naming a directory), the message says how to build it and names the
 #   override, instead of the bare "No such file" the client would otherwise see.
 #
+# IMPORTANT (issue #242: the server works where the client started it):
+#   The cd above is for the shellHook, not for the server.  The directory the
+#   client started this script in (for Claude Code, the directory `claude` was
+#   launched from) is captured first, as LAUNCH_DIR, and the server is anchored
+#   there: when the arguments carry no --cwd, the script passes
+#   --cwd LAUNCH_DIR, so the server behaves as it would if the client had
+#   spawned the binary itself.  A --cwd the arguments do carry wins, so every
+#   registration that names its checkout explicitly is unchanged.
+#   Claude Code expands ${PWD} in a registration's arguments at launch, and
+#   every registration in claude-tooling passes --cwd ${PWD} on that strength;
+#   a client that does not expand variables hands over the literal string.  So
+#   this script substitutes LAUNCH_DIR for ${PWD} and for ${PWD:-default} (the
+#   two forms Claude Code accepts) wherever they occur in an argument, scanning
+#   left to right so a substituted path is never rescanned.  No other variable
+#   is expanded: a general expander in a launcher is a surprise waiting for a
+#   value with a space in it.  An argument that still holds "${" afterwards is
+#   named on stderr, and the server refuses a --cwd that does.
+#
 # Usage (from anywhere):
 #   scripts/run-server.sh [extra agda-mcp args...]
+#
+#   Relative paths among the arguments resolve against the directory the
+#   script is started in (or against --cwd, when it names another), exactly as
+#   they would for the bare binary.
 
 set -euo pipefail
 
@@ -55,6 +77,48 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # The same path, shell-escaped, for the commands the diagnostics ask the
 # operator to paste: a checkout path with a space must survive the paste.
 REPO_ROOT_Q="$(printf %q "${REPO_ROOT}")"
+
+# The directory the client started us in, before the cd below moves us: the
+# server's anchor (issue #242, see the header).  Bash's $PWD is the logical
+# path when the inherited one names this directory, as Claude Code's ${PWD}
+# is, and the physical one otherwise.
+LAUNCH_DIR="${PWD}"
+
+# expand_pwd ARG: set REPLY to ARG with each ${PWD} and ${PWD:-default}
+# replaced by LAUNCH_DIR.  Each pass moves the text before the next "${PWD"
+# into the result, so the substituted path is never scanned again, and a
+# "${PWD" that opens some other name (${PWDX}, ${PWD:x}) is kept as written.
+#
+# The literal tokens live in variables and are matched as "$open" and
+# "$close": a quoted variable in a pattern matches as plain text, which
+# sidesteps the rules for single quotes inside a double-quoted ${var%%pat}.
+expand_pwd() {
+  local rest="$1" out="" open='${PWD' close='}'
+  while [[ "$rest" == *"$open"* ]]; do
+    out+="${rest%%"$open"*}"
+    rest="${rest#*"$open"}"
+    case "$rest" in
+      "$close"*)       rest="${rest#"$close"}";  out+="${LAUNCH_DIR}" ;;
+      ":-"*"$close"*)  rest="${rest#*"$close"}"; out+="${LAUNCH_DIR}" ;;
+      *)               out+="$open" ;;
+    esac
+  done
+  REPLY="${out}${rest}"
+}
+
+SERVER_ARGS=()
+has_cwd=0
+unexpanded='${'
+for arg in "$@"; do
+  expand_pwd "$arg"
+  if [[ "$REPLY" == *"$unexpanded"* ]]; then
+    echo "agda-mcp: an argument still holds an unexpanded variable (this launcher substitutes \${PWD} and nothing else): $REPLY" >&2
+  fi
+  if [ "$REPLY" = "--cwd" ]; then has_cwd=1; fi
+  SERVER_ARGS+=("$REPLY")
+done
+# No --cwd among the arguments: anchor the server where the client started us.
+if [ "$has_cwd" = 0 ]; then SERVER_ARGS+=(--cwd "${LAUNCH_DIR}"); fi
 
 # Anchor the shellHook to this repository, whatever the client's cwd was.
 export AGDA_NATIVE_AIR_ROOT="${REPO_ROOT}"
@@ -110,4 +174,4 @@ exec nix develop "${REPO_ROOT}#backend" --command \
     # A regular, executable file: -x alone is true of a directory as well.
     [ -f "$BIN" ] && [ -x "$BIN" ] || no_server "server binary is not an executable file: $BIN"
     exec "$BIN" "$@"
-  ' -- "$@"
+  ' -- "${SERVER_ARGS[@]}"

@@ -320,7 +320,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  corpus-stdlib corpus-stdlib-nix \
                  test-scripts-python \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
-                 agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-serve agda-mcp-clean \
+                 agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-launcher-smoke agda-mcp-serve agda-mcp-clean \
                  lane-give-parity auto-floor \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
@@ -440,6 +440,7 @@ help:
 	@echo "  make bench                       - Run AgdaDojang tiny benchmark"
 	@echo "  make agda-mcp-smoke              - Build agda-mcp + JSON-RPC round-trip sanity (fast)"
 	@echo "  make agda-mcp-test               - Full agda-mcp cabal test (unit + corpus + Agda integration)"
+	@echo "  make agda-mcp-launcher-smoke     - scripts/run-server.sh anchors the server where the client started it (issue #242)"
 	@echo "  make agda-mcp-build / -serve / -clean - Build / launch / clean the agda-mcp server"
 	@echo "  make lane-give-parity            - Replay committed candidates through both lanes (issue #163)"
 	@echo "  make auto-floor                  - Agda's own proof search on every obligation, judged by fill_hole (issue 205)"
@@ -771,6 +772,18 @@ agda-mcp-smoke:
 	    echo "$$OUT"; \
 	    exit 1; \
 	  fi)
+
+# The launcher's own smoke (issue #242): scripts/run-server.sh started from a
+# scratch client checkout with --cwd as a literal ${PWD}, as ${PWD:-...},
+# absent, explicit from elsewhere, and as another variable; check_project must
+# run the client's own gate in the first four, and the last must be refused.
+# The launcher enters the backend shell itself, so only the build goes through
+# run_backend, and the script needs nix on PATH even under BACKEND_USE_NIX=0
+# (CI runs it from inside the shell, where the runner's nix is still on PATH).
+agda-mcp-launcher-smoke:
+	@echo ">> [agda-mcp-launcher-smoke] scripts/run-server.sh anchors the server where the client started it"
+	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:agda-mcp)
+	@./scripts/run-server-smoke.sh
 
 # Launch the server for manual/interactive use (Ctrl-C to stop).  Goes through
 # scripts/run-server.sh (the same launcher wired into .mcp.json), which enters

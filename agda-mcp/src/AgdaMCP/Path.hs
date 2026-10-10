@@ -17,11 +17,12 @@
 --
 --   * A relative path is resolved against __the server's own working
 --     directory__, and against nothing else.  The server is a separate process
---     from the client; @scripts\/run-server.sh@ deliberately @cd@s to the
---     agda-native-air checkout before exec (issue #76's stray-directory fix),
---     so its working directory is normally /not/ the client's project.  This is
---     the only resolution the server can perform honestly: it is never told
---     where the client stands.
+--     from the client, working where it was started or where @--cwd@ says
+--     (through @scripts\/run-server.sh@, the directory the client started the
+--     launcher in, issue #242), and that need not be the client's project:
+--     the client may have started anywhere, and a registration may name any
+--     directory.  This is the only resolution the server can perform
+--     honestly: it is never told where the client stands.
 --   * Which is why the resolution must now be /checked/.  A relative path that
 --     resolves to a file that is really there was meant for this tree — that is
 --     the in-repo client, whose working directory is the server's, and whose
