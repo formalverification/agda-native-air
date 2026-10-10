@@ -81,10 +81,17 @@ agent.
 ```sh
 git clone git@github.com:formalverification/agda-native-air.git
 cd agda-native-air
-nix develop          # Agda 2.8.0, Scala/sbt, Python; NOT a pinned GHC
+nix develop          # Agda 2.9.0, Scala/sbt, Python; NOT a pinned GHC
 nix develop .#backend # add the pinned GHC 9.10.3 + Cabal (Haskell work)
 make check           # build + test all components
  ```
+
+The toolchain is Agda 2.9.0, not yet released (agda/agda at `da66a8c`, the
+`nightly` of 2026-10-05), with standard-library 2.3 patched to type-check under
+it (formalverification/agda-stdlib, tag `v2.3-agda-2.9.0`).  Until Agda 2.9.0
+and a standard library for it are released, the toolchain is available only
+through `nix develop`, and the flake needs Nix 2.28 or later; the
+`formalverification` Cachix cache serves it prebuilt.
 
 For `agda-mcp` specifically (build, run, connect Claude Code), see
 [HowToRun §13](docs/HowToRun.md#13--agda-mcp-ai-assisted-proof-development).
@@ -103,10 +110,11 @@ descriptions.
 
 ## Editing Agda in Emacs
 
-Inside `nix develop`, `agda` is a shell function: it runs the pinned Agda 2.8.0
+Inside `nix develop`, `agda` is a shell function: it runs the pinned Agda 2.9.0
 with `--library-file "$AGDA_DIR/libraries"`, the registry the shell writes at
 the root of each checkout, and that registry is the only place `agda-dojang`,
-the pinned standard library 2.3, and the pinned agda-algebras are registered.
+the pinned standard library 2.3 (patched for 2.9.0), and the pinned
+agda-algebras are registered.
 An Emacs started outside the shell sees none of this, so loading a benchmark
 fixture fails with `Library 'agda-dojang' not found`.  You do not have to start
 Emacs inside the shell; two steps give agda-mode the same Agda and the same
@@ -114,7 +122,7 @@ registry.
 
 ### 1. Pin the Agda: `nix build .#agda`
 
-The flake exposes the dev shells' own Agda (Agda 2.8.0 wrapped with the pinned
+The flake exposes the dev shells' own Agda (Agda 2.9.0 wrapped with the pinned
 standard library) as `packages.agda`, beside the pinned agda-algebras as
 `packages.agda-algebras`.  From any checkout, build both to links under your
 home:
@@ -134,14 +142,15 @@ What the two commands give you is as follows:
 +  each `-o` link is a garbage-collector root, so `nix-collect-garbage` cannot
    delete the Agda, the standard library it wraps, or the agda-algebras copy the
    registry names;
-+  after `flake.lock` moves, the same two commands, run from a checkout at the
-   new pin, point the links at the new store paths; each checkout's registry
-   still names the old pin's paths until its shell writes it again (below),
-   and those paths are no longer rooted, so re-enter the shell there too.
++  after a pin moves (`flake.lock`, or the `agda` input or `stdlibRev` in
+   `flake.nix`), the same two commands, run from a checkout at the new pin,
+   point the links at the new store paths; each checkout's registry still names
+   the old pin's paths until its shell writes it again (below), and those paths
+   are no longer rooted, so re-enter the shell there too.
 
 The registry itself, `agda/libraries`, is written by the dev shell, so enter a
-checkout's shell once before editing there, and again whenever its
-`flake.lock` moves: the registry names that checkout's own `agda-dojang` and the
+checkout's shell once before editing there, and again whenever one of its
+pins moves: the registry names that checkout's own `agda-dojang` and the
 pin's standard library and agda-algebras by their store paths.  The following
 writes it without leaving you in the shell:
 
@@ -167,7 +176,7 @@ Doom Emacs, your `init.el` otherwise):
 ;; agda-mode starts Agda from the mode's body, before any hook or directory-local
 ;; variable applies, so the settings are bound around `agda2-restart' itself.
 (defvar my/air-agda (expand-file-name "~/.cache/agda-native-air/agda/bin/agda")
-  "The pinned Agda 2.8.0 of agda-native-air, kept alive by a GC root.")
+  "The pinned Agda 2.9.0 of agda-native-air, kept alive by a GC root.")
 
 (defvar my/agda-process-root nil
   "The checkout the running Agda process was started for, or nil.")
@@ -241,8 +250,9 @@ still restarts it by hand.  The snippet is shaped by the following facts:
 +  files outside every checkout the snippet recognizes keep whatever Agda your
    configuration already uses.
 
-agda-mode refuses an Agda whose version differs from its own.  If your Emacs
-has no agda-mode 2.8.0, load the pinned one instead of your own:
+agda-mode refuses an Agda whose version differs from its own.  No package
+manager ships agda-mode 2.9.0 until Agda 2.9.0 is released, so load the
+pinned one instead of your own:
 
 ```elisp
 (load-file (let ((coding-system-for-read 'utf-8))

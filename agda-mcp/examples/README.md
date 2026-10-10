@@ -134,9 +134,8 @@ the arrangement:
    command after fls's `flake.lock` moves; it re-points the same symlink.  Until
    you re-run it, the server keeps checking with the previously pinned toolchain.
 +  `--agda-flags`: only `-i .../agda-dojang/agda`, so the `AgdaDojang.Debug`
-   module that `get_goal` splices in is visible to fls's Agda (it imports only
-   builtins, so it compiles under any Agda 2.8).  Everything else rides in the
-   wrapper.
+   module that `get_goal` splices in is visible to fls's Agda (it compiles under
+   Agda 2.8.0 and 2.9.0).  Everything else rides in the wrapper.
 
 The `--check-command` gate checks `src/Ledger.lagda.md`, the module that
 aggregates the whole specification.  To make `check_project` double as a

@@ -10,8 +10,8 @@
   *  Agda's own proof search inside the loop (issue #206): at every state the
   *  loop expands, before any other proposal, ask agda-mcp's `auto` tool
   *  (issue #205) for a term at the selected obligation, and propose that term
-  *  first.  Under the pinned Agda 2.8 the search is Mimer, which replaced
-  *  Agsy in Agda 2.7.  It needs no corpus, costs milliseconds a hole, and on
+  *  first.  Under Agda 2.8 and the pinned 2.9 the search is Mimer, which
+  *  replaced Agsy in Agda 2.7.  It needs no corpus, costs milliseconds a hole, and on
   *  the benchmark solves 17 of the 55 original rows by itself
   *  (reports/auto-floor/), so it is the cheapest closer the loop can have.
   *

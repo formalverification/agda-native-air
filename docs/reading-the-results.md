@@ -62,9 +62,9 @@ arm's current numbers are the header-free runs of that day.
 ### 1.3  The agent with a shell: the `shell` arm
 
 The same session, prompts, caps, and judge, given Bash, Read, and Edit, the
-pinned `agda` 2.8.0 on `PATH` with the same libraries the server resolves
-against, the row's corpus JSONL on disk to `grep`, and **no server** ([#162]).
-This is the control: the tools' absence.
+pinned `agda` (2.8.0 in every run this guide reports) on `PATH` with the same
+libraries the server resolves against, the row's corpus JSONL on disk to `grep`,
+and **no server** ([#162]).  This is the control: the tools' absence.
 
 ### 1.4  The agent with both: the `both` arm
 
@@ -88,14 +88,14 @@ for the second.
 
 ### 1.6  The floor: Agda's own proof search
 
-Agda ships a proof search, the one an editor's `C-c C-a` runs; under the
-pinned Agda 2.8.0 it is Mimer, which replaced Agsy in Agda 2.7 (the issues
-that measured it first, [#205] and [#206], say Agsy).  `make auto-floor` runs
-it once at every obligation's hole through `agda-mcp`'s `auto` tool, with
-Agda's default options and no hints, and gives every term it finds to
-`fill_hole` under `--safe` ([`reports/auto-floor/`]).  There is no model, no
-corpus, and no search of the loop's: one call per obligation, a second or
-less each.
+Agda ships a proof search, the one an editor's `C-c C-a` runs; under Agda 2.8.0,
+which ran every number here, and the pinned 2.9.0 alike, it is Mimer, which
+replaced Agsy in Agda 2.7 (the issues that measured it first, [#205] and [#206],
+say Agsy).  `make auto-floor` runs it once at every obligation's hole through
+`agda-mcp`'s `auto` tool, with Agda's default options and no hints, and gives
+every term it finds to `fill_hole` under `--safe` ([`reports/auto-floor/`]).
+There is no model, no corpus, and no search of the loop's: one call per
+obligation, a second or less each.
 
 **What the floor is for**: a row Agda solves by itself says nothing about the
 loop's searcher or an agent's skill.  A count read against the floor says

@@ -1,7 +1,7 @@
 # Benchmark Obligations (M1-5)
 
-**Status:** stdlib obligations COMMITTED and verified; `agda-algebras` obligations DEFERRED  
-**Agda:** 2.8.0  |  **standard-library:** 2.3 (pinned by `flake.lock`)
+**Status**: stdlib obligations COMMITTED and verified; `agda-algebras` obligations DEFERRED  
+**Agda**: 2.9.0, pre-release  |  **standard-library**: 2.3 patched for 2.9.0 (both pinned by `flake.nix`; 2.8.0 and 2.3 until issue [#234])
 
 The committed v0 suite — 22 `agda-stdlib` obligations, every gold solution
 type-checking under the pinned toolchain — is the source of truth in
@@ -111,7 +111,7 @@ require `AGDA_ALGEBRAS_SRC` to be set.
 
 ## Notes for Review
 
-1. **stdlib obligations 1–15** are high-confidence: these lemmas exist in Agda 2.8.0 stdlib and the proof strategies are standard.  Need to verify exact names and module paths against the Nix-pinned version.
+1. **stdlib obligations 1–15** are high-confidence: these lemmas exist in standard-library 2.3 and the proof strategies are standard.  Need to verify exact names and module paths against the Nix-pinned version.
 
 2. **stdlib obligations 16–20** need more careful verification.  In particular:
    - `reverse-involutive` exists but the proof might be refactored in newer stdlib.
@@ -127,5 +127,4 @@ require `AGDA_ALGEBRAS_SRC` to be set.
 
 6. **Potential additions** if we want to reach 40: `*-comm`, `*-assoc`, `filter-++`, `++-assoc`, `map-++-commute`, more `Vec` lemmas, and additional agda-algebras obligations from `Setoid.Subalgebras` and `Setoid.Terms`.
 
-
-
+[#234]: https://github.com/formalverification/agda-native-air/issues/234
