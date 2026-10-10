@@ -80,6 +80,7 @@ import System.Directory
 import System.Environment (setEnv)
 import System.Exit (ExitCode (..), exitFailure, exitSuccess)
 import System.Process (readProcessWithExitCode)
+import qualified System.Process as P
 import System.IO.Error
   ( doesNotExistErrorType, mkIOError, permissionErrorType )
 import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, unionFileModes)
@@ -5095,8 +5096,10 @@ pathTests = do
                        -- The mis-resolution diagnosis belongs on this failure:
                        -- a relative path that resolved to nothing is the one
                        -- case where resolving against the wrong directory is
-                       -- what went wrong.
-                       , "does not\n  name your file here" ]
+                       -- what went wrong.  (Hedged since issue #242: the
+                       -- launcher now starts the server where the client
+                       -- started, which may be the client's project.)
+                       , "need not\n  name your file here" ]
                 missing = [w | w <- want, not (w `T.isInfixOf` msg)]
             in  assert ("missing from the message " <> show msg <> ": " <> show missing)
                   (null missing)
@@ -5367,6 +5370,12 @@ unreadableFileTest injLanes cfg cs = do
 -- discovery saw the client root as cwd — the fls failure shape); a relative
 -- miss is refused against the client root, not the launch directory; and a
 -- directory that cannot be entered is a fatal startup error naming the path.
+-- Issue #242 adds two: without the flag the server stays in the directory it
+-- was started in and serves the client from there, and a value still holding
+-- an unexpanded variable is refused by name, even where a directory of that
+-- literal name exists.  (scripts/run-server.sh's own share of #242, the
+-- ${PWD} substitution and the default it passes, is `make
+-- agda-mcp-launcher-smoke`, which needs the launcher's nix develop.)
 --
 -- The executable is the one cabal built.  CI builds it before running this
 -- suite (the smoke lane precedes agda-mcp-test in ci.yml); a local bare
@@ -5444,6 +5453,18 @@ cwdProcessTests exe = do
   (badExit, _, badErr) <-
     readProcessWithExitCode exe ["--cwd", client </> "no-such-dir"]
       "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}\n"
+  -- Issue #242.  No --cwd, the process started in the client root: the same
+  -- requests, which must be answered exactly as with --cwd naming it.
+  (bareExit, bareOut, bareErr) <-
+    P.readCreateProcessWithExitCode
+      ((P.proc exe ["--timeout", "120"]) { P.cwd = Just client }) reqs
+  -- A literal ${PWD}, started beside a directory of that very name, which
+  -- entering the value would have found.
+  createDirectoryIfMissing True (client </> "${PWD}")
+  (varExit, _, varErr) <-
+    P.readCreateProcessWithExitCode
+      ((P.proc exe ["--cwd", "${PWD}"]) { P.cwd = Just client })
+      "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}\n"
 
   results <- sequence
     [ runTest "--cwd: the server serves from the client root and exits cleanly" $
@@ -5479,6 +5500,30 @@ cwdProcessTests exe = do
           , assert ("stderr was:\n" <> badErr) ("cannot enter --cwd" `isInfixOf` badErr)
           , assert "the failing path is named"
               ((client </> "no-such-dir") `isInfixOf` badErr)
+          ]
+
+    , runTest "--cwd absent: the server stays where it was started and serves the client from there (#242)" $
+        allOf
+          [ assertEqual "exit" ExitSuccess bareExit
+          , assert ("stderr was:\n" <> bareErr) (("cwd: " <> client) `isInfixOf` bareErr)
+          , case innerText 2 bareOut of
+              Nothing -> pure (Fail ("no response payload for id 2; stdout:\n" <> take 400 bareOut))
+              Just t  -> allOf
+                [ assert ("payload was: " <> T.unpack (T.take 300 t))
+                    ("\"success\":true" `T.isInfixOf` t)
+                , assert "project root should be the client checkout"
+                    (T.pack ("\"root\":\"" <> client <> "\"") `T.isInfixOf` t)
+                ]
+          ]
+
+    , runTest "--cwd with an unexpanded ${PWD}: refused by name with both fixes, beside a directory of that name (#242)" $
+        allOf
+          [ assert ("exit was: " <> show varExit) (varExit /= ExitSuccess)
+          , assert ("stderr was:\n" <> varErr)
+              ("--cwd ${PWD} holds a variable the client did not expand" `isInfixOf` varErr)
+          , assert "the first fix: omit the flag" ("omit --cwd" `isInfixOf` varErr)
+          , assert "the second fix: an absolute path" ("pass an absolute path" `isInfixOf` varErr)
+          , assert "the server never started" (not ("starting" `isInfixOf` varErr))
           ]
     ]
   nuke

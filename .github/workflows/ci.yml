@@ -507,7 +507,8 @@ jobs:
   # Haskell • agda-mcp build & tests (requires Nix → GHC 9.10.3 + Agda)
   #
   # Conditional: only runs when the MCP server, the agda-dojang fixtures/macros
-  # it drives, or the pinned toolchain change.  agda-mcp does NOT link
+  # it drives, the pinned toolchain, or the launcher (scripts/run-server.sh)
+  # and its smoke change.  agda-mcp does NOT link
   # Agda-as-a-library (it calls the `agda` binary as a subprocess), so the build
   # itself is light; Nix is needed to put `agda` + the repo-root agda/libraries
   # file (written by the flake shellHook) on the path so the tier-2 integration
@@ -534,7 +535,8 @@ jobs:
             BASE="${{ github.event.before }}"
           fi
           if ! CHANGED=$(git diff --name-only "$BASE" HEAD -- \
-            'agda-mcp/' 'agda-dojang/' 'flake.nix' 'flake.lock'); then
+            'agda-mcp/' 'agda-dojang/' 'flake.nix' 'flake.lock' \
+            'scripts/run-server.sh' 'scripts/run-server-smoke.sh'); then
             echo "Error: failed to compute diff between $BASE and HEAD."
             exit 1
           fi
@@ -570,6 +572,7 @@ jobs:
             echo "Agda: $(agda --version)"
             cabal update
             make agda-mcp-smoke BACKEND_USE_NIX=0
+            make agda-mcp-launcher-smoke BACKEND_USE_NIX=0
             make agda-mcp-test  BACKEND_USE_NIX=0
           '
 

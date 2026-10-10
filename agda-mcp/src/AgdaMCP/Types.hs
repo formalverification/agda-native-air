@@ -733,8 +733,10 @@ data PathProblem
 --
 -- Both defects the field test hit are this one payload.  A relative path is
 -- resolved against the __server's__ working directory — the server is a
--- separate process, and @scripts\/run-server.sh@ deliberately starts it in the
--- agda-native-air checkout (issue #76), so a path relative to the /client's/
+-- separate process, which @scripts\/run-server.sh@ then started in the
+-- agda-native-air checkout (issue #76; since issue #242 it starts the server
+-- where the client started the launcher, which is the client's project only
+-- when the client started there), so a path relative to the /client's/
 -- project names a file in the wrong tree, or, far more often, no file at all.
 -- And a path naming no file used to reach @readFile@ and throw, which escaped
 -- the handler as JSON-RPC @-32603 Internal error@: an error that names neither
@@ -845,8 +847,8 @@ pathFailureMessage f = T.concat $
     -- wrong directory is what went wrong.
     diagnosis = case pfProblem f of
       PathMissing | pfRelative f ->
-        [ "  This server is a separate process, normally started in its own checkout\n"
-        , "  rather than in your project, so a path relative to your project does not\n"
+        [ "  This server is a separate process, and its working directory (below)\n"
+        , "  need not be your project's, so a path relative to your project need not\n"
         , "  name your file here.\n" ]
       _ -> []
 

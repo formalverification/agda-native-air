@@ -65,9 +65,11 @@ Each binding does one job; they are the following:
    worktree.  Agda finds that worktree's `agda-algebras.agda-lib` from there,
    resolves the modules in that tree, and writes their `.agdai` interfaces to its
    `_build/`, which the worktree's own `nix develop` runs share.  A client
-   that does not expand variables passes `${PWD}` through literally, and the
-   server stops with `cannot enter --cwd`; give such a client the worktree's
-   absolute path instead.
+   that does not expand variables passes `${PWD}` through literally, and
+   `scripts/run-server.sh` substitutes the directory it was started in
+   (issue #242), so the same file serves such a client, provided it starts
+   the server in the worktree.  The bare binary, run without the launcher,
+   refuses the literal string by name.
 +  `--agda-bin`: agda-algebras's wrapped Agda, the one its `nix develop` and CI
    use, through the gc-rooted symlink built above.
 +  `--agda-flags`: two flags.  `--library-file` names the same registry the
@@ -120,8 +122,10 @@ the arrangement:
    discovery (the nearest `*.agda-lib`) to the directory it runs in, so this is
    what makes fls modules resolve, and write their `.agdai` interfaces, exactly
    as fls's own `nix develop --command agda` does.  The template carries an
-   absolute placeholder; under Claude Code, `${PWD}` in its place, as in the
-   agda-algebras template, lets one copy serve every fls worktree.
+   absolute placeholder; `${PWD}` in its place, as in the agda-algebras
+   template, lets one copy serve every fls worktree: Claude Code expands it,
+   and `scripts/run-server.sh` substitutes it for a client that does not
+   (issue #242).
 +  `--agda-bin`: fls's wrapped Agda, through a gc-rooted symlink realized once:
 
    ```sh
@@ -170,12 +174,14 @@ for the resolution rules and for what the server writes where.
 
 ## `check_project` on an external project
 
-`scripts/run-server.sh` starts the server from *this* repository's root.  Both
-templates pass `--cwd`, which moves the server into the client project, and
-`--check-command`, which names that project's gate, so `check_project` with no
-arguments runs the right gate in the right tree.  A registration without `--cwd`
-leaves `check_project` anchored at agda-native-air, where it would run
-**agda-native-air's** gate; pass the project you mean:
+`scripts/run-server.sh` starts the server in the directory the client started
+the launcher in, unless `--cwd` names another (issue #242).  Both templates pass
+`--cwd`, which names the client project explicitly, and `--check-command`,
+which names that project's gate, so `check_project` with no arguments runs the
+right gate in the right tree.  A registration without `--cwd` anchors
+`check_project` wherever the client started, which is the right tree only when
+the client starts at the project's root; a session started in agda-native-air
+would run **agda-native-air's** gate.  When in doubt, pass the project you mean:
 
 ```json
 {"name": "check_project", "arguments": {"projectPath": "/ABS/PATH/TO/agda-algebras/<your-worktree>"}}

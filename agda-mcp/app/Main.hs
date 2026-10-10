@@ -44,6 +44,15 @@
 --                   at a hole).  Off by default: a place on the default
 --                   surface waits for an arm that shows an agent using it
 --                   (ADR 0002, decision 25).
+--
+-- Issue #242 addition:
+--   --cwd DIR       Optional, and documented as such: without it the server
+--                   stays in the directory it was started in.  A value that
+--                   still holds "${" is a variable the client passed through
+--                   unexpanded, and is refused by name with the two fixes,
+--                   before any attempt to enter it (scripts/run-server.sh
+--                   substitutes ${PWD} itself, so this is what any other
+--                   variable meets).
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -51,6 +60,7 @@ module Main where
 
 import Control.Exception (IOException, try)
 import Control.Monad (unless, when)
+import Data.List (isInfixOf)
 import qualified Data.Text as T
 import System.Directory (getCurrentDirectory, setCurrentDirectory)
 import System.Environment (getArgs)
@@ -104,9 +114,20 @@ main = do
   -- checkout, or Agda resolves the file against no project at all (issue #103).
   -- A directory we cannot enter is a fatal configuration error, reported by
   -- name rather than discovered one bewildering tool failure at a time.
+  -- Without the flag the server stays where it was started (issue #242).
   case cliCwd opts of
     Nothing  -> pure ()
     Just dir -> do
+      -- A value still holding "${" is a variable the client did not expand
+      -- (Claude Code expands ${PWD} at launch; another client may hand over
+      -- the literal string).  It is refused whether or not a directory of
+      -- that name happens to exist, because entering one would anchor the
+      -- server somewhere nobody meant.
+      when ("${" `isInfixOf` dir) $ do
+        hPutStrLn stderr $ "agda-mcp: --cwd " <> dir <> " holds a variable the client did not expand."
+        hPutStrLn stderr   "agda-mcp: Fix: omit --cwd, and the server works in the directory it was started in;"
+        hPutStrLn stderr   "agda-mcp: or pass an absolute path.  (scripts/run-server.sh substitutes ${PWD} itself, and no other variable.)"
+        exitFailure
       entered <- try (setCurrentDirectory dir) :: IO (Either IOException ())
       case entered of
         Left err -> do
@@ -179,7 +200,8 @@ main = do
 -- | Minimal CLI argument parser.
 --
 -- Supports:
---   --cwd DIR             Working directory to enter before anything else.
+--   --cwd DIR             Working directory to enter before anything else
+--                         (default: the directory the server was started in).
 --   --agda-bin PATH       Override the agda binary path (default: "agda").
 --   --agda-flags "..."    Space-separated Agda flags.
 --   --corpus PATH         Load agda-strux JSONL corpus for search tools.
@@ -242,12 +264,18 @@ usage = unlines
   , ""
   , "Options:"
   , "  --cwd DIR             Working directory to enter before anything else."
-  , "                        Every later relative path — --corpus, client file"
-  , "                        paths, gate discovery — resolves inside it, and the"
+  , "                        Every later relative path (--corpus, client file"
+  , "                        paths, gate discovery) resolves inside it, and the"
   , "                        checking agda runs there, so Agda's own project"
   , "                        discovery (the nearest *.agda-lib) anchors to it."
-  , "                        Set it to the client project's checkout root when"
-  , "                        this server checks a project it is not started in."
+  , "                        Default: the directory the server was started in;"
+  , "                        through scripts/run-server.sh, the directory the"
+  , "                        client started the launcher in (for Claude Code,"
+  , "                        where claude was launched).  Set it to the client"
+  , "                        project's checkout root when that is not where"
+  , "                        this server is started.  A value still holding"
+  , "                        \"${\" (a variable the client did not expand) is"
+  , "                        refused."
   , "  --agda-bin PATH       Path to the agda binary (default: agda)"
   , "  --agda-flags \"...\"    Space-separated Agda flags"
   , "  --corpus PATH         Load agda-strux JSONL corpus for search tools"
