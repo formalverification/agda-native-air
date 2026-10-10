@@ -71,21 +71,51 @@
 # PINNING POLICY
 #
 #   - nixpkgs        : general toolchain (Scala/sbt/JDK/Python/etc.)
-#   - nixpkgs-agda   : *dedicated* pin for Agda + stdlib (and backend dev tooling)
+#   - nixpkgs-agda   : the Agda package-set machinery (agdaPackages: the
+#                      wrapper, the library builder, the standard library's
+#                      derivation) and the site's Python
+#   - agda           : Agda itself, built by Agda's own flake, whose nixpkgs
+#                      also supplies the backend shell's GHC and Cabal
 #
-#   Why a dedicated Agda pin:
-#     Backend work is sensitive to Agda version and its Haskell dependency graph.
-#     Keeping Agda on its own pin avoids breakage when updating general tooling.
+#   Agda 2.9.0 is not released yet, and no released standard library
+#   type-checks under it, so until both are released the flake pins them
+#   itself, as agda-algebras does (ualib/agda-algebras PR #598), as follows:
+#
+#     +  Agda comes from the `agda` input: agda/agda at a fixed commit, the
+#        `nightly` of 2026-10-05, built from source by Agda's own flake (its
+#        `base` package, without the `debug` flag of its default build).
+#        nixpkgs-agda's Agda package set is rebuilt around it
+#        (mkAgdaPackages).  The input's URL names the commit, so `nix flake
+#        update` cannot move it; to move it, edit the URL and the standard
+#        library together.
+#     +  The standard library is nixpkgs-agda's derivation with its `src`
+#        moved to formalverification/agda-stdlib's tag v2.3-agda-2.9.0: v2.3
+#        with the five changes it needs to type-check under Agda 2.9.0, which
+#        that tag's release notes list (stdlibRev and stdlibHash, below).
+#     +  agda-strux links Agda as a Haskell library, and the one library
+#        that matches the `agda` binary is the library output of the same
+#        derivation, built with GHC 9.10.3 from Agda's own nixpkgs.  So the
+#        backend shell's GHC, Cabal, and language server come from that
+#        package set (pkgsHaskell), not from nixpkgs-agda.
+#
+#   Once Agda 2.9.0 and a standard library for it are released and nixpkgs
+#   packages them, drop the `agda` input and the standard library's override,
+#   and return to nixpkgs-agda supplying all of it.
+#
+#   The flake needs Nix 2.28 or later.  Agda's tree holds six empty
+#   directories (the paths of its submodules), which Nix 2.26.3 drops when it
+#   unpacks the tree, so that it computes another hash than the one
+#   flake.lock records, and stops with `NAR hash mismatch`.
 #
 #   Updating pins (regenerates flake.lock):
-#     nix flake lock --update-input nixpkgs
-#     nix flake lock --update-input nixpkgs-agda
+#     nix flake update nixpkgs
+#     nix flake update nixpkgs-agda
 #
 #
 # AVAILABLE SHELLS
 #
 #   nix develop            — default: CPU, Agda + Scala + Python (day-to-day)
-#   nix develop .#backend  — Agda backend dev: GHC/Cabal pinned to pkgsAgda
+#   nix develop .#backend  (Agda backend dev: GHC/Cabal pinned with Agda, pkgsHaskell)
 #   nix develop .#all      — monolithic: everything including Spark
 #   nix develop .#proofParser — minimal Scala/sbt/JDK
 #   nix develop .#mlPipeline  — Scala + Python (CPU), no Agda
@@ -108,10 +138,17 @@
   # Keep general tools on stable.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
-  # Pin Agda separately (start on unstable; lock file makes it exact/reproducible).
-  # If you later want to pin to a specific nixpkgs revision with Agda 2.8.0,
-  # you can override nixpkgs-agda in flake.lock (see commands below).
+  # The Agda package-set machinery, on its own pin (unstable; the lock file
+  # makes it exact).  Moving it moves the standard library's derivation and the
+  # site's Python, so it moves deliberately (see PINNING POLICY above).
   inputs.nixpkgs-agda.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  # Agda 2.9.0, unreleased: agda/agda at the commit of the `nightly` of
+  # 2026-10-05.  Agda's flake builds it with its own nixpkgs; do not make it
+  # follow ours, or its derivation changes and misses the binary cache, which
+  # already holds the one agda-algebras uses.  Needs Nix 2.28 or later (see
+  # PINNING POLICY above).
+  inputs.agda.url = "github:agda/agda/da66a8c75f11d10699a6b38b261efdf244b66f2a";
 
   # agda-algebras, pinned at the exact commit the benchmark fixtures and the
   # corpus were cut from (issue #127; see data/benchmarks/README.md and
@@ -130,56 +167,138 @@
   # targets and issue #92.
   inputs.github-project.url = "github:williamdemeo/github-project";
 
-  outputs = { self, nixpkgs, nixpkgs-agda, github-project, agda-algebras-src }:
+  outputs = { self, nixpkgs, nixpkgs-agda, agda, github-project, agda-algebras-src }:
   let
     systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
 
-    # Provide pkgsStable + pkgsAgda for each system.
-    # Make an attrset { system => f { pkgsStable, pkgsUnstable } }
+    # Provide, for each system, the following:
+    #   system      : the system string (agda.packages is per system);
+    #   pkgsStable  : nixpkgs, the general toolchain;
+    #   pkgsAgda    : nixpkgs-agda, the Agda package-set machinery;
+    #   agdaPkgs    : the Agda package set rebuilt around the `agda` input
+    #                 (mkAgdaPackages: agda, mkDerivation, standard-library);
+    #   pkgsHaskell : Agda's own nixpkgs, whose GHC 9.10.3 built the Agda
+    #                 library agda-strux links (see PINNING POLICY).
     forAllSystems = f:
       nixpkgs.lib.genAttrs systems (system:
-        f {
-          pkgsStable = import nixpkgs {
-            inherit system;
-            config = { allowUnfree = true; };
-          };
+        let
           pkgsAgda = import nixpkgs-agda {
             inherit system;
             config = { allowUnfree = true; };
           };
+        in
+        f {
+          inherit system pkgsAgda;
+          pkgsStable = import nixpkgs {
+            inherit system;
+            config = { allowUnfree = true; };
+          };
+          agdaPkgs = mkAgdaPackages system pkgsAgda;
+          pkgsHaskell = agda.inputs.nixpkgs.legacyPackages.${system};
         });
 
+    # ---- Agda 2.9.0 + the patched standard library ---------------------------
+    # Agda and its standard library MUST be resolved from the same package set:
+    # nixpkgs-agda's Agda package set, rebuilt around the `agda` input's Agda,
+    # with the standard library's source moved to the patched v2.3 (see
+    # PINNING POLICY).  The same construction as agda-algebras' mkAgdaPackages.
+    #
+    # To move the standard library, set stdlibRev, put nixpkgs.lib.fakeHash in
+    # stdlibHash's place, run `nix build .#agda`, and copy the hash the error
+    # prints after `got:`; or ask Nix for it directly:
+    #   nix flake prefetch --json github:formalverification/agda-stdlib/<rev> | jq -r .hash
+    stdlibRev  = "fb5d1840d26909038b5ae1459733b0db425a7488";
+    stdlibHash = "sha256-ZF+/2bUhKggpGY0WtHqKkOstRTGe8LOhK4lD+4T3xSc=";
+
+    mkAgdaPackages = system: pkgs:
+      let
+        agdaPackages = pkgs.agdaPackages.override {
+          Agda = agda.packages.${system}.base;
+        };
+      in {
+        inherit (agdaPackages) agda mkDerivation;
+        standard-library = agdaPackages.standard-library.overrideAttrs (_: {
+          version = "2.3-agda-2.9.0";
+          src = pkgs.fetchFromGitHub {
+            owner = "formalverification";
+            repo = "agda-stdlib";
+            rev = stdlibRev;
+            hash = stdlibHash;
+          };
+        });
+      };
+
     # ---- Helper: Agda env with stdlib ----------------------------------------
-    # Important: Agda + stdlib must come from the SAME nixpkgs pin (pkgsAgda).
-    # This produces an Agda binary that knows about the standard library package,
-    # but we still write a project-local libraries file so users don't need ~/.agda.
-    mkAgdaEnv = pkgs: pkgs.agda.withPackages (p: [ p.standard-library ]);
+    # The pinned Agda wrapped with the pinned standard library.  This produces an
+    # Agda binary that knows about the standard library package, but we still
+    # write a project-local libraries file so users don't need ~/.agda.  The
+    # list form, not `(p: [ p.standard-library ])`: the function form would
+    # resolve the package set's own standard library, not the patched one.
+    #
+    # One more wrapper around that one unsets LD_LIBRARY_PATH.  The default
+    # and all shells export one for pip wheels (exportLibPath, below) that puts
+    # nixos-24.05's libstdc++ first, and Agda 2.9.0 links ICU (the build's
+    # enable-cluster-counting flag), built against a newer libstdc++, so under
+    # that export it does not start: "version `CXXABI_1.3.15' not found
+    # (required by …/libicui18n.so.76)".  A Nix-built binary finds its
+    # libraries through its RPATH, so the variable can only do it harm; the
+    # same holds for an editor's environment, which runs this same `agda`.
+    mkAgdaEnv = pkgs: ap:
+      let agdaWithStdlib = ap.agda.withPackages [ ap.standard-library ];
+      in pkgs.symlinkJoin {
+        name = "agda-env-${ap.agda.version}";
+        paths = [ agdaWithStdlib ];
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/agda --unset LD_LIBRARY_PATH
+        '';
+      };
 
     # ---- Helper: flake-pinned agda-algebras ----------------------------------
     # Same packaging shape as the Nix stdlib: $out carries the .agda-lib, src/,
-    # and prebuilt _build/2.8.0 interfaces.  The pinned agdaPackages builder's
+    # and prebuilt _build/2.9.0 interfaces.  The pinned agdaPackages builder's
     # default buildPhase is `agda --build-library`, which type-checks every
-    # module the .agda-lib exposes — measured at the 2026-09-07 pin: all 407
-    # committed modules interfaced, an ~84 MB store path built in ~15 minutes
-    # cold.  (The library's Everything.agda barrel is generated and git-ignored
+    # module the .agda-lib exposes.  Measured at the 2026-09-07 pin: all 407
+    # committed modules interfaced, a 59 MB store path built in about 2
+    # minutes cold under Agda 2.9.0 (issue #234; 85 MB and about 15 minutes
+    # under nixpkgs' 2.8.0, a build with the `debug` flag, so the ratio
+    # compares two binaries, not two versions).  The build's warnings are the
+    # library's 951 UserWarning deprecations, as under 2.8.0, and three
+    # FixityDeclarationForNonOperator, new in 2.9.0, for fixities of closed
+    # operators that agda-algebras removed after this commit.  (The library's
+    # Everything.agda barrel is generated and git-ignored
     # upstream, so it is absent from the flake source; the builder takes no
     # everythingFile argument, per the #132 review.)  Must use the same
     # agdaPackages set as mkAgdaEnv so the library is checked by the same
     # Agda + stdlib the shells use.
-    mkAgdaAlgebrasPkg = pkgs: pkgs.agdaPackages.mkDerivation {
+    mkAgdaAlgebrasPkg = ap: ap.mkDerivation {
       pname = "agda-algebras";
       version = "unstable-2026-09-07";
       src = agda-algebras-src;
-      buildInputs = [ pkgs.agdaPackages.standard-library ];
+      buildInputs = [ ap.standard-library ];
       meta = {
         description = "The Agda Universal Algebra Library, pinned at the benchmark-suite commit";
         homepage = "https://github.com/ualib/agda-algebras";
       };
     };
 
+    # ---- Helper: the shells' Agda version guards -----------------------------
+    # Warnings, not errors, as in agda-algebras: whoever moved a pin (the
+    # `agda` input's URL, stdlibRev) has opted into what it brings.
+    agdaVersionGuard = ap: ''
+      case "${ap.agda.version}" in
+        2.9.*) : ;;
+        *) echo "⚠  expected Agda 2.9.x, got ${ap.agda.version}" ;;
+      esac
+      case "${ap.standard-library.version}" in
+        2.3*) : ;;
+        *) echo "⚠  expected standard-library 2.3, got ${ap.standard-library.version}" ;;
+      esac
+    '';
+
     # ---- Helper: complete Agda shell setup ------------------------------------
     # Single entry-point for all Agda configuration in any devShell.
-    # Call as: ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
+    # Call as: ${mkAgdaShellSetup agdaPkgs.standard-library (mkAgdaAlgebrasPkg agdaPkgs)}
     #
     # What it does (in order):
     #   1. Locates the repo root via git (falls back to $PWD).
@@ -528,15 +647,15 @@
     # The Agda-capable devShells depend on it via mkAgdaShellSetup, so the
     # first `nix develop` after a pin bump builds (or downloads) it too.
     #
-    # The pinned Agda 2.8.0 wrapped with the pinned standard library: the very
+    # The pinned Agda 2.9.0 wrapped with the pinned standard library: the very
     # `agda` the Agda-capable devShells put on PATH (agdaPinnedEnv below), so an
     # editor started outside `nix develop` can run it from an out link that is
     # also a garbage-collector root:
     #   nix build .#agda -o ~/.cache/agda-native-air/agda
     # See CONTRIBUTING.md, "Editing Agda in Emacs".
-    packages = forAllSystems ({ pkgsAgda, ... }: {
-      agda          = mkAgdaEnv pkgsAgda;
-      agda-algebras = mkAgdaAlgebrasPkg pkgsAgda;
+    packages = forAllSystems ({ pkgsAgda, agdaPkgs, ... }: {
+      agda          = mkAgdaEnv pkgsAgda agdaPkgs;
+      agda-algebras = mkAgdaAlgebrasPkg agdaPkgs;
     });
 
     # Roadmap-engine apps re-exported under a ghproject- prefix, so
@@ -562,10 +681,19 @@
     });
 
     # ---- Dev Shells -----------------------------------------------------------
-    devShells = forAllSystems ({ pkgsStable, pkgsAgda, ... }:
+    devShells = forAllSystems ({ system, pkgsStable, pkgsAgda, agdaPkgs, pkgsHaskell, ... }:
       let
-        # Agda env (PINNED via pkgsAgda)
-        agdaPinnedEnv = mkAgdaEnv pkgsAgda;
+        # Agda env (PINNED: the `agda` input's Agda, which mkAgdaEnv wraps)
+        agdaPinnedEnv = mkAgdaEnv pkgsAgda agdaPkgs;
+
+        # The Agda configuration every Agda-capable shell runs (stdlib +
+        # agda-dojang + the flake-pinned agda-algebras), and its version guards.
+        agdaShellSetup = mkAgdaShellSetup agdaPkgs.standard-library (mkAgdaAlgebrasPkg agdaPkgs);
+        agdaGuard      = agdaVersionGuard agdaPkgs;
+
+        # The backend shell's Haskell package set: Agda's own nixpkgs' GHC
+        # 9.10.3, which built the Agda library agda-strux links (PINNING POLICY).
+        hsPkgs = pkgsHaskell.haskell.packages.ghc910;
 
         # Python envs (from stable)
         pythonCPU          = mkPythonEnv { pkgs = pkgsStable; cuda = false; };
@@ -595,7 +723,7 @@
       in {
         # -----------------------------------------------------------------------
         # default: CPU-only, day-to-day everything shell
-        #   - uses PINNED Agda (from pkgsAgda)
+        #   - uses PINNED Agda (the `agda` input, via agdaPkgs)
         #   - includes Python/PyTorch (CPU) + Scala toolchain
         #   - Agda is configured via mkAgdaShellSetup (stdlib + agda-dojang +
         #     optional external libraries)
@@ -627,6 +755,8 @@
             ${exportLibPath}
             echo "✅ agda-native-air (CPU dev shell)"
             echo "   Agda : $(agda --version | head -n1 || true)"
+            echo "   stdlib: ${agdaPkgs.standard-library.version}"
+            ${agdaGuard}
             echo "   Java : $(java -version 2>&1 | head -n1 || true)"
             echo "   sbt  : $(sbt --version 2>&1 | head -n1 || true)"
             echo "   LD_LIBRARY_PATH (head): $(echo "$LD_LIBRARY_PATH" | cut -d: -f1-3)"
@@ -652,7 +782,7 @@ PY
 
             # Configure Agda: project-local libraries, external lib registration,
             # and the agda() wrapper function.
-            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
+            ${agdaShellSetup}
 
             echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
             echo "~ Examples (things you can try right now!)"
@@ -667,8 +797,12 @@ PY
 
         # -----------------------------------------------------------------------
         # backend: for custom Agda backend development (agda-strux / agda-json)
-        #   - pins GHC/Cabal to the SAME pkgsAgda universe as Agda itself
-        #   - includes Agda-as-a-library + JSON deps in ghcWithPackages
+        #   - pins GHC/Cabal to the SAME universe as Agda itself: Agda's own
+        #     nixpkgs (pkgsHaskell), whose GHC 9.10.3 built the `agda` input
+        #   - includes Agda-as-a-library + JSON deps in ghcWithPackages; the
+        #     library is the `agda` input's own (the library output of the
+        #     derivation whose binary the shell runs), so agda-json and `agda`
+        #     are one Agda, writing and reading one interface format
         #   - Agda is configured via mkAgdaShellSetup (same as default)
         # -----------------------------------------------------------------------
         backend = pkgsStable.mkShell {
@@ -678,18 +812,18 @@ PY
             pkgsStable.scala_2_13
             pkgsStable.sbt
             agdaPinnedEnv
-            (pkgsAgda.haskellPackages.ghcWithPackages (ps: with ps; [
-              Agda            # Agda as a Haskell library
+            (hsPkgs.ghcWithPackages (ps: with ps; [
+              agda.packages.${system}.base  # Agda 2.9.0 as a Haskell library
               aeson           # JSON encoding for exporter
               text bytestring vector unordered-containers
               filepath directory
-              tasty tasty-hunit  # test deps — avoids cabal rebuilding from Hackage
+              tasty tasty-hunit  # test deps; avoids cabal rebuilding them from Hackage
             ]))
-            pkgsAgda.haskellPackages.cabal-install
-            pkgsAgda.haskellPackages.haskell-language-server
-            pkgsAgda.zlib
-            pkgsAgda.gmp
-            pkgsAgda.pkg-config
+            hsPkgs.cabal-install
+            hsPkgs.haskell-language-server
+            pkgsHaskell.zlib
+            pkgsHaskell.gmp
+            pkgsHaskell.pkg-config
 
             pkgsStable.stdenv.cc.cc.lib
             pkgsStable.git
@@ -701,16 +835,23 @@ PY
 
           shellHook = ''
             export AGDA_NATIVE_AIR_SHELL="backend"
-            ${exportLibPath}
+            # No pip wheels live here, so no exportLibPath; and the variable is
+            # unset rather than left as inherited, since agda-json links Agda's
+            # library, hence ICU, and fails to start under the other shells'
+            # export the way `agda` does (see mkAgdaEnv).  Entering this shell
+            # from inside the default one must not carry that export in.
+            unset LD_LIBRARY_PATH
 
             # Configure Agda: project-local libraries, external lib registration,
             # and the agda() wrapper function.
-            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
+            ${agdaShellSetup}
 
             echo "🛠  backend shell — Agda + GHC/Cabal are pinned together"
             echo "   ROOT      : $ROOT"
             echo "   AGDA_DIR  : $AGDA_DIR"
             echo "   Agda      : $(agda --version | head -n1 || true)"
+            echo "   stdlib    : ${agdaPkgs.standard-library.version}"
+            ${agdaGuard}
             echo "   GHC       : $(ghc --version 2>/dev/null || true)"
             echo "   JAVA_HOME : $(echo "$JAVA_HOME")"
             echo "   Java      : $(java -version 2>&1 | head -n1 || true)"
@@ -720,10 +861,9 @@ PY
             # here.
             echo "   sbt       : $( (cd "$ROOT" && sbt --version) 2>&1 | head -n1 || true)"
             echo "   ---------"
-            echo "   LD_LIBRARY_PATH (head): $(echo "$LD_LIBRARY_PATH" | cut -d: -f1-3)"
-            echo "   WHEEL_LD_LIBRARY_PATH: $(echo "$WHEEL_LD_LIBRARY_PATH")"
+            # The Agda library agda-strux links must be the binary's own version.
             echo "Agda in ghc-pkg?"
-            ghc-pkg list | rg "Agda-2\.8\.0" || (echo "Missing Agda in GHC package DB" && exit 1)
+            ghc-pkg list | rg "Agda-${agdaPkgs.agda.version}" || (echo "Missing Agda ${agdaPkgs.agda.version} in GHC package DB" && exit 1)
           '';
         };
 
@@ -802,7 +942,7 @@ PY
 
         # -----------------------------------------------------------------------
         # all: monolithic “everything” shell (CPU)
-        #   - uses PINNED Agda (from pkgsAgda)
+        #   - uses PINNED Agda (the `agda` input, via agdaPkgs)
         #   - includes Spark
         #   - Agda is configured via mkAgdaShellSetup (same as default)
         # -----------------------------------------------------------------------
@@ -831,12 +971,13 @@ PY
 
             # Configure Agda: project-local libraries, external lib registration,
             # and the agda() wrapper function.
-            ${mkAgdaShellSetup pkgsAgda.agdaPackages.standard-library (mkAgdaAlgebrasPkg pkgsAgda)}
+            ${agdaShellSetup}
 
             echo "   ROOT      : $ROOT"
             echo "   AGDA_DIR  : $AGDA_DIR"
             echo "   Agda      : $(agda --version | head -n1 || true)"
-            echo "   GHC       : $(ghc --version 2>/dev/null || true)"
+            echo "   stdlib    : ${agdaPkgs.standard-library.version}"
+            ${agdaGuard}
             echo "   JAVA_HOME : $(echo "$JAVA_HOME")"
             echo "   Java      : $(java -version 2>&1 | head -n1 || true)"
             echo "   Spark     : $(spark-submit --version 2>&1 | head -n1 || true)"
@@ -844,8 +985,9 @@ PY
             echo "   ---------"
             echo "   LD_LIBRARY_PATH (head): $(echo "$LD_LIBRARY_PATH" | cut -d: -f1-3)"
             echo "   WHEEL_LD_LIBRARY_PATH: $(echo "$WHEEL_LD_LIBRARY_PATH")"
-            echo "Agda in ghc-pkg?"
-            ghc-pkg list | rg "Agda-2\.8\.0" || (echo "Missing Agda in GHC package DB" && exit 1)
+            # No GHC line and no ghc-pkg check here: this shell carries no
+            # GHC, so both used to report whatever GHC the host had on PATH.
+            # agda-strux's GHC and its Agda library live in the backend shell.
           '';
         };
 
