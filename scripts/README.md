@@ -16,7 +16,14 @@ report generation — rather than pipeline stages themselves, and are wired into
 
 +  `run-server.sh` launches the `agda-mcp` server inside the `nix develop .#backend`
    shell, routing the Nix banner to stderr so it does not corrupt the MCP JSON-RPC
-   framing on stdout.  It is the command configured in `.mcp.json`.
+   framing on stdout.  It is the command configured in `.mcp.json`.  The shell is
+   entered from this repository, but the server is anchored in the directory the
+   client started the launcher in, which the launcher also substitutes for a
+   literal `${PWD}` a client did not expand (issue #242).
+
++  `run-server-smoke.sh` proves that anchoring through the real launcher: five
+   launches from a scratch checkout, each asking `check_project` to run that
+   checkout's own gate.  It backs `make agda-mcp-launcher-smoke`, which CI runs.
 
 ## Python tooling
 

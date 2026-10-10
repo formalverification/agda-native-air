@@ -189,14 +189,14 @@ An optional `line` argument scopes the question to the goal whose range contains
 
 Every path-taking tool (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`, and `check_project`'s `projectPath`) resolves the path you send the same way, and the rule matters because the server is a **separate process** from your client.
 
-+  **Pass an absolute path**.  A relative path is resolved against the *server's* working directory, which is the only directory the server knows: it is never told where its client stands.  Launched through `scripts/run-server.sh`, that directory is this repository's root, because the script deliberately `cd`s there (issue #76's stray-directory fix).  So `src/Foo.lagda.md` sent from your project names a file in *this* checkout, not in yours.
++  **Pass an absolute path**.  A relative path is resolved against the *server's* working directory, which is the only directory the server knows: it is never told where its client stands.  Launched through `scripts/run-server.sh`, that directory is the one the client started the launcher in (for Claude Code, the directory `claude` was launched from), unless `--cwd` names another (issue #242); the launcher's own `cd` to this repository is for entering its shell (issue #76's stray-directory fix), and it hands the server the client's directory as `--cwd`.  So `src/Foo.lagda.md` sent from your project names your file only when the client started at your checkout root, and an absolute path never depends on where it started.
 +  **A relative path that does resolve still works**.  A client whose own working directory *is* the server's (this repository's committed `.mcp.json`, `make agda-mcp-serve`, or the binary driven by hand from the repo root) keeps sending repo-root-relative paths exactly as before.
-+  **`--cwd` moves that directory, deliberately**.  A registration made *for* one client project (issue #103) starts the server with `--cwd` naming that project's checkout root; the server enters it before doing anything else, so the project's own relative paths resolve there — and, just as important, the checking `agda` runs there, which is where Agda's own project discovery (the nearest `*.agda-lib`) anchors.  See [Checking a client project with its own toolchain](#checking-a-client-project-with-its-own-toolchain-issue-103).
++  **`--cwd` moves that directory, deliberately**.  A registration made *for* one client project (issue #103) starts the server with `--cwd` naming that project's checkout root; the server enters it before doing anything else, so the project's own relative paths resolve there, and, just as important, the checking `agda` runs there, which is where Agda's own project discovery (the nearest `*.agda-lib`) anchors.  Without the flag the server stays in the directory it was started in, which through the launcher is the client's (issue #242), so a client that always starts at its checkout root may leave it out.  See [Checking a client project with its own toolchain](#checking-a-client-project-with-its-own-toolchain-issue-103).
 +  **A path that resolves to no readable file is refused by name**.  The failure is a structured `pathError` object next to the prose, naming what you sent, what it resolved to, whether it was relative, and the server's working directory.  The prose states how the path was resolved on every failure; it goes on to explain the cwd rule only when the path resolved to *nothing*, which is the one case where resolving against the wrong directory is what went wrong; a relative path that resolved to a directory gets the remedy for that instead:
 
 ```json
 {
-  "error": "agda-mcp: filePath does not exist: /home/w/git/…/agda-native-air/src/Foo.lagda.md\n  you sent a RELATIVE path (src/Foo.lagda.md), which this server resolved against its own\n  working directory.\n  This server is a separate process, normally started in its own checkout\n  rather than in your project, so a path relative to your project does not\n  name your file here.\n  this server's working directory: /home/w/git/…/agda-native-air\n  Fix: pass an ABSOLUTE path: YOUR project's directory, followed by src/Foo.lagda.md.",
+  "error": "agda-mcp: filePath does not exist: /home/w/git/…/agda-native-air/src/Foo.lagda.md\n  you sent a RELATIVE path (src/Foo.lagda.md), which this server resolved against its own\n  working directory.\n  This server is a separate process, and its working directory (below)\n  need not be your project's, so a path relative to your project need not\n  name your file here.\n  this server's working directory: /home/w/git/…/agda-native-air\n  Fix: pass an ABSOLUTE path: YOUR project's directory, followed by src/Foo.lagda.md.",
   "pathError": {
     "parameter": "filePath",
     "requestedPath": "src/Foo.lagda.md",
@@ -421,7 +421,7 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 
 | Flag | Description |
 |------|-------------|
-| `--cwd DIR`          | Working directory to enter before anything else.  Every later relative path (`--corpus`, client file paths, gate discovery) resolves inside it, and the checking `agda` runs there, so Agda's own project discovery (the nearest `*.agda-lib`) anchors to it.  Set it to the client project's checkout root when this server checks a project it is not started in (issue #103).  A directory the server cannot enter is a fatal startup error, reported by name. |
+| `--cwd DIR`          | Working directory to enter before anything else.  Every later relative path (`--corpus`, client file paths, gate discovery) resolves inside it, and the checking `agda` runs there, so Agda's own project discovery (the nearest `*.agda-lib`) anchors to it.  Optional: without it the server stays in the directory it was started in.  Through `scripts/run-server.sh` that is the directory the client started the launcher in, because the launcher passes it as `--cwd` when the flag is absent; for Claude Code it is the directory `claude` was launched from, and for another client, whichever directory that client spawns its servers in (the server's `cwd:` startup line on stderr says which).  Run directly, it is the binary's own working directory.  Set the flag to the client project's checkout root when that is not where the server starts (issue #103).  A directory the server cannot enter is a fatal startup error, reported by name; so is a value still holding `${`, a variable the client did not expand, refused with the two fixes (omit the flag, or pass an absolute path) even where a directory of that literal name exists.  The launcher substitutes the directory it was started in for `${PWD}` and `${PWD:-default}` in any argument, which are the forms Claude Code expands, and expands nothing else (issue #242). |
 | `--agda-bin PATH`    | Path to the `agda` binary (default: `agda` on `PATH`). |
 | `--agda-flags "..."` | Space-separated flags passed through to Agda (include paths, `--library-file`, `-l` library names). |
 | `--corpus PATH`      | Load an agda-strux JSONL corpus; registers the four corpus tools (`search_by_name`, `search_by_type`, `get_dependencies`, `search_in_scope`), the last presented only when `--expose` names it. |
@@ -475,7 +475,7 @@ other path.
 A project that pins its own Agda (e.g., formal-ledger-specifications) must be checked with *that* toolchain, never this repository's; for a specification repo, version skew is a correctness hazard.  Two flags carry the whole arrangement:
 
 +  **`--agda-bin`** names the client's own `agda`.  For a Nix-pinned project, realise a garbage-collector-rooted wrapper once (`nix build <checkout>#<agdaWithPackages-attr> -o ~/.cache/<proj>/agda-root`) and point at `<root>/bin/agda`: the wrapper bakes in the project's `--library-file`, so it is self-contained from any directory, and the gc-root pins it against `nix store gc`.  Re-run the same command after the project's flake pin moves; it re-points the same symlink.
-+  **`--cwd`** names the client's checkout root.  Agda decides a file's project by walking up from the *directory it runs in* to the nearest `*.agda-lib` — not from the checked file's location — so without `--cwd` the client's modules resolve against no project at all, and with it they resolve, and write their `.agdai` interfaces, exactly as the project's own `nix develop --command agda` does.
++  **`--cwd`** names the client's checkout root.  Agda decides a file's project by walking up from the *directory it runs in* to the nearest `*.agda-lib`, not from the checked file's location, so a server working anywhere else resolves the client's modules against no project at all, and one working there resolves them, and writes their `.agdai` interfaces, exactly as the project's own `nix develop --command agda` does.  Through `scripts/run-server.sh` the flag may be left out when the client starts at that root, since the launcher then passes the client's directory itself; `--cwd ${PWD}` says the same thing in the registration, and the launcher substitutes it for a client that does not expand it (issue #242).
 
 `--agda-flags` then needs only what the wrapped binary does not already carry.  One addition is load-bearing: `-i <this-repo>/agda-dojang/agda`, because `get_goal` splices `open import AgdaDojang.Debug` into the file it inspects, and the client's Agda must be able to see that module's source (it imports only builtins, so it compiles under any Agda 2.8).  [`examples/fls.mcp.json`](examples/fls.mcp.json) is the registration this section describes, tested against real formal-ledger modules.
 
@@ -1440,11 +1440,21 @@ cover that cold call (see [Timeouts, cold calls, and latency](#timeouts-cold-cal
 }
 ```
 
-### Cursor / Codex CLI
+### Cursor / Codex CLI / Copilot CLI
 
 Similar configuration: point the MCP client at `scripts/run-server.sh` (or the
 `agda-mcp` binary if you are already in a Nix shell) with the appropriate
 `--agda-flags` and optional `--corpus`.
+
+A registration copied from one written for Claude Code may keep `--cwd ${PWD}`,
+drop the flag, or name the checkout by absolute path (issue #242).  The launcher
+substitutes the directory it was started in for a `${PWD}` (or
+`${PWD:-default}`) that the client did not expand, and passes that directory as
+`--cwd` when the flag is absent.  Both rely on the client starting the server in
+the checkout it works on; the server's `cwd:` startup line on stderr says where
+it went, and what each client does is for its field report to record (issue
+#243).  No other variable is expanded: an argument still holding `${` is named
+on stderr, and a `--cwd` holding one is refused.
 
 ---
 

@@ -953,7 +953,9 @@ Claude Code from the other project's worktree** (so that project is the working
 directory, with its own `CLAUDE.md`, git, and permissions) and **attach agda-mcp to
 that session**.  agda-mcp does not need to be the working directory;
 `scripts/run-server.sh` computes the agda-native-air repo root and `cd`s there
-before launching the server, so it works from any cwd; it also clears the
+to enter its shell, so it works from any cwd, and then starts the server back
+in the directory the client launched it from, unless `--cwd` names another
+(issue #242); it also clears the
 `LD_LIBRARY_PATH` this flake's devShells export, so a Claude Code session
 started from inside `nix develop` loads the server too (issue #153).  Set
 `AGDA_MCP_BIN` in the server's `env` block to run a prebuilt binary instead of
@@ -973,7 +975,11 @@ Copy the committed template
 into the checkout you are editing as `.mcp.json`, replace its `/ABS/PATH/TO/...`
 placeholders with real absolute paths, and keep it out of that project's history.
 The template names no worktree (`--cwd ${PWD}` anchors the server wherever Claude
-Code starts), so the same file serves every worktree.  Its three machine-specific
+Code starts), so the same file serves every worktree.  A client that does not
+expand `${PWD}` passes the literal string, which the launcher substitutes with
+the directory it was started in; such a registration may also drop `--cwd`
+altogether, since the launcher then passes that directory itself (issue #242).
+Its three machine-specific
 inputs (agda-algebras's own Agda, the libraries file that Agda reads, and the
 search corpus) are realized once; the commands are in the
 [examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).  Then:
@@ -1117,7 +1123,8 @@ neither requires nor affects library registration.
    Read/Edit tools; just avoid hand-typing relative paths in prompts.  Both templates
    pass `--cwd`, which moves the server's working directory to the client project, so
    project-relative paths resolve there too; a registration without `--cwd` leaves the
-   server in agda-native-air, and resolves them here.  Absolute is the form that is
+   server in the directory the client started it in (issue #242), so they resolve in
+   the project only when the client starts at its root.  Absolute is the form that is
    correct under every registration.
 +  **Match the toolchain**.  The server checks with the Agda its registration names.
    Both templates name the client project's own, with `--agda-bin` naming that
@@ -1173,10 +1180,11 @@ typecheck a temp copy that collides with the module's canonical location.  Use
 module — see the first item under *Three things to know* in §13.5.
 
 **"filePath does not exist" naming a path in the agda-native-air checkout**.  You sent a
-relative path from your own project.  The server is a separate process, and
-`scripts/run-server.sh` starts it in *this* repository, so relative paths resolve here
-rather than in your tree; the error names both the path as resolved and the working
-directory it was resolved against.  Send an absolute path: your project's directory
+relative path from your own project to a server working in *this* repository.  The
+server is a separate process, and resolves a relative path against its own working
+directory (the directory the client started it in, or the one `--cwd` names), not
+against yours; the error names both the path as resolved and the working directory
+it was resolved against.  Send an absolute path: your project's directory
 followed by the relative path you tried.  See *Which file gets checked: the path rule*
 in [`agda-mcp/README.md`](../agda-mcp/README.md).
 
