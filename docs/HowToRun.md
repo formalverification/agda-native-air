@@ -1132,9 +1132,9 @@ neither requires nor affects library registration.
    [`agda-mcp/examples/fls.mcp.json`](../agda-mcp/examples/fls.mcp.json) introduced
    for formal-ledger-specifications (see its
    [README section](../agda-mcp/examples/README.md#flsmcpjson)).  A registration
-   without `--agda-bin` checks with this repo's pinned Agda 2.8.0 and standard-library
-   2.3, which is correct only if the other project is compatible with those versions;
-   confirm `agda --version` and the std-lib version line up.
+   without `--agda-bin` checks with this repo's pinned Agda 2.9.0 and standard-library
+   2.3 (patched for 2.9.0), which is correct only if the other project is compatible
+   with those versions; confirm `agda --version` and the std-lib version line up.
 
 #### Web UI
 

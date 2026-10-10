@@ -227,6 +227,10 @@ data IResponse
       -- would write this text into the file.  The fields are the point's id
       -- and @giveResult.str@; the text is 'Nothing' for the parenthesization
       -- forms of Agda's @GiveResult@, which carry no string (issue #163).
+      -- Agda 2.9.0 answers every give made without a range, as the lane's
+      -- are, with one of them, @{"paren": false}@: keep the text as given
+      -- (captured; issue #234).  2.8.0 reprinted it.  A proof search's term
+      -- still arrives as a string in both.
   | IOther Text Value         -- ^ Any other JSON kind (Status, highlighting, …).
   | IUnreadable Text          -- ^ A line that was not JSON.
   deriving (Eq, Show)
@@ -1491,7 +1495,10 @@ data GiveReading = GiveReading
                              -- deliberately weaker than the class: a give that
                              -- landed somewhere unexpected still consumed a
                              -- hole, so the reload is still owed.
-  , grText   :: Maybe Text   -- ^ What Agda would write into the file.
+  , grText   :: Maybe Text   -- ^ What Agda would write into the file, when
+                             -- it reprinted the candidate (Agda 2.8.0); absent
+                             -- under 2.9.0, whose answer to a rangeless give
+                             -- is @{"paren": false}@.  The class never reads it.
   , grPoint  :: Maybe Int    -- ^ The point the give consumed, when the wire
                              -- carried an id that parsed.
   , grHere   :: Bool         -- ^ The give landed on the point it was aimed at.
@@ -1726,8 +1733,10 @@ elapsedUsBetween start end =
 -- Agda's own proof search at a hole (issue #205)
 -- ---------------------------------------------------------------------------
 --
--- What @Cmd_autoOne@ answers, probed under the pinned Agda 2.8.0 on the
--- benchmark's obligations and on the suite's AutoSearch fixture:
+-- What @Cmd_autoOne@ answers, probed under Agda 2.8.0 on the benchmark's
+-- obligations and on the suite's AutoSearch fixture (and re-probed under
+-- 2.9.0 for issue #234: a found term still arrives as @giveResult.str@,
+-- where a give now gets @{"paren": false}@):
 --
 -- * A term found: a top-level @GiveAction@ at the asked point, whose
 --   @giveResult.str@ is Mimer's own rendering (Agda's pretty printer, which

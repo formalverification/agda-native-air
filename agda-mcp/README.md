@@ -311,16 +311,16 @@ One lexical scan serves the scans that are not about holes, too.  The `AgdaDojan
 }
 ```
 
-+  `code` is Agda's own name for the diagnostic (`NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedMetaVariables`, and so on) read from the `[Code]` of an error header or the `-W[no]Code` of a warning header.  It is absent only when Agda printed no name.
++  `code` is Agda's own name for the diagnostic (`NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnequalTypes`, `UnsolvedMetaVariables`, and so on) read from the `[Code]` of an error header or the `-W[no]Code` of a warning header.  It is absent only when Agda printed no name.
 +  `range` is 1-based (line, column) in the file as written, with `endCol` one past the last character, exactly as Agda spells a span.  Both of Agda's position formats parse: the current `file:9.12-13` and `file:9.12-11.5`, and the older `file:10,5-15` and `file:10,5-11,3`.  `line` and `col` are retained as aliases of the range start, so a pre-#74 client keeps working.  Some diagnostics genuinely have no position (e.g., `error: [UnsolvedConstraints]` is printed without one) and those omit `file` and `range` rather than inventing them.
 +  `message` is the *full* message body, not just the header line, bounded at 24 lines and 2000 characters (elision marker included, so a client budgeting 2000 characters is never handed one more) with the elision stated rather than silent.
-+  `involved` lifts out what the message is about, per code: `expected` and `actual` for a mismatch (`Bool !=< Nat`), `candidates` for a "did you mean" list, the ambiguity candidates, the missing exports, or the origin of a clashing definition, and `metaTypes` for one entry per unsolved meta or constraint.  It is omitted when nothing was extracted; the full message is always there to fall back on.
++  `involved` lifts out what the message is about, per code: `expected` and `actual` for a mismatch (`Bool !=< Nat` under Agda 2.8.0; "The type Bool is not a subtype of Nat", coded `UnequalTypes`, under 2.9.0), `candidates` for a "did you mean" list, the ambiguity candidates, the missing exports, or the origin of a clashing definition, and `metaTypes` for one entry per unsolved meta or constraint.  It is omitted when nothing was extracted; the full message is always there to fall back on.
 +  `involved.metas` is the one payload that does not come from the prose (issue #115).  Agda names its unsolved metas by location and never prints their types, so the § 5 corpus's last ask — each meta with its type — is unanswerable from a batch run; a load on the interaction lane lists every meta with its name, type, and range instead.  `check_file` and `get_diagnostics` therefore hand the unsolved-meta diagnostics (`[UnsolvedMetaVariables]` and its `[UnsolvedConstraints]` sibling, whose constraint text names those very metas) a `metas: [{name, type, range}]` list from a warm lane's stored load — the same free peek that fills the hole listings' `goal` fields, never a lane call — and omit it when the lane is cold or its recorded load no longer describes the file's current bytes.  `metaTypes` is unaffected either way: it is what Agda's own prose said, and a client reading it keeps working.
 +  Diagnostics are ordered **most likely root cause first**: unresolvable-file errors, then the scope warnings that precede a hard error (`ModuleDoesntExport` before the `NotInScope` it causes), then scope errors, then type errors, then unsolved metas and constraints, then remaining warnings.  The sort is stable, so Agda's own order survives within a rank.
 +  The list is capped by the optional `maxDiagnostics` argument (default 10; `0` means no limit), and `diagnosticsTotal` always reports how many were found before the cap, so a broken import list cannot return a hundred cascading errors, and a truncated list is never mistaken for a short one.  `get_diagnostics`' `errors` and `warnings` counts are over *every* diagnostic found, not over the capped list.
 +  Identical diagnostics collapse to one.  A run that ends in warnings prints each of them twice (once where it was raised, once under Agda's `———— All done; warnings encountered ————` banner) and counting both would double every count.
 
-The regression suite under `test/resources/diagnostics/` has one fixture per error class of the field report's [§ 5 corpus](../docs/feedback/flrp-agda-mcp-improvements.md) (`ModuleDoesntExport`, `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedConstraints` + `UnsolvedMetaVariables`) each asserting the code, the range, and the payload § 5 asks for, against the pinned Agda.
+The regression suite under `test/resources/diagnostics/` has one fixture per error class of the field report's [§ 5 corpus](../docs/feedback/flrp-agda-mcp-improvements.md) (`ModuleDoesntExport`, `NotInScope`, `AmbiguousName`, `ClashingDefinition`, `UnequalTerms`, `UnsolvedConstraints` + `UnsolvedMetaVariables`) each asserting the code, the range, and the payload § 5 asks for, against the pinned Agda.  Where Agda 2.9.0 prints a class differently (a mismatch, now laid out one side per line, and a clash, whose origin now ends a scope explanation), its output is captured beside 2.8.0's and both must parse, since the server serves projects on either (issue #234).
 
 ### Live queries over the interaction lane (issue #75)
 
@@ -477,7 +477,7 @@ A project that pins its own Agda (e.g., formal-ledger-specifications) must be ch
 +  **`--agda-bin`** names the client's own `agda`.  For a Nix-pinned project, realise a garbage-collector-rooted wrapper once (`nix build <checkout>#<agdaWithPackages-attr> -o ~/.cache/<proj>/agda-root`) and point at `<root>/bin/agda`: the wrapper bakes in the project's `--library-file`, so it is self-contained from any directory, and the gc-root pins it against `nix store gc`.  Re-run the same command after the project's flake pin moves; it re-points the same symlink.
 +  **`--cwd`** names the client's checkout root.  Agda decides a file's project by walking up from the *directory it runs in* to the nearest `*.agda-lib`, not from the checked file's location, so a server working anywhere else resolves the client's modules against no project at all, and one working there resolves them, and writes their `.agdai` interfaces, exactly as the project's own `nix develop --command agda` does.  Through `scripts/run-server.sh` the flag may be left out when the client starts at that root, since the launcher then passes the client's directory itself; `--cwd ${PWD}` says the same thing in the registration, and the launcher substitutes it for a client that does not expand it (issue #242).
 
-`--agda-flags` then needs only what the wrapped binary does not already carry.  One addition is load-bearing: `-i <this-repo>/agda-dojang/agda`, because `get_goal` splices `open import AgdaDojang.Debug` into the file it inspects, and the client's Agda must be able to see that module's source (it imports only builtins, so it compiles under any Agda 2.8).  [`examples/fls.mcp.json`](examples/fls.mcp.json) is the registration this section describes, tested against real formal-ledger modules.
+`--agda-flags` then needs only what the wrapped binary does not already carry.  One addition is load-bearing: `-i <this-repo>/agda-dojang/agda`, because `get_goal` splices `open import AgdaDojang.Debug` into the file it inspects, and the client's Agda must be able to see that module's source (it compiles under Agda 2.8.0 and 2.9.0).  [`examples/fls.mcp.json`](examples/fls.mcp.json) is the registration this section describes, tested against real formal-ledger modules.
 
 A second addition is needed when this repository's registry knows the client's library.  The server decides which tree a file belongs to by reading a libraries registry (see [`docs/agda-mcp/agda-mcp-environment.md`](../docs/agda-mcp/agda-mcp-environment.md) § 4), and it cannot see the `--library-file` baked into a wrapper, so it reads the one in its own flags, else `$AGDA_DIR/libraries`, which the shell `run-server.sh` enters sets to this repository's `agda/libraries`.  That registry names agda-algebras (at the flake-pinned store copy), so a server checking an agda-algebras worktree refuses every file with a `rootMismatch` unless its flags name the wrapper's own registry: gc-root the wrapper's libraries file beside the wrapper and pass `--library-file=<that root>`.  Agda gets the same file twice and takes the last.  [`examples/agda-algebras.mcp.json`](examples/agda-algebras.mcp.json) does this, and its [README section](examples/README.md#agda-algebrasmcpjson) has the commands.
 
@@ -608,7 +608,7 @@ Submit a candidate term for a hole and receive typecheck feedback: success (hole
   "status": "type_error",
   "candidate": "tt",
   "addressed": {"line": 7, "col": 8, "resolvedBy": "span"},
-  "message": "A !=< ⊤ when checking that the expression tt has type A",
+  "message": "/path/to/Fixture01.agda:16.8-10: error: [UnequalTypes]\nThe type\n  ⊤\nis not a subtype of\n  A\nwhen checking that the expression tt has type A",
   "holes": [{"index": 0, "line": 10, "col": 11, "goal": "?"}],
   "remainingHoles": 1,
   "elapsedMs": 1795,
@@ -672,12 +672,12 @@ echo](#the-response-echo-verdict-command-project-issues-72-and-76).
   "diagnostics": [
     {
       "severity": "error",
-      "code": "UnequalTerms",
+      "code": "UnequalTypes",
       "file": "/path/to/Fixture01.agda",
       "range": {"startLine": 17, "startCol": 5, "endLine": 17, "endCol": 9},
       "line": 17,
       "col": 5,
-      "message": "Bool !=< Nat\nwhen checking that the expression true has type Nat",
+      "message": "The type\n  Bool\nis not a subtype of\n  Nat\nwhen checking that the expression true has type Nat",
       "involved": {"expected": "Nat", "actual": "Bool"}
     }
   ],
@@ -709,7 +709,7 @@ every proof-state tool adds on request; it is shown in full only here.
     "exitCode": 42
   },
   "command": {
-    "binary": "/nix/store/…-agdaWithPackages-2.8.0/bin/agda",
+    "binary": "/nix/store/…-agda-env-2.9.0/bin/agda",
     "args": ["-i", "agda-dojang/agda", "--library-file=agda/libraries", "-l", "agda-dojang", "-l", "standard-library", "-i", "/abs/dir", "/abs/Fixture01.agda"],
     "cwd": "/abs/agda-native-air"
   },
@@ -1220,13 +1220,13 @@ not part of this tool.
 
 #### `auto`
 
-Runs Agda's own proof search at one hole on the interaction lane and answers
-the term it found, as a candidate for `fill_hole` to judge.  Registered only
-with `--auto`.  Under the pinned Agda 2.8.0 the search is **Mimer**, which
-replaced Agsy in Agda 2.7 (the 2.7.0 release notes: "Mimer, a
-re-implementation of the 'auto' term synthesizer, replaces Agsy"); the
-command is `Cmd_autoOne`, the one an editor's `C-c C-a` sends, with the
-`Simplified` rendering the reference measurement used.
+Runs Agda's own proof search at one hole on the interaction lane and answers the
+term it found, as a candidate for `fill_hole` to judge.  Registered only with
+`--auto`.  Under Agda 2.8.0 and the pinned 2.9.0 the search is **Mimer**, which
+replaced Agsy in Agda 2.7 (the 2.7.0 release notes: "Mimer, a re-implementation
+of the 'auto' term synthesizer, replaces Agsy"); the command is `Cmd_autoOne`,
+the one an editor's `C-c C-a` sends, with the `Simplified` rendering the
+reference measurement used.
 
 **Why the answer is a candidate**.  Three facts, each read off Agda's source
 or measured:

@@ -12,7 +12,9 @@
 --   here maps Agda's captured stdout+stderr to values, so the whole surface is
 --   testable without an Agda subprocess.
 --
---   What Agda 2.8.0 actually prints, which is what this parses:
+--   What Agda prints, 2.8.0 and 2.9.0 alike, which is what this parses (the
+--   two differ in the bodies of a mismatch and of a clash, and both layouts
+--   are read; see 'mismatchOf' and 'previousDefinitionOrigin'):
 --
 --   > Checking Consumer (/x/Consumer.agda).
 --   > /x/Consumer.agda:3.20-43: warning: -W[no]ModuleDoesntExport
@@ -104,9 +106,9 @@ import AgdaMCP.Types
 -- and ordered most-likely-root-cause first.
 --
 -- The whole output is accepted (stdout and stderr concatenated, as the tools
--- capture it): Agda 2.8.0 prints diagnostics on stdout, earlier versions on
--- stderr, and the caller need not know which.  Nothing is capped here —
--- 'capDiagnostics' does that, so the caller can report the true total.
+-- capture it): Agda 2.8.0 and 2.9.0 print diagnostics on stdout, earlier
+-- versions on stderr, and the caller need not know which.  Nothing is capped
+-- here; 'capDiagnostics' does that, so the caller can report the true total.
 -- Dedup runs on the blocks, /before/ 'blockToDiagnostic' bounds the message:
 -- keying off the retained prose would make two diagnostics that agree for the
 -- first 'maxMessageLines' lines and differ only past them look identical, drop
@@ -362,7 +364,7 @@ isBoundaryLine ln =
 
 -- | parseHeaderLine: recognize a diagnostic header and take it apart.
 --
--- Both shapes Agda 2.8.0 emits are accepted:
+-- Both shapes Agda emits, 2.8.0 and 2.9.0 alike, are accepted:
 --
 -- > /x/M.agda:11.5-17: error: [UnsolvedMetaVariables]
 -- > /x/M.agda:3.20-43: warning: -W[no]ModuleDoesntExport
@@ -678,43 +680,125 @@ ambiguityCandidates body =
 
 -- | previousDefinitionOrigin: where the definition being clashed with lives.
 --
+-- Agda 2.8.0 names it directly:
+--
 -- > Multiple definitions of least. Previous definition at
 -- > /x/M.agda:4.9-14
 --
--- Agda wraps that sentence freely, so the body is rejoined before the phrase is
--- located; the answer is the token that follows it.
+-- Agda 2.9.0 explains instead how the earlier name came into scope, and that
+-- lineage ends at its definition, the very site 2.8.0 printed (both are the
+-- name's binding site; captured on test/resources/diagnostics/):
+--
+-- > Multiple definitions of least. Previous definition
+-- > least is in scope as
+-- >   * a record field ClashingDefinition.Bound.least
+-- >     brought into scope by
+-- >     - the opening of Bound at /x/M.agda:22.6-11
+-- >     - its definition at /x/M.agda:20.9-14
+--
+-- Agda wraps these sentences freely, so the body is rejoined before a phrase
+-- is located; the answer is the token that follows it, and only if that
+-- token is a location (it has a colon).  2.8.0's phrase is tried first.  In a
+-- 2.9.0 message the words "Previous definition" are followed by the name, so
+-- the phrase appears there only for a name spelled @at@, whose next token
+-- (@is@) is no location; the lineage is read then.
 previousDefinitionOrigin :: [Text] -> [Text]
 previousDefinitionOrigin body =
-  case T.breakOn marker (T.unwords (map T.strip body)) of
-    (_, rest) | T.null rest -> []
-              | otherwise   -> take 1 (T.words (T.drop (T.length marker) rest))
+  case after "Previous definition at" joined of
+    [] -> after "its definition at" (snd (T.breakOn "Previous definition" joined))
+    xs -> xs
   where
-    marker = "Previous definition at"
+    joined = T.unwords (map T.strip body)
+    after marker t = case T.breakOn marker t of
+      (_, rest) | T.null rest -> []
+                | otherwise   -> filter (":" `T.isInfixOf`)
+                                   (take 1 (T.words (T.drop (T.length marker) rest)))
 
--- | mismatchOf: the two sides of Agda's inequality line.
+-- | mismatchOf: the two sides of Agda's inequality, in either version's
+-- layout.  Agda writes the actual (inferred) side first and the expected one
+-- second in both, so the payload means the same thing whichever printed it.
+--
+-- Agda 2.8.0 prints one inequality line:
 --
 -- > Bool !=< Nat
 -- > when checking that the expression true has type Nat
 --
--- @!=<@ is "is not a subtype of", and Agda writes the actual (inferred) type on
--- its left, the expected one on its right; @!=@ is the same shape for terms,
--- with an @of type T@ trailer that belongs to neither side.  Everything from the
--- @when …@ trailer on is context, not the mismatch, so it is cut first.
+-- @!=<@ is "is not a subtype of"; @!=@ is the same shape for terms, with an
+-- @of type T@ trailer that belongs to neither side.
+--
+-- Agda 2.9.0 prints each side on lines of its own, indented under the phrase
+-- that introduces it, and calls a mismatch of types @[UnequalTypes]@ rather
+-- than @[UnequalTerms]@ (captured on the fixtures under
+-- test/resources/diagnostics/):
+--
+-- > The type
+-- >   Bool
+-- > is not a subtype of
+-- >   Nat
+--
+-- and for terms, or for types compared for equality (@The types … and … are
+-- not equal@, which is what 2.8.0's @[UnequalSorts]@ @Set₁ != Set@ became):
+--
+-- > The terms
+-- >   0
+-- > and
+-- >   1
+-- > are not equal at type Nat
+--
+-- Either way, everything from the @when …@ trailer on is context, not the
+-- mismatch, so it is cut first.  The 2.9.0 layout is tried first: its two
+-- sides are delimited by the layout itself, whereas a @!=@ inside one of them
+-- (a term that mentions an inequality) would mislead the line split.
 mismatchOf :: [Text] -> Involved
-mismatchOf body = case splitOnEither ["!=<", "!="] joined of
-  Nothing -> noInvolved
-  Just (lhs, rhs)
-    | T.null actual || T.null expected -> noInvolved
-    | otherwise -> noInvolved { invActual = Just actual, invExpected = Just expected }
-    where
-      actual   = T.strip lhs
-      expected = T.strip (fst (T.breakOn " of type " rhs))
+mismatchOf body = case stackedSides pre of
+  Just (a, e) -> sides a e
+  Nothing -> case splitOnEither ["!=<", "!="] joined of
+    Nothing         -> noInvolved
+    Just (lhs, rhs) -> sides (T.strip lhs) (T.strip (fst (T.breakOn " of type " rhs)))
   where
-    joined = T.unwords (map T.strip (takeWhile (not . isTrailer) body))
+    pre    = takeWhile (not . isTrailer) body
+    joined = T.unwords (map T.strip pre)
     isTrailer ln = "when " `T.isPrefixOf` T.strip ln
+
+    sides actual expected
+      | T.null actual || T.null expected = noInvolved
+      | otherwise = noInvolved { invActual = Just actual, invExpected = Just expected }
 
     splitOnEither [] _ = Nothing
     splitOnEither (sep : seps) t =
       case T.breakOn sep t of
         (_, rest) | T.null rest -> splitOnEither seps t
-        (pre, rest)             -> Just (pre, T.drop (T.length sep) rest)
+        (pre', rest)            -> Just (pre', T.drop (T.length sep) rest)
+
+-- | stackedSides: the two sides of Agda 2.9.0's layout of an inequality.
+--
+-- The shape is an introducing line (@The terms@, @The type@, @The types@, or
+-- @The function type(s)@, as Agda's @Conversion.Errors@ spells them), the
+-- first side on the lines indented deeper than it, a connective at the
+-- introducing line's own indentation (@and@, @is not a subtype of@), and the
+-- second side on the deeper lines after it.  A side that the pretty printer
+-- broke across lines is rejoined with single spaces, as the 2.8.0 path does.
+-- Indentation is read relative to the introducing line, so the shape is found
+-- even when another message nests it.  Anything else yields 'Nothing'.
+stackedSides :: [Text] -> Maybe (Text, Text)
+stackedSides ls = case break isIntro ls of
+  (_, intro : rest) ->
+    let depth            = indentOf intro
+        deeper ln        = not (T.null (T.strip ln)) && indentOf ln > depth
+        (first, afterA)  = span deeper rest
+    in  case afterA of
+          conn : afterConn
+            | indentOf conn == depth, T.strip conn `elem` connectives ->
+                let second = takeWhile deeper afterConn
+                in  if null first || null second
+                      then Nothing
+                      else Just (rejoin first, rejoin second)
+          _ -> Nothing
+  _ -> Nothing
+  where
+    isIntro ln = T.strip ln `elem` intros
+    intros =
+      [ "The terms", "The types", "The type", "The function types", "The function type" ]
+    connectives = [ "and", "is not a subtype of" ]
+    indentOf = T.length . T.takeWhile (== ' ')
+    rejoin = T.unwords . map T.strip

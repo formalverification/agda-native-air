@@ -261,7 +261,8 @@ one.
    `agda-algebras`.
 +  Combined output plus exit code captured, the variant's own root normalized
    out of every path, Agda's progress lines dropped, and the transcripts diffed.
-   Agda 2.8.0 writes diagnostics to stdout, so `2>&1` is what captures them.
+   Agda 2.8.0 and 2.9.0 write diagnostics to stdout, so `2>&1` is what
+   captures them.
 +  Never warm one variant's cache and not the other: a file whose `.agdai` is
    current prints nothing at all, so its transcript differs from the same file
    checked cold even though the verdict is identical.

@@ -49,7 +49,7 @@ import Agda.Syntax.Common.Pretty (prettyShow, pretty)
 -- Levels
 -----------------------------------------------------------------------------
 
--- Agda 2.8.0:
+-- Agda 2.8.0 and 2.9.0:
 --   type Level = Level' Term
 --   data Level' t      = Max Integer [PlusLevel' t]
 --   data PlusLevel' t  = Plus Integer t

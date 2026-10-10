@@ -860,12 +860,14 @@ pcOfLibrary lib = ProjectContext
 -- ---------------------------------------------------------------------------
 -- Tier 0b: Structured-diagnostic tests (issue #74; pure)
 --
--- These run the parser over Agda output captured verbatim from the pinned
--- Agda 2.8.0 against the fixtures in test/resources/diagnostics/ (the tier-2e
--- tests below re-derive the same facts from a live Agda, so drift between the
--- two is a test failure rather than a silent divergence).  They also cover the
--- old `LINE,COL` position spelling, which the pinned Agda cannot produce and
--- which the pre-#74 extractor was written for.
+-- These run the parser over Agda output captured verbatim from Agda 2.8.0
+-- against the fixtures in test/resources/diagnostics/, and, where Agda 2.9.0
+-- (the pinned toolchain since issue #234) prints a class differently, over
+-- its output captured beside it, since the server serves projects on either
+-- (the tier-2e tests below re-derive the same facts from a live Agda, so
+-- drift between the two is a test failure rather than a silent divergence).
+-- They also cover the old `LINE,COL` position spelling, which neither Agda
+-- produces and which the pre-#74 extractor was written for.
 -- ---------------------------------------------------------------------------
 
 -- | Captured output: the § 5 pair — a [ModuleDoesntExport] warning on the
@@ -954,6 +956,143 @@ outUnsolvedMetas = T.unlines
   , "Unsolved metas at the following locations:"
   , "  /r/UnsolvedMetas.agda:26.9-16"
   ]
+
+-- | Captured output, Agda 2.8.0: a term mismatch whose sides are long enough
+-- for the printer to wrap (two postulates applied to twenty numbers, compared
+-- by `refl`).  The inequality spans five lines.
+outWrappedSides28 :: Text
+outWrappedSides28 = T.unlines
+  [ "Checking WrappedSides (/r/WrappedSides.agda)."
+  , "/r/WrappedSides.agda:10.5-9: error: [UnequalTerms]"
+  , "g 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "1013 1014 1015 1016 1017 1018 1019"
+  , "!="
+  , "h 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "1013 1014 1015 1016 1017 1018 1019"
+  , "of type Nat"
+  , "when checking that the expression refl has type"
+  , "g 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "1013 1014 1015 1016 1017 1018 1019"
+  , "≡"
+  , "h 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "1013 1014 1015 1016 1017 1018 1019"
+  ]
+
+-- | Captured output, Agda 2.8.0: a clash on a name spelled `at`.  Agda 2.9.0
+-- prints "Previous definition at" for it too, with another meaning (see
+-- 'outClashAt29').
+outClashAt28 :: Text
+outClashAt28 = T.unlines
+  [ "Checking ClashAt (/r/ClashAt.agda)."
+  , "/r/ClashAt.agda:8.1-3: error: [ClashingDefinition]"
+  , "Multiple definitions of at. Previous definition at"
+  , "/r/ClashAt.agda:5.1-3"
+  , "when scope checking the declaration"
+  , "  at : Nat"
+  ]
+
+-- Agda 2.9.0 (agda/agda da66a8c, the pinned toolchain since issue #234)
+-- rewords two of the § 5 classes, so its output is captured beside 2.8.0's:
+-- the server serves projects on either, and both must parse.
+
+-- | Captured output, Agda 2.9.0: the UnequalTerms.agda of 'outUnequalTerms'.
+-- 2.9.0 calls a mismatch of types [UnequalTypes], keeping [UnequalTerms] for
+-- terms, and prints each side on lines of its own.
+outUnequalTypes29 :: Text
+outUnequalTypes29 = T.unlines
+  [ "Checking UnequalTerms (/r/UnequalTerms.agda)."
+  , "/r/UnequalTerms.agda:17.5-9: error: [UnequalTypes]"
+  , "The type"
+  , "  Bool"
+  , "is not a subtype of"
+  , "  Nat"
+  , "when checking that the expression true has type Nat"
+  ]
+
+-- | Captured output, Agda 2.9.0: two terms that differ (`p : 0 ≡ 1`,
+-- `p = refl`), which 2.8.0 printed as `0 != 1 of type Nat`.
+outUnequalTerms29 :: Text
+outUnequalTerms29 = T.unlines
+  [ "Checking TermMismatch (/r/TermMismatch.agda)."
+  , "/r/TermMismatch.agda:7.5-9: error: [UnequalTerms]"
+  , "The terms"
+  , "  0"
+  , "and"
+  , "  1"
+  , "are not equal at type Nat"
+  , "when checking that the expression refl has type 0 ≡ 1"
+  ]
+
+-- | Captured output, Agda 2.9.0: two types compared for equality (`x : Set`,
+-- `x = Set`), which 2.8.0 printed as `[UnequalSorts]` `Set₁ != Set`.
+outUnequalTypesEq29 :: Text
+outUnequalTypesEq29 = T.unlines
+  [ "Checking SortMismatch (/r/SortMismatch.agda)."
+  , "/r/SortMismatch.agda:4.5-8: error: [UnequalTypes]"
+  , "The types"
+  , "  Set₁"
+  , "and"
+  , "  Set"
+  , "are not equal"
+  , "when checking that the expression Set has type Set"
+  ]
+
+-- | Captured output, Agda 2.9.0: the wrapped sides of 'outWrappedSides28'.
+outWrappedSides29 :: Text
+outWrappedSides29 = T.unlines
+  [ "Checking WrappedSides (/r/WrappedSides.agda)."
+  , "/r/WrappedSides.agda:10.5-9: error: [UnequalTerms]"
+  , "The terms"
+  , "  g 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "  1013 1014 1015 1016 1017 1018 1019"
+  , "and"
+  , "  h 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "  1013 1014 1015 1016 1017 1018 1019"
+  , "are not equal at type Nat"
+  , "when checking that the expression refl has type"
+  , "g 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "1013 1014 1015 1016 1017 1018 1019"
+  , "≡"
+  , "h 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010 1011 1012"
+  , "1013 1014 1015 1016 1017 1018 1019"
+  ]
+
+-- | Captured output, Agda 2.9.0: the ClashingDefinition.agda fixture, whose
+-- message now explains how the earlier name came into scope instead of
+-- naming its site; the lineage ends at that site.
+outClashingDefinition29 :: Text
+outClashingDefinition29 = T.unlines
+  [ "Checking ClashingDefinition (/r/ClashingDefinition.agda)."
+  , "/r/ClashingDefinition.agda:24.1-6: error: [ClashingDefinition]"
+  , "Multiple definitions of least. Previous definition"
+  , "least is in scope as"
+  , "  * a record field ClashingDefinition.Bound.least"
+  , "    brought into scope by"
+  , "    - the opening of Bound at /r/ClashingDefinition.agda:22.6-11"
+  , "    - its definition at /r/ClashingDefinition.agda:20.9-14"
+  , "when scope checking the declaration"
+  , "  least : Nat"
+  ]
+
+-- | Captured output, Agda 2.9.0: the clash of 'outClashAt28', where the
+-- rejoined message reads "Previous definition at is in scope as".
+outClashAt29 :: Text
+outClashAt29 = T.unlines
+  [ "Checking ClashAt (/r/ClashAt.agda)."
+  , "/r/ClashAt.agda:8.1-3: error: [ClashingDefinition]"
+  , "Multiple definitions of at. Previous definition"
+  , "at is in scope as"
+  , "  * a defined name ClashAt.at brought into scope by"
+  , "    - its definition at /r/ClashAt.agda:5.1-3"
+  , "when scope checking the declaration"
+  , "  at : Nat"
+  ]
+
+-- | The codes of a type mismatch: [UnequalTerms] under Agda 2.8.0, which used
+-- it for terms and types alike, and [UnequalTypes] under 2.9.0.  The live
+-- tests accept either, since they run against whichever Agda is on PATH.
+typeMismatchCodes :: [Text]
+typeMismatchCodes = ["UnequalTerms", "UnequalTypes"]
 
 -- | byCode: the first diagnostic carrying a given code.
 byCode :: Text -> [Diagnostic] -> Maybe Diagnostic
@@ -1137,6 +1276,67 @@ diagnosticTests = do
         allOf
           [ assertEqual "actual"   (Just "1") (invActual inv)
           , assertEqual "expected" (Just "2") (invExpected inv)
+          ]
+
+      -- Agda 2.9.0's layout of the same mismatches (issue #234): each side on
+      -- lines of its own under the phrase that introduces it.  The payload
+      -- must mean what it meant under 2.8.0: actual first, expected second.
+    , runTest "involved: 2.9.0's [UnequalTypes] carries actual and expected, in that order" $ do
+        let ds  = parseDiagnostics outUnequalTypes29
+            inv = involvedIn (byCode "UnequalTypes" ds)
+        allOf
+          [ assertEqual "codes" [Just "UnequalTypes"] (codesOf ds)
+          , assertEqual "actual"   (Just "Bool") (invActual inv)
+          , assertEqual "expected" (Just "Nat")  (invExpected inv)
+            -- The message is the whole body, as under 2.8.0.
+          , assertEqual "message"
+              "The type\n  Bool\nis not a subtype of\n  Nat\nwhen checking that the expression true has type Nat"
+              (maybe "" diagMessage (byCode "UnequalTypes" ds))
+          ]
+
+    , runTest "involved: 2.9.0's 'The terms … and … are not equal' carries the terms, not the type" $ do
+        let inv = involvedIn (byCode "UnequalTerms" (parseDiagnostics outUnequalTerms29))
+        allOf
+          [ assertEqual "actual"   (Just "0") (invActual inv)
+          , assertEqual "expected" (Just "1") (invExpected inv)
+          ]
+
+    , runTest "involved: 2.9.0's 'The types … and … are not equal' carries both sides" $ do
+        let inv = involvedIn (byCode "UnequalTypes" (parseDiagnostics outUnequalTypesEq29))
+        allOf
+          [ assertEqual "actual"   (Just "Set₁") (invActual inv)
+          , assertEqual "expected" (Just "Set")  (invExpected inv)
+          ]
+
+    , runTest "involved: a side the printer wrapped is rejoined, in either version's layout" $ do
+        let side c = c <> " 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009 1010"
+                       <> " 1011 1012 1013 1014 1015 1016 1017 1018 1019"
+            of28 = involvedIn (byCode "UnequalTerms" (parseDiagnostics outWrappedSides28))
+            of29 = involvedIn (byCode "UnequalTerms" (parseDiagnostics outWrappedSides29))
+        allOf
+          [ assertEqual "2.8.0 actual"   (Just (side "g")) (invActual of28)
+          , assertEqual "2.8.0 expected" (Just (side "h")) (invExpected of28)
+          , assertEqual "2.9.0 actual"   (Just (side "g")) (invActual of29)
+          , assertEqual "2.9.0 expected" (Just (side "h")) (invExpected of29)
+          ]
+
+    , runTest "involved: 2.9.0's ClashingDefinition reads the origin off the scope lineage" $
+        -- The site 2.8.0 printed after "Previous definition at" (the record
+        -- field's definition), not the opening that brought it into scope.
+        assertEqual "candidates" ["/r/ClashingDefinition.agda:20.9-14"]
+          (invCandidates (involvedIn
+            (byCode "ClashingDefinition" (parseDiagnostics outClashingDefinition29))))
+
+    , runTest "involved: a clash on a name spelled 'at' yields its origin in both versions" $
+        allOf
+          [ assertEqual "2.8.0" ["/r/ClashAt.agda:5.1-3"]
+              (invCandidates (involvedIn
+                (byCode "ClashingDefinition" (parseDiagnostics outClashAt28))))
+            -- "Previous definition at is in scope as": the 2.8.0 phrase, but
+            -- followed by no location, so the lineage is read instead.
+          , assertEqual "2.9.0" ["/r/ClashAt.agda:5.1-3"]
+              (invCandidates (involvedIn
+                (byCode "ClashingDefinition" (parseDiagnostics outClashAt29))))
           ]
 
       -- Agda fills its sentences to the terminal width, so the phrase that
@@ -5639,7 +5839,12 @@ leanProcessTests exe = do
     , runTest "wire: type_of answers lean by default, and verbose:true restores the lane's echo" $
         pairOf 4 5 $ \lean full -> allOf
           [ theRule lean full laneEcho
-          , assertEqual "type" (Just (Aeson.String "Lean.Nat")) (valueAt ["type"] lean)
+            -- The lane loads Lean from the interface check_file wrote.  Agda
+            -- 2.8.0 printed a type loaded so with its qualified name, 2.9.0
+            -- prints it as the module sees it (both captured on this module;
+            -- issue #234).
+          , assert ("type was " <> show (valueAt ["type"] lean))
+              (valueAt ["type"] lean `elem` map (Just . Aeson.String) ["Lean.Nat", "Nat"])
           ]
 
     , runTest "wire: exports_of answers one page, with the total and the rest by name" $
@@ -6531,6 +6736,14 @@ needCode c ds k = case byCode c ds of
   Nothing -> pure . Fail $
     "no [" <> T.unpack c <> "] diagnostic; got " <> show (codesOf ds)
 
+-- | needOneOf: 'needCode' for a class whose code depends on the Agda version
+-- (see 'typeMismatchCodes'): the first diagnostic carrying any of them.
+needOneOf :: [Text] -> [Diagnostic] -> (Diagnostic -> IO TestResult) -> IO TestResult
+needOneOf cs ds k = case find (maybe False (`elem` cs) . diagCode) ds of
+  Just d  -> k d
+  Nothing -> pure . Fail $
+    "no diagnostic coded any of " <> show cs <> "; got " <> show (codesOf ds)
+
 diagnosticIntegrationTests :: AgdaConfig -> IO [Bool]
 diagnosticIntegrationTests cfg = do
   injLanes <- injectionOnlyLanes
@@ -6609,13 +6822,25 @@ diagnosticIntegrationTests cfg = do
                   _ -> pure (Fail "fixture no longer contains two `least` tokens")
 
         , withFixtureDiagnostics cfg
-            "diagnostics: UnequalTerms carries actual, expected, and the range"
+            "diagnostics: a type mismatch carries actual, expected, and the range"
             "UnequalTerms.agda" $ \src ds ->
-              needCode "UnequalTerms" ds $ \d -> allOf
+              -- [UnequalTerms] under Agda 2.8.0, [UnequalTypes] under 2.9.0.
+              needOneOf typeMismatchCodes ds $ \d -> allOf
                 [ assertEqual "range" (rangeOfNth 0 src "true") (diagRange d)
                 , assertEqual "involved.actual"   (Just "Bool")
                     (invActual (diagInvolved d))
                 , assertEqual "involved.expected" (Just "Nat")
+                    (invExpected (diagInvolved d))
+                ]
+
+        , withFixtureDiagnostics cfg
+            "diagnostics: UnequalTerms on two terms carries both, and the range"
+            "UnequalTermsRefl.agda" $ \src ds ->
+              needCode "UnequalTerms" ds $ \d -> allOf
+                [ assertEqual "range" (rangeOfNth 0 src "refl") (diagRange d)
+                , assertEqual "involved.actual"   (Just "0")
+                    (invActual (diagInvolved d))
+                , assertEqual "involved.expected" (Just "1")
                     (invExpected (diagInvolved d))
                 ]
 
@@ -7239,6 +7464,28 @@ interactionWireTests = do
           , assertEqual "no codes" [] (grCodes g)
           ]
 
+    , -- The same give under Agda 2.9.0, captured (`p : 0 ≡ 0`, `p = {!!}`,
+      -- give "refl" with noRange): Agda answers a give made without a range
+      -- with a parenthesization form, {"paren": false}, not the reprinted
+      -- text.  The class never read the text, so the reading is the same ok,
+      -- and only the text goes absent (issue #234).
+      runTest "readGive: 2.9.0's {\"paren\": false} answer reads ok, with no text" $ do
+        let rs = mapMaybe parseResponseLine
+              [ "{\"giveResult\":{\"paren\":false},\"interactionPoint\":{\"id\":0,\"range\":[{\"end\":{\"col\":9,\"line\":7,\"pos\":106},\"start\":{\"col\":5,\"line\":7,\"pos\":102}}]},\"kind\":\"GiveAction\"}"
+              , "{\"info\":{\"errors\":[],\"invisibleGoals\":[],\"kind\":\"AllGoalsWarnings\",\"visibleGoals\":[],\"warnings\":[]},\"kind\":\"DisplayInfo\"}"
+              , "{\"interactionPoints\":[],\"kind\":\"InteractionPoints\"}"
+              ]
+            g = readGive 0 rs
+        allOf
+          [ assertEqual "the GiveAction parses, with no text"
+              [IGiveAction (Just 0) Nothing] [ r | r@(IGiveAction _ _) <- rs ]
+          , assertEqual "class" GiveClassOk (grClass g)
+          , assertEqual "given" True (grGiven g)
+          , assertEqual "no text" Nothing (grText g)
+          , assertEqual "point" (Just 0) (grPoint g)
+          , assertEqual "no points left" (Just []) (grPoints g)
+          ]
+
     , -- `(+-comm {!!} {!!})` on stdlib-nat-plus-comm, captured.  Two NEW
       -- visible goals do not make it a type error (a sub-hole is the
       -- [UnsolvedInteractionMetas] class fill_hole tolerates), but the
@@ -7747,8 +7994,11 @@ interactionLaneTests cfg repoRoot = do
           Right res -> do
             r1 <- assert "no type" (isNothing (torType res))
             r2 <- assertEqual "stage" (Just "load") (lveStage <$> torError res)
-            r3 <- assertEqual "code" (Just (Just "UnequalTerms"))
-                    (lveCode <$> torError res)
+            -- `bad = Nat` is a type mismatch: [UnequalTerms] under Agda 2.8.0,
+            -- [UnequalTypes] under 2.9.0.
+            r3 <- assert ("code was " <> show (lveCode <$> torError res))
+                    (maybe False (maybe False (`elem` typeMismatchCodes))
+                       (lveCode <$> torError res))
             -- This load failed while CHECKING the file, so Agda announced it
             -- and the cache signal has real evidence to report (the control for
             -- the test below).
@@ -8289,7 +8539,11 @@ interactionLaneTests cfg repoRoot = do
               allOf
                 [ assertEqual "class" GiveClassOk (grClass g)
                 , assertEqual "given" True (grGiven g)
-                , assertEqual "text" (Just "zero") (grText g)
+                  -- Agda 2.8.0 reprints the candidate; 2.9.0 answers a give
+                  -- made without a range, as the lane's are, with
+                  -- {"paren": false} and no text (issue #234).
+                , assert ("text was " <> show (grText g))
+                    (grText g `elem` [Just "zero", Nothing])
                   -- The other hole is still there: an open interaction point
                   -- is the one class fill_hole tolerates, and the lane says
                   -- the same by listing it rather than by erroring.

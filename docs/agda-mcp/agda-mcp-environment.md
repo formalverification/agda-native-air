@@ -70,10 +70,13 @@ The server writes no state of its own.  `get_goal` and `fill_hole` do rewrite th
 Two further environment facts an operator needs.
 
 +  **`AGDA_DIR` is exported unconditionally by the hook**, so setting it before entering the shell has no effect.  It is also where Agda looks for a `libraries` file when none is passed explicitly, which is why `AgdaMCP.Project` consults `$AGDA_DIR/libraries` (then `~/.agda/libraries`) as its fallback registry.
-+  **The Nix `agda` on `PATH` is a wrapper that already supplies `--library-file`**, pointing into the Nix store:
++  **The Nix `agda` on `PATH` is a wrapper that already supplies `--library-file`**, pointing into the Nix store.  It is two scripts deep since Agda 2.9.0 ([#234]): the outer one unsets `LD_LIBRARY_PATH`, which the default and all shells export for pip wheels and under which Agda 2.9.0 does not start, and the inner one is nixpkgs' wrapper:
 
    ```sh
-   exec /nix/store/…-Agda-2.8.0-bin/bin/agda --with-compiler=… --library-file=/nix/store/…/libraries "$@"
+   unset LD_LIBRARY_PATH
+   exec -a "$0" "/nix/store/…-agda-env-2.9.0/bin/.agda-wrapped" "$@"
+   # .agda-wrapped:
+   exec /nix/store/…-Agda-2.9.0-bin/bin/agda --with-compiler=… --library-file=/nix/store/…/libraries "$@"
    ```
 
    The caller's `--library-file` arrives after it and wins, since Agda's option parser takes the last occurrence.  The shell *function* `agda()` that the hook defines — the one that adds `--no-default-libraries` and the `--library` flags — is not visible to a subprocess, so `agda-mcp` never gets it; that is why the client configuration must pass `--library-file` and `-l` explicitly.  Every response now echoes the resolved binary under `command.binary`, so which `agda` ran is no longer a guess.
@@ -125,3 +128,5 @@ One limit worth stating.  The name comparison is exact, so a library that declar
 +  Read `project.root` in any response to confirm which tree answered.  If it is not the tree you are editing, the server will have told you so rather than guessed.
 +  A `[agda] WARNING: this does not look like the agda-native-air checkout` line on startup means the shell could not identify this repository; the Agda configuration it wrote will not work, and nothing downstream will be trustworthy.
 +  Nothing needs adding to a client project's `.gitignore` any more — the server writes nothing into it.  If you want belt and braces for older launches, `agda/` and `target/` are the two names to cover.
+
+[#234]: https://github.com/formalverification/agda-native-air/issues/234

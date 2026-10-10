@@ -272,6 +272,17 @@ final class OriginalInViewSpec extends AnyFunSuite with Matchers {
     ("arm162-shell-1", 15, 16), ("arm162-mcp-1", 4, 5), ("arm162-both-1", 16, 16),
     ("arm184-mcp-1", 3, 5), ("arm184-both-1", 14, 15))
 
+  /** A block with the hash of a store path elided from its `file`.  The hash
+    * names a build, not a file: the archive was read against the agda-algebras
+    * the flake built with Agda 2.8.0, and the move to 2.9.0 (issue #234)
+    * rebuilt the same source commit under another hash, so the same file of
+    * the same library now sits under another store path.
+    */
+  private def storeHashElided(j: io.circe.Json): io.circe.Json =
+    j.hcursor.downField("file")
+      .withFocus(_.mapString(_.replaceAll("^/nix/store/[a-z0-9]{32}-", "/nix/store/…-")))
+      .top.getOrElse(j)
+
   test("the committed archive: every original block is this reading of its transcript, and the counts per arm are the issue's") {
     val root     = Paths.get("..").toAbsolutePath.normalize
     val registry = sys.env.get("AGDA_DIR").map(d => Paths.get(d).resolve("libraries"))
@@ -295,7 +306,7 @@ final class OriginalInViewSpec extends AnyFunSuite with Matchers {
         withClue(s"$arm ${e.id}: ") {
           r.inView should not be None
           TextIO.readJson(subj.resolve("outcome.json")).unsafeRunSync().get.hcursor.downField("original").focus
-            .filterNot(_.isNull).foreach(archived => archived shouldBe r.toJson)
+            .filterNot(_.isNull).foreach(archived => storeHashElided(archived) shouldBe storeHashElided(r.toJson))
         }
         (e.id, r)
       }

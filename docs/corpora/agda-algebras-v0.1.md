@@ -105,6 +105,12 @@ make corpus-nix CORPUS_VERSION=v0.1
 
 Artifacts land under `data/corpora/agda-algebras/v0.1/`.  Byte-identical output is expected for the same library commit and toolchain (sorted concatenation, gzip with no filename and `mtime=0`); compare against the digests above.  The generated `Everything*` barrels may or may not be present in the checkout; they contribute no rows, so `corpus.jsonl` and its digests are unaffected; only `coverage.json`'s module count varies with them.  Expect six to seven minutes of wall time with warm `.agdai` interfaces.
 
+**The toolchain has moved since**.  The producer commit pins Agda 2.8.0; since [#234] the repository pins Agda 2.9.0, and `agda-json` links 2.9.0's library, so reproducing these bytes needs the producer commit's flake.  An extraction at a later commit differs, as follows, measured on 29 modules of this library commit (every fourteenth of the module list):
+
++  2.8.0 wrote 962 rows and 2.9.0 wrote 954, of which 944 share a qname;
++  the printed `type` agrees for 938 rows and `bodyRefs` for 943;
++  `typeAst` agrees for 426 only, because it carries strings of Agda's internal terms that 2.9.0 prints differently (a function type's sort, `FunSort` under 2.8.0, is `PiSort`; a variable, `Var`, is `Var'`); without those strings it agrees for 900.
+
 ## Using it with agda-mcp
 
 As for v0: `gunzip -k corpus.jsonl.gz && agda-mcp --corpus corpus.jsonl [flags]` registers `search_by_name`, `search_by_type`, and `get_dependencies`; `make corpus-mcp-smoke CORPUS_VERSION=v0.1` drives them over the real JSON-RPC transport.
@@ -114,3 +120,4 @@ As for v0: `gunzip -k corpus.jsonl.gz && agda-mcp --corpus corpus.jsonl [flags]`
 [#127]: https://github.com/formalverification/agda-native-air/issues/127
 [#132]: https://github.com/formalverification/agda-native-air/pull/132
 [agda-algebras]: https://github.com/ualib/agda-algebras
+[#234]: https://github.com/formalverification/agda-native-air/issues/234

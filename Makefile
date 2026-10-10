@@ -680,7 +680,8 @@ extract-lib-smoke-nix:
 # agda-strux (Haskell executable: agda-json)
 #
 # We intentionally run cabal via the flake backend shell to ensure:
-#   - cabal/ghc are compatible with the pinned Agda library (2.8.0)
+#   - cabal/ghc are compatible with the pinned Agda library (2.9.0, the
+#     library output of the `agda` input itself)
 #   - we don't accidentally pick up a random system cabal
 # Backend test output retention
 #
@@ -719,7 +720,7 @@ backend-clean:
 # 1.4.1. agda-mcp (Haskell MCP server) — build / test / smoke / serve
 #
 # Like the agda-strux targets above, these run cabal inside the flake backend
-# shell (GHC 9.10.3 + Agda 2.8.0) via run_backend, so `make agda-mcp-test` works
+# shell (GHC 9.10.3 + Agda 2.9.0) via run_backend, so `make agda-mcp-test` works
 # from outside a Nix shell.  When already inside `nix develop .#backend` (or in
 # CI, whose outer step is `nix develop`), pass BACKEND_USE_NIX=0 to avoid nesting.
 #

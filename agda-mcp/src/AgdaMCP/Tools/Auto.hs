@@ -6,7 +6,7 @@
 --   The auto tool (issue #205): Agda's own proof search at one hole, run on
 --   the interaction lane, answering the term it found as a candidate.
 --
---   Under the pinned Agda 2.8.0 the search is Mimer, which replaced Agsy in
+--   Under Agda 2.8.0 and 2.9.0 the search is Mimer, which replaced Agsy in
 --   Agda 2.7 (the 2.7.0 release notes); @Cmd_autoOne@ is the command, the
 --   one an editor's @C-c C-a@ sends.  It needs no corpus and no model, and on
 --   the benchmark it costs milliseconds a hole, so it is the cheapest proposer

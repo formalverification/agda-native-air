@@ -5,8 +5,8 @@ Description: The proof-search floor of the benchmark (issues #205, #206):
   Agda's own proof search on every obligation, with no model and no corpus
   ranking, each term it finds judged by the batch fill_hole under --safe.
 
-  The search is Mimer, the one Agda 2.8 runs for Cmd_autoOne (it replaced
-  Agsy in Agda 2.7), asked through agda-mcp's auto tool.  The number it
+  The search is Mimer, the one Agda 2.8 and 2.9 run for Cmd_autoOne (it
+  replaced Agsy in Agda 2.7), asked through agda-mcp's auto tool.  The number it
   produces per tier is a denominator no model had to earn: an agent's or the
   loop's solves on a tier read differently when Agda alone already solves
   some of them.

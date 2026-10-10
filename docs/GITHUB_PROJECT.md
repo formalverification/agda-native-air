@@ -4800,7 +4800,7 @@ Two uses here.  The proof-search loop builds `f {!!} {!!}` candidates by hand an
 
 ---
 
-### Issue M5-22: run-server.sh: default --cwd to the launcher's working directory, for a harness that does not expand ${PWD} (#242)
+### Issue M5-22: run-server.sh: default --cwd to launcher's working directory for harnesses not expanding ${PWD} (#242)
 
 **Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
 

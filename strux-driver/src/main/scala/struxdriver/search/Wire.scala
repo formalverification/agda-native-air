@@ -181,7 +181,7 @@ object TypeOfBody {
 }
 
 /** auto (issue #205): Agda's own proof search at one hole, on the lane.
-  * The search is Mimer under Agda 2.8, and its answer is a CANDIDATE: the
+  * The search is Mimer under Agda 2.8 and 2.9, and its answer is a CANDIDATE: the
   * loop judges a found term with fill_hole like any other (issue #206).
   *
   * `outcome` is one of four, and each carries exactly its own field, checked

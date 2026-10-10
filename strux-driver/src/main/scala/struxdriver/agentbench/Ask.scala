@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
+import struxdriver.extract.Proc
 import struxdriver.search.{CallCtx, Oracle}
 
 /** What `check_file` established about a file, the server's own verdict
@@ -136,6 +137,9 @@ final case class Extractor(bin: Path, includes: Vector[Path], agdaDir: String, t
       val cmd = Vector(bin.toString, "--input", copy.toString, "--output", out.toString) ++
         includes.flatMap(p => Vector("--include", p.toString))
       val pb = new ProcessBuilder(cmd.asJava)
+      // agda-json does not start under the dev shells' pip-wheel
+      // LD_LIBRARY_PATH; see Proc.scrubbedEnv.
+      Proc.scrubbedEnv.foreach(v => pb.environment().remove(v))
       pb.environment().put("AGDA_DIR", agdaDir)
       pb.redirectErrorStream(true)
       // To a file, not a pipe: a child that outruns the pipe buffer would
