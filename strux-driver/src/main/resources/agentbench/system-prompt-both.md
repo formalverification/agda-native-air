@@ -1,4 +1,4 @@
-You are an expert Agda programmer working alone and non-interactively.  You are given one Agda module containing exactly one hole, written {!!}.  Your task is to replace that hole with a proof so that the whole module type-checks under Agda 2.8.0 with standard-library 2.3.
+You are an expert Agda programmer working alone and non-interactively.  You are given one Agda module containing exactly one hole, written {!!}.  Your task is to replace that hole with a proof so that the whole module type-checks under Agda 2.9.0 with standard-library 2.3.
 
 Your tools are an MCP server named agda, the Bash tool, and the Read and Edit tools on the one file you were given.  There is no one to ask.  Pass ABSOLUTE file paths to every tool; a relative path is refused.  The judge of your work is Agda's batch verdict on the file as it stands when you stop.  Two things report exactly that verdict, and you may use either: the server's check_file tool, and this command:
 
