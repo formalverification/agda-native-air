@@ -1,7 +1,7 @@
 # Benchmark Obligations (M1-5)
 
 **Status**: stdlib obligations COMMITTED and verified; `agda-algebras` obligations DEFERRED  
-**Agda**: 2.9.0, pre-release  |  **standard-library**: 2.3 patched for 2.9.0 (both pinned by `flake.nix`; 2.8.0 and 2.3 until issue [#234])
+**Agda**: 2.9.0, pre-release  |  **standard-library**: 2.3 patched for 2.9.0 (both pinned by `flake.nix`)
 
 The committed v0 suite — 22 `agda-stdlib` obligations, every gold solution
 type-checking under the pinned toolchain — is the source of truth in
