@@ -67,9 +67,9 @@
 # Usage (from anywhere):
 #   scripts/run-server.sh [extra agda-mcp args...]
 #
-#   Relative paths among the arguments resolve against the directory the
-#   script is started in (or against --cwd, when it names another), exactly as
-#   they would for the bare binary.
+# Relative paths are resolved by the server after this launcher enters REPO_ROOT:
+# --cwd itself is relative to REPO_ROOT, and later paths are relative to the
+# resulting server cwd.  Use an absolute --cwd when naming another checkout.
 
 set -euo pipefail
 
