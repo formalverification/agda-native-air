@@ -379,6 +379,933 @@ was a batch verdict on a whole module in a worktree the server did not own;
 the MCP's advantage (warm interaction lane, structured diagnostics) never had
 a chance to apply.  Net: for multi-worktree stacked-PR work the server needs
 per-call roots before it can replace the CLI.
+## 2026-09-22, fls PR #1304 review triage (no Agda written)
+
+Session: reading the reviewers' comments on the Leios crypto
+structure PR and proposing fixes; analysis only, no Agda edited.
+
++  Tools used: `type_of` once, to check that `IsStrictTotalOrder._<?_` exists
+   (a reviewer said the `Dec-<ᵏʰ` field is derivable).
++  What happened: the call failed at load with `LibraryError`.  The server's
+   libraries file was agda-native-air's own (`agda/libraries`, registering
+   agda-dojang and standard-library-2.3 only), so `standard-library-classes`,
+   `standard-library-meta`, `abstract-set-theory` and `iog-prelude` were
+   unresolvable, and `command.cwd` was a worktree of a private repository, not the fls
+   worktree the file lives in.  The echo made the diagnosis immediate, which is
+   the tool doing its job; the configuration is the problem.
++  Workaround: grep the pinned stdlib source in the nix store
+   (`Relation/Binary/Structures.agda`), which answered in one command.
++  Verdict: for a one-fact lookup the grep was faster than a working lane would
+   have been; the lane would pay off only for the hole-driven edits that a fix
+   session will do.  A per-project libraries file (or starting the server from
+   the fls worktree) is the prerequisite before that session.
++  Same day, the fix session: the four edits were written from the analysis and
+   gated with the devShell `agda` on PATH (Dijkstra Specification and Foreign
+   umbrellas, 75 modules, 8 minutes, exit 0).  No hole was opened: the changes
+   were deletions, a one-line derived instance, and prose, so the lane would
+   have had nothing to add even if it had loaded.
+
+## 2026-09-28, agda-algebras #513, PR #579 (Aschbacher's D-lattices specialized to parachutes), Claude Fable 5.1
+
+Task shape: read three of Aschbacher's papers, work out what they say about
+parachutes, and land the result as a new lattice module
+(`Classical.Structures.Lattice.Disconnected`: modular elements, A- and
+D-lattices, the theorem that D-lattices are A-lattices, and that parachutes
+with two big canopies are D-lattices), three catalog entries in
+`FLRP.Reductions`, a relocated three-element chain, and survey-note updates.
+About 250 lines of new Agda, all composed as complete definitions from a
+plan; no holes were opened.
+
+Tools used: `check_file` ×8 (the new module ×3, `FLRP.Closure.Basic` ×1,
+`FLRP.Reductions` ×2, `FLRP.Hunt` ×1, plus one on the module before a rename
+that was abandoned).  Nothing else: no `get_goal`, `fill_hole`, `type_of`,
+`resolve_name`, or `exports_of`.  The final gate was `make check` from the
+shell (74 s, exit 0), because CI runs it that way.
+
+What worked:
+
++  **The structured diagnostics carried the repair each time**.  Three
+   failures, three fixes, each from one read of the JSON: a `NotInScope` on
+   a renamed operator whose `where`-clause rename did not reach the type
+   signature; an `UnsolvedConstraints` whose `involved.metaTypes` showed the
+   parachute's meet reduced at an extremum (`meetᶜ … (i ≟ i)`), which is the
+   documented reason the Parachute module passes endpoints explicitly, so the
+   fix was mechanical; and an `UnsolvedMetaVariables` at a single
+   `IE→cfIE ie` whose lattice argument cannot be inferred through the
+   unfolded interval isomorphism, again visible from the printed constraint
+   (`_𝑳.fst.Interp.to … = hexagonᵃ ∧ᵖ …`).  The line and column ranges pointed
+   at the right token every time.
++  **Root selection was right without configuration this time**: the
+   worktree's `.agda-lib` was already in the server's libraries registry
+   (from the 2026-09-01 session), and every response echoed
+   `rootSource: nearest-agda-lib` with this worktree as the root.  The one
+   thing to remember is that this registry line is per-worktree and goes
+   stale when the worktree is deleted.
++  **Turnaround**: 5–30 s per check on modules whose dependencies were
+   warm, against a 74 s `make check`; for a session that edits four modules
+   in a chain (Problem → Closure.Basic → Reductions → Hunt) the per-file
+   verdicts were the right granularity and the CLI was only needed at the
+   end.
+
+What was awkward or missing:
+
++  **No profiling tool**, again (agda-native-air #134).  The new module's
+   cost was never measured because the measurement loop lives in Bash.
++  **The lane's warm state is wasted by a batch-only workflow**.  Every
+   `check_file` here `checkedFromSource: true`; the interaction lane, which
+   would have answered `get_goal` in milliseconds, was never used because
+   the definitions were written whole.  That is a choice about how to work,
+   not a tool defect, but it means this session cannot say whether
+   hole-driven development would have been faster.  For the two
+   unsolved-meta repairs a `type_of` on the offending subterm would have
+   shown the stuck meet directly; the batch diagnostic showed it too, one
+   level less conveniently.
++  **Two agda processes on one tree**.  While the server had a lane open on
+   the worktree, the session ran `make check` in the background from the
+   shell; both write interfaces under the same `_build/`.  Nothing broke,
+   but nothing guarantees it, and the server gives no way to ask "is a lane
+   currently loading this root?" before starting a batch build beside it.
+
+Verdict: the MCP loop was more efficient than the CLI for the per-module
+checks (shorter turnaround, and the diagnostics were readable without
+scrolling a log), and the CLI was still required for the acceptance gate.
+Net positive, modest.  The larger cost centers of the session were reading
+papers and running GAP, which no Agda tool touches.
+
+Addendum, later the same day: one more `check_file` on `FLRP.Reductions` after
+a prose-only edit (16 s, green), the cheap way to confirm that a documentation
+change did not disturb a code fence.
+
+Second addendum, after Copilot's round two on the same PR: two more
+`check_file` calls on `FLRP.Reductions` (8 s and 17 s, both green) confirmed
+the two code repairs the review asked for, an added premise on an imported
+hypothesis and a finiteness-aware restatement of an entry, before the 13 s
+incremental `make check`.  Same pattern as before: per-file verdicts for the
+edits, the batch gate at the end.
+
+## 2026-09-28, fls Leios reorientation and two PR reviews (Claude Fable 5.1)
+
+Session: reorient on the Leios ledger formalization, refresh the review artifact,
+review PRs #1331 (BLS keys in the pool state) and #1300 (the voting committee).
+
+Tools used: none of the agda-mcp tools.  All Agda work went through the CLI
+`agda` of the nix devShell the session was launched from.
+
+Why not: the two review targets were not the session worktree.  #1331's tree
+IS the session worktree, and its gate (Specification + Foreign umbrellas, 76
+modules, exit 0) ran as two plain `agda` invocations in the background while
+other reading went on; nothing in that review needed a goal, a type, or a
+normal form.  #1300's head lives on a sibling branch, so it was checked out
+into a detached scratch worktree seeded with a sibling's `_build/`, and the
+known limit (check_file and the lane resolve a sibling worktree's modules
+twice, AmbiguousTopLevelModuleName, recorded 2026-09-21) kept the MCP tools
+out of it.
+
+The one place a live query would have earned its keep: verifying that
+`selectCommittee` sorts the committee in reverse.  `normalize` would have been
+the natural instrument, but the definition does not compute anyway, because
+stdlib's `Data.List.Sort.sort` is `abstract`; the answer came from a probe
+module that sorts four concrete seats with `Data.List.Sort.MergeSort.mergeSort`
+under the PR's own (private) order, exposed by appending a hidden block to the
+scratch copy.  A `refl` that fails prints the computed list, so one batch run
+answered the question and a second run confirmed the fix.  A normalize call in
+a hole would have needed the same visibility hook and the same substitution of
+the computable sort, so the CLI loop was not slower here; it was the only loop
+available for a sibling tree.
+
+What would have made agda-mcp useful this session: a per-call project root
+(or a `cwd` parameter) so a sibling worktree can be served, and a way to
+evaluate under `abstract` (Agda has none; this is not the server's fault).
+
+Verdict: neutral.  The session was review and status work; the checker was
+consulted as a batch oracle four times, and the structured diagnostics of
+check_file would have saved nothing over reading the last lines of a log.
+
+Addendum, later the same session (agda-algebras, second batch).  Two
+more modules were written whole, an imported-theorem entry for Lucchini's
+`Mₙ` dichotomy and an emitted certificate for the hexagon on six points.
+Neither could be checked through the server: the libraries file the server
+reads (`agda/libraries` of this repository) had meanwhile been rewritten to
+register `agda-algebras` at a Nix store path rather than at the worktree,
+and `check_file` refused with the root-mismatch diagnostic the tool
+documents (it names both roots and the fix).  The diagnostic was right and
+the refusal was the correct behavior; the fix it asks for, restarting the
+server against the worktree, is not something a session can do from inside
+(the harness spawns the server from `.mcp.json`), and William reported a
+newly compiled server in the meantime, which likewise needs a restart of
+the client to take effect.  The CLI (`agda <file>` through the worktree's
+wrapper) was the gate for the rest of the session: 10 s for the new entry,
+7 s for the 550-line certificate, a 4 s recheck after a prose edit.  For a
+session that writes small modules whole, the CLI is a complete substitute;
+what the server would have added is the structured diagnostic, and there
+was one error to diagnose (a `let … where` on a signature), which the CLI
+reported plainly.  Two things for the tool: the registry line for a
+worktree should not be silently replaced by a flake rebuild, or the server
+should read the `*_ROOT` variable the `.mcp.json` sets over the registry;
+and a way to reload or restart the server from a client session would have
+turned a dead tool into a live one here.
+
+Addendum, third stretch of the same session (agda-algebras, third batch).  The Agda work was
+one derived module (`AlmostSimple`, instantiating a structure theorem from
+`FLRP.Parachute.Basic` at the monolith of a catalog entry, about 60 lines)
+plus prose and an umbrella re-export, all checked through the CLI wrapper:
+one error in two runs (a `Fin (suc m)` versus the parachute's own `Ix`, an
+index mismatch seen earlier in the session; fixed by naming the module's
+type), 25 s and 19 s per run, then `make check` in the background (exit 0).
+The server stayed unusable for the reason of the previous addendum (the
+registry root), so there is no comparison to draw from this stretch beyond
+the earlier one; but the error is worth noting as the kind a `get_goal`
+would have answered in one step, since the mismatch is visible only after
+the checker unfolds the record's index, and the CLI reports it as
+`suc m != m` at the use site with no hint of where `Ix` is defined.  A
+`definition_of` call on `Ix` would have been the natural next move.
+Everything else in the stretch was Python (a lattice enumerator), GAP
+(three sweeps run in the background), and prose; none of it
+touches the server.  Verdict for the stretch: not applicable, one small
+data point for the value of `get_goal` on index mismatches.
+
+## 2026-09-29, formal-ledger-specifications: leios-main history rewrite
+
+Task: rebuild `leios-main` (16 commits from six merged PRs) as six commits, one
+per PR with authorship kept, rebase the two stacked PR branches onto the result,
+and open the PR to master.  No Agda was written or edited; the rebuilt tree is
+byte-identical to the old head.
+
++  **agda-mcp tools used**: none.  The task had no hole to drive and no module
+   to compose; the checker was needed only as a gate.
++  **What the gate was**: the two rebased stacked branches live in sibling
+   worktrees, and `check_file` serves only the session worktree (a sibling
+   resolves twice and fails with `AmbiguousTopLevelModuleName`, as recorded on
+   2026-09-15), so each was checked by a detached CLI process in its own
+   worktree and `_build/` (`agda src/Ledger.lagda.md`, then the Foreign
+   modules), with a log-polling monitor for the verdicts.  Each run re-checked
+   roughly 60 to 90 modules off a warm cache.
++  **What was awkward**: the gate is a whole-closure batch run per branch, so
+   the two verdicts arrived twenty-odd minutes after the branches were ready,
+   and nothing in the MCP surface shortens that: `check_project` runs one
+   project's gate from one root, and neither it nor `check_file` accepts a
+   worktree other than the registered one.  A `check_file` that took a project
+   root (or a `--library-file`) as an argument would have replaced the shell
+   processes and the monitor.  Verdicts: exit 0 on both (225 and 209
+   modules), about 45 minutes each, because the rebase moved the branches
+   onto a master that had changed the set library, which invalidated every
+   cached interface; two checks ran side by side without interference.
++  **CLI versus MCP**: the CLI loop was the right tool and not slower; the MCP
+   server had nothing to offer a history rewrite, which is the honest finding.
+
+## 2026-09-30, formal-ledger-specifications, leios-main (Claude Fable 5.1)
+
+No Agda was written or modified: the session rewrote four commit messages of
+`leios-main` (trees byte-identical, so no typecheck was needed) and drafted the
+Integration plan and issues from the merged modules.  agda-mcp tools used:
+none.  CLI agda used: none.  Nothing to compare; the loop question did not
+arise.  The modules were read with plain `cat`, which was the right tool for
+orientation across many files.
+
+## 2026-09-30, agda-algebras: moving a subtree into its own library (Claude Opus 5.5)
+
+The session moved a subtree of agda-algebras into a new library that depends on
+agda-algebras.  The Agda edits were small and mechanical: a record and its lemma
+moved verbatim between two modules, one import was redirected, three modules
+were renamed along with their importers, and one import that had gone through a
+barrel was pointed at the module directly.
+
++  **agda-mcp tools used**: `check_file`, once, on the record's new home in a
+   second worktree of agda-algebras.  It ran Agda and returned exit 42 with
+   `AmbiguousTopLevelModuleName`: the server's registry places the library at
+   the primary checkout, so the module resolved to two files.  This is the
+   sibling-worktree failure recorded on 2026-09-15.  The server did not refuse
+   with the `rootMismatch` its instructions describe; it ran a check that
+   could only fail.
++  **What I used instead**: the CLI from each tree's own dev shell
+   (`nix develop --command agda <file>`, 27 to 33 s per module with its
+   dependencies), then `make check` as the gate on both libraries.  I did not
+   try agda-mcp on the new library, which resolves agda-algebras from a copy
+   that the server's registry knows nothing about, and I did not try
+   `check_project`.
++  **What was missing**: a way to name the registry per call (a project root,
+   or the libraries file the tree's dev shell writes).  With it, `check_file`
+   would have served the worktree and the new library, and the one scope error
+   of the session (a name reached through a barrel that no longer re-exports
+   it) could have been found by a single-module check instead of a 53 s
+   `make check`.
++  **CLI versus MCP**: for a mechanical move the CLI was the right loop, and
+   here it was the only one that worked.  The verification was whole-library
+   builds, which no MCP tool shortened.
++  **Addendum, 2026-10-01**: a later prose-only correction in the new library
+   was checked with `make check` alone.  The server is not configured for that
+   library, so agda-mcp was not tried; configuring it needs a libraries file
+   that registers the dependency's writable copy, which is the same missing
+   per-call registry noted above.
+
+## 2026-09-30, fls issue #1336: the Leios block structure (Claude Fable 5.1)
+
+The session added two header fields, two block fields, a record, a predicate
+with its decider, one premise, the Computational case, and the Foreign mirror,
+in a worktree that started with no interface cache.
+
++  **agda-mcp tools used**: `type_of` once, to warm the lane and confirm the
+   project root, and `check_file` four times: the types, the Computational
+   module, the Foreign mirror, and the prose version of the module.  Every
+   check passed on the first attempt, so `get_goal` and `fill_hole` were never
+   needed: the shapes were known from the consensus spec's `certChecks` and
+   from the file's neighbors.
++  **What worked**: `check_file` on one module with its dependencies cached is
+   a 13 to 15 s answer carrying Agda's own exit code, with no output to parse.
+   The first lane load of `BlockBody` took 213 s because the worktree had no
+   `_build`; seeding `_build` from master's with `rsync --ignore-existing`
+   cut the next check to 13 s, since Agda verifies source hashes and rebuilds
+   only what is stale.
++  **What was awkward**: two of the four `check_file` calls (204 s and 159 s)
+   outran the 120 s foreground limit and went to the background, because
+   checking the Computational and Foreign modules rebuilt the dependents of
+   the changed module that master's interfaces no longer covered.  There is no
+   progress signal from a running check other than listing `_build`.  The
+   server served only the session worktree, as recorded on 2026-09-15; the
+   session never pointed it at a sibling, so the ambiguous-module trap did not
+   fire.
++  **CLI versus MCP**: roughly even.  The development was four batch checks,
+   and the CLI would have run the same four `agda` invocations at the same
+   cost; the saving was the structured verdict.  The final gate ran on the CLI
+   in the background (1 min 15 s and 20 s, 21 and 3 modules from source, zero
+   warnings), which the foreground limit would not have tolerated.
+   Hole-driven development did not happen because the Agda was mechanical;
+   the judgment was in the shape of one premise and in the prose.
+
+## 2026-09-30, fls issue #1337: the Leios certification delay in slots (Claude Fable 5.1)
+
+Task: four small definitions across the prelude, the epoch structure, the Leios
+module, and a two-conjunct change to the Dijkstra `paramsWellFormed` and its
+update predicate, in the session's own worktree with a `_build/` seeded from a
+sibling.
+
+Tools used and what each did:
+
++  `check_file`, four times, as the per-file gate after each edit: `Core/Foreign/Epoch.agda`
+   14 s and 12 s (prelude closure), `Leios.lagda.md` 130 s (the Dijkstra spine,
+   moved to the background after 120 s and the completion notification arrived),
+   `PParams.lagda.md` 100 s.  All green on the first run.
++  `get_goal` on both holes in `PParams.lagda.md`: the first load of the file
+   cost 114 s in the lane; the second goal answered in 38 ms.  Goal `Type`,
+   context as expected.
++  `resolve_name` for `Maybe.All` and `½` (1 to 2 ms each) confirmed the names
+   and their provenance through the `as ℚ` opening.
++  `type_of` on the two candidate conjuncts caught `fromUnitInterval` out of
+   scope (a `using` list in the module header) before any batch run; after the
+   one-line import fix the lane reloaded in 107 s and both candidates typed as
+   `Type`.
++  `fill_hole` once, for the update-level clause, the one real uncertainty
+   (whether `¿ paramsUpdateWellFormed u ¿` still resolves its instances through
+   `Dec-×`, `Dec-MAll` and `ℚ-Dec-<`): status `ok` in 96 s with the other hole
+   listed as remaining.
++  `normalize` on `Ledger.Prelude.Base`, four probes of `durationToSlots 1000 d`
+   for d = 8500, 8000, 0, 1 (9, 8, 0, 1): the rounding check at the boundary,
+   0.2 s to load the file and about 1 ms per probe afterward.
++  `search_in_scope` once, at the `paramsWellFormed` hole with tokens `ℚ` and
+   `<`: 7 s, six results, mostly `Data.Nat.Properties` lemmas; the ranking is
+   over function rows by type-token overlap, and a goal of type `Type` has no
+   tokens, so it had nothing to rank by.  Not useful for this shape of goal.
+
+What was awkward or missing:
+
++  `type_of` on `¿ P ¿` prints the unapplied instance argument
+   (`⦃ _ : P ⁇ ⦄ → Dec P`), so it cannot say whether the instance resolves; only
+   a batch run (`fill_hole` or `check_file`) answers that.  A `type_of` variant
+   that runs instance resolution to completion would have saved the fill.
++  One agda process per `_build/`: the lane (persistent) and the batch tools write
+   interfaces into the same tree, and the project's long gate must run outside
+   the tools (45 minutes, detached), so lane queries had to wait for it.  Nothing
+   in the tools serializes this; I did it by hand.
++  `check_project` was not applicable: the project's acceptance gate is the
+   closure plus the test library under a custom `--library-file`, which no
+   Makefile target or single command expresses.
++  The lane reload after a one-line import edit cost a full re-typecheck of
+   `PParams` (107 s), the same as the first load; a 50-field record with derived
+   `DecEq` and `Show` is what makes that file slow, not the tool.
+
+The final gate ran on the CLI, detached from a script with a status file,
+because one agda process at a time may touch `_build/` and the project's gate
+is two libraries: the closure (`agda src/Ledger.lagda.md`) re-checked 222
+modules from source in 16 min 06 s with zero warnings, the two `Foreign`
+umbrellas took 16 s and 15 s (already inside the closure), and the test library
+took 11 min for 50 modules against the working copy through a custom
+`--library-file`, a configuration `check_project` has no way to express.
+
+Was the CLI loop more efficient?  About even, and honestly so.  Each verdict
+is a full agda run on the file either way (PParams: 100 s), and the task's
+definitions were small enough that a careful first draft would have passed the
+batch check anyway; the lane saved exactly one failed batch run (the missing
+import), about 100 s, at the cost of a 114 s first load.  Where the MCP clearly
+won was the knowledge side: `normalize` for the rounding probe and `resolve_name`
+for provenance answered in milliseconds what a CLI session would have done with a
+scratch module and another batch run.  The hole-driven loop's value scales with
+the uncertainty of the term, and this task had little.
+
+## 2026-10-01, fls issue #1338: the CHAIN certificate branch (Claude Fable 5.1)
+
+Task: a new relation (`CERTIFY`) beside `CHAIN`, a new chain-state record, two
+`⁇` instances and a decision procedure in two other modules, two `Computational`
+instances, and the Foreign mirror, in the session's own worktree with a
+`_build/` seeded from a sibling and a background whole-closure check of the
+merged base (222 modules, 20 minutes) run before the first edit.
+
+Tools used and what each did:
+
++  `check_file`, eleven times, as the per-module gate after each edit: 11 to
+   23 s per module on the warm cache, with one outlier of 117 s for the
+   `Computational` module while it still held two holes and an error (the same
+   module without holes checked in 19 s).  Eight runs green; three red, each
+   with a diagnosis the structured answer made immediate: `MetaCannotDependOn`
+   (a product pattern over a field with an implicit binder, elaborated before
+   its type was known), `UnsolvedConstraints` whose `involved.metaTypes` listed
+   both instance candidates (`Dec-AllPairs` and the module's own `Dec-Unique`,
+   stuck between them), and `InstanceNoCandidate` (an instance left out by a
+   `using` list).  The `holes` list gave the two holes' positions exactly.
++  `get_goal`, twice, on those holes: both answered through the injected-macro
+   fallback, because the file did not load (a type error in another clause of
+   the same instance).  One answer was a macro-induced error, the macro inside
+   a `do` block breaking the `Monad` instance resolution for `>>=`; the other
+   surfaced the real error (`lhs != CertifyEnv.lastApplied Γ`: a `rewrite` on
+   a record projection that also sits in a with-function's argument type),
+   which was the most useful single message of the session, though not a goal.
++  No `fill_hole`, `type_of`, `normalize`, `resolve_name`, or `search_in_scope`:
+   the premise types are the specification and the instance's expected terms
+   followed from the constructor, so every question was "does the edit check",
+   which `check_file` answers.
+
+What was awkward or missing:
+
++  A file with one broken clause cannot be queried at a hole in another clause.
+   Agda's own interaction mode has the same limit, but the fallback then ran
+   the macro path and reported its own failure; a plain "the file does not
+   load, first error here" would have been the honest answer and saved a call.
++  One agda process per `_build/`: while the 20-minute base check ran, no
+   `check_file` could run on the worktree.  A scratch copy of `src`,
+   `src-lib-exts`, the `.agda-lib` and `_build/` (147 MB, seconds to rsync)
+   gave a second cache to check the first edit in, and later a from-source run
+   of the final tree with the worktree's cache untouched.  A `buildDir`
+   argument, or the server queuing behind a concurrent agda on the same
+   `_build/`, would remove the workaround.
+
+Verdict on efficiency: the batch loop was the right loop here, and `check_file`
+was at least as fast as the CLI with the structured `code` and candidate
+listing as a small plus over log reading.  Hole-driven development did not
+contribute: the two `get_goal` calls both fell back and neither showed a goal.
+Checker time in total about five minutes across twelve calls, against about
+three hours of session time, most of it reading and design.
+
+## 2026-10-03, agda-flrp, two generated modules (Claude Fable 5.1)
+
+A session whose only Agda output was two generated literate modules
+(0.6 and 0.8 MB each), type-checked once each.
+
++  `check_file` on the larger module: `success: true`, `exitCode: 0`, no
+   diagnostics, `checkedFromSource: true`, 67 s, `project.rootSource:
+   nearest-agda-lib`; the CLI `agda` on the other module took 75 s to the
+   same verdict.  Nothing differs in what either reports for a passing
+   file; the server's answer is the smaller one to read (a JSON object
+   against a screen of `Checking …` lines).
++  Nothing else was asked of the server: the modules were generated, not
+   developed, so no hole, goal or name query arose and the knowledge lane
+   was never used.  The tools were loaded with `ToolSearch("+agda")` on the
+   first Agda step; the registry resolved to the checkout the session ran
+   in, with no `rootMismatch`.
+
+Verdict on efficiency: for a session of this kind the CLI loop and the
+server are equally efficient; the server's one advantage was the
+structured verdict.
+
+## 2026-10-03, agda-flrp, a research pass with one new module (Claude Fable 5.1)
+
+A session whose Agda output was one new literate module of about 60 lines
+of code, written whole and checked once, inside a library of some forty
+modules over a dependency library registered through the dev shell's own
+`.agda/libraries` in a worktree.
+
++  The registration resolved the worktree as the project root
+   (`project.rootSource: nearest-agda-lib`) and the dependency library's
+   copy under the main checkout's dependency directory, with no
+   `rootMismatch`: the first `check_file` on a small existing module,
+   6.9 s from source, `success: true`, and the second on the new module,
+   40 s from source (its imports rebuilt from the worktree's empty
+   interface cache), `success: true`, no diagnostics, first try.
++  Nothing else was asked of the server.  The module's proof was planned
+   from reading two neighboring modules' source rather than by querying
+   their exports or goal types, which would have been the hole-driven
+   alternative: `exports_of` on the two modules could have replaced two
+   `grep` and `sed` passes over them, and `get_goal` on a hole would have
+   confirmed the one type the author was unsure of (a lemma's
+   argument order) before the file was written; the file checked, so the
+   cost of not asking was zero this time.
++  The whole-library gate was run from a shell (`make check`, which
+   regenerates the aggregator and checks everything but the certificate
+   census) in the background while other work went on; it took about ten
+   minutes.
+   `check_project` would have blocked for the same time, so the shell was
+   the right tool for a gate run concurrently with unrelated work.
+
+Verdict on efficiency: for one module written whole, the CLI loop and the
+server are equally efficient and the server's structured verdict is the
+small plus; the session's time went to GAP computations and reading, not
+to Agda, and the one place the server could have saved effort was the
+knowledge lane (`exports_of`), which was not used.
+
+## 2026-10-04: one new lattice-theory module in a research session dominated by GAP
+
+Context: a session that mostly ran group-theoretic computations in GAP;
+the Agda work was one small new module (a
+short group-theoretic lemma) and a one-line addition to the library's barrel,
+in a git worktree whose dev shell registers the dependency library's copy
+under the main checkout.
+
++  `check_file` on a small existing module at the start, as the
+   connection test: `success: true`, 9.0 s, `checkedFromSource: false`
+   (interfaces already built by a shell `make check` running concurrently),
+   `rootSource: nearest-agda-lib`, no `rootMismatch`.
++  `type_of` on two library names from an existing module's scope
+   (Dedekind's rule and the core-freeness predicate): 7.3 s for the first
+   question (one lane load) and 0.5 s for the second after a lane switch
+   to a neighboring file.  The printed types were fully qualified and long
+   (several screens for Dedekind's rule), so the argument order was read
+   from the library's source instead; `exports_of` on the complements
+   module (12 members, 7.4 s, first load) gave the member names and types
+   that decided which lemmas to import.
++  `check_file` on the new module: `success: true`, 8.1 s, checked from
+   source, no diagnostics, first try; then `check_file` on the barrel
+   module that imports every library module: `success: true`, 9.7 s.
+   Neither run needed a hole: the proof was written whole from the two
+   neighboring modules' source.
++  The whole-library gate (`make check`) was run from the shell in the
+   background at session start, before any Agda was written, so the
+   server's `check_project` was not used.
+
+Verdict on efficiency: equal.  For a module written in one piece, the
+server's structured verdicts replaced a CLI invocation and saved nothing
+but the parsing; the two knowledge-lane calls (`exports_of`, `type_of`)
+answered real questions in seconds, and `exports_of` was the more useful
+of the two because its answer is a list rather than one long printed type.
+
+## 2026-10-04, agda-algebras issue #577: the in-browser playground (Claude Opus 5.5)
+
+Context: the session built an interactive Agda page for the documentation
+site (Agda 2.8.0 compiled to WebAssembly, driven through its
+`--interaction-json` protocol), so most of its time went to JavaScript,
+Python and measurement.  The Agda written was six small files: three
+exercises taken from the library (`graft` and `_✦_` of
+`Overture.Terms.Interpretation`, `⊙-is-hom` of
+`Setoid.Homomorphisms.Properties`) and their solutions, outside `src/`, in
+`docs/playground/`.
+
++  `check_file` (7 calls) on the exercises and solutions: correct verdicts,
+   0.1 to 0.8 s for the small ones and 4.4 s for the one that imports the
+   Setoid tree, `rootSource: nearest-agda-lib` even though the files live
+   outside the library's `include: src`.  An exercise with a hole came back
+   `success: false`, exit 42, with the hole listed: exactly what was needed.
++  `get_goal` (2 calls): right goal and context, through the live lane.  The
+   types were printed fully normalized (`𝑆 : Agda.Builtin.Sigma.Σ (Type 𝑆.𝓞)
+   (λ F → F → Type 𝑆.𝓥)`, `Func (Algebra.Domain 𝑨) (Algebra.Domain 𝑩)`)
+   where agda-mode's default, `Simplified`, prints `Signature 𝑆.𝓞 𝑆.𝓥` and
+   `Func 𝔻[ 𝑨 ] 𝔻[ 𝑩 ]`.  For this task, where the page shows readers what
+   agda-mode shows them, the server's display was the wrong one to design
+   against, and the protocol had to be driven directly to see the
+   `Simplified` form.  **Missing**: a `rewrite` argument on `get_goal`
+   (`AsIs`, `Simplified`, `Normalised`), defaulting to `Simplified` as
+   agda-mode does.
++  `fill_hole` (1 call): `trans (cong h (compatible ghom)) ?` in the
+   homomorphism exercise, `status: ok` with the new hole listed, 4.4 s.
++  **Missing for this task**: the goal commands that rewrite text, case
+   split above all.  The page's hints had to name the variables a case
+   split introduces, and Agda names them after the constructor's own
+   binders (`ℊ x`, `node f t`, not the `y` and `ts` a person would guess);
+   the server could not say, so the answer came from running the protocol.
+   A `make_case` tool (and `refine`, `give`) answering with Agda's text
+   would have settled that in one call.
+
+Verdict on efficiency: for checking six small files the server and the CLI
+were equal, and the structured verdict was the small plus.  The real work
+(the protocol's JSON shapes, the case-split names, the `Simplified` display)
+needed Agda's interaction protocol itself, which the server does not expose,
+so the CLI and a node driver over the WebAssembly checker did it.
+
+## 2026-10-05, fls PR #1340: rebase onto master after #1330 merged (Claude Opus 5.5)
+
+Task: rebase a four-commit branch onto a master that had gained one merged PR
+(endorser-block validity, six files, none shared with the branch), audit the
+result, and re-run the project's gate.  No Agda was written: the replay was
+clean, and the audit (rebased tree byte-identical to `git merge-tree`'s
+mechanical three-way merge; the same six files and 60 changed lines; messages,
+authors and dates unchanged) left only the semantic question to the checker.
+
++  **`check_project`** ran the closure gate, the server's `--check-command`
+   (`agda src/Ledger.lagda.md`), as its first real use in an fls session.
+   It answered `success: true`, exit 0, `modulesChecked: 83` and zero
+   diagnostics in 17 min 27 s, with `gate.source: server-config` saying which
+   gate ran and a bounded output tail ending at `Checking Ledger`.  The call
+   outlived the 120-second foreground limit and finished as a background task
+   whose notification carried the whole result.  Its diagnostics include
+   warnings, since the parser takes every `: warning:` line from the full output
+   (read in `Tools/CheckProject.hs` and `Diagnostics.hs`), so the project's
+   zero-warning requirement is answered by `diagnosticsTotal` without a grep.
++  **The test library** still had to run on the CLI: its gate needs a custom
+   `--library-file` naming the worktree's own `.agda-lib`, and the library has
+   no umbrella module, so it is one `agda` call per file in a loop.  50 files
+   green and nothing re-checked from source, since the merged PR changed only
+   Dijkstra modules and the test library builds on Conway; the 20 minutes were
+   each call loading the ledger's interfaces.
+
+Was the CLI more efficient?  For a gate, the two are the same agda run; the
+difference is the report.  `check_project` was the better instrument for the
+closure: one structured answer (verdict, module count, warnings counted, masked
+failures caught) in place of a detached script, a status file and three greps,
+at the same cost.  It cannot run the second half of the fls gate, a library
+that depends on the worktree's own library through a custom registry; a
+`--check-command` that ran both halves, or a per-call extra `--library-file`,
+would make it the whole gate.
+
+## 2026-10-05 (evening), fls: restacking four Leios PRs and two review tweaks
+
+Session root was the merged `1337` worktree, so every branch being rebased lived in a
+sibling worktree that the server cannot check (`AmbiguousTopLevelModuleName`); all
+verdicts came from the CLI `agda` in each worktree, seeded by copying `_build/` from a
+sibling whose tree matched (master's tree equaled the merged branch's).
+
++  `resolve_name` on the session worktree's copy of the module answered the two scope
+   questions that decided the shape of a reviewer's suggestions in milliseconds: the
+   unqualified `filter` is NOT in scope (the prelude hides the list one behind
+   `Filter.filter`, and the did-you-mean list showed the set and map variants), and
+   `zip` IS in scope but is `Data.Product.Base.zip`.  Both answers were right; a guess
+   at either would have cost a failed batch run.  Using a sibling's copy of the file
+   for scope questions works whenever the import block is the same.
++  Nothing else was usable across worktrees; `check_file` and `type_of` for the edited
+   file would have been welcome, and a rebase-heavy session spends most of its time in
+   siblings.  A server option to serve a second root, or to take the root from the
+   file's own `.agda-lib`, would have covered this whole session.
++  The CLI was more efficient for the verdicts themselves: three whole-closure gates
+   (211, 11, 211 modules) and three test-library runs ran concurrently in the
+   background from one agda per `_build/`, which the single-lane server does not do.
+
+Addendum (same session, after the switch to the indexed sum):
+
++  `normalize` was the right tool to test a claim about `setToList` of an aggregated map,
+   and its answer was informative in a way a batch run is not: the normal form came back
+   stuck on `abstract-set-theory.FiniteSetTheory.listing` and `finiteness`, which shows
+   at once that fls's finite sets are abstract and that the listing cannot be computed,
+   so no probe can settle the question.  A batch `refl` probe would only have reported a
+   failed equation.  The answer was very long (the whole stuck term); a size cap or a
+   "stuck on: <names>" summary would have been enough.
++  A small batch probe (three `refl` equations in a throwaway module) remained the
+   quickest way to confirm that the new `∑ˡ` over ℚ computes like the fold it replaced;
+   it ran in a sibling worktree the server could not serve.
+
+## 2026-10-06, agda-algebras issue #586: the library under the Agda 2.9.0 nightly (Claude Opus 5.5)
+
+Context: the session checked the whole library under an unreleased Agda
+(the 2.9.0 nightly) against five standard libraries, so nearly all of its
+Agda was whole-library `make check` runs through per-row wrappers, not
+editing.  The only Agda written was two deletions, fixity declarations for
+closed operators in `Overture.Basic` and `Overture.Relations` (pull request
+587).
+
++  agda-mcp was not connected: ToolSearch for "+agda" found nothing, so the
+   session used the CLI throughout.
++  It would not have helped much here, and the reason is worth recording:
+   the server runs the flake's Agda 2.8.0, and the question was what a
+   different Agda does with the library.  Every run needed its own Agda
+   binary, its own libraries file and a reset `_build`, and five of them
+   ran back to back with timing and module counts recorded.  A server bound
+   to one Agda and one libraries file cannot serve that; an option to name
+   the Agda binary and the libraries file per call would.
++  For the two deletions, the CLI was the right tool: the verdict that
+   mattered was a from-source `make check` under both Agdas (344 library
+   modules each), not a per-module check.
+
+## 2026-10-06, fls PR #1339 self-review before merge (Claude Opus 5.5)
+
+The session reviewed a finished PR and changed only module prose: two sentences
+of `BlockBody.lagda.md` that described unmerged work in the present tense.
+
++  **agda-mcp tools used**: `check_file` three times and `normalize` twice.
+   The edited module checked in 14.7 s (exit 0); its interfaces had been built
+   the day before from a byte-identical tree.  To test the new premise by
+   execution, `normalize` failed twice.  At the top level of a parameterized
+   module every definition still takes the module's parameters
+   (`CertifiedEB` "should be a sort"), and in the Foreign module that
+   instantiates them the completed top-level scope omits its non-public
+   imports, so the spec's names were `NotInScope`.  A throwaway probe module
+   of `refl` assertions over arbitrary module parameters worked instead:
+   `check_file` passed it in 22 s, and a control with one expectation flipped
+   failed with exit 42, printing the actual value.
++  **What worked**: structured verdicts for the edit, the probe, and the
+   control, with Agda's actual value in `involved.actual` on the failure.
++  **What was awkward**: `normalize` is unusable on a parameterized module's
+   definitions without a hole in scope; the probe file is the workaround.
++  **CLI versus MCP**: even.  The two Dijkstra umbrellas ran on the CLI in the
+   background as the final gate (21 s and 19 s, 6 and 2 modules from source,
+   zero warnings).
+
+## 2026-10-06, fls PR 1346 self-review: probing the CERTIFY instance (Claude Opus 5.5)
+
+Task: a self-review of the CHAIN certificate branch, execution and a full read of
+the diff, with no edits to the repository.  The probes asked what the shipped
+`Computational` instance returns on its early branches under the Foreign
+instantiation.
+
+Tools used and what each did:
+
++  `normalize`, once, in the scope of `Foreign/Chain.agda` (lane load 31 s):
+   `NotInScope` for `Computational-CERTIFY`, which that file brings in by a
+   file-local `open import … Chain.Properties.Computational it DummyAbstractFunctions`.
+   The top level of a hole-free file has lost its file-local opens, as the tool
+   description says; the "did you mean" offered the applied-module alias
+   (`.#…Computational-12409013205270436615.Computational-CERTIFY`), which no
+   expression can spell.
++  Nothing else from agda-mcp.  The gate ran as a background CLI script, one agda
+   per `_build/`, and the five probes ran as `refl` assertions in a scratch copy
+   seeded with the worktree's interfaces: one CLI run, 30 s, all green.
+
+What was awkward or missing: evaluation in the scope a file has after its own
+imports, without adding a hole to the worktree under review; and a suggestion
+list that offers only names an expression can write.
+
+Verdict on efficiency: the CLI probe module was the right instrument.  Universally
+quantified `refl` assertions answered five branch questions in one run, and
+agda-mcp contributed only the confirmation of its scope limit.
+
+## 2026-10-06, fls PR 1342 re-review: probes on a Leios committee rotation (Claude Opus 5.5)
+
+Task: a sourced review of the committee-rotation PR, drafted for William,
+with no edits to the branch.  Agda work was four probe lemmas in a scratch module
+under the session worktree's `src/` (deleted afterwards) plus four CLI builds:
+the head, the head merged with `master`, and the head merged with #1346 before
+and after a one-line fix.
+
+Tools used and what each did:
+
++  `check_file`, five calls (20 to 27 s each on a warm cache; the module imports
+   the Dijkstra `Epoch` closure).  The first caught my own error (`0` elaborated
+   as `ℕ` in a module without ℚ literals); one returned `NotInScope` for
+   `PoolsOf` with `Snapshot.pools` among the candidates, which was the fix.
++  `get_goal`, three calls.  For `PParamsOf (applyRUpd ru eps) ≡ PParamsOf eps`
+   the normalized goal showed both sides as the same `proj₁ (EnactState.pparams
+   (EpochState.es eps))`, which answered the review question before any fill.
+   For a goal under `opaque unfolding calculatePoolDelegatedStake` it printed a
+   normal form of about 200 lines from agda-sets' list model: true, and useless.
++  `fill_hole`, three calls (`refl` twice, `res-dom` once), all `ok`, then
+   written back by hand.  The match on the `EPOCH` derivation needed an edited
+   left-hand side, which `fill_hole` cannot do; one `check_file` after the edit.
++  `resolve_name` found `_∣_` in agda-sets' `Axiom/Set/Map.agda` (via
+   `Restrictionᵐ`); the lemma `res-dom` came from grepping that store path,
+   because `search_in_scope`'s corpus is the standard library only (it probed 12
+   unrelated stdlib rows for `res`).
+
+What was awkward or missing:
+
++  A goal display that does not unfold opaque or list-model definitions, or a
+   size cap with an elision, for goals like the restriction one.
++  A corpus covering the repository's own libraries (agda-sets,
+   agda-stdlib-classes, agda-stdlib-meta); in fls most lemmas a proof needs live
+   there.
++  The server serves only the session worktree, so the merged-tree builds ran on
+   the CLI in scratch worktrees, and the probes had to wait for the head build to
+   release `_build/`: two agda processes must not write one `_build/`.
+
+Verdict on efficiency: mixed, honestly so.  For the probes agda-mcp was at least
+as quick as a CLI loop, and the goal display was itself evidence.  For the
+builds (11 min at the head, 30 min for the full gate on the `master` merge, 4
+and 10 min on the #1346 merge) the background CLI was the only instrument that
+reached the scratch worktrees.
+
+## 2026-10-07, agda-algebras issue #594: switching every module to --without-K (Claude Opus 5.5)
+
+Context: a pragma sweep over all 344 modules (`--cubical-compatible` to
+`--without-K`), prose rewrites in twelve modules, and a decision record with
+timing measurements (pull request 595).  No definition or proof changed, so
+there was no hole-driven work; the Agda verdicts that mattered were
+whole-library checks from an empty `_build`.
+
++  agda-mcp was connected (ToolSearch "+agda" loaded all fourteen tools) and
+   ran the flake's Agda 2.8.0: its gate wrapper,
+   `~/.cache/agda-algebras/agda-root/bin/agda`, execs the same
+   `…-Agda-2.8.0-bin` store path as the dev shell's wrapper.
++  `check_project` was the final gate, after `rm -rf _build`: exit 0, 346
+   modules, 88.3 s, 952 diagnostics and no error, with the equivalent
+   `make check AGDA=…` command echoed.  It replaced a timed shell run cleanly,
+   and `modulesChecked` gave the module count without grepping a log.
++  `check_file`, three calls (0.8 to 3.1 s, warm) on modules whose prose
+   changed, each `success: true`; `checkedFromSource` correctly said which
+   call rechecked its file.
++  The CLI did the measurement runs, and had to: ten timed `make check` runs
+   alternating between two revisions of one worktree (`git switch --detach`
+   between them, so interface paths stayed identical), under GNU time, with
+   `+RTS -s`, `+RTS -S` and `+RTS -hT -i0.05` for a peak-memory diagnosis.
+   `check_project` reports elapsed time but not peak RSS, and takes no RTS
+   options; a `rtsOptions` argument and a peak-RSS field (the `ru_maxrss` of
+   the gate's children) would have let it serve the timing runs too.
++  Nothing was awkward in the calls that were made.  The one hazard is
+   operational: the tools must not run while a background `make check`
+   writes the same `_build/`, so I held them until the runs finished.
+
+Verdict on efficiency: for this task the CLI was the instrument and agda-mcp
+the final judge.  As a gate `check_project` was as fast as the shell
+(88 s against 86 to 128 s for the shell runs) and its verdict needed no log
+reading.
+
+## 2026-10-07, agda-algebras issue #589: free lattices and Whitman's procedure (Claude Opus 5.5)
+
+Context: four new modules and an example (pull request 596), about 900 lines
+of new Agda: a term type, Whitman's rules as an inductive family with a
+decision procedure, transitivity by a mutual structural recursion, the free
+lattice built order first with soundness, completeness and the universal
+property, and a bridge to the library's equational logic.  The session was
+launched from the `master/` checkout and worked in a worktree under
+`worktrees/`.
+
++  agda-mcp was connected (ToolSearch "+agda" loaded all fourteen tools).
+   Every call resolved the project root to the worktree
+   (`rootSource: nearest-agda-lib`).
++  The batch tools did not work on the worktree.  `check_file` failed with
+   `AmbiguousTopLevelModuleName` on the first import
+   (`Classical.Operations` found in both `master/src` and the worktree's
+   `src`); the echoed command ran with `cwd` set to `master/`, the launch
+   directory.  `fill_hole` and `get_diagnostics` share that path, so I did
+   not use them.  Running batch Agda with `cwd` at the resolved project root
+   would fix it.
++  The lane did work, with the same `cwd`.  I used `type_of` with
+   `reload: true` as a load oracle after each edit: seven loads that failed
+   came back in-band with the right code and position (`AmbiguousName`,
+   `UnequalSorts` and `MetaCannotDependOn` from generalized level variables,
+   `ParseError`, `WrongHidingInLHS`, two `UnequalTerms`), each in 0.5 to
+   2 s.  A batch check of one module from the CLI took 8 to 18 s, most of
+   it loading dependency interfaces.
++  The lane missed two errors the batch check caught: an unsolved level
+   meta (`Type (α ⊔ ρ ⊔ _)` in a type signature) and an unsolved `Fin _n`
+   from opening a parameterized module at the polymorphic `_≟_`.  In both
+   cases `type_of` answered with a type and no warning; batch Agda exited
+   42 with `UnsolvedMetaVariables`.  A lane answer that carried the load's
+   warnings (at least a count of unsolved metas) would make "it loads in the
+   lane" mean what it seems to mean.
++  The lane writes `.agdai` files into the project's `_build` (mode 644,
+   where the CLI writes 664), and a later CLI run reuses them without a
+   "Checking" line.  I deleted the new modules' interfaces before every
+   verdict run, and the final gate was `rm -rf _build && make check`.
++  No hole-driven work.  The plan was precise enough to write each module
+   whole, and the transitivity proof (19 clauses, mutually recursive with an
+   auxiliary) passed the termination checker at its first load.  `get_goal`
+   and `fill_hole` were not needed.
+
+Verdict on efficiency: the lane as a reload oracle was the fastest inner
+loop I had, about ten times quicker than a CLI check per iteration, but it
+cannot be the judge: twice it reported success on a file that does not type
+check.  The CLI in the worktree's own `nix develop` was the judge, and the
+batch tools were unusable from a session launched in another checkout.
+
+## 2026-10-07, agda-algebras issue #588: a trial port to Agda 2.9.0 and agda-stdlib 3.0 (Claude Opus 5.5)
+
+Context: the question was what a move to Agda 2.9.0 would take today, before
+either Agda 2.9.0 or agda-stdlib 3.0 is released.  I answered it with a trial
+in a scratch copy of master, outside every registered project: Agda master's
+nightly binary and, later, Agda built from agda/agda's flake, with the
+standard library at the commit Agda's `std-lib` submodule pins.  The Agda
+changes were renames (two errors, 170 deprecated names in 21 modules), with
+no hole-driven work.
+
++  agda-mcp was connected (ToolSearch "+agda" loaded all fourteen tools), and
+   none of them could serve the trial.  The server's Agda is fixed at launch
+   (`--agda-bin`, the flake's 2.8.0, and a registry naming only
+   standard-library 2.3); no tool takes an Agda binary or a libraries file.
+   One probe, `resolve_name` on a trial file with `verbose: true`, answered
+   in 53 ms with an in-band `LibraryError` ("Library
+   'standard-library-3.0' not found"), and the echo named the binary, the
+   registry and the root it had chosen (the trial's own `.agda-lib`, found
+   as `nearest-agda-lib`).  The refusal was clear and correct; the gap is
+   that a toolchain trial cannot use the tools at all.
++  The CLI did all the work: seven whole-library runs (a nightly wrapper with
+   a throwaway data directory, then `nix develop --command make check` in the
+   candidate flake's shell) and one single-module check.  Each run stopped
+   at its first error, which Agda localized well enough that a grep of the
+   library for the same construct found every other instance at once.
++  What would have helped: an `agdaBin` and `librariesFile` per call (or a
+   second registered toolchain), so the lane could answer `type_of` and
+   `exports_of` under the new Agda.  `exports_of` on the new standard
+   library's modules would have confirmed the replacement names
+   (`_×?_`, `¬∀⇒∃¬`, `_≡?_`) faster than grepping its source.  Also useful: a
+   warnings summary by kind and by message, once per position, since the
+   port's real work was splitting 1,121 warning positions into the
+   library's own 951 and the standard library's 170.
++  One finding no warning count would have caught: uses of `_≟_` opened from
+   a `DecSetoid` bundle raised no deprecation warning, though agda-stdlib 3.0
+   deprecates `IsDecEquivalence._≟_`.  A tool listing a module's uses of
+   names that carry a `WARNING_ON_USAGE` pragma, through module applications,
+   would close that hole.
+
+Verdict on efficiency: for a toolchain trial the CLI was the only
+instrument; agda-mcp neither helped nor slowed the work, because it could
+not reach the toolchain under test.
+
+## 2026-10-07, fls PR 1342 second version: one gate call (Claude Fable 5.1)
+
+Task: re-review a force-pushed head (three files, 29 changed lines) that had
+dropped the previous version's committee rotation; no Agda written.
+
++  `check_file` on the Dijkstra `Specification.lagda.md` umbrella, once, from
+   the session worktree synced to the new head with its `_build/` seeded the day
+   before: exit 0, no diagnostics, 373.5 s.  The call outlived the 120 s
+   foreground limit and came back as a background task, as the agda-typecheck
+   skill says it does.  Only `Epoch.lagda.md` differed from the previous head
+   (`Leios.lagda.md` and `UnitInterval.lagda.md` were byte-identical), so the
+   rest came from interfaces.
++  Nothing else from agda-mcp; the review's claims were about which snapshot
+   and parameters a rule reads, settled by reading both repositories at pinned
+   commits, and the earlier session's probes still applied to unchanged terms.
+
+What was awkward or missing: `check_file` reports no module count, so "how
+much re-checked" has to come from the CLI's `Checking` lines when it matters.
+
+Verdict on efficiency: even.  One call, one verdict, no log to parse; the CLI
+would have taken the same six minutes.
+
+## 2026-10-10, agda-algebras #553: span-class checker, second opinions only (Kimi K3, Copilot CLI)
+
+Task: build a checker that validates the kramdown attribute spans on inline
+Agda names in agda-algebras' prose (`Algebra`{.AgdaRecord} and kin) against
+Agda's own classification, fix the defects it finds, and gate it
+(ualib/agda-algebras#553, PR #599).  No Agda written; the ground truth was
+the `agda --html --html-highlight=code` render.
+
++  agda-mcp was connected and its registration rooted at the session worktree
+   correctly (`nearest-agda-lib` found the worktree's own `.agda-lib`).
+   `check_file` on `Overture/Signatures.lagda.md` answered the baseline in
+   220 ms from warm interfaces; `resolve_name` gave the two second opinions
+   the task asked for: `𝒦₀` in `Examples.Setoid.HSPCommutativeMonoid` ("a
+   data type", first load 21.6 s) and `Group` in
+   `Examples.Classical.Groups.SymmetricGroup3` ("a defined name", load switch
+   10.2 s), both agreeing with the render and both locating the definition
+   through the import chain with provenance.  Each also reported the spawned
+   module as a second candidate, the same Record/Module duality the render
+   shows.
++  The server could not have been the gate's oracle, and the issue's design 2
+   (a resolve_name sweep) would have been the expensive route: the corpus has
+   ~990 distinct (name, class) pairs across 282 live modules, so a sweep is
+   one lane load per file (measured 10-22 s each here) against one 34 s
+   render.  More fundamentally, `resolve_name` answers what a name resolves
+   *to*, not the highlighter's per-occurrence aspect: the local/global split
+   this task needed (Bound vs Argument vs Generalizable on one name at
+   different sites) is exactly what a definition lookup does not carry.
++  Version skew, as CLAUDE.md warns: the server runs Agda 2.8.0
+   (`--agda-bin` under ~/.cache/agda-algebras) while the library targets
+   2.9.0.  Both probed files still loaded and answered correctly under
+   2.8.0, and the answers matched the 2.9.0 render; but for a verdict that
+   must equal CI's, the CLI (the worktree's 2.9.0 wrapper) stayed
+   authoritative, and the whole-library `make check` ran on it at the end.
++  What would have helped: a per-occurrence aspect tool, "the highlighter's
+   class for every token in this file" (the information `agda --html`
+   emits), without going through an HTML render, would let a checker like
+   this one skip the render step and stay inside the lane.
+
+Verdict on efficiency: the CLI was the right instrument for the corpus-wide
+gate (one render beats ~350 lane loads, and carries per-occurrence aspects
+the lane does not expose); the server earned its place as the fast second
+opinion on individual names.  Neither slowed the other.
 
 ## 2026-10-10, agda-native-air issue #243: Copilot CLI on the one-step subgroup test (GPT-6.1 Sol, Kimi K3)
 
