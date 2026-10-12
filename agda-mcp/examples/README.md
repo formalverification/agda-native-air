@@ -108,6 +108,30 @@ repository's `agda/libraries` to name its own worktree.  A second session in
 another worktree re-pointed the registry, and the first session's server then
 refused its own files.)
 
+## `agda-algebras.codex.toml`
+
+The same agda-algebras registration as a `[mcp_servers.agda]` table, for an
+OpenAI Codex CLI session, which does not read `.mcp.json`.  It needs the same
+three inputs, realized with the commands above, and is installed per checkout as
+`.codex/config.toml` (Codex reads a project's file only once the project is
+trusted) or appended to `~/.codex/config.toml`.  It differs from the `.mcp.json`
+template in four ways, each explained in a comment in the file, as follows:
+
++  It passes no `--cwd`: Codex expands no variables and starts the server in the
+   directory the session started in, which the launcher then passes as `--cwd`
+   (issue #242).
++  It sets `startup_timeout_sec` and `tool_timeout_sec` above Codex's defaults
+   (10 and 60 seconds), which the launcher's shell entry and a cold check
+   overrun.
++  It sets `required = true`, so that `codex exec` holds its first request until
+   the server is up.
++  It approves every tool but `check_project` without a prompt, since the
+   server's tools carry no read-only annotation and `codex exec`, which cannot
+   ask, would refuse them all.
+
+Tested on 2026-10-11 with Codex CLI 0.162.1 in an agda-algebras checkout: the
+server presented thirteen tools, and `check_file` answered from that checkout.
+
 ## `fls.mcp.json`
 
 Connects a Claude Code session working on

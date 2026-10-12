@@ -1,0 +1,43 @@
+# File: agda-mcp/examples/agda-algebras.codex.toml
+#
+# agda-mcp for an OpenAI Codex CLI session working on agda-algebras: the
+# registration agda-algebras.mcp.json carries for Claude Code and Copilot CLI,
+# written as the table Codex reads.  Copy it into the checkout's
+# .codex/config.toml (Codex reads a project file only once you trust the
+# project) or append it to ~/.codex/config.toml, and replace every
+# /ABS/PATH/TO/... placeholder with an absolute path.  The examples README has
+# the commands that realize the three machine-specific inputs, and
+# docs/agda-mcp/connecting-an-agent.md the rest of the Codex setup.
+
+[mcp_servers.agda]
+command = "/ABS/PATH/TO/agda-native-air/scripts/run-server.sh"
+# No --cwd: Codex starts the server in the directory the session started in,
+# and the launcher passes that directory as --cwd itself (issue #242).  Start
+# Codex inside an agda-algebras checkout.
+args = [
+  "--agda-bin", "/ABS/PATH/TO/agda-algebras-agda-root/bin/agda",
+  "--agda-flags", "--library-file=/ABS/PATH/TO/agda-algebras-libraries -i /ABS/PATH/TO/agda-native-air/agda-dojang/agda",
+  "--corpus", "/ABS/PATH/TO/agda-algebras-corpus-v0.1/corpus.jsonl",
+  "--timeout", "600",
+  "--check-command", "make check AGDA=/ABS/PATH/TO/agda-algebras-agda-root/bin/agda",
+  "--check-timeout", "3600",
+]
+# The launcher enters a Nix shell before the server starts: a few seconds once
+# the shell is cached, longer on a fresh machine.  Codex's default is 10.
+startup_timeout_sec = 120
+# Above the server's own bounds (--timeout 600 for a check, --check-timeout
+# 3600 for check_project), so the server's own timeout answer arrives first.
+# Codex's default is 60, less than one cold check of a large library.
+tool_timeout_sec = 3660
+# Hold the first request until the server is up.  Without it, codex exec asks
+# the model before the server's tools exist, and the model finds none.
+required = true
+# agda-mcp's tools carry no read-only annotation, so Codex asks before every
+# call, and codex exec, which cannot ask, refuses them.  Every tool here leaves
+# the checkout as it found it (get_goal and fill_hole restore the file byte for
+# byte) except check_project, which runs the project's gate and stays on a
+# prompt.
+default_tools_approval_mode = "approve"
+
+[mcp_servers.agda.tools.check_project]
+approval_mode = "prompt"
