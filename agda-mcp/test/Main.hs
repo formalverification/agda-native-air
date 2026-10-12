@@ -8096,7 +8096,12 @@ interactionLaneTests cfg repoRoot = do
             -- the test below).
             r4 <- assertEqual "checkedFromSource" (Just True)
                     (lmCheckedFromSource (torMeta res))
-            pure (firstFailure [r1, r2, r3, r4])
+            -- Every type_of answer names the mode it asked for, this one
+            -- included, though nothing was printed (#248; Copilot's review of
+            -- PR #257 found it missing here).
+            r5 <- assert "the mode rides the response"
+                    ("\"rewrite\":\"Simplified\"" `T.isInfixOf` encodeText res)
+            pure (firstFailure [r1, r2, r3, r4, r5])
 
     , -- Copilot's review of PR 117: a load that fails BEFORE Agda announces the
       -- file established no interface reuse, so its cache signal must be absent
@@ -8318,9 +8323,9 @@ interactionLaneTests cfg repoRoot = do
           (Right d, Right n) -> allOf
             [ assertEqual "scope" "goal 0 (line 31, column 11)" (torScope d)
             , assertEqual "default type" (Just "Pair Nat") (torType d)
-            , assertEqual "default mode echoed" (Just Simplified) (torRewrite d)
+            , assertEqual "default mode echoed" Simplified (torRewrite d)
             , assertEqual "Normalised type" (Just "Σ Nat (λ _ → Nat)") (torType n)
-            , assertEqual "Normalised echoed" (Just Normalised) (torRewrite n)
+            , assertEqual "Normalised echoed" Normalised (torRewrite n)
             ]
           (Left err, _) -> pure (Fail $ T.unpack (failureText err))
           (_, Left err) -> pure (Fail $ T.unpack (failureText err))

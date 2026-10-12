@@ -8,7 +8,7 @@
 --   which the display modes print differently: Simplified, the default (what
 --   an editor sends), keeps the name, and Normalised unfolds it into the Σ
 --   type it abbreviates, as it unfolded `Group α ρ` on the #243 field hole.
---   On the Nat fixtures the lane was first probed on every mode prints the
+--   The lane was first probed on Nat fixtures, where every mode prints the
 --   same thing, which is how the old default went unnoticed.
 --
 --   `b : Box` is the control: a record type is not a definition that

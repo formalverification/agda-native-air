@@ -2203,15 +2203,16 @@ data ExportsSlice = ExportsSlice
   } deriving (Eq, Show)
 
 -- | Result of @type_of@.  Exactly one of @type@ / @error@ is present.
--- @rewrite@ is the display mode the inference was asked in (#248), present
--- whenever it was asked, and absent when the file failed to load and no
--- inference ran.
+-- @rewrite@ is the display mode the call asked Agda to print in (#248), on
+-- every answer, so the shape is one for a type, an error, and a file that
+-- failed to load (where nothing was printed, and the mode is still the one
+-- the call asked for); Agda's inference answer carries no echo of its own.
 data TypeOfResult = TypeOfResult
   { torExpr    :: Text
   , torScope   :: Text              -- ^ @toplevel@, or @goal N@ with its line.
   , torType    :: Maybe Text
   , torError   :: Maybe LiveError
-  , torRewrite :: Maybe Rewrite
+  , torRewrite :: Rewrite
   , torMeta    :: LiveMeta
   } deriving (Eq, Show)
 
@@ -2220,9 +2221,9 @@ instance ToJSON TypeOfResult where
     [ "expr"  .= torExpr r
     , "scope" .= torScope r
     ]
-    <> maybe [] (\t -> ["type"    .= t]) (torType r)
-    <> maybe [] (\e -> ["error"   .= e]) (torError r)
-    <> maybe [] (\w -> ["rewrite" .= w]) (torRewrite r)
+    <> maybe [] (\t -> ["type"  .= t]) (torType r)
+    <> maybe [] (\e -> ["error" .= e]) (torError r)
+    <> [ "rewrite" .= torRewrite r ]
     <> liveMetaPairs (torMeta r)
 
 -- | Result of @normalize@.  Exactly one of @normalForm@ / @error@ is present.

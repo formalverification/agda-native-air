@@ -428,8 +428,10 @@ handleTypeOf lanes cfg0 p =
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
+        -- The mode is reported here too, though nothing was printed, so
+        -- every answer has one shape (Copilot's review of PR #257).
         pure . Right $ TypeOfResult (topExpr p) "toplevel"
-          Nothing (Just (loadError loadMsg)) Nothing meta
+          Nothing (Just (loadError loadMsg)) (topRewrite p) meta
       Right _ -> do
         let (scope, scopeTxt) = scopeFor (topLine p) (topColumn p) (lcLoad ctx)
             rw  = topRewrite p
@@ -446,7 +448,7 @@ handleTypeOf lanes cfg0 p =
                 Just _  -> Nothing
                 Nothing -> Just (fromMaybe (opaqueAnswer "expression" resps)
                                            (queryError "expression" resps))
-            , torRewrite = Just rw
+            , torRewrite = rw
             , torMeta    = meta
             }
 
