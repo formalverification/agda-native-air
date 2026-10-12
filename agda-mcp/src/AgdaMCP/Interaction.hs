@@ -206,6 +206,7 @@ import System.Timeout (timeout)
 
 import AgdaMCP.Agda
   ( AgdaConfig (..), escalateAndReap, parseCheckingLine, progressChannelMuted )
+import AgdaMCP.Types (Rewrite, rewriteFromText, rewriteText)
 
 
 -- ---------------------------------------------------------------------------
@@ -430,11 +431,18 @@ goalInfoOf _ = Nothing
 
 -- | GoalContext: a goal's type and context as @Cmd_goal_type_context@
 -- reports them — the structured answer that lets @get_goal@ skip the
--- reporting-macro injection entirely (issue #108).  Probed on Fixture01:
--- the @type@ strings are byte-identical to what the macro path reports.
+-- reporting-macro injection entirely (issue #108).  Probed on Fixture01 in
+-- @Normalised@, the mode the macro's own @normalise@ matches: the @type@
+-- strings are byte-identical to what the macro path reports.
+--
+-- @gcRewrite@ is the display mode Agda says it printed them in, the
+-- @rewrite@ key of the same answer (issue #248), so an answer can report
+-- the mode that answered rather than the mode that was asked for; 'Nothing'
+-- when the key is absent or names no mode.
 data GoalContext = GoalContext
   { gcType    :: Text
   , gcEntries :: [GoalCtxEntry]
+  , gcRewrite :: Maybe Rewrite
   } deriving (Eq, Show)
 
 -- | GoalCtxEntry: one context entry of a goal display.  @geName@ is the
@@ -455,6 +463,7 @@ data GoalCtxEntry = GoalCtxEntry
 goalContextOf :: [IResponse] -> Maybe GoalContext
 goalContextOf rs = listToMaybe
   [ GoalContext t (maybe [] entriesFrom (KM.lookup "entries" gi))
+                  (rewriteFromText =<< textField "rewrite" gi)
   | r <- rs
   , Just (Object gi) <- [goalInfoOf r]
   , textField "kind" gi == Just "GoalType"
@@ -548,12 +557,21 @@ cmdLoad :: FilePath -> [String] -> Text
 cmdLoad file argv =
   "Cmd_load " <> hsShow (T.pack file) <> " " <> hsShowList argv
 
-cmdInferToplevel :: Text -> Text
-cmdInferToplevel expr = "Cmd_infer_toplevel Normalised " <> hsShow expr
+-- | cmdInferToplevel, cmdInferAtGoal: Agda's @C-c C-d@, toplevel or in a
+-- goal's scope, printing the inferred type in the given display mode.  The
+-- mode is the caller's (issue #248): @type_of@ sends its @rewrite@ argument,
+-- whose default is the editor's 'AgdaMCP.Types.editorRewrite', and the
+-- callers that compare or tokenize printed types (@search_in_scope@'s
+-- ladder, @resolve_name@'s recovery) name 'AgdaMCP.Types.Normalised', the
+-- mode every command here sent before.
+cmdInferToplevel :: Rewrite -> Text -> Text
+cmdInferToplevel rw expr =
+  "Cmd_infer_toplevel " <> rewriteText rw <> " " <> hsShow expr
 
-cmdInferAtGoal :: Int -> Text -> Text
-cmdInferAtGoal gid expr =
-  "Cmd_infer Normalised " <> T.pack (show gid) <> " noRange " <> hsShow expr
+cmdInferAtGoal :: Rewrite -> Int -> Text -> Text
+cmdInferAtGoal rw gid expr =
+  "Cmd_infer " <> rewriteText rw <> " " <> T.pack (show gid) <> " noRange "
+  <> hsShow expr
 
 cmdComputeToplevel :: Text -> Text
 cmdComputeToplevel expr = "Cmd_compute_toplevel DefaultCompute " <> hsShow expr
@@ -574,9 +592,14 @@ cmdModuleContentsToplevel :: Text -> Text
 cmdModuleContentsToplevel m =
   "Cmd_show_module_contents_toplevel Simplified " <> hsShow m
 
-cmdGoalTypeContext :: Int -> Text
-cmdGoalTypeContext gid =
-  "Cmd_goal_type_context Normalised " <> T.pack (show gid) <> " noRange \"\""
+-- | cmdGoalTypeContext: Agda's @C-c C-,@, the goal's type and its context,
+-- printed in the given display mode: @get_goal@'s @rewrite@ argument, or
+-- 'AgdaMCP.Types.Normalised' where @search_in_scope@ derives a query from
+-- the goal (issue #248).
+cmdGoalTypeContext :: Rewrite -> Int -> Text
+cmdGoalTypeContext rw gid =
+  "Cmd_goal_type_context " <> rewriteText rw <> " " <> T.pack (show gid)
+  <> " noRange \"\""
 
 -- | cmdShowVersion: the sentinel.  State-free, fast, and its response
 -- (@DisplayInfo@/@Version@) occurs nowhere else, so it delimits the previous

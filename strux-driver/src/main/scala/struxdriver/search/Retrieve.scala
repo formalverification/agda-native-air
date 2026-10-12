@@ -566,8 +566,10 @@ object Fragments {
 /** The corpus's own definitions, for unfolding: qualified name → the tokens
   * of the definition's body, for every `function` row that has one.  Goal
   * displays reach the ranker NORMALISED (the interaction lane prints
-  * `Cmd_goal_type_context Normalised`), so a goal about `hom 𝑨 𝑪` or `𝑨 ≤ 𝑪`
-  * displays as its Σ-unfolding, while lemma types are stated in the alias
+  * `Cmd_goal_type_context Normalised`, the mode `Oracle.Rewrite` asks
+  * get_goal for since agda-mcp's default became Simplified in issue #248),
+  * so a goal about `hom 𝑨 𝑪` or `𝑨 ≤ 𝑪` displays as its Σ-unfolding,
+  * while lemma types are stated in the alias
   * the library defines, and no token of `hom 𝑨 𝑩 → hom 𝑩 𝑪 → hom 𝑨 𝑪`
   * occurs in the display of its own conclusion.  Unfolding a row's type
   * tokens through the bodies of the definitions they name, a bounded number

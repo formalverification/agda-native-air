@@ -24,9 +24,16 @@
 --   The handler owns the lane half of the pipeline and the response:
 --
 --   * The query.  Given, or derived from the goal at the anchor through one
---     @Cmd_goal_type_context@ (Agda's own normalized display and context, the
---     same call @get_goal@'s lane path makes), so a call with no query at a
---     hole asks "what in scope could help with this goal".
+--     @Cmd_goal_type_context Normalised@ (Agda's own normalized display and
+--     context; @get_goal@'s lane path makes the same call, in the caller's
+--     mode, @Simplified@ by default since issue #248), so a call with no
+--     query at a hole asks "what in scope could help with this goal".
+--   * The display mode.  Both lane calls here, the goal read and the
+--     ladder's inference, stay in @Normalised@, the mode the tool was built
+--     and measured in: the goal's tokens rank the pool, and the printed type
+--     is what the lane-form statement exclusion compares.  Issue #248 moved
+--     @get_goal@ and @type_of@ to @Simplified@ and left this tool where it was
+--     (the measurement is in that PR).
 --   * The walk.  Ranked rows are resolved through the rendering ladder one by
 --     one until @limit@ rows are ACCEPTED or @maxProbes@ rows have been sent
 --     to the lane; the cut is taken after resolution, so a rejected rendering
@@ -231,7 +238,7 @@ resolveQuery ctx counters mQuery scope = case (mQuery, scope) of
                    \the query can be derived from that goal's type"
     }
   (Nothing, AtGoal g) -> do
-    answered <- timedQuery ctx counters GoalRead (cmdGoalTypeContext g)
+    answered <- timedQuery ctx counters GoalRead (cmdGoalTypeContext Normalised g)
     case answered of
       Left tf -> pure (Left tf)
       Right resps -> case goalContextOf resps of
@@ -353,8 +360,8 @@ tryLadder
 tryLadder _ _ _ _ [] = pure (Right Nothing)
 tryLadder ctx counters scope qname ((rung, rendering) : rest) = do
   let cmd = case scope of
-        AtGoal g -> cmdInferAtGoal g rendering
-        Toplevel -> cmdInferToplevel rendering
+        AtGoal g -> cmdInferAtGoal Normalised g rendering
+        Toplevel -> cmdInferToplevel Normalised rendering
   answered <- timedQuery ctx counters ValidationCall cmd
   case answered of
     Left tf -> pure (Left tf)

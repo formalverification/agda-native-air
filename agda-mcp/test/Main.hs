@@ -62,7 +62,7 @@ import Data.Char (isAlphaNum, isDigit, isSpace)
 import Data.Either (isLeft)
 import Data.List (find, isInfixOf, nub, sort, sortOn, subsequences)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (isJust, isNothing, listToMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -121,7 +121,9 @@ import AgdaMCP.Interaction
   , LoadReport (..), LoadedInfo (..)
   , GiveClass (..), GiveForce (..), GiveOutcome (..), GiveReading (..)
   , LaneHandle
-  , cmdGive, cmdGoalTypeContext, cmdLoad, ensureLoaded, giveCandidate
+  , cmdGive, cmdGoalTypeContext, cmdInferAtGoal, cmdInferToplevel, cmdLoad
+  , ensureLoaded, giveCandidate
+  , GoalContext (..), GoalCtxEntry (..), goalContextOf
   , goalsOf, hsShow, readGive, ReportCheck (..), giveReportCheck
   , interactionPointsOf, iotcmLine, loadCheckedFromSource, metasOf
   , newInteractionLanes, parseAmbiguousName, parseDidYouMean, parseResponseLine
@@ -3240,7 +3242,7 @@ timeoutTests = do
       gg <- handleGetGoal injLanes slowCfg GetGoalParams
         { ggFilePath = timeoutFixturePath
         , ggHole     = ByIndex 0
-        , ggReload  = False
+        , ggReload  = False, ggRewrite = editorRewrite
         }
       resultsGoal <- sequence
         [ runTest "get_goal: a timeout is a structured failure carrying elapsedMs" $
@@ -4049,6 +4051,28 @@ surfaceTests = do
     , runTest "surface: the instructions fit in the 2,048 characters a client reads, full and subset" $
         assertEqual "instruction lengths over the cap" []
           [ l | c <- [corpusConfig, subset], let l = T.length (serverInstructions c), l > clientCap ]
+
+    , -- get_goal and type_of take Agda's display mode (issue #248): declared
+      -- with exactly the five values the parser accepts and not required, and
+      -- named with its default in each description, which is what a client
+      -- reads whether or not it reads property documentation.
+      runTest "surface: get_goal and type_of declare rewrite with Agda's five modes, optional, and say the default (#248)" $
+        let rewriteTools = ["get_goal", "type_of"]
+            modes        = Aeson.toJSON (map rewriteText [minBound .. maxBound :: Rewrite])
+            enumOf t = case KM.lookup "properties" (inputSchemaOf t full) of
+              Just (Aeson.Object props) -> case KM.lookup "rewrite" props of
+                Just (Aeson.Object r) -> KM.lookup "enum" r
+                _                     -> Nothing
+              _ -> Nothing
+            required t = fromMaybe [] (requiredOf (inputSchemaOf t full))
+        in  allOf $
+              [ assertEqual (T.unpack t <> ": enum") (Just modes) (enumOf t) | t <- rewriteTools ]
+              <> [ assert (T.unpack t <> ": optional") ("rewrite" `notElem` required t) | t <- rewriteTools ]
+              <> [ assert (T.unpack t <> ": the description names the default")
+                     ("default Simplified" `T.isInfixOf` descriptionOf t full) | t <- rewriteTools ]
+              <> [ assertEqual "no other tool declares rewrite" []
+                     [ n | n <- toolNamesOf fullTools, n `notElem` rewriteTools
+                         , "rewrite" `elem` schemaProperties n fullTools ] ]
 
     , runTest "surface: tools/list and the instructions together are under half the 77,603 characters before #191" $
         let total = chars full + T.length instr
@@ -5258,7 +5282,7 @@ pathTests = do
     absMiss  <- handleCheckFile injLanes cfg (CheckFileParams (csMissing cs) Nothing)
     diagMiss <- handleGetDiagnostics injLanes cfg (GetDiagnosticsParams (csMissing cs) Nothing)
     goalMiss <- handleGetGoal injLanes cfg GetGoalParams
-      { ggFilePath = csMissing cs, ggHole = ByIndex 0, ggReload = False }
+      { ggFilePath = csMissing cs, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
     fillMiss <- handleFillHole cfg FillHoleParams
       { fhFilePath = csMissing cs, fhHole = ByIndex 0, fhCandidate = "zero" }
     dirCall  <- handleCheckFile injLanes cfg (CheckFileParams (csRoot cs) Nothing)
@@ -6084,28 +6108,28 @@ integrationTests cfg fixturePath repoRoot = do
       -- exact strings (rather than mere non-emptiness) is what catches a macro
       -- that "reports something" but reports the wrong thing.
       runTest "get_goal: Fixture01 hole 0 goal is exactly \"A\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "A" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 1 goal is exactly \"⊤\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 1, ggReload = False }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 1, ggReload = False, ggRewrite = editorRewrite }
         result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "⊤" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 2 goal is exactly \"x ≡ x\" (#70)" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 2, ggReload = False }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 2, ggReload = False, ggRewrite = editorRewrite }
         result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
           Right info -> assertEqual "goal" "x ≡ x" (giGoal info)
 
     , runTest "get_goal: Fixture01 hole 0 context contains 'x : A'" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         result <- handleGetGoal injLanes cfg params
         case result of
           Left err -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
@@ -6204,7 +6228,7 @@ integrationTests cfg fixturePath repoRoot = do
             <> " / " <> show (either (T.unpack . failureText) (const "ok") m)
 
     , runTest "get_goal: a real goal query carries elapsedMs" $ do
-        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False }
+        let params = GetGoalParams { ggFilePath = fixturePath, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         result <- handleGetGoal injLanes cfg params
         case result of
           Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
@@ -6267,21 +6291,21 @@ hierIntegrationTests cfg repoRoot = do
       before <- BS.readFile useFile
       results <- sequence
         [ runTest "get_goal: Proofs.Use (hierarchical) returns a non-empty goal" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False }
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             result <- handleGetGoal injLanes hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assert "goal should be non-empty" (not . T.null $ giGoal info)
 
         , runTest "get_goal: Proofs.Use reports its declared (hierarchical) module name" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False }
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             result <- handleGetGoal injLanes hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "module" (Just "Proofs.Use") (giModule info)
 
         , runTest "get_goal: Proofs.Use context contains 'x' (Debug import injected)" $ do
-            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False }
+            let params = GetGoalParams { ggFilePath = useFile, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             result <- handleGetGoal injLanes hierCfg params
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
@@ -6435,7 +6459,7 @@ holeModelIntegrationTests cfg = do
       results <- sequence
         [ runTest "get_goal: the ? hole in HoleVariants (index 3) has goal Nat" $ do
             result <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = variants, ggHole = ByIndex 3, ggReload = False }
+              { ggFilePath = variants, ggHole = ByIndex 3, ggReload = False, ggRewrite = editorRewrite }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> assertEqual "goal" "Nat" (giGoal info)
@@ -6467,9 +6491,9 @@ holeModelIntegrationTests cfg = do
 
         , runTest "get_goal: {! zero !} in a .lagda.md ≡ the same code in a .agda" $ do
             mdGoal    <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = lagdaMd, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = lagdaMd, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             plainGoal <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = plainTwin, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = plainTwin, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             case (mdGoal, plainGoal) of
               (Right md, Right plain) -> do
                 r1 <- assertEqual "goals agree" (giGoal plain) (giGoal md)
@@ -6508,7 +6532,7 @@ holeModelIntegrationTests cfg = do
                         , resources </> "LiterateTree.lagda.tree"
                         ]
             results <- mapM (\f -> handleGetGoal injLanes cfg GetGoalParams
-                              { ggFilePath = f, ggHole = ByIndex 0, ggReload = False }) files
+                              { ggFilePath = f, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }) files
             let bad = [ (takeFileName f, r)
                       | (f, r) <- zip files results
                       , either (const True) ((/= "Nat") . giGoal) r
@@ -6521,9 +6545,9 @@ holeModelIntegrationTests cfg = do
         -- where`.  This is the acceptance criterion of the issue.
         , runTest "get_goal: the reported module is declared, not read from prose or a comment (#100)" $ do
             mdInfo <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = lagdaMd, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = lagdaMd, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             bcInfo <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = blockComment, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = blockComment, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             case (mdInfo, bcInfo) of
               (Right md, Right bc) -> allOf
                 [ assertEqual "module (.lagda.md)" (Just "LiterateMd") (giModule md)
@@ -6540,7 +6564,7 @@ holeModelIntegrationTests cfg = do
         , runTest "get_goal: an anonymous module is reported by Agda's name, not its header (#100)" $ do
             src <- TIO.readFile anonModule
             result <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = anonModule, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = anonModule, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -6560,7 +6584,7 @@ holeModelIntegrationTests cfg = do
         , runTest "get_goal: with --trace-imports=0 the module falls back to the declared name (#100)" $ do
             let quietCfg = cfg { agdaFlags = agdaFlags cfg <> ["--trace-imports=0"] }
             result <- handleGetGoal injLanes quietCfg GetGoalParams
-              { ggFilePath = anonModule, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = anonModule, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -6575,7 +6599,7 @@ holeModelIntegrationTests cfg = do
         -- decoy as an import and then the hole (decoy included) was replaced.
         , runTest "get_goal: a decoy import inside the hole does not break injection (#100)" $ do
             result <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = holeDecoy, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = holeDecoy, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -6589,7 +6613,7 @@ holeModelIntegrationTests cfg = do
         -- that type-checks (measured before the fix).
         , runTest "get_goal: an indented module body still gets a well-placed import (#100)" $ do
             result <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = indentedBody, ggHole = ByIndex 0, ggReload = False }
+              { ggFilePath = indentedBody, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
             case result of
               Left err   -> pure (Fail $ "get_goal failed: " <> T.unpack (failureText err))
               Right info -> allOf
@@ -6948,9 +6972,9 @@ holeAddressingIntegrationTests cfg = do
                 let mdRef    = ByPosition (hsLine mh) (hsCol mh)
                     plainRef = ByPosition (hsLine ph) (hsCol ph)
                 mdGoal    <- handleGetGoal injLanes cfg GetGoalParams
-                  { ggFilePath = lagdaMd,   ggHole = mdRef, ggReload = False }
+                  { ggFilePath = lagdaMd,   ggHole = mdRef, ggReload = False, ggRewrite = editorRewrite }
                 plainGoal <- handleGetGoal injLanes cfg GetGoalParams
-                  { ggFilePath = plainTwin, ggHole = plainRef, ggReload = False }
+                  { ggFilePath = plainTwin, ggHole = plainRef, ggReload = False, ggRewrite = editorRewrite }
                 mdFill    <- handleFillHole cfg FillHoleParams
                   { fhFilePath = lagdaMd,   fhHole = mdRef,    fhCandidate = "zero" }
                 plainFill <- handleFillHole cfg FillHoleParams
@@ -7018,7 +7042,7 @@ holeAddressingIntegrationTests cfg = do
             result <- handleGetGoal injLanes cfg GetGoalParams
               { ggFilePath = lagdaMd
               , ggHole     = ByPosition (proseDecoyLine mdSrc) (proseDecoyCol mdSrc)
-              , ggReload  = False
+              , ggReload  = False, ggRewrite = editorRewrite
               }
             case (result, findHoles LiterateMd mdSrc) of
               (Right _, _)  -> pure (Fail "a prose decoy position should address no hole")
@@ -7058,7 +7082,7 @@ holeAddressingIntegrationTests cfg = do
 
         , runTest "get_goal: one column before the only hole answers its goal (#201)" $ do
             result <- handleGetGoal injLanes cfg GetGoalParams
-              { ggFilePath = plainTwin, ggHole = ByPosition 15 4, ggReload = False }
+              { ggFilePath = plainTwin, ggHole = ByPosition 15 4, ggReload = False, ggRewrite = editorRewrite }
             withRight result $ \gi -> allOf
               [ assertEqual "goal" "Nat" (giGoal gi)
               , assertEqual "addressed" (Just (HoleAddressed 15 5 "only hole, same line"))
@@ -7130,9 +7154,9 @@ reanchorTest cfg path =
                 bracket_ (BS.writeFile path (TE.encodeUtf8 patchedSrc))
                          (BS.writeFile path orig) $ do
                   goal  <- handleGetGoal injLanes cfg GetGoalParams
-                    { ggFilePath = path, ggHole = p1, ggReload = False }
+                    { ggFilePath = path, ggHole = p1, ggReload = False, ggRewrite = editorRewrite }
                   stale <- handleGetGoal injLanes cfg GetGoalParams
-                    { ggFilePath = path, ggHole = ByIndex 1, ggReload = False }
+                    { ggFilePath = path, ggHole = ByIndex 1, ggReload = False, ggRewrite = editorRewrite }
                   allOf
                     [ case goal of
                         Right info -> assertEqual "goal at the unmoved position" "Nat" (giGoal info)
@@ -7238,13 +7262,81 @@ interactionWireTests = do
           "IOTCM \"/p/F.agda\" None Direct (Cmd_load \"/p/F.agda\" [\"-i\",\"/p\",\"-l\",\"lib\"])"
           (iotcmLine "/p/F.agda" (cmdLoad "/p/F.agda" ["-i", "/p", "-l", "lib"]))
 
-    , -- The one command the tools do not yet send: issue #108 re-sources
-      -- get_goal through it, so its wire shape is pinned here against the
-      -- captured transcript rather than left to drift unexercised.
-      runTest "cmdGoalTypeContext: the #108 seam's exact wire shape" $
-        assertEqual "command"
-          "Cmd_goal_type_context Normalised 0 noRange \"\""
-          (cmdGoalTypeContext 0)
+    , -- get_goal's lane path sends this command (issue #108); its wire shape
+      -- is pinned against the captured transcript.  Until issue #248 the
+      -- mode was fixed at Normalised and this test pinned that literal; the
+      -- mode is now the caller's, so both the default the tools send and
+      -- the old mode are pinned, at two goal ids.
+      runTest "cmdGoalTypeContext: the #108 seam's exact wire shape, in the mode asked for (#248)" $ allOf
+        [ assertEqual "Simplified, the default"
+            "Cmd_goal_type_context Simplified 0 noRange \"\""
+            (cmdGoalTypeContext Simplified 0)
+        , assertEqual "Normalised, the old mode"
+            "Cmd_goal_type_context Normalised 3 noRange \"\""
+            (cmdGoalTypeContext Normalised 3)
+        ]
+
+    , runTest "cmdInferToplevel/cmdInferAtGoal: the mode is the word after the command (#248)" $ allOf
+        [ assertEqual "toplevel" "Cmd_infer_toplevel AsIs \"p\"" (cmdInferToplevel AsIs "p")
+        , assertEqual "at a goal" "Cmd_infer HeadNormal 2 noRange \"p\""
+            (cmdInferAtGoal HeadNormal 2 "p")
+        ]
+
+    , -- The wire word is what Agda's derived Read parses, so it must be the
+      -- constructor's name exactly: Agda reads neither a lower-case word nor
+      -- the American spelling.
+      runTest "Rewrite: each mode's wire word is Agda's constructor name, and reads back (#248)" $ allOf
+        [ assertEqual "words"
+            ["AsIs", "Instantiated", "HeadNormal", "Simplified", "Normalised"]
+            (map rewriteText [minBound .. maxBound])
+        , assertEqual "round trip" (map Just [minBound .. maxBound])
+            (map (rewriteFromText . rewriteText) [minBound .. maxBound :: Rewrite])
+        , assertEqual "no case folding, no American spelling" [Nothing, Nothing]
+            (map rewriteFromText ["normalised", "Normalized"])
+        , assertEqual "the default is the editor's" Simplified editorRewrite
+        ]
+
+    , -- The goal answer echoes the mode it was printed in (the shape of § 2.5
+      -- of the lane doc, with RewriteModes.agda's values), and get_goal
+      -- reports that echo rather than the mode it asked for.
+      runTest "goalContextOf: reads the type, the context, and the mode Agda printed them in (#248)" $ do
+        let ln = "{\"info\":{\"goalInfo\":{\"boundary\":[],\"entries\":[{\"binding\":\"Σ Nat (λ _ → Nat)\",\"inScope\":true,\"originalName\":\"p\",\"reifiedName\":\"p\"}],\"kind\":\"GoalType\",\"outputForms\":[],\"rewrite\":\"Normalised\",\"type\":\"Nat\",\"typeAux\":{\"kind\":\"GoalOnly\"}},\"interactionPoint\":{\"id\":0,\"range\":[]},\"kind\":\"GoalSpecific\"},\"kind\":\"DisplayInfo\"}"
+        case goalContextOf (mapMaybe parseResponseLine [ln]) of
+          Nothing -> pure (Fail "goalContextOf answered Nothing")
+          Just gc -> allOf
+            [ assertEqual "type" "Nat" (gcType gc)
+            , assertEqual "context" [("p", "Σ Nat (λ _ → Nat)")]
+                [ (geName e, geBinding e) | e <- gcEntries gc ]
+            , assertEqual "mode" (Just Normalised) (gcRewrite gc)
+            ]
+
+    , -- The argument is read by Agda's name, defaults to the editor's mode
+      -- when absent, and a word that names no mode is refused at the parser,
+      -- which is before anything reaches the lane, with the five named.
+      runTest "rewrite argument: get_goal and type_of default to Simplified, take a mode by name, refuse another word (#248)" $ do
+        let obj kvs = Aeson.object kvs
+            goalP v = Aeson.fromJSON v :: Aeson.Result GetGoalParams
+            typeP v = Aeson.fromJSON v :: Aeson.Result TypeOfParams
+            goalAt  = [("filePath", "f")]
+            typeAt  = [("filePath", "f"), ("expr", "e")]
+            refusal r = case r of
+              Aeson.Error e -> all (`T.isInfixOf` T.pack e)
+                ["rewrite is one of", "\"AsIs\"", "\"Normalised\"", "not \"Normalized\""]
+              Aeson.Success _ -> False
+        allOf
+          [ assertEqual "get_goal default" (Aeson.Success Simplified)
+              (ggRewrite <$> goalP (obj goalAt))
+          , assertEqual "get_goal Normalised" (Aeson.Success Normalised)
+              (ggRewrite <$> goalP (obj (("rewrite", "Normalised") : goalAt)))
+          , assertEqual "type_of default" (Aeson.Success Simplified)
+              (topRewrite <$> typeP (obj typeAt))
+          , assertEqual "type_of AsIs" (Aeson.Success AsIs)
+              (topRewrite <$> typeP (obj (("rewrite", "AsIs") : typeAt)))
+          , assert "get_goal refuses Normalized, naming the five"
+              (refusal (goalP (obj (("rewrite", "Normalized") : goalAt))))
+          , assert "type_of refuses Normalized, naming the five"
+              (refusal (typeP (obj (("rewrite", "Normalized") : typeAt))))
+          ]
 
     , runTest "hsShow: escaping is Haskell's — backslash, quote, newline, unicode" $ do
         r1 <- assertEqual "backslash" "\"\\\\x -> x\"" (hsShow "\\x -> x")
@@ -7740,7 +7832,7 @@ interactionLaneTests cfg repoRoot = do
                , topExpr     = "implicitOnly {3}"
                , topLine     = Nothing
                , topColumn   = Nothing
-               , topReload   = False
+               , topReload   = False, topRewrite = editorRewrite
                }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -7875,7 +7967,7 @@ interactionLaneTests cfg repoRoot = do
       runTest "lean answers: type_of keeps its type, lane.load, and the tree, and drops the lane's wire lines" $ do
         r <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "implicitOnly {3}"
-               , topLine = Nothing, topColumn = Nothing, topReload = True }
+               , topLine = Nothing, topColumn = Nothing, topReload = True, topRewrite = editorRewrite }
         withRight r $ \res -> do
           let full = Aeson.toJSON res
           allOf
@@ -7893,7 +7985,7 @@ interactionLaneTests cfg repoRoot = do
                , topExpr     = "Nat Nat"
                , topLine     = Nothing
                , topColumn   = Nothing
-               , topReload   = False
+               , topReload   = False, topRewrite = editorRewrite
                }
         a <- case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -7907,7 +7999,7 @@ interactionLaneTests cfg repoRoot = do
                , topExpr     = "g"
                , topLine     = Nothing
                , topColumn   = Nothing
-               , topReload   = False
+               , topReload   = False, topRewrite = editorRewrite
                }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
@@ -7937,14 +8029,14 @@ interactionLaneTests cfg repoRoot = do
           "module LaneStale where\nopen import Agda.Builtin.Nat\nf : Nat\nf = zero\n"
         r1 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "f", topLine = Nothing
-                , topColumn = Nothing, topReload = False }
+                , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         a <- case r1 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "first load" "first"
             (lchLoad (lmLane (torMeta res)))
         r2 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "f", topLine = Nothing
-                , topColumn = Nothing, topReload = False }
+                , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         b <- case r2 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> assertEqual "unchanged is reused" "reused"
@@ -7952,7 +8044,7 @@ interactionLaneTests cfg repoRoot = do
         TIO.appendFile file "extra : Nat\nextra = suc zero\n"
         r3 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "extra", topLine = Nothing
-                , topColumn = Nothing, topReload = False }
+                , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         c <- case r3 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -7964,7 +8056,7 @@ interactionLaneTests cfg repoRoot = do
         -- Copilot round).
         r4 <- handleTypeOf lanes cfg TypeOfParams
                 { topFilePath = file, topExpr = "extra", topLine = Nothing
-                , topColumn = Nothing, topReload = True }
+                , topColumn = Nothing, topReload = True, topRewrite = editorRewrite }
         d <- case r4 of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -7988,7 +8080,7 @@ interactionLaneTests cfg repoRoot = do
           "module LaneBroken where\nopen import Agda.Builtin.Nat\nbad : Nat\nbad = Nat\n"
         r <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = file, topExpr = "zero", topLine = Nothing
-               , topColumn = Nothing, topReload = False }
+               , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -8018,7 +8110,7 @@ interactionLaneTests cfg repoRoot = do
           "module NotTheFileName where\nopen import Agda.Builtin.Nat\nok : Nat\nok = 0\n"
         r <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = file, topExpr = "zero", topLine = Nothing
-               , topColumn = Nothing, topReload = False }
+               , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         case r of
           Left err  -> pure (Fail $ T.unpack (failureText err))
           Right res -> do
@@ -8121,7 +8213,7 @@ interactionLaneTests cfg repoRoot = do
                , topExpr     = "g"
                , topLine     = Nothing
                , topColumn   = Nothing
-               , topReload   = False
+               , topReload   = False, topRewrite = editorRewrite
                }
         shutdownLanes freshLanes
         case r of
@@ -8144,7 +8236,7 @@ interactionLaneTests cfg repoRoot = do
                , topExpr     = "g"
                , topLine     = Nothing
                , topColumn   = Nothing
-               , topReload   = False
+               , topReload   = False, topRewrite = editorRewrite
                }
         case r of
           Left (FailInteraction xf) -> do
@@ -8164,7 +8256,7 @@ interactionLaneTests cfg repoRoot = do
         checks <- mapM
           (\(i, want) -> do
             r <- handleGetGoal lanes cfg GetGoalParams
-                   { ggFilePath = fixture, ggHole = ByIndex i, ggReload = False }
+                   { ggFilePath = fixture, ggHole = ByIndex i, ggReload = False, ggRewrite = editorRewrite }
             case r of
               Left err   -> pure (Fail $ "hole " <> show i <> ": "
                                     <> T.unpack (failureText err))
@@ -8181,16 +8273,61 @@ interactionLaneTests cfg repoRoot = do
     , runTest "get_goal: lane-sourced context carries names and types (#108)" $ do
         let fixture = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
         r <- handleGetGoal lanes cfg GetGoalParams
-               { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False }
+               { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         case r of
           Left err   -> pure (Fail $ T.unpack (failureText err))
           Right info -> assertEqual "context (name, type) pairs"
             [("A", "Set"), ("x", "A")]
             [(ctxName e, ctxType e) | e <- giContext info]
 
+    , -- Issue #248's fixture: a module parameter of a defined type.  The
+      -- default keeps the name a caller has to write; Normalised, the mode
+      -- get_goal sent before #248, unfolds it.  Asserting both makes the test
+      -- fail on the old default and fail again if the argument stopped being
+      -- honored; the record parameter is the control, the same in both.
+      runTest "get_goal: the default context keeps a defined type's name; rewrite Normalised unfolds it (#248)" $ do
+        -- The default call is parsed from a request with no rewrite key, so
+        -- the default under test is the one a client gets.
+        let request kvs = Aeson.fromJSON (Aeson.object
+              (("filePath", Aeson.toJSON (fx "RewriteModes.agda")) : kvs))
+            ask kvs = case request kvs of
+              Aeson.Success params -> handleGetGoal lanes cfg params
+              Aeson.Error e        -> pure (Left (FailMessage (T.pack e)))
+            pairs info = [(ctxName e, ctxType e) | e <- giContext info]
+        rDefault <- ask []
+        rNormal  <- ask [("rewrite", "Normalised")]
+        case (rDefault, rNormal) of
+          (Right d, Right n) -> allOf
+            [ assertEqual "source" (Just "interaction-lane") (giSource d)
+            , assertEqual "default context" [("p", "Pair Nat"), ("b", "Box")] (pairs d)
+            , assertEqual "default mode echoed" (Just Simplified) (giRewrite d)
+            , assertEqual "Normalised context" [("p", "Σ Nat (λ _ → Nat)"), ("b", "Box")] (pairs n)
+            , assertEqual "Normalised echoed" (Just Normalised) (giRewrite n)
+            , assertEqual "the goal is the same" (giGoal d) (giGoal n)
+            ]
+          (Left err, _) -> pure (Fail $ T.unpack (failureText err))
+          (_, Left err) -> pure (Fail $ T.unpack (failureText err))
+
+    , runTest "type_of: the default prints a defined type by its name; rewrite Normalised unfolds it (#248)" $ do
+        let at rw = handleTypeOf lanes cfg TypeOfParams
+              { topFilePath = fx "RewriteModes.agda", topExpr = "p"
+              , topLine = Just 31, topColumn = Just 11, topReload = False, topRewrite = rw }
+        rDefault <- at editorRewrite
+        rNormal  <- at Normalised
+        case (rDefault, rNormal) of
+          (Right d, Right n) -> allOf
+            [ assertEqual "scope" "goal 0 (line 31, column 11)" (torScope d)
+            , assertEqual "default type" (Just "Pair Nat") (torType d)
+            , assertEqual "default mode echoed" (Just Simplified) (torRewrite d)
+            , assertEqual "Normalised type" (Just "Σ Nat (λ _ → Nat)") (torType n)
+            , assertEqual "Normalised echoed" (Just Normalised) (torRewrite n)
+            ]
+          (Left err, _) -> pure (Fail $ T.unpack (failureText err))
+          (_, Left err) -> pure (Fail $ T.unpack (failureText err))
+
     , runTest "get_goal: a literate file answers through the lane too (#108)" $ do
         r <- handleGetGoal lanes cfg GetGoalParams
-               { ggFilePath = fx "LiterateMd.lagda.md", ggHole = ByIndex 0, ggReload = False }
+               { ggFilePath = fx "LiterateMd.lagda.md", ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         case r of
           Left err   -> pure (Fail $ T.unpack (failureText err))
           Right info -> do
@@ -8206,14 +8343,17 @@ interactionLaneTests cfg repoRoot = do
         shutdownLanes deadLanes
         let fixture = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
         r <- handleGetGoal deadLanes cfg GetGoalParams
-               { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False }
+               { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         case r of
           Left err   -> pure (Fail $ T.unpack (failureText err))
           Right info -> do
             a <- assertEqual "goal" "A" (giGoal info)
             b <- assertEqual "source" (Just "injected-macro") (giSource info)
             c <- assert "the fallback carries the verdict echo" (isJust (giVerdict info))
-            pure (firstFailure [a, b, c])
+            -- The macro normalizes whatever the call asked for, and says so
+            -- (#248): this call asked for the default, Simplified.
+            d <- assertEqual "the fallback's mode" (Just Normalised) (giRewrite info)
+            pure (firstFailure [a, b, c, d])
 
     , -- Hole-goal enrichment (#108): a free peek, so a cold registry keeps
       -- the placeholder and a warm one fills real types — with the batch
@@ -8229,7 +8369,7 @@ interactionLaneTests cfg repoRoot = do
         shutdownLanes coldLanes
         _ <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g"
-               , topLine = Nothing, topColumn = Nothing, topReload = False }
+               , topLine = Nothing, topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         rWarm <- handleCheckFile lanes cfg CheckFileParams
                    { cfFilePath = fx "TwoHoles.agda", cfMaxDiagnostics = Nothing }
         b <- case rWarm of
@@ -8272,7 +8412,7 @@ interactionLaneTests cfg repoRoot = do
         -- point; what matters is what the load left behind.
         _     <- handleTypeOf lanes cfg TypeOfParams
                    { topFilePath = file, topExpr = "three"
-                   , topLine = Nothing, topColumn = Nothing, topReload = False }
+                   , topLine = Nothing, topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         rWarm  <- handleGetDiagnostics lanes cfg (diagnosticsOf file)
         -- The sibling tool reads the same peek, so it must answer the same.
         rCheck <- handleCheckFile lanes cfg
@@ -8347,7 +8487,7 @@ interactionLaneTests cfg repoRoot = do
         TIO.writeFile file src
         _ <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = file, topExpr = "three"
-               , topLine = Nothing, topColumn = Nothing, topReload = False }
+               , topLine = Nothing, topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         r <- handleGetDiagnostics lanes cfg GetDiagnosticsParams
                { gdFilePath = file, gdMaxDiagnostics = Nothing }
         case r of
@@ -8386,7 +8526,7 @@ interactionLaneTests cfg repoRoot = do
             TIO.writeFile file v1
             r1 <- handleTypeOf lanes cfg TypeOfParams
                     { topFilePath = file, topExpr = "v", topLine = Nothing
-                    , topColumn = Nothing, topReload = False }
+                    , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
             a <- case r1 of
               Left err -> pure (Fail $ T.unpack (failureText err))
               Right _  -> pure Pass
@@ -8395,7 +8535,7 @@ interactionLaneTests cfg repoRoot = do
             setModificationTime file mtime
             r2 <- handleTypeOf lanes cfg TypeOfParams
                     { topFilePath = file, topExpr = "v", topLine = Nothing
-                    , topColumn = Nothing, topReload = False }
+                    , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
             b <- case r2 of
               Left err  -> pure (Fail $ T.unpack (failureText err))
               Right res -> assertEqual "fingerprint sees through the metadata"
@@ -8408,7 +8548,7 @@ interactionLaneTests cfg repoRoot = do
         r <- handleGetGoal lanes cfg GetGoalParams
                { ggFilePath = fx "TwoHoles.agda"
                , ggHole     = ByIndex 0
-               , ggReload   = True
+               , ggReload   = True, ggRewrite = editorRewrite
                }
         case r of
           Left err   -> pure (Fail $ T.unpack (failureText err))
@@ -8432,7 +8572,7 @@ interactionLaneTests cfg repoRoot = do
         let fixture  = repoRoot </> "agda-dojang" </> "data" </> "fixtures" </> "Fixture01.agda"
             mutedCfg = cfg { agdaFlags = agdaFlags cfg <> ["--trace-imports=0"] }
             ask ls c = handleGetGoal ls c GetGoalParams
-                         { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False }
+                         { ggFilePath = fixture, ggHole = ByIndex 0, ggReload = False, ggRewrite = editorRewrite }
         rOpen   <- ask openLanes  cfg
         rMuted  <- ask mutedLanes mutedCfg
         rReused <- ask mutedLanes mutedCfg
@@ -8463,7 +8603,7 @@ interactionLaneTests cfg repoRoot = do
                 , topExpr     = "g"
                 , topLine     = Nothing
                 , topColumn   = Nothing
-                , topReload   = False
+                , topReload   = False, topRewrite = editorRewrite
                 }
         a <- case r1 of
           Left err  -> pure (Left (T.unpack (failureText err)))
@@ -8479,7 +8619,7 @@ interactionLaneTests cfg repoRoot = do
                     , topExpr     = "h"
                     , topLine     = Nothing
                     , topColumn   = Nothing
-                    , topReload   = False
+                    , topReload   = False, topRewrite = editorRewrite
                     }
             case r2 of
               Left err  -> pure (Fail $ "after kill: " <> T.unpack (failureText err))
@@ -8614,7 +8754,7 @@ interactionLaneTests cfg repoRoot = do
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgHang TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
-               , topColumn = Nothing, topReload = False }
+               , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
@@ -8641,7 +8781,7 @@ interactionLaneTests cfg repoRoot = do
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgHang TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
-               , topColumn = Nothing, topReload = False }
+               , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) -> do
@@ -8659,7 +8799,7 @@ interactionLaneTests cfg repoRoot = do
         freshLanes <- newInteractionLanes
         r <- handleTypeOf freshLanes cfgDie TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "g", topLine = Nothing
-               , topColumn = Nothing, topReload = False }
+               , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
         shutdownLanes freshLanes
         case r of
           Left (FailInteraction xf) ->

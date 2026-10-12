@@ -208,7 +208,8 @@ object FixedProposer {
 /** The type_of peek: candidate → `_`-meta form, and the conservative
   * compatibility judgement between the lane's inferred type and the goal
   * display.  Both strings come from the same lane load and the same
-  * Normalised printer, which is what makes textual comparison meaningful;
+  * Normalised printer (`Oracle.Rewrite`, asked for by name since agda-mcp
+  * issue #248), which is what makes textual comparison meaningful;
   * where rendering still diverges the worst case is a skipped probe, and the
   * sweep measures exactly that.
   */

@@ -236,7 +236,8 @@ handleGetGoal lanes cfg0 params =
             -- cannot answer — except on a lane timeout, which is surfaced
             -- rather than silently doubling the call's bound with a second
             -- full run.
-            viaLane <- laneGoal lanes cfg pc absPath src (ggReload params) idx
+            viaLane <- laneGoal lanes cfg pc absPath src (ggReload params)
+                         (ggRewrite params) idx
             case viaLane of
               Right (Just info) -> pure (withAddress (Right info))
               Left tf           -> pure (Left tf)
@@ -309,6 +310,10 @@ injectedGoal cfg pc absPath origBytes src idx = do
                         , giSource  = Just "injected-macro"
                         , giLane    = Nothing
                         , giAddressed = Nothing
+                        -- The macro prints @inferType >=> normalise@, whatever
+                        -- the call asked for, so a caller that asked for
+                        -- another mode can see that it did not get it (#248).
+                        , giRewrite = Just Normalised
                         }
 
 
@@ -328,10 +333,13 @@ injectedGoal cfg pc absPath origBytes src idx = do
 -- 'resolveHoleRef'), and 'pointForHole' holds the point at that index to the
 -- scanned hole's coordinates, which covers the day the two enumerations
 -- disagree, by declining rather than answering about the wrong hole.
+--
+-- The display mode is the caller's @rewrite@ (issue #248), and the answer
+-- reports the mode Agda says it printed in, falling back to the one sent.
 laneGoal
   :: InteractionLanes -> AgdaConfig -> ProjectContext -> FilePath -> Text
-  -> Bool -> Int -> IO (Either ToolFailure (Maybe GoalInfo))
-laneGoal lanes cfg pc absPath src reload idx = do
+  -> Bool -> Rewrite -> Int -> IO (Either ToolFailure (Maybe GoalInfo))
+laneGoal lanes cfg pc absPath src reload rw idx = do
   startNs <- getMonotonicTimeNSec
   out <- withLane lanes cfg (pcRoot pc) $ \lh -> do
     loaded <- ensureLoaded lh reload absPath (agdaFlags cfg)
@@ -344,7 +352,7 @@ laneGoal lanes cfg pc absPath src reload idx = do
         Right li -> case pointForHole (flavourOf absPath) src idx (liPoints li) of
           Nothing -> pure (Right Nothing)
           Just p  -> do
-            rs <- runQuery lh absPath (cmdGoalTypeContext (ipId p))
+            rs <- runQuery lh absPath (cmdGoalTypeContext rw (ipId p))
             case rs of
               Left lf     -> pure (Left lf)
               Right resps -> case goalContextOf resps of
@@ -380,6 +388,7 @@ laneGoal lanes cfg pc absPath src reload idx = do
                     , giSource  = Just "interaction-lane"
                     , giLane    = Just lane
                     , giAddressed = Nothing
+                    , giRewrite = gcRewrite gc <|> Just rw
                     }
   case out of
     Right (Right mInfo) -> pure (Right mInfo)
