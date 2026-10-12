@@ -818,8 +818,10 @@ gitignored, so a fresh worktree has no server binary, and `scripts/run-server.sh
 (which the `.mcp.json` registration runs) cannot connect a Claude Code session
 there until `cabal build exe:agda-mcp` has run in that worktree.  The exception
 is `AGDA_MCP_BIN`: when it names a prebuilt binary, the launcher runs that
-instead of looking under the worktree's `dist-newstyle/` (§ 13.4).  The launcher
-names a missing build on stderr; the client shows only `CONNECTION_CLOSED`.
+instead of looking under the worktree's `dist-newstyle/` (§ 13.4), and when the
+registration also passes `--agda-bin`, it runs that binary without entering the
+shell at all (issue #249).  The launcher names a missing build on stderr; the
+client shows only `CONNECTION_CLOSED`.
 
 The test suite includes both pure tests (marker parsing, hole finding) and tier-2
 integration tests that invoke a real `agda` binary.  For the integration tests, you
@@ -931,7 +933,10 @@ another (issue #242); it also clears the `LD_LIBRARY_PATH` this flake's
 devShells export, so a session started from inside `nix develop` loads the
 server too (issue #153).  Set `AGDA_MCP_BIN` in the server's `env` block to run
 a prebuilt binary instead of the one `cabal list-bin` names in the launcher's
-own checkout.
+own checkout.  With `--agda-bin` among the arguments, as both templates pass
+it, the launcher then skips the shell, and the server answers `initialize` in
+milliseconds rather than seconds (issue #249); *Which Agda checks your files*
+below says what the server's environment is then.
 
 The registration itself, in each harness's format, is on the
 [Connecting an agent](agda-mcp/connecting-an-agent.md) page: for Claude Code
@@ -963,9 +968,11 @@ absent means unknown, not warm).
 
 agda-mcp runs inside **this** repository's `.#backend` shell (`run-server.sh` does
 `nix develop <agda-native-air>#backend --command …`; your own `nix develop` before
-launching `claude` equips only Claude's Bash, not the server), but the template has it
-check agda-algebras files with **agda-algebras's own** Agda, the one its `nix develop`
-and CI use.  Three arguments carry that, as follows:
+launching `claude` equips only Claude's Bash, not the server), unless the registration
+sets `AGDA_MCP_BIN` and passes `--agda-bin`, in which case the launcher runs the server
+directly (see below).  Either way the template has it check
+agda-algebras files with **agda-algebras's own** Agda, the one its `nix develop` and CI
+use.  Three arguments carry that, as follows:
 
 +  `--agda-bin` names agda-algebras's wrapped Agda, which bakes in a `--library-file`
    registering its standard library.
@@ -980,6 +987,18 @@ and CI use.  Three arguments carry that, as follows:
    flag it reads this repository's `agda/libraries`, which registers agda-algebras at
    the flake-pinned store copy; every worktree file would then be refused with a
    `rootMismatch`.
+
+Which environment the server runs in decides what a gate finds (issue #249).
+Through the shell, a `check_project` recipe gets the shell's `make`, this
+repository's Agda 2.9.0 as `agda`, and this repository's `agda/` as `$AGDA_DIR`;
+with `AGDA_MCP_BIN` set and `--agda-bin` passed, the launcher skips the shell, and
+the same recipe gets the client's own `make`, `agda` (often none), and `$AGDA_DIR`.
+The template's `--check-command` names its Agda with `AGDA=`, and its
+`--agda-flags` name the libraries file, so the two paths agree on both; a
+`check_project` call naming a `target` runs bare `make <target>`, which uses
+whatever `agda` the server's environment has, on either path.
+[`agda-mcp/README.md`](../agda-mcp/README.md), § *Without the shell*, lists what
+the fast path takes from the client.
 
 Nothing in this arrangement is shared between sessions, so sessions in different
 worktrees do not disturb each other.  (An earlier template set `env.AGDA_ALGEBRAS_ROOT`

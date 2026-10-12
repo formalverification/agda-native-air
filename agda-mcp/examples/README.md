@@ -105,6 +105,18 @@ cover those cases: an `-l` flag makes Agda ignore the worktree's own
 `agda-algebras.agda-lib`, so its modules would resolve only through the
 server's fallback include path and lose the `flags:` line the library sets.
 
+One binding is optional, and the template leaves it out.  An `env` block naming
+a built server, `"env": {"AGDA_MCP_BIN": "/ABS/PATH/TO/agda-mcp"}` (the path
+`cabal list-bin exe:agda-mcp` prints in a checkout that has built it), lets the
+launcher skip the shell, since the template already names its Agda with
+`--agda-bin` (issue #249).  The server then answers `initialize` in milliseconds
+plus the corpus load, about 3 s, instead of several seconds more; it runs in
+the client's environment, so the `make` and `env` its gate runs and the
+`$AGDA_DIR/defaults` of the previous paragraph are the client's, not this
+repository's.  The template's `--library-file` and `AGDA=` keep the rest the
+same on both paths.  [`agda-mcp/README.md`](../README.md), § *Without the
+shell*, has the whole list.
+
 Nothing this registration reads is written by another session, so any number of
 sessions in different worktrees run side by side.  (The template this one
 replaced set `AGDA_ALGEBRAS_ROOT` instead, and every launch rewrote this
