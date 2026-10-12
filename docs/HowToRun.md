@@ -793,7 +793,9 @@ exit code, including the case where a wrapper script ending in `echo` reports
 shell exit 0 for a build that failed.
 See [`agda-mcp/README.md`](../agda-mcp/README.md#check_project).
 
-This section walks you through building, testing, running, and connecting an agent.
+This section walks you through building, testing, and running the server;
+connecting an agent to it is on the site page
+[Connecting an agent](agda-mcp/connecting-an-agent.md) (§ 13.3).
 
 ### 13.1.  Build & Test
 
@@ -816,7 +818,7 @@ gitignored, so a fresh worktree has no server binary, and `scripts/run-server.sh
 (which the `.mcp.json` registration runs) cannot connect a Claude Code session
 there until `cabal build exe:agda-mcp` has run in that worktree.  The exception
 is `AGDA_MCP_BIN`: when it names a prebuilt binary, the launcher runs that
-instead of looking under the worktree's `dist-newstyle/` (§ 13.5).  The launcher
+instead of looking under the worktree's `dist-newstyle/` (§ 13.4).  The launcher
 names a missing build on stderr; the client shows only `CONNECTION_CLOSED`.
 
 The test suite includes both pure tests (marker parsing, hole finding) and tier-2
@@ -890,115 +892,59 @@ For a pre-built sequence of test requests, see `agda-mcp/test/resources/mcp-test
 
 ---
 
-### 13.3.  Connect Claude Code
+### 13.3.  Connect an agent
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is a CLI coding agent
-that can connect to `agda-mcp`, giving you an interactive AI assistant that can
-inspect goals, fill holes, and check Agda files through natural language.
+The site page [Connecting an agent](agda-mcp/connecting-an-agent.md) takes each
+agent harness from sign-up to a session that calls `check_file`: Claude Code
+with Anthropic's models, Claude Code against another provider's endpoint, Kimi
+Code CLI, Codex CLI and Copilot CLI, each with its plan, install, sign-in, model
+and effort, instruction files and skills, registration, smoke test and known
+issues.  The registrations all run `scripts/run-server.sh`; the repository's
+root `.mcp.json` is the registration for this checkout, which Claude Code and
+Copilot CLI read from the checkout's root.
 
-1.  **Install Claude Code** (requires Node.js 18+).
+Once a session is connected, two prompts exercise more of the server than the
+page's smoke test does.  The first solves the fixture's holes:
 
-    ```sh
-    npm install -g @anthropic-ai/claude-code
-    ```
-
-2.  **Navigate to the repo root** (`cd agda-native-air`).  The `.mcp.json` file there
-    configures the agda MCP server connection.
-
-3.  **Launch Claude Code**.
-
-    ```sh
-    MCP_TIMEOUT=120000 claude
-    ```
-
-    Claude Code will detect `.mcp.json` and start the agda MCP server.  You may need
-    to approve the connection when prompted.
-
-4.  **Verify Connection**.  Enter `/mcp` at the Claude Code prompt and confirm `agda · ✔ connected`.
-
-5.  **Try a proof-state query**.  Once connected, start by entering a simple query at the Claude Code prompt, such as
-
-    ```
-    Use ONLY the agda MCP tool `get_goal` with filePath "agda-dojang/data/fixtures/Fixture01.agda" and holeIndex 0. Show me the raw result.
-    ```
-
-    If that works, try something a bit harder, such as
-
-    ```
-    Use ONLY the agda MCP tools (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`) to solve all holes in `agda-dojang/data/fixtures/Fixture01.agda`.  For each hole, inspect with `get_goal`, propose a candidate, and verify with `fill_hole`.  If a candidate fails, read the error message and adjust. Note: `fill_hole` validates candidates without modifying the file; once all candidates are verified, use your Edit tool to write them into the source, then confirm with `check_file`.
-    ```
-
-    If you started the server with `--corpus` (the shipped `.mcp.json` does, using
-    the bundled fixture corpus), you can also exercise the search tools:
-
-    ```
-    Use ONLY the agda MCP tool `search_by_name` to find definitions whose name contains "hom", then `get_dependencies` on the most relevant result. Show me the raw results.
-    ```
-
-
-### 13.4.  Connect other MCP clients
-
-Any MCP-compatible agent can connect to `agda-mcp`.  The general pattern is to
-configure the agent to start `cabal run agda-mcp -- --agda-flags "..."` as a
-subprocess with the repo root as working directory.
-
-See [`agda-mcp/README.md` § Configuring MCP Clients](../agda-mcp/README.md#configuring-mcp-clients)
-for JSON configuration examples for Claude Desktop, Cursor, and Codex CLI.
-
-### 13.5.  Using agda-mcp on another Agda project
-
-You can point Claude Code at another Agda project (for example `agda-algebras`) while
-still giving it agda-mcp from *this* repository.  The recommended setup: **launch
-Claude Code from the other project's worktree** (so that project is the working
-directory, with its own `CLAUDE.md`, git, and permissions) and **attach agda-mcp to
-that session**.  agda-mcp does not need to be the working directory;
-`scripts/run-server.sh` computes the agda-native-air repo root and `cd`s there
-to enter its shell, so it works from any cwd, and then starts the server back
-in the directory the client launched it from, unless `--cwd` names another
-(issue #242); it also clears the
-`LD_LIBRARY_PATH` this flake's devShells export, so a Claude Code session
-started from inside `nix develop` loads the server too (issue #153).  Set
-`AGDA_MCP_BIN` in the server's `env` block to run a prebuilt binary instead of
-the one `cabal list-bin` names in the launcher's own checkout.
-
-(Launching from agda-native-air and using `/add-dir` to reach the other project also
-works, but then agda-native-air stays the project root, so committing the other
-project's work through that session is awkward.  Prefer the setup below.)
-
-There are two ways to attach the server.  **Option A is recommended**; it is a plain
-file, immune to shell aliasing, and self-documenting.
-
-#### Option A: a project `.mcp.json` (recommended)
-
-Copy the committed template
-[`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
-into the checkout you are editing as `.mcp.json`, replace its `/ABS/PATH/TO/...`
-placeholders with real absolute paths, and keep it out of that project's history.
-The template names no worktree (`--cwd ${PWD}` anchors the server wherever Claude
-Code starts), so the same file serves every worktree.  A client that does not
-expand `${PWD}` passes the literal string, which the launcher substitutes with
-the directory it was started in; such a registration may also drop `--cwd`
-altogether, since the launcher then passes that directory itself (issue #242).
-Its three machine-specific
-inputs (agda-algebras's own Agda, the libraries file that Agda reads, and the
-search corpus) are realized once; the commands are in the
-[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).  Then:
-
-```sh
-cd /path/to/agda-algebras/<your-branch-worktree>
-cp /abs/path/to/agda-native-air/agda-mcp/examples/agda-algebras.mcp.json ./.mcp.json
-# edit ./.mcp.json: replace every /ABS/PATH/TO/... placeholder with a real path
-echo '.mcp.json' >> "$(git rev-parse --git-common-dir)/info/exclude"   # once per clone
-
-nix develop   # optional: gives Claude's own Bash the agda-algebras toolchain
-claude        # approve the "agda" server when prompted, then /mcp → agda · ✔ connected
+```
+Use ONLY the agda MCP tools (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`) to solve all holes in `agda-dojang/data/fixtures/Fixture01.agda`.  For each hole, inspect with `get_goal`, propose a candidate, and verify with `fill_hole`.  If a candidate fails, read the error message and adjust. Note: `fill_hole` validates candidates without modifying the file; once all candidates are verified, use your Edit tool to write them into the source, then confirm with `check_file`.
 ```
 
-(In a worktree `.git` is a file, so the exclude file has to be named through
-`git rev-parse --git-common-dir`; the shared `info/exclude` then covers every
-worktree of the clone.)  Claude Code auto-loads `.mcp.json` from the working
-directory, asking once to approve it.  What each argument does is covered in
-*Which Agda checks your files* and *The search corpus* below.
+The second exercises the search tools, which the shipped `.mcp.json` turns on
+with the bundled fixture corpus (`--corpus`):
+
+```
+Use ONLY the agda MCP tool `search_by_name` to find definitions whose name contains "hom", then `get_dependencies` on the most relevant result. Show me the raw results.
+```
+
+### 13.4.  Using agda-mcp on another Agda project
+
+You can point an agent at another Agda project (for example `agda-algebras`)
+while still giving it agda-mcp from *this* repository.  The recommended setup is
+to **launch the agent from the other project's worktree** (so that project is
+the working directory, with its own instruction files, git, and permissions) and
+**attach agda-mcp to that session**.  agda-mcp does not need to be the working
+directory; `scripts/run-server.sh` computes the agda-native-air repo root and
+`cd`s there to enter its shell, so it works from any cwd, and then starts the
+server back in the directory the client launched it from, unless `--cwd` names
+another (issue #242); it also clears the `LD_LIBRARY_PATH` this flake's
+devShells export, so a session started from inside `nix develop` loads the
+server too (issue #153).  Set `AGDA_MCP_BIN` in the server's `env` block to run
+a prebuilt binary instead of the one `cabal list-bin` names in the launcher's
+own checkout.
+
+The registration itself, in each harness's format, is on the
+[Connecting an agent](agda-mcp/connecting-an-agent.md) page: for Claude Code a
+project `.mcp.json` copied from
+[`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
+or `claude mcp add`, for Codex CLI the table in
+[`agda-mcp/examples/agda-algebras.codex.toml`](../agda-mcp/examples/agda-algebras.codex.toml).
+The templates' three machine-specific inputs (agda-algebras's own Agda, the
+libraries file that Agda reads, and the search corpus) are realized once, with
+the commands in the
+[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).  What
+each argument does is covered in *Which Agda checks your files* and *The search
+corpus* below.
 
 Keep `--timeout 600`: the bound is enforced; on expiry the `agda` process group is
 killed and the tool returns a timeout rather than blocking.  The first typecheck
@@ -1012,33 +958,6 @@ tell a slow cold call from a slow warm one (`checkedFromSource` is omitted when
 the run died before producing evidence either way, and when your `--agda-flags`
 carry `--trace-imports=0`, which silences the progress lines it is read from;
 absent means unknown, not warm).
-
-#### Option B: `claude mcp add`
-
-Equivalently, register the server on the command line from the worktree:
-
-```sh
-claude mcp add agda --scope local \
-  -- /abs/path/to/agda-native-air/scripts/run-server.sh \
-     --cwd "$PWD" \
-     --agda-bin /abs/path/to/agda-algebras-agda-root/bin/agda \
-     --agda-flags "--library-file=/abs/path/to/agda-algebras-libraries -i /abs/path/to/agda-native-air/agda-dojang/agda" \
-     --corpus /abs/path/to/agda-algebras-corpus-v0.1/corpus.jsonl \
-     --timeout 600 \
-     --check-command "make check AGDA=/abs/path/to/agda-algebras-agda-root/bin/agda" \
-     --check-timeout 3600
-```
-
-`--scope local` keeps the registration in your per-project config, not committed to the
-other repository.  That config is per directory, so each worktree needs its own
-`claude mcp add`; the shell expands `"$PWD"` to that worktree when you run it.
-
-> **If this errors with `script: unrecognized option '--scope'`** (or similar), your
-> shell has `claude` aliased or wrapped — e.g. under `script` for session logging — so
-> the subcommand arguments reach the wrapper instead of Claude Code.  Run `type claude`
-> to confirm, then either prefix the command with `command` (`command claude mcp add …`
-> bypasses the alias/function) or just use Option A, which avoids the `claude` CLI for
-> configuration entirely.
 
 #### Which Agda checks your files
 
@@ -1144,7 +1063,7 @@ build takes several minutes, and the container is ephemeral), and an MCP config 
 absolute container paths.  That is worth setting up via an environment setup script
 once the workflow is proven, but for a first sanity test the terminal is far simpler.
 
-### 13.6.  Troubleshooting
+### 13.5.  Troubleshooting
 
 **Server won't start / "agda not found"**.  Make sure you are inside `nix develop`
 (or `nix develop .#backend`).  The Nix shell provides the pinned `agda` binary.
@@ -1157,7 +1076,7 @@ flags match the example above.
 registration passes no `--library-file`, so the server read this repository's
 registry, which places agda-algebras at the flake-pinned store copy, and refused a file
 in your worktree.  Pass the registry the client's Agda actually reads, as the template
-does; see *Which Agda checks your files* in §13.5.
+does; see *Which Agda checks your files* in § 13.4.
 
 **`Library 'agda-dojang' not found` on another project**.  Agda found no `.agda-lib`
 above the directory the server runs in (or, for the lane tools, above the file), so it
@@ -1177,7 +1096,7 @@ the known limitation tracked in
 [#66](https://github.com/formalverification/agda-native-air/issues/66): those two tools
 typecheck a temp copy that collides with the module's canonical location.  Use
 `check_file` / `get_diagnostics` (which load in place), or work in a scratch top-level
-module — see the first item under *Three things to know* in §13.5.
+module; see the first item under *Three things to know* in § 13.4.
 
 **"filePath does not exist" naming a path in the agda-native-air checkout**.  You sent a
 relative path from your own project to a server working in *this* repository.  The
@@ -1188,9 +1107,11 @@ it was resolved against.  Send an absolute path: your project's directory
 followed by the relative path you tried.  See *Which file gets checked: the path rule*
 in [`agda-mcp/README.md`](../agda-mcp/README.md).
 
-**Claude Code doesn't see the MCP server**.  Verify that `.mcp.json` exists in the
-repo root and that the `cwd` field (if present) points to the correct absolute path.
-Run `claude` from the repo root directory.
+**The agent doesn't see the MCP server**.  Verify that the registration is where the
+harness reads it (for Claude Code and Copilot CLI, `.mcp.json` at the root of the
+directory the session starts in), that the folder is trusted, and that the server is
+approved: `claude mcp get agda` names Claude Code's state.  Each harness's known issues
+are on the [Connecting an agent](agda-mcp/connecting-an-agent.md) page.
 
 
 ---

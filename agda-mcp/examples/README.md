@@ -3,15 +3,19 @@
 # agda-mcp client-config examples
 
 Ready-to-adapt MCP client configurations for using `agda-mcp` from **another Agda
-project** (one whose code lives outside this repository).  JSON does not allow
-comments, so the templates use `/ABS/PATH/TO/...` placeholders; copy one into the
-project you are editing as `.mcp.json`, replace the placeholders with absolute
-paths, and keep it out of that project's git history.
+project** (one whose code lives outside this repository).  The templates use
+`/ABS/PATH/TO/...` placeholders; copy one into the project you are editing (a
+`.mcp.json` template as `.mcp.json`, the Codex template as `.codex/config.toml`),
+replace the placeholders with absolute paths, and keep it out of that project's
+git history.
 
 See
-[`docs/HowToRun.md` §13.5](../../docs/HowToRun.md#135--using-agda-mcp-on-another-agda-project)
-for the full walkthrough, the caveats (`get_goal` needs `AgdaDojang.Debug`;
-absolute paths; toolchain match), and the alternative `claude mcp add` command.
+[Connecting an agent](../../docs/agda-mcp/connecting-an-agent.md)
+for the walkthrough in each agent harness, including the `claude mcp add` command,
+and
+[`docs/HowToRun.md` § 13.4](../../docs/HowToRun.md#134--using-agda-mcp-on-another-agda-project)
+for the caveats (`get_goal` needs `AgdaDojang.Debug`; absolute paths; toolchain
+match).
 
 Both templates check the client project with **its own pinned Agda**, never this
 repository's, so the client's version pins stay authoritative (issue #103), and

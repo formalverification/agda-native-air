@@ -89,7 +89,8 @@ make agda-mcp-serve   # launch the server (the same invocation as .mcp.json)
 
 Already inside `nix develop .#backend`?  Add `BACKEND_USE_NIX=0` to skip the nested shell (this is what CI does).
 
-For Claude Code setup and MCP client configuration, see [Configuring MCP Clients](#configuring-mcp-clients) below.
+For connecting an agent harness to the server, see
+[Configuring MCP Clients](#configuring-mcp-clients) below.
 
 ---
 
@@ -1389,40 +1390,43 @@ cabal run agda-mcp -- \
 
 ## Configuring MCP Clients
 
-### Claude Code / Claude Desktop
+The setup for each agent harness (Claude Code, Claude Code against another
+provider's endpoint, Kimi Code CLI, Codex CLI and Copilot CLI), from sign-up
+to a smoke test, is on the site page
+[Connecting an agent](../docs/agda-mcp/connecting-an-agent.md), with the
+registration in each harness's format.  What follows is what those
+registrations run.
 
-**Recommended (zero-setup)**.  This repository already ships a project `.mcp.json`
-at the root that launches the server through `scripts/run-server.sh`.  That wrapper
-enters `nix develop .#backend` for you (so `agda`, `cabal`, and GHC need not be on
-your `PATH`) and routes the Nix banner to stderr so it does not corrupt the MCP
-JSON-RPC framing.  It looks like this:
+### Through the launcher
 
-```json
-{
-  "mcpServers": {
-    "agda": {
-      "command": "./scripts/run-server.sh",
-      "args": [
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library",
-        "--corpus", "agda-mcp/test/resources/corpus-fixture.jsonl",
-        "--timeout", "600",
-        "--verbose"
-      ]
-    }
-  }
-}
-```
+Every registration runs `scripts/run-server.sh`, as the repository's root
+`.mcp.json` does.  The launcher enters `nix develop .#backend` for you (so
+`agda`, `cabal`, and GHC need not be on your `PATH`) and routes the Nix banner
+to stderr so it does not corrupt the MCP JSON-RPC framing.  The root
+registration passes the agda-dojang flags, the bundled fixture corpus, and
+`--timeout 600`.  Drop `--corpus` to run without the search tools; point it at
+a real agda-strux corpus to search a whole library (`make extract-lib` then
+`make corpus` builds one, and
+[`docs/corpora/agda-algebras-v0.md`](../docs/corpora/agda-algebras-v0.md)
+describes the published agda-algebras corpus and how to reproduce it).  The
+`--timeout 600` is deliberate rather than decorative: a first check of a large
+library builds its `.agdai` interfaces and can run for minutes, so the bound has
+to cover that cold call (see
+[Timeouts, cold calls, and latency](#timeouts-cold-calls-and-latency)).
 
-Drop the `--corpus` line to run with only the four core proof-state tools; point it
-at a real agda-strux corpus to search a whole library — `make extract-lib` then
-`make corpus` builds one, and [`docs/corpora/agda-algebras-v0.md`](../docs/corpora/agda-algebras-v0.md)
-describes the published agda-algebras corpus and how to reproduce it.
-The `--timeout 600` is deliberate rather than decorative: a first check of a large
-library builds its `.agdai` interfaces and can run for minutes, so the bound has to
-cover that cold call (see [Timeouts, cold calls, and latency](#timeouts-cold-calls-and-latency)).
+The launcher starts the server in the directory the client started it in,
+unless `--cwd` names another (issue #242).  It substitutes that directory for a
+`${PWD}` (or `${PWD:-default}`) that the client did not expand, and passes it as
+`--cwd` when the flag is absent, so a registration copied from one written for
+Claude Code may keep `--cwd ${PWD}`, drop the flag, or name the checkout by
+absolute path.  The server's `cwd:` startup line on stderr says where it went.
+No other variable is expanded: an argument still holding `${` is named on
+stderr, and a `--cwd` holding one is refused.
 
-**Direct (already inside a Nix shell)**.  If you launch your client from within
-`nix develop .#backend`, you can skip the wrapper and invoke `cabal` directly:
+### Without the launcher
+
+From inside `nix develop .#backend`, a client can run the server through
+`cabal` directly:
 
 ```json
 {
@@ -1431,7 +1435,7 @@ cover that cold call (see [Timeouts, cold calls, and latency](#timeouts-cold-cal
       "command": "cabal",
       "args": [
         "run", "-v0", "agda-mcp", "--",
-        "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library",
+        "--agda-flags", "-i ../agda-dojang/agda --library-file=../agda/libraries -l agda-dojang -l standard-library",
         "--timeout", "600"
       ],
       "cwd": "/path/to/agda-native-air/agda-mcp"
@@ -1440,21 +1444,9 @@ cover that cold call (see [Timeouts, cold calls, and latency](#timeouts-cold-cal
 }
 ```
 
-### Cursor / Codex CLI / Copilot CLI
-
-Similar configuration: point the MCP client at `scripts/run-server.sh` (or the
-`agda-mcp` binary if you are already in a Nix shell) with the appropriate
-`--agda-flags` and optional `--corpus`.
-
-A registration copied from one written for Claude Code may keep `--cwd ${PWD}`,
-drop the flag, or name the checkout by absolute path (issue #242).  The launcher
-substitutes the directory it was started in for a `${PWD}` (or
-`${PWD:-default}`) that the client did not expand, and passes that directory as
-`--cwd` when the flag is absent.  Both rely on the client starting the server in
-the checkout it works on; the server's `cwd:` startup line on stderr says where
-it went, and what each client does is for its field report to record (issue
-#243).  No other variable is expanded: an argument still holding `${` is named
-on stderr, and a `--cwd` holding one is refused.
+The server works in `agda-mcp/`, where `cabal` finds the package, so the paths in
+`--agda-flags` start from there.  (With root-relative paths, `check_file` fails
+with Agda's `LibraryError`.)
 
 ---
 
