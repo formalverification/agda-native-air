@@ -415,8 +415,10 @@ claude mcp add agda --scope local \
 `--scope local`, the default, keeps the registration in your own per-project
 configuration rather than in the project's files.  That configuration is per
 directory, so each worktree needs its own `claude mcp add`, and the shell
-expands `"$PWD"` to that worktree when you run it.  `--scope user` registers
-the server for every project instead (*read*).
+expands `"$PWD"` to that worktree when you run it.  (*Run*, verbatim but for
+the placeholders, against a throwaway `CLAUDE_CONFIG_DIR`: `claude mcp get
+agda` then showed it with the local scope.)  `--scope user` registers the
+server for every project instead (*read*).
 
 **One session only**.  `claude --mcp-config <file> --strict-mcp-config`
 takes the servers from a registration file for that run and ignores every
@@ -450,7 +452,11 @@ server.  It answered in 15 s and four turns, as follows:
 
 ### Known issues
 
-+  **A fresh worktree has no server binary**.  `dist-newstyle/` is
+From this page's runs and the issues each item names, except where marked
+read.
+
++  **A fresh worktree has no server binary** (*run*: this page's own session
+   met it).  `dist-newstyle/` is
    gitignored, so the launcher has nothing to run until `cabal build
    exe:agda-mcp` has run in that checkout, or `AGDA_MCP_BIN` names a
    prebuilt binary.  Claude Code shows only `CONNECTION_CLOSED`; the
@@ -465,10 +471,11 @@ server.  It answered in 15 s and four turns, as follows:
    tool's description and to the server's instructions alike;
    `CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH` changes the limit (version
    2.1.280 and later, *read*).  agda-mcp's instructions are written to fit.
-+  **A wrapped `claude`**.  If `claude mcp add` fails with an error about an
-   unrecognized option, your shell has `claude` aliased or wrapped (under
-   `script`, say), so the arguments reach the wrapper.  `type claude` shows
-   it; `command claude mcp add ...` bypasses it, or use Option A.
++  **A wrapped `claude`** (*read*, from [`docs/HowToRun.md`][howtorun-13]).
+   If `claude mcp add` fails with an error about an unrecognized option, your
+   shell has `claude` aliased or wrapped (under `script`, say), so the
+   arguments reach the wrapper.  `type claude` shows it;
+   `command claude mcp add ...` bypasses it, or use Option A.
 +  **Started from inside `nix develop`**.  This works since issue [#153],
    whose fix clears the `LD_LIBRARY_PATH` that this flake's shells export before
    the launcher runs `nix`.
@@ -718,9 +725,11 @@ under its `auto` permission policy, and static deny rules still apply.
 
 ### Known issues
 
+From this page's runs, except where marked read.
+
 +  **An empty balance** stops `kimi -p` at once with the provider's `429`,
    without retrying.
-+  **Permission rules** name the server's tools `mcp__agda__<tool>`
++  **Permission rules** (*read*) name the server's tools `mcp__agda__<tool>`
    (`[[permission.rules]]` in `config.toml`).
 
 ## OpenAI Codex CLI
@@ -837,13 +846,13 @@ test).  Each choice in the table is there for a reason, as follows:
 
 +  `startup_timeout_sec`: Codex's default is 10 s, and the launcher took 2.5
    to 16 s in the runs above, and up to 32 s with a dirty working tree.
-+  `tool_timeout_sec`: Codex's documented default is 60 s, and a first
-   check of a large library can take minutes.  The value sits above the
-   server's own bounds, `--timeout` for a check and `--check-timeout` for
++  `tool_timeout_sec`: Codex's documented default is 60 s, and a first check
+   of a large library can take minutes.  The value sits above the server's
+   own bounds, `--timeout` for a check and `--check-timeout` for
    `check_project` (1800 s by default, 3600 in the template), so that the
-   server's timeout answer, which names the bound, arrives first.  (Observed: a 90 s call completed with
-   the key unset, in 0.162.1; the documentation is what a later version may
-   enforce.)
+   server's timeout answer, which names the bound, arrives first.  (Observed:
+   a 90 s call completed with the key unset, in 0.162.1; the documentation is
+   what a later version may enforce.)
 +  `required = true`: without it, `codex exec` sends its first request
    before the server is up, and the model finds no agda tools; this is what
    happened in the Codex session of [#243].
@@ -862,7 +871,8 @@ test).  Each choice in the table is there for a reason, as follows:
 `codex mcp add agda -- /path/to/agda-native-air/scripts/run-server.sh
 <arguments>`, with the `args` of the table as the arguments, writes the
 table's first lines to `~/.codex/config.toml`, and the other keys are added
-by hand (*read*; not run here, since it edits the user's configuration).
+by hand (*run* against a throwaway `CODEX_HOME`, which got exactly `command`
+and `args`).
 `codex mcp list` shows the servers Codex will start, and a trusted project's
 table among them.
 
@@ -914,6 +924,9 @@ that checkout as both the project root and the directory Agda ran in.
 
 ### Known issues
 
+From this page's runs and the field report of [#243], except where marked
+read.
+
 +  **The sandbox on Ubuntu 24.04**.  Codex's Linux sandbox runs commands
    under bubblewrap, which Ubuntu 24.04's AppArmor policy stops from
    creating its namespaces.  Every sandboxed shell command then fails, while
@@ -923,8 +936,8 @@ that checkout as both the project root and the directory Agda ran in.
    permitted` here.  agda-mcp's calls do not go through the sandbox: the
    smoke test passed under `-s read-only` with the sandbox broken.  The fix
    follows this list.
-+  **Approval prompts**.  `approvals_reviewer = "auto_review"` hands the
-   prompts that `on-request` would show you to Codex's reviewer agent
++  **Approval prompts** (*read*).  `approvals_reviewer = "auto_review"` hands
+   the prompts that `on-request` would show you to Codex's reviewer agent
    instead, which costs extra model calls; it grants no permission the
    sandbox does not.
 +  **`codex exec` reads standard input**.  Whenever standard input is not a
@@ -1054,12 +1067,12 @@ substitutes it.  Filled in and placed in an agda-algebras checkout, it
 checked the whole library (`src/agda-algebras.lagda.md`) green in 27 s, with
 the interfaces of 92 modules left by an earlier run.
 
-**Every project**.  `copilot mcp add agda --
-/path/to/agda-native-air/scripts/run-server.sh <arguments>`, with the `args`
-of the `.mcp.json` entry you would otherwise use as the arguments, writes the
-server to `~/.copilot/mcp-config.json` (*read*; not run here, since it edits
-the user's configuration).  The file's entry has the following shape, and
-takes `env`, `cwd` and `timeout` too:
+**Every project**.  `copilot mcp add agda -- <command> <arguments>`, with the
+launcher, `/path/to/agda-native-air/scripts/run-server.sh`, as the command
+and the `args` of the `.mcp.json` entry you would otherwise use as the
+arguments, writes the server to `~/.copilot/mcp-config.json` (*run* against a
+throwaway, private `COPILOT_HOME`, which got the entry below).  The file's
+entry has the following shape, and takes `env`, `cwd` and `timeout` too:
 
 ```json
 {"mcpServers": {"agda": {"type": "local", "command": "...", "args": ["..."], "tools": ["*"]}}}
@@ -1070,8 +1083,10 @@ one session only, `--additional-mcp-config @<file>` takes a file of the same
 shape (*run*).
 
 **Timeouts**.  The documented `timeout` is in milliseconds, "for tool
-discovery and tool calls", with a default of 30000.  Observed in 1.0.95: a
-90 s call completed with no `timeout` set.  A registration that runs long
+discovery and tool calls", with a default of 30000; for the connection, the
+budget it sets is floored at 60000 ms (*read*), which covers the launcher's
+32 s worst case.  Observed in 1.0.95: a 90 s call completed with no
+`timeout` set.  A registration that runs long
 gates may set `"timeout": 3660000` against a later version that enforces it.
 
 **Tool names**.  The model sees `agda-check_file`; permission patterns are
@@ -1124,6 +1139,8 @@ session reported `premiumRequests: 0`.  Copilot still sends its telemetry to
 GitHub in this mode unless it is offline (*read*).
 
 ### Known issues
+
+From the field reports of [#243], except where marked read.
 
 +  **Server instructions**.  Copilot sends the server's `initialize`
    instructions only for allowlisted servers, or under

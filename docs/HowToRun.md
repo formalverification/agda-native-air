@@ -934,10 +934,10 @@ a prebuilt binary instead of the one `cabal list-bin` names in the launcher's
 own checkout.
 
 The registration itself, in each harness's format, is on the
-[Connecting an agent](agda-mcp/connecting-an-agent.md) page: for Claude Code a
-project `.mcp.json` copied from
+[Connecting an agent](agda-mcp/connecting-an-agent.md) page: for Claude Code
+and Copilot CLI a project `.mcp.json` copied from
 [`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
-or `claude mcp add`, for Codex CLI the table in
+(or, for Claude Code, `claude mcp add`), for Codex CLI the table in
 [`agda-mcp/examples/agda-algebras.codex.toml`](../agda-mcp/examples/agda-algebras.codex.toml).
 The templates' three machine-specific inputs (agda-algebras's own Agda, the
 libraries file that Agda reads, and the search corpus) are realized once, with
