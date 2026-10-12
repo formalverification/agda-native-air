@@ -71,6 +71,7 @@ exclude_docs: |
   !adr/0001-proof-search-on-agda-mcp.md
   !adr/0002-agda-mcp.md
   !agda-mcp/
+  !agda-mcp/connecting-an-agent.md
   !agda-mcp/agda-mcp-interaction-lane.md
   !agda-mcp/agda-mcp-ask-agda-audit.md
   !agda-mcp/agda-mcp-environment.md
@@ -261,6 +262,7 @@ nav:
       - "ADR 0001: proof search": adr/0001-proof-search-on-agda-mcp.md
       - "ADR 0002: agda-mcp": adr/0002-agda-mcp.md
   - The server:
+      - Connecting an agent: agda-mcp/connecting-an-agent.md
       - The interaction lane: agda-mcp/agda-mcp-interaction-lane.md
       - "Ask Agda: the audit": agda-mcp/agda-mcp-ask-agda-audit.md
       - What it writes, which tree it checks: agda-mcp/agda-mcp-environment.md
