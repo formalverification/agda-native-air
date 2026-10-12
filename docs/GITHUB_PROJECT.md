@@ -1065,7 +1065,7 @@ Its banner echoes `WHEEL_LD_LIBRARY_PATH` (flake.nix:528), but `exportWheelRunti
 
 ---
 
-### Issue M0-17: Move to Agda 2.9.0, pre-release, with the patched standard library 2.3 (#234)
+### Issue M0-17: Move to Agda 2.9.0, pre-release, with the patched standard library 2.3 (#234, closed)
 
 **Labels:** `agda-mcp`, `agda-strux`, `infrastructure`, `reproducibility`, `M0: migration + infrastructure`
 
@@ -4800,7 +4800,7 @@ Two uses here.  The proof-search loop builds `f {!!} {!!}` candidates by hand an
 
 ---
 
-### Issue M5-22: run-server.sh: default --cwd to launcher's working directory for harnesses not expanding ${PWD} (#242)
+### Issue M5-22: run-server.sh: default --cwd to launcher's working directory for harnesses not expanding ${PWD} (#242, closed)
 
 **Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
 
@@ -4826,7 +4826,7 @@ Needed by [#239] and [#243]; part of the work tracked in [#235].
 
 ---
 
-### Issue M5-23: field report: Copilot CLI and Codex CLI driving agda-mcp on an ordinary task (#243)
+### Issue M5-23: field report: Copilot CLI and Codex CLI driving agda-mcp on an ordinary task (#243, closed)
 
 **Labels:** `agda-mcp`, `docs`, `M5: agda-mcp erg + metrics`
 
@@ -4851,6 +4851,160 @@ Part of [#235].  The harness-side setup (the second link targets for skills, `AG
 [#242]: https://github.com/formalverification/agda-native-air/issues/242
 [#235]: https://github.com/formalverification/agda-native-air/issues/235
 [claude-tooling#27]: https://github.com/williamdemeo/claude-tooling/issues/27
+
+---
+
+### Issue M5-24: agda-mcp: get_goal's Normalised context unfolds the names a model has to write (#248)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+`get_goal` asks the interaction lane for `Cmd_goal_type_context Normalised` ([`cmdGoalTypeContext`]), and `type_of` asks for `Cmd_infer Normalised` and `Cmd_infer_toplevel Normalised` ([`cmdInferToplevel`, `cmdInferAtGoal`]).  Normalising a context entry unfolds every definition in it, so the context a model reads in order to write the next term no longer uses the names it has to write.  A module parameter `𝑮 : Group α ρ` comes back as the 528-character Σ type that `Group` abbreviates, and a hypothesis `ε∈B : ε ∈ B` comes back as `B (Function.Bundles.Func.to (Setoid.Algebras.Basic.Algebra.Interp (𝑮 .proj₁)) …)`.  The goal itself survives (`IsSubgroup 𝑮 B` is a record type, which normalising leaves alone).
+
+The mode was set when the lane was first probed ([#75], `docs/agda-mcp/agda-mcp-interaction-lane.md` § 2.5), on `Nat` fixtures where every mode prints the same thing; no trade-off is recorded.  An editor's `C-c C-,` sends `Simplified`.
+
+## Field evidence
+
+From the first session outside Claude Code ([#243]: Copilot CLI 1.0.95, GPT-6.1 Sol, 2026-10-10, adding `Classical.Structures.Group.SubgroupTest` to agda-algebras at `ee830bea9`).  The session's one `get_goal` call, on the hole of its first draft, answered:
+
+```
+"goal": "IsSubgroup 𝑮 B",
+"context": [ …, {"name": "𝑮", "type": "Data.Product.Σ (Setoid.Algebras.Basic.Algebra α ρ)\n(λ 𝑨 →\n   (i : Classical.Theories.Group.Eq-Group)\n   (ρ₁\n    : Data.Fin.Base.Fin 3 → …"}, …,
+             {"name": "ε∈B", "type": "B\n(Function.Bundles.Func.to\n (Setoid.Algebras.Basic.Algebra.Interp (𝑮 .proj₁))\n (Classical.Signatures.Group.Op-Group.ε-O…"}, … ]
+```
+
+and the session's own report said: "The goal itself was concise, but the context expanded the carrier and operations into lengthy interpretation terms."
+
+Measured on that same hole with `agda --interaction-json` (agda-algebras' Agda 2.8.0 wrapper), one `Cmd_goal_type_context` per mode:
+
+| Mode | Context, characters | `𝑮` | `ε∈B` | `diff-closed` |
+|------|--------------------:|-----|-------|---------------|
+| `AsIs` | 168 | `Group α ρ` | `ε ∈ B` | 106 characters, ending `x ∈ B → y ∈ B → x ∙ y ⁻¹ ∈ B` |
+| `Simplified` | 168 | `Group α ρ` | `ε ∈ B` | the same |
+| `Normalised` | 1,326 | 528 characters | 145 characters | 416 characters |
+
+`type_of` uses the same mode and was not measured in the field.
+
+## Tasks
+
+- [ ] `get_goal` and `type_of` answer in `Simplified` by default, the mode an editor sends, and take an optional `rewrite` argument (`AsIs`, `Simplified`, `Normalised`, …) for a caller that wants the unfolded form; `normalize` is unchanged.
+- [ ] `search_in_scope` (and `search_by_name`'s `inScopeAt`) render and rank with the same two commands; leave them as they are unless a measurement over the archived queries says the change is neutral or better there.
+- [ ] Each description says which mode answers, within the 2,048-character budget of [#191].
+- [ ] A test with a module parameter of a defined type: `get_goal`'s context keeps the name.
+
+## Acceptance criteria
+
+- [ ] On the hole above, `get_goal`'s default context reads `𝑮 : Group α ρ` and `ε∈B : ε ∈ B`.
+
+Filed from the field report of [#243]; part of the work tracked in [#235].
+
+[`cmdGoalTypeContext`]: https://github.com/formalverification/agda-native-air/blob/55781f9dd07c8ba1e1f44c428468ff2669a00a92/agda-mcp/src/AgdaMCP/Interaction.hs#L577-L579
+[`cmdInferToplevel`, `cmdInferAtGoal`]: https://github.com/formalverification/agda-native-air/blob/55781f9dd07c8ba1e1f44c428468ff2669a00a92/agda-mcp/src/AgdaMCP/Interaction.hs#L551-L556
+[#75]: https://github.com/formalverification/agda-native-air/issues/75
+[#191]: https://github.com/formalverification/agda-native-air/issues/191
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
+
+---
+
+### Issue M5-25: run-server.sh: skip nix develop when AGDA_MCP_BIN and --agda-bin are given (#249)
+
+**Labels:** `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+`scripts/run-server.sh` always enters `nix develop <this repository>#backend` before it runs the server ([`exec nix develop`]), for `agda`, `cabal` and GHC.  A registration that names a prebuilt server (`AGDA_MCP_BIN`) and its project's own Agda (`--agda-bin`, as claude-tooling's agda-algebras registration does) needs none of them, but still pays for the shell before the server can answer `initialize`.  The cost varied from 5 s to 32 s on 2026-10-10 (the main checkout's tree was dirty, which makes `nix develop` re-evaluate the flake):
+
+| Client, run | Launch to server ready |
+|-------------|-----------------------:|
+| a hand-driven `initialize` through the agda-algebras registration | 32.4 s |
+| Copilot CLI probe | 28.8 s |
+| Copilot CLI, GPT-6.1 Sol trial | 15.5 s |
+| Copilot CLI, Kimi K3 trial | 5.2 s |
+| Codex CLI, GPT-6.1 Sol trial | 6.0 s |
+
+## Field evidence
+
+Copilot CLI waits for its servers before the first model request, so the cost there is only latency.  Codex CLI 0.162.1's `exec` does not wait, unless the registration sets `required = true`, and it lists MCP tools to the model only through its code-mode `ALL_TOOLS`.  In the Codex trial of [#243] the model's first step looked for them:
+
+```
+18:00:53.752  exec: text(ALL_TOOLS.filter(x=>/agda/i.test(x.name+" "+x.description)).map(…))
+18:00:53.862  output: []
+18:00:53.870  Codex log: MCP binding catalog materialized server_kind="configured" tool_count=13
+18:01:16      "No Agda MCP tools are exposed in this session, so I'll use the CLI loop."
+```
+
+The server's tools arrived 8 ms after the model's one look, and the session ran every check from the shell.  The harness side of this (`required = true` in the generated Codex registration) is a comment on [claude-tooling#27]; the launcher side is this issue.
+
+The shell is not needed when the binary and the Agda are given.  The binary built from `55781f9d`, run with `env -i HOME=… PATH=/usr/bin:/bin LANG=C.UTF-8` and the agda-algebras registration's `--cwd`, `--agda-bin` and `--agda-flags`, answered `initialize` and then a `check_file` on an agda-algebras module (`success: true`, exit 0) in 7.1 s, of which Agda's own check was 7.05 s.
+
+## Tasks
+
+- [ ] When `AGDA_MCP_BIN` names an executable and the arguments carry `--agda-bin`, the launcher runs the server directly, after the same `${PWD}` substitution and `--cwd` default, without `nix develop`.
+- [ ] The launcher's header and the README say what that path does not provide: whatever the server reaches through `PATH` (`make`, for a `check_project` gate).
+- [ ] The start time measured both ways, from a client's launch to `initialize`.
+
+## Acceptance criteria
+
+- [ ] With the agda-algebras registration and `AGDA_MCP_BIN` set, the server answers `initialize` within a second of launch.
+
+Filed from the field report of [#243]; part of the work tracked in [#235].  Related: the build `cabal list-bin` names in the main checkout dates from 2026-09-28 and lacks 23 server commits merged since ([#185], [#201], [#202], [#203], [#205], [#242], [#234]), because nothing rebuilds it when main moves; a registration that sets `AGDA_MCP_BIN` would name its binary explicitly.
+
+[`exec nix develop`]: https://github.com/formalverification/agda-native-air/blob/55781f9dd07c8ba1e1f44c428468ff2669a00a92/scripts/run-server.sh#L156
+[#185]: https://github.com/formalverification/agda-native-air/issues/185
+[#201]: https://github.com/formalverification/agda-native-air/issues/201
+[#202]: https://github.com/formalverification/agda-native-air/issues/202
+[#203]: https://github.com/formalverification/agda-native-air/issues/203
+[#205]: https://github.com/formalverification/agda-native-air/issues/205
+[#234]: https://github.com/formalverification/agda-native-air/issues/234
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+[#242]: https://github.com/formalverification/agda-native-air/issues/242
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
+[claude-tooling#27]: https://github.com/williamdemeo/claude-tooling/issues/27
+
+---
+
+### Issue M5-26: field reports: one file per session, committed by the session that writes it (#252)
+
+**Labels:** `agda-mcp`, `docs`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+Sessions working in other repositories record how they used agda-mcp by appending a dated section to `docs/mcp-field-reports.md`, by path, in this repository's main checkout: the project instructions that claude-tooling installs for agda-algebras, fls and two private repositories say to.  Nothing commits those appends.  They sit in the main checkout's working tree until a pull disturbs them, and on 2026-10-10 one did: `git pull --rebase` stashed twenty-five sessions' sections (2026-09-22 to 2026-10-10), the merge of [#250] had added two sections at the same place, and re-applying the stash conflicted.  The stash was the only copy until [#251] recovered them.
+
+The shared file has three further faults.
+
++  **Concurrent sessions write one file**: two sessions appending at once, or one appending while another pulls, can interleave or lose text, and nothing records which session wrote what.
++  **Nothing reviews a report before it is public**: a session working in a private repository writes into this public one, and the recovery had to screen every section by hand; one section was held back, and three needed edits to remove another repository's unpublished work.
++  **The record is unaddressable**: one 1,500-line file, appended newest last, cited by heading from issues.
+
+## Proposal
+
++  **One file per session**, `docs/field-reports/<YYYY-MM-DD>-<slug>.md`, with a fixed header (date, harness and its version, model and reasoning effort, the repository and the issue or pull request worked on, the tools called) and the body the current sections use.  An index, `docs/field-reports/README.md`, lists them, newest last.
++  **The session that writes a report commits it**: on its own branch of this repository (a worktree beside the others, `field-report-<date>-<slug>`), pushed, with a pull request of one new file, so that no report waits in a working tree and William reviews each before it is public.  A small command creates the worktree from the template and later commits, pushes and opens the pull request; the session runs it from wherever it is.
++  **The existing file is frozen**, not rewritten: a note at its top says that sections stop at the date of the change and where new reports go, so that every link to it and every heading cited in an issue keeps working.
++  **The instructions change in the same step**: the four project instruction files in claude-tooling, this repository's README and `docs/README.md`, and the plan's note on the file (`docs/GITHUB_PROJECT.md`), each pointing at the new command instead of the path.
++  **The privacy rule travels with the template**: a report from a private repository records tool usage only, names its repository "a private repository", and never quotes its mathematics or anyone's unpublished work.
+
+## Tasks
+
+- [ ] `docs/field-reports/` with its README (the header, the rules, the index) and the template.
+- [ ] The command that creates a report's worktree and file, and the one that commits, pushes and opens its pull request; both tested, including from a session whose working directory is another repository.
+- [ ] The note at the top of `docs/mcp-field-reports.md`, which otherwise stays as it is.
+- [ ] The README, `docs/README.md` and the plan's note updated; the four instruction files in claude-tooling updated in a pull request there that merges after this one.
+- [ ] One real report submitted through the new path as its proof.
+
+## Acceptance criteria
+
+- [ ] No instruction anywhere tells a session to append to a shared file in a working tree.
+- [ ] A session in another repository submits a report as a pull request of one new file, with no step in this repository's main checkout.
+- [ ] `docs/mcp-field-reports.md` is unchanged below its new note, and the index links every report written after it.
+
+Depends on [#251], which recovers the sections the stash held.
+
+[#250]: https://github.com/formalverification/agda-native-air/pull/250
+[#251]: https://github.com/formalverification/agda-native-air/pull/251
 
 <!-- END GENERATED: milestone-5 -->
 
@@ -5475,6 +5629,64 @@ The rows on which the instruments differ exist now, and the demo shows none of t
 [#218]: https://github.com/formalverification/agda-native-air/pull/218
 [#219]: https://github.com/formalverification/agda-native-air/issues/219
 [#223]: https://github.com/formalverification/agda-native-air/pull/223
+
+---
+
+### Issue M6-13: site: a setup guide per agent harness, from sign-up to a connected agda-mcp (#247)
+
+**Labels:** `agda-mcp`, `docs`, `M6: docs + dissemination`
+
+## Context
+
+The server's setup instructions were written for one harness.  `docs/HowToRun.md` § 13.3 to 13.5 take Claude Code from installation to a connected server, and the README's "Cursor / Codex CLI / Copilot CLI" section is two paragraphs; neither is a page of the published site.  The exploration that [#235] tracks now drives the server from OpenAI's Codex CLI, from GitHub Copilot CLI, and from Claude Code pointed at another provider's endpoint, and each new harness spends its first session on setup: which plan or key, which install, which sign-in, which model id and effort setting, which file registers the server, and how to tell that it connected.  That knowledge is in session transcripts and in an outside write-up whose appendix gives only the short form and will link here, so the page has to stand on its own.
+
+The plans alone show why.  On 2026-10-10, OpenAI's pricing page made ChatGPT Plus ($20 a month) the least plan with GPT-6.1 Sol in Codex, with OpenAI's Pro from $100; GitHub's plans page gave Copilot Pro ($10 a month) an allowance of 1,500 GitHub AI Credits, a credit worth a cent and spent by model and by token, while its premium-requests page still described 300 premium requests a month.  Two tiers named Pro, from two vendors at two prices, are easy to confuse, and both pages change monthly.
+
+## The page
+
+One section per harness, each in the following order, so that a reader goes from nothing to a session that calls `check_file`:
+
+1. **Plan or key, and cost**: what to sign up for, the price and the allowance as the vendor's page gave them on a named date, with the page's link, and what the provider may do with the code a session sends (the plan's data-use default and the setting that changes it).
+2. **Install**: the command, its prerequisites, and the version the section was verified with.
+3. **Sign in**: the browser flow, the device flow for a machine without a browser, and the key route; a key goes in an environment variable or the harness's own credential store, never in a file in a repository.
+4. **Model and reasoning effort**: the model id, the flag and the config key that select it, and the effort levels the harness offers.
+5. **Instructions and skills**: which instruction files the harness reads (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`), which skill directories it searches and how far up, and whether it follows symlinks.
+6. **Registering agda-mcp**: the registration in the harness's own format (a project `.mcp.json` or `claude mcp add`; `codex mcp add` or a `[mcp_servers.agda]` table in `.codex/config.toml`; `copilot mcp add` or `~/.copilot/mcp-config.json`), through `scripts/run-server.sh`, per user and per project, with what [#242] made of `--cwd` and the startup and tool timeouts that a cold first check needs.
+7. **A smoke test**: list the server's tools, `check_file` a fixture, `get_goal` on one of its holes, and the same through the harness's non-interactive mode (`claude -p`, `codex exec`, `copilot -p`), with the output that means success.
+8. **Known issues**: what the field reports of [#243] found for that harness, dated.
+
+The harnesses are the following:
+
+- Claude Code with Anthropic's models, the reference, whose sections in `docs/HowToRun.md` move here.
+- Claude Code with another provider's Anthropic-compatible endpoint: Moonshot for Kimi K3 ([#238]), and Ollama for a local model ([#240], [#241]).
+- OpenAI Codex CLI, for GPT-6.1 Sol and GPT-6 Astra ([#239]).
+- GitHub Copilot CLI, for the models a Copilot plan offers.
+- Any harness added later, in a section of the same shape.
+
+## Tasks
+
+- [ ] The page, for example `docs/agda-mcp/connecting-an-agent.md`, on the `exclude_docs` allowlist and in the nav under "The server".
+- [ ] A section per harness, each run end to end on a real machine at least once; a step that was not run says so and cites the vendor's page with the date it was read.
+- [ ] `docs/HowToRun.md` § 13.3 to 13.5 and the README's "Configuring MCP Clients" cut to what is specific to building and running the server, with a link to the page.
+- [ ] An example registration for each harness whose format is not `.mcp.json`, beside `agda-mcp/examples/agda-algebras.mcp.json` and with the same placeholders.
+- [ ] Packaging, decided: where a harness has a plugin or extension format that bundles a server registration with skills (Claude Code's plugins, and whatever Codex CLI and Copilot CLI offer), say whether agda-mcp should ship as one, and file the work if the answer is yes.
+
+## Acceptance criteria
+
+- [ ] The page is on the published site, and `make site` and `make site-check` pass.
+- [ ] Each harness section names the harness version, the date it was verified, and its smoke test's result.
+- [ ] Every price and allowance carries the date it was read and a link to the vendor's page.
+- [ ] The page names no private repository, no account, and no path under a home directory; examples use placeholders.
+
+It serves the exploration that [#235] tracks, and the field reports of [#243] feed its known issues.
+
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+[#238]: https://github.com/formalverification/agda-native-air/issues/238
+[#239]: https://github.com/formalverification/agda-native-air/issues/239
+[#240]: https://github.com/formalverification/agda-native-air/issues/240
+[#241]: https://github.com/formalverification/agda-native-air/issues/241
+[#242]: https://github.com/formalverification/agda-native-air/issues/242
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
 
 <!-- END GENERATED: milestone-6 -->
 
