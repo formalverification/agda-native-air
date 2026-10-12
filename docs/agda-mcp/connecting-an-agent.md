@@ -107,9 +107,12 @@ covers building, testing and running the server by hand, and the server's
 
 Driven directly over JSON-RPC, the launcher answered `initialize` 2.5 s after
 it started, and 5.8 s with the 224 MB agda-algebras corpus loaded; the
-sessions of [#243] waited 5 to 16 s.  A first start on a machine whose Nix
-store lacks the shell can take minutes.  Each harness's startup timeout has
-to cover that, and each section says how to set it.
+sessions of [#243] waited 5 to 16 s, and [#249] measured up to 32 s when the
+checkout's working tree was dirty, which makes `nix develop` evaluate the
+flake again.  The build step above has already downloaded the shell, so a
+harness never waits for that; if a garbage collection removes it, run the
+build step again before the next session.  Each harness's startup timeout
+has to cover the half minute, and each section says how to set it.
 
 ### The smoke test
 
@@ -420,11 +423,11 @@ takes the servers from a registration file for that run and ignores every
 other.
 
 **Timeouts**.  Claude Code waits 30 s for a server to start (`MCP_TIMEOUT`,
-in milliseconds), which covers the launcher on a machine whose Nix store
-holds the shell, but not a first start that downloads it:
-`MCP_TIMEOUT=120000 claude` covers that too.  A tool call has no practical
-bound (`MCP_TOOL_TIMEOUT` defaults to about 28 hours), so the server's own
-`--timeout` decides (*read*, [environment variables][claude-env-vars]).
+in milliseconds), which covers the launcher's usual few seconds but not the
+32 s of a dirty working tree: `MCP_TIMEOUT=120000 claude` covers that too.
+A tool call has no practical bound (`MCP_TOOL_TIMEOUT` defaults to about 28
+hours), so the server's own `--timeout` decides (*read*,
+[environment variables][claude-env-vars]).
 
 ### Smoke test
 
@@ -481,10 +484,10 @@ Messages API once three environment variables say so, as follows:
 +  `ANTHROPIC_API_KEY` is set to the empty string, so that an Anthropic key
    in your environment is not sent instead.
 
-Then `--model` names the provider's model.  The provider's key apart, the
-install, the instruction files, the skills and the registration of agda-mcp
-are Claude Code's own and do not change, so the Claude Code section holds for
-them; what changes is in this section.
+Then `--model` names the provider's model.  Each provider below takes the
+eight steps in order; where a step is Claude Code's own (the install, the
+instruction files, the skills, the registration of agda-mcp), it says so,
+and the Claude Code section holds for it.
 
 **One session, not every session**.  Moonshot's guide puts these variables
 in the `env` block of `~/.claude/settings.json`, which moves every Claude
@@ -526,7 +529,8 @@ It also turns off tool search, so agda-mcp's tools load up front.
 
 *Read*, 2026-10-11, on Moonshot's [Claude Code guide][moonshot-claude-code],
 [pricing][moonshot-pricing], [rate limits][moonshot-limits] and
-[terms][moonshot-terms], except the smoke test, which was run.
+[terms][moonshot-terms], except where marked run.  The eight steps are as
+follows:
 
 +  **Plan and cost**.  Moonshot's platform bills by the token from a prepaid
    balance, with no subscription.  `kimi-k3` cost $3.00 per million input
@@ -538,27 +542,34 @@ It also turns off tool search, so agda-mcp's tools load up front.
    daily cap.  For scale, Claude Code's smoke test above read about 297,000
    input tokens in its four turns, most of them from cache (whether Moonshot
    counts cached tokens against the daily cap was not read).  A project can
-   carry a daily spending limit.
-+  **What leaves the machine**.  Moonshot's terms (last updated 30 July
-   2026) let it use customer content to improve its services, model training
-   included, unless a written agreement says otherwise; a customer who wants
-   that restricted is to contact Moonshot about an enterprise arrangement.
-   Its privacy policy stores data in Singapore, and it offers zero data
-   retention to enterprise customers on request.  No self-serve opt-out was
-   found.
-+  **A Kimi membership** is a separate product: its Kimi Code allowance works
-   from other harnesses through its own key and endpoint
-   (`https://api.kimi.ai/coding/`, with the key in `ANTHROPIC_API_KEY` and a
-   model such as `k3[1m]`, by [Kimi's Claude Code page][kimi-claude-code]).
-   The two kinds of key are not interchangeable.  The membership's prices
-   did not render for a script on 2026-10-11; read the plan page signed in.
+   carry a daily spending limit.  What leaves the machine: Moonshot's terms
+   (last updated 30 July 2026) let it use customer content to improve its
+   services, model training included, unless a written agreement says
+   otherwise, and a customer who wants that restricted is to contact
+   Moonshot about an enterprise arrangement.  Its privacy policy stores data
+   in Singapore, and it offers zero data retention to enterprise customers
+   on request.  No self-serve opt-out was found.  A Kimi membership is a
+   separate product, whose Kimi Code allowance works from other harnesses
+   through its own key and endpoint (`https://api.kimi.ai/coding/`, with the
+   key in `ANTHROPIC_API_KEY` and a model such as `k3[1m]`, by
+   [Kimi's Claude Code page][kimi-claude-code]); the two kinds of key are
+   not interchangeable, and the membership's prices did not render for a
+   script on 2026-10-11, so read the plan page signed in.
++  **Install**.  Claude Code, as in its own section; nothing else.  The
+   settings file and the `claude-kimi` launcher above are the whole setup.
 +  **Sign in**.  The key comes from the platform console at
-   `platform.kimi.ai`; keep it as the launcher above does.
+   `platform.kimi.ai`; keep it as the launcher above does.  A session started
+   with the launcher sends that key, not your Anthropic login.
 +  **Model and effort**.  `--model kimi-k3`, or `kimi-k3[1m]` to tell Claude
    Code the model has a one-million-token window.  Moonshot documents K3's
    effort levels as `low`, `high` and `max`, with `max` the default; K3
    refused `xhigh` in the sessions of [#243].  Moonshot's guide sets
    `CLAUDE_CODE_EFFORT_LEVEL` to `max`; name the level you ran.
++  **Instructions and skills**.  Claude Code's own, unchanged: `CLAUDE.md`
+   and `.claude/skills/` as in the Claude Code section.
++  **Registering agda-mcp**.  Unchanged: the same `.mcp.json` and the same
+   approval.  With the base URL pointed away from Anthropic, Claude Code
+   turns tool search off, so the server's tools load up front.
 +  **Smoke test**.  *Run*, 2026-10-11, Claude Code 2.1.282 with the settings
    file and launcher above, `--model kimi-k3 --effort low`, and the smoke
    test's `--allowedTools`.  The request reached Moonshot's endpoint with
@@ -578,26 +589,32 @@ It also turns off tool search, so agda-mcp's tools load up front.
 [context length page][ollama-context] and [cloud page][ollama-cloud].
 Ollama was not installed here, so nothing in this subsection was run; the
 bench arm of [#240] and the model server of [#241] are where it will be.
+The eight steps are as follows:
 
 +  **Plan and cost**.  Ollama is free and runs on your own hardware.  Its
-   `:cloud` models run on Ollama's servers instead.
-+  **What leaves the machine**.  Nothing, for a local model.  For a cloud
-   model, Ollama "processes cloud prompts and responses to answer your
-   requests.  We do not use them to train models."  Setting
-   `"disable_ollama_cloud": true` in `~/.ollama/server.json` keeps every
-   request local.
-+  **Install**.  On Linux, `curl -fsSL https://ollama.com/install.sh | sh`;
-   on macOS and Windows, the download from `ollama.com/download`.
-+  **Point Claude Code at it**.  Set `ANTHROPIC_BASE_URL` to
+   `:cloud` models run on Ollama's servers instead.  What leaves the
+   machine: nothing, for a local model.  For a cloud model, Ollama
+   "processes cloud prompts and responses to answer your requests.  We do
+   not use them to train models."  Setting `"disable_ollama_cloud": true` in
+   `~/.ollama/server.json` keeps every request local.
++  **Install**.  Claude Code, as in its own section, and Ollama: on Linux,
+   `curl -fsSL https://ollama.com/install.sh | sh`; on macOS and Windows,
+   the download from `ollama.com/download`.  `ollama launch claude` offers
+   to install Claude Code too.
++  **Sign in**.  None, for a local model.  Set `ANTHROPIC_BASE_URL` to
    `http://localhost:11434`, `ANTHROPIC_AUTH_TOKEN` to `ollama` (required,
    but the local server does not check it) and `ANTHROPIC_API_KEY` to the
-   empty string, then run `claude --model <a model you have pulled>`.
-   `ollama launch claude` does the same in one step, and offers to install
-   Claude Code.
-+  **Context length**.  Ollama's default context is 4k tokens on a machine
-   with less than 24 GiB of VRAM, too small for a coding agent; its pages
-   ask for at least 64k, for example `OLLAMA_CONTEXT_LENGTH=64000 ollama
-   serve`.
+   empty string, for the one session, as in the settings file above;
+   `ollama launch claude` sets them itself.
++  **Model and effort**.  `claude --model <a model you have pulled>`.
+   Ollama's default context is 4k tokens on a machine with less than 24 GiB
+   of VRAM, too small for a coding agent; its pages ask for at least 64k,
+   for example `OLLAMA_CONTEXT_LENGTH=64000 ollama serve`.  The pages read
+   do not say whether Ollama honors Claude Code's effort setting.
++  **Instructions and skills**.  Claude Code's own, unchanged.
++  **Registering agda-mcp**.  Unchanged: the same `.mcp.json` and the same
+   approval, with tool search off as above.
++  **Smoke test**.  Not run; [#240] is where it will be.
 +  **Known issues**.  Ollama's Anthropic compatibility does not support
    `tool_choice` or prompt caching.
 
@@ -675,7 +692,7 @@ repository, as follows:
         "--timeout", "600"
       ],
       "startupTimeoutMs": 120000,
-      "toolTimeoutMs": 660000
+      "toolTimeoutMs": 1860000
     }
   }
 }
@@ -804,7 +821,7 @@ args = [
   "--timeout", "600",
 ]
 startup_timeout_sec = 120
-tool_timeout_sec = 660
+tool_timeout_sec = 1860
 required = true
 default_tools_approval_mode = "approve"
 
@@ -819,11 +836,12 @@ agda-algebras registration as a table, with the same placeholders as the
 test).  Each choice in the table is there for a reason, as follows:
 
 +  `startup_timeout_sec`: Codex's default is 10 s, and the launcher took 2.5
-   to 16 s in the runs above, more on a fresh machine.
+   to 16 s in the runs above, and up to 32 s with a dirty working tree.
 +  `tool_timeout_sec`: Codex's documented default is 60 s, and a first
    check of a large library can take minutes.  The value sits above the
-   server's own `--timeout`, so that the server's timeout answer, which
-   names the bound, arrives first.  (Observed: a 90 s call completed with
+   server's own bounds, `--timeout` for a check and `--check-timeout` for
+   `check_project` (1800 s by default, 3600 in the template), so that the
+   server's timeout answer, which names the bound, arrives first.  (Observed: a 90 s call completed with
    the key unset, in 0.162.1; the documentation is what a later version may
    enforce.)
 +  `required = true`: without it, `codex exec` sends its first request
@@ -1181,6 +1199,7 @@ The vendors' pages were all read on 2026-10-11, as follows:
 [#241]: https://github.com/formalverification/agda-native-air/issues/241
 [#242]: https://github.com/formalverification/agda-native-air/issues/242
 [#243]: https://github.com/formalverification/agda-native-air/issues/243
+[#249]: https://github.com/formalverification/agda-native-air/issues/249
 [launcher]: ../../scripts/run-server.sh
 [root-mcp-json]: ../../.mcp.json
 [example-mcp-json]: ../../agda-mcp/examples/agda-algebras.mcp.json
