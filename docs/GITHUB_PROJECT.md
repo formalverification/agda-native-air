@@ -5006,6 +5006,92 @@ Depends on [#251], which recovers the sections the stash held.
 [#250]: https://github.com/formalverification/agda-native-air/pull/250
 [#251]: https://github.com/formalverification/agda-native-air/pull/251
 
+---
+
+### Issue M5-27: agda-mcp: tool annotations, so that a harness approves the read-only tools without a list (#253)
+
+**Labels:** `enhancement`, `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+agda-mcp's `tools/list` carries no tool annotations, so a harness that decides approval from them treats every tool as one that may change something.  Codex CLI does.  In the smoke test of [#247] (Codex CLI 0.162.1, GPT-6.1 Sol, 2026-10-11), `codex exec` refused both calls of a three-call prompt:
+
+```
+mcp_tool_call check_file  failed  "MCP tool call requires approval, but approval policy is never"
+mcp_tool_call get_goal    failed  "MCP tool call requires approval, but approval policy is never"
+```
+
+`codex exec` cannot ask, so its approval policy is `never`, and a call that needs approval fails.  The same prompt passed once the registration approved the two tools by name (`mcp_servers.agda.tools.<tool>.approval_mode = "approve"`).  The Codex template that [#247] adds, `agda-mcp/examples/agda-algebras.codex.toml`, therefore approves every tool with `default_tools_approval_mode = "approve"` and puts `check_project` back on a prompt by name.  That is a judgment about each tool written into every registration, and a tool added later is approved by the blanket without anyone deciding it.
+
+Codex's documentation says it reads the annotations: its `writes` approval mode "prompts for tools that aren't marked read-only", and "Destructive app/MCP tool calls always require approval when the tool advertises a destructive annotation (unless the tool advertises a read annotation, which takes priority)" (the MCP and security pages, read 2026-10-11).  With annotations from the server, a registration would say `default_tools_approval_mode = "writes"` and nothing else, and the server, which knows what each tool does, would carry the judgment.
+
+## Decisions to make
+
++  **What "read-only" means here**.  `check_file` writes `.agdai` interfaces, and `get_goal` and `fill_hole` patch the source file for the length of a call and restore it byte for byte.  The proposal is that a tool is read-only when the checkout's tracked files are as they were after the call, so that every tool but `check_project` (which runs the project's gate) is `readOnlyHint: true`; the transient patch is the case to argue, since an editor or a watcher sees it.
++  **The protocol version**.  The server answers `initialize` with `protocolVersion` 2024-11-05, which predates tool annotations: the specification's 2025-03-26 revision added them ([changelog]).  Whether a harness reads annotations from a server that negotiates the older version has to be checked per harness before the change can be measured.
+
+## Tasks
+
+- [ ] Each tool in `tools/list` carries `annotations` (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) as decided above, with a test that pins them.
+- [ ] The protocol version question answered for Claude Code, Codex CLI and Copilot CLI, and the version raised if that is what reading the annotations needs.
+- [ ] `agda-mcp/examples/agda-algebras.codex.toml` and the setup page's Codex table move to `default_tools_approval_mode = "writes"`, with the per-tool lines gone.
+
+## Acceptance criteria
+
+- [ ] With `default_tools_approval_mode = "writes"` and no per-tool lines, `codex exec` runs the smoke test of [#247] (`check_file` and `get_goal` on `agda-dojang/data/fixtures/Fixture01.agda`) without a refusal, and a `check_project` call is refused for want of approval.
+
+Found by the smoke test of [#247].  Related: [#249] (the launcher's start time, the other half of what a Codex registration has to work around).
+
+[#247]: https://github.com/formalverification/agda-native-air/issues/247
+[#249]: https://github.com/formalverification/agda-native-air/issues/249
+[changelog]: https://modelcontextprotocol.io/specification/2025-03-26/changelog
+
+---
+
+### Issue M5-28: agda-mcp as an agent plugin: one directory for Claude Code, Codex CLI, Copilot CLI and Kimi Code CLI (#254)
+
+**Labels:** `enhancement`, `agda-mcp`, `M5: agda-mcp erg + metrics`
+
+## Context
+
+Every harness that [#247]'s setup page covers now installs plugins, and every one of them lets a plugin carry an MCP server and skills (the vendors' pages, read 2026-10-11), as follows:
+
++  **Claude Code**: a directory with an optional `.claude-plugin/plugin.json`, a `.mcp.json` at its root that declares the server, and `skills/`; `${CLAUDE_PLUGIN_ROOT}` names the installed copy.  Installed from a marketplace (`claude plugin install <plugin>@<marketplace>`), or for one session with `--plugin-dir`.
++  **Codex CLI**: a root `plugin.json` declaring the Agent Plugins schema (`.codex-plugin/plugin.json` remains a fallback), a root `mcp.json`, and `skills/`.  Installed from a configured marketplace (`codex plugin add`, `codex plugin marketplace add` with a local path or `owner/repo`).
++  **Copilot CLI**: the same Agent Plugins layout (root `plugin.json`, root `mcp.json` with the schema's `$schema`, `skills/`), where a root `plugin.json` that targets Agent Plugins "takes precedence over `.plugin/plugin.json` and `.claude-plugin/plugin.json`".  Installed from a marketplace, from `OWNER/REPO:PATH`, from a local path, or with `--plugin-dir`; `${PLUGIN_ROOT}` is expanded in a server's `args`, `env` and `cwd`.
++  **Kimi Code CLI**: plugins that can add skills and custom agents and declare MCP servers, installed with `/plugins install <path-or-url>`.
+
+So one directory carrying both manifests and both MCP files can serve all four.  Two findings of [#243] and [#247] make a skill worth shipping beside the server: Copilot sends the server's `initialize` instructions only for allowlisted servers, and Codex 0.162.1 sent none; Claude Code cuts them at 2,048 characters.  A skill is how the verdict contract and the hole-driven loop reach a model in every harness.
+
+## The decision
+
+Yes, agda-mcp should ship as a plugin, one directory for the four harnesses, but not as the launcher works today.  A plugin is installed as a copy of its directory, with no checkout of this repository and no `dist-newstyle/` beside it, and `scripts/run-server.sh` needs both: it finds the repository from its own path and the server through `cabal list-bin`.  The plugin's server has to start from a pinned flake instead, with `nix run github:formalverification/agda-native-air/<tag>#agda-mcp`, which the flake does not yet offer (its `packages` are `agda` and `agda-algebras`).
+
+What the plugin would bundle is the following:
+
++  **The server**, through `nix run` of a release tag, with the server's own Agda 2.9.0, standard library 2.3, and the `AgdaDojang.Debug` source `get_goal` needs, all from the store; `--timeout 600`; no `--cwd`, so that it anchors where the session starts.
++  **One skill**, the verdict contract and the loop (`get_goal`, `fill_hole`, `check_file`; absolute paths; success is Agda's exit code; a first check is cold), written for any harness.
++  **No corpus and no project toolchain**.  A plugin's server is the same for every project, and a project that pins its own Agda (agda-algebras, formal-ledger-specifications) keeps its per-project registration from `agda-mcp/examples/`, which a plugin's server would otherwise check with the wrong Agda.
+
+## Tasks
+
+- [ ] A flake package and app, `agda-mcp`, that runs the server wrapped with the pinned Agda environment and the agda-dojang include path, built in CI and pushed to the binary cache.
+- [ ] A plugin directory (for example `plugins/agda-mcp/`) with the Agent Plugins `plugin.json` and `mcp.json`, the `.claude-plugin/plugin.json` and `.mcp.json` Claude Code reads, and the skill.
+- [ ] The smoke test of [#247] run through the installed plugin in Claude Code, Codex CLI and Copilot CLI, and in Kimi Code CLI once a funded key allows, with the start time from launch to `initialize` measured cold and warm.
+- [ ] A section on the setup page, `docs/agda-mcp/connecting-an-agent.md`, that installs the plugin in each harness, beside the registrations it already has.
+
+## Acceptance criteria
+
+- [ ] On a machine with Nix and no checkout of this repository, each of the three harnesses installs the plugin and passes the smoke test.
+- [ ] A Codex session started with only the plugin installed finds the server's tools at its first look (the failure of [#243]).
+
+Depends on: [#249] (a launcher that skips the shell, whose measurements apply to `nix run`) and [#253] (tool annotations, so that Codex approves the read-only tools without a list).  Decided in [#247].
+
+[#243]: https://github.com/formalverification/agda-native-air/issues/243
+[#247]: https://github.com/formalverification/agda-native-air/issues/247
+[#249]: https://github.com/formalverification/agda-native-air/issues/249
+[#253]: https://github.com/formalverification/agda-native-air/issues/253
+
 <!-- END GENERATED: milestone-5 -->
 
 ---
