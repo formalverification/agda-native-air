@@ -13,13 +13,16 @@ Description: Launch to ready (issue #249): how long an MCP client waits
   +  The initialize request is written to the command's stdin at once, as a
      client writes it; a launcher still entering a shell leaves it waiting in
      the pipe.
-  +  It ends when the first stdout line arrives that is the JSON-RPC response
-     to that request carrying result.protocolVersion.  agda-mcp's result
+  +  It ends when the first stdout line arrives that is the JSON-RPC 2.0
+     success response to that request, carrying result.protocolVersion as a
+     string.  agda-mcp's result
      object begins with "capabilities", so the end is read from the parsed
      line, never matched as text.
 
-  After each run stdin is closed, which the server takes as shutdown, and
-  the process is waited for and killed if it lingers, so runs never overlap.
+  After each run stdin is closed, which the server takes as shutdown, the
+  process is waited for, and then whatever is left of its process group (the
+  command leads one of its own) is killed, so no descendant of one run, such
+  as a shellHook's child holding the pipes, lives into the next.
 
   Usage, from the repository root (`make agda-mcp-launch-time` wraps it with
   the agda-algebras registration's arguments):
@@ -49,6 +52,7 @@ import argparse
 import json
 import os
 import queue
+import signal
 import statistics
 import subprocess
 import sys
@@ -108,19 +112,24 @@ def initialize_request(request_id: int) -> str:
 
 
 def is_ready(line: str, request_id: int) -> bool:
-    """True when LINE is the response to initialize REQUEST_ID with a protocol version.
+    """True when LINE is the JSON-RPC 2.0 success response to initialize
+    REQUEST_ID, naming its protocol version as a non-empty string.
 
-    A banner line, a notification, an error response, or a response to some
-    other id is not readiness.
+    A banner line, a notification, an error response, a response to some other
+    id, an envelope that is not JSON-RPC 2.0, and a version that is not a
+    string are not readiness.
     """
     try:
         message = json.loads(line)
     except ValueError:
         return False
-    if not isinstance(message, dict) or message.get("id") != request_id:
+    if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
+        return False
+    if message.get("id") != request_id or "error" in message:
         return False
     result = message.get("result")
-    return isinstance(result, dict) and "protocolVersion" in result
+    version = result.get("protocolVersion") if isinstance(result, dict) else None
+    return isinstance(version, str) and version != ""
 
 
 def child_environment(base: Mapping[str, str], sets: Sequence[Tuple[str, str]],
@@ -197,25 +206,48 @@ def _drain(stream: IO[str], sink: "queue.Queue[Tuple[float, str]]") -> None:
     sink.put((time.monotonic(), ""))
 
 
-def _stop(process: "subprocess.Popen[str]") -> None:
-    """Close stdin (the server's shutdown), wait, and kill a lingerer."""
+def _kill_group(process: "subprocess.Popen[str]") -> None:
+    """SIGKILL whatever is left of the command's process group.
+
+    The command leads a group of its own (start_new_session), so this reaches
+    every descendant that did not leave it: a shellHook's child (the banner's
+    sbt probe, cabal) or a forked helper holding the pipes.  Without a group,
+    killing the leader alone left such a child running into the next run.
+    """
+    if not hasattr(os, "killpg"):
+        process.kill()  # no process groups (Windows): the leader is all we reach
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass  # the group is empty already
+
+
+def _stop(process: "subprocess.Popen[str]", grace: float) -> None:
+    """Close stdin (the server's shutdown), wait up to GRACE seconds, then
+    kill the rest of the process group, so no part of one run outlives it."""
     try:
         if process.stdin is not None:
             process.stdin.close()
-        process.wait(timeout=SHUTDOWN_GRACE_SECONDS)
+        process.wait(timeout=grace)
     except (OSError, subprocess.TimeoutExpired):
-        process.kill()
-        process.wait()
+        pass  # the group kill below ends it
+    _kill_group(process)
+    process.wait()
 
 
-def measure_once(options: Options, env: Mapping[str, str]) -> Result[float, PipelineError]:
-    """Seconds from spawn to the initialize response, for one launch."""
+def measure_once(options: Options, env: Mapping[str, str],
+                 grace: float = SHUTDOWN_GRACE_SECONDS) -> Result[float, PipelineError]:
+    """Seconds from spawn to the initialize response, for one launch.
+
+    GRACE bounds the wait for a clean exit after stdin closes; the tests
+    shorten it."""
     started = time.monotonic()
     try:
         process = subprocess.Popen(options.command, cwd=options.start_dir, env=dict(env),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                                   errors="replace")
+                                   errors="replace", start_new_session=True)
     except OSError as exc:
         return Result.err(PipelineError(ErrorType.COMMAND_FAILED,
                                         f"cannot start {options.command[0]}", cause=exc))
@@ -247,12 +279,12 @@ def measure_once(options: Options, env: Mapping[str, str]) -> Result[float, Pipe
             break
         if is_ready(line, REQUEST_ID):
             outcome = arrived - started
-    _stop(process)
+    _stop(process, grace)
     if outcome is not None:
         return Result.ok(outcome)
-    # The process has exited, so its pipes close and both drains finish.
+    # The whole group is gone, so its pipes close and both drains finish.
     for drain in drains:
-        drain.join(timeout=SHUTDOWN_GRACE_SECONDS)
+        drain.join(timeout=grace)
     tail = "".join(line for _, line in list(err.queue))[-STDERR_TAIL_CHARS:]
     return Result.err(PipelineError(ErrorType.COMMAND_FAILED,
                                     f"{reason} (exit {process.returncode})",

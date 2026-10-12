@@ -76,9 +76,11 @@ were not tried.
 *Run*, 2026-10-11.
 
 Every registration on this page runs [`scripts/run-server.sh`][launcher], the
-launcher in this repository.  It enters the flake's `.#backend` shell, so
-`agda`, GHC and the standard library come from Nix rather than from your
-`PATH`; it keeps the shell's banner off the JSON-RPC stream; and it starts
+launcher in this repository.  By default it enters the flake's `.#backend`
+shell, so `agda`, GHC and the standard library come from Nix rather than from
+your `PATH` (a registration that names your own Agda can skip the shell, as
+*Your own Agda project* explains); it keeps the shell's banner off the
+JSON-RPC stream; and it starts
 the server in the directory the harness started it in, substituting that
 directory for a literal `${PWD}` in an argument (issue [#242]).  The server
 therefore needs a checkout of this repository and a build in it, once per

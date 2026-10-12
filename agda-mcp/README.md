@@ -1400,9 +1400,12 @@ registrations run.
 ### Through the launcher
 
 Every registration runs `scripts/run-server.sh`, as the repository's root
-`.mcp.json` does.  The launcher enters `nix develop .#backend` for you (so
-`agda`, `cabal`, and GHC need not be on your `PATH`) and routes the Nix banner
-to stderr so it does not corrupt the MCP JSON-RPC framing.  The root
+`.mcp.json` does.  By default the launcher enters `nix develop .#backend` for
+you (so `agda`, `cabal`, and GHC need not be on your `PATH`) and routes the Nix
+banner to stderr so it does not corrupt the MCP JSON-RPC framing.  A
+registration that names a built server and its own Agda skips the shell, and
+then none of the shell's tools are on the server's `PATH`; see
+[Without the shell](#without-the-shell).  The root
 registration passes the agda-dojang flags, the bundled fixture corpus, and
 `--timeout 600`.  Drop `--corpus` to run without the search tools; point it at
 a real agda-strux corpus to search a whole library (`make extract-lib` then

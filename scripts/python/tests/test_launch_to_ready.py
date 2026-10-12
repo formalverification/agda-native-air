@@ -22,7 +22,9 @@ Usage
 from __future__ import annotations
 
 import json
+import os
 import sys
+import time
 from pathlib import Path
 
 from scripts.python.launch_to_ready import (
@@ -64,6 +66,17 @@ def test_not_ready_on_anything_else() -> None:
                                     "error": {"code": -32603, "message": "x"}}), 1)
     assert not is_ready(json.dumps({"id": 1, "jsonrpc": "2.0", "result": {"tools": []}}), 1)
     assert not is_ready(json.dumps({"jsonrpc": "2.0", "method": "notifications/x"}), 1)
+
+
+def test_not_ready_on_an_envelope_that_is_not_json_rpc_2() -> None:
+    answer = json.loads(AGDA_MCP_ANSWER)
+    without = {k: v for k, v in answer.items() if k != "jsonrpc"}
+    assert not is_ready(json.dumps(without), 1)
+    assert not is_ready(json.dumps({**answer, "jsonrpc": "1.0"}), 1)
+    assert not is_ready(json.dumps({**answer, "error": {"code": -1, "message": "x"}}), 1)
+    for version in (20241105, "", None, ["2024-11-05"]):
+        assert not is_ready(json.dumps({**answer, "result": {**answer["result"],
+                                                              "protocolVersion": version}}), 1)
 
 
 def test_child_environment_unsets_then_sets_and_leaves_inputs_alone() -> None:
@@ -133,6 +146,35 @@ def test_measure_once_times_out() -> None:
     silent = "import sys\nsys.stdin.readline()\nsys.stdin.read()\n"
     result = measure_once(stand_in(silent, timeout=0.5), {"PATH": "/usr/bin:/bin"})
     assert result.is_err and result.unwrap_err().message.startswith("timed out")
+
+
+def alive(pid: int) -> bool:
+    """True while PID names a process (signal 0 tests without sending)."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def test_measure_once_leaves_no_descendant_after_a_timeout(tmp_path: Path) -> None:
+    # A parent that forks a child holding the pipes (as a shellHook's sbt probe
+    # would), never answers, and ignores the end of stdin.
+    pidfile = tmp_path / "child.pid"
+    forking = ("import subprocess, time\n"
+               "c = subprocess.Popen(['sleep', '300'])\n"
+               f"open({str(pidfile)!r}, 'w').write(str(c.pid))\n"
+               "time.sleep(600)\n")
+    result = measure_once(stand_in(forking, timeout=1.0), dict(os.environ), grace=0.5)
+    assert result.is_err and result.unwrap_err().message.startswith("timed out")
+    child = int(pidfile.read_text())
+    deadline = time.monotonic() + 5
+    while alive(child) and time.monotonic() < deadline:
+        time.sleep(0.05)  # the group kill has landed; reaping it is init's job
+    survived = alive(child)
+    if survived:
+        os.kill(child, 9)  # by the recorded pid alone, so a failure leaves nothing behind
+    assert not survived, "the forked child outlived the run"
 
 
 def test_measure_once_names_a_command_that_cannot_start() -> None:

@@ -934,9 +934,11 @@ devShells export, so a session started from inside `nix develop` loads the
 server too (issue #153).  Set `AGDA_MCP_BIN` in the server's `env` block to run
 a prebuilt binary instead of the one `cabal list-bin` names in the launcher's
 own checkout.  With `--agda-bin` among the arguments, as both templates pass
-it, the launcher then skips the shell, and the server answers `initialize` in
-milliseconds rather than seconds (issue #249); *Which Agda checks your files*
-below says what the server's environment is then.
+it, the launcher then skips the shell, which saves its 4 to 5 s; a server
+started with `--corpus` still loads it before answering `initialize`, 3 to 4 s
+for the agda-algebras template's corpus, and without one it answers in
+milliseconds (issue #249).  *Which Agda checks your files* below says what the
+server's environment is then.
 
 The registration itself, in each harness's format, is on the
 [Connecting an agent](agda-mcp/connecting-an-agent.md) page: for Claude Code
