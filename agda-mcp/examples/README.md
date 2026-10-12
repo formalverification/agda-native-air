@@ -3,15 +3,19 @@
 # agda-mcp client-config examples
 
 Ready-to-adapt MCP client configurations for using `agda-mcp` from **another Agda
-project** (one whose code lives outside this repository).  JSON does not allow
-comments, so the templates use `/ABS/PATH/TO/...` placeholders; copy one into the
-project you are editing as `.mcp.json`, replace the placeholders with absolute
-paths, and keep it out of that project's git history.
+project** (one whose code lives outside this repository).  The templates use
+`/ABS/PATH/TO/...` placeholders; copy one into the project you are editing (a
+`.mcp.json` template as `.mcp.json`, the Codex template as `.codex/config.toml`),
+replace the placeholders with absolute paths, and keep it out of that project's
+git history.
 
 See
-[`docs/HowToRun.md` §13.5](../../docs/HowToRun.md#135--using-agda-mcp-on-another-agda-project)
-for the full walkthrough, the caveats (`get_goal` needs `AgdaDojang.Debug`;
-absolute paths; toolchain match), and the alternative `claude mcp add` command.
+[Connecting an agent](../../docs/agda-mcp/connecting-an-agent.md)
+for the walkthrough in each agent harness, including the `claude mcp add` command,
+and
+[`docs/HowToRun.md` § 13.4](../../docs/HowToRun.md#134--using-agda-mcp-on-another-agda-project)
+for the caveats (`get_goal` needs `AgdaDojang.Debug`; absolute paths; toolchain
+match).
 
 Both templates check the client project with **its own pinned Agda**, never this
 repository's, so the client's version pins stay authoritative (issue #103), and
@@ -107,6 +111,30 @@ replaced set `AGDA_ALGEBRAS_ROOT` instead, and every launch rewrote this
 repository's `agda/libraries` to name its own worktree.  A second session in
 another worktree re-pointed the registry, and the first session's server then
 refused its own files.)
+
+## `agda-algebras.codex.toml`
+
+The same agda-algebras registration as a `[mcp_servers.agda]` table, for an
+OpenAI Codex CLI session, which does not read `.mcp.json`.  It needs the same
+three inputs, realized with the commands above, and is installed per checkout as
+`.codex/config.toml` (Codex reads a project's file only once the project is
+trusted) or appended to `~/.codex/config.toml`.  It differs from the `.mcp.json`
+template in four ways, each explained in a comment in the file, as follows:
+
++  It passes no `--cwd`: Codex expands no variables and starts the server in the
+   directory the session started in, which the launcher then passes as `--cwd`
+   (issue #242).
++  It sets `startup_timeout_sec` and `tool_timeout_sec` above Codex's defaults
+   (10 and 60 seconds), which the launcher's shell entry and a cold check
+   overrun.
++  It sets `required = true`, so that `codex exec` holds its first request until
+   the server is up.
++  It approves every tool but `check_project` without a prompt, since the
+   server's tools carry no read-only annotation and `codex exec`, which cannot
+   ask, would refuse them all.
+
+Tested on 2026-10-11 with Codex CLI 0.162.1 in an agda-algebras checkout: the
+server presented thirteen tools, and `check_file` answered from that checkout.
 
 ## `fls.mcp.json`
 

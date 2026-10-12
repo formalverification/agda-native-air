@@ -13,8 +13,8 @@ tree, and then the properties the site is published on:
 +  Nothing published is fetched from off the origin, and every link and
    asset reference resolves, over every page and stylesheet.
 +  The allowlist holds: the pages published are the curated ones of
-   [M6-3] (#171), the 404, and the demo, and nothing written for
-   contributors is published.
+   [M6-3] (#171) and the setup guide of [M6-13] (#247), the 404, and the
+   demo, and nothing written for contributors is published.
 +  The landing page's figures were all read (no marker survives into any
    built page), and every link to GitHub, the nav's included, names a path
    git tracks, on the branch the site links to.
@@ -159,12 +159,14 @@ def test_every_link_and_asset_reference_resolves(built) -> None:
 # ------------------------------------------------------------- the allowlist
 
 #: The pages [M6-3] (#171) publishes, as built; the PR names every page left
-#: out and why.  A page added to the allowlist is added here on purpose.
+#: out and why.  A page added to the allowlist is added here on purpose: the
+#: setup guide by [M6-13] (#247).
 CURATED = {
     "index.html",
     "reading-the-results/index.html",
     "adr/0001-proof-search-on-agda-mcp/index.html",
     "adr/0002-agda-mcp/index.html",
+    "agda-mcp/connecting-an-agent/index.html",
     "agda-mcp/agda-mcp-interaction-lane/index.html",
     "agda-mcp/agda-mcp-ask-agda-audit/index.html",
     "agda-mcp/agda-mcp-environment/index.html",
