@@ -32,8 +32,12 @@
 --     ladder's inference, stay in @Normalised@, the mode the tool was built
 --     and measured in: the goal's tokens rank the pool, and the printed type
 --     is what the lane-form statement exclusion compares.  Issue #248 moved
---     @get_goal@ and @type_of@ to @Simplified@ and left this tool where it was
---     (the measurement is in that PR).
+--     @get_goal@ and @type_of@ to @Simplified@ and measured this tool both
+--     ways.  On the #243 field hole the rows were the same, with types a
+--     quarter the length; on this suite's own fixture, in @Simplified@ the
+--     derived query gained the name the goal unfolds (@twice@) and the
+--     lane-form exclusion stopped firing.  So it stays (ADR 0002, decision
+--     28).
 --   * The walk.  Ranked rows are resolved through the rendering ladder one by
 --     one until @limit@ rows are ACCEPTED or @maxProbes@ rows have been sent
 --     to the lane; the cut is taken after resolution, so a rejected rendering

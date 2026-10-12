@@ -70,12 +70,14 @@ This is once per process, not per load (verified against an empty stdin).  The l
 
 All verified live; each answer arrives as one `DisplayInfo` whose `info.kind` names it.  Toplevel variants answer in the scope of the loaded file's top-level module; goal variants take an interaction-point id and answer in the scope at that goal, locals included.
 
-+  `Cmd_infer_toplevel Normalised "<expr>"` → `InferredType`.  The inferred type is in the `expr` field (so named on the wire); `commandState` echoes the current file and its load mtime:
+The goal and inference commands name a display mode, Agda's `Rewrite` (`AsIs`, `Instantiated`, `HeadNormal`, `Simplified`, `Normalised`), which decides how the types in the answer are printed; the word on the wire is the constructor's name, read by Agda's derived `Read`.  The lane was first probed in `Normalised` on `Nat` fixtures, where every mode prints the same thing, and `get_goal` and `type_of` sent it until issue #248.  The modes differ on a defined type.  On the hole of the #243 field session, `Normalised` printed a module parameter `𝑮 : Group α ρ` as the 528-character Σ type `Group` abbreviates, `ε∈B : ε ∈ B` as 145 characters of interpretation term, and the hole's context as 1,326 characters against 168 in `AsIs` and `Simplified`; a record type, such as that hole's goal `IsSubgroup 𝑮 B`, prints the same in every mode, since there is nothing to unfold.  So `get_goal` and `type_of` send the caller's `rewrite`, `Simplified` by default, which is what an editor's `C-c C-,` and `C-c C-d` send without a prefix argument (`agda2-maybe-normalised` in `agda2-mode.el`); `search_in_scope` and `resolve_name`'s recovery still send `Normalised` (§ 5).  The goal answer echoes the mode it printed in (`goalInfo.rewrite`, below); the inference answer does not.
+
++  `Cmd_infer_toplevel <rewrite> "<expr>"` → `InferredType`.  The inferred type is in the `expr` field (so named on the wire); `commandState` echoes the current file and its load mtime:
 
         {"info":{"commandState":{"currentFile":["/…/TwoHoles.agda","2026-08-20T02:57:51.892054865Z"],"interactionPoints":[0,1]},"expr":"Nat","kind":"InferredType","time":null},"kind":"DisplayInfo"}
 
     The expression need not appear in the file — the § 4 moment — and an ill-typed expression answers with `DisplayInfo`/`Error` whose positions are in the *expression's own* coordinates (`1.1-4: error: [CannotApply] …`), not the file's.
-+  `Cmd_infer Normalised <goalId> noRange "<expr>"` → `GoalSpecific` wrapping `goalInfo:{"expr":"Nat","kind":"InferredType"}` — same answer, goal scope.
++  `Cmd_infer <rewrite> <goalId> noRange "<expr>"` → `GoalSpecific` wrapping `goalInfo:{"expr":"Nat","kind":"InferredType"}`: the same answer, in the goal's scope.
 +  `Cmd_compute_toplevel DefaultCompute "<expr>"` → `NormalForm` (`"expr":"2"` for `implicitOnly {suc 1}`); `Cmd_compute DefaultCompute <goalId> noRange "<expr>"` is the goal variant.
 +  `Cmd_why_in_scope_toplevel "<name>"` / `Cmd_why_in_scope <goalId> noRange "<name>"` → `WhyInScope` with `thing` (the name as asked) and `message`, the provenance prose:
 
@@ -97,7 +99,7 @@ All verified live; each answer arrives as one `DisplayInfo` whose `info.kind` na
         {"info":{"contents":[{"name":"_+_","term":"Nat → Nat → Nat"},…],"kind":"ModuleContents","names":["Nat"],"telescope":[]},"kind":"DisplayInfo"}
 
     The module must be *in scope in the loaded file* — `Agda.Builtin.Nat` answers in a file that imports it and `NotInScope` in one that does not, and the loaded file's own top-level module name is itself `NotInScope`.  The empty string names the file's own top-level module and lists its definitions (`g`, `h`, `implicitOnly` for `TwoHoles`).
-+  `Cmd_goal_type_context Normalised <goalId> noRange ""` → `GoalSpecific` with the goal's type and its context as data — no source mutation, no injected macro:
++  `Cmd_goal_type_context <rewrite> <goalId> noRange ""` → `GoalSpecific` with the goal's type and its context as data, with no source mutation and no injected macro.  Captured in `Normalised`; `rewrite` in the answer is the mode that printed it:
 
         {"info":{"goalInfo":{"boundary":[],"entries":[{"binding":"Nat","inScope":true,"originalName":"x","reifiedName":"x"},{"binding":"Nat","inScope":true,"originalName":"y","reifiedName":"y"}],"kind":"GoalType","outputForms":[],"rewrite":"Normalised","type":"Nat","typeAux":{"kind":"GoalOnly"}},"interactionPoint":{"id":0,…},"kind":"GoalSpecific"},"kind":"DisplayInfo"}
 
@@ -147,9 +149,9 @@ Probed on this session's hardware, disk-warm `.agdai` interfaces throughout (the
 
 ## 5.  The tools, mapped to the protocol
 
-Each of the six below takes `filePath` (absolute; resolved and refused exactly as the batch tools do, per #101) and `verbose` (issue #184), and answers with the echo of § 3, lean unless `verbose` is true; `get_goal` and `search_in_scope` take the lane too and are documented with their own tools.
+Each of the six below takes `filePath` (absolute; resolved and refused exactly as the batch tools do, per #101) and `verbose` (issue #184), and answers with the echo of § 3, lean unless `verbose` is true; `get_goal` and `search_in_scope` take the lane too and are documented with their own tools.  `get_goal` takes `rewrite` as `type_of` does (issue #248), while `search_in_scope` reads the goal and types its rows in `Normalised`, the mode it was built and measured in: its query tokens come from the goal's display, and its lane-form statement exclusion compares printed types.
 
-+  `type_of(filePath, expr, line?, column?)` → `Cmd_infer` at the goal whose range contains the position when one does, else `Cmd_infer_toplevel`; `Normalised` rewrite.  Answers for expressions not present in the file.  The optional column decides between two goals sharing a line, whose scopes can differ (probed: `(\ m -> {!!}) {!!}` binds `m` in the first hole only); a line alone selects the earliest goal on it.
++  `type_of(filePath, expr, line?, column?, rewrite?)` → `Cmd_infer` at the goal whose range contains the position when one does, else `Cmd_infer_toplevel`, printed in the call's `rewrite` mode, `Simplified` by default (issue #248), which the answer echoes as `rewrite`.  Answers for expressions not present in the file.  The optional column decides between two goals sharing a line, whose scopes can differ (probed: `(\ m -> {!!}) {!!}` binds `m` in the first hole only); a line alone selects the earliest goal on it.
 +  `normalize(filePath, expr, line?, column?)` → `Cmd_compute` / `Cmd_compute_toplevel`, `DefaultCompute`.
 +  `resolve_name(filePath, name, line?, column?)` → `Cmd_why_in_scope` (goal-scoped when the position addresses a goal, else toplevel), parsed into candidates `{name, qualified?, kind?, provenance chain with file/line/col steps, definition site}`; on a not-in-scope answer the ambiguity recovery of § 2.6 runs before the tool reports an empty candidate list.
 +  `definition_of(filePath, name, line?, column?, maxLines?)` → the `resolve_name` machinery, projected to each candidate's `its definition at` step: qualified name, file, line, column; and since issue #185 each site's `source`, the declaration it opens quoted from the file on disk (at most `maxLines` lines, default 40, `0` for all).  The quote is a read of the file, not a lane query: no command answers a declaration's range, so `AgdaMCP.Declaration` cuts it by layout and the answer names the line range it quotes.

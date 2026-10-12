@@ -176,7 +176,7 @@ These answer read-only questions from a persistent `agda --interaction-json` chi
 
 | Tool | Description |
 |------|-------------|
-| `type_of`       | Infer the type of an expression in a file's scope — the expression need not appear in the file (Agda's `C-c C-d`). |
+| `type_of`       | Infer the type of an expression in a file's scope, where the expression need not appear (Agda's `C-c C-d`), printed as an editor prints it, in Agda's `Simplified` display, unless `rewrite` names another mode (issue #248). |
 | `normalize`     | Evaluate an expression to normal form in a file's scope (Agda's `C-c C-n`). |
 | `resolve_name`  | Every candidate a name resolves to, with provenance chains — the `AmbiguousName` answer, through re-exports and module applications grep cannot see. |
 | `definition_of` | The defining file and position of every candidate, chased through barrels to the origin, and what the definition says there: its declaration's source, quoted and bounded (issue #185). |
@@ -550,6 +550,7 @@ Given a file path and hole address (none is needed in a file with one hole), ret
     {"name": "x", "type": "A", "visibility": "visible", "index": 0},
     {"name": "A", "type": "Set₀", "visibility": "hidden", "index": 1}
   ],
+  "rewrite": "Normalised",
   "addressed": {"line": 7, "col": 8, "resolvedBy": "span"},
   "module": "Fixture01",
   "elapsedMs": 1720,
@@ -564,6 +565,19 @@ That is the default (lean) answer; `verbose: true` adds the rest of the
 [response echo](#the-response-echo-verdict-command-project-issues-72-and-76).
 A lane-sourced answer (`source: "interaction-lane"`) carries `lane {load,
 loadElapsedMs?}` in place of `verdict`.
+
+**The display mode (issue #248)**.  `rewrite` names the display mode Agda
+prints the goal and context in, spelled as Agda's `Rewrite` constructors:
+`AsIs`, `Instantiated`, `HeadNormal`, `Simplified`, or `Normalised`; any
+other word is refused by name before Agda is asked.  The default is
+`Simplified`, what an editor's `C-c C-,` sends, which prints a module
+parameter `𝑮 : Group α ρ` as `Group α ρ`; `Normalised` unfolds every
+definition, and printed the same parameter as the 528-character Σ type
+`Group` abbreviates (the #243 field hole, whose context was 168 characters
+in `Simplified` and 1,326 in `Normalised`).  Every answer's `rewrite` says
+which mode printed it: on the lane, the mode Agda's own answer echoes; on
+the fallback, `Normalised`, since the reporting macro normalizes whatever
+was asked, as in the example above.  Until #248 the lane sent `Normalised`.
 
 `module` is the name **Agda** resolved for this file, read from the `Checking M (path).` line of the very run this call made.  That is the name an `import` of the file must use and the name Agda's own messages print: `Proofs.Use` for a module embedded at `src/Proofs/Use.agda`, and `AnonModule` for a file whose header reads `module _ where`, which no reading of the source could supply.  When the goal comes back and Agda named no module — a client whose `--agda-flags` include `--trace-imports=0` silences the progress line — the field falls back to the name the source *declares*, scanned off the code-only view so that neither prose nor a comment can supply it.  The other ways Agda can decline to say do not reach this field: a parse error, a header that disagrees with its file name, or a timeout ends the call as a failure response, which carries no `module` at all — for a mismatched header the failure's text is Agda's own message, which names both the module it found and the file it expected (issue #100).
 
@@ -1125,8 +1139,9 @@ the ladder and the rank below are documented here, for people.
 
 **Input**.  Only `filePath` is required.  `query` may be omitted when
 `line`/`column` addresses a hole: the tokens are then derived from that goal's
-own displayed type, through the same normalized display `get_goal`'s lane path
-reads, and the response says `query.source: "goal"`.
+own displayed type, through Agda's `Normalised` display of it (the command
+`get_goal`'s lane path sends, though `get_goal` itself asks for `Simplified`
+by default since issue #248), and the response says `query.source: "goal"`.
 
 ```json
 {
