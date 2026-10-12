@@ -1435,9 +1435,10 @@ exe:agda-mcp` names in a checkout that has built it, as follows:
 "env": { "AGDA_MCP_BIN": "/path/to/agda-native-air/agda-mcp/dist-newstyle/build/.../agda-mcp" }
 ```
 
-The launcher then answers `initialize` in about 13 ms instead of 3 s or more.
-A `--corpus` is still loaded before the server answers, on either path:
-about 3 s for the 224 MB agda-algebras corpus.  Without `--agda-bin` the
+The server then answers `initialize` within 20 ms of launch, against 4 to 5 s
+through the shell (issue #249's measurement, `make agda-mcp-launch-time`).  A
+`--corpus` is still loaded before the server answers, on either path: 3 to 4 s
+for the 224 MB agda-algebras corpus.  Without `--agda-bin` the
 launcher always enters the shell, since the server's default `agda` is the
 shell's, and an `AGDA_MCP_BIN` that is not an executable file is refused by
 name before anything starts.

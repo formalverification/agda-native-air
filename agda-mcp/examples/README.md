@@ -109,10 +109,10 @@ One binding is optional, and the template leaves it out.  An `env` block naming
 a built server, `"env": {"AGDA_MCP_BIN": "/ABS/PATH/TO/agda-mcp"}` (the path
 `cabal list-bin exe:agda-mcp` prints in a checkout that has built it), lets the
 launcher skip the shell, since the template already names its Agda with
-`--agda-bin` (issue #249).  The server then answers `initialize` in milliseconds
-plus the corpus load, about 3 s, instead of several seconds more; it runs in
-the client's environment, so the `make` and `env` its gate runs and the
-`$AGDA_DIR/defaults` of the previous paragraph are the client's, not this
+`--agda-bin` (issue #249).  The server then answers `initialize` once it has
+loaded the corpus (3 to 4 s), where the shell path adds about 4 s before that.
+It runs in the client's environment, so the `make` and `env` its gate runs and
+the `$AGDA_DIR/defaults` of the previous paragraph are the client's, not this
 repository's.  The template's `--library-file` and `AGDA=` keep the rest the
 same on both paths.  [`agda-mcp/README.md`](../README.md), § *Without the
 shell*, has the whole list.
