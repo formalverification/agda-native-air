@@ -15,9 +15,10 @@
   *  said, to a billionth of a dollar.  That second test grows with the
   *  archive: a run archived on an Anthropic model the table prices wrongly,
   *  or not at all, fails it until the row is right (a subject the flat table
-  *  cannot price exactly, which carries a caveat, is left out of it).  No
-  *  archived run pins the claude-opus-5-5 row yet; the first archived Opus
-  *  5.5 arm will.  Beside them: why rows are priced from `modelUsage` rather
+  *  cannot price exactly, which carries a caveat, is left out of it).  The
+  *  archived Opus 5.5 arms of issue #236 pin the claude-opus-5-5 row; the
+  *  claude-sonnet-5-5 row is not pinned, since client 2.1.282 priced that
+  *  issue's Sonnet 5.5 subjects as unknown.  Beside them: why rows are priced from `modelUsage` rather
   *  than the `usage` block, the table's strict reading, the lookup, an
   *  unpriced row's reason, and a slice's lower bound.
   *
@@ -102,9 +103,9 @@ final class PricingSpec extends AnyFunSuite with Matchers {
         }
       }
     }
-    // 1,263 subjects in 57 runs on 2026-10-13; the archive only grows.
-    checked.size should be >= 1263
-    checked.flatten.distinct.toSet should contain allOf ("claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5-20251001")
+    // 1,551 subjects in 68 runs on 2026-10-13, after issue #236; the archive only grows.
+    checked.size should be >= 1551
+    checked.flatten.distinct.toSet should contain allOf ("claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claude-haiku-4-5-20251001")
   }
 
   test("the usage block alone misses what the client spent beside the subject's model, which is why rows are priced from modelUsage") {

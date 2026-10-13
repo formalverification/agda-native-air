@@ -97,12 +97,13 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    Anthropic's is refused when it names no price table (below), and when both
    `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, since the client
    would send both to that host.  Every archived run predates the record and
-   was served by Anthropic's API: all 1,263 subjects authenticated with the
-   client's own login (`apiKeySource: "none"` in the init record) and report
-   every model as `provider: "firstParty"`.  A protocol recorded before the
-   endpoint and the price table reads as the client's default endpoint and
-   the current table, as one recorded before `--expose` reads as the full
-   surface, so a run in flight across the change can still be resumed.
+   was served by Anthropic's API: all 1,634 subjects in 72 runs authenticated
+   with the client's own login (`apiKeySource: "none"` in the init record)
+   and report every model as `provider: "firstParty"`.  A protocol recorded
+   before the endpoint and the price table reads as the client's default
+   endpoint and the current table, as one recorded before `--expose` reads as
+   the full surface, so a run in flight across the change can still be
+   resumed.
 +  **No credential in a run directory** ([#237]).  The harness writes none,
    but a subject can: on an arm with a shell it inherits every exported
    secret, and one that runs `env` writes them into its transcript, which the
@@ -162,13 +163,15 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    `cacheRead`, and `output`, in USD per million tokens, the reader requires).
    The default is Anthropic's list prices as of 2026-10-13, the cache write
    at the one-hour rate (twice the input price, the write the client asks
-   for); at it, the priced figure equals the client's on all 1,263 archived
-   subjects in 57 runs, which `PricingSpec` pins, so a typo in a row an
-   archived run uses cannot pass.  No archived run uses the `claude-opus-5-5`
-   or `claude-sonnet-5-5` rows yet (the first is from client 2.1.282's own
-   catalog, the second Anthropic's published list price, which client 2.1.296
-   prices at, [#236]); the first archived arm on each will pin it.  The
-   archived reports predate the field, so their `totals.costUsd` stands for
+   for); at it, the priced figure equals the client's on every archived
+   subject the client priced at its list prices (1,551 subjects in 68 runs),
+   which `PricingSpec` pins, so a typo in a row an archived run uses cannot
+   pass.  The Opus 5.5 arms of [#236] pin the `claude-opus-5-5` row (from
+   client 2.1.282's own catalog).  The `claude-sonnet-5-5` row (Anthropic's
+   published list price, which client 2.1.296 prices at) is still unpinned:
+   client 2.1.282 priced [#236]'s 83 Sonnet 5.5 subjects as `unknown`, so
+   the spec leaves them out, and the row is the price [#236] quotes them at.
+   The archived reports predate the field, so their `totals.costUsd` stands for
    both: a re-judge writes the same figure as `totals.pricedCostUsd`.  The
    report's `tokens` is not what is priced: it is the main loop's `usage`
    block, which misses calls, the Haiku call of about USD 0.0011 that client
@@ -303,11 +306,14 @@ as archived, and the section on the header-free arms below says which of their
 figures the new runs replace.
 
 The cost column is the client's own figure, `totals.costUsd`.  Every run
-below ran on Anthropic's API, where that figure is the list price: priced
-from each transcript at the committed table it comes out the same, as
-`PricingSpec` checks, though these reports predate the `pricedCostUsd`
-field ([#237]).  A run on another endpoint quotes `totals.pricedCostUsd`
-there instead, at the table it names.
+below ran on Anthropic's API, where that figure is the list price for every
+model the client can price: priced from each transcript at the committed
+table it comes out the same, as `PricingSpec` checks, though these reports
+predate the `pricedCostUsd` field ([#237]).  The exception is Sonnet 5.5
+(the `*sonnet55*` rows), which client 2.1.282 cannot price: its column is
+priced from the tokens at the committed table's `claude-sonnet-5-5` row,
+with the client's figure beside it.  A run on another endpoint quotes
+`totals.pricedCostUsd` there instead, at the table it names.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
