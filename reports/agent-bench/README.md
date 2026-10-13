@@ -96,9 +96,10 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    as a changed model is.  A fresh run whose base URL names another host than
    Anthropic's is refused when it names no price table (below), and when both
    `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, since the client
-   would send both to that host.  Every archived run predates the record and
-   was served by Anthropic's API: all 1,634 subjects in 72 runs (1,486
-   sessions; the five `rejudge290-*` runs are re-judged copies of 148)
+   would send both to that host.  Every archived run predates the record,
+   and every session behind it was served by Anthropic's API: the 1,486
+   sessions behind the 1,634 subject records in 72 runs (the five
+   `rejudge290-*` runs re-judge copies of 148 of them, with no model call)
    authenticated with the client's own login (`apiKeySource: "none"` in the
    init record) and report every model as `provider: "firstParty"`.  A protocol
    recorded before the endpoint and the price table reads as the client's
@@ -177,7 +178,7 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    The archived reports predate the field, so their `totals.costUsd` stands
    for both, and a re-judge writes the same figure as `totals.pricedCostUsd`,
    except on the four Sonnet 5.5 runs, where it writes the list price from
-   the tokens (2.09 for `suite236-sonnet55-mcp-1`, whose `costUsd` is 9.69).
+   `modelUsage` (2.09 for `suite236-sonnet55-mcp-1`, whose `costUsd` is 9.69).
    The report's `tokens` is not what is priced: it is the main loop's `usage`
    block, which misses calls, the Haiku call of about USD 0.0011 that client
    2.1.261 made beside each session (335 subjects in 9 runs) and one Sonnet 5
@@ -316,9 +317,9 @@ model the client can price: priced from each transcript at the committed
 table it comes out the same, as `PricingSpec` checks, though these reports
 predate the `pricedCostUsd` field ([#237]).  The exception is Sonnet 5.5
 (the `*sonnet55*` rows), which client 2.1.282 cannot price: its column is
-priced from the tokens at the committed table's `claude-sonnet-5-5` row,
-with the client's figure beside it.  A run on another endpoint quotes
-`totals.pricedCostUsd` there instead, at the table it names.
+priced from each subject's `modelUsage` at the committed table's
+`claude-sonnet-5-5` row, with the client's figure beside it.  A run on another
+endpoint quotes `totals.pricedCostUsd` there instead, at the table it names.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1155,7 +1156,7 @@ the `*236-*` runs.  These are the header-free baselines the re-judge
 covers.  Two later 2.8.0 arms ran on a server nearer this one's, with
 [#228] and [#229]: `suite-answers-sonnet5-mcp-1` (47 solved, 6 restated,
 332 turns, USD 3.56) and `hard-answers-opus5-mcp-1` (14 solved, 127 turns,
-USD 6.34).  USD is list price; for Sonnet 5.5 it is priced from the tokens
+USD 6.34).  USD is list price; for Sonnet 5.5 it is priced from `modelUsage`
 (below).
 
 +  **Every final file checks, in every arm**: all 81 of each new model's,
