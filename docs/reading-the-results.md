@@ -52,19 +52,22 @@ judge.  They are not a baseline for an agent.
 ### 1.2  The agent with the server: the `mcp` arm
 
 One fresh, non-interactive `claude -p` session per obligation, given the
-thirteen (since PR [#161], fourteen) `agda-mcp` tools plus Read and Edit on a
-single staged file, **no shell**, under caps of 30 turns, 900 s, and USD 3.00
-per subject ([#154], [`reports/agent-bench/README.md`]).  Every agent number
-published before 2026-09-21 is this arm.  Until 2026-09-29 the staged file
-carried its fixture's header, and the header carried hints (§ 4.6); the
-arm's current numbers are the header-free runs of that day.
+thirteen (fourteen from PR [#161] until PR [#232] folded `search_in_scope`
+into `search_by_name`) `agda-mcp` tools plus Read and Edit on a single staged
+file, **no shell**, under caps of 30 turns, 900 s, and USD 3.00 per subject
+([#154], [`reports/agent-bench/README.md`]).  Every agent number published
+before 2026-09-21 is this arm.  Until 2026-09-29 the staged file carried its
+fixture's header, and the header carried hints (§ 4.6); the arm's current
+numbers are the header-free runs of that day, and from 2026-10-13 the runs on
+Agda 2.9.0 (§ 4.8).
 
 ### 1.3  The agent with a shell: the `shell` arm
 
 The same session, prompts, caps, and judge, given Bash, Read, and Edit, the
-pinned `agda` (2.8.0 in every run this guide reports) on `PATH` with the same
-libraries the server resolves against, the row's corpus JSONL on disk to `grep`,
-and **no server** ([#162]).  This is the control: the tools' absence.
+pinned `agda` (2.8.0 in every shell arm this guide reports) on `PATH` with
+the same libraries the server resolves against, the row's corpus JSONL on
+disk to `grep`, and **no server** ([#162]).  This is the control: the tools'
+absence.
 
 ### 1.4  The agent with both: the `both` arm
 
@@ -88,14 +91,15 @@ for the second.
 
 ### 1.6  The floor: Agda's own proof search
 
-Agda ships a proof search, the one an editor's `C-c C-a` runs; under Agda 2.8.0,
-which ran every number here, and the pinned 2.9.0 alike, it is Mimer, which
-replaced Agsy in Agda 2.7 (the issues that measured it first, [#205] and [#206],
-say Agsy).  `make auto-floor` runs it once at every obligation's hole through
+Agda ships a proof search, the one an editor's `C-c C-a` runs; under Agda
+2.8.0, which ran every number here but those of the 2.9.0 runs (§ 4.8 and the
+rows that cite it), and the pinned 2.9.0 alike, it is Mimer, which replaced
+Agsy in Agda 2.7 (the issues that measured it first, [#205] and [#206], say
+Agsy).  `make auto-floor` runs it once at every obligation's hole through
 `agda-mcp`'s `auto` tool, with Agda's default options and no hints, and gives
-every term it finds to `fill_hole` under `--safe` ([`reports/auto-floor/`]).
-There is no model, no corpus, and no search of the loop's: one call per
-obligation, a second or less each.
+every term it finds to `fill_hole` under `--safe`
+([`reports/auto-floor/`]).  There is no model, no corpus, and no search of the
+loop's: one call per obligation, a second or less each.
 
 **What the floor is for**: a row Agda solves by itself says nothing about the
 loop's searcher or an agent's skill.  A count read against the floor says
@@ -191,8 +195,10 @@ instruments:
 
 ## 3.  The tools, in two classes
 
-`agda-mcp` offers fourteen tools ([`agda-mcp/README.md`]).  For reading
-results, what matters is what each one runs and what it returns.
+`agda-mcp` implements fifteen tools and presents thirteen by default
+(`search_in_scope` only on request since PR [#232], `auto` only behind
+`--auto`; [`agda-mcp/README.md`]).
+For reading results, what matters is what each one runs and what it returns.
 
 **Verdict tools** run a batch process (`agda`, or for `check_project` the
 project's own gate) and answer from its exit code.  They are the only tools
@@ -220,7 +226,8 @@ Two facts about this split that the results turn on.  The **loop** uses one
 verdict tool (`fill_hole`, plus `check_file` for the final claim) and three
 knowledge tools (`get_goal`, `type_of` for the peek, and `search_by_name` /
 `search_by_type` for retrieval).  And in the archived runs below, except
-the two [#185] re-runs (§ 4.3 and § 4.5 name them), `definition_of`
+the two [#185] re-runs (§ 4.3 and § 4.5 name them) and the Agda 2.9.0 arms
+(§ 4.8), `definition_of`
 returned *where* a definition is, not what it says; since [#185] it quotes
 the declaration too, and § 4.3 is where the difference shows.
 
@@ -271,12 +278,16 @@ Every run below reported zero anomalies.  Run ids are the harness's own;
 and where the two differ, the header-free number is the one quoted (§ 4.6).
 A USD figure is the client's own arithmetic over a run's tokens at
 Anthropic's list prices (`totals.costUsd`).  Every run below ran on
-Anthropic's API, where that figure is what the run cost at list prices: it
-equals the run's tokens priced at the committed table, which the reports
-predate but `PricingSpec` checks against every transcript ([#237]).  For a
-run served by another provider's endpoint the client's figure is a guess,
-and the figure quoted is the report's priced one, `totals.pricedCostUsd`,
-at the table the run names, beside the provider's usage page.
+Anthropic's API, where that figure is what the run cost at list prices for
+every model the client can price: it equals the run's tokens priced at the
+committed table, which the reports predate but `PricingSpec` checks against
+every transcript ([#237]).  The exception is Sonnet 5.5 (§ 4.8), which
+client 2.1.282 cannot price (`costBasis` `unknown`); its figures here are
+priced from its tokens at the published list.  For a run served by another
+provider's endpoint the client's figure is a guess, and the figure quoted is
+the report's priced one, `totals.pricedCostUsd`, at the table the run names,
+beside the provider's usage page.  Every run before 2026-10-13 ran on Agda
+2.8.0; the runs of that day (`*236-*`) ran on 2.9.0 (§ 4.8).
 
 ### 4.1  The loop
 
@@ -340,6 +351,9 @@ edge, stated.
 | Sonnet 5, `mcp` arm, hints in view | 46 solved, 8 restated, 1 preservation gate; 327 turns, 272 calls, USD 4.62 | § 1.2, 13 tools | `agent-sonnet5-1` | [ADR 0001] § 9, dated table |
 | Opus 5, `mcp` arm, hints in view | 54 solved, 1 restated; 325 turns, 270 calls, USD 9.14 | same | `agent-opus5-1` | same |
 | Opus 5, second seed, hints in view | 54 solved, 1 restated, the same rows; 338 turns, 283 calls | same | `agent-opus5-2` | same |
+| Opus 5, `mcp` arm, Agda 2.9.0 | **54 solved, 0 restated**, 1 isolation gate (one refused call; the file earned the solve); 309 turns, 254 calls, USD 6.91 | § 1.2, 13 tools, Agda 2.9.0 | `suite236-opus5-mcp-1` | § 4.8, [`reports/agent-bench/`] |
+| Sonnet 5.5, `mcp` arm, Agda 2.9.0 | **51 solved, 4 restated**; 281 turns, 226 calls, USD 2.09 at list (the client's figure 9.69) | same | `suite236-sonnet55-mcp-1` | same |
+| Opus 5.5, `mcp` arm, Agda 2.9.0 | **37 solved, 1 restated**, 17 isolation gates, each from refused calls to bare tool names (18 calls; 51 and 4 with those calls not counted, [#266]); 270 turns, 215 calls, USD 3.78 | same | `suite236-opus55-mcp-1` | same |
 
 Header-free, per stratum (Sonnet, then Opus): stdlib 21 and 22 of
 22; haystack 12 and 12 of 12; `using` 9 (1 restated) and
@@ -946,16 +960,118 @@ ceiling in fact.  Rows the models cannot assemble alone need relations the
 proof cannot unfold (a record or an abstract definition), longer chains,
 or weaker subjects; this tier's twelve cannot tell the tools apart.
 
+The current models on this tier, on Agda 2.9.0, are § 4.8's: Sonnet 5.5
+solves 11 of the 12 rows, losing one to the same `using`-list habit that
+cost Sonnet 5 nine, and Opus 5.5's files all check.
+
+### 4.8  Agda 2.9.0, and the current models
+
+[#236], on the move of [#234].  Every arm from 2026-10-13 on runs on Agda
+2.9.0, because the models read Agda's error text and 2.9.0 rewords it, so
+the first runs on it are baselines: the five arms that § 4.2 to § 4.7
+compare with, re-judged under 2.9.0 with no model call, and Opus 5 on the 55
+library rows again.  Then Sonnet 5.5 (`claude-sonnet-5-5`) and Opus 5.5
+(`claude-opus-5-5`) ran on the three tiers, `mcp` arm, one seed each, at
+each tier's caps, client 2.1.282, from one frozen server and extractor;
+[`reports/agent-bench/`] has the protocol, every table here, and the
+readings in full.  The server is not the archived arms' own.  Besides
+reading 2.9.0's diagnostics, it has five changes a subject meets:
+`fill_hole` and `get_goal` reach the only hole from anywhere on its line
+([#228]), `definition_of` quotes the source ([#229]), `search_by_type`
+matches a statement as written ([#231]), `search_in_scope` is asked through
+`search_by_name`, leaving 13 tools presented where there were 14 ([#232]),
+and `get_goal` and `type_of` answer in `Simplified` ([#257]).  So the Opus 5
+re-run measures the toolchain and the server together, and every comparison
+below with Sonnet 5, or with Opus 5 on the composition and hard tiers,
+varies the model, the toolchain, and the server at once.  Zero anomalies;
+USD 21.16 at list for the seven arms and their cost pairs.
+
+**On verdicts, the move to 2.9.0 changed nothing**.  Under the re-judge no
+verdict moves on any of the 148 rows.  The one difference is a deprecation
+warning, `FixityDeclarationForNonOperator`, in `check_file`'s answer on
+every file that imports agda-algebras' `Overture.Basic` (for `∣_∣`), twice
+on the files that also import `Overture.Relations` (for `[_]`).  The Opus 5
+re-run (`suite236-opus5-mcp-1`) solves 54 rows and restates none, against
+55 and 0 (`suite219-opus5-mcp-1`); the 55th file checks with its statement
+kept and lost the isolation gate to one refused call (below).  41 of the 55
+final files are byte-identical and the turns differ by 14 (309 against
+323), as two seeds of one protocol differed before (44 identical, 13 turns,
+`agent-opus5-1` and `-2`).  The rewording itself had little to act on:
+Opus 5 met Agda's error text in one answer in the 55 rows (two in the
+baseline), and the three subjects that mention the warning set it aside as
+a library's.  The tool mix did move, beyond that spread: `definition_of` 24
+calls against 10, `get_goal` 4 against 14, `type_of` 7 against 17, and no
+`fill_hole` refused for its address against 6.  The server's changes act on
+those tools, but this run cannot separate them from the toolchain.
+
+| | Sonnet 5 | Sonnet 5.5 | Opus 5 | Opus 5.5 |
+|---|---:|---:|---:|---:|
+| library (55): solved, restated | 44, 9 | 51, 4 | 54, 0 | 37, 1 |
+| the same, refused calls not counted ([#266]) | 44, 9 | 51, 4 | 55, 0 | 51, 4 |
+| composition (12): solved | 3 | 11 | 12 | 4 |
+| the same, refused calls not counted | 3 | 11 | 12 | 12 |
+| hard (14): solved | not run | 14 | 14 | 10 |
+| the same, refused calls not counted | | 14 | 14 | 14 |
+| final files that check, statement kept | 67 of 67 | 81 of 81 | 81 of 81 | 81 of 81 |
+| USD at list: library, composition, hard | 3.99, 3.55 | 2.09, 1.26, 1.81 | 6.91, 4.05, 7.71 | 3.78, 2.07, 2.51 |
+
+Runs: Sonnet 5 `suite219-sonnet5-mcp-1` and `comp-sonnet5-mcp-1`; Opus 5
+`suite236-opus5-mcp-1`, `comp-opus5-mcp-1`, and `hard219-opus5-mcp-1`;
+Sonnet 5.5 and Opus 5.5 `suite236-*`, `comp236-*`, and `hard236-*` (each
+`-sonnet55-mcp-1` or `-opus55-mcp-1`) ([`reports/agent-bench/`]).  The
+Sonnet 5 runs and Opus 5's composition and hard runs are Agda 2.8.0's, on
+the older servers, and the re-judge leaves their verdicts as they were.
+
++  **Sonnet 5.5 closes all but one row of Sonnet 5's composition-tier gap**:
+   it solves 11 of the 12 rows where Sonnet 5 solved 3, and loses one to the
+   preservation gate where Sonnet 5 lost nine, to the same habit of extending
+   one of the original `using` lists rather than adding a line.  Every final
+   file of both models checks with its statement kept, so what closed is the
+   habit, not a proof Sonnet 5 could not write; the model, the toolchain, and
+   the server all differ between the two runs.  On the library tier it narrows
+   the gap (51 and 4 against 44 and 9: seven rows move to solved, two edited
+   `using` lists and five restatements, and none moves back), and it proves
+   all fourteen hard rows, which Sonnet 5 never ran.  On the composition tier
+   it took Opus 5's route rather than Sonnet 5's, unfolding the relations the
+   needles are about: its files name as many of each row's needles as Opus 5's
+   on all twelve rows (20 of 33, where Sonnet 5's name 32).
++  **Opus 5.5's measured counts are lowered by a slip the audit
+   misreads**.  In 29 of its 81 sessions it called a server tool by its
+   bare name, without the `mcp__agda__` prefix; the client refused the
+   call (`No such tool available`), the session went on under the full
+   names, and the isolation audit counts any name outside the presented
+   set as foreign use.  None of those rows left its roots, and every file
+   checks with its statement kept.  Opus 5 made the slip once in 55
+   sessions and no Sonnet arm ever did.  [#266] fixes the audit and
+   re-judges; until then both rows of the table are quoted.
++  **Opus 5.5 restates where Opus 5 wrote the proof out**: four rows with
+   the refused calls not counted (one as measured) against none, three of
+   them rows Sonnet 5.5 restates too.  The client opens an Opus 5.5
+   session at `medium` effort, one level below the `high` it sends Opus 5
+   and both Sonnets, and reports per-turn effort active for the 5.5 models,
+   so here the model and the effort are one variable.
++  **No tier separates these models by whether their proofs check**.
+   Every final file of every model that ran a tier checks with its
+   statement kept; what separates the counts is restatement and the
+   protocol's gates, so on these rows the counts order the models by habit
+   and cost.  The cheapest is Sonnet 5.5: USD 5.16 at list for the 81 rows,
+   against 8.36 for Opus 5.5 and 18.67 for Opus 5.  The client cannot price
+   Sonnet 5.5 (it charges an unknown model at another model's rates,
+   Fable 5.1's on 79 of its 83 subjects, the cost pair's two included, and
+   Opus 5.5's on four, 4.2 to 4.8 times the list), so its figures are
+   priced from each subject's tokens at the published list.
+
 ## 5.  How to tell a win from a loss
 
 | question | look at | it is a win for the tools when |
 |---|---|---|
 | Does the server help a frontier model solve more? | § 4.3, `shell` against `mcp`, solved | `mcp` is higher by more than one seed's noise, with the originals hidden from both.  **Today: no on the count (header-free, 47 with a shell against 44 with the server; with the hints, 50 against 47); the agda-algebras rows are confounded by readable originals, and on the hard tier (§ 4.5, with the hints and without them) and the composition tier (§ 4.7), with nothing to copy, every final file of Opus 5, and on the composition tier of Sonnet 5, checks with or without the server**. |
 | Does it help it prove rather than cite? | § 4.3, restated | `mcp` restates fewer, with the originals hidden from both.  **Today: not measured; the shell arm restates fewer (4 against 9 header-free, and against 6 for the server since [#185] quotes definitions; 0 against 6 with the hints), with the original in view for most of its solves**. |
-| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no, by 4 % header-free with the current server (USD 3.56 against 3.42, `suite-answers-sonnet5-mcp-1`, after [#185] and [#201]), 17 % before it (3.99), from 83 % in the first control.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
+| Does it make a session cheaper? | § 4.3, USD and bytes | `mcp` costs less.  **Today: no, by 4 % header-free with the server of 2026-10-03 (USD 3.56 against 3.42, `suite-answers-sonnet5-mcp-1`, after [#185] and [#201]), 17 % before it (3.99), from 83 % in the first control.  Answer size was not the cause (PR [#190]); the tool surface was a third of the context and is trimmed (PR [#193], cost 17 to 19 % lower); what remains is turns, and four tools with the context below the shell's still cost more because the subject hunts for files**. |
 | Which tools does a model want? | § 4.3, `both` arm per tool | a tool is used when a shell is available too.  **`check_file`: yes.  Knowledge tools: no**. |
 | Does retrieval help the loop? | § 4.1, haystack and 43-suite | solves appear under exclusion.  **Haystack: yes, 0 to 6.  Elsewhere: no**. |
 | Did the fixture headers' hints change what the agents did? | § 4.6 | the header-free arms differ from the hinted ones by more than a seed's spread.  **The haystack tier's route, yes (3 rows solved with no query before the final check, against 8 to 11); about three agda-algebras rows per Sonnet arm written out rather than cited, in the same direction in every arm; the rows with no original, no** |
+| Did the move to Agda 2.9.0 change what the agents did? | § 4.8 | the 2.9.0 runs differ from the 2.8.0 ones by more than a seed's spread.  **On verdicts, no: the re-judge moves none on 148 rows, and the Opus 5 re-run solves the same rows bar one lost to a refused call.  The tool mix did move, on tools the server's changes act on, but the run cannot separate the server from the toolchain; and Opus 5 met Agda's error text in one answer in 55 rows, so the rewording was barely tested** |
 | Do the tools help a model assemble a proof from library lemmas? | § 4.7, the composition tier, per arm | a row is solved only with the server, or its needles come only from the server's answers.  **Today: not measurable; every final file checks in all six arms, the needles came from tool answers and source reads alike (not from memory), and Opus often skipped them by unfolding the definitions** |
 | Is the loop a baseline for the agents? | nothing | **never**; a different instrument |
 | Is a lane judgment as trustworthy as batch? | § 4.4 | parity holds.  **Yes, on 80 of 80**. |
@@ -1005,9 +1121,10 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
    arms had and used (16 and 12 calls) and which, in those arms, answered
    where a definition is and not what it says.  No arm has run the subset
    with a locator added to it.  The content-returning `definition_of` of
-   [#185] has run only in the full fourteen-tool `mcp` arms
-   (`suite-answers-sonnet5-mcp-1`, `hard-answers-opus5-mcp-1`), not in the
-   four-tool subset; the two are separate variables.
+   [#185] has run only in the full `mcp` arms (fourteen tools in
+   `suite-answers-sonnet5-mcp-1` and `hard-answers-opus5-mcp-1`, thirteen
+   in the Agda 2.9.0 arms of § 4.8), not in the four-tool subset; the two
+   are separate variables.
 +  **Construction, tools against no tools**.  The archived arms could not
    read the originals and the [#162] arms could (§ 4.3), so no run compares
    the tools with their absence on rows the subject cannot copy.  The
@@ -1023,6 +1140,16 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 +  **Opus with a shell on the mined rows**.  The mined-tier control was run
    on Sonnet only; Opus with a shell has run only on the hard and
    composition tiers (§ 4.5, § 4.7), where it proves every row.
++  **The toolchain alone, on a model that errs** (§ 4.8).  The Opus 5
+   re-run on Agda 2.9.0 carries the server's later changes too, and Opus
+   5 met Agda's error text in one answer in 55 rows, so what 2.9.0's
+   rewording does to a model that reads it often is not measured.  Sonnet
+   5, which met it in 12 answers on the library tier and 25 on the
+   composition tier, has not been re-run on 2.9.0.
++  **The effort a subject runs at**.  The client opens each session at the
+   model's own default (`medium` for Opus 5.5, `high` for Opus 5 and both
+   Sonnets), reports per-turn effort active for the 5.5 models, and no run
+   records the level of any turn; Opus 5.5 at `high` has not run.
 
 ## References
 
@@ -1086,3 +1213,11 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 [#206]: https://github.com/formalverification/agda-native-air/issues/206
 [#237]: https://github.com/formalverification/agda-native-air/issues/237
 [`reports/auto-floor/`]: ../reports/auto-floor/README.md
+[#228]: https://github.com/formalverification/agda-native-air/pull/228
+[#229]: https://github.com/formalverification/agda-native-air/pull/229
+[#231]: https://github.com/formalverification/agda-native-air/pull/231
+[#232]: https://github.com/formalverification/agda-native-air/pull/232
+[#234]: https://github.com/formalverification/agda-native-air/issues/234
+[#236]: https://github.com/formalverification/agda-native-air/issues/236
+[#257]: https://github.com/formalverification/agda-native-air/pull/257
+[#266]: https://github.com/formalverification/agda-native-air/issues/266
