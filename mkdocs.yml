@@ -55,7 +55,7 @@ copyright: >-
 # benchmark's taxonomy, the corpus cards and their schema, the architecture,
 # and one proposal as a note), and what is left is written for contributors
 # (the plan and workflow files, the runbooks, the imported feedback, the
-# field-report log that other repositories append to) or superseded.  A
+# field reports that sessions in other repositories submit) or superseded.  A
 # published page's links to files left out are sent to GitHub at build time
 # by scripts/python/site/links_hook.py, so a page is published as written.
 docs_dir: docs

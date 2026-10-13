@@ -13,6 +13,7 @@ An index of this directory and a reading order for a new collaborator.  The repo
 +  [`benchmarks/`](benchmarks/): the M1-5 baseline benchmark's difficulty taxonomy and its obligations document; the suite itself, its index, and its README are under [`data/benchmarks/`](../data/benchmarks/).
 +  [`corpora/`](corpora/): one dataset card per published corpus cut, and the procedure for publishing a corpus release.
 +  [`feedback/`](feedback/): documents imported from consumer projects (sessions in `ualib/agda-algebras`), kept verbatim apart from their header comments: the field report that motivated the [#68] wave, and the consumer-side case for corpus proof search.
++  [`field-reports/`](field-reports/README.md): the field reports, one file per session's account of the agda-mcp server in real use, each submitted as a pull request by the session that wrote it ([#252]).  Its README says how to write one, the header every report carries, what a session in a private repository may say, and what `scripts/python/field_report.py` checks before it opens the pull request.
 +  [`notes/`](notes/): working notes and background reading: a prior-art report on AI for theorem proving, and [a proposal](notes/browser-ide-proposal.md) for a browser workbench where people, models, and Agda build proofs together, with a proof-design view drawn from the checked source.
 
 ## Top-level documents
@@ -43,7 +44,7 @@ The operating guides are as follows:
 The evidence record is as follows:
 
 +  [`import-closure.md`](import-closure.md): what this repository's Agda costs to check and to ship.  What an `open import` drags behind it, how to measure a module closure without getting a plausible wrong number, the measured record of [#168] (the prelude, cut from 190 modules to 36) and [#167] (the benchmark fixtures, deliberately left idiomatic), and what reads a fixture's import lines besides Agda.
-+  [`mcp-field-reports.md`](mcp-field-reports.md): the session-by-session record of agda-mcp in real use, appended newest last.  It stays at this path deliberately: the agda-algebras and fls standing instructions (in the claude-tooling repository) tell sessions in those projects to append to it by path.
++  [`mcp-field-reports.md`](mcp-field-reports.md): the field reports committed through 2026-10-11, one section each, appended newest last.  It is frozen ([#252]) and unchanged below its note, so every link to a section still works; later reports are files under [`field-reports/`](field-reports/README.md).
 
 ## Reading order for a new collaborator
 
@@ -52,10 +53,11 @@ The evidence record is as follows:
 3.  [`GITHUB_PROJECT.md`](GITHUB_PROJECT.md) for where the work stands.
 4.  [`adr/0002-agda-mcp.md`](adr/0002-agda-mcp.md) for the server's design and the evidence behind it, with [`agda-mcp/README.md`](../agda-mcp/README.md) open beside it for the tool contracts; the notes under [`agda-mcp/`](agda-mcp/) when a decision's detail matters.
 5.  [`proof-search/overview.md`](proof-search/overview.md) for how the search built on top of the server works, then [`adr/0001-proof-search-on-agda-mcp.md`](adr/0001-proof-search-on-agda-mcp.md) for its decisions and numbers, and [`benchmarks/taxonomy.md`](benchmarks/taxonomy.md) for how it is scored.
-6.  [`feedback/`](feedback/) and [`mcp-field-reports.md`](mcp-field-reports.md) for what agents actually do with the tools, which is what the next design decisions will be argued from.
+6.  [`feedback/`](feedback/), [`mcp-field-reports.md`](mcp-field-reports.md), and [`field-reports/`](field-reports/README.md) for what agents actually do with the tools, which is what the next design decisions will be argued from.
 
 <!-- GitHub references -->
 [#68]: https://github.com/formalverification/agda-native-air/issues/68
 [#169]: https://github.com/formalverification/agda-native-air/issues/169
 [#167]: https://github.com/formalverification/agda-native-air/issues/167
 [#168]: https://github.com/formalverification/agda-native-air/issues/168
+[#252]: https://github.com/formalverification/agda-native-air/issues/252

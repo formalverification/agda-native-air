@@ -187,7 +187,7 @@ def test_only_the_curated_pages_the_404_and_the_demo_are_published(built) -> Non
     expected = CURATED | {"404.html", "demo/index.html"}
     assert pages == expected, sorted(pages ^ expected)
     for internal in ("GITHUB_PROJECT", "PLAN", "WORKFLOW", "README", "MANIFESTO",
-                     "feedback", "mcp-field-reports", "import-closure",
+                     "feedback", "mcp-field-reports", "field-reports", "import-closure",
                      "notes/ai-for-theorem-proving-prior-art", "corpora/README",
                      "benchmarks/obligations"):
         assert not (public / internal).exists(), internal

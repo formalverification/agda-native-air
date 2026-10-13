@@ -66,8 +66,9 @@ agda-native-air/
 │   ├── benchmarks/            # the difficulty taxonomy
 │   ├── corpora/               # one dataset card per published corpus
 │   ├── feedback/              # documents imported from consumer projects
+│   ├── field-reports/         # the server in real use, one report per session
 │   ├── notes/                 # working notes and background reading
-│   └── mcp-field-reports.md   # the session-by-session record of the server in real use
+│   └── mcp-field-reports.md   # the reports through 2026-10-11, one section each (frozen)
 ├── experiments/               # archived exploratory work (read-only)
 ├── reports/                   # archived agent transcripts
 └── scripts/                   # launchers and Python utilities
@@ -125,8 +126,10 @@ As of October 2026 the following are built, measured, and in use.
    Cardano formal ledger specification,
    [`IntersectMBO/formal-ledger-specifications`](https://github.com/IntersectMBO/formal-ledger-specifications);
    what those sessions did with it, and
-   where it fell short, is recorded session by session in
-   [`docs/mcp-field-reports.md`](docs/mcp-field-reports.md).
+   where it fell short, is recorded session by session, one file each, in
+   [`docs/field-reports/`](docs/field-reports/README.md) (the reports through
+   2026-10-11 are sections of
+   [`docs/mcp-field-reports.md`](docs/mcp-field-reports.md)).
 +  **Two corpora**, extracted by `agda-strux` from pinned library commits and
    described by dataset cards under [`docs/corpora/`](docs/corpora/): the Agda
    standard library 2.3 (55,576 definitions from 1,153 modules;

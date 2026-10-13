@@ -1,5 +1,16 @@
 # agda-mcp field reports
 
+> **Frozen on 2026-10-12** ([#252]).  This file holds the field reports
+> committed through 2026-10-11, one section each, and takes no more.  Reports
+> written since, and eight sections of 2026-10-11 and 2026-10-12 that never
+> reached this file, are files of their own under [`field-reports/`], each
+> submitted as a pull request by the session that wrote it; that directory's
+> README says how.  Nothing below this note has changed, so every link to a
+> section of this file still works.
+
+[#252]: https://github.com/formalverification/agda-native-air/issues/252
+[`field-reports/`]: field-reports/README.md
+
 Session-by-session notes on using the agda-mcp server for real work, kept per the
 agda-algebras `CLAUDE.md` standing instruction.  Reports are appended, newest last,
 and are meant to be evidence in both directions: where the server helped, and where
