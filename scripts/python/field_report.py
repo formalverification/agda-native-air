@@ -12,8 +12,9 @@ Description: Field reports, one file per session (issue #252).
 
     field_report.py new <slug>      fetch origin; make a worktree on a new
                                     branch field-report-<date>-<slug> from
-                                    origin/main; write the template there
-                                    with the date filled in; print its path
+                                    origin/main (or --base); write the
+                                    template there with the date filled in;
+                                    print its path
     field_report.py submit <path>   check the report; commit it as the
                                     branch's one commit; push; open the pull
                                     request through `gh api`; remove the
@@ -485,10 +486,10 @@ def origin_repository(directory: Path) -> Optional[str]:
     return github_repository(url.unwrap()) if url.is_ok else None
 
 
-def new_report(repo: Path, names: Names) -> Result[Path, PipelineError]:
-    """Fetch, make the report's worktree and branch from origin/main, and
+def new_report(repo: Path, names: Names, base: str = BASE_BRANCH) -> Result[Path, PipelineError]:
+    """Fetch, make the report's worktree and branch from origin/<base>, and
     write the template there.  Returns the report file's path."""
-    template_spec = f"origin/{BASE_BRANCH}:{REPORTS_DIR}/{TEMPLATE_NAME}"
+    template_spec = f"origin/{base}:{REPORTS_DIR}/{TEMPLATE_NAME}"
 
     def refuse_existing(_: str) -> Result[str, PipelineError]:
         local = git("-C", str(repo), "rev-parse", "--verify", "--quiet",
@@ -507,17 +508,17 @@ def new_report(repo: Path, names: Names) -> Result[Path, PipelineError]:
         return (git("-C", str(repo), "show", template_spec)
                 .and_then(lambda template: git(
                     "-C", str(repo), "worktree", "add", "-q", "--no-track", "-b",
-                    names.branch, str(worktree), f"origin/{BASE_BRANCH}")
+                    names.branch, str(worktree), f"origin/{base}")
                     .map(lambda _: template))
                 .and_then(lambda template: write_text(
                     worktree / names.relative_path, fill_template(template, names) + "\n"))
                 .map(lambda _: worktree / names.relative_path))
 
-    return (git("-C", str(repo), "fetch", "-q", "origin", BASE_BRANCH)
+    return (git("-C", str(repo), "fetch", "-q", "origin", base)
             .and_then(refuse_existing)
             .and_then(lambda _: git("-C", str(repo), "cat-file", "-e", template_spec)
-                      .map_err(lambda e: problem("no template on origin/main", [
-                          f"{template_spec} does not exist; has issue #252 merged?"])))
+                      .map_err(lambda e: problem(f"no template on origin/{base}", [
+                          f"{template_spec} does not exist"])))
             .and_then(lambda _: common_dir(repo))
             .and_then(make))
 
@@ -579,8 +580,8 @@ def privacy_problems(text: str, report: Report, cwd: Path) -> List[str]:
                     if working else [])
 
 
-def submit_report(repo: Path, path: Path, github_repo: str, cwd: Path,
-                  home: str) -> Result[Tuple[str, str], PipelineError]:
+def submit_report(repo: Path, path: Path, github_repo: str, cwd: Path, home: str,
+                  base: str = BASE_BRANCH) -> Result[Tuple[str, str], PipelineError]:
     """Check, commit, push, open the pull request, remove the worktree.
 
     Returns the pull request's URL and a note on the worktree."""
@@ -605,7 +606,7 @@ def submit_report(repo: Path, path: Path, github_repo: str, cwd: Path,
                 .and_then(lambda _: git("-C", tree, "push", "-q", "-u", "origin", located.names.branch))
                 .and_then(lambda _: gh("api", "-X", "POST", f"repos/{github_repo}/pulls",
                                        "-f", f"title={title}", "-f", f"head={located.names.branch}",
-                                       "-f", f"base={BASE_BRANCH}", "-f", f"body={text}",
+                                       "-f", f"base={base}", "-f", f"body={text}",
                                        "--jq", ".html_url")
                           .map_err(lambda e: e.with_context(
                               note=f"{located.names.branch} is pushed; open its pull request by hand")))
@@ -649,16 +650,23 @@ def parse_arguments(argv: Sequence[str]) -> argparse.Namespace:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--repo", type=Path, default=DEFAULT_REPO,
                         help="the checkout whose origin receives the report (default: this file's)")
+    # A report stacked on a branch not yet merged (the first report, made
+    # before the template reached main, was one): new starts from it, and
+    # submit opens the pull request against it.  GitHub retargets such a
+    # pull request to main when its base merges and is deleted.
+    based = argparse.ArgumentParser(add_help=False)
+    based.add_argument("--base", default=BASE_BRANCH,
+                       help=f"the branch to start from and to merge into (default: {BASE_BRANCH})")
     parser = argparse.ArgumentParser(
         prog="field_report.py",
         description="Write and submit an agda-mcp field report as a pull request of one new file.")
     commands = parser.add_subparsers(dest="command", required=True)
-    new = commands.add_parser("new", parents=[common],
+    new = commands.add_parser("new", parents=[common, based],
                               help="make the report's worktree and file; print its path")
     new.add_argument("slug")
     new.add_argument("--date", default=datetime.date.today().isoformat(),
                      help="the report's date (default: today)")
-    submit = commands.add_parser("submit", parents=[common],
+    submit = commands.add_parser("submit", parents=[common, based],
                                  help="check, commit, push, and open the pull request")
     submit.add_argument("path", type=Path)
     submit.add_argument("--github-repo", default=None,
@@ -671,7 +679,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     options = parse_arguments(sys.argv[1:] if argv is None else argv)
     repo = options.repo.resolve()
     if options.command == "new":
-        result = names_for(options.date, options.slug).and_then(lambda n: new_report(repo, n))
+        result = names_for(options.date, options.slug).and_then(lambda n: new_report(repo, n, options.base))
         if result.is_ok:
             print(result.unwrap())
             return 0
@@ -680,7 +688,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if github_repo is None:
             print("field_report: --repo's origin is not on GitHub; pass --github-repo", file=sys.stderr)
             return 2
-        result = submit_report(repo, options.path, github_repo, Path.cwd(), str(Path.home()))
+        result = submit_report(repo, options.path, github_repo, Path.cwd(), str(Path.home()),
+                               options.base)
         if result.is_ok:
             url, note = result.unwrap()
             print(url)

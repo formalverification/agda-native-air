@@ -416,6 +416,22 @@ def test_submit_from_inside_a_private_repository(world: Dict[str, Path]) -> None
     assert submit(world, path).is_ok
 
 
+def test_a_report_stacked_on_an_unmerged_branch(world: Dict[str, Path]) -> None:
+    git("checkout", "-q", "-b", "stack", cwd=world["seed"])
+    (world["seed"] / "notes.md").write_text("not on main yet\n")
+    git("add", ".", cwd=world["seed"])
+    git("commit", "-q", "-m", "stack", cwd=world["seed"])
+    git("push", "-q", "origin", "stack", cwd=world["seed"])
+    path = new_report(world["main"], NAMES, base="stack").unwrap()
+    assert (path.parents[2] / "notes.md").exists()
+    path.write_text(report_text(), encoding="utf-8")
+    assert submit_report(world["main"], path, "test/repo", Path.cwd(), HOME, base="stack").is_ok
+    assert git("diff", "--name-status", "stack", NAMES.branch, cwd=world["origin"]) == (
+        f"A\t{NAMES.relative_path}")
+    [post] = [c for c in gh_calls(world) if c["args"][:3] == ["api", "-X", "POST"]]
+    assert "base=stack" in post["args"]
+
+
 def test_the_script_runs_by_absolute_path_from_another_repository(
         world: Dict[str, Path]) -> None:
     def run(*args: str) -> subprocess.CompletedProcess:

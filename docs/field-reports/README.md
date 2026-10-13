@@ -38,7 +38,10 @@ checkout it lives in.
     branch stays, locally and on `origin`.  A refused report names each
     problem; fix them and run `submit` again.
 
-`field_report.py index` prints a table of every report's header, newest last.
+`new` and `submit` both take `--base <branch>` (default `main`) to stack a
+report on a branch that has not merged yet; GitHub retargets its pull request
+to `main` when that branch merges and is deleted.  `field_report.py index`
+prints a table of every report's header, newest last.
 
 ## The header
 
