@@ -123,17 +123,21 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     Subject.fixedFlags(SubjectConfig.of(cliParse(base ++ List("--all")).getOrElse(fail("parse")), "s", "u")) should not contain "--add-dir"
   }
 
-  test("--prices resolves from the project root, is optional on Anthropic's endpoint, and is required on another (#237)") {
+  test("--prices resolves from the project root, and is required on another endpoint unless a resume has its own copy (#237)") {
     val repo = List("--index", "i.jsonl", "--out-dir", "out", "--run-id", "r", "--project-root", "/repo", "--all",
       "--server-bin", "b", "--agda-json-bin", "j", "--model", "m", "--corpus-stdlib", "s", "--corpus-algebras", "a")
     cliParse(repo).map(_.prices) shouldBe Right(None)                       // the harness reads Cli.defaultPrices
     cliParse(repo ++ List("--prices", "data/prices-moonshot.json")).map(_.prices.map(_.toString)) shouldBe Right(Some("/repo/data/prices-moonshot.json"))
     val moonshot = Map("ANTHROPIC_BASE_URL" -> "https://api.moonshot.ai/anthropic")
-    cliParse(repo, moonshot).left.map(_.startsWith("ANTHROPIC_BASE_URL names another host than Anthropic's: pass --prices")) shouldBe Left(true)
-    cliParse(repo ++ List("--prices", "p.json"), moonshot).isRight shouldBe true
-    cliParse(repo, Map("ANTHROPIC_BASE_URL" -> "https://api.anthropic.com/")).isRight shouldBe true
-    cliParse(List("--rejudge", "--index", "i", "--out-dir", "o", "--run-id", "r", "--project-root", ".", "--all",
-      "--server-bin", "b", "--agda-json-bin", "j"), moonshot).isRight shouldBe true   // a re-judge prices at the run's own table
+    def named(args: List[String], env: Map[String, String], ownCopy: Boolean) = AgentBench.tableNamed(cliParse(args, env).getOrElse(fail("parse")), ownCopy)
+    named(repo, moonshot, ownCopy = false).exists(_.startsWith("ANTHROPIC_BASE_URL names another host than Anthropic's: pass --prices")) shouldBe true
+    named(repo ++ List("--prices", "p.json"), moonshot, ownCopy = false) shouldBe None
+    named(repo, Map("ANTHROPIC_BASE_URL" -> "https://api.anthropic.com/"), ownCopy = false) shouldBe None
+    // A resume prices at its own copy, so it needs no --prices; without a copy it does.
+    named(repo ++ List("--resume", "on"), moonshot, ownCopy = true) shouldBe None
+    named(repo ++ List("--resume", "on"), moonshot, ownCopy = false).isDefined shouldBe true
+    named(List("--rejudge", "--index", "i", "--out-dir", "o", "--run-id", "r", "--project-root", ".", "--all",
+      "--server-bin", "b", "--agda-json-bin", "j"), moonshot, ownCopy = false) shouldBe None   // a re-judge needs no table
   }
 
   test("an unknown flag and a bad on|off value are refused by name") {

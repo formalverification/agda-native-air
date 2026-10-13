@@ -268,6 +268,9 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     Endpoint.redact("http://orin.local:11434") shouldBe "http://orin.local:11434"
     Endpoint.redact(" https://api.moonshot.ai/anthropic ") shouldBe "https://api.moonshot.ai/anthropic"
     Endpoint.redact("localhost:11434") shouldBe "unparsed"
+    // A gateway that takes its key in the path: a segment long enough to be a token is not recorded.
+    Endpoint.redact(s"https://gateway.example/v1/$credential/anthropic") shouldBe "https://gateway.example/v1/<redacted>/anthropic"
+    Endpoint.redact("https://api.moonshot.ai/anthropic/v1/") shouldBe "https://api.moonshot.ai/anthropic/v1/"
     Endpoint.redact(credential) shouldBe "unparsed"
     Endpoint.of(Map("ANTHROPIC_BASE_URL" -> s"https://$credential@h/p")).toJson.noSpaces should not include (credential)
   }

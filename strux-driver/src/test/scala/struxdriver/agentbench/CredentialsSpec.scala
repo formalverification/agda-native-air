@@ -146,4 +146,17 @@ final class CredentialsSpec extends AnyFunSuite with Matchers {
     kept.flatMap(_.hcursor.get[String]("file").toOption) shouldBe Vector("subjects/x/transcript.jsonl", "report.json")
     read(layout.leaks) should not include (token)
   }
+
+  test("the base URL's long path segments and any URL's fragment are looked for; another variable's path segments are not") {
+    val key   = "0123456789abcdef0123"
+    val creds = Credentials.of(Map(
+      "ANTHROPIC_BASE_URL" -> s"https://gateway.example/v1/$key/anthropic",
+      "NOTES_URL"          -> s"https://notes.example/page#fragment-$key",
+      "REPO_URL"           -> "https://github.com/formalverification/agda-native-air"))
+    creds.names shouldBe Vector("ANTHROPIC_BASE_URL", "NOTES_URL")
+    creds.redact(s"ANTHROPIC_BASE_URL=https://gateway.example/v1/$key/anthropic") shouldBe "ANTHROPIC_BASE_URL=<redacted:ANTHROPIC_BASE_URL>"
+    creds.redact(s"the key alone: $key") should not include (key)
+    // A repository's name in a path is ordinary text, which transcripts are full of.
+    creds.found("/home/someone/git/formalverification/agda-native-air/main") shouldBe Vector.empty
+  }
 }

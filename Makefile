@@ -1993,15 +1993,20 @@ agent-bench-it: _check-sbt
 # when the harness found a credential left in its directory
 # (credential-leaks.json), or when the directory holds the value, of 16
 # characters or more (the harness's floor), of any exported variable whose
-# name says it is a credential; the value is handed to grep on standard
-# input, never on its command line.  The run's prices.json is copied beside
+# name says it is a credential or whose value is a URL with userinfo, a
+# query, or a fragment; the value is handed to grep on standard input, never
+# on its command line.  The harness's own search, whose finding the first
+# test reads, also covers the pieces of a value and a base URL's long path
+# segments.  The run's prices.json is copied beside
 # protocol.json.
 agent-bench-archive:
 	@set -e; src="$(AGENT_BENCH_OUT_DIR)/$(AGENT_BENCH_RUN_ID)"; dst="$(AGENT_BENCH_ARCHIVE_DIR)/$(AGENT_BENCH_RUN_ID)"; \
 	test -f "$$src/report.json" || { echo "ERROR: no report.json under $$src (set AGENT_BENCH_RUN_ID)"; exit 1; }; \
 	if [ -f "$$src/credential-leaks.json" ]; then echo "ERROR: the run found credentials in its directory ($$src/credential-leaks.json): not archived"; exit 1; fi; \
-	for v in $$(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' | grep -iE 'TOKEN|KEY|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|HEADERS'); do \
+	for v in $$(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do \
 	  val=$$(printenv "$$v" || true); \
+	  case "$$v" in *[Tt][Oo][Kk][Ee][Nn]*|*[Kk][Ee][Yy]*|*[Ss][Ee][Cc][Rr][Ee][Tt]*|*[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]*|*[Pp][Aa][Ss][Ss][Ww][Dd]*|*[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll]*|*[Aa][Uu][Tt][Hh]*|*[Hh][Ee][Aa][Dd][Ee][Rr][Ss]*) ;; \
+	    *) case "$$val" in *://*@*|*://*\?*|*://*\#*) ;; *) continue;; esac;; esac; \
 	  if [ $${#val} -ge 16 ] && printenv "$$v" | grep -rqF --exclude-dir=work -f - "$$src"; then \
 	    echo "ERROR: the value of $$v occurs under $$src: not archived"; exit 1; fi; done; \
 	mkdir -p "$$dst/subjects" "$$dst/prompts"; \

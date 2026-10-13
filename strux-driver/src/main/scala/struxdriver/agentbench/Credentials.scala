@@ -28,9 +28,10 @@
   *    values looked for are its value and each whitespace-separated piece of
   *    it (a header line's token), when at least 16 characters long: a
   *    shorter value is no secret worth the false matches.  So is any
-  *    variable whose value is a URL carrying userinfo or a query (a base URL
-  *    with a key in it, a proxy with a password): the URL, its userinfo, and
-  *    its query are looked for, by the same floor.  Longer values are
+  *    variable whose value is a URL carrying userinfo, a query, or a fragment
+  *    (a base URL with a key in it, a proxy with a password), and the base URL
+  *    when a path segment is long enough to be a token: the URL and those
+  *    parts are looked for, by the same floor.  Longer values are
   *    replaced first, so a header line goes before the token inside it.
   *  - Each value is looked for in two spellings, as written and as it reads
   *    inside a JSON string (a quote or a backslash in it is escaped there,
@@ -81,16 +82,23 @@ object Credentials {
   val minLength: Int         = 16
 
   /** The secret parts of a URL: the URL itself, its userinfo and the
-    * password in it, its query and each value in it; none for a value that
-    * is no URL or carries neither.
+    * password in it, its query and each value in it, and its fragment; for
+    * the base URL also every path segment long enough to be a token (the
+    * segments the endpoint record redacts); none for a value that is no URL
+    * or carries none of them.  Path segments are looked for in the base URL
+    * alone: in another variable's URL they are ordinary names (a
+    * repository's, a directory's) that transcripts are full of.
     */
-  private def urlParts(v: String): Vector[String] =
+  private def urlParts(name: String, v: String): Vector[String] =
     scala.util.Try(new java.net.URI(v.trim)).toOption.filter(_.getScheme != null).toVector.flatMap { u =>
       val user  = Option(u.getRawUserInfo).toVector
       val query = Option(u.getRawQuery).toVector
-      if (user.isEmpty && query.isEmpty) Vector.empty
-      else Vector(v.trim) ++ user ++ user.flatMap(_.split(":", 2).drop(1)) ++ query ++
-        query.flatMap(_.split("&").toVector.flatMap(_.split("=", 2).drop(1)))
+      val frag  = Option(u.getRawFragment).toVector
+      val path  = if (name != Endpoint.baseUrlVar) Vector.empty
+                  else Option(u.getRawPath).toVector.flatMap(_.split("/").toVector.filter(_.length >= Endpoint.tokenLength))
+      val parts = user ++ user.flatMap(_.split(":", 2).drop(1)) ++ query ++
+                    query.flatMap(_.split("&").toVector.flatMap(_.split("=", 2).drop(1))) ++ frag ++ path
+      if (parts.isEmpty) Vector.empty else v.trim +: parts
     }
 
   /** A value as it is written into a JSON string. */
@@ -103,7 +111,7 @@ object Credentials {
   def of(env: Map[String, String]): Credentials =
     new Credentials(env.toVector.flatMap { case (n, v) =>
       val named = if (n.matches(credentialName)) v.trim +: v.split("\\s+").toVector else Vector.empty
-      (named ++ urlParts(v)).filter(_.length >= minLength).flatMap(s => Vector(s, inJson(s))).map(asBytes).distinct.map(n -> _)
+      (named ++ urlParts(n, v)).filter(_.length >= minLength).flatMap(s => Vector(s, inJson(s))).map(asBytes).distinct.map(n -> _)
     }.distinct.sortBy { case (n, v) => (-v.length, n) })
 
   /** Replace every value in the files that exist, and name the variables replaced. */

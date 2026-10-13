@@ -165,19 +165,21 @@ object Priced {
   */
 final case class PriceTable(path: Path, sha256: String, asOf: String, source: Option[String], models: Map[String, ModelPrice]) {
 
-  /** The key of a model's row: its own id, then the id the client priced it by. */
+  /** The key of a model's row: its own id, then the id the client priced it
+    * by, then the id without a trailing snapshot date, which is what the
+    * client's canonical id drops (`claude-haiku-4-5-20251001`); the one rule
+    * both before a run (`priceOfModelId`) and for every subject.
+    */
   def rowOf(model: String, canonical: Option[String] = None): Option[String] =
-    Some(model).filter(models.contains).orElse(canonical.filter(models.contains))
+    (Vector(model) ++ canonical.toVector :+ model.replaceAll("-[0-9]{8}$", "")).find(models.contains)
 
   def priceOf(model: String, canonical: Option[String] = None): Option[ModelPrice] =
     rowOf(model, canonical).flatMap(models.get)
 
-  /** The row a `--model` id is priced at before any subject has run: the id,
-    * or the id without a trailing snapshot date, which is what the client's
-    * own canonical id drops (`claude-haiku-4-5-20251001`).
+  /** The row a `--model` id is priced at before any subject has run, by the
+    * same rule as a subject's.
     */
-  def priceOfModelId(id: String): Option[ModelPrice] =
-    priceOf(id, Some(id.replaceAll("-[0-9]{8}$", "")))
+  def priceOfModelId(id: String): Option[ModelPrice] = priceOf(id)
 
   /** One subject's usage priced: the sum over its models, or None naming
     * every model that spent tokens and has no row.

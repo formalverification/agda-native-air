@@ -61,8 +61,12 @@ object AgentBench extends IOApp {
       // The price table every row is priced at, beside the client's figure,
       // and the run's model checked against it before anything is written
       // (issue #237; pricesPath and modelPriced below).
-      pricesAt <- IO.blocking(Files.isRegularFile(layout.prices)).map(pricesPath(cfg, _))
+      ownTable <- IO.blocking(Files.isRegularFile(layout.prices))
+      _        <- tableNamed(cfg, ownTable).fold(IO.unit)(why => IO.raiseError(new RuntimeException(why)))
+      pricesAt  = pricesPath(cfg, ownTable)
       prices   <- Pricing.load(pricesAt)
+      recorded <- TextIO.readJson(layout.protocol).map(_.flatMap(_.hcursor.downField("inputs").downField("prices").get[String]("sha256").toOption))
+      _        <- ownCopyIntact(cfg, pricesAt == layout.prices, recorded, prices).fold(IO.unit)(why => IO.raiseError(new RuntimeException(why)))
       _        <- modelPriced(cfg, prices) match {
                     case Left(refusal)   => IO.raiseError(new RuntimeException(refusal))
                     case Right(Some(w))  => IO.println(s"!! warning: $w")
@@ -164,6 +168,27 @@ object AgentBench extends IOApp {
     */
   private[agentbench] def pricesPath(cfg: AgentBenchConfig, runHasTable: Boolean): java.nio.file.Path =
     cfg.prices.getOrElse(if ((cfg.rejudge || cfg.resume) && runHasTable) cfg.layout.prices else cfg.projectRoot.resolve(Cli.defaultPrices))
+
+  /** A run on another endpoint names its own price table, since the
+    * committed one is Anthropic's list prices, not that provider's bill: a
+    * fresh run refuses to start without `--prices`; a resume needs none when
+    * the run has its own copy, which it prices at; a re-judge never needs one.
+    */
+  private[agentbench] def tableNamed(cfg: AgentBenchConfig, runHasTable: Boolean): Option[String] =
+    if (cfg.rejudge || cfg.prices.isDefined || !Endpoint.foreign(cfg.endpoint) || (cfg.resume && runHasTable)) None
+    else Some(s"${Endpoint.baseUrlVar} names another host than Anthropic's: pass --prices with that provider's prices " +
+      "(the default table is Anthropic's list prices)")
+
+  /** A re-judge that prices at the run's own copy finds it as the run
+    * recorded it: a copy whose digest is not the one `protocol.json` names
+    * is refused, since the report would carry the priced figures of a table
+    * the run never started with.  A resume compares the digest in `admit`;
+    * a re-judge given `--prices` re-prices on purpose.
+    */
+  private[agentbench] def ownCopyIntact(cfg: AgentBenchConfig, atOwnCopy: Boolean, recorded: Option[String], prices: PriceTable): Option[String] =
+    recorded.filter(d => cfg.rejudge && atOwnCopy && d != prices.sha256).map(d =>
+      s"the run's ${Layout.pricesFile} (sha256 ${prices.sha256.take(12)}) is not the table its protocol.json names " +
+        s"(sha256 ${d.take(12)}); restore it, or pass --prices to re-price at another table")
 
   /** A fresh run's model checked against its table: on another endpoint,
     * where the priced figure is the one quoted, a model with no row refuses

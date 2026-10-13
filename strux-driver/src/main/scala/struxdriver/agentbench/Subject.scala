@@ -130,9 +130,10 @@ object SubjectConfig {
   * says how the subjects authenticated (none of them: the client's own
   * login) and never with what.  It is an allowlist, so no token or key can
   * reach the record under a name nobody foresaw; and a base URL keeps only
-  * its scheme, host, port, and path, since userinfo and a query string are
-  * where a credential inside a URL would sit.  A value that is not an
-  * absolute URL is recorded as `unparsed`, never verbatim.
+  * its scheme, host, port, and path, with any path segment of 16 characters
+  * or more recorded as `<redacted>`, since userinfo, a query string, and a
+  * long path segment are where a credential inside a URL would sit.  A value
+  * that is not an absolute URL is recorded as `unparsed`, never verbatim.
   */
 final case class Endpoint(vars: Vector[(String, String)]) {
   /** The base URL when one is set, for the console lines. */
@@ -174,11 +175,23 @@ object Endpoint {
   def foreign(e: Endpoint): Boolean =
     e.baseUrl.exists(u => scala.util.Try(new java.net.URI(u).getHost).toOption.forall(h => h == null || !(h == "anthropic.com" || h.endsWith(".anthropic.com"))))
 
-  /** A base URL without its userinfo, query, and fragment. */
+  /** The length from which a path segment of a base URL may be a token,
+    * Credentials.minLength's floor.
+    */
+  val tokenLength: Int = 16
+  val redacted: String = "<redacted>"
+
+  /** A base URL without its userinfo, query, and fragment, and with every
+    * path segment long enough to be a token recorded as `<redacted>`, since
+    * some gateways take a key in the path.
+    */
   def redact(url: String): String =
     scala.util.Try(new java.net.URI(url.trim)).toOption
       .filter(u => u.getScheme != null && u.getHost != null)
-      .fold(unparsed)(u => s"${u.getScheme}://${u.getHost}${if (u.getPort >= 0) s":${u.getPort}" else ""}${Option(u.getRawPath).getOrElse("")}")
+      .fold(unparsed) { u =>
+        val path = Option(u.getRawPath).getOrElse("").split("/", -1).map(s => if (s.length >= tokenLength) redacted else s).mkString("/")
+        s"${u.getScheme}://${u.getHost}${if (u.getPort >= 0) s":${u.getPort}" else ""}$path"
+      }
 
   /** A record's endpoint block; None when it has none (every subject made before issue #237). */
   def fromJson(j: Json): Option[Endpoint] =

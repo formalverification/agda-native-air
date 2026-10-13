@@ -162,6 +162,11 @@ final class PricingSpec extends AnyFunSuite with Matchers {
     table.priceOfModelId("claude-haiku-4-5-20251001") shouldBe table.priceOf("claude-haiku-4-5")
     table.priceOfModelId("claude-opus-5-5").isDefined shouldBe true
     table.priceOfModelId("kimi-k3") shouldBe None
+    // A subject's model is looked up by the same rule as the --model id, so
+    // a dated id that passed the check before the run is priced after it.
+    val k3Table = parsed(tableJson("kimi-k3" -> goodRow)).getOrElse(fail("table"))
+    k3Table.priceOfModelId("kimi-k3-20260701").isDefined shouldBe true
+    k3Table.price(Vector(ModelUsage("kimi-k3-20260701", spent, 0.0, Some("kimi-k3-20260701"), None, Some("unknown")))).usd.isDefined shouldBe true
   }
 
   test("a row is priced from its result record's modelUsage, and left unpriced, with the reason, without a result record or without modelUsage") {
@@ -261,5 +266,14 @@ final class PricingSpec extends AnyFunSuite with Matchers {
     AgentBench.modelPriced(cfg(Map.empty, "--model", "claude-next"), table).map(_.exists(_.startsWith("--model claude-next has no row"))) shouldBe Right(true)
     AgentBench.modelPriced(cfg(moon, "--model", "kimi-k3", "--prices", "p.json"), table).left.map(_.startsWith("--model kimi-k3 has no row")) shouldBe Left(true)
     AgentBench.modelPriced(cfg(moon, "--rejudge"), table) shouldBe Right(None)
+  }
+
+  test("a re-judge at the run's own copy finds it as the protocol recorded it; one given --prices re-prices on purpose") {
+    def cfg(extra: String*) = Cli.parse(pricesArgs ++ extra, Map.empty).getOrElse(fail("parse"))
+    AgentBench.ownCopyIntact(cfg("--rejudge"), atOwnCopy = true, Some(table.sha256), table) shouldBe None
+    AgentBench.ownCopyIntact(cfg("--rejudge"), atOwnCopy = true, Some("0" * 64), table).exists(_.startsWith("the run's prices.json")) shouldBe true
+    AgentBench.ownCopyIntact(cfg("--rejudge", "--prices", "fixed.json"), atOwnCopy = false, Some("0" * 64), table) shouldBe None
+    AgentBench.ownCopyIntact(cfg("--rejudge"), atOwnCopy = true, None, table) shouldBe None                  // a run before #237 recorded none
+    AgentBench.ownCopyIntact(cfg("--model", "m", "--resume", "on"), atOwnCopy = true, Some("0" * 64), table) shouldBe None   // admit compares a resume's
   }
 }

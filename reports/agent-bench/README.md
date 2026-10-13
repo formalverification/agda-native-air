@@ -80,8 +80,10 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    credential point it at another provider's Anthropic-compatible endpoint
    (Moonshot's for Kimi K3, [#238]; an Ollama server for a local model,
    [#240]).  `protocol.json` and each `subject.json` record it as an
-   `endpoint` block: `ANTHROPIC_BASE_URL` (its scheme, host, port, and path;
-   `absent` when it is unset or empty, the client's default, Anthropic's API;
+   `endpoint` block: `ANTHROPIC_BASE_URL` (its scheme, host, port, and path,
+   with any path segment of 16 characters or more, where a gateway might
+   carry a key, as `<redacted>`; `absent` when it is unset or empty, the
+   client's default, Anthropic's API;
    `unparsed` when it is no absolute URL, which is never recorded verbatim and
    counts as another host); the client's model variables (`ANTHROPIC_MODEL`,
    `ANTHROPIC_SMALL_FAST_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`) when set; and
@@ -110,18 +112,23 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    variables in `run.json` (`redacted`) and the row's `outcome.json`
    (`credentialsRedacted`).  A credential is a variable whose name contains
    TOKEN, KEY, SECRET, PASSWORD, PASSWD, CREDENTIAL, AUTH, or HEADERS, in any
-   case, or whose value is a URL carrying userinfo or a query (a base URL with
-   a key in it, a proxy with a password); its value, each whitespace-separated
-   piece of it, and a URL's userinfo and query are looked for when at least
-   16 characters long, as written and as they read inside a JSON string.
+   case, or whose value is a URL carrying userinfo, a query, or a fragment (a
+   base URL with a key in it, a proxy with a password), and the base URL when
+   a path segment is long enough to be a token; its value, each
+   whitespace-separated piece of it, and those parts of a URL are looked for
+   when at least 16 characters long, as written and as they read inside a
+   JSON string.  Path segments count in the base URL alone: elsewhere they are
+   ordinary names, a repository's or a directory's, that transcripts are full
+   of.
    When the report is written, the harness searches the run directory (the
    work copies aside, which are never archived) for every value, and if one
    is left it fails the run, naming the variable and the file, and adds them
    to `credential-leaks.json`, which no later run removes: the operator does,
    once the files it names are checked.  `make agent-bench-archive` refuses a
    run directory that has that file, or that holds the value of any exported
-   variable a credential's name rule picks out (handed to `grep` on standard
-   input, never on its command line).
+   variable whose name says it is a credential or whose value is a URL with
+   userinfo, a query, or a fragment (handed to `grep` on standard input, never
+   on its command line).
 +  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own list-price
    accounting, per subject; three subjects at a time, so wall clocks are
    indicative only.  The cost cap stays the client's, on its own figure
@@ -170,7 +177,8 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    it in `protocol.json` by that name and its digest; a re-judge and a resume
    price at that copy (the committed table, for a run made before it
    existed) unless given another, so a row added to the committed table never
-   stops a run in flight, and a resume under a different table is refused.
+   stops a run in flight; a resume under a different table is refused, and so
+   is a re-judge at a copy whose digest is not the one `protocol.json` names.
    The report's `pricing` block names the table that priced it and carries
    the rates of every row it used, so its figures can be recomputed from it
    alone.  A row with no figure (a wall-cap kill or a crash leaves no result
@@ -182,7 +190,8 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    twice for them, since the client's counts are priced as reported.  A run on
    another endpoint names its own table (a fresh run whose model has no row
    in it is refused; on Anthropic's endpoint it is a warning, and the rows
-   come out unpriced), and its figure is checked against the provider's usage
+   come out unpriced; a resume of such a run prices at its own copy and needs
+   no `--prices`), and its figure is checked against the provider's usage
    page by the per-model counts in `pricing.byModel` and each subject's
    `startedAt`.
 +  **Judge**.  Every fact about the final file is Agda's own answer, asked
