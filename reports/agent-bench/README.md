@@ -129,15 +129,17 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    figure, which would mean reading the stream as it is written and killing
    a subject mid-turn ([#237]).  On Anthropic's API the client's figure is the
    list price.  For a model the client has no price for, it prices the tokens
-   at its own default model's rates and marks the figure
-   `costBasis: "unknown"`, which client 2.1.282 describes as "a guess at the
-   default model's rate"; on that client the default was Claude Fable 5.1,
-   at USD 10 and 50 per million input and output tokens (measured on
-   [#236]'s cost pair, an exact fit).  The cap is then a token budget at
-   those rates, tighter than an Opus 5 arm's: the most expensive subject of
+   at what it calls its default model's rate and marks the figure
+   `costBasis: "unknown"` ("a guess at the default model's rate", in client
+   2.1.282's words).  That rate is not one the run chooses, nor a fixed one:
+   on one client and one account, [#236]'s 83 Sonnet 5.5 subjects were
+   priced at Claude Fable 5.1's rates (USD 10 and 50 per million input and
+   output tokens) on 79 rows and at Claude Opus 5.5's (4 and 20) on the
+   other 4, each to the micro-dollar.  The cap is then a token budget at an
+   unknown rate, as tight as Fable 5.1's: the most expensive subject of
    `hard219-opus5-mcp-1`, USD 2.06 at Opus 5's prices, would count 3.19
-   against it, over the cap, and 14.41 on an endpoint that reports every
-   prompt token as uncached input.  So an arm on another endpoint reads its
+   against it at Fable 5.1's, over the cap, and 14.41 on an endpoint that
+   reports every prompt token as uncached input.  So an arm on another endpoint reads its
    cost pair's token counts first and sets `--max-budget-usd` high enough
    that the turn and wall caps are the ones that bind (the value is in its
    protocol like any cap), and the report's `pricing.clientCostBasis` says
