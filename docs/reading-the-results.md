@@ -269,6 +269,14 @@ Every run below reported zero anomalies.  Run ids are the harness's own;
 2026-09-29 had the fixture headers' hints in view; the runs of that day
 (`suite219-*`, `hard219-*`, and the composition tier's `comp-*`) had none,
 and where the two differ, the header-free number is the one quoted (§ 4.6).
+A USD figure is the client's own arithmetic over a run's tokens at
+Anthropic's list prices (`totals.costUsd`).  Every run below ran on
+Anthropic's API, where that figure is what the run cost at list prices: it
+equals the run's tokens priced at the committed table, which the reports
+predate but `PricingSpec` checks against every transcript ([#237]).  For a
+run served by another provider's endpoint the client's figure is a guess,
+and the figure quoted is the report's priced one, `totals.pricedCostUsd`,
+at the table the run names, beside the provider's usage page.
 
 ### 4.1  The loop
 
@@ -1076,4 +1084,5 @@ or weaker subjects; this tier's twelve cannot tell the tools apart.
 [#221]: https://github.com/formalverification/agda-native-air/pull/221
 [#205]: https://github.com/formalverification/agda-native-air/issues/205
 [#206]: https://github.com/formalverification/agda-native-air/issues/206
+[#237]: https://github.com/formalverification/agda-native-air/issues/237
 [`reports/auto-floor/`]: ../reports/auto-floor/README.md

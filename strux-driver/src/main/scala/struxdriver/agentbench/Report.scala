@@ -9,8 +9,8 @@
   *  -------
   *  The run's outputs (issue #154), in the loop's shape so the two
   *  instruments read side by side: `report.json` (runId, timestamp, config,
-  *  corpora, obligations, totals, perTier, perStratum, perTool, perShell,
-  *  perVia, outcomes),
+  *  corpora, pricing, obligations, totals, perTier, perStratum, perTool,
+  *  perShell, perVia, outcomes),
   *  `results.jsonl` (one eval-proof-completion.v0 row per fill_hole probe),
   *  `fixtures.jsonl` (one per obligation), and the console summary.  The
   *  config block records the protocol (every cap and client flag, the
@@ -32,6 +32,18 @@
   *  in view before the subject's last edit (OriginalInView.scala).  A slice
   *  with no row that names an original (the stdlib strata) has nothing to
   *  count and reports `null`, never 0.
+  *
+  *  The priced cost (issue #237).  Beside the client's `costUsd`, every slice
+  *  carries `pricedCostUsd`, the sum of its rows' priced figures (Outcomes,
+  *  Pricing.scala), and `unpricedRows`, how many rows had none, so a total
+  *  never silently leaves a row out: with any unpriced row it is a lower
+  *  bound.  The `pricing` block names the table that priced this report
+  *  (path, digest, date, and the rates of the rows used; a re-judge prices
+  *  at the run's own copy unless it is given another), the run's tokens and
+  *  both figures per model with the row that priced it, the models no row
+  *  priced, how many rows have no figure, and the client's own price bases
+  *  (`list`, `managed`, `unknown`), which say whether its `costUsd` was a
+  *  list price or a guess.
   *
   *  ============================================================================
   */
@@ -68,7 +80,39 @@ object Report {
       "turns"     -> sel.map(_.turns).sum.asJson,
       "toolCalls" -> sel.map(_.toolCallsTotal).sum.asJson,
       "wallMs"    -> sel.map(_.wallMs).sum.asJson,
-      "costUsd"   -> Scaffold.round3(sel.map(_.costUsd).sum).asJson
+      "costUsd"   -> Scaffold.round3(sel.map(_.costUsd).sum).asJson,
+      "pricedCostUsd" -> Pricing.round3(pricedTotal(sel).usd).asJson,
+      "unpricedRows"  -> pricedTotal(sel).unpricedRows.asJson
+    )
+  }
+
+  /** A slice's priced cost: the sum over its priced rows, and how many had none. */
+  private def pricedTotal(sel: Vector[Outcome]): Priced.Total = Priced.total(sel.map(_.priced))
+
+  /** The `pricing` block: the table with the rates of the rows used, then
+    * per model the run's tokens, the client's figure, the priced one (null
+    * for a model with no row), and the row that priced it; the models no row
+    * priced, how many rows have no figure, and the price bases the client
+    * reported.  These are the counts to check against a provider's usage
+    * page: the report's `tokens` is the main loop's `usage` block, which can
+    * miss calls.
+    */
+  private[agentbench] def pricing(outcomes: Vector[Outcome], prices: PriceTable): Json = {
+    val usages = outcomes.flatMap(_.usageByModel)
+    val byModel = ModelUsage.totals(usages).map { case (m, tokens, client) =>
+      val row = usages.find(_.model == m).flatMap(u => prices.rowOf(m, u.canonical))
+      m -> Json.fromFields(tokens.fields ++ Vector(
+        "costUsd"       -> Scaffold.round3(client).asJson,
+        "pricedCostUsd" -> (if (tokens.isZero) Some(BigDecimal(0)) else row.map(r => prices.models(r).cost(tokens))).map(Pricing.round3).asJson,
+        "pricedAs"      -> row.asJson))
+    }
+    val used = usages.flatMap(u => prices.rowOf(u.model, u.canonical))
+    Json.obj(
+      "prices"          -> prices.toJson(used),
+      "byModel"         -> Json.obj(byModel: _*),
+      "unpricedModels"  -> outcomes.flatMap(_.priced.models).distinct.asJson,
+      "unpricedRows"    -> outcomes.count(!_.priced.isPriced).asJson,
+      "clientCostBasis" -> usages.flatMap(_.costBasis).distinct.sorted.asJson
     )
   }
 
@@ -124,7 +168,8 @@ object Report {
     driven:         Vector[Judged],
     corpora:        Json,
     protocol:       Json,
-    previousConfig: Option[Json]
+    previousConfig: Option[Json],
+    prices:         PriceTable
   ): IO[Unit] = {
     val layout   = cfg.layout
     val outcomes = driven.map(_.outcome)
@@ -140,6 +185,7 @@ object Report {
       "rejudged"      -> cfg.rejudge.asJson,
       "config"        -> config,
       "corpora"       -> corpora,
+      "pricing"       -> pricing(outcomes, prices),
       "obligations"   -> entries.size.asJson,
       "totals"        -> block(outcomes),
       "perTier"       -> Json.obj(tiers.map(t => t -> block(outcomes.filter(_.entry.difficulty.tag == t))): _*),
@@ -154,28 +200,35 @@ object Report {
       _ <- Scaffold.writeJsonl(layout.results, driven.flatMap(_.attempts).map(_.toJson))
       _ <- Scaffold.writeJsonl(layout.fixtures, driven.map(_.fixtureRow))
       _ <- TextIO.write(layout.report, report.spaces2)
-      _ <- IO.println(summarize(cfg, config.hcursor.get[String]("arm").getOrElse(cfg.arm.name), outcomes))
+      _ <- IO.println(summarize(cfg, config.hcursor.get[String]("arm").getOrElse(cfg.arm.name), endpointOf(config), outcomes, prices))
       _ <- IO.println(s">> wrote ${layout.report}")
     } yield ()
   }
 
-  private def summarize(cfg: AgentBenchConfig, arm: String, outcomes: Vector[Outcome]): String = {
+  /** The base URL a report's config names, when the run had one (issue #237). */
+  private def endpointOf(config: Json): Option[String] =
+    config.hcursor.downField("endpoint").get[String](Endpoint.baseUrlVar).toOption.filter(_ != Endpoint.absent)
+
+  private def summarize(cfg: AgentBenchConfig, arm: String, endpoint: Option[String], outcomes: Vector[Outcome], prices: PriceTable): String = {
     def line(label: String, sel: Vector[Outcome]) =
-      f"$label%-26s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  ${sel.count(_.restated)}%2d restated  ${originalInView(sel).fold("-")(_.toString)}%2s original in view  ${sel.count(_.anomaly.isDefined)}%2d anomaly  turns=${sel.map(_.turns).sum}%4d calls=${sel.map(_.toolCallsTotal).sum}%4d cost=$$${sel.map(_.costUsd).sum}%.2f"
+      f"$label%-26s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  ${sel.count(_.restated)}%2d restated  ${originalInView(sel).fold("-")(_.toString)}%2s original in view  ${sel.count(_.anomaly.isDefined)}%2d anomaly  turns=${sel.map(_.turns).sum}%4d calls=${sel.map(_.toolCallsTotal).sum}%4d cost=$$${sel.map(_.costUsd).sum}%.2f priced=$$${pricedTotal(sel).usd.toDouble}%.2f${pricedTotal(sel).unpricedRows match { case 0 => ""; case n => s" (+$n unpriced)" }}"
     val byTier    = tiers.map(t => line(t, outcomes.filter(_.entry.difficulty.tag == t)))
     val byStratum = outcomes.map(_.stratum).distinct.map(s => line(s, outcomes.filter(_.stratum == s)))
     val tools     = perTool(outcomes).map { case (n, k) => s"$n=$k" }.mkString(" ")
     val shell     = perShell(outcomes).map { case (n, k) => s"$n=$k" }.mkString(" ")
     val via       = perVia(outcomes, _.via).map { case (n, k) => s"$n=$k" }.mkString(" ")
     val verdict   = perVia(outcomes, _.verdictVia).map { case (n, k) => s"$n=$k" }.mkString(" ")
+    val unpriced  = outcomes.flatMap(_.priced.models).distinct
+    val bases     = outcomes.flatMap(_.usageByModel.flatMap(_.costBasis)).distinct.sorted
     s"""
-       |== agent-bench (arm=$arm model=${cfg.model.getOrElse("?")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} safe=${cfg.safe}) ==
+       |== agent-bench (arm=$arm model=${cfg.model.getOrElse("?")}${endpoint.fold("")(u => s" endpoint=$u")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} safe=${cfg.safe}) ==
        |${byTier.mkString("\n")}
        |${byStratum.mkString("\n")}
        |${line("total", outcomes)}
        |tools: $tools
        |shell: ${if (shell.isEmpty) "(none)" else shell}
        |via:   ${if (via.isEmpty) "(none)" else via}   verdict via: ${if (verdict.isEmpty) "(none)" else verdict}
+       |priced at ${prices.path} (${prices.asOf})${if (unpriced.isEmpty) "" else s"; no price for ${unpriced.mkString(", ")}"}; the client's cost basis: ${if (bases.isEmpty) "(none reported)" else bases.mkString(", ")}
        |""".stripMargin
   }
 }

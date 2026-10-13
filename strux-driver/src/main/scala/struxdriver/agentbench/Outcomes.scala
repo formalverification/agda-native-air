@@ -30,6 +30,20 @@
   *  harness's, which are the libraries the judge checks the file against.  It
   *  is a column, not a gate: `solved`, `restated`, and `gate` never read it.
   *
+  *  The priced cost (issue #237).  Beside the client's `costUsd`, which is
+  *  kept as the client reported it, a row carries `pricedCostUsd`, what each
+  *  model the session called spent priced at the run's table (Pricing.scala),
+  *  and `usageByModel`, the counts it was priced from with the row that
+  *  priced each, so the figure can be recomputed from the report alone (its
+  *  `pricing` block carries those rows' rates).  A
+  *  row the table cannot price has a null figure and says why in `unpriced`
+  *  (a model with no row, named in `unpricedModels`; no result record, as
+  *  from a wall-cap kill or a crash; no `modelUsage`); like `original`, the
+  *  null states something, so it is kept rather than dropped.  What the flat
+  *  table cannot price exactly is named in `pricingCaveats`, and the
+  *  credential variables found and replaced in what the subject wrote
+  *  (Credentials.scala) in `credentialsRedacted`.
+  *
   *  Anomaly rules
   *  -------------
   *  A row is an anomaly, not a result, when the subject never had the
@@ -94,14 +108,20 @@ final case class Outcome(
   transcriptPath:    Option[String],
   lastWords:         String,
   rateLimit:         Option[Json],
-  original:          Option[OriginalReading]
+  original:          Option[OriginalReading],
+  usageByModel:      Vector[ModelUsage],
+  priced:            Priced,
+  pricingCaveats:    Vector[String],
+  redacted:          Vector[String]
 ) {
   def stratum: String = LoopOutcome.stratumOf(entry.source, entry.tags)
   def toolCallsTotal: Int = toolCalls.map(_._2).sum
   /** Solved with the original's proof in view before the last edit (issue #188). */
   def solvedOriginalInView: Boolean = solved && original.exists(_.seen)
   // An absent value is dropped, except `original`, whose null states that the
-  // row names no original (issue #188), which is not the same as `false`.
+  // row names no original (issue #188), which is not the same as `false`, and
+  // `pricedCostUsd`, whose null states that the row could not be priced
+  // (issue #237), which is not the same as free.
   def toJson: Json = Json.fromFields(Vector(
     "benchmarkId"         -> entry.id.asJson,
     "difficulty"          -> entry.difficulty.tag.asJson,
@@ -123,7 +143,13 @@ final case class Outcome(
     "toolCallsTotal"      -> toolCallsTotal.asJson,
     "wallMs"              -> wallMs.asJson,
     "costUsd"             -> costUsd.asJson,
+    "pricedCostUsd"       -> priced.usd.asJson,
+    "unpriced"            -> priced.unpriced.asJson,
+    "unpricedModels"      -> (if (priced.models.isEmpty) Json.Null else priced.models.asJson),
+    "pricingCaveats"      -> (if (pricingCaveats.isEmpty) Json.Null else pricingCaveats.asJson),
     "tokens"              -> tokens,
+    "usageByModel"        -> Pricing.byModelJson(usageByModel, priced.pricedAs),
+    "credentialsRedacted" -> (if (redacted.isEmpty) Json.Null else redacted.asJson),
     "permissionDenials"   -> permissionDenials.asJson,
     "isolation"           -> isolation.map(_.toJson).asJson,
     "via"                 -> via.asJson,
@@ -141,18 +167,21 @@ final case class Outcome(
     "transcriptPath"      -> transcriptPath.asJson,
     "lastWords"           -> lastWords.asJson,
     "rateLimit"           -> rateLimit.asJson
-  ).filter { case (k, v) => k == "original" || !v.isNull })
+  ).filter { case (k, v) => k == "original" || k == "pricedCostUsd" || !v.isNull })
 }
 
 object Outcome {
   /** A row the harness could not judge at all: nothing was read, so a row
-    * with an original carries a block whose reading was never made.
+    * with an original carries a block whose reading was never made, and its
+    * priced cost is what the caller knows (`spent`): nothing for a subject
+    * that never spawned, unread otherwise.
     */
-  def anomaly(entry: IndexEntry, msg: String, wallMs: Long): Outcome =
+  def anomaly(entry: IndexEntry, msg: String, wallMs: Long, spent: Priced): Outcome =
     Outcome(entry, solved = false, restated = false, None, Vector.empty, Vector.empty, "anomaly", 0, Vector.empty,
       wallMs, 0.0, Json.obj(), 0, None, "none", "none", None, None, None, None, Vector.empty, None,
       "unavailable: anomaly", Some(msg), None, None, "", None,
-      if (Gates.originalOf(entry.module, entry.hole, entry.tags).tagged) Some(OriginalReading.unread(None)) else None)
+      if (Gates.originalOf(entry.module, entry.hole, entry.tags).tagged) Some(OriginalReading.unread(None)) else None,
+      Vector.empty, spent, Vector.empty, Vector.empty)
 }
 
 /** One obligation's three outputs: the report outcome, the fixtures.jsonl row, the results.jsonl rows. */
@@ -187,8 +216,8 @@ object Outcomes {
   def judged(layout: RunLayout, o: Outcome, rows: Vector[AttemptRow]): Judged =
     Judged(o, fixtureRow(layout, o), rows)
 
-  def anomaly(layout: RunLayout, entry: IndexEntry, msg: String): Judged =
-    judged(layout, Outcome.anomaly(entry, msg, 0L), Vector.empty)
+  def anomaly(layout: RunLayout, entry: IndexEntry, msg: String, spent: Priced): Judged =
+    judged(layout, Outcome.anomaly(entry, msg, 0L, spent), Vector.empty)
 
   /** The anomaly rules of the header, first that applies. */
   def anomalyOf(t: Transcript, iso: Isolation, verdict: Verdict, terminal: String): Option[String] = {
@@ -244,11 +273,12 @@ object Outcomes {
     }
   }
 
-  /** Judge one archived subject: transcript, isolation, gates, outcome, and
-    * the original in view.  `libraryRoots` are the harness's own read roots,
-    * used only for an archive whose record names none.
+  /** Judge one archived subject: transcript, isolation, gates, outcome, the
+    * original in view, and the cost priced at `prices`.  `libraryRoots` are
+    * the harness's own read roots, used only for an archive whose record
+    * names none.
     */
-  def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry, agda: Agda, libraryRoots: Vector[Path]): IO[Judged] = {
+  def judgeOne(cfg: AgentBenchConfig, entry: IndexEntry, agda: Agda, libraryRoots: Vector[Path], prices: PriceTable): IO[Judged] = {
     val layout    = cfg.layout
     val subj      = layout.subject(entry.id)
     val stem      = Scaffold.fixtureStem(entry)
@@ -288,6 +318,9 @@ object Outcomes {
       solved      = anomaly.isEmpty && gate.isEmpty && verdict.solved
       restated    = anomaly.isEmpty && gate.isEmpty && verdict.restated
       reading    <- originalReading(entry, t, roots, libraryRoots)
+      usages      = t.result.map(_.modelUsage).getOrElse(Vector.empty)
+      priced      = Pricing.ofResult(t.result, prices)
+      redacted    = record.map(_.redacted).getOrElse(Vector.empty)
       outcome     = Outcome(
         entry             = entry,
         solved            = solved,
@@ -319,7 +352,11 @@ object Outcomes {
         rateLimit         = t.rateLimitMax.map(u => Json.obj(
                               "maxUtilization" -> u.asJson,
                               "statuses"       -> t.rateLimits.map(_._1).distinct.asJson)),
-        original          = reading
+        original          = reading,
+        usageByModel      = usages,
+        priced            = priced,
+        pricingCaveats    = t.result.map(r => Pricing.caveats(r.usage)).getOrElse(Vector.empty),
+        redacted          = redacted
       )
       _          <- if (solved) IO.blocking {
                       Files.createDirectories(layout.solved)
@@ -331,7 +368,7 @@ object Outcomes {
                       case Some(false) => "unseen"
                       case None        => "unread"
                     }))
-      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}")
+      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f priced=${priced.usd.fold("?")(u => f"$$${u.toDouble}%.3f")} terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}${if (redacted.isEmpty) "" else s"  CREDENTIALS REDACTED: ${redacted.mkString(",")}"}")
     } yield judged(layout, outcome, Audit.attemptRows(entry, workDir.resolve(s"$stem.agda"), t, subj.transcriptRel))
   }
 }
