@@ -6,7 +6,8 @@
 # Description:
 #   Prove that scripts/run-server.sh anchors the server where the client
 #   started it (issue #242), through the real launcher and the real
-#   `nix develop` it enters.
+#   `nix develop` it enters, and that it runs a prebuilt server without the
+#   shell when the registration names the server and its Agda (issue #249).
 #
 #   Claude Code expands ${PWD} in a registration's arguments, so every
 #   registration that passes --cwd ${PWD} works there; a client that expands
@@ -38,19 +39,32 @@
 #     other-var        from the client, --cwd '${CLAUDE_PROJECT_DIR}': not
 #                      substituted, named by the launcher on stderr, and
 #                      refused by the server before it starts
+#     fast-path        from the client, AGDA_MCP_BIN naming the built server
+#                      and --agda-bin '${PWD}/.agda/bin/agda', as
+#                      claude-tooling's lean2agda registration writes it
+#                      (issue #249): the launcher runs the server without
+#                      the shell, after the same substitution
+#     bin-dir          AGDA_MCP_BIN naming a directory, with --agda-bin: refused
+#                      by name, with the shell's wording
+#     bin-dir-shell    the same without --agda-bin, which would enter the
+#                      shell: refused by name before it does
 #
-#   The first four must answer check_project from the client: the gate
-#   searched from the client root, found the client's own Makefile, and ran
-#   there.  A launcher anchored at this repository instead finds no Makefile
-#   declaring the target and fails the call by name, so a regression runs
-#   nothing of this repository's.
+#   The first four, and fast-path, must answer check_project from the client:
+#   the gate searched from the client root, found the client's own Makefile,
+#   and ran there.  A launcher anchored at this repository instead finds no
+#   Makefile declaring the target and fails the call by name, so a regression
+#   runs nothing of this repository's.  The last three run with a `nix` first
+#   on PATH that names itself and fails, so a launcher that entered the shell
+#   on any of them fails the case.
 #
 # Usage:
 #   scripts/run-server-smoke.sh
 #
 #   Needs nix, python3, and a built server (`make agda-mcp-launcher-smoke`
-#   builds it first), or AGDA_MCP_BIN naming one.  Each case is one entry of
-#   the backend shell, a few seconds when the shell is already built.
+#   builds it first), or AGDA_MCP_BIN naming one; fast-path runs AGDA_MCP_BIN
+#   when it is set and otherwise the newest build under agda-mcp/dist-newstyle.
+#   Each of the first five cases is one entry of the backend shell, a few
+#   seconds when the shell is already built; the last three take milliseconds.
 #
 # Design notes:
 #   + Every assertion is made in Python over the parsed responses: a tool
@@ -81,13 +95,41 @@ cat > "${WORK}/requests.jsonl" <<'JSON'
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"check_project","arguments":{"target":"launcher-smoke","verbose":true}}}
 JSON
 
-# launch CASE DIR ARGS...: start the launcher from DIR with ARGS, keeping its
+# The server fast-path runs: the override if the caller set one, else the
+# newest regular, executable build (the glob the launcher's own warning uses).
+FAST_BIN="${AGDA_MCP_BIN:-}"
+if [ -z "$FAST_BIN" ]; then
+  for candidate in "${REPO_ROOT}"/agda-mcp/dist-newstyle/build/*/ghc-*/agda-mcp-*/x/agda-mcp/build/agda-mcp/agda-mcp; do
+    if [ -f "$candidate" ] && [ -x "$candidate" ] && { [ -z "$FAST_BIN" ] || [ "$candidate" -nt "$FAST_BIN" ]; }; then
+      FAST_BIN="$candidate"
+    fi
+  done
+fi
+if [ -z "$FAST_BIN" ]; then
+  echo "run-server-smoke: no built server under ${REPO_ROOT}/agda-mcp/dist-newstyle and no AGDA_MCP_BIN; run make agda-mcp-launcher-smoke, which builds it" >&2
+  exit 1
+fi
+
+# A `nix` that says it was called and fails: first on PATH for the cases the
+# launcher must finish without the shell.
+mkdir -p "${WORK}/no-nix"
+printf '#!/bin/sh\necho "run-server-smoke: nix was called" >&2\nexit 97\n' > "${WORK}/no-nix/nix"
+chmod +x "${WORK}/no-nix/nix"
+NO_NIX_PATH="${WORK}/no-nix:${PATH}"
+
+# launch CASE DIR ARGS...: start the launcher from DIR with ARGS, and with the
+# NAME=VALUE assignments in LAUNCH_ENV added to its environment, keeping its
 # stdout, stderr, and exit status under $WORK/CASE.*.
+LAUNCH_ENV=()
 launch() {
-  local name="$1" dir="$2"
+  local name="$1" dir="$2" pair shown=()
   shift 2
-  echo "run-server-smoke: ${name}: from ${dir}, args: $*"
-  if (cd "$dir" && "$LAUNCHER" "$@" --check-timeout 60 \
+  # A long value is shown to its first colon: PATH as the entry put first.
+  for pair in "${LAUNCH_ENV[@]}"; do
+    case "$pair" in *:*) shown+=("${pair%%:*}:...") ;; *) shown+=("$pair") ;; esac
+  done
+  echo "run-server-smoke: ${name}: from ${dir}, ${shown[*]:+env: ${shown[*]}, }args: $*"
+  if (cd "$dir" && env "${LAUNCH_ENV[@]}" "$LAUNCHER" "$@" --check-timeout 60 \
         < "${WORK}/requests.jsonl" > "${WORK}/${name}.out" 2> "${WORK}/${name}.err"); then
     echo 0 > "${WORK}/${name}.status"
   else
@@ -101,10 +143,17 @@ launch no-cwd          "$CLIENT"
 launch explicit-cwd    "$ELSEWHERE" --cwd "$CLIENT"
 launch other-var       "$CLIENT"    --cwd '${CLAUDE_PROJECT_DIR}'
 
-python3 - "$WORK" "$CLIENT" <<'PY'
+LAUNCH_ENV=(AGDA_MCP_BIN="$FAST_BIN" PATH="$NO_NIX_PATH")
+launch fast-path       "$CLIENT"    --cwd '${PWD}' --agda-bin '${PWD}/.agda/bin/agda' --agda-flags '-i ${PWD}/src'
+LAUNCH_ENV=(AGDA_MCP_BIN="$ELSEWHERE" PATH="$NO_NIX_PATH")
+launch bin-dir         "$CLIENT"    --cwd '${PWD}' --agda-bin '${PWD}/.agda/bin/agda'
+launch bin-dir-shell   "$CLIENT"    --cwd '${PWD}'
+LAUNCH_ENV=()
+
+python3 - "$WORK" "$CLIENT" "$ELSEWHERE" <<'PY'
 import json, os, sys
 
-work, client = sys.argv[1], sys.argv[2]
+work, client, elsewhere = sys.argv[1], sys.argv[2], sys.argv[3]
 failures = []
 
 def read(name, ext):
@@ -150,18 +199,49 @@ def anchored_at_client(name):
         return fail(name, "; ".join(bad) + f"\n{json.dumps(a, indent=2)[:2000]}")
     print(f"run-server-smoke: ok {name}: check_project ran the client's gate in {client}")
 
-for name in ["dollar-pwd", "dollar-pwd-dflt", "no-cwd", "explicit-cwd"]:
+for name in ["dollar-pwd", "dollar-pwd-dflt", "no-cwd", "explicit-cwd", "fast-path"]:
     anchored_at_client(name)
 
 # ${PWD} inside a longer argument is substituted too.  (The server splits
 # --agda-flags on whitespace, so a path with a space would not survive as a
 # flag; the banner joins the words with single spaces, which is what this
 # compares, and the check is about the substitution, not the flag.)
-name = "dollar-pwd"
-if f"flags: -i {client}/src\n" not in read(name, "err"):
-    fail(name, f"the banner does not show --agda-flags with ${{PWD}} substituted ({client}/src)")
+for name in ["dollar-pwd", "fast-path"]:
+    if f"flags: -i {client}/src\n" not in read(name, "err"):
+        fail(name, f"the banner does not show --agda-flags with ${{PWD}} substituted ({client}/src)")
+    else:
+        print(f"run-server-smoke: ok {name}: ${{PWD}} inside --agda-flags became {client}/src")
+
+# The fast path: --agda-bin substituted (the condition is read after the
+# substitution), and the shell never entered.
+name = "fast-path"
+err = read(name, "err")
+checks = [
+    (f"(agda-bin: {client}/.agda/bin/agda)\n" in err, "the banner does not show --agda-bin with ${PWD} substituted"),
+    ("run-server-smoke: nix was called" not in err, "the launcher entered the shell"),
+]
+bad = [why for ok, why in checks if not ok]
+if bad:
+    fail(name, "; ".join(bad))
 else:
-    print(f"run-server-smoke: ok {name}: ${{PWD}} inside --agda-flags became {client}/src")
+    print(f"run-server-smoke: ok {name}: the server ran without the shell, --agda-bin {client}/.agda/bin/agda")
+
+# An AGDA_MCP_BIN that is not an executable file: refused by name, with the
+# shell path's wording, before the shell, on either path.
+for name in ["bin-dir", "bin-dir-shell"]:
+    err = read(name, "err")
+    checks = [
+        (read(name, "status").strip() != "0", "the launcher exited 0"),
+        (f"agda-mcp: server binary is not an executable file: {elsewhere}\n" in err, "the launcher did not name the override"),
+        ("agda-mcp: or point AGDA_MCP_BIN at a prebuilt agda-mcp binary.\n" in err, "the message lacks the override hint"),
+        ("run-server-smoke: nix was called" not in err, "the launcher entered the shell first"),
+        (read(name, "out") == "", "the launcher wrote to stdout"),
+    ]
+    bad = [why for ok, why in checks if not ok]
+    if bad:
+        fail(name, "; ".join(bad))
+    else:
+        print(f"run-server-smoke: ok {name}: AGDA_MCP_BIN naming a directory refused by name, before the shell")
 
 name = "other-var"
 err = read(name, "err")
@@ -178,7 +258,7 @@ else:
     print(f"run-server-smoke: ok {name}: named by the launcher and refused by the server")
 
 if failures:
-    print(f"run-server-smoke: FAILED: {', '.join(failures)}", file=sys.stderr)
+    print(f"run-server-smoke: FAILED: {', '.join(dict.fromkeys(failures))}", file=sys.stderr)
     raise SystemExit(1)
-print("run-server-smoke: OK: the launcher anchors the server where the client started it")
+print("run-server-smoke: OK: the launcher anchors the server where the client started it, through the shell and without it")
 PY

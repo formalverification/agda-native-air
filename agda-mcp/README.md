@@ -1400,9 +1400,12 @@ registrations run.
 ### Through the launcher
 
 Every registration runs `scripts/run-server.sh`, as the repository's root
-`.mcp.json` does.  The launcher enters `nix develop .#backend` for you (so
-`agda`, `cabal`, and GHC need not be on your `PATH`) and routes the Nix banner
-to stderr so it does not corrupt the MCP JSON-RPC framing.  The root
+`.mcp.json` does.  By default the launcher enters `nix develop .#backend` for
+you (so `agda`, `cabal`, and GHC need not be on your `PATH`) and routes the Nix
+banner to stderr so it does not corrupt the MCP JSON-RPC framing.  A
+registration that names a built server and its own Agda skips the shell, and
+then none of the shell's tools are on the server's `PATH`; see
+[Without the shell](#without-the-shell).  The root
 registration passes the agda-dojang flags, the bundled fixture corpus, and
 `--timeout 600`.  Drop `--corpus` to run without the search tools; point it at
 a real agda-strux corpus to search a whole library (`make extract-lib` then
@@ -1422,6 +1425,45 @@ Claude Code may keep `--cwd ${PWD}`, drop the flag, or name the checkout by
 absolute path.  The server's `cwd:` startup line on stderr says where it went.
 No other variable is expanded: an argument still holding `${` is named on
 stderr, and a `--cwd` holding one is refused.
+
+### Without the shell
+
+A registration that names a prebuilt server in its `env` block and its own
+Agda with `--agda-bin` does not need the shell, and the launcher skips it
+(issue #249): after the same `${PWD}` substitution and `--cwd` default, it
+runs the server directly.  The server is the binary `cabal list-bin
+exe:agda-mcp` names in a checkout that has built it, as follows:
+
+```json
+"env": { "AGDA_MCP_BIN": "/path/to/agda-native-air/agda-mcp/dist-newstyle/build/.../agda-mcp" }
+```
+
+The server then answers `initialize` within 20 ms of launch, against 4 to 5 s
+through the shell (issue #249's measurement, `make agda-mcp-launch-time`).  A
+`--corpus` is still loaded before the server answers, on either path: 3 to 4 s
+for the 224 MB agda-algebras corpus.  Without `--agda-bin` the
+launcher always enters the shell, since the server's default `agda` is the
+shell's, and an `AGDA_MCP_BIN` that is not an executable file is refused by
+name before anything starts.
+
+What the shell provided is then the client's to provide.  The server and
+everything it starts inherit the client's environment, so the following come
+from the client's `PATH` and environment, not this repository's:
+
++  `make` for a `check_project` gate, and the program a `--check-command`
+   names (`make` or `env` in the registrations here);
++  an `--agda-bin` given as a bare name rather than a path;
++  the libraries file the server reads when `--agda-flags` names no
+   `--library-file`: `$AGDA_DIR/libraries`, which the shell points at this
+   repository's `agda/libraries` and a client's environment points wherever
+   it does (pass `--library-file` and the two paths agree);
++  `$AGDA_DIR/defaults`, which Agda reads for a file under no `.agda-lib`.
+
+A registration that needs the shell's tools leaves `AGDA_MCP_BIN` unset.  The
+shell path has the opposite gap: a `check_project` call naming a `target` runs
+bare `make <target>`, so a recipe that runs `agda` gets this repository's
+Agda 2.9.0, not the project's own, unless the Makefile is told which (the
+registrations' `--check-command` passes `AGDA=` for that reason).
 
 ### Without the launcher
 

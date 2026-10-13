@@ -76,9 +76,11 @@ were not tried.
 *Run*, 2026-10-11.
 
 Every registration on this page runs [`scripts/run-server.sh`][launcher], the
-launcher in this repository.  It enters the flake's `.#backend` shell, so
-`agda`, GHC and the standard library come from Nix rather than from your
-`PATH`; it keeps the shell's banner off the JSON-RPC stream; and it starts
+launcher in this repository.  By default it enters the flake's `.#backend`
+shell, so `agda`, GHC and the standard library come from Nix rather than from
+your `PATH` (a registration that names your own Agda can skip the shell, as
+*Your own Agda project* explains); it keeps the shell's banner off the
+JSON-RPC stream; and it starts
 the server in the directory the harness started it in, substituting that
 directory for a literal `${PWD}` in an argument (issue [#242]).  The server
 therefore needs a checkout of this repository and a build in it, once per
@@ -112,7 +114,9 @@ checkout's working tree was dirty, which makes `nix develop` evaluate the
 flake again.  The build step above has already downloaded the shell, so a
 harness never waits for that; if a garbage collection removes it, run the
 build step again before the next session.  Each harness's startup timeout
-has to cover the half minute, and each section says how to set it.
+has to cover the half minute, and each section says how to set it.  A
+registration that names your own Agda can skip the shell, and the half
+minute with it (see *Your own Agda project*).
 
 ### The smoke test
 
@@ -209,6 +213,17 @@ rest of the arguments are optional, as follows:
    the `AgdaDojang.Debug` module visible, which `get_goal`'s fallback imports
    into the file; the templates pass it, and `get_goal` answered here without
    it.
+
+One more setting is optional, and it goes in the registration's environment
+rather than its arguments (in a `.mcp.json`, an `"env"` object beside
+`"args"`).  With `--agda-bin` given, `"AGDA_MCP_BIN": "/path/to/agda-mcp"`,
+the path `cabal list-bin exe:agda-mcp` prints in the checkout after the build
+step, makes the launcher run the server without the shell, so it answers in
+milliseconds plus any corpus load (issue [#249]).  The server then takes
+`make`, `$AGDA_DIR` and the rest of its environment from the harness rather
+than from this repository's shell, so pass the libraries file as above and
+name your Agda in `--check-command`; [the server's README][without-the-shell]
+lists what changes.
 
 What the server does to your files: `check_file` writes Agda's interface
 files, as `agda` does; `get_goal` and `fill_hole` patch the file on disk for
@@ -1223,6 +1238,7 @@ The vendors' pages were all read on 2026-10-11, as follows:
 [example-codex]: ../../agda-mcp/examples/agda-algebras.codex.toml
 [examples-readme]: ../../agda-mcp/examples/README.md#agda-algebrasmcpjson
 [command-line options]: ../../agda-mcp/README.md#command-line-options
+[without-the-shell]: ../../agda-mcp/README.md#without-the-shell
 [howtorun-13]: ../HowToRun.md#13--agda-mcp-ai-assisted-proof-development
 [howtorun-134]: ../HowToRun.md#134--using-agda-mcp-on-another-agda-project
 [field-reports]: ../mcp-field-reports.md

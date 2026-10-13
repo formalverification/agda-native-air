@@ -1562,6 +1562,81 @@ tools.
    server in Codex as it did in Copilot is a question for the next trial;
    the Copilot run suggests it would (inferred).
 
+## 2026-10-11, agda-native-air issue #249: the launcher's fast path, measured (Claude Opus 5.5)
+
+Not a proof session.  The session that gave `scripts/run-server.sh` its fast
+path ([#249]) measured what the shell costs a client before the server
+answers, the question the Codex section above left open.
+
++  **What was measured**.  Launch to ready: the wall time from spawning a
+   registration's exact argv to the first stdout line that is the JSON-RPC
+   response to `initialize` carrying `result.protocolVersion`, with the
+   request written at once, as a client writes it.  agda-mcp's result begins
+   with `capabilities`, so the driver parses each line rather than matching
+   text (`scripts/python/launch_to_ready.py`; `make agda-mcp-launch-time`).
++  **The setup**.  claude-tooling's agda-algebras registration's arguments,
+   with `--cwd ${PWD}` passed literally for the launcher to substitute,
+   started from `~/git/ualib/agda-algebras/master` in the session's own
+   environment (outside every dev shell); five runs each way; the launcher
+   and the server built from the branch at 8b2f1ddc.  The `shell` rows leave
+   `AGDA_MCP_BIN` unset, as every registration runs today; `fast` sets it;
+   `direct` runs the binary itself, the floor.  Other sessions were building
+   and testing on the same 20-core machine (load average 3.5 rising to 11).
++  **The numbers**, in seconds, are the following:
+
+   | Path | Corpus | Launcher's tree | Min | Median | Max |
+   |------|--------|-----------------|----:|-------:|----:|
+   | shell | 224 MB | clean | 7.390 | 7.809 | 12.481 |
+   | shell | 224 MB | one tracked file modified | 7.167 | 7.721 | 12.470 |
+   | fast | 224 MB | clean | 3.942 | 4.118 | 4.496 |
+   | direct | 224 MB | clean | 3.746 | 3.819 | 4.590 |
+   | shell | none | clean | 4.246 | 4.624 | 5.165 |
+   | fast | none | clean | 0.013 | 0.017 | 0.018 |
+   | direct | none | clean | 0.018 | 0.019 | 0.022 |
+
+   An earlier round the same evening, under a load average near 8, gave
+   medians of 11.3, 12.1, 3.06 and 2.86 s for the first four rows and 3.29 s,
+   13 ms and 22 ms for the last three: the shell rows move by seconds with
+   the machine's load, and the fast path stays level with the bare binary.
++  **Where the shell's seconds go**.  One launch with the corpus, its stderr
+   lines timestamped, took 5.45 s: Nix's own start 0.1 s; the shellHook
+   2.3 s, of which the banner's `sbt` version probe was 2.05 s; `cabal
+   list-bin` 0.06 s; the corpus 2.9 s.  The corpus loads as fast inside the
+   shell's environment as outside it (2.8 to 3.9 s, three runs each,
+   interleaved).
++  **The corpus is the ceiling**.  The issue's acceptance criterion, an
+   answer within a second with the agda-algebras registration and
+   `AGDA_MCP_BIN` set, holds for the launcher (17 ms without the corpus)
+   and not for the registration as written, because the server loads its
+   corpus before it answers `initialize`: 3 to 4 s for the 224 MB
+   agda-algebras corpus, on either path.
++  **A dirty tree made no difference here**.  With one tracked file of the
+   launcher's checkout modified, the shell path's median was 7.7 s against
+   7.8 s clean; [#249]'s 32 s with a dirty main checkout was not reproduced,
+   so the tree's state alone does not explain it (inferred).
++  **What a gate finds on each path**.  A scratch checkout whose Makefile
+   prints what its recipe sees, asked through `check_project` with
+   `target`: through the shell, the store's GNU Make 4.4.1, this
+   repository's Agda 2.9.0 as `agda`, and the launcher's checkout's `agda/`
+   as `$AGDA_DIR`; on the fast path, `/usr/bin/make`, no `agda` at all, and
+   the session's `$AGDA_DIR` (`~/.config/agda`).  Neither is agda-algebras's
+   own Agda, which is why the registrations name it with `AGDA=` in
+   `--check-command`.
++  **Verdict**.  The launcher's side of [#249] is done: a registration that
+   sets `AGDA_MCP_BIN` and passes `--agda-bin` waits for nothing but the
+   server itself.  For the agda-algebras registration the server's own wait
+   is the corpus load, so whether a Codex `exec` session now finds the tools
+   in its first step depends on when Codex sends its first request, which
+   these runs do not measure; without a corpus the 17 ms precedes any model
+   request (inferred).  Two changes would close the rest: `required = true`
+   in a generated Codex registration ([claude-tooling#27]), which waits
+   however long the server takes, and a server that answers `initialize`
+   before it loads its corpus.  On the shell path, 2 of the 2.3 s the
+   shellHook took in the timestamped launch were the banner's `sbt` probe,
+   which a launch does not need.  No registration
+   takes the fast path until its `env` block names the server;
+   claude-tooling's four have none yet.
+
 [#242]: https://github.com/formalverification/agda-native-air/issues/242
 [#243]: https://github.com/formalverification/agda-native-air/issues/243
 [#248]: https://github.com/formalverification/agda-native-air/issues/248

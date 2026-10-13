@@ -320,7 +320,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  corpus-stdlib corpus-stdlib-nix \
                  test-scripts-python \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
-                 agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-launcher-smoke agda-mcp-serve agda-mcp-clean \
+                 agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-launcher-smoke agda-mcp-launch-time agda-mcp-serve agda-mcp-clean \
                  lane-give-parity auto-floor \
                  extract extract-stdlib extract-categories transform a2t \
                  etl-test etl-test-preprocess-agda etl etl-agda-algebras \
@@ -440,7 +440,8 @@ help:
 	@echo "  make bench                       - Run AgdaDojang tiny benchmark"
 	@echo "  make agda-mcp-smoke              - Build agda-mcp + JSON-RPC round-trip sanity (fast)"
 	@echo "  make agda-mcp-test               - Full agda-mcp cabal test (unit + corpus + Agda integration)"
-	@echo "  make agda-mcp-launcher-smoke     - scripts/run-server.sh anchors the server where the client started it (issue #242)"
+	@echo "  make agda-mcp-launcher-smoke     - scripts/run-server.sh anchors the server where the client started it (issues #242, #249)"
+	@echo "  make agda-mcp-launch-time        - Launch to initialize, through the shell and without it (issue #249)"
 	@echo "  make agda-mcp-build / -serve / -clean - Build / launch / clean the agda-mcp server"
 	@echo "  make lane-give-parity            - Replay committed candidates through both lanes (issue #163)"
 	@echo "  make auto-floor                  - Agda's own proof search on every obligation, judged by fill_hole (issue 205)"
@@ -778,6 +779,9 @@ agda-mcp-smoke:
 # scratch client checkout with --cwd as a literal ${PWD}, as ${PWD:-...},
 # absent, explicit from elsewhere, and as another variable; check_project must
 # run the client's own gate in the first four, and the last must be refused.
+# Issue #249 adds the fast path (AGDA_MCP_BIN and --agda-bin: the same gate,
+# without the shell) and an AGDA_MCP_BIN naming a directory, refused on both
+# paths before the shell.
 # The launcher enters the backend shell itself, so only the build goes through
 # run_backend, and the script needs nix on PATH even under BACKEND_USE_NIX=0
 # (CI runs it from inside the shell, where the runner's nix is still on PATH).
@@ -785,6 +789,47 @@ agda-mcp-launcher-smoke:
 	@echo ">> [agda-mcp-launcher-smoke] scripts/run-server.sh anchors the server where the client started it"
 	@$(call run_backend,cd "$(AGDA_MCP_DIR)" && cabal build -v0 exe:agda-mcp)
 	@./scripts/run-server-smoke.sh
+
+# Launch to ready (issue #249): the wall time from starting a server command to
+# its answer to initialize (scripts/python/launch_to_ready.py defines it), with
+# the arguments of claude-tooling's agda-algebras registration, from an
+# agda-algebras checkout, LAUNCH_TIME_RUNS times each way: `shell`, the
+# launcher with AGDA_MCP_BIN unset (as every registration runs it today);
+# `fast`, the launcher with AGDA_MCP_BIN naming the build (the fast path); and
+# `direct`, the binary itself, the floor neither launcher can beat.  The shell
+# row depends on whether this checkout's tracked files are modified (a dirty
+# tree makes nix develop evaluate the flake again), so the target says which.
+# LAUNCH_TIME_CORPUS= (empty) drops --corpus, whose load the server finishes
+# before it answers.  Run it outside nix develop, as a client would start it.
+LAUNCH_TIME_RUNS      ?= 5
+LAUNCH_TIME_FROM      ?= $(AGDA_ALGEBRAS_ROOT)
+LAUNCH_TIME_BIN       ?= $(shell ls -t "$(AGDA_MCP_DIR)"/dist-newstyle/build/*/ghc-*/agda-mcp-*/x/agda-mcp/build/agda-mcp/agda-mcp 2>/dev/null | head -1)
+LAUNCH_TIME_AGDA      ?= $(HOME)/.cache/agda-algebras/agda-root/bin/agda
+LAUNCH_TIME_LIBRARIES ?= $(HOME)/.cache/agda-algebras/libraries
+LAUNCH_TIME_CORPUS    ?= $(PROJECT_ROOT)/data/corpora/agda-algebras/v0.1/corpus.jsonl
+# The registration's arguments after its --cwd, which the launcher rows pass
+# as the literal ${PWD} (the launcher substitutes it) and the direct row as
+# the directory itself (the server refuses an unexpanded variable).
+LAUNCH_TIME_ARGS       = --agda-bin "$(LAUNCH_TIME_AGDA)" \
+  --agda-flags "--library-file=$(LAUNCH_TIME_LIBRARIES) -i $(PROJECT_ROOT)/agda-dojang/agda" \
+  $(if $(LAUNCH_TIME_CORPUS),--corpus "$(LAUNCH_TIME_CORPUS)",) --timeout 600 \
+  --check-command "make check AGDA=$(LAUNCH_TIME_AGDA)" --check-timeout 3600
+LAUNCH_TIME_DRIVER     = $(CORPUS_PY) scripts/python/launch_to_ready.py --runs $(LAUNCH_TIME_RUNS) --from "$(LAUNCH_TIME_FROM)"
+LAUNCH_TIME_LAUNCHER   = "$(PROJECT_ROOT)/scripts/run-server.sh" '--cwd' '$${PWD}' $(LAUNCH_TIME_ARGS)
+
+agda-mcp-launch-time:
+	@test -x "$(LAUNCH_TIME_BIN)" || { echo "ERROR: build the server first (make agda-mcp-build), or set LAUNCH_TIME_BIN"; exit 1; }
+	@test -z "$(LAUNCH_TIME_CORPUS)" || test -f "$(LAUNCH_TIME_CORPUS)" || { echo "ERROR: no corpus at $(LAUNCH_TIME_CORPUS); set LAUNCH_TIME_CORPUS to one, or to nothing"; exit 1; }
+	@echo ">> [agda-mcp-launch-time] $(LAUNCH_TIME_RUNS) runs each, from $(LAUNCH_TIME_FROM); corpus: $(or $(LAUNCH_TIME_CORPUS),(none))"
+	@echo ">> [agda-mcp-launch-time] tracked files modified in this checkout: $$(git status --porcelain --untracked-files=no | wc -l)"
+	@rows="$$(mktemp)" && \
+	  $(LAUNCH_TIME_DRIVER) --label shell --unset AGDA_MCP_BIN -- $(LAUNCH_TIME_LAUNCHER) >> "$$rows" && \
+	  $(LAUNCH_TIME_DRIVER) --label fast --env AGDA_MCP_BIN="$(LAUNCH_TIME_BIN)" -- $(LAUNCH_TIME_LAUNCHER) >> "$$rows" && \
+	  $(LAUNCH_TIME_DRIVER) --label direct -- "$(LAUNCH_TIME_BIN)" --cwd "$(LAUNCH_TIME_FROM)" $(LAUNCH_TIME_ARGS) >> "$$rows"; \
+	  status=$$?; \
+	  echo "| Path | Runs | Min (s) | Median (s) | Max (s) |"; \
+	  echo "|------|-----:|--------:|-----------:|--------:|"; \
+	  cat "$$rows"; rm -f "$$rows"; exit $$status
 
 # Launch the server for manual/interactive use (Ctrl-C to stop).  Goes through
 # scripts/run-server.sh (the same launcher wired into .mcp.json), which enters
