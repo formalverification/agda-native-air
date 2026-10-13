@@ -1645,3 +1645,320 @@ answers, the question the Codex section above left open.
 [claude-tooling#34]: https://github.com/williamdemeo/claude-tooling/pull/34
 [ualib/agda-algebras#598]: https://github.com/ualib/agda-algebras/pull/598
 [`flrp-agda-mcp-improvements.md`]: feedback/flrp-agda-mcp-improvements.md
+
+## 2026-10-11: Codex tool discovery and the project check environment
+
++  **Setup**.  Codex CLI 0.162.1, GPT-6.1 Sol with `xhigh` reasoning.
+   The first `ALL_TOOLS` scan contained no Agda tools.  A later scan
+   exposed all 13 tools, and the session then used them.  The tool
+   catalog needs another check after startup; its first snapshot is
+   insufficient evidence that the server is unavailable.
++  **File checks**.  `check_file` on a valid scratch module returned
+   `success:true`, exit 0, no diagnostics, and 64 ms elapsed.  It reused
+   the interface (`checkedFromSource:false`).  On a separate invalid
+   scratch module, it returned `success:false`, exit 42, a `NotInScope`
+   diagnostic with the correct line and columns, and 54 ms elapsed.
+   That call checked from source.  Both verdicts agreed with the expected
+   batch Agda behavior.
++  **Project check**.  `check_project` selected the intended Makefile
+   target but failed in 219 ms with exit 2 and library diagnostics.
+   Its child commands found an inherited Agda 2.9.0 and a different
+   registry, while `check_file` used the explicitly configured Agda
+   2.8.0 wrapper.  Selecting the right Makefile did not ensure the gate
+   used the same toolchain as the file checker.
++  **CLI comparison**.  The same project gate passed in 23 seconds through
+   the pinned Nix shell with Agda 2.8.0.  The CLI loop was more efficient
+   for this session's batch syntax checks because it kept the toolchain
+   correct and ran the generated fixtures together.  The server's file
+   diagnostics were useful once discovered; its project environment
+   needs correction before it can replace the CLI gate here.
+
+## 2026-10-11 — agda-algebras #590 canonical forms (Kimi K3, partial session)
+
+Session: formalizing canonical forms in free lattices (ualib/agda-algebras #590)
+in worktree `590-m3-11-free-lattices-canonical-form`.  agda-mcp at Agda 2.8.0,
+project at 2.9.0.
+
+**Used**: `check_file` (~35 calls, 2-8 s each, all against
+`src/Classical/Structures/Lattice/Free/Canonical.lagda.md` and a scratch file).
+**Not used**: `fill_hole`, `get_goal`, `type_of`, `resolve_name`,
+`search_by_name` (lookups were done with grep/Read against the nix-store stdlib
+instead, which was fast enough that the corpus tools never became the path of
+least resistance).
+
+What worked well: (1) the scratch-file loop — validating the representation
+(three-way mutual data with head+tail constructors), the mutual-data `≈ᶜ`
+family, and WF-recursion evaluation on closed terms in ~2 s per check before
+writing 900 lines against those decisions; (2) `check_file` as a whole-section
+gate, with diagnostics precise enough to fix one issue per cycle.
+
+What was awkward: (1) errors from `with`-defined functions (`stepJ`, stdlib
+`filter`) arrive as giant `UnsolvedConstraints`/`UnsolvedMetaVariables` dumps
+whose root cause ("the scrutinee is hidden inside another definition, so the
+goal never reduces", or "a meta predicate cannot unify against a concrete
+lambda inside a stuck with-application") is nowhere in the message; each cost
+several cycles.  (2) `fill_hole` was not attempted because the development is
+heavy on nested pattern matches where a whole clause is the natural unit — the
+failures were structural, not goal-shaped.  (3) No way to ask the server for a
+stdlib name's exact signature (`definition_of` might have served; I only
+noticed it existed late).
+
+CLI comparison: for single-module checks the MCP (2-8 s, source-fresh) beat
+`nix develop --command agda` (~20 s startup) every time, so the CLI was never
+tempting mid-development; the 2.9.0 `make check` remains the final gate and
+was not run in this partial session.
+
+## 2026-10-11, agda-algebras issue #590: canonical forms, finishing a partial session (Claude Opus 5.5)
+
+Continued the Kimi K3 session above in the same worktree, under Claude Code
+2.1.282, with the agda-mcp server connected (Agda 2.8.0; the project is on
+2.9.0).  Result: six new modules (about 2,300 lines: duality, canonical terms,
+the algorithm, uniqueness, canonical joinands, a barrel), examples, and PR 600,
+in about 50 minutes of wall time.
+
++  **Tools used**.  `check_file` 8 calls (one per module draft or repair, 5 to
+   7.5 s each), `normalize` 7 calls, nothing else.  `get_goal`, `fill_hole`,
+   `type_of`, `resolve_name`, `search_by_name`, `definition_of`, and
+   `exports_of` were not used; standard-library signatures came from grep over
+   the Nix store, which answered in one call each.
++  **What worked**.  The diagnostics of `check_file` named the root cause every
+   time.  An `UnsolvedConstraints` list of the form `⌊ dualᴹ _b ⌋ᴶ = ⌊ dualᴹ x ⌋ᴶ
+   (blocked on _b)` showed at once that a non-injective embedding was blocking
+   inference of two implicit arguments; a `CoverageNoExactSplit` warning quoted
+   the offending clause, which showed that the case tree split on the joinand
+   before the location proof.  Four of the six modules checked on the first
+   call; the other two took one and three repairs.
++  **`normalize` as a test harness**.  Before writing the examples, five calls
+   evaluated `canonical` on closed terms over three generators (2 to 16 ms each
+   once loaded) and confirmed the outputs by hand, including the case where
+   condition 4 of Theorem 1.18 fires.  Two calls failed in band: the top-level
+   scope drops a file-local `open`, so the scratch module needed `open ...
+   public` (the tool description says so), and a tuple of four expressions
+   failed because `_,_` was not in scope.
++  **No holes**.  The work was planned on paper and written a module at a time.
+   The failures were about the shape of case trees (exact split, an index left
+   neutral by `there`) and implicit-argument inference, not about what term
+   fills a goal, so hole-driven development had nothing to offer here.
++  **2.8.0 against 2.9.0**.  Every server verdict agreed with the 2.9.0 command
+   line.  The final gates ran on the command line: `make check` from source, 358
+   modules, exit 0, 45 s wall.
++  **Command line comparison**.  Inside `nix develop`, a batch `agda` on one
+   module with warm interfaces took 2.6 to 4 s, no slower than `check_file`.  The
+   server's advantage was the structured diagnostic (code, range, expected and
+   actual), not speed.  Kimi's report above measured about 20 s for the command
+   line; the difference is probably the dev-shell entry and cold interfaces,
+   neither of which I timed.
+
+## 2026-10-11, a private repository: four new modules under `--cubical-compatible` (Claude Opus 5.5)
+
+Wrote four new Agda modules (76 to 397 lines; profile `--safe
+--cubical-compatible`, one of them also `--prop`) in a private repository,
+under Claude Code with the agda-mcp server connected (Agda 2.8.0,
+agda-stdlib 2.3).  Each module was written whole and then repaired from the
+diagnostics; the project's own gate ran on the command line at the end and
+passed.
+
++  **Tools used**.  `check_file` 13 calls, nothing else: no holes, so
+   `get_goal` and `fill_hole` had nothing to do, and standard-library names
+   came from grep over the Nix store.  The failures were about names,
+   operator precedence and universe levels, not about what term fills a
+   goal.
++  **Speed**.  150 to 310 ms for a small module with warm library interfaces,
+   4.2 to 4.6 s for the largest, which imports some forty library modules.
++  **Diagnostics that named the fix**.  `NotInScope` listed candidates, and
+   the right one was among them (a module-qualified alias,
+   `↭.↭-reflexive`).  An `UnequalTerms` whose `actual` was `A` and
+   `expected` `B` at an argument position pointed at precedence: an
+   operator declared without fixity bound tighter than another declared
+   `infixl 5`.  `UnequalSorts` printed `Set A.a != Set a`, which named the
+   cause, a generalized variable `A : Set a` whose level Agda generalizes
+   separately from an `a` written in the same signature.
++  **Warnings, which the project's gate hides**.  `check_file` returns
+   warnings with `severity: "warning"` beside errors, and on a passing file
+   with `success: true`.  That mattered here: the project's checker reports
+   only pass or fail, and three `UnsupportedIndexedMatch` warnings
+   ("relies on injectivity of the data constructor `_∷_`", and on
+   `Agda.Builtin.Bool.Bool.true` for the `yes` and `no` patterns of `Dec`)
+   came only from `check_file`; the module was rewritten until it had none.
++  **Outside the project**.  `check_file` also checked a scratch file in a
+   directory outside the repository (the project root became that
+   directory) and reported its warning.  That call had
+   `checkedFromSource: false`, because a command-line run had just left an
+   interface file, and the warning still came back.
++  **Command line comparison**.  Five control files were checked on the
+   command line instead, `nix develop --command bash -c 'cd … && agda F.agda'`,
+   out of habit for files outside the project, before I found that the
+   server took them too.  Each such run spent seconds entering the dev
+   shell, against the server's sub-second answer on the same kind of file,
+   and its output had to be filtered by hand.  The server was the more
+   efficient loop for every check in this session; the command line was
+   needed only for the project's gate.
+
+## 2026-10-11, a private repository: four more modules under `--cubical-compatible`, a second session (Claude Opus 5.5)
+
+A second session in the same private repository wrote four modules
+(`--safe --cubical-compatible`, Agda 2.8.0, agda-stdlib 2.3) under Claude
+Code with the agda-mcp server connected.  As in the first, each module was
+written whole and repaired from the diagnostics, and the project's own gate
+ran on the command line at the end and passed.
+
++  **Tools used**.  `check_file` 13 calls, nothing else.  No module had a
+   hole, and standard-library names came from grep over the Nix store, so
+   `get_goal`, `fill_hole`, `search_by_name` and `type_of` were not needed.
+   One module imports another; after an edit to the imported one,
+   `check_file` on the importer re-checked both (3.9 s) with no
+   `reload` asked.
++  **Speed**.  170 ms for a 124-line module with warm library interfaces,
+   about 600 ms for a 273-line one, 2 to 3.4 s for a 495-line one, and 5.8
+   to 8.4 s for a 421-line module whose first check included its
+   dependency.
++  **Diagnostics that named the fix**.  `AmbiguousName` listed both
+   candidates (`Level.suc` and `Fin.suc`, both opened); `ClashingDefinition`
+   named the earlier definition's file and line, an imported operator with
+   the name of a record field; `UnequalHiding` gave `expected` and `actual`,
+   an implicit function type against an explicit lambda, which a
+   type-annotated `where` clause fixed; `NotInScope` listed the
+   candidates, and the module to import from was among them.
++  **One diagnostic that did not**.  An `UnsolvedMetaVariables` error came
+   with `involved.metaTypes` holding the meta's file and range, not its
+   type, and with no `metas` (no warm lane held the file).  The meta was a
+   universe level that `u ⊔ w ⊔ p = u ⊔ w ⊔ q` does not determine; the
+   range pointed at the right argument, and passing the arguments
+   explicitly fixed it, but the type had to be inferred by hand.
++  **Warnings on a passing file**.  One `check_file` answered
+   `success: true` with five `UnsupportedIndexedMatch` warnings, for
+   clauses matching on the constructors of `Fin` and of `Dec` (whose
+   `Reflects` is indexed by `Bool`).  The project's gate hides warnings of
+   passing files, so only the server showed them; the module was rewritten
+   (cases on `Fin` through agda-stdlib's `∀-cons`, decisions through `does`)
+   until `check_file` returned no diagnostic at all.
++  **Command line comparison**.  Four runs went to the command line: one
+   on a repository module, to look for warnings the gate hides, before a
+   later `check_file` showed that the server reports them; and three in
+   scratch directories outside the repository, two controls (a clause
+   removed to see a proof fail, and an example whose expected value was
+   changed to see `refl` reject it) and the example itself.  Each took
+   about 9 seconds, most of it entering the dev
+   shell, against the server's answers of under a second to 8 seconds on
+   the repository's files, and its output had to be filtered by hand.  The
+   server was the more efficient loop for every module in the repository;
+   the command line was used out of habit for the scratch controls, which
+   the first session reports the server also accepts.
+
+## 2026-10-11, agda-algebras issue #591: semidistributivity and Whitman's condition (Claude Opus 5.5)
+
+Claude Code launched from the worktree root, agda-mcp connected (Agda 2.8.0;
+the project is on 2.9.0).  Result: five new modules (about 1,000 lines:
+predicates, invariance and decisions; the free-lattice theorems; a
+table-driven lattice constructor; the examples `M₃` and `N₅`), a sweep added
+to `Setoid.Algebras.Finite`, and a pull request, in under an hour of wall
+time, about half of it reading.
+
++  **Tools used**.  `check_file` 7 calls, one per module draft (2.5, 19.4,
+   14.2, 9.6, 5.9, 6.1, and 6.6 s), and `type_of` once (27.9 s, a first lane
+   load) to read the elaborated type of `canonicalJoinands-refine`.  Nothing
+   else.  Standard-library signatures came from grep over the Nix store.
++  **What happened**.  Every `check_file` call answered `success: true` on the
+   first try, so the server was a verdict oracle only: no diagnostic was ever
+   read, no hole was opened, and `get_goal` and `fill_hole` had nothing to do.
+   The modules were planned on paper from the existing APIs (the inversion
+   `∧≤∨-inv`, Theorem 1.19 as `canonicalJoinands-refine`, `≅→≤`) before a line
+   was written.
++  **2.8.0 against 2.9.0**.  Every server verdict agreed with the 2.9.0
+   command line.  The server keeps its own `_build/2.8.0`, so the first check
+   after an edit to an imported module re-checked the importers under 2.8.0
+   as the command line did under 2.9.0; the work was done twice.
++  **Command line comparison**.  Inside `nix develop`, the worktree's
+   `./.agda/bin/agda` took 1.0 to 7.8 s for the same modules, faster than
+   `check_file` on every one, and it is the version of record, so each module
+   was checked both ways.  Three controls for the decision procedures (a
+   wrong verdict that must be rejected, and two lattices whose verdicts are
+   known from the literature) ran on the command line out of habit; the
+   expected failure came back as exit 42 with an `UnequalTypes` message that
+   was enough on its own.  On this issue the command line was the more
+   efficient loop: the work had no debugging in it, and for pure verdicts the
+   server's structured diagnostics bring nothing while its older Agda costs a
+   second check.  The server would have earned its place had a module failed.
+
+## 2026-10-12, agda-algebras issue #592: substitutions, free generating sets, and embeddings (Claude Opus 5.5)
+
+Claude Code launched from the worktree root, agda-mcp connected (Agda 2.8.0,
+with its own `_build/2.8.0`; the project is on 2.9.0, and every verdict agreed
+with the 2.9.0 command line).  Result: four
+new library modules (substitution, closure, free generation, embeddings) and two
+example modules, about 2,200 lines, in one session; the largest pieces were
+Lemma 1.3 and Corollary 1.12 of Freese, Ježek, and Nation and their Lemma 9.13.
+
++  **Tools used**.  `check_file` 12 calls (5.8 to 8.5 s each, 25.6 s for the
+   first file importing a newly merged module); `type_of` once (22.4 s, a first
+   lane load, to confirm the server saw the worktree); `exports_of` once, with
+   `pattern`, to read the types of three lemmas of a canonical-forms module;
+   `normalize` 3 times.  No holes were opened, so `get_goal` and `fill_hole` had
+   nothing to do: each module was planned on paper against the existing APIs and
+   written whole.
++  **What worked**.  Six of the twelve checks failed, and every failure was
+   fixed from the structured diagnostic alone, without reading Agda's prose:
+   `AmbiguousName` with both candidates (`cong` from `Func`); `UnequalTerms`
+   `Y.υ != υ`, which named the generalized-variable trap at once (a `Y : Type υ`
+   variable and `υ` in the same signature generalize two levels);
+   `WrongHidingInApplication` (generalized implicits come before a module's
+   explicit argument); and three `UnsolvedConstraints` and `UnsolvedMetaVariables`
+   whose ranges pointed at the argument whose implicit could not be inferred
+   (`fromPairs` and `Gen`, whose algebra the carrier does not determine; the list
+   of `∈-filter⁻`; a where-bound lemma passed to `mkhom`, which needed
+   `λ {f} → compatible {f}`).
++  **`normalize` found a misprint in a paper**.  Normalizing `canonical a` for a
+   term from Freese's notes on Dean's problem returned a canonical term of a few
+   hundred lines of nested `suc`, unreadable.  A ten-line `show` function into
+   `String`, written in a scratch module and normalized in its place, printed the
+   form in the paper's notation in 13 s, and it differed from the form the notes
+   display in two meetands.  That is the most useful single answer the server
+   gave this session.
++  **What was awkward**.  `normalize` at top level did not see names the file
+   brought in with `open M using (…)`: `canonical` was `NotInScope` in a file
+   that opened it, and the qualified name was needed.  The first `normalize` on a
+   new file cost a 53 s lane load.  The server has no way to pass RTS options or
+   `--profile`, and both decided this session: the worked example passed every
+   uncapped check and exhausted the 6 GB heap of the project's `make check`
+   (`+RTS -M6G`), which only the command line showed, and
+   `--profile=definitions` located the cost in two definitions.  A
+   `ClashingDefinition` in a barrel two levels up is invisible to `check_file`
+   on the new module; checking the barrel file would have caught it.
++  **Command line comparison**.  The command line (`./.agda/bin/agda`, 2 to 7 s
+   per module) was used for barrel checks, for timing and profiling under the
+   heap cap, and for measurement modules in a scratch library outside the
+   repository (`-i <dir>`, since the wrapper's `--no-default-libraries` ignores a
+   scratch `.agda-lib`).  For writing and repairing modules the server was the
+   better loop: its diagnostics were structured, and none needed filtering.  For
+   cost, the command line was the only loop.
+
+## 2026-10-12, a private project: generated modules checked in batch (Claude Opus 5.5)
+
+A session whose Agda was generated by a program: modules of 4 to 85 KB
+under `--type-in-type`, each one hierarchical module (`A.B.C.D`) written under
+an output directory outside any `.agda-lib`, plus a few hand-written probe
+files.  The development loop was the command line and a driver script that
+reruns Agda on a module, removing the declaration each error names, until the
+rest checks; the server was tried at the end on two of the files.
+
++  **What was asked**.  `check_file` twice and `type_of` once.
++  **What worked**.  On a flat module (`module X where` in `X.agda`),
+   `check_file` returned green in 54 ms with `checkedFromSource: false`, reusing
+   the interface a command-line run had left, and `type_of` answered in 85 ms
+   after a 40 ms lane load.
++  **What did not**.  On a generated hierarchical module the server took the
+   file's own directory as the project root (`rootSource: "server-config"`)
+   rather than the directory the module name implies, so Agda failed with
+   `ModuleNameDoesntMatchFileName`, while `agda A/B/C/D.agda` run from the
+   output directory checks the same file.  No parameter names an include root.
+   The diagnostic's list of candidate locations included a directory of another
+   project on the machine (`…/agda-native-air/main/agda-dojang/agda`), so the
+   server's search path is wider than the checkout it serves.
++  **Command line comparison**.  The command line was the more efficient loop
+   here, for two reasons.  The work needed Agda's verdict on whole generated
+   modules many times over (up to 60 runs per module, each removing one refused
+   declaration), which a driver did in batch; and the modules lived in a scratch
+   output tree whose root the server could not be told.  Per-module tools that
+   take an include root, or a `check_file` that derives the root from the
+   module header when no `.agda-lib` is found, would let the server serve
+   generated code.
