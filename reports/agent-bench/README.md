@@ -96,13 +96,15 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    as a changed model is.  A fresh run whose base URL names another host than
    Anthropic's is refused when it names no price table (below), and when both
    `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, since the client
-   would send both to that host.  Every archived run predates the record and
-   was served by Anthropic's API: all 1,634 subjects in 72 runs authenticated
-   with the client's own login (`apiKeySource: "none"` in the init record)
-   and report every model as `provider: "firstParty"`.  A protocol recorded
-   before the endpoint and the price table reads as the client's default
-   endpoint and the current table, as one recorded before `--expose` reads as
-   the full surface, so a run in flight across the change can still be
+   would send both to that host.  Every archived run predates the record,
+   and every session behind it was served by Anthropic's API: the 1,486
+   sessions behind the 1,634 subject records in 72 runs (the five
+   `rejudge290-*` runs re-judge copies of 148 of them, with no model call)
+   authenticated with the client's own login (`apiKeySource: "none"` in the
+   init record) and report every model as `provider: "firstParty"`.  A protocol
+   recorded before the endpoint and the price table reads as the client's
+   default endpoint and the current table, as one recorded before `--expose`
+   reads as the full surface, so a run in flight across the change can still be
    resumed.
 +  **No credential in a run directory** ([#237]).  The harness writes none,
    but a subject can: on an arm with a shell it inherits every exported
@@ -131,24 +133,25 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    variable whose name says it is a credential or whose value is a URL with
    userinfo, a query, or a fragment (handed to `grep` on standard input, never
    on its command line).
-+  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own list-price
++  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own cost
    accounting, per subject; three subjects at a time, so wall clocks are
    indicative only.  The cost cap stays the client's, on its own figure
    (`--max-budget-usd`); the harness enforces no second cap on the priced
    figure, which would mean reading the stream as it is written and killing
    a subject mid-turn ([#237]).  On Anthropic's API the client's figure is the
-   list price.  For a model the client has no price for, it prices the tokens
-   at what it calls its default model's rate and marks the figure
-   `costBasis: "unknown"` ("a guess at the default model's rate", in client
-   2.1.282's words).  That rate is not one the run chooses, nor a fixed one:
-   on one client and one account, [#236]'s 83 Sonnet 5.5 subjects were
-   priced at Claude Fable 5.1's rates (USD 10 and 50 per million input and
-   output tokens) on 79 rows and at Claude Opus 5.5's (4 and 20) on the
+   list price for every model it has a price for.  For a model the client has no
+   price for, it prices the tokens at what it calls its default model's rate
+   and marks the figure `costBasis: "unknown"` ("a guess at the default model's
+   rate", in client 2.1.282's words).  That rate is not one the run chooses, nor
+   a fixed one: on one client and one account, [#236]'s 83 Sonnet 5.5 subjects
+   were priced at Claude Fable 5.1's rates (USD 10 and 50 per million input
+   and output tokens) on 79 rows and at Claude Opus 5.5's (4 and 20) on the
    other 4, each to the micro-dollar.  The cap is then a token budget at an
    unknown rate, as tight as Fable 5.1's: the most expensive subject of
    `hard219-opus5-mcp-1`, USD 2.06 at Opus 5's prices, would count 3.19
-   against it at Fable 5.1's, over the cap, and 14.41 on an endpoint that
-   reports every prompt token as uncached input.  So an arm on another endpoint reads its
+   against it at Fable 5.1's, over the library tier's USD 3.00 cap though
+   under the 6.00 that run had, and 14.41 on an endpoint that reports every
+   prompt token as uncached input.  So an arm on another endpoint reads its
    cost pair's token counts first and sets `--max-budget-usd` high enough
    that the turn and wall caps are the ones that bind (the value is in its
    protocol like any cap), and the report's `pricing.clientCostBasis` says
@@ -165,15 +168,18 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    at the one-hour rate (twice the input price, the write the client asks
    for); at it, the priced figure equals the client's on every archived
    subject the client priced at its list prices (1,551 subjects in 68 runs),
-   which `PricingSpec` pins, so a typo in a row an archived run uses cannot
-   pass.  The Opus 5.5 arms of [#236] pin the `claude-opus-5-5` row (from
-   client 2.1.282's own catalog).  The `claude-sonnet-5-5` row (Anthropic's
-   published list price, which client 2.1.296 prices at) is still unpinned:
-   client 2.1.282 priced [#236]'s 83 Sonnet 5.5 subjects as `unknown`, so
-   the spec leaves them out, and the row is the price [#236] quotes them at.
-   The archived reports predate the field, so their `totals.costUsd` stands for
-   both: a re-judge writes the same figure as `totals.pricedCostUsd`.  The
-   report's `tokens` is not what is priced: it is the main loop's `usage`
+   which `PricingSpec` pins, so a typo in a row a list-priced archived
+   subject uses cannot pass.  The Opus 5.5 arms of [#236] pin the
+   `claude-opus-5-5` row (from client 2.1.282's own catalog).  The
+   `claude-sonnet-5-5` row (Anthropic's published list price, which client
+   2.1.296 prices at) is still unpinned: client 2.1.282 priced [#236]'s 83
+   Sonnet 5.5 subjects as `unknown`, so the spec leaves them out, and the row
+   is the price [#236] quotes them at.
+   The archived reports predate the field, so their `totals.costUsd` stands
+   for both, and a re-judge writes the same figure as `totals.pricedCostUsd`,
+   except on the four Sonnet 5.5 runs, where it writes the list price from
+   `modelUsage` (2.09 for `suite236-sonnet55-mcp-1`, whose `costUsd` is 9.69).
+   The report's `tokens` is not what is priced: it is the main loop's `usage`
    block, which misses calls, the Haiku call of about USD 0.0011 that client
    2.1.261 made beside each session (335 subjects in 9 runs) and one Sonnet 5
    call of USD 0.0131 (`suite219-sonnet5-mcp-1`, client 2.1.282).  A fresh
@@ -311,9 +317,9 @@ model the client can price: priced from each transcript at the committed
 table it comes out the same, as `PricingSpec` checks, though these reports
 predate the `pricedCostUsd` field ([#237]).  The exception is Sonnet 5.5
 (the `*sonnet55*` rows), which client 2.1.282 cannot price: its column is
-priced from the tokens at the committed table's `claude-sonnet-5-5` row,
-with the client's figure beside it.  A run on another endpoint quotes
-`totals.pricedCostUsd` there instead, at the table it names.
+priced from each subject's `modelUsage` at the committed table's
+`claude-sonnet-5-5` row, with the client's figure beside it.  A run on another
+endpoint quotes `totals.pricedCostUsd` there instead, at the table it names.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1150,7 +1156,7 @@ the `*236-*` runs.  These are the header-free baselines the re-judge
 covers.  Two later 2.8.0 arms ran on a server nearer this one's, with
 [#228] and [#229]: `suite-answers-sonnet5-mcp-1` (47 solved, 6 restated,
 332 turns, USD 3.56) and `hard-answers-opus5-mcp-1` (14 solved, 127 turns,
-USD 6.34).  USD is list price; for Sonnet 5.5 it is priced from the tokens
+USD 6.34).  USD is list price; for Sonnet 5.5 it is priced from `modelUsage`
 (below).
 
 +  **Every final file checks, in every arm**: all 81 of each new model's,
