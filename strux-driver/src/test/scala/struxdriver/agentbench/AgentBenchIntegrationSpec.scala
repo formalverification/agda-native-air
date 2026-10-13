@@ -17,7 +17,11 @@
   *  judged again end to end: a stdlib row, whose `original` column is null
   *  (issue #188), and an agda-algebras row of the shell arm, whose column
   *  names the library file it read before its last edit; the first is priced
-  *  at the committed price table to the client's own figure (issue #237).
+  *  at the committed price table to the client's own figure (issue #237).  And
+  *  the harness end to end on another endpoint (issue #237), with a stand-in
+  *  client that prints a planted credential into everything it writes: the run
+  *  records the endpoint, prices the row at the run's own table, scrubs the
+  *  value, and leaves it nowhere in the run directory or on the console.
   *  Needs AGDA_MCP_BIN, AGDA_JSON_BIN, and AGDA_NATIVE_AIR_ROOT inside `nix
   *  develop .#backend` (the agent-bench-it Make target sets them); without
   *  them the suite is cancelled.
@@ -257,5 +261,103 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     r.gate shouldBe None
     r.restated shouldBe true
     r.evidence shouldBe Vector("ref Data.Nat.Properties.+-comm")
+  }
+
+  test("a run on another endpoint records it, prices at its own table, and leaves a credential the subject printed nowhere (#237)") {
+    val root = rootEnv.getOrElse(cancel("AGDA_NATIVE_AIR_ROOT not set; skipping the judge's live test"))
+    val bin  = binEnv.getOrElse(cancel("AGDA_MCP_BIN not set; skipping the judge's live test"))
+    val json = jsonEnv.getOrElse(cancel("AGDA_JSON_BIN not set; skipping the judge's live test"))
+    assume(sys.env.contains("AGDA_DIR"), "AGDA_DIR not set: run inside nix develop .#backend")
+    assume(Files.isRegularFile(bin) && Files.isRegularFile(json), "the server or the extractor binary is missing")
+    // A value no real credential has, standing for one, and a stand-in client
+    // that prints it into its stream, its result, its stderr, and the file.
+    val planted = "sk-test-not-a-credential-237-e2e"
+    val out     = Files.createTempDirectory(Paths.get("target").toAbsolutePath, "agentbench-endpoint-")
+    // The shell arm starts no server with a corpus, so stand-ins do: the run
+    // only digests them.
+    val corpora = Vector("stdlib.jsonl", "algebras.jsonl").map(n => Files.write(out.resolve(n), Array.emptyByteArray))
+    val client  = out.resolve("stand-in-claude")
+    val usage   = """"usage":{"input_tokens":10,"output_tokens":1000,"cache_read_input_tokens":100000,"cache_creation_input_tokens":5000}"""
+    val mu      = """"modelUsage":{"kimi-k3":{"inputTokens":10,"outputTokens":1000,"cacheReadInputTokens":100000,"cacheCreationInputTokens":5000,"costUSD":0.12505,"canonicalModel":"kimi-k3","provider":"firstParty","costBasis":"unknown"}}"""
+    Files.write(client, Vector(
+      "#!/usr/bin/env bash",
+      """if [ "$1" = "--version" ]; then echo "0.0.0 (a stand-in client)"; exit 0; fi""",
+      """tok="$ANTHROPIC_AUTH_TOKEN"; url="$ANTHROPIC_BASE_URL"""",
+      """printf '%s\n' '{"type":"system","subtype":"init","tools":["Bash","Edit","Read"],"mcp_servers":[],"model":"kimi-k3","permissionMode":"acceptEdits"}'""",
+      """printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"printenv ANTHROPIC_AUTH_TOKEN"}}]}}'""",
+      """printf '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"%s"}]}}\n' "$tok"""",
+      """printf '{"type":"assistant","message":{"content":[{"type":"text","text":"served by %s with %s"}]}}\n' "$url" "$tok"""",
+      """for f in *.agda; do printf -- '-- %s\n' "$tok" >> "$f"; done""",
+      """printf 'stderr: %s\n' "$tok" >&2""",
+      s"""printf '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"duration_ms":10,"total_cost_usd":0.12505,$usage,$mu,"result":"done: %s"}\\n' "$$tok""""
+    ).mkString("\n").getBytes(StandardCharsets.UTF_8))
+    client.toFile.setExecutable(true)
+    // Prices that differ from the client's own figure (USD 0.12505 above), so
+    // the two columns cannot be mistaken for each other.
+    val prices = out.resolve("prices-standin.json")
+    Files.write(prices, """{"schemaVersion":"agent-bench-prices.v0","asOf":"2026-10-13","models":{"kimi-k3":{"input":0.6,"cacheWrite":0.6,"cacheRead":0.15,"output":2.5}}}"""
+      .getBytes(StandardCharsets.UTF_8))
+    // The subjects' environment, named in full: no variable of the machine's
+    // own reaches the record or the scrub.
+    val env = Map("PATH" -> sys.env.getOrElse("PATH", "/usr/bin:/bin"), "HOME" -> sys.env.getOrElse("HOME", "/tmp"),
+      "ANTHROPIC_BASE_URL" -> "https://api.moonshot.ai/anthropic", "ANTHROPIC_AUTH_TOKEN" -> planted)
+    val args = List("--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString, "--ids", "stdlib-nat-plus-identity-l",
+      "--out-dir", out.toString, "--run-id", "it-endpoint", "--arm", "shell", "--project-root", root.toString,
+      "--server-bin", bin.toString, "--agda-json-bin", json.toString, "--model", "kimi-k3", "--max-turns", "5", "--wall-cap", "120",
+      "--claude-bin", client.toString, "--prices", prices.toString,
+      "--corpus-stdlib", corpora(0).toString, "--corpus-algebras", corpora(1).toString)
+
+    // The console, captured for the run, is searched too.
+    val console = new java.io.ByteArrayOutputStream()
+    val stdout  = System.out
+    val exit    = try { System.setOut(new java.io.PrintStream(console, true, "UTF-8")); AgentBench.runWith(args, env).unsafeRunSync() }
+                  finally System.setOut(stdout)
+    val runRoot = out.resolve("it-endpoint")
+    val subj    = runRoot.resolve("subjects/stdlib-nat-plus-identity-l")
+    def text(p: Path) = new String(Files.readAllBytes(p), StandardCharsets.UTF_8)
+
+    // Nothing the run kept, and nothing it printed, holds the value.
+    val kept = Files.walk(runRoot).iterator.asScala.toVector.filter(f => Files.isRegularFile(f) && !f.startsWith(runRoot.resolve("work")))
+    kept.map(f => runRoot.relativize(f).toString) should contain allOf ("protocol.json", "prices.json", "report.json",
+      "subjects/stdlib-nat-plus-identity-l/transcript.jsonl", "subjects/stdlib-nat-plus-identity-l/stderr.log")
+    kept.foreach(f => withClue(runRoot.relativize(f).toString)(new String(Files.readAllBytes(f), StandardCharsets.ISO_8859_1) should not include (planted)))
+    console.toString("UTF-8") should not include (planted)
+    // The run's own search of its directory found nothing either (an
+    // anomaly of the row's verdict would fail the run for another reason).
+    console.toString("UTF-8") should not include ("!! credential")
+    Files.exists(runRoot.resolve("credential-leaks.json")) shouldBe false
+    withClue(console.toString("UTF-8"))(exit shouldBe cats.effect.ExitCode.Success)
+
+    // The subject saw the endpoint the protocol records, and printed it.
+    val protocol = TextIO.readJson(runRoot.resolve("protocol.json")).unsafeRunSync().get
+    protocol.hcursor.downField("endpoint").get[String]("ANTHROPIC_BASE_URL").toOption shouldBe Some("https://api.moonshot.ai/anthropic")
+    protocol.hcursor.downField("endpoint").get[String]("ANTHROPIC_AUTH_TOKEN").toOption shouldBe Some("set")
+    text(subj.resolve("transcript.jsonl")) should include ("served by https://api.moonshot.ai/anthropic with <redacted:ANTHROPIC_AUTH_TOKEN>")
+    val finalFile = Files.list(subj.resolve("final")).iterator.asScala.find(_.toString.endsWith(".agda")).getOrElse(fail("no final file"))
+    text(finalFile) should include ("-- <redacted:ANTHROPIC_AUTH_TOKEN>")
+    val run = TextIO.readJson(subj.resolve("run.json")).unsafeRunSync().flatMap(SubjectRun.fromJson).get
+    run.redacted shouldBe Vector("ANTHROPIC_AUTH_TOKEN")
+    run.startedAt.isDefined shouldBe true
+
+    // The table is the run's own, byte for byte, named by the protocol; the
+    // row is priced at it, beside the client's guess, and the report says so.
+    Files.readAllBytes(runRoot.resolve("prices.json")) shouldBe Files.readAllBytes(prices)
+    protocol.hcursor.downField("inputs").downField("prices").get[String]("sha256").toOption shouldBe
+      Some(Pricing.load(prices).unsafeRunSync().sha256)
+    // 10*0.6 + 5000*0.6 + 100000*0.15 + 1000*2.5, per million tokens,
+    // beside the client's 0.12505.
+    val outcome = TextIO.readJson(subj.resolve("outcome.json")).unsafeRunSync().get
+    outcome.hcursor.get[BigDecimal]("pricedCostUsd").toOption shouldBe Some(BigDecimal("0.020506"))
+    outcome.hcursor.get[Double]("costUsd").toOption shouldBe Some(0.12505)
+    outcome.hcursor.get[Vector[String]]("credentialsRedacted").toOption shouldBe Some(Vector("ANTHROPIC_AUTH_TOKEN"))
+    val report = TextIO.readJson(runRoot.resolve("report.json")).unsafeRunSync().get
+    report.hcursor.downField("totals").get[BigDecimal]("pricedCostUsd").toOption shouldBe Some(BigDecimal("0.021"))
+    report.hcursor.downField("totals").get[BigDecimal]("costUsd").toOption shouldBe Some(BigDecimal("0.125"))
+    report.hcursor.downField("totals").get[Int]("unpricedRows").toOption shouldBe Some(0)
+    report.hcursor.downField("pricing").downField("prices").downField("rows").downField("kimi-k3").get[BigDecimal]("output").toOption shouldBe
+      Some(BigDecimal("2.5"))
+    report.hcursor.downField("pricing").get[Vector[String]]("clientCostBasis").toOption shouldBe Some(Vector("unknown"))
+    report.hcursor.downField("pricing").downField("prices").get[String]("sha256").toOption shouldBe
+      protocol.hcursor.downField("inputs").downField("prices").get[String]("sha256").toOption
   }
 }
