@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/corpora/agda-stdlib/v0/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/reports/agent-bench/suite219-sonnet5-mcp-1/work/haystack-nat-plus-monus-assoc /home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/reports/agent-bench/suite219-sonnet5-mcp-1/work/haystack-nat-plus-monus-assoc/Nat-plus-monus-assoc.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/219-m1-42-benchmarks-fixture-headers-give-hints/data/benchmarks/reports/agent-bench/.bin-219/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}
