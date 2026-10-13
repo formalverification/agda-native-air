@@ -1189,8 +1189,8 @@ tool calls do not strain.
 
 A harness added later gets a section of the same shape: the eight steps in
 order, each marked run or read with the version and the date, and the smoke
-test above with its output.  Its known issues come from a field report in
-[`docs/mcp-field-reports.md`][field-reports].
+test above with its output.  Its known issues come from a field report under
+[`docs/field-reports/`][field-reports].
 
 ## Sources
 
@@ -1241,7 +1241,7 @@ The vendors' pages were all read on 2026-10-11, as follows:
 [without-the-shell]: ../../agda-mcp/README.md#without-the-shell
 [howtorun-13]: ../HowToRun.md#13--agda-mcp-ai-assisted-proof-development
 [howtorun-134]: ../HowToRun.md#134--using-agda-mcp-on-another-agda-project
-[field-reports]: ../mcp-field-reports.md
+[field-reports]: ../field-reports/README.md
 [results-guide]: ../reading-the-results.md
 [nixos.org/download]: https://nixos.org/download/
 [claude-pricing]: https://claude.com/pricing
