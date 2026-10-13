@@ -5,7 +5,7 @@ Description: Field reports, one file per session (issue #252).
 
   A session that used the agda-mcp server for real work writes its report as
   one new file under docs/field-reports/ and submits it as a pull request of
-  that one file, so that every report is reviewed before it is public and no
+  that one file, so that every report is reviewed before it merges and no
   report waits uncommitted in a working tree.  This script is that whole path.
   The session that runs it is usually working in another repository, so it
   runs by absolute path from any directory with the system python3:
@@ -37,8 +37,9 @@ Design notes:
      worktree goes where every worktree of this repository goes,
      `<container>/worktrees/<branch>`, `<container>` being the directory that
      holds the main checkout.
-  +  The privacy checks fail closed: a repository whose visibility gh cannot
-     confirm is treated as private.
+  +  The privacy checks run before the push, because a pushed branch is
+     public whether or not its pull request opens, and they fail closed: a
+     visibility gh cannot establish refuses the report.
   +  gh runs with GH_TOKEN removed from its environment, as William's shells
      run it (`env -u GH_TOKEN gh`), so that it uses its own login.
   +  The index is not a file (README, "The index"): a report's pull request
@@ -548,7 +549,9 @@ def locate(repo: Path, path: Path) -> Result[Located, PipelineError]:
     def placed(worktree: Path) -> Result[Located, PipelineError]:
         relative = path.relative_to(worktree).as_posix() if path.is_relative_to(worktree) else ""
         branch = git("-C", folder, "symbolic-ref", "--quiet", "--short", "HEAD").unwrap_or("")
-        status = git("-C", folder, "status", "--porcelain=v1", "--untracked-files=all")
+        # Porcelain paths are relative to the root wherever git runs; asking
+        # at the root makes that plain to a reader.
+        status = git("-C", str(worktree), "status", "--porcelain=v1", "--untracked-files=all")
         changes = status.unwrap_or("").splitlines() if status.is_ok else ["(git status failed)"]
         problems = (
             ([] if relative == names.relative_path else
@@ -571,17 +574,35 @@ def locate(repo: Path, path: Path) -> Result[Located, PipelineError]:
             .and_then(placed))
 
 
-def privacy_problems(text: str, report: Report, cwd: Path) -> List[str]:
-    """The checks that ask GitHub: the named repository is public, and a
-    report from inside a private repository says so and never names it."""
+def gh_said(error: PipelineError) -> str:
+    """The first line of what gh printed on failing, or the error itself."""
+    said = str(error.context.get("stderr", "")).strip()
+    return said.splitlines()[0] if said and said != "N/A" else error.message
+
+
+def privacy_problems(text: str, report: Report, cwd: Path, github_repo: str) -> List[str]:
+    """The checks that ask GitHub, all made before anything is pushed, since
+    a pushed branch of this repository is public whether or not its pull
+    request opens.  gh must reach the repository the pull request goes to,
+    or the branch would be pushed with no pull request behind it; a
+    repository the report names must be public; and a report written inside
+    a private repository must say so and never name it.  A visibility gh
+    cannot establish is a refusal, never a guess."""
+    reach = gh("api", f"repos/{github_repo}", "--jq", ".full_name")
+    if reach.is_err:
+        return [f"gh could not reach {github_repo} ({gh_said(reach.unwrap_err())})"]
     repository = report.field("Repository")
     named = (([] if is_public(repository).unwrap_or(False) else
               [f"GitHub does not report {repository} as a public repository"])
              if OWNER_NAME.fullmatch(repository) else [])
     working = origin_repository(cwd)
-    working_private = working is not None and not is_public(working).unwrap_or(False)
-    return named + (working_repository_problems(text, report, working, working_private)
-                    if working else [])
+    if working is None:
+        return named
+    public = is_public(working)
+    if public.is_err:
+        return named + [f"could not tell whether the working directory's repository, {working},"
+                        f" is public ({gh_said(public.unwrap_err())})"]
+    return named + working_repository_problems(text, report, working, not public.unwrap())
 
 
 def submit_report(repo: Path, path: Path, github_repo: str, cwd: Path, home: str,
@@ -590,7 +611,7 @@ def submit_report(repo: Path, path: Path, github_repo: str, cwd: Path, home: str
 
     Returns the pull request's URL and a note on the worktree."""
     def private_checked(text: str, report: Report) -> Result[Report, PipelineError]:
-        found = privacy_problems(text, report, cwd)
+        found = privacy_problems(text, report, cwd, github_repo)
         return (Result.ok(report) if not found
                 else Result.err(problem(f"{path.name}: the report is refused", found)))
 

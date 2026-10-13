@@ -61,15 +61,19 @@ NAMES = Names("2026-10-12", "agda-algebras-592")
 
 # The fake gh: visibility from FAKE_GH_PRIVATE (a JSON object, owner/name ->
 # bool; a repository not in it answers 404 as GitHub does for one you cannot
-# see), a fixed URL for a created pull request, and every call logged with
-# whether GH_TOKEN reached it.
+# see), a fixed URL for a created pull request, every call logged with whether
+# GH_TOKEN reached it, and, with FAKE_GH_BROKEN set, a failure on every call,
+# as when gh is logged out or offline.
 FAKE_GH = """\
 import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["FAKE_GH_LOG"], "a", encoding="utf-8") as log:
     log.write(json.dumps({"args": args, "token": "GH_TOKEN" in os.environ}) + "\\n")
 private = json.loads(os.environ.get("FAKE_GH_PRIVATE", "{}"))
-if args[:3] == ["api", "-X", "POST"]:
+if os.environ.get("FAKE_GH_BROKEN"):
+    print("gh: To get started with GitHub CLI, please run:  gh auth login", file=sys.stderr)
+    sys.exit(4)
+elif args[:3] == ["api", "-X", "POST"]:
     print("https://github.com/test/repo/pull/7")
 elif args[:1] == ["api"] and args[1][len("repos/"):] in private:
     print("true" if private[args[1][len("repos/"):]] else "false")
@@ -282,7 +286,7 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Dict[str, Path]:
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_GH_LOG", str(tmp_path / "gh.log"))
     monkeypatch.setenv("FAKE_GH_PRIVATE", json.dumps({
-        "ualib/agda-algebras": False, "acme/public-thing": False,
+        "test/repo": False, "ualib/agda-algebras": False, "acme/public-thing": False,
         "acme/hidden-thing": True, "acme/secret": True}))
     monkeypatch.setenv("GH_TOKEN", "a-token-gh-must-not-see")
 
@@ -416,6 +420,34 @@ def test_submit_from_inside_a_private_repository(world: Dict[str, Path]) -> None
     path.write_text(report_text(repository="a private repository", work="not named"),
                     encoding="utf-8")
     assert submit(world, path).is_ok
+
+
+def test_submit_refuses_a_working_repository_whose_visibility_is_unknown(
+        world: Dict[str, Path]) -> None:
+    # GitHub answers 404 for a repository the user cannot see; that is not
+    # evidence that it is public, nor licence to guess that it is private.
+    git("remote", "set-url", "origin", "git@github.com:acme/unseen.git", cwd=world["other"])
+    path = new_report(world["main"], NAMES).unwrap()
+    path.write_text(report_text(repository="a private repository", work="not named"),
+                    encoding="utf-8")
+    found = submit(world, path).unwrap_err().context["problems"]
+    assert any("could not tell whether" in p and "acme/unseen" in p for p in found), found
+    assert_nothing_published(world, path)
+
+
+def test_submit_pushes_nothing_when_gh_cannot_reach_github(
+        world: Dict[str, Path], monkeypatch: pytest.MonkeyPatch) -> None:
+    # From a directory in no repository, with a report that names none, only
+    # the reachability check stands between a broken gh and a pushed branch
+    # with no pull request behind it.
+    path = new_report(world["main"], NAMES).unwrap()
+    path.write_text(report_text(repository="a private repository", work="not named"),
+                    encoding="utf-8")
+    monkeypatch.chdir(world["tmp"])
+    monkeypatch.setenv("FAKE_GH_BROKEN", "1")
+    found = submit(world, path).unwrap_err().context["problems"]
+    assert any("gh could not reach test/repo (gh: To get started" in p for p in found), found
+    assert_nothing_published(world, path)
 
 
 def test_a_report_stacked_on_an_unmerged_branch(world: Dict[str, Path]) -> None:
