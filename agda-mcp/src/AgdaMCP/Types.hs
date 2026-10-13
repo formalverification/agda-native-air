@@ -82,6 +82,15 @@
 --   are additive: @holeIndex@ still parses and every pre-existing key keeps its
 --   name, type, and meaning, so the schema version is unchanged.
 --
+--   @get_goal@ and @type_of@ take a @rewrite@ argument ('Rewrite', issue
+--   #248), the display mode Agda prints their types in, defaulting to the
+--   one an editor sends ('editorRewrite', @Simplified@), and their answers
+--   say which mode printed them.  Until then both answered in @Normalised@,
+--   which unfolds every defined type in a goal's context; that form is still
+--   one argument away (@rewrite: "Normalised"@).  The argument and the echo
+--   are new keys, so this too is additive and the schema version is
+--   unchanged.
+--
 --   The corpus types track the agda-strux JSONL schema (v0.01) documented in
 --   docs/representation.md.  They are used by the search tools (M1-3).
 
@@ -91,6 +100,11 @@
 module AgdaMCP.Types
   ( -- * Context entries
     CtxEntry (..)
+    -- * How a type is printed (issue #248)
+  , Rewrite (..)
+  , rewriteText
+  , rewriteFromText
+  , editorRewrite
     -- * Tool parameters (inbound)
   , GetGoalParams (..)
   , FillHoleParams (..)
@@ -266,6 +280,57 @@ instance ToJSON CtxEntry where
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- § How a type is printed (issue #248)
+--
+-- Agda prints the answer to a goal or inference command in the display mode
+-- the command names.  Until #248, get_goal and type_of named Normalised,
+-- which unfolds every defined type: a module parameter 𝑮 : Group α ρ came
+-- back as the 528-character Σ type Group abbreviates, so the context a model
+-- read in order to write the next term no longer used the names it had to
+-- write.  An editor's C-c C-, and C-c C-d send Simplified.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- | Rewrite: a display mode, Agda's own @Rewrite@
+-- (@Agda.Interaction.Base@), with its constructors' names, so that the word
+-- sent on the wire is the word Agda's derived @Read@ parses there.  In
+-- Agda's words (@agda2-mode.el@): 'AsIs' "returned as is", 'Instantiated'
+-- "neither explicitly normalised nor simplified", 'HeadNormal' "head
+-- normalised", 'Simplified' "simplified", 'Normalised' "normalised".
+data Rewrite = AsIs | Instantiated | HeadNormal | Simplified | Normalised
+  deriving (Eq, Show, Enum, Bounded)
+
+-- | rewriteText: the mode's wire word, which is its constructor's name.
+rewriteText :: Rewrite -> Text
+rewriteText = T.pack . show
+
+-- | rewriteFromText: the mode a wire word names, exactly as Agda spells it
+-- (no case folding: @Normalized@ is not a mode, and Agda would not read it).
+rewriteFromText :: Text -> Maybe Rewrite
+rewriteFromText t = lookup t [ (rewriteText r, r) | r <- [minBound .. maxBound] ]
+
+-- | editorRewrite: the mode an editor sends when no prefix argument is
+-- given, for the goal display (@C-c C-,@) and inference (@C-c C-d@) alike
+-- (@agda2-maybe-normalised@ in Agda 2.9.0's @agda2-mode.el@); the default
+-- of the tools that take a @rewrite@ argument.
+editorRewrite :: Rewrite
+editorRewrite = Simplified
+
+-- | A mode is read by name and refused, naming the five, when it names
+-- none of them, so a bad value fails before anything is sent to Agda.
+instance FromJSON Rewrite where
+  parseJSON = withText "Rewrite" $ \t -> case rewriteFromText t of
+    Just r  -> pure r
+    Nothing -> fail . T.unpack $ "rewrite is one of "
+      <> T.intercalate ", " [ quoted (rewriteText r) | r <- [minBound .. maxBound :: Rewrite] ]
+      <> " (Agda's spelling), not " <> quoted t
+    where
+      quoted w = "\"" <> w <> "\""
+
+instance ToJSON Rewrite where
+  toJSON = String . rewriteText
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- Tool parameters (inbound from agent)
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -336,12 +401,16 @@ data GetGoalParams = GetGoalParams
                               --   live-query tools expose (#108); the
                               --   injection fallback is per-call fresh and
                               --   ignores it.
+  , ggRewrite  :: Rewrite     -- ^ The lane's display mode (#248), the
+                              --   editor's by default; the injection
+                              --   fallback's macro always normalizes.
   } deriving (Eq, Show)
 
 instance FromJSON GetGoalParams where
   parseJSON = withObject "GetGoalParams" $ \o ->
     GetGoalParams <$> o .: "filePath" <*> parseHoleRef o
                   <*> (o .:? "reload" .!= False)
+                  <*> (o .:? "rewrite" .!= editorRewrite)
 
 -- | Parameters for the @fill_hole@ tool.
 data FillHoleParams = FillHoleParams
@@ -988,13 +1057,19 @@ data GoalInfo = GoalInfo
   , giAddressed         :: Maybe HoleAddressed  -- ^ The hole this goal is for, and
                                                 --   how the address reached it
                                                 --   (#201); set by the handler.
+  , giRewrite           :: Maybe Rewrite        -- ^ The display mode the goal and
+                                                --   context are printed in (#248):
+                                                --   the one Agda says answered, on
+                                                --   the lane; Normalised on the
+                                                --   fallback, whose macro normalizes.
   } deriving (Eq, Show)
 
 instance ToJSON GoalInfo where
   toJSON g = object $
     [ "goal"    .= giGoal g
     , "context" .= giContext g
-    ] <> maybe [] (\a -> ["addressed"         .= a]) (giAddressed g)
+    ] <> maybe [] (\r -> ["rewrite"           .= r]) (giRewrite g)
+      <> maybe [] (\a -> ["addressed"         .= a]) (giAddressed g)
       <> maybe [] (\m -> ["module"            .= m]) (giModule g)
       <> maybe [] (\m -> ["elapsedMs"         .= m]) (giElapsedMs g)
       <> maybe [] (\b -> ["checkedFromSource" .= b]) (giCheckedFromSource g)
@@ -1817,6 +1892,8 @@ data TypeOfParams = TypeOfParams
   , topLine     :: Maybe Int
   , topColumn   :: Maybe Int
   , topReload   :: Bool       -- ^ Force a fresh load (a changed dependency).
+  , topRewrite  :: Rewrite    -- ^ The display mode of the answer (#248), the
+                              --   editor's by default.
   } deriving (Eq, Show)
 
 instance FromJSON TypeOfParams where
@@ -1825,6 +1902,7 @@ instance FromJSON TypeOfParams where
     TypeOfParams <$> o .: "filePath" <*> o .: "expr" <*> pure mLine
                  <*> scopeColumn mLine o
                  <*> (o .:? "reload" .!= False)
+                 <*> (o .:? "rewrite" .!= editorRewrite)
 
 -- | Parameters for the @normalize@ tool: evaluate an expression to normal
 -- form in a file's scope.  @line@ as in 'TypeOfParams'.
@@ -2125,12 +2203,17 @@ data ExportsSlice = ExportsSlice
   } deriving (Eq, Show)
 
 -- | Result of @type_of@.  Exactly one of @type@ / @error@ is present.
+-- @rewrite@ is the display mode the call asked Agda to print in (#248), on
+-- every answer, so the shape is one for a type, an error, and a file that
+-- failed to load (where nothing was printed, and the mode is still the one
+-- the call asked for); Agda's inference answer carries no echo of its own.
 data TypeOfResult = TypeOfResult
-  { torExpr  :: Text
-  , torScope :: Text              -- ^ @toplevel@, or @goal N@ with its line.
-  , torType  :: Maybe Text
-  , torError :: Maybe LiveError
-  , torMeta  :: LiveMeta
+  { torExpr    :: Text
+  , torScope   :: Text              -- ^ @toplevel@, or @goal N@ with its line.
+  , torType    :: Maybe Text
+  , torError   :: Maybe LiveError
+  , torRewrite :: Rewrite
+  , torMeta    :: LiveMeta
   } deriving (Eq, Show)
 
 instance ToJSON TypeOfResult where
@@ -2140,6 +2223,7 @@ instance ToJSON TypeOfResult where
     ]
     <> maybe [] (\t -> ["type"  .= t]) (torType r)
     <> maybe [] (\e -> ["error" .= e]) (torError r)
+    <> [ "rewrite" .= torRewrite r ]
     <> liveMetaPairs (torMeta r)
 
 -- | Result of @normalize@.  Exactly one of @normalForm@ / @error@ is present.

@@ -27,6 +27,13 @@
   *    a Crash outcome carrying the reply text, so one bad candidate cannot
   *    abort a sweep; check_file and get_goal errors are surfaced to the caller
   *    instead, since without them the fixture cannot be driven at all.
+  *  - get_goal and type_of are asked for Agda's Normalised display by name
+  *    (`rewrite`), the mode both answered in when the loop was built and
+  *    measured.  The binder counts read the expanded pi type of a lemma
+  *    declared through an alias (`Commutative _+_`), and the peek compares
+  *    the goal and the inferred type as text from one printer.  The server's
+  *    default became Simplified, the editor's mode, in issue #248; the loop
+  *    does not follow it until a sweep shows what that changes.
   *
   *  Integration
   *  -----------
@@ -108,7 +115,8 @@ final class Oracle private (
       timed <- client.callTool("get_goal", Json.obj(
                  "filePath" -> file.toString.asJson,
                  "line"     -> ob.line.asJson,
-                 "column"   -> ob.col.asJson))
+                 "column"   -> ob.col.asJson,
+                 "rewrite"  -> Oracle.Rewrite.asJson))
       _     <- IO.raiseWhen(timed.value.isError)(new RuntimeException(
                  s"get_goal failed on $file at (${ob.line},${ob.col}): ${timed.value.text.take(400)}"))
       body  <- IO.fromEither(timed.value.decodeAs[GetGoalBody].leftMap(new RuntimeException(_)))
@@ -129,7 +137,8 @@ final class Oracle private (
       timed <- client.callTool("type_of", Json.obj(
                  (Vector(
                    "filePath" -> file.toString.asJson,
-                   "expr"     -> expr.asJson
+                   "expr"     -> expr.asJson,
+                   "rewrite"  -> Oracle.Rewrite.asJson
                  ) ++ pos.toVector.flatMap { case (l, c) =>
                    Vector("line" -> l.asJson, "column" -> c.asJson)
                  }): _*))
@@ -282,6 +291,12 @@ final class Oracle private (
 }
 
 object Oracle {
+  /** The display mode get_goal and type_of are asked for (`rewrite`, agda-mcp
+    * issue #248), spelled as Agda spells it: the mode the loop's binder counts
+    * and textual peek were built and measured on (see the design notes).
+    */
+  val Rewrite: String = "Normalised"
+
   def create(client: ToolCaller): IO[Oracle] =
     Ref.of[IO, Vector[TimingRow]](Vector.empty).flatMap(create(client, _))
 

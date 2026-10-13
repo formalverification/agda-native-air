@@ -75,6 +75,14 @@
 --     shows an agent using it (ADR 0002, decision 25).  The proof-search
 --     loop, the tool's first measured consumer, starts its server with the
 --     flag.
+--
+-- Issue #248 addition:
+--   * get_goal and type_of take @rewrite@, Agda's display mode for the types
+--     they answer ('AgdaMCP.Types.Rewrite'), declared with its five values;
+--     the default is the mode an editor sends, @Simplified@, which keeps a
+--     context's defined names (@Group α ρ@, not the 528-character Σ type it
+--     abbreviates), and each answer names the mode that printed it.  Until
+--     then both sent @Normalised@; search_in_scope still does.
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -123,8 +131,8 @@ import AgdaMCP.Tools.ProofState
 import AgdaMCP.Tools.Search
 import AgdaMCP.Tools.SearchInScope (handleSearchInScope)
 import AgdaMCP.Types
-  ( CorpusIndex, SearchByNameParams (..), ToolFailure (..), Verbosity (..)
-  , answerAt, defaultExportsLimit )
+  ( CorpusIndex, Rewrite, SearchByNameParams (..), ToolFailure (..)
+  , Verbosity (..), answerAt, defaultExportsLimit, editorRewrite, rewriteText )
 
 -- ---------------------------------------------------------------------------
 -- Configuration
@@ -248,14 +256,16 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
           ("The goal type and local context at a hole. " <> holeAddressing
            <> " source says which of two mechanisms answered. \
               \'interaction-lane' (preferred): Agda's own goal display from \
-              \the live lane, with no file edit; the answer carries lane \
-              \{load, loadElapsedMs?} and NO verdict, and its context entries \
-              \are {name, type}, shadowed outer names primed. \
-              \'injected-macro' (the fallback, when the lane cannot serve the \
-              \file): injects a reporting macro over the hole, typechecks the \
-              \patched file in place with batch agda, and restores it byte for \
-              \byte; the one path whose context entries carry visibility \
-              \(visible/hidden), with verdict {exitCode} and no lane block. Its \
+              \the live lane, with no file edit, printed in the display mode \
+              \rewrite names (" <> rewriteDefaultNote <> "); the answer \
+              \carries rewrite, lane {load, loadElapsedMs?} and NO verdict, and \
+              \its context entries are {name, type}, shadowed outer names \
+              \primed. 'injected-macro' (the fallback, when the lane cannot \
+              \serve the file): injects a reporting macro over the hole, \
+              \typechecks the patched file in place with batch agda, and \
+              \restores it byte for byte; the one path whose context entries \
+              \carry visibility (visible/hidden), with verdict {exitCode}, \
+              \rewrite 'Normalised' whatever was asked, and no lane block. Its \
               \exitCode is normally NON-ZERO even when the goal is right, because the macro leaves an interaction \
               \point behind: it judges the introspection run, not your file"
            <> (if shown "check_file" then " (use check_file for that)" else "")
@@ -269,6 +279,7 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
           , prop "col"       "integer" colDoc
           , prop "holeIndex" "integer" holeIndexDoc
           , prop "reload"    "boolean" liveReloadDoc
+          , rewriteProp
           , prop "verbose"   "boolean" verboseDoc
           ]
           ["filePath"]
@@ -365,13 +376,14 @@ registeredTools cfg = proofStateTools <> liveQueryTools <> autoTools <> searchTo
     -- 'serverInstructions'; each description says what its tool answers.
     liveQueryTools =
       [ toolDef "type_of"
-          "Infer the type of an Agda expression IN A FILE'S SCOPE, without \
-          \editing the file; the expression need not occur in it (Agda's \
-          \C-c C-d). Answers {expr, scope, type}, or {expr, scope, error: \
-          \{stage, code?, message}} when it does not typecheck there, which is \
-          \an answer, not a tool failure."
+          ("Infer the type of an Agda expression IN A FILE'S SCOPE, without \
+           \editing the file; the expression need not occur in it (Agda's \
+           \C-c C-d). Answers {expr, scope, type, rewrite}, the type printed \
+           \in the display mode rewrite names (" <> rewriteDefaultNote <> "), \
+           \or {expr, scope, error: {stage, code?, message}, rewrite} when it \
+           \does not typecheck there, which is an answer, not a tool failure.")
           (liveProps "The Agda expression to type, sent verbatim (any syntax \
-                     \a hole would accept).")
+                     \a hole would accept)." <> [rewriteProp])
           ["filePath", "expr"]
 
       , toolDef "normalize"
@@ -847,6 +859,32 @@ liveColumnDoc =
 
 liveColDoc :: Text
 liveColDoc = "column, spelled as the hole lists spell it."
+
+-- | rewriteProp: the @rewrite@ property of @get_goal@ and @type_of@ (issue
+-- #248), Agda's display mode, declared with its five values so a client that
+-- validates its arguments refuses what the parser would.
+rewriteProp :: (Text, Value)
+rewriteProp =
+  propEnum "rewrite" [ rewriteText r | r <- [minBound .. maxBound :: Rewrite] ]
+    rewriteDoc
+
+-- | rewriteDoc: the property's own line.  What the modes do is said once, in
+-- each description ('rewriteDefaultNote'), since a property's documentation
+-- is paid for on every turn too (issue #191).
+rewriteDoc :: Text
+rewriteDoc =
+  "Agda's display mode, spelled as Agda spells it; default "
+  <> rewriteText editorRewrite <> "."
+
+-- | rewriteDefaultNote: the default mode and what the other common one does,
+-- said in each description that takes @rewrite@, where a client reads it
+-- whether or not it reads the schema's property documentation.  On the
+-- #243 field hole, Normalised printed a module parameter's type, @Group α ρ@
+-- under the default, as 528 characters.
+rewriteDefaultNote :: Text
+rewriteDefaultNote =
+  "default " <> rewriteText editorRewrite <> ", as an editor prints it; \
+  \Normalised unfolds every definition"
 
 -- | verboseDoc: the @verbose@ property (issue #184), declared on every tool
 -- whose answer carries an echo, since a client that validates its arguments

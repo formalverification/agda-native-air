@@ -417,7 +417,9 @@ candidateFrom sc = NameCandidate
 
 -- | handleTypeOf: Agda's @C-c C-d@ on an expression that need not be in the
 -- file.  Goal-scoped when the (line, column) position addresses a goal,
--- else toplevel.
+-- else toplevel.  The type is printed in the call's @rewrite@ mode, the
+-- editor's @Simplified@ by default (issue #248), which the answer echoes;
+-- Agda's inference answer carries no echo of its own.
 handleTypeOf
   :: InteractionLanes -> AgdaConfig -> TypeOfParams
   -> IO (Either ToolFailure TypeOfResult)
@@ -426,24 +428,28 @@ handleTypeOf lanes cfg0 p =
     case lrOutcome (lcLoad ctx) of
       Left loadMsg -> do
         meta <- liveMeta ctx
+        -- The mode is reported here too, though nothing was printed, so
+        -- every answer has one shape (Copilot's review of PR #257).
         pure . Right $ TypeOfResult (topExpr p) "toplevel"
-          Nothing (Just (loadError loadMsg)) meta
+          Nothing (Just (loadError loadMsg)) (topRewrite p) meta
       Right _ -> do
         let (scope, scopeTxt) = scopeFor (topLine p) (topColumn p) (lcLoad ctx)
+            rw  = topRewrite p
             cmd = case scope of
-              AtGoal g -> cmdInferAtGoal g (topExpr p)
-              Toplevel -> cmdInferToplevel (topExpr p)
+              AtGoal g -> cmdInferAtGoal rw g (topExpr p)
+              Toplevel -> cmdInferToplevel rw (topExpr p)
         runShaped ctx cmd $ \resps -> do
           meta <- liveMeta ctx
           pure . Right $ TypeOfResult
-            { torExpr  = topExpr p
-            , torScope = scopeTxt
-            , torType  = inferredTypeOf resps
-            , torError = case inferredTypeOf resps of
+            { torExpr    = topExpr p
+            , torScope   = scopeTxt
+            , torType    = inferredTypeOf resps
+            , torError   = case inferredTypeOf resps of
                 Just _  -> Nothing
                 Nothing -> Just (fromMaybe (opaqueAnswer "expression" resps)
                                            (queryError "expression" resps))
-            , torMeta  = meta
+            , torRewrite = rw
+            , torMeta    = meta
             }
 
 -- | opaqueAnswer: the fallback error when Agda answered with neither the
@@ -527,9 +533,12 @@ resolveMachinery ctx name mLine mCol = do
       whyCmd n = case scope of
         AtGoal g -> cmdWhyInScopeAtGoal g n
         Toplevel -> cmdWhyInScopeToplevel n
+      -- Only the inference's error is read (its candidates or suggestions),
+      -- never a printed type, so the mode is the one this has always sent
+      -- (issue #248 left it alone).
       inferCmd = case scope of
-        AtGoal g -> cmdInferAtGoal g name
-        Toplevel -> cmdInferToplevel name
+        AtGoal g -> cmdInferAtGoal Normalised g name
+        Toplevel -> cmdInferToplevel Normalised name
   runShaped ctx (whyCmd name) $ \resps ->
     case whyInScopeMessageOf resps of
       Nothing -> pure . Right $ Resolution scopeTxt False []

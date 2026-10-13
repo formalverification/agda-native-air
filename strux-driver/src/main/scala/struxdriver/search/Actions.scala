@@ -81,9 +81,10 @@ object Actions {
 
   /** The deliberately small top-level pi-type splitter of issue #122: read a
     * binder telescope off a printed type as the interaction lane renders it
-    * (type_of, Normalised — captures in test/resources/search/).  The type is
-    * split on arrows at bracket depth 0 (counting (), {}, ⦃⦄); every segment
-    * before the last is a domain.  A domain consisting only of binder groups
+    * (type_of in Normalised, which `Oracle.Rewrite` asks for; captures in
+    * test/resources/search/).  The type is split on arrows at bracket depth
+    * 0 (counting (), {}, ⦃⦄); every segment before the last is a domain.  A
+    * domain consisting only of binder groups
     * — optionally ∀-prefixed — contributes one binder per bound name, with
     * the group's own visibility; any other domain is a single visible one
     * (an unnamed function-type domain like `x ≡ y` or `(A → B)`).  This is a
