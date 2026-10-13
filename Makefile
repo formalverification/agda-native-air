@@ -1920,6 +1920,11 @@ proof-search-recall: _check-sbt
 # files, and judge verdicts under subjects/.  A full arm runs for hours: launch
 # it detached (see the running-proof-search-sweeps skill), never as a
 # foreground shell.
+#
+# Another provider (issue #237): export ANTHROPIC_BASE_URL and its credential
+# around the target, and the subjects inherit both; protocol.json records the
+# base URL (the credential only as "set"), and every credential value is
+# scrubbed from what the subjects write.
 AGENT_BENCH_OUT_DIR         ?= data/benchmarks/reports/agent-bench
 AGENT_BENCH_MODEL           ?= claude-sonnet-5
 AGENT_BENCH_ARM             ?= mcp
@@ -1975,10 +1980,20 @@ agent-bench-it: _check-sbt
 # the JSONL rows, the prompts, and every subject's transcript, verdict, final
 # file, and configuration, under $(AGENT_BENCH_ARCHIVE_DIR)/<run-id>/, which is
 # committed.  The work copies, the staging server's log, and the .agdai files
-# stay behind.
+# stay behind.  Before anything is copied (issue #237), a run is refused
+# when the harness found a credential left in its directory
+# (credential-leaks.json), or when the directory holds the value, of 16
+# characters or more (the harness's floor), of any exported variable whose
+# name says it is a credential; the value is handed to grep on standard
+# input, never on its command line.
 agent-bench-archive:
 	@set -e; src="$(AGENT_BENCH_OUT_DIR)/$(AGENT_BENCH_RUN_ID)"; dst="$(AGENT_BENCH_ARCHIVE_DIR)/$(AGENT_BENCH_RUN_ID)"; \
 	test -f "$$src/report.json" || { echo "ERROR: no report.json under $$src (set AGENT_BENCH_RUN_ID)"; exit 1; }; \
+	if [ -f "$$src/credential-leaks.json" ]; then echo "ERROR: the run found credentials in its directory ($$src/credential-leaks.json): not archived"; exit 1; fi; \
+	for v in $$(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' | grep -iE 'TOKEN|KEY|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|HEADERS'); do \
+	  val=$$(printenv "$$v" || true); \
+	  if [ $${#val} -ge 16 ] && printenv "$$v" | grep -rqF --exclude-dir=work -f - "$$src"; then \
+	    echo "ERROR: the value of $$v occurs under $$src: not archived"; exit 1; fi; done; \
 	mkdir -p "$$dst/subjects" "$$dst/prompts"; \
 	cp "$$src"/report.json "$$src"/results.jsonl "$$src"/fixtures.jsonl "$$dst"/; \
 	if [ -f "$$src"/protocol.json ]; then cp "$$src"/protocol.json "$$dst"/; fi; \

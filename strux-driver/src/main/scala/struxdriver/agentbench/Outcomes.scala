@@ -30,6 +30,10 @@
   *  harness's, which are the libraries the judge checks the file against.  It
   *  is a column, not a gate: `solved`, `restated`, and `gate` never read it.
   *
+  *  The credential variables whose values were found and replaced in what
+  *  the subject wrote (Credentials.scala, issue #237) are named in
+  *  `credentialsRedacted`, read from the subject's `run.json`.
+  *
   *  Anomaly rules
   *  -------------
   *  A row is an anomaly, not a result, when the subject never had the
@@ -94,7 +98,8 @@ final case class Outcome(
   transcriptPath:    Option[String],
   lastWords:         String,
   rateLimit:         Option[Json],
-  original:          Option[OriginalReading]
+  original:          Option[OriginalReading],
+  redacted:          Vector[String]
 ) {
   def stratum: String = LoopOutcome.stratumOf(entry.source, entry.tags)
   def toolCallsTotal: Int = toolCalls.map(_._2).sum
@@ -140,7 +145,8 @@ final case class Outcome(
     "finalPath"           -> finalPath.asJson,
     "transcriptPath"      -> transcriptPath.asJson,
     "lastWords"           -> lastWords.asJson,
-    "rateLimit"           -> rateLimit.asJson
+    "rateLimit"           -> rateLimit.asJson,
+    "credentialsRedacted" -> (if (redacted.isEmpty) Json.Null else redacted.asJson)
   ).filter { case (k, v) => k == "original" || !v.isNull })
 }
 
@@ -152,7 +158,8 @@ object Outcome {
     Outcome(entry, solved = false, restated = false, None, Vector.empty, Vector.empty, "anomaly", 0, Vector.empty,
       wallMs, 0.0, Json.obj(), 0, None, "none", "none", None, None, None, None, Vector.empty, None,
       "unavailable: anomaly", Some(msg), None, None, "", None,
-      if (Gates.originalOf(entry.module, entry.hole, entry.tags).tagged) Some(OriginalReading.unread(None)) else None)
+      if (Gates.originalOf(entry.module, entry.hole, entry.tags).tagged) Some(OriginalReading.unread(None)) else None,
+      Vector.empty)
 }
 
 /** One obligation's three outputs: the report outcome, the fixtures.jsonl row, the results.jsonl rows. */
@@ -288,6 +295,7 @@ object Outcomes {
       solved      = anomaly.isEmpty && gate.isEmpty && verdict.solved
       restated    = anomaly.isEmpty && gate.isEmpty && verdict.restated
       reading    <- originalReading(entry, t, roots, libraryRoots)
+      redacted    = record.map(_.redacted).getOrElse(Vector.empty)
       outcome     = Outcome(
         entry             = entry,
         solved            = solved,
@@ -319,7 +327,8 @@ object Outcomes {
         rateLimit         = t.rateLimitMax.map(u => Json.obj(
                               "maxUtilization" -> u.asJson,
                               "statuses"       -> t.rateLimits.map(_._1).distinct.asJson)),
-        original          = reading
+        original          = reading,
+        redacted          = redacted
       )
       _          <- if (solved) IO.blocking {
                       Files.createDirectories(layout.solved)
@@ -331,7 +340,7 @@ object Outcomes {
                       case Some(false) => "unseen"
                       case None        => "unread"
                     }))
-      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}")
+      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}${if (redacted.isEmpty) "" else s"  CREDENTIALS REDACTED: ${redacted.mkString(",")}"}")
     } yield judged(layout, outcome, Audit.attemptRows(entry, workDir.resolve(s"$stem.agda"), t, subj.transcriptRel))
   }
 }

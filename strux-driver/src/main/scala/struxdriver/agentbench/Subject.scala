@@ -51,7 +51,13 @@
   *  - The environment loses every CLAUDE* variable, so a subject launched from
   *    inside a Claude Code session is not that session's child (no inherited
   *    session id, messaging socket, or effort level), and MCP_TIMEOUT covers
-  *    the launcher's shell entry plus the corpus load.
+  *    the launcher's shell entry plus the corpus load.  Everything else is
+  *    inherited, an exported ANTHROPIC_BASE_URL and its credential included,
+  *    which is how an arm reaches another provider's Anthropic-compatible
+  *    endpoint (issue #237); `environment` is that rule as a function, read
+  *    once into `SubjectEnv`, which the launch hands to the child and the
+  *    protocol reads the endpoint from (`Endpoint`), so the record is what
+  *    the subject was given.
   *  - `setsid` puts the subject in its own process group, so a wall-cap kill
   *    reaches the server and its agda children too.
   *
@@ -85,7 +91,8 @@ final case class SubjectConfig(
   userTemplate:    String,
   arm:             Arm,
   addDirs:         Vector[Path],
-  expose:          Option[Vector[String]] = None
+  expose:          Option[Vector[String]],
+  env:             SubjectEnv
 ) {
   def runServer: Path = projectRoot.resolve("scripts/run-server.sh")
 }
@@ -110,20 +117,120 @@ object SubjectConfig {
       userTemplate    = userTemplate,
       arm             = cfg.arm,
       addDirs         = addDirs,
-      expose          = cfg.expose
+      expose          = cfg.expose,
+      env             = cfg.env
     )
 }
 
-/** How a subject process ended: its exit code (None when the wall cap killed it) and its wall clock. */
-final case class SubjectRun(exitCode: Option[Int], wallMs: Long, killed: Boolean) {
-  def toJson: Json = Json.obj("exitCode" -> exitCode.asJson, "wallMs" -> wallMs.asJson, "killed" -> killed.asJson)
+/** The endpoint that serves a run's subjects, as their environment names it
+  * (issue #237): `ANTHROPIC_BASE_URL` always, its value or `absent` (the
+  * client's default, Anthropic's API); the variables that choose which model
+  * ids the client asks that endpoint for, only when they are set; and the
+  * credential variables the client sends it, by name only, as `set`, which
+  * says how the subjects authenticated (none of them: the client's own
+  * login) and never with what.  It is an allowlist, so no token or key can
+  * reach the record under a name nobody foresaw; and a base URL keeps only
+  * its scheme, host, port, and path, since userinfo and a query string are
+  * where a credential inside a URL would sit.  A value that is not an
+  * absolute URL is recorded as `unparsed`, never verbatim.
+  */
+final case class Endpoint(vars: Vector[(String, String)]) {
+  /** The base URL when one is set, for the console lines. */
+  def baseUrl: Option[String] = vars.collectFirst { case (Endpoint.baseUrlVar, v) if v != Endpoint.absent => v }
+  def toJson: Json = Json.obj(vars.map { case (k, v) => k -> v.asJson }: _*)
+}
+
+object Endpoint {
+  val baseUrlVar: String = "ANTHROPIC_BASE_URL"
+  val absent: String     = "absent"
+  val unparsed: String   = "unparsed"
+
+  /** The variables besides the base URL that the record carries when set:
+    * the client's model aliases and its small fast model, which decide what
+    * an endpoint is asked to serve for the calls `--model` does not name.
+    */
+  val modelVars: Vector[String] = Vector(
+    "ANTHROPIC_MODEL", "ANTHROPIC_SMALL_FAST_MODEL",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL")
+
+  /** The credential variables the client reads, recorded as `set` when present. */
+  val credentialVars: Vector[String] = Vector("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS")
+  val set: String = "set"
+
+  /** A variable's value when it is set to something: an exported empty
+    * value (Ollama's and OpenRouter's setups clear ANTHROPIC_API_KEY so)
+    * is no value, for the client and for the record.
+    */
+  def valueOf(env: Map[String, String], k: String): Option[String] = env.get(k).filter(_.trim.nonEmpty)
+
+  /** A run's endpoint, read from the environment its subjects are given. */
+  def of(env: Map[String, String]): Endpoint =
+    Endpoint((baseUrlVar -> valueOf(env, baseUrlVar).fold(absent)(redact)) +:
+      (modelVars.flatMap(k => valueOf(env, k).map(k -> _)) ++ credentialVars.filter(valueOf(env, _).isDefined).map(_ -> set)))
+
+  /** Is the base URL another host than Anthropic's own?  The client sends
+    * every credential it is given to it.
+    */
+  def foreign(e: Endpoint): Boolean =
+    e.baseUrl.exists(u => scala.util.Try(new java.net.URI(u).getHost).toOption.forall(h => h == null || !(h == "anthropic.com" || h.endsWith(".anthropic.com"))))
+
+  /** A base URL without its userinfo, query, and fragment. */
+  def redact(url: String): String =
+    scala.util.Try(new java.net.URI(url.trim)).toOption
+      .filter(u => u.getScheme != null && u.getHost != null)
+      .fold(unparsed)(u => s"${u.getScheme}://${u.getHost}${if (u.getPort >= 0) s":${u.getPort}" else ""}${Option(u.getRawPath).getOrElse("")}")
+
+  /** A record's endpoint block; None when it has none (every subject made before issue #237). */
+  def fromJson(j: Json): Option[Endpoint] =
+    j.asObject.map(o => Endpoint(o.toVector.flatMap { case (k, v) => v.asString.map(k -> _) }))
+}
+
+/** The environment a run's subjects are given (`Subject.environment` of
+  * the harness's own), read once and threaded to the launch, so the endpoint
+  * the protocol records and the environment a subject receives are one value
+  * (issue #237).  It holds credentials, so it is a plain class whose
+  * rendering names only how many variables it holds: a config that prints
+  * itself, in a log or a failed test, prints no secret.
+  */
+final class SubjectEnv(val vars: Map[String, String]) {
+  def endpoint: Endpoint       = Endpoint.of(vars)
+  def credentials: Credentials = Credentials.of(vars)
+  override def toString: String = s"SubjectEnv(${vars.size} variables)"
+  override def equals(o: Any): Boolean = o match {
+    case e: SubjectEnv => e.vars == vars
+    case _             => false
+  }
+  override def hashCode: Int = vars.hashCode
+}
+
+object SubjectEnv {
+  /** The subjects' environment, from the harness's own. */
+  def of(harness: Map[String, String]): SubjectEnv = new SubjectEnv(Subject.environment(harness))
+}
+
+/** How a subject process ended: its exit code (None when the wall cap killed
+  * it), its wall clock, when it started (issue #237: an arm on another
+  * endpoint is checked against a usage page that counts by the hour), and
+  * the credential variables whose values were found in what it wrote and
+  * replaced (Credentials.scala).  The last two are absent from an archive
+  * made before issue #237.
+  */
+final case class SubjectRun(exitCode: Option[Int], wallMs: Long, killed: Boolean, startedAt: Option[String] = None,
+                            redacted: Vector[String] = Vector.empty) {
+  // The exit code is kept when null (a kill); the two later fields only
+  // when they say something.
+  def toJson: Json = Json.fromFields(
+    Vector("exitCode" -> exitCode.asJson, "wallMs" -> wallMs.asJson, "killed" -> killed.asJson) ++
+      startedAt.map(at => "startedAt" -> at.asJson) ++
+      (if (redacted.isEmpty) Vector.empty else Vector("redacted" -> redacted.asJson)))
 }
 object SubjectRun {
   def fromJson(j: Json): Option[SubjectRun] =
     for {
       wallMs <- j.hcursor.get[Long]("wallMs").toOption
       killed <- j.hcursor.get[Boolean]("killed").toOption
-    } yield SubjectRun(j.hcursor.get[Option[Int]]("exitCode").toOption.flatten, wallMs, killed)
+    } yield SubjectRun(j.hcursor.get[Option[Int]]("exitCode").toOption.flatten, wallMs, killed,
+      j.hcursor.get[String]("startedAt").toOption, j.hcursor.get[Vector[String]]("redacted").getOrElse(Vector.empty))
 }
 
 object Subject {
@@ -237,6 +344,14 @@ object Subject {
   val envAdded: Map[String, String] = Map("MCP_TIMEOUT" -> "120000", "ENABLE_TOOL_SEARCH" -> "false")
   val envRemovedPrefix: String      = "CLAUDE"
 
+  /** The environment a subject is given: the harness's own, less every
+    * CLAUDE* variable, plus the additions.  Read once, as `SubjectEnv`: the
+    * launch hands it to the child, and the protocol reads the endpoint from
+    * it.
+    */
+  def environment(base: Map[String, String]): Map[String, String] =
+    base.filterNot { case (k, _) => k.startsWith(envRemovedPrefix) } ++ envAdded
+
   /** The client's own version string, for the report (`unknown` when the binary cannot be run). */
   def version(bin: String): IO[String] =
     IO.blocking {
@@ -279,16 +394,17 @@ object Subject {
       pb.redirectOutput(Redirect.to(stdout.toFile))
       pb.redirectError(Redirect.to(stderr.toFile))
       val env = pb.environment()
-      env.keySet().removeIf(k => k.startsWith(envRemovedPrefix))
-      envAdded.foreach { case (k, v) => env.put(k, v) }
+      env.clear()
+      env.putAll(cfg.env.vars.asJava)
       pb.start()
     }
     for {
+      at  <- IO.realTimeInstant
       t0  <- IO.monotonic
       res <- start.bracket { proc =>
                await(proc, t0 + cfg.wallCap).map(exited => if (exited) (Some(proc.exitValue()), false) else (Option.empty[Int], true))
              }(killGroup)
       t1  <- IO.monotonic
-    } yield SubjectRun(res._1, (t1 - t0).toMillis, res._2)
+    } yield SubjectRun(res._1, (t1 - t0).toMillis, res._2, Some(at.toString))
   }
 }

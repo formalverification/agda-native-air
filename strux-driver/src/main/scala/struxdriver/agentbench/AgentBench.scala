@@ -15,7 +15,9 @@
   *  server, a shell with the pinned `agda`, or both -- and the arm chooses the
   *  prompts; the libraries' source roots come from the Agda registry and are
   *  given to the file tools on every arm, so the arms differ in their
-  *  instrument and in nothing else.
+  *  instrument and in nothing else.  The endpoint the subjects are served by
+  *  is recorded, and no credential they inherit is left in the run directory
+  *  (issue #237).
   *  This file only wires the parts together: Cli (the arguments), Layout
   *  (where a run keeps things), Run (stage, spawn, archive), Outcomes (the
   *  judge step over the archive), Report (the outputs).  Like the loop, an
@@ -40,8 +42,13 @@ import scala.concurrent.duration._
 
 object AgentBench extends IOApp {
 
-  def run(args: List[String]): IO[ExitCode] =
-    Cli.parse(args) match {
+  def run(args: List[String]): IO[ExitCode] = runWith(args, sys.env)
+
+  /** The harness under a given environment, which its subjects inherit: the
+    * process's own from `run`, a planted one from a test (issue #237).
+    */
+  def runWith(args: List[String], env: Map[String, String]): IO[ExitCode] =
+    Cli.parse(args, env) match {
       case Left(err)  => IO.println(s"error: $err\n\n${Cli.usage}").as(ExitCode.Error)
       case Right(cfg) => runHarness(cfg)
     }
@@ -113,8 +120,28 @@ object AgentBench extends IOApp {
       _        <- Report.write(cfg, entries, driven, corpora, protocol, previous.flatMap(_.hcursor.downField("config").focus))
       anomalies = driven.map(_.outcome).filter(_.anomaly.isDefined)
       _        <- anomalies.traverse_(o => IO.println(s"!! ${o.entry.id} anomaly: ${o.anomaly.getOrElse("")}"))
-    } yield if (anomalies.isEmpty) ExitCode.Success else ExitCode.Error
+      // The run directory searched for every credential value in the
+      // subjects' environment, the work copies aside; one found fails the
+      // run, named by variable and file, never by value (issue #237).
+      leaks    <- Credentials.leaks(cfg.env.credentials, layout.runRoot, layout.runRoot.resolve("work"))
+      _        <- leaks.traverse_ { case (f, names) => IO.println(s"!! credential ${names.mkString(", ")} found in ${layout.relative(f)}: do not archive this run") }
+      // The verdict is kept in the run directory, by name and file, so the
+      // archive target can refuse the run without the operator's environment.
+      // A later run never clears it, since it may not hold the variable that
+      // was found; the operator removes the file once its files are checked.
+      _        <- if (leaks.isEmpty) IO.unit else recordLeaks(layout, leaks)
+    } yield if (anomalies.isEmpty && leaks.isEmpty) ExitCode.Success else ExitCode.Error
   }
+
+  /** Add what this run found to the run directory's record of credentials
+    * left in it, keeping what earlier runs found.
+    */
+  private[agentbench] def recordLeaks(layout: RunLayout, leaks: Vector[(java.nio.file.Path, Vector[String])]): IO[Unit] =
+    TextIO.readJson(layout.leaks).flatMap { earlier =>
+      val found = leaks.map { case (f, names) => Json.obj("file" -> layout.relative(f).asJson, "variables" -> names.asJson) }
+      val kept  = earlier.flatMap(_.asArray).getOrElse(Vector.empty)
+      TextIO.write(layout.leaks, Json.arr((kept ++ found).distinct: _*).spaces2)
+    }
 
   /** An archived prompt, named when missing: a re-judge never substitutes the packaged one. */
   private def archived(p: java.nio.file.Path): IO[String] =

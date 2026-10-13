@@ -39,6 +39,11 @@ import struxdriver.search.{McpClient, Oracle, Scaffold, ServerConfig}
 
 final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
 
+  /** The harness's parser under an environment the test names: none unless
+    * it says, so no test reads the endpoint of the machine it runs on.
+    */
+  private def cliParse(args: List[String], env: Map[String, String] = Map.empty): Either[String, AgentBenchConfig] = Cli.parse(args, env)
+
   private val rootEnv = sys.env.get("AGDA_NATIVE_AIR_ROOT").map(Paths.get(_))
   private val binEnv  = sys.env.get("AGDA_MCP_BIN").map(Paths.get(_))
   private val jsonEnv = sys.env.get("AGDA_JSON_BIN").map(Paths.get(_))
@@ -65,7 +70,7 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     Files.list(archived).forEach { p => if (Files.isRegularFile(p)) Files.copy(p, dst.resolve(p.getFileName)) }
     Files.list(archived.resolve("final")).forEach { p => Files.copy(p, dst.resolve("final").resolve(p.getFileName)) }
 
-    val cfg = Cli.parse(List("--rejudge", "--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString,
+    val cfg = cliParse(List("--rejudge", "--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString,
       "--all", "--out-dir", out.toString, "--run-id", "it-anomaly", "--project-root", root.toString,
       "--server-bin", bin.toString, "--agda-json-bin", json.toString)).getOrElse(fail("cli"))
     val e       = entry(root, "stdlib-nat-plus-identity-l")
@@ -120,7 +125,7 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     Files.createDirectories(dst.resolve("final"))
     Files.list(archived).forEach { p => if (Files.isRegularFile(p)) Files.copy(p, dst.resolve(p.getFileName)) }
     Files.list(archived.resolve("final")).forEach { p => Files.copy(p, dst.resolve("final").resolve(p.getFileName)) }
-    val cfg = Cli.parse(List("--rejudge", "--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString,
+    val cfg = cliParse(List("--rejudge", "--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString,
       "--all", "--out-dir", out.toString, "--run-id", "it-original", "--project-root", root.toString,
       "--server-bin", bin.toString, "--agda-json-bin", json.toString)).getOrElse(fail("cli"))
     val e       = entry(root, id)

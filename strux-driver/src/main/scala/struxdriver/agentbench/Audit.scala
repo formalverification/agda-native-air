@@ -87,22 +87,24 @@ final case class Isolation(
   ).dropNullValues
 }
 
-/** What a run gave one subject: the arm, the roots its tools and commands
-  * were allowed (issue #162), and the server tools it was shown when the run
-  * exposed a subset (issue #191).  Written beside the subject before it spawns and
+/** What a run gave one subject: the arm, the roots its tools and commands were
+  * allowed (issue #162), the server tools it was shown when the run exposed a
+  * subset (issue #191), and the endpoint that served it (issue #237, the
+  * protocol's `endpoint`).  Written beside the subject before it spawns and
   * read back by the judge, so a re-judge audits a run under the arm and the
   * roots it actually had -- not the operator's current `--arm`, and not
   * today's nix store paths, which a toolchain bump would move.  An archive
   * without one is the server-only arm confined to its work directory, which is
   * what the runs made before this record existed were.
   */
-final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None) {
+final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None, endpoint: Option[Endpoint] = None) {
   def toJson: Json = Json.obj(
     "arm"       -> arm.name.asJson,
     "workDir"   -> roots.workDir.toString.asJson,
     "readRoots" -> roots.readRoots.map(_.toString).asJson,
     "corpora"   -> roots.corpora.map(_.toString).asJson,
-    "expose"    -> expose.asJson
+    "expose"    -> expose.asJson,
+    "endpoint"  -> endpoint.map(_.toJson).asJson
   ).dropNullValues
 }
 
@@ -116,7 +118,8 @@ object SubjectRecord {
       workDir   = work,
       readRoots = c.get[Vector[String]]("readRoots").getOrElse(Vector.empty).map(Paths.get(_)),
       corpora   = c.get[Vector[String]]("corpora").getOrElse(Vector.empty).map(Paths.get(_))),
-      expose    = c.get[Vector[String]]("expose").toOption)
+      expose    = c.get[Vector[String]]("expose").toOption,
+      endpoint  = c.downField("endpoint").focus.flatMap(Endpoint.fromJson))
   }
 }
 

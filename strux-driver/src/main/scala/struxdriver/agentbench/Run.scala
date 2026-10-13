@@ -14,13 +14,16 @@
   *  tools and commands may touch), its server config where the arm has a
   *  server, and its rendered prompts, spawn the subject (Subject.run) under
   *  the caps, archive the file it left and how its process ended, and hand the
-  *  archive to the judge
-  *  (Outcomes.judgeOne).  Subjects run `parallelism` at a time; the staging
-  *  server serializes its own calls.  Under `--resume` a subject already
-  *  archived with no anomaly is kept and re-judged, once the run id's
-  *  recorded protocol (Protocol.scala) has been found to be this run's;
-  *  `--rejudge` re-judges every archived subject and spawns nothing.  A
-  *  failure inside one drive is that row's anomaly, never the sweep's.
+  *  archive to the judge (Outcomes.judgeOne).  Between the two, every
+  *  credential value in what the subject and its client wrote is replaced
+  *  (issue #237; `keep`, Credentials.scrub), the logs before anything that can
+  *  fail, so nothing judged or archived holds one.  Subjects run `parallelism`
+  *  at a time; the staging server serializes its own calls.  Under `--resume`
+  *  a subject already archived with no anomaly is kept and re-judged, once the
+  *  run id's recorded protocol (Protocol.scala) has been found to be this
+  *  run's; `--rejudge` re-judges every archived subject and spawns nothing.  A
+  *  failure inside one drive is
+  *  that row's anomaly, never the sweep's.
   *
   *  ============================================================================
   */
@@ -48,7 +51,7 @@ object Run {
     val layout  = cfg.layout
     val subject = SubjectConfig.of(cfg, sysP, userT, addDirs)
     for {
-      _       <- IO.println(s">> agent-bench: ${entries.size} obligation(s), arm=${cfg.arm.name}${cfg.expose.fold("")(ts => s" expose=${ts.mkString(",")}")} model=${subject.model} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} parallelism=${cfg.parallelism} safe=${cfg.safe}")
+      _       <- IO.println(s">> agent-bench: ${entries.size} obligation(s), arm=${cfg.arm.name}${cfg.expose.fold("")(ts => s" expose=${ts.mkString(",")}")} model=${subject.model}${cfg.endpoint.baseUrl.fold("")(u => s" endpoint=$u")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} parallelism=${cfg.parallelism} safe=${cfg.safe}")
       _       <- IO.println(s">> run root: ${layout.runRoot}")
       timings <- Ref.of[IO, Vector[TimingRow]](Vector.empty)
       driven  <- entries.parTraverseN(cfg.parallelism) { e =>
@@ -124,20 +127,34 @@ object Run {
           val finalFile = subj.finalFile(stem)
           val mcpCfg    = if (cfg.arm.hasServer) Some(subj.mcpConfig) else None
           for {
-            _   <- TextIO.write(subj.record, SubjectRecord(cfg.arm, roots, cfg.expose).toJson.spaces2)
+            _   <- TextIO.write(subj.record, SubjectRecord(cfg.arm, roots, cfg.expose, Some(cfg.endpoint)).toJson.spaces2)
             _   <- mcpCfg.fold(IO.unit)(p => TextIO.write(p, Subject.mcpConfig(perRow, workDir, st.workFile, corpus).spaces2))
             _   <- TextIO.write(subj.prompt, prompt + "\n")
             _   <- TextIO.write(subj.sysPrompt, sysPrompt + "\n")
             _   <- IO.println(s">> ${entry.id} launch (${entry.difficulty.tag}, ${struxdriver.search.LoopOutcome.stratumOf(entry.source, entry.tags)})")
             run <- Subject.run(perRow, workDir, mcpCfg, prompt, subj.transcript, subj.stderr)
-            _   <- IO.blocking { Files.createDirectories(finalFile.getParent); Files.copy(st.workFile, finalFile, StandardCopyOption.REPLACE_EXISTING); () }
-            _   <- TextIO.write(subj.runRecord, run.toJson.spaces2)
+            _   <- keep(cfg.env.credentials, subj, st.workFile, finalFile, run)
             _   <- IO.println(f">> ${entry.id}%-36s subject exit=${run.exitCode.map(_.toString).getOrElse("killed")} wall=${run.wallMs / 1000}s")
             j   <- Outcomes.judgeOne(cfg, entry, agda, subject.addDirs)
           } yield j
       }
     } yield out
   }
+
+  /** Archive what a finished subject left: its transcript and stderr are
+    * scrubbed of every credential value first (issue #237), so a failure
+    * after this point (a work file the subject deleted fails the copy)
+    * still leaves nothing to archive that holds one; then the final file is
+    * copied and scrubbed, and `run.json` names what was replaced.
+    */
+  private[agentbench] def keep(creds: Credentials, subj: SubjectLayout, workFile: Path, finalFile: Path, run: SubjectRun): IO[SubjectRun] =
+    for {
+      logs  <- Credentials.scrub(creds, Vector(subj.transcript, subj.stderr))
+      _     <- IO.blocking { Files.createDirectories(finalFile.getParent); Files.copy(workFile, finalFile, StandardCopyOption.REPLACE_EXISTING); () }
+      file  <- Credentials.scrub(creds, Vector(finalFile))
+      done   = run.copy(redacted = (logs ++ file).distinct.sorted)
+      _     <- TextIO.write(subj.runRecord, done.toJson.spaces2)
+    } yield done
 
   /** Every archived subject judged again, `cfg.parallelism` at a time; a
     * missing archive is that row's anomaly.  `libraryRoots` are the harness's

@@ -154,12 +154,16 @@ object Report {
       _ <- Scaffold.writeJsonl(layout.results, driven.flatMap(_.attempts).map(_.toJson))
       _ <- Scaffold.writeJsonl(layout.fixtures, driven.map(_.fixtureRow))
       _ <- TextIO.write(layout.report, report.spaces2)
-      _ <- IO.println(summarize(cfg, config.hcursor.get[String]("arm").getOrElse(cfg.arm.name), outcomes))
+      _ <- IO.println(summarize(cfg, config.hcursor.get[String]("arm").getOrElse(cfg.arm.name), endpointOf(config), outcomes))
       _ <- IO.println(s">> wrote ${layout.report}")
     } yield ()
   }
 
-  private def summarize(cfg: AgentBenchConfig, arm: String, outcomes: Vector[Outcome]): String = {
+  /** The base URL a report's config names, when the run had one (issue #237). */
+  private def endpointOf(config: Json): Option[String] =
+    config.hcursor.downField("endpoint").get[String](Endpoint.baseUrlVar).toOption.filter(_ != Endpoint.absent)
+
+  private def summarize(cfg: AgentBenchConfig, arm: String, endpoint: Option[String], outcomes: Vector[Outcome]): String = {
     def line(label: String, sel: Vector[Outcome]) =
       f"$label%-26s ${sel.count(_.solved)}%2d/${sel.size}%-2d solved  ${sel.count(_.restated)}%2d restated  ${originalInView(sel).fold("-")(_.toString)}%2s original in view  ${sel.count(_.anomaly.isDefined)}%2d anomaly  turns=${sel.map(_.turns).sum}%4d calls=${sel.map(_.toolCallsTotal).sum}%4d cost=$$${sel.map(_.costUsd).sum}%.2f"
     val byTier    = tiers.map(t => line(t, outcomes.filter(_.entry.difficulty.tag == t)))
@@ -169,7 +173,7 @@ object Report {
     val via       = perVia(outcomes, _.via).map { case (n, k) => s"$n=$k" }.mkString(" ")
     val verdict   = perVia(outcomes, _.verdictVia).map { case (n, k) => s"$n=$k" }.mkString(" ")
     s"""
-       |== agent-bench (arm=$arm model=${cfg.model.getOrElse("?")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} safe=${cfg.safe}) ==
+       |== agent-bench (arm=$arm model=${cfg.model.getOrElse("?")}${endpoint.fold("")(u => s" endpoint=$u")} turns=${cfg.maxTurns} wall=${cfg.wallCapSec}s budget=${cfg.maxBudgetUsd} safe=${cfg.safe}) ==
        |${byTier.mkString("\n")}
        |${byStratum.mkString("\n")}
        |${line("total", outcomes)}

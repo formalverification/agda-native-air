@@ -10,7 +10,9 @@
   *  The agent bench's configuration and its argument parser (issue #154):
   *  the caps, the paths, the model, the corpora, the arm (issue #162: which
   *  instrument the subjects get), the tools the server exposes (issue #191:
-  *  `--expose`, a subset of the server's surface), and the two modes that need less
+  *  `--expose`, a subset of the server's surface), the endpoint the
+  *  subjects are served by (issue #237: read from the environment they
+  *  inherit, never from an argument), and the two modes that need less
   *  (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
   *  in the LoopHarness style: unknown flags are refused by name, exactly one
   *  of `--ids` and `--all` is required, and an `--ids` that names nothing is
@@ -48,9 +50,13 @@ final case class AgentBenchConfig(
   corpusAlgebras:  Option[Path],
   agdaJsonBin:     Option[Path],
   rejudge:         Boolean,
-  resume:          Boolean
+  resume:          Boolean,
+  env:             SubjectEnv
 ) {
   def layout: RunLayout = RunLayout(outDir.resolve(runId))
+
+  /** The endpoint the subjects are served by, from the environment they are given. */
+  def endpoint: Endpoint = env.endpoint
 
   /** The flags every Agda of the protocol runs with: the subjects' servers,
     * the harness's own server that stages the work copies and answers the
@@ -88,13 +94,18 @@ object Cli {
       |    [--server-timeout N]      per-Agda-call bound, seconds (default 600)
       |    [--rejudge]               re-judge an existing run root from subjects/ with its own prompts; no model call (the server and the extractor are still needed)
       |    [--resume on|off]         keep the archived, non-anomalous subjects of this run id and run only the rest (default off); refused when the run id's recorded protocol differs
+      |  The endpoint is the environment's: ANTHROPIC_BASE_URL and the client's model variables, exported around the run, reach the subjects and are recorded in protocol.json.
       |""".stripMargin
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
     "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
     "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm", "expose")
 
-  def parse(args: List[String]): Either[String, AgentBenchConfig] = {
+  /** Parse the arguments; `env` is the harness's environment, which the
+    * subjects inherit (less every CLAUDE* variable) and the endpoint is read
+    * from.  AgentBench passes its own; a test passes the one it means.
+    */
+  def parse(args: List[String], env: Map[String, String]): Either[String, AgentBenchConfig] = {
     @annotation.tailrec
     def go(rest: List[String], m: Map[String, String]): Either[String, Map[String, String]] =
       rest match {
@@ -151,6 +162,8 @@ object Cli {
       resume  <- onOff(m, "resume", false)
       arm     <- m.get("arm").fold[Either[String, Arm]](Right(Arm.default))(Arm.parse)
       expose  <- m.get("expose").fold[Either[String, Option[Vector[String]]]](Right(None))(s => exposeOf(s, arm).map(Some(_)))
+      subjEnv  = SubjectEnv.of(env)
+      _       <- if (rejudge) Right(()) else credentialsFor(subjEnv)
     } yield AgentBenchConfig(
       index           = abs(ix),
       ids             = ids,
@@ -174,9 +187,21 @@ object Cli {
       corpusAlgebras  = ca,
       agdaJsonBin     = json,
       rejudge         = rejudge,
-      resume          = resume
+      resume          = resume,
+      env             = subjEnv
     )
   }
+
+  /** A run whose subjects would send another host a credential it may not
+    * have issued is refused (issue #237): the client sends every credential
+    * it is given to the base URL, so with both ANTHROPIC_API_KEY and
+    * ANTHROPIC_AUTH_TOKEN set and the base URL not Anthropic's, one of them
+    * (an Anthropic key left in the shell, most likely) would reach that host.
+    */
+  private def credentialsFor(env: SubjectEnv): Either[String, Unit] =
+    Either.cond(!(Endpoint.foreign(env.endpoint) && Vector("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN").forall(Endpoint.valueOf(env.vars, _).isDefined)), (),
+      s"${Endpoint.baseUrlVar} names another host than Anthropic's and both ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN are set: " +
+        "the client would send both to it; unset the one that endpoint did not issue")
 
   /** The `--expose` list (issue #191): bare tool names, each one the server
     * registers with a corpus, on an arm that has the server.  Refused by name
