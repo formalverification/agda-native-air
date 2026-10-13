@@ -30,11 +30,15 @@
   *  served by, read from the environment they are given (`Endpoint`: the base
   *  URL or `absent`, and the client's model variables when set, never a
   *  credential), so a run on another provider names it, and a resume under a
-  *  changed endpoint is refused naming the field, as a changed model is.  A
-  *  protocol recorded before issue #237 has no endpoint, and reads as the
-  *  client's default (`differences`), as one recorded before `--expose` reads
-  *  as the full surface, so a run in flight across the change can still be
-  *  resumed.
+  *  changed endpoint is refused naming the field, as a changed model is.  The
+  *  price table the report prices tokens at (`--prices`) is an input like the
+  *  corpora, by digest, under the name of the run's own copy (`prices.json`,
+  *  which a resume prices at), so a resume under a changed table is refused,
+  *  and an edit to the committed one is not a change.  A protocol recorded
+  *  before issue #237 has neither the endpoint nor the table, and reads as the
+  *  client's default endpoint and the current table (`differences`), as one
+  *  recorded before `--expose` reads as the full surface, so a run in flight
+  *  across the change can still be resumed.
   *
   *  ============================================================================
   */
@@ -57,12 +61,13 @@ object Protocol {
   private def fileId(p: Path): IO[Json] =
     Digest.sha256Hex(p).map(d => Json.obj("path" -> abs(p).asJson, "sha256" -> d.asJson))
 
-  /** What the run reads, by content: the index, the binaries, and the corpora
+  /** What the run reads, by content: the index, the binaries, the corpora
     * (whose provenance block already carries a digest and the assembly's own
-    * provenance).  The project root is a path: it is where everything else is
-    * resolved from, and its content is the repository.
+    * provenance), and the price table (issue #237).  The project root is a
+    * path: it is where everything else is resolved from, and its content is
+    * the repository.
     */
-  def inputs(cfg: AgentBenchConfig, corpora: Json): IO[Json] =
+  def inputs(cfg: AgentBenchConfig, corpora: Json, prices: PriceTable): IO[Json] =
     for {
       index  <- fileId(cfg.index)
       server <- cfg.serverBin.traverse(fileId)
@@ -72,7 +77,11 @@ object Protocol {
       "index"       -> index,
       "serverBin"   -> server.asJson,
       "agdaJsonBin" -> extr.asJson,
-      "corpora"     -> corpora
+      "corpora"     -> corpora,
+      // The table the run prices at is its own copy, `prices.json` in the
+      // run root, by digest: the same record whether a fresh run copied it
+      // there or a resume reads it back.
+      "prices"      -> Json.obj("path" -> Layout.pricesFile.asJson, "sha256" -> prices.sha256.asJson)
     ).dropNullValues
 
   /** The protocol as JSON: null-valued knobs (an unset model) are dropped, so
@@ -117,12 +126,19 @@ object Protocol {
   }
 
   /** A protocol recorded before issue #237, read as one recorded after it:
-    * no `endpoint` is the client's default.  A record that has one is
-    * unchanged.
+    * no `endpoint` is the client's default, and no price table is the
+    * current one.  A record that has them is unchanged.
     */
-  private def since237(recorded: Json, current: Json): Json =
-    if (recorded.hcursor.downField("endpoint").succeeded || !current.hcursor.downField("endpoint").succeeded) recorded
-    else recorded.mapObject(_.add("endpoint", Endpoint(Vector(Endpoint.baseUrlVar -> Endpoint.absent)).toJson))
+  private def since237(recorded: Json, current: Json): Json = {
+    val c        = recorded.hcursor
+    val endpoint = if (c.downField("endpoint").succeeded || !current.hcursor.downField("endpoint").succeeded) recorded
+                   else recorded.mapObject(_.add("endpoint", Endpoint(Vector(Endpoint.baseUrlVar -> Endpoint.absent)).toJson))
+    (endpoint.hcursor.downField("inputs").focus, current.hcursor.downField("inputs").downField("prices").focus) match {
+      case (Some(in), Some(p)) if !in.hcursor.downField("prices").succeeded =>
+        endpoint.mapObject(_.add("inputs", in.mapObject(_.add("prices", p))))
+      case _ => endpoint
+    }
+  }
 
   /** The fields on which two protocols differ, `name: recorded -> current`,
     * over the union of their keys (a key one side lacks reads `absent`).

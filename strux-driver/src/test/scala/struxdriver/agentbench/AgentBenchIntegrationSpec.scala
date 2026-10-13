@@ -11,14 +11,16 @@
   *  extractor.  On stdlib-nat-plus-comm: the committed gold is solved; the
   *  obligation fails on holes; a weakened statement and an edited import line
   *  fail preservation (the first by Agda's elaborated type differing from the
-  *  gold's, the second by the diff); a postulate fails escape by `SafeFlagPostulate`; a
-  *  wrong proof fails typecheck; a proof by the library's own lemma is
-  *  restated by its `bodyRefs`.  Two archived subjects judged again end to
-  *  end: a stdlib row, whose `original` column is null (issue #188), and an
-  *  agda-algebras row of the shell arm, whose column names the library file
-  *  it read before its last edit.  Needs AGDA_MCP_BIN, AGDA_JSON_BIN, and
-  *  AGDA_NATIVE_AIR_ROOT inside `nix develop .#backend` (the agent-bench-it
-  *  Make target sets them); without them the suite is cancelled.
+  *  gold's, the second by the diff); a postulate fails escape by
+  *  `SafeFlagPostulate`; a wrong proof fails typecheck; a proof by the
+  *  library's own lemma is restated by its `bodyRefs`.  Two archived subjects
+  *  judged again end to end: a stdlib row, whose `original` column is null
+  *  (issue #188), and an agda-algebras row of the shell arm, whose column
+  *  names the library file it read before its last edit; the first is priced
+  *  at the committed price table to the client's own figure (issue #237).
+  *  Needs AGDA_MCP_BIN, AGDA_JSON_BIN, and AGDA_NATIVE_AIR_ROOT inside `nix
+  *  develop .#backend` (the agent-bench-it Make target sets them); without
+  *  them the suite is cancelled.
   *
   *  ============================================================================
   */
@@ -81,7 +83,8 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
       for {
         oracle   <- Oracle.create(client)
         includes <- Extractor.includesFromRegistry(Paths.get(agdaDir).resolve("libraries"))
-        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id), includes)
+        prices   <- Pricing.load(root.resolve(Cli.defaultPrices))
+        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id), includes, prices)
       } yield judged.outcome
     }.unsafeRunSync()
 
@@ -93,6 +96,9 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     // A stdlib row names no original: the column is null, not false.
     intact.original shouldBe None
     intact.toJson.hcursor.downField("original").focus shouldBe Some(io.circe.Json.Null)
+    // Priced at the committed table, the row costs what the client said (#237).
+    intact.priced.unpriced shouldBe None
+    (intact.priced.usd.map(_.toDouble).getOrElse(-1.0) - intact.costUsd).abs should be < 1e-9
 
     val transcript = dst.resolve("transcript.jsonl")
     val kept = new String(Files.readAllBytes(transcript), StandardCharsets.UTF_8)
@@ -105,6 +111,8 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     crashed.gate     shouldBe None            // the file itself still passes every gate
     crashed.solved   shouldBe false           // and is still not published as a solve
     crashed.restated shouldBe false
+    crashed.priced.usd shouldBe None          // what it spent was never reported, so it is unpriced, not free
+    crashed.priced.unpriced.exists(_.startsWith("no result record")) shouldBe true
   }
 
   test("an archived agda-algebras solve of the shell arm carries the original it read, and its verdict is unchanged") {
@@ -135,7 +143,8 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
       for {
         oracle   <- Oracle.create(client)
         includes <- Extractor.includesFromRegistry(Paths.get(agdaDir).resolve("libraries"))
-        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id), includes)
+        prices   <- Pricing.load(root.resolve(Cli.defaultPrices))
+        judged   <- Outcomes.judgeOne(cfg, e, new ServerAgda(oracle, Extractor(json, includes, agdaDir, 300.seconds), e.id), includes, prices)
       } yield judged.outcome
     }.unsafeRunSync()
 

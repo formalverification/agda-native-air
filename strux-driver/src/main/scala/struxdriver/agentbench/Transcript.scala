@@ -11,9 +11,10 @@
   *  --verbose` stream it wrote (issue #154): the init record (which tools the
   *  client presented, whether the agda server connected), every tool call the
   *  model made with the result it got back, the text it wrote, and the final
-  *  result record (turns, wall, cost, tokens, how the session ended).  From
-  *  those the harness derives the per-tool call counts, the fill_hole attempt
-  *  rows, the Read/Edit path audit, and the isolation verdict.
+  *  result record (turns, wall, cost, tokens, what each model spent, how the
+  *  session ended).  From those the harness derives the per-tool call counts,
+  *  the fill_hole attempt rows, the Read/Edit path audit, and the isolation
+  *  verdict.
   *
   *  Design notes
   *  ------------
@@ -33,6 +34,11 @@
   *    one turn, and none of their results is in its context until all of them
   *    were made.  "Seen before the last edit" (OriginalInView.scala, issue
   *    #188) is a comparison of records, never of call indices.
+  *  - The result record carries two accounts of what the session spent:
+  *    `usage`, the main loop's calls (the report's `tokens`), and
+  *    `modelUsage`, every model's, each with the client's own figure and the
+  *    price table it used.  The second is what the client's `costUsd` sums
+  *    and what a priced cost is computed from (Pricing.scala, issue #237).
   *
   *  ============================================================================
   */
@@ -78,15 +84,19 @@ final case class ResultRecord(
   costUsd:           Double,
   usage:             Json,
   permissionDenials: Int,
-  text:              String
+  text:              String,
+  modelUsage:        Vector[ModelUsage]
 ) {
   private def usageInt(field: String): Long = usage.hcursor.get[Long](field).getOrElse(0L)
-  def tokens: Json = Json.obj(
-    "input"         -> Json.fromLong(usageInt("input_tokens")),
-    "output"        -> Json.fromLong(usageInt("output_tokens")),
-    "cacheRead"     -> Json.fromLong(usageInt("cache_read_input_tokens")),
-    "cacheCreation" -> Json.fromLong(usageInt("cache_creation_input_tokens"))
-  )
+
+  /** The `usage` block's counts: the main loop's calls, which can miss one. */
+  def usageTokens: Tokens = Tokens(
+    input         = usageInt("input_tokens"),
+    output        = usageInt("output_tokens"),
+    cacheRead     = usageInt("cache_read_input_tokens"),
+    cacheCreation = usageInt("cache_creation_input_tokens"))
+
+  def tokens: Json = usageTokens.toJson
 }
 
 final case class Transcript(
@@ -202,7 +212,9 @@ object Transcript {
                 costUsd           = c.get[Double]("total_cost_usd").getOrElse(0.0),
                 usage             = c.downField("usage").focus.getOrElse(Json.obj()),
                 permissionDenials = c.downField("permission_denials").focus.flatMap(_.asArray).map(_.size).getOrElse(0),
-                text              = c.get[String]("result").getOrElse(""))))
+                text              = c.get[String]("result").getOrElse(""),
+                modelUsage        = c.downField("modelUsage").focus.flatMap(_.asObject).toVector
+                                      .flatMap(_.toVector.map { case (m, u) => ModelUsage.fromClient(m, u) }))))
             case _ => acc
           }
           next.copy(records = next.records + 1)

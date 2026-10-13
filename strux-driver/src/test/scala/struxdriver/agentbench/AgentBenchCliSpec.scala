@@ -8,7 +8,8 @@
   *  -------
   *  Pins the harness's argument contract (Copilot on PR #158): exactly one of
   *  `--ids` and `--all`, and an `--ids` that names at least one obligation, so
-  *  a mis-selection fails at parse time rather than an hour into a sweep.
+  *  a mis-selection fails at parse time rather than an hour into a sweep;
+  *  and where `--prices` resolves (issue #237).
   *
   *  ============================================================================
   */
@@ -120,6 +121,19 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     }
     // No roots, no flag: an empty --add-dir would be an argument error.
     Subject.fixedFlags(SubjectConfig.of(cliParse(base ++ List("--all")).getOrElse(fail("parse")), "s", "u")) should not contain "--add-dir"
+  }
+
+  test("--prices resolves from the project root, is optional on Anthropic's endpoint, and is required on another (#237)") {
+    val repo = List("--index", "i.jsonl", "--out-dir", "out", "--run-id", "r", "--project-root", "/repo", "--all",
+      "--server-bin", "b", "--agda-json-bin", "j", "--model", "m", "--corpus-stdlib", "s", "--corpus-algebras", "a")
+    cliParse(repo).map(_.prices) shouldBe Right(None)                       // the harness reads Cli.defaultPrices
+    cliParse(repo ++ List("--prices", "data/prices-moonshot.json")).map(_.prices.map(_.toString)) shouldBe Right(Some("/repo/data/prices-moonshot.json"))
+    val moonshot = Map("ANTHROPIC_BASE_URL" -> "https://api.moonshot.ai/anthropic")
+    cliParse(repo, moonshot).left.map(_.startsWith("ANTHROPIC_BASE_URL names another host than Anthropic's: pass --prices")) shouldBe Left(true)
+    cliParse(repo ++ List("--prices", "p.json"), moonshot).isRight shouldBe true
+    cliParse(repo, Map("ANTHROPIC_BASE_URL" -> "https://api.anthropic.com/")).isRight shouldBe true
+    cliParse(List("--rejudge", "--index", "i", "--out-dir", "o", "--run-id", "r", "--project-root", ".", "--all",
+      "--server-bin", "b", "--agda-json-bin", "j"), moonshot).isRight shouldBe true   // a re-judge prices at the run's own table
   }
 
   test("an unknown flag and a bad on|off value are refused by name") {

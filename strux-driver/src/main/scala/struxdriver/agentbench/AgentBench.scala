@@ -15,9 +15,9 @@
   *  server, a shell with the pinned `agda`, or both -- and the arm chooses the
   *  prompts; the libraries' source roots come from the Agda registry and are
   *  given to the file tools on every arm, so the arms differ in their
-  *  instrument and in nothing else.  The endpoint the subjects are served by
-  *  is recorded, and no credential they inherit is left in the run directory
-  *  (issue #237).
+  *  instrument and in nothing else.  Every row is priced at the run's price
+  *  table beside the client's own figure, and the endpoint the subjects are
+  *  served by is recorded (issue #237).
   *  This file only wires the parts together: Cli (the arguments), Layout
   *  (where a run keeps things), Run (stage, spawn, archive), Outcomes (the
   *  judge step over the archive), Report (the outputs).  Like the loop, an
@@ -58,6 +58,16 @@ object AgentBench extends IOApp {
     for {
       entries  <- Scaffold.readIndex(cfg.index, cfg.ids)
       _        <- IO.raiseWhen(entries.isEmpty)(new RuntimeException("no obligations matched"))
+      // The price table every row is priced at, beside the client's figure,
+      // and the run's model checked against it before anything is written
+      // (issue #237; pricesPath and modelPriced below).
+      pricesAt <- IO.blocking(Files.isRegularFile(layout.prices)).map(pricesPath(cfg, _))
+      prices   <- Pricing.load(pricesAt)
+      _        <- modelPriced(cfg, prices) match {
+                    case Left(refusal)   => IO.raiseError(new RuntimeException(refusal))
+                    case Right(Some(w))  => IO.println(s"!! warning: $w")
+                    case Right(None)     => IO.unit
+                  }
       _        <- IO.blocking(Files.createDirectories(layout.runRoot))
       // The prompts: a fresh run packages them into the archive; a re-judge
       // reads the archive's own, so the record of what the subjects saw is
@@ -70,7 +80,7 @@ object AgentBench extends IOApp {
       fresh    <- if (cfg.rejudge) IO.pure(Json.obj())
                   else Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
                          .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*))
-      inputs   <- if (cfg.rejudge) IO.pure(Json.obj()) else Protocol.inputs(cfg, fresh)
+      inputs   <- if (cfg.rejudge) IO.pure(Json.obj()) else Protocol.inputs(cfg, fresh, prices)
       // The roots outside its own directory that a subject may read: every
       // registered library's own directory (a library IS its directory, and a
       // subject exploring one starts at its root) with its source roots, and
@@ -96,6 +106,10 @@ object AgentBench extends IOApp {
       _        <- if (cfg.rejudge) IO.unit else Protocol.admit(layout, protocol, cfg.resume)
       _        <- if (cfg.rejudge) IO.unit
                   else TextIO.write(layout.prompts.resolve("system-prompt.md"), sysP) *> TextIO.write(layout.prompts.resolve("user-prompt.md"), userT)
+      // The table, byte for byte, beside the protocol that names its digest,
+      // so a re-judge prices at the run's own and the archive keeps it.
+      _        <- if (cfg.rejudge) IO.unit
+                  else IO.blocking { Files.copy(prices.path, layout.prices, java.nio.file.StandardCopyOption.REPLACE_EXISTING); () }
       // A re-judge keeps the run's own record of how its subjects were run:
       // the previous report's config and corpora blocks are carried over,
       // since the harness is not told the model or the corpora a second time.
@@ -113,11 +127,11 @@ object AgentBench extends IOApp {
                     corpus     = None)
       extractor = Extractor(cfg.agdaJsonBin.getOrElse(throw new IllegalStateException("agda-json-bin required")), includes, agdaDir, cfg.serverTimeout.seconds)
       driven   <- McpClient.resource(server).use { client =>
-                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor, readRoots)
-                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots, sources)
+                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor, readRoots, prices)
+                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots, sources, prices)
                   }
       corpora   = previous.flatMap(_.hcursor.downField("corpora").focus).getOrElse(fresh)
-      _        <- Report.write(cfg, entries, driven, corpora, protocol, previous.flatMap(_.hcursor.downField("config").focus))
+      _        <- Report.write(cfg, entries, driven, corpora, protocol, previous.flatMap(_.hcursor.downField("config").focus), prices)
       anomalies = driven.map(_.outcome).filter(_.anomaly.isDefined)
       _        <- anomalies.traverse_(o => IO.println(s"!! ${o.entry.id} anomaly: ${o.anomaly.getOrElse("")}"))
       // The run directory searched for every credential value in the
@@ -141,6 +155,29 @@ object AgentBench extends IOApp {
       val found = leaks.map { case (f, names) => Json.obj("file" -> layout.relative(f).asJson, "variables" -> names.asJson) }
       val kept  = earlier.flatMap(_.asArray).getOrElse(Vector.empty)
       TextIO.write(layout.leaks, Json.arr((kept ++ found).distinct: _*).spaces2)
+    }
+
+  /** The price table a run prices at: `--prices`, else, for a re-judge or a
+    * resume, the run's own copy when it has one, else the committed table
+    * (issue #237).  A resume prices at its own copy, so an edit to the
+    * committed table (a new model's row) never stops a run in flight.
+    */
+  private[agentbench] def pricesPath(cfg: AgentBenchConfig, runHasTable: Boolean): java.nio.file.Path =
+    cfg.prices.getOrElse(if ((cfg.rejudge || cfg.resume) && runHasTable) cfg.layout.prices else cfg.projectRoot.resolve(Cli.defaultPrices))
+
+  /** A fresh run's model checked against its table: on another endpoint,
+    * where the priced figure is the one quoted, a model with no row refuses
+    * the run before anything is written (Left); on Anthropic's, where the
+    * client's figure is the list price, it is a warning and its rows come
+    * out unpriced with the model named, as a re-judge's do.
+    */
+  private[agentbench] def modelPriced(cfg: AgentBenchConfig, prices: PriceTable): Either[String, Option[String]] =
+    (if (cfg.rejudge) None else cfg.model.filter(m => prices.priceOfModelId(m).isEmpty)) match {
+      case None    => Right(None)
+      case Some(m) =>
+        val why = s"--model $m has no row in the price table ${prices.path}; pass --prices with a table that prices it " +
+          "(copy data/benchmarks/prices-anthropic.json: USD per million tokens of input, cacheWrite, cacheRead, output; zeros for a model that costs nothing)"
+        if (Endpoint.foreign(cfg.endpoint)) Left(why) else Right(Some(why))
     }
 
   /** An archived prompt, named when missing: a re-judge never substitutes the packaged one. */

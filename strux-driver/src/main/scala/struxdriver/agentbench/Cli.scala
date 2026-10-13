@@ -10,7 +10,8 @@
   *  The agent bench's configuration and its argument parser (issue #154):
   *  the caps, the paths, the model, the corpora, the arm (issue #162: which
   *  instrument the subjects get), the tools the server exposes (issue #191:
-  *  `--expose`, a subset of the server's surface), the endpoint the
+  *  `--expose`, a subset of the server's surface), the price table the
+  *  report prices tokens at (issue #237: `--prices`), the endpoint the
   *  subjects are served by (issue #237: read from the environment they
   *  inherit, never from an argument), and the two modes that need less
   *  (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
@@ -51,6 +52,7 @@ final case class AgentBenchConfig(
   agdaJsonBin:     Option[Path],
   rejudge:         Boolean,
   resume:          Boolean,
+  prices:          Option[Path],
   env:             SubjectEnv
 ) {
   def layout: RunLayout = RunLayout(outDir.resolve(runId))
@@ -94,12 +96,16 @@ object Cli {
       |    [--server-timeout N]      per-Agda-call bound, seconds (default 600)
       |    [--rejudge]               re-judge an existing run root from subjects/ with its own prompts; no model call (the server and the extractor are still needed)
       |    [--resume on|off]         keep the archived, non-anomalous subjects of this run id and run only the rest (default off); refused when the run id's recorded protocol differs
+      |    [--prices PATH]           the price table each subject's tokens are priced at, beside the client's own figure (default: data/benchmarks/prices-anthropic.json for a fresh run; for a re-judge the run's own prices.json, or that table for a run with none); required when ANTHROPIC_BASE_URL names another host, where a fresh run whose --model has no row in it is refused
       |  The endpoint is the environment's: ANTHROPIC_BASE_URL and the client's model variables, exported around the run, reach the subjects and are recorded in protocol.json.
       |""".stripMargin
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
     "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
-    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm", "expose")
+    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm", "expose", "prices")
+
+  /** The price table a fresh run reads unless `--prices` names another, from the project root. */
+  val defaultPrices: String = "data/benchmarks/prices-anthropic.json"
 
   /** Parse the arguments; `env` is the harness's environment, which the
     * subjects inherit (less every CLAUDE* variable) and the endpoint is read
@@ -163,7 +169,13 @@ object Cli {
       arm     <- m.get("arm").fold[Either[String, Arm]](Right(Arm.default))(Arm.parse)
       expose  <- m.get("expose").fold[Either[String, Option[Vector[String]]]](Right(None))(s => exposeOf(s, arm).map(Some(_)))
       subjEnv  = SubjectEnv.of(env)
+      prices   = m.get("prices").map(abs)
       _       <- if (rejudge) Right(()) else credentialsFor(subjEnv)
+      // Another provider's run names its own price table: the committed one
+      // is Anthropic's list prices, which are not that provider's bill.
+      _       <- Either.cond(rejudge || prices.isDefined || !Endpoint.foreign(subjEnv.endpoint), (),
+                   s"${Endpoint.baseUrlVar} names another host than Anthropic's: pass --prices with that provider's prices " +
+                     "(the default table is Anthropic's list prices)")
     } yield AgentBenchConfig(
       index           = abs(ix),
       ids             = ids,
@@ -188,6 +200,7 @@ object Cli {
       agdaJsonBin     = json,
       rejudge         = rejudge,
       resume          = resume,
+      prices          = prices,
       env             = subjEnv
     )
   }

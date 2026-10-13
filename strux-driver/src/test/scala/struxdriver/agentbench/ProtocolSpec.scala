@@ -12,8 +12,10 @@
   *  the resume rule names every field on which two protocols differ.  The
   *  endpoint (issue #237): the base URL the subjects are given, or `absent`,
   *  in the protocol and in each subject's record, never a credential (a
-  *  search of the two records written with one in the environment), and a
-  *  resume under a changed endpoint refused naming the field.
+  *  search of the two records written with one in the environment; the
+  *  live spec searches a whole run directory), and a resume under a changed
+  *  endpoint refused naming the field.  The price
+  *  table is an input by path and digest, like the corpora.
   *
   *  ============================================================================
   */
@@ -41,7 +43,7 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     */
   private def cfg(extra: String*): AgentBenchConfig = cfgIn(Map.empty, extra: _*)
   private def cfgIn(env: Map[String, String], extra: String*): AgentBenchConfig =
-    cliParse(base ++ List("--model", "claude-sonnet-5") ++ extra.toList, env).getOrElse(fail("parse"))
+    cliParse(base ++ List("--model", "claude-sonnet-5", "--prices", "p.json") ++ extra.toList, env).getOrElse(fail("parse"))
 
   /** A value no real credential has, standing for one. */
   private val credential = "sk-test-not-a-credential-237"
@@ -74,16 +76,19 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     p.hcursor.downField("inputs").downField("corpora").downField("agda-stdlib").get[String]("sha256").toOption shouldBe Some("cc")
   }
 
-  test("inputs identify the index, the binaries, and the corpora by content, so a file regenerated in place differs") {
-    val dir   = Files.createTempDirectory("agentbench-inputs")
-    val index = dir.resolve("i.jsonl"); val bin = dir.resolve("bin"); val js = dir.resolve("j")
-    val corp  = dir.resolve("s.jsonl"); val alg = dir.resolve("a.jsonl")
-    Vector(index -> "one\n", bin -> "server", js -> "extractor", corp -> "rows", alg -> "rows")
+  test("inputs identify the index, the binaries, the corpora, and the price table by content, so a file regenerated in place differs") {
+    val dir    = Files.createTempDirectory("agentbench-inputs")
+    val index  = dir.resolve("i.jsonl"); val bin = dir.resolve("bin"); val js = dir.resolve("j")
+    val corp   = dir.resolve("s.jsonl"); val alg = dir.resolve("a.jsonl"); val prices = dir.resolve("p.json")
+    val row    = """{"input": 3, "cacheWrite": 3, "cacheRead": 0.3, "output": 15}"""
+    Vector(index -> "one\n", bin -> "server", js -> "extractor", corp -> "rows", alg -> "rows",
+      prices -> s"""{"schemaVersion": "agent-bench-prices.v0", "asOf": "2026-10-13", "models": {"kimi-k3": $row}}""")
       .foreach { case (p, s) => Files.write(p, s.getBytes("UTF-8")) }
+    val table  = Pricing.load(prices).unsafeRunSync()
     val real = cliParse(List("--index", index.toString, "--out-dir", "out", "--run-id", "r", "--project-root", ".", "--all",
       "--server-bin", bin.toString, "--agda-json-bin", js.toString, "--corpus-stdlib", corp.toString,
-      "--corpus-algebras", alg.toString, "--model", "m")).getOrElse(fail("parse"))
-    val before = Protocol.inputs(real, Json.obj("agda-stdlib" -> Json.obj("sha256" -> "digest-of-rows".asJson))).unsafeRunSync()
+      "--corpus-algebras", alg.toString, "--model", "m", "--prices", prices.toString), Map.empty).getOrElse(fail("parse"))
+    val before = Protocol.inputs(real, Json.obj("agda-stdlib" -> Json.obj("sha256" -> "digest-of-rows".asJson)), table).unsafeRunSync()
     before.hcursor.downField("index").get[String]("path").toOption shouldBe Some(index.toAbsolutePath.toString)
     val indexSha = before.hcursor.downField("index").get[String]("sha256").getOrElse(fail("no index digest"))
     indexSha.length shouldBe 64
@@ -91,12 +96,22 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     before.hcursor.downField("corpora").downField("agda-stdlib").get[String]("sha256").toOption shouldBe Some("digest-of-rows")
 
     Files.write(index, "one\ntwo\n".getBytes("UTF-8"))          // regenerated in place, same path
-    val after = Protocol.inputs(real, Json.obj()).unsafeRunSync()
+    val after = Protocol.inputs(real, Json.obj(), table).unsafeRunSync()
     after.hcursor.downField("index").get[String]("sha256").toOption should not be Some(indexSha)
     val ds = Protocol.differences(
       Protocol.of(real, "v1", "system", "user", before),
       Protocol.of(real, "v1", "system", "user", after))
     ds.map(_.takeWhile(_ != ':')) shouldBe Vector("inputs")
+
+    // The price table likewise (issue #237): by path and digest, so a table
+    // edited in place is a different protocol.
+    after.hcursor.downField("prices").get[String]("path").toOption shouldBe Some("prices.json")   // the run's own copy, which a resume reads
+    val pricesSha = after.hcursor.downField("prices").get[String]("sha256").getOrElse(fail("no price-table digest"))
+    Files.write(prices, new String(Files.readAllBytes(prices), "UTF-8").replace("15}", "15.5}").getBytes("UTF-8"))
+    val repriced = Protocol.inputs(real, Json.obj(), Pricing.load(prices).unsafeRunSync()).unsafeRunSync()
+    repriced.hcursor.downField("prices").get[String]("sha256").toOption should not be Some(pricesSha)
+    Protocol.differences(Protocol.of(real, "v1", "system", "user", after), Protocol.of(real, "v1", "system", "user", repriced))
+      .map(_.takeWhile(_ != ':')) shouldBe Vector("inputs")
   }
 
   test("the subject's server config carries the judge's --safe in its flags and in the check_project command") {
@@ -291,25 +306,29 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
 
   test("a run that would send another host both an API key and an auth token is refused at parse time; a re-judge, which spawns nothing, is not (#237)") {
     val both = moonshot + ("ANTHROPIC_API_KEY" -> credential)
-    val refused = cliParse(base ++ List("--model", "kimi-k3"), both)
+    val refused = cliParse(base ++ List("--model", "kimi-k3", "--prices", "p.json"), both)
     refused.left.map(_.startsWith("ANTHROPIC_BASE_URL names another host than Anthropic's and both")) shouldBe Left(true)
     refused.left.map(_.contains(credential)) shouldBe Left(false)
-    cliParse(base ++ List("--model", "kimi-k3"), moonshot).isRight shouldBe true                                   // one credential
+    cliParse(base ++ List("--model", "kimi-k3", "--prices", "p.json"), moonshot).isRight shouldBe true              // one credential
     cliParse(base ++ List("--model", "m"), both + ("ANTHROPIC_BASE_URL" -> "https://api.anthropic.com")).isRight shouldBe true  // Anthropic's own host
     cliParse(base ++ List("--model", "m"), both - "ANTHROPIC_BASE_URL").isRight shouldBe true                        // the client's default
-    cliParse(base ++ List("--model", "m"), both + ("ANTHROPIC_API_KEY" -> "")).isRight shouldBe true               // an emptied key is no key
+    cliParse(base ++ List("--model", "m", "--prices", "p.json"), both + ("ANTHROPIC_API_KEY" -> "")).isRight shouldBe true  // an emptied key is no key
     cliParse(List("--rejudge", "--index", "i", "--out-dir", "o", "--run-id", "r", "--project-root", ".", "--all",
       "--server-bin", "b", "--agda-json-bin", "j"), both).isRight shouldBe true
   }
 
-  test("a protocol recorded before #237 reads as the client's default endpoint, so a run in flight resumes") {
-    val now    = Protocol.of(cfg(), "v1", "system", "user", someInputs())
-    val before = now.mapObject(_.remove("endpoint"))
+  test("a protocol recorded before #237 reads as the client's default endpoint and the current table, so a run in flight resumes") {
+    val table  = Json.obj("path" -> "prices.json".asJson, "sha256" -> "pp".asJson)
+    val now    = Protocol.of(cfg(), "v1", "system", "user", someInputs().mapObject(_.add("prices", table)))
+    val before = now.mapObject(_.remove("endpoint")).hcursor.downField("inputs").withFocus(_.mapObject(_.remove("prices"))).top.get
+    before.hcursor.downField("endpoint").focus shouldBe None
     Protocol.differences(before, now) shouldBe Vector.empty
     // It is still the client's default it reads as: under another endpoint
     // the resume is refused.
-    Protocol.differences(before, Protocol.of(cfgIn(moonshot), "v1", "system", "user", someInputs())).map(_.takeWhile(_ != ':')) shouldBe
-      Vector("endpoint")
+    val moon = Protocol.of(cfgIn(moonshot), "v1", "system", "user", someInputs().mapObject(_.add("prices", table)))
+    Protocol.differences(before, moon).map(_.takeWhile(_ != ':')) shouldBe Vector("endpoint")
+    // And a record that has a table keeps it: a changed table is a change.
+    val repriced = now.hcursor.downField("inputs").downField("prices").withFocus(_.mapObject(_.add("sha256", "qq".asJson))).top.get
+    Protocol.differences(now, repriced).map(_.takeWhile(_ != ':')) shouldBe Vector("inputs")
   }
-
 }

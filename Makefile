@@ -461,7 +461,7 @@ help:
 	@echo "                                     PROOF_SEARCH_RECALL_REPORT=<run>/report.json PROOF_SEARCH_CORPUS=… PROOF_SEARCH_RECALL_SCORERS=a,b"
 	@echo "  make proof-search-loop-it        - Proof-search P1: live full-search regression vs the real agda-mcp"
 	@echo "  make proof-search-retrieval-it   - Proof-search P2: live corpus-tool transport test (issue 123)"
-	@echo "  make agent-bench                 - Agent-in-the-loop: a frontier model over the benchmark with AGENT_BENCH_ARM=mcp|shell|both, AGENT_BENCH_EXPOSE=tool,... (issues 154, 162, 191)"
+	@echo "  make agent-bench                 - Agent-in-the-loop: a frontier model over the benchmark with AGENT_BENCH_ARM=mcp|shell|both, AGENT_BENCH_EXPOSE=tool,..., AGENT_BENCH_PRICES=table.json (issues 154, 162, 191, 237)"
 	@echo "  make agent-bench-rejudge         - Re-judge an existing agent-bench run from its archived final files and transcripts (pass the run's own AGENT_BENCH_IDS)"
 	@echo "  make agent-bench-it              - Agent-bench: the judge's Agda typecheck gate against a committed gold and obligation"
 	@echo "  make agent-bench-archive         - Copy a quoted agent-bench run (report, rows, prompts, transcripts, final files) under reports/agent-bench/"
@@ -1924,7 +1924,12 @@ proof-search-recall: _check-sbt
 # Another provider (issue #237): export ANTHROPIC_BASE_URL and its credential
 # around the target, and the subjects inherit both; protocol.json records the
 # base URL (the credential only as "set"), and every credential value is
-# scrubbed from what the subjects write.
+# scrubbed from what the subjects write.  AGENT_BENCH_PRICES names the price
+# table every row's tokens are priced at, beside the client's own figure:
+# empty, a fresh run reads data/benchmarks/prices-anthropic.json and a
+# re-judge the run's own prices.json (the committed table for a run that has
+# none); it is required with another endpoint, where a run whose
+# AGENT_BENCH_MODEL has no row in it is refused at start.
 AGENT_BENCH_OUT_DIR         ?= data/benchmarks/reports/agent-bench
 AGENT_BENCH_MODEL           ?= claude-sonnet-5
 AGENT_BENCH_ARM             ?= mcp
@@ -1940,6 +1945,7 @@ AGENT_BENCH_CLAUDE_BIN      ?= claude
 AGENT_BENCH_CORPUS_STDLIB   ?= data/corpora/agda-stdlib/v0/corpus.jsonl
 AGENT_BENCH_CORPUS_ALGEBRAS ?= data/corpora/agda-algebras/v0.1/corpus.jsonl
 AGENT_BENCH_RUN_ID          ?= agent-$(AGENT_BENCH_MODEL)-$(shell date -u +%Y%m%dT%H%M%SZ)
+AGENT_BENCH_PRICES          ?=
 
 AGENT_BENCH_ARCHIVE_DIR     ?= reports/agent-bench
 
@@ -1952,19 +1958,22 @@ agent-bench: _check-sbt
 	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
 	echo ">> [agent-bench] arm=$(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), expose=$(AGENT_BENCH_EXPOSE)) model=$(AGENT_BENCH_MODEL) turns=$(AGENT_BENCH_MAX_TURNS) wall=$(AGENT_BENCH_WALL_CAP)s budget=$(AGENT_BENCH_MAX_BUDGET_USD) parallelism=$(AGENT_BENCH_PARALLELISM) run-id=$(AGENT_BENCH_RUN_ID) against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --arm $(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), --expose $(AGENT_BENCH_EXPOSE)) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))"
+	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --arm $(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), --expose $(AGENT_BENCH_EXPOSE)) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))$(if $(AGENT_BENCH_PRICES), --prices $(abspath $(AGENT_BENCH_PRICES)))"
 
 # Re-judge a finished run (AGENT_BENCH_RUN_ID=<run-id>): no model is called;
 # the archived final files are judged again (the harness's server and the
 # extractor answer the judge) and the report rebuilt, so a judge fix never
-# costs a sweep.  AGENT_BENCH_PARALLELISM rows at a time.  Each subject's own
-# record names the arm and the roots it ran with, so AGENT_BENCH_ARM matters
-# only to an archive made before that record existed, which is the mcp arm.
+# costs a sweep; the rows are priced again at AGENT_BENCH_PRICES when it is
+# set, else at the run's own prices.json, else (a run made before issue #237)
+# at the committed table.  AGENT_BENCH_PARALLELISM rows at a time.  Each
+# subject's own record names the arm and the roots it ran with, so
+# AGENT_BENCH_ARM matters only to an archive made before that record
+# existed, which is the mcp arm.
 agent-bench-rejudge: _check-sbt
 	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
 	echo ">> [agent-bench-rejudge] run-id=$(AGENT_BENCH_RUN_ID)"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --arm $(AGENT_BENCH_ARM) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE)"
+	  "runMain struxdriver.agentbench.AgentBench --rejudge --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --arm $(AGENT_BENCH_ARM) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE)$(if $(AGENT_BENCH_PRICES), --prices $(abspath $(AGENT_BENCH_PRICES)))"
 
 # The judge against the real server, agda, and extractor (AgentBenchIntegrationSpec):
 # a committed gold is solved; the obligation fails on holes; a weakened
@@ -1985,7 +1994,8 @@ agent-bench-it: _check-sbt
 # (credential-leaks.json), or when the directory holds the value, of 16
 # characters or more (the harness's floor), of any exported variable whose
 # name says it is a credential; the value is handed to grep on standard
-# input, never on its command line.
+# input, never on its command line.  The run's prices.json is copied beside
+# protocol.json.
 agent-bench-archive:
 	@set -e; src="$(AGENT_BENCH_OUT_DIR)/$(AGENT_BENCH_RUN_ID)"; dst="$(AGENT_BENCH_ARCHIVE_DIR)/$(AGENT_BENCH_RUN_ID)"; \
 	test -f "$$src/report.json" || { echo "ERROR: no report.json under $$src (set AGENT_BENCH_RUN_ID)"; exit 1; }; \
@@ -1997,6 +2007,7 @@ agent-bench-archive:
 	mkdir -p "$$dst/subjects" "$$dst/prompts"; \
 	cp "$$src"/report.json "$$src"/results.jsonl "$$src"/fixtures.jsonl "$$dst"/; \
 	if [ -f "$$src"/protocol.json ]; then cp "$$src"/protocol.json "$$dst"/; fi; \
+	if [ -f "$$src"/prices.json ]; then cp "$$src"/prices.json "$$dst"/; fi; \
 	cp "$$src"/prompts/*.md "$$dst"/prompts/; \
 	for d in "$$src"/subjects/*/; do test -d "$$d" || continue; id=$$(basename "$$d"); mkdir -p "$$dst/subjects/$$id"; \
 	  for f in transcript.jsonl outcome.json mcp.json subject.json prompt.txt system-prompt.txt run.json; do \
