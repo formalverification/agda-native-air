@@ -75,9 +75,114 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    reads for Sonnet and two for Opus as a confinement side effect, and a
    shell arm that can `cat` a module while the server arm cannot would
    confound the comparison.
++  **The endpoint** ([#237]).  A subject inherits the harness's environment
+   less every `CLAUDE*` variable, so an exported `ANTHROPIC_BASE_URL` and its
+   credential point it at another provider's Anthropic-compatible endpoint
+   (Moonshot's for Kimi K3, [#238]; an Ollama server for a local model,
+   [#240]).  `protocol.json` and each `subject.json` record it as an
+   `endpoint` block: `ANTHROPIC_BASE_URL` (its scheme, host, port, and path;
+   `absent` when it is unset or empty, the client's default, Anthropic's API;
+   `unparsed` when it is no absolute URL, which is never recorded verbatim and
+   counts as another host); the client's model variables (`ANTHROPIC_MODEL`,
+   `ANTHROPIC_SMALL_FAST_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`) when set; and
+   the credential variables it reads (`ANTHROPIC_API_KEY`,
+   `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_CUSTOM_HEADERS`) as `set`, never their
+   values.  A variable exported empty is unset, for the client and for the
+   record: Ollama's and OpenRouter's setups clear `ANTHROPIC_API_KEY` that
+   way.  A `--resume` under a changed endpoint is refused naming the field,
+   as a changed model is.  A fresh run whose base URL names another host than
+   Anthropic's is refused when it names no price table (below), and when both
+   `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, since the client
+   would send both to that host.  Every archived run predates the record and
+   was served by Anthropic's API: all 1,263 subjects authenticated with the
+   client's own login (`apiKeySource: "none"` in the init record) and report
+   every model as `provider: "firstParty"`.  A protocol recorded before the
+   endpoint and the price table reads as the client's default endpoint and
+   the current table, as one recorded before `--expose` reads as the full
+   surface, so a run in flight across the change can still be resumed.
++  **No credential in a run directory** ([#237]).  The harness writes none,
+   but a subject can: on an arm with a shell it inherits every exported
+   secret, and one that runs `env` writes them into its transcript, which the
+   archive commits.  So after each subject the harness replaces every
+   credential value in its transcript and its stderr, then in its final
+   file, with `<redacted:NAME>` before anything is judged (the logs first, so
+   a final file the subject deleted leaves nothing behind), and names the
+   variables in `run.json` (`redacted`) and the row's `outcome.json`
+   (`credentialsRedacted`).  A credential is a variable whose name contains
+   TOKEN, KEY, SECRET, PASSWORD, PASSWD, CREDENTIAL, AUTH, or HEADERS, in any
+   case, or whose value is a URL carrying userinfo or a query (a base URL with
+   a key in it, a proxy with a password); its value, each whitespace-separated
+   piece of it, and a URL's userinfo and query are looked for when at least
+   16 characters long, as written and as they read inside a JSON string.
+   When the report is written, the harness searches the run directory (the
+   work copies aside, which are never archived) for every value, and if one
+   is left it fails the run, naming the variable and the file, and adds them
+   to `credential-leaks.json`, which no later run removes: the operator does,
+   once the files it names are checked.  `make agent-bench-archive` refuses a
+   run directory that has that file, or that holds the value of any exported
+   variable a credential's name rule picks out (handed to `grep` on standard
+   input, never on its command line).
 +  **Caps**.  30 turns, 900 s of wall, USD 3.00 of the client's own list-price
    accounting, per subject; three subjects at a time, so wall clocks are
-   indicative only.
+   indicative only.  The cost cap stays the client's, on its own figure
+   (`--max-budget-usd`); the harness enforces no second cap on the priced
+   figure, which would mean reading the stream as it is written and killing
+   a subject mid-turn ([#237]).  On Anthropic's API the client's figure is the
+   list price.  For a model the client has no price for, it prices the tokens
+   at its own default model's rates and marks the figure
+   `costBasis: "unknown"`, which client 2.1.282 describes as "a guess at the
+   default model's rate"; on that client the default was Claude Fable 5.1,
+   at USD 10 and 50 per million input and output tokens (measured on
+   [#236]'s cost pair, an exact fit).  The cap is then a token budget at
+   those rates, tighter than an Opus 5 arm's: the most expensive subject of
+   `hard219-opus5-mcp-1`, USD 2.06 at Opus 5's prices, would count 3.19
+   against it, over the cap, and 14.41 on an endpoint that reports every
+   prompt token as uncached input.  So an arm on another endpoint reads its
+   cost pair's token counts first and sets `--max-budget-usd` high enough
+   that the turn and wall caps are the ones that bind (the value is in its
+   protocol like any cap), and the report's `pricing.clientCostBasis` says
+   which basis the client used.  This covers the `claude -p` subject; a
+   subject of another harness (a Codex subject, [#239]) has the bounds that
+   harness offers, and its run's section says which ones bind.
++  **Cost, priced** ([#237]).  Beside the client's `costUsd`, every row
+   carries `pricedCostUsd`: what each model the session called spent, from
+   the result record's `modelUsage`, priced at a table the run names
+   (`--prices`; copy `data/benchmarks/prices-anthropic.json`, whose
+   `schemaVersion`, `asOf`, and rows of exactly `input`, `cacheWrite`,
+   `cacheRead`, and `output`, in USD per million tokens, the reader requires).
+   The default is Anthropic's list prices as of 2026-10-13, the cache write
+   at the one-hour rate (twice the input price, the write the client asks
+   for); at it, the priced figure equals the client's on all 1,263 archived
+   subjects in 57 runs, which `PricingSpec` pins, so a typo in a row an
+   archived run uses cannot pass.  No archived run uses the `claude-opus-5-5`
+   or `claude-sonnet-5-5` rows yet (the first is from client 2.1.282's own
+   catalog, the second Anthropic's published list price, which client 2.1.296
+   prices at, [#236]); the first archived arm on each will pin it.  The
+   archived reports predate the field, so their `totals.costUsd` stands for
+   both: a re-judge writes the same figure as `totals.pricedCostUsd`.  The
+   report's `tokens` is not what is priced: it is the main loop's `usage`
+   block, which misses calls, the Haiku call of about USD 0.0011 that client
+   2.1.261 made beside each session (335 subjects in 9 runs) and one Sonnet 5
+   call of USD 0.0131 (`suite219-sonnet5-mcp-1`, client 2.1.282).  A fresh
+   run copies its table into the run directory as `prices.json` and records
+   it in `protocol.json` by that name and its digest; a re-judge and a resume
+   price at that copy (the committed table, for a run made before it
+   existed) unless given another, so a row added to the committed table never
+   stops a run in flight, and a resume under a different table is refused.
+   The report's `pricing` block names the table that priced it and carries
+   the rates of every row it used, so its figures can be recomputed from it
+   alone.  A row with no figure (a wall-cap kill or a crash leaves no result
+   record; a model with no row) has `pricedCostUsd: null` and an `unpriced`
+   reason, and each slice sums its priced rows beside `unpricedRows`, the
+   count of the rest, so its figure is a lower bound whenever that count is
+   not 0.  A provider with no cache-write price has its input price in that
+   column; an endpoint that counts cached tokens inside input would be priced
+   twice for them, since the client's counts are priced as reported.  A run on
+   another endpoint names its own table (a fresh run whose model has no row
+   in it is refused; on Anthropic's endpoint it is a warning, and the rows
+   come out unpriced), and its figure is checked against the provider's usage
+   page by the per-model counts in `pricing.byModel` and each subject's
+   `startedAt`.
 +  **Judge**.  Every fact about the final file is Agda's own answer, asked
    through the server (started with `--safe` in its flags) and the agda-strux
    extractor.  The gates, named in order: *preservation* (the module line and
@@ -148,15 +253,18 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 
 | path | contents |
 |---|---|
-| `report.json` | the run: `config` (model, caps, every client flag, the prompts' digests, the client version), `corpora` (paths and digests), `totals`, `perTier`, `perStratum` (each with `solved`, `restated`, and `solvedOriginalInView`, which is `null` on a slice with no original), `perTool`, and one `outcomes[]` entry per obligation (`solved`, `restated`, `gate`, `restatementEvidence`, `original`, `addedImports`, `terminal`, `turns`, `toolCalls`, `wallMs`, `costUsd`, `tokens`, `isolation`, `agdaExit`) |
+| `report.json` | the run: `config` (the protocol below, and the run's own knobs), `corpora` (paths and digests), `pricing` (the table that priced the report, by path, digest, and date, with the rates of the rows it used; per model the run's token counts, the client's figure, the priced one, and the row that priced it, which are the counts to check against a provider's usage page; the models no row priced; how many rows have no figure, `unpricedRows`; the client's price bases), `totals`, `perTier`, `perStratum` (each with `solved`, `restated`, and `solvedOriginalInView`, which is `null` on a slice with no original, and `costUsd` beside `pricedCostUsd` and `unpricedRows`), `perTool`, and one `outcomes[]` entry per obligation (`solved`, `restated`, `gate`, `restatementEvidence`, `original`, `addedImports`, `terminal`, `turns`, `toolCalls`, `wallMs`, `costUsd`, `pricedCostUsd` with `unpriced` and `unpricedModels` when it is `null`, `pricingCaveats`, `tokens` (the main loop's `usage` block, which can miss calls), `usageByModel` (every model's, as priced), `credentialsRedacted`, `isolation`, `agdaExit`) |
+| `protocol.json` | the protocol, written before the first subject spawns: the arm, the model, the `endpoint` block, the caps, the client's flags and version, the tools, the read roots, the prompts by digest, and every input by content (the index, the binaries, the corpora, the price table); a `--resume` is refused when it differs |
+| `prices.json` | the price table the run was priced at, byte for byte, so a re-judge and a resume price at the run's own (from [#237]) |
+| `credential-leaks.json` | present only when a run found a credential value left in its directory: the files and the variables, never the values; the archive target refuses the run while it exists (from [#237]) |
 | `results.jsonl` | one `eval-proof-completion.v0` attempt row per `fill_hole` the subject probed, the refused ones included: a reply that was an error (no hole at the address the call named, or no address) or that the strict reader could not decode is a row with `status` `crash`, `elapsedMs` 0, and `rc` -1, the reader's defaults, with no `agda` run behind it (`Audit.attemptRows`); a run whose subjects never called `fill_hole`, such as every `shell` arm, has an empty file |
 | `fixtures.jsonl` | one `eval-proof-completion.v0` fixture row per obligation, plus `restated`, `gate`, and `terminal` |
 | `prompts/` | the system prompt and the user-prompt template, verbatim |
 | `subjects/<id>/transcript.jsonl` | the client's `stream-json` output: every tool call with its result, the model's text, the init and result records |
 | `subjects/<id>/final/<Stem>.agda` | the file as the subject left it, which is what was judged |
 | `subjects/<id>/outcome.json` | the judge's verdict and the transcript audit for that row, with its `original` block: the restated lemma's file, whether its proof was in view before the last edit (`inView`, `how`, `at`, the call's index from 0), and the successful and refused calls that named the file (`reads`, `refusedReads`); `null` on a row with no original |
-| `subjects/<id>/subject.json` | the arm the subject ran under and the roots its tools and commands were allowed, which is what a re-judge audits against |
-| `subjects/<id>/mcp.json`, `prompt.txt`, `system-prompt.txt`, `run.json` | the subject's server configuration (an arm with the server), its two rendered prompts, and how its process ended |
+| `subjects/<id>/subject.json` | the arm the subject ran under, the roots its tools and commands were allowed, which is what a re-judge audits against, and the `endpoint` block that served it (from [#237]) |
+| `subjects/<id>/mcp.json`, `prompt.txt`, `system-prompt.txt`, `run.json` | the subject's server configuration (an arm with the server), its two rendered prompts, and how its process ended (`run.json`: exit code, wall, whether the wall cap killed it, and from [#237] when it started and the credential variables whose values were replaced in what it wrote) |
 | `subjects/<id>/stderr.log` | the client's standard error, archived when it is not empty; this is what an anomaly message means by "see stderr.log" |
 
 A subject that ended early has only what it wrote: the archive copies each of
@@ -181,6 +289,13 @@ loop nor the judge reads comments, so no verdict of an old run would change
 under a re-judge; what changed is what a subject was told.  The old runs stay
 as archived, and the section on the header-free arms below says which of their
 figures the new runs replace.
+
+The cost column is the client's own figure, `totals.costUsd`.  Every run
+below ran on Anthropic's API, where that figure is the list price: priced
+from each transcript at the committed table it comes out the same, as
+`PricingSpec` checks, though these reports predate the `pricedCostUsd`
+field ([#237]).  A run on another endpoint quotes `totals.pricedCostUsd`
+there instead, at the table it names.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -964,3 +1079,8 @@ new run gets a new run id.
 [#203]: https://github.com/formalverification/agda-native-air/issues/203
 [#231]: https://github.com/formalverification/agda-native-air/pull/231
 [#232]: https://github.com/formalverification/agda-native-air/pull/232
+[#236]: https://github.com/formalverification/agda-native-air/issues/236
+[#237]: https://github.com/formalverification/agda-native-air/issues/237
+[#238]: https://github.com/formalverification/agda-native-air/issues/238
+[#239]: https://github.com/formalverification/agda-native-air/issues/239
+[#240]: https://github.com/formalverification/agda-native-air/issues/240
