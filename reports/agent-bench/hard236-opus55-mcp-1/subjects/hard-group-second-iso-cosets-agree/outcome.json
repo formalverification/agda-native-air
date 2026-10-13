@@ -1,0 +1,95 @@
+{
+  "benchmarkId" : "hard-group-second-iso-cosets-agree",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "second-iso-cosets-agree",
+  "goal" : "∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__definition_of" : 2,
+    "mcp__agda__exports_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 7,
+  "wallMs" : 29378,
+  "costUsd" : 0.1233156,
+  "tokens" : {
+    "input" : 12,
+    "output" : 1905,
+    "cacheRead" : 90358,
+    "cacheCreation" : 8387
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 2060,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-second-iso-cosets-agree/final/Group-second-iso-cosets-agree.agda",
+  "transcriptPath" : "subjects/hard-group-second-iso-cosets-agree/transcript.jsonl",
+  "lastWords" : "I filled the hole in `second-iso-cosets-agree`, and `check_file` reports success on the final file: Agda exits with code 0 and no holes remain. The only warnings are two deprecation notices from inside the agda-algebras library, not from this file.\n\nThe proof relies on how cosets are defined in the library: `x ∼ y` means `x ⁻¹ ∙ y` is in the subgroup.\n\n- **Same coset of H ∩ K ⇒ same coset of K:** `h₁ ⁻¹ ∙ h₂` is in both H and K, so `proj₂` gives the K part.\n- **Same coset of K ⇒ same coset of H ∩ K:** `h₁ ⁻¹ ∙ h₂` is already in K. It is also in H, because H is closed under inverses and product",
+  "rateLimit" : {
+    "maxUtilization" : 0.14,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

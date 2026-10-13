@@ -1,0 +1,91 @@
+{
+  "benchmarkId" : "haystack-nat-plus-zero-diag",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-zero-diag",
+  "goal" : "∀ (m : ℕ) → m + m ≡ 0 → m ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 22539,
+  "costUsd" : 0.055401599999999995,
+  "tokens" : {
+    "input" : 6,
+    "output" : 893,
+    "cacheRead" : 37468,
+    "cacheCreation" : 3753
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 867,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
+  "lastWords" : "I filled the hole by splitting on `m`, and check_file reports success on the final file, with no errors and no holes left.\n\n```agda\n+-zero-diag ℕ.zero eq = eq\n+-zero-diag (ℕ.suc m) ()\n```\n\n- **When `m` is 0:** the assumption `eq : 0 + 0 ≡ 0` reduces to exactly `0 ≡ 0`, so `eq` itself is the proof.\n- **When `m` is `suc m`:** `suc m + suc m` reduces to `suc (…)`, which can never equal `0`, so Agda accepts the absurd pattern `()` and no proof is needed.\n\nI didn't need `+-comm` or any other lemma, and I left the header, the imports and the type signature unchanged.",
+  "rateLimit" : {
+    "maxUtilization" : 0.12,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

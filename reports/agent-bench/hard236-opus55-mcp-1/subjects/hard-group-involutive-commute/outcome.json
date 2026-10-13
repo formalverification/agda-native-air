@@ -1,0 +1,92 @@
+{
+  "benchmarkId" : "hard-group-involutive-commute",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "involutive-commute",
+  "goal" : "(∀ x → x ∙ x ≈ ε) → Commutative _≈_ _∙_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Relation.Binary.Reasoning.Setoid setoid"
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 27894,
+  "costUsd" : 0.08512059999999999,
+  "tokens" : {
+    "input" : 6,
+    "output" : 2016,
+    "cacheRead" : 37443,
+    "cacheCreation" : 4661
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 244,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-involutive-commute/final/Group-involutive-commute.agda",
+  "transcriptPath" : "subjects/hard-group-involutive-commute/transcript.jsonl",
+  "lastWords" : "I filled the hole in `involutive-commute`, and `check_file` reports success on the final file: exit code 0, no diagnostics and no holes left.\n\nThe proof is a chain of equalities using `Relation.Binary.Reasoning.Setoid`, which I imported inside a `where` block. It shows `x ∙ y ≈ y ∙ x` in these steps:\n\n1. **Insert ε:** write `x ∙ y` as `ε ∙ (x ∙ y)`.\n2. **Rewrite ε:** since every element squared is ε, replace that ε with `(y ∙ x) ∙ (y ∙ x)`.\n3. **Regroup:** associativity turns this into `(y ∙ x) ∙ ((y ∙ x) ∙ (x ∙ y))`.\n4. **Collapse the inner part:** a helper lemma, `lem`, shows `(y ∙ x) ∙ (x ∙",
+  "rateLimit" : {
+    "maxUtilization" : 0.13,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
