@@ -199,6 +199,8 @@ def test_a_path_that_only_looks_like_home_passes(line: str) -> None:
 def test_an_em_dash_a_fill_and_an_empty_body_are_refused() -> None:
     assert any("em-dash" in p for p in problems(report_text(body="One — two.")))
     assert any("FILL" in p for p in problems(report_text(body="FILL: the report.")))
+    # Quoted in a code span, the word is prose about the template, not a FILL.
+    assert problems(report_text(body="It named each `FILL` line.")) == []
     assert any("no body" in p for p in problems(report_text(body="<!-- nothing -->")))
 
 

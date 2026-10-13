@@ -100,6 +100,9 @@ OWNER_NAME: re.Pattern[str] = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._
 WORK_ITEM: re.Pattern[str] = re.compile(r"(?P<kind>issue|pull request) (?P<number>[1-9][0-9]*)")
 
 PLACEHOLDER: re.Pattern[str] = re.compile(r"\bFILL\b")
+# An inline code span, where a report may quote the placeholder (`FILL`)
+# without leaving one: the template never puts a FILL in backticks.
+INLINE_CODE: re.Pattern[str] = re.compile(r"`[^`]*`")
 EM_DASH: str = "—"
 # A `#N` in a title: GitHub links it to this repository's item N when the
 # title becomes a pull request's, whatever repository the report is about.
@@ -328,7 +331,8 @@ def line_problems(text: str, home: str) -> List[str]:
         homes = [m.group(0) for m in HOME_PATH.finditer(line)] + (
             [home] if home and home in line else [])
         return (
-            ([f"line {number}: FILL left in place"] if PLACEHOLDER.search(line) else [])
+            ([f"line {number}: FILL left in place"]
+             if PLACEHOLDER.search(INLINE_CODE.sub("", line)) else [])
             + ([f"line {number}: an em-dash; use a semicolon, colon, comma, or parentheses"]
                if EM_DASH in line else [])
             + ([f"line {number}: a path under a home directory ({', '.join(homes)})"]

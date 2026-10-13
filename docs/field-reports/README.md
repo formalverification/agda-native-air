@@ -81,7 +81,8 @@ Before it commits anything, `submit` refuses a report for any of the following:
    worktree of this repository whose branch is that name's
    `field-report-<date>-<slug>`, or a worktree with any other change;
 +  a missing title or header field, a field out of order, a date that is not
-   the file name's, or a `FILL` left anywhere;
+   the file name's, or a `FILL` left anywhere outside a code span (where a
+   report may quote it);
 +  an empty body;
 +  a path under a home directory anywhere in the file (`~/`, `$HOME`,
    `/home/`, `/Users/`, `/root/`, or the home directory of the user running
