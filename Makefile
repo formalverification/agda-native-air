@@ -318,7 +318,7 @@ PHONY_TARGETS := env diag _ensure-dirs check check-nix audit audit-nix test \
                  extract-algebras-backend extract-algebras agda-algebras-metadata metadata \
                  corpus corpus-nix corpus-assemble corpus-stats corpus-mcp-smoke \
                  corpus-stdlib corpus-stdlib-nix \
-                 test-scripts-python \
+                 test-scripts-python field-reports-index field-reports-test \
                  build-agda-json show-agda-json-bin backend-test backend-smoke backend-clean \
                  agda-mcp-build agda-mcp-test agda-mcp-smoke agda-mcp-launcher-smoke agda-mcp-launch-time agda-mcp-serve agda-mcp-clean \
                  lane-give-parity auto-floor \
@@ -432,6 +432,8 @@ help:
 	@echo "  make corpus-stdlib / -nix        - Extract + package the pinned Nix-store agda-stdlib corpus (issue 123)"
 	@echo "  make mine-compositions           - Mine composition-tier candidates from the agda-algebras corpus (issue 160)"
 	@echo "  make test-scripts-python         - pytest scripts/python/tests"
+	@echo "  make field-reports-index         - Print a table of every field report's header (docs/field-reports)"
+	@echo "  make field-reports-test          - Test scripts/python/field_report.py and every committed field report"
 	@echo "  make etl-test                    - Run all Scala ETL tests (ml-pipeline/etl)"
 	@echo "  make etl-test-preprocess-agda    - Run ETL smoke test (etl.PreprocessAgdaSpec)"
 	@echo "  make etl-proof-completion-smoke  - Build proof-completion dataset from fixture JSONL + validate"
@@ -1141,6 +1143,19 @@ test-scripts-python:
 	else \
 	  echo "  pytest not available for $(PY); skipping (try: nix develop .#mlPipeline)"; \
 	fi
+
+# ---- Field reports (docs/field-reports, issue #252) ----
+# Sessions in other repositories run scripts/python/field_report.py by
+# absolute path (new, then submit; docs/field-reports/README.md), so these
+# targets are only for work here: the index table, generated from the
+# reports' headers, and the script's suite, which also checks every
+# committed report.  The index runs on the system python3; the suite needs
+# pytest (nix develop .#mlPipeline).
+field-reports-index:
+	@$(CORPUS_PY) scripts/python/field_report.py index --repo "$(PROJECT_ROOT)"
+
+field-reports-test:
+	@$(CORPUS_PY) -m pytest -q scripts/python/tests/test_field_report.py
 #
 #
 # -------------------------------------------------------------------------------
