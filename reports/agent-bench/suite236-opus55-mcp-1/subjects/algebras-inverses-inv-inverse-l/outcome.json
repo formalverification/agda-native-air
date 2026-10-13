@@ -1,0 +1,107 @@
+{
+  "benchmarkId" : "algebras-inverses-inv-inverse-l",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Functions.Inverses.InvIsInverseˡ",
+    "target:Relation.Binary.Bundles.Setoid.refl"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "InvIsInverseˡ′",
+  "goal" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ} {F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →  Setoid._≈_ 𝑨 (Inv F {b = Func.to F a} Imagef∋f) a",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "tool get_goal",
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Inverses.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "get_goal" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 22000,
+  "costUsd" : 0.0727272,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1137,
+    "cacheRead" : 52336,
+    "cacheCreation" : 4936
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+      "get_goal"
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1191,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "final" : "{α ρᵃ β ρᵇ : Level} {𝑨 : Setoid α ρᵃ} {𝑩 : Setoid β ρᵇ}\n{F : Func 𝑨 𝑩} {a : Setoid.Carrier 𝑨} →\n(𝑨 Setoid.≈ Inv F Imagef∋f) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-inverses-inv-inverse-l/final/Inverses-inv-inverse-l.agda",
+  "transcriptPath" : "subjects/algebras-inverses-inv-inverse-l/transcript.jsonl",
+  "lastWords" : "Yes, check_file reports success on the final file: Agda exits 0, there are no holes left, and the only messages are two deprecation warnings from the imported library. I filled the hole with `Setoid.refl 𝑨`. That works because the inverse of `F` applied to the built-in proof that `F a` is in `F`'s image just returns `a`, so the goal is reflexivity in `𝑨`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.1,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

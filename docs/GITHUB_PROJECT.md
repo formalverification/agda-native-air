@@ -2846,6 +2846,39 @@ Part of [#235]; needs [#241] and [#237].
 [#241]: https://github.com/formalverification/agda-native-air/issues/241
 [#235]: https://github.com/formalverification/agda-native-air/issues/235
 
+---
+
+### Issue M1-49: agent-bench: a refused call to a server tool's bare name is not foreign tool use (#266)
+
+**Labels:** `eval`, `M1: agda-dojang/mcp`
+
+## Context
+
+The isolation audit (`Audit.scala`, `foreignToolUses`) fails a row when the transcript names any tool outside the set the arm presented, whether or not the client ran the call.  On the arms of [#236] it failed 30 rows in which no tool beyond the server's was used: in each, the subject called a server tool by its bare name (`fill_hole`, `definition_of`, `search_by_name`, ...) without the `mcp__agda__` prefix, the client answered `<tool_use_error>Error: No such tool available: <name></tool_use_error>`, and the session went on with the tools it had.  No such row has a path violation, and every one of the 30 final files type-checks with its statement kept.  The counts are as follows:
+
++  **Opus 5.5** (`claude-opus-5-5`, at the client's default effort): 29 of 81 sessions, 34 refused calls.  The library tier measured 37 solved and 1 restated where the files earned 51 and 4; the composition tier 4 of 12 where they earned 12; the hard tier 10 of 14 where they earned 14 (`suite236-opus55-mcp-1`, `comp236-opus55-mcp-1`, `hard236-opus55-mcp-1`).
++  **Opus 5**: 1 of 55 sessions (`suite236-opus5-mcp-1`, row `haystack-nat-plus-zero-diag`).
++  **Every other arm**: no Sonnet 5.5 arm, and no arm archived before [#236], has a single such call.
+
+So on these rows the gate measures a habit of dropping the prefix, which the client already refuses, and not confinement.  The [#236] write-up quotes both numbers; this issue makes the judge's own reading the right one.
+
+## Tasks
+
+- [ ] In the audit, do not count as foreign a `tool_use` whose name is a presented server tool's name without its `mcp__agda__` prefix and whose `tool_result` is the client's `No such tool available` refusal; record such calls in a field of their own (the name and the call's index), so a row still says it happened.  Any other refused name stays a finding, as now.
+- [ ] A spec from a transcript with one refused bare-name call followed by the same tool under its full name, and one with a refused name that is not a presented tool's.
+- [ ] Re-judge copies of every archived arm that offered the server, with each run's own ids and arm, compare the verdict columns with the archive, and archive the copies whose verdicts move (the four arms named above at least).
+- [ ] Update the counts quoted in `reports/agent-bench/README.md` and `docs/reading-the-results.md`.
+
+## Acceptance criteria
+
+- [ ] The 30 rows above are solved or restated by the judge's own reading, with their refused calls recorded.
+- [ ] No other archived verdict moves, or each one that does is named.
+
+Part of [#235]; found on [#236].
+
+[#235]: https://github.com/formalverification/agda-native-air/issues/235
+[#236]: https://github.com/formalverification/agda-native-air/issues/236
+
 <!-- END GENERATED: milestone-1 -->
 
 ---

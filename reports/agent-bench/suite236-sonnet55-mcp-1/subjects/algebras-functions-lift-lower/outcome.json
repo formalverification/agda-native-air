@@ -1,0 +1,105 @@
+{
+  "benchmarkId" : "algebras-functions-lift-lower",
+  "difficulty" : "routine",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "universe-polymorphic",
+    "restates:Setoid.Functions.Basic.lift∼lower",
+    "target:Relation.Binary.Bundles.Setoid.refl"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "lift∼lower′",
+  "goal" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ) (a : Lift β (Setoid.Carrier 𝑨)) →  Setoid._≈_ (𝑙𝑖𝑓𝑡 {𝑨 = 𝑨} β) (lift (lower a)) a",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src/Setoid/Functions/Basic.lagda.md",
+    "inView" : false,
+    "how" : null,
+    "at" : null,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__search_by_name" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__fill_hole" : 1,
+    "Edit" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 31331,
+  "costUsd" : 0.16223875000000001,
+  "tokens" : {
+    "input" : 10,
+    "output" : 936,
+    "cacheRead" : 69675,
+    "cacheCreation" : 4896
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "none",
+  "agdaExit" : 0,
+  "agdaMs" : 3217,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+    "final" : "{α ρᵃ β : Level} (𝑨 : Setoid α ρᵃ)\n(a : Lift β (Setoid.Carrier 𝑨)) →\n(𝑙𝑖𝑓𝑡 β Setoid.≈ a) a",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-functions-lift-lower/final/Functions-lift-lower.agda",
+  "transcriptPath" : "subjects/algebras-functions-lift-lower/transcript.jsonl",
+  "lastWords" : "I replaced the hole with `Setoid.refl 𝑨`. `fill_hole` confirmed it with Agda exit code 0 and no remaining holes. I then made the edit in the file but didn't run `check_file` on the final file.",
+  "rateLimit" : {
+    "maxUtilization" : 0.66,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

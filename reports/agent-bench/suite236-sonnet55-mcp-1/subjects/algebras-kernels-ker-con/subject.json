@@ -1,0 +1,18 @@
+{
+  "arm" : "mcp",
+  "workDir" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/reports/agent-bench/suite236-sonnet55-mcp-1/work/algebras-kernels-ker-con",
+  "readRoots" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda-dojang",
+    "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0",
+    "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda-dojang/agda",
+    "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0/src",
+    "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src",
+    "/nix/store/95cx28xrqs5cnaq2d2zb7m6285n8jr5h-Agda-2.9.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-b976/Agda-2.9.0/lib/prim",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda"
+  ],
+  "corpora" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+    "/home/williamdemeo/git/formalverification/agda-native-air/main/data/corpora/agda-algebras/v0.1/corpus.jsonl"
+  ]
+}

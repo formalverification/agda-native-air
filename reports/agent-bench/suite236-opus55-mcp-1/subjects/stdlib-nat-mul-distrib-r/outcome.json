@@ -1,0 +1,90 @@
+{
+  "benchmarkId" : "stdlib-nat-mul-distrib-r",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+  ],
+  "stratum" : "agda-stdlib",
+  "hole" : "*-distribʳ-+",
+  "goal" : "∀ (m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 4,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 3,
+  "wallMs" : 27423,
+  "costUsd" : 0.059225400000000004,
+  "tokens" : {
+    "input" : 6,
+    "output" : 1020,
+    "cacheRead" : 37487,
+    "cacheCreation" : 3913
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 819,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+    "final" : "(m n p : ℕ) → (n + p) * m ≡ n * m + p * m",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/stdlib-nat-mul-distrib-r/final/Nat-mul-distribR.agda",
+  "transcriptPath" : "subjects/stdlib-nat-mul-distrib-r/transcript.jsonl",
+  "lastWords" : "I filled the hole using induction on `n`, and check_file reports success on the final file (exit code 0, no diagnostics, no holes left).\n\n- **When `n` is zero**, both sides reduce to the same value, so the proof is `refl`.\n- **When `n` is `suc n`**, the goal unfolds to `m + (n + p) * m ≡ m + n * m + p * m`. The proof applies the induction hypothesis under `m +_` (via `cong`), then a local helper `go` uses `rewrite` and finishes with `sym (+-assoc m (n * m) (p * m))`.\n\nThe header, imports and type signature are unchanged, and the proof uses only `+-assoc`, the prerequisite the file already impo",
+  "rateLimit" : {
+    "maxUtilization" : 0.09,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

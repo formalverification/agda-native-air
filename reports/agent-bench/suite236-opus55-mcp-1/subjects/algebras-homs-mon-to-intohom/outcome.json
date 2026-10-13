@@ -1,0 +1,108 @@
+{
+  "benchmarkId" : "algebras-homs-mon-to-intohom",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:wholesale",
+    "restates:Setoid.Homomorphisms.Basic.mon→intohom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.isHom",
+    "target:Setoid.Homomorphisms.Basic.IsMon.isInjective"
+  ],
+  "stratum" : "agda-algebras/wholesale",
+  "hole" : "mon→intohom′",
+  "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → Σ[ h ∈ hom 𝑨 𝑩 ] IsInjective (proj₁ h)",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "isolation",
+  "gateDetail" : "tool definition_of",
+  "restatementEvidence" : [
+  ],
+  "original" : {
+    "file" : "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+    "inView" : true,
+    "how" : "result",
+    "at" : 2,
+    "reads" : 0,
+    "refusedReads" : 0
+  },
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "definition_of" : 1,
+    "mcp__agda__definition_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 26336,
+  "costUsd" : 0.08080559999999999,
+  "tokens" : {
+    "input" : 10,
+    "output" : 1270,
+    "cacheRead" : 66508,
+    "cacheCreation" : 5258
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+      "definition_of"
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 2365,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+    "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → Σ-syntax (hom 𝑨 𝑩) (λ h → IsInjective (proj₁ h))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/algebras-homs-mon-to-intohom/final/Homs-mon-to-intohom.agda",
+  "transcriptPath" : "subjects/algebras-homs-mon-to-intohom/transcript.jsonl",
+  "lastWords" : "I filled the hole, and check_file reports success on the final file: Agda exits with code 0, no holes are left, and the only messages are two deprecation warnings that come from the library itself.\n\nThe definition is now:\n```agda\nmon→intohom′ (hh , hhM) = (hh , IsMon.isHom hhM) , IsMon.isInjective hhM\n```\nIt splits the monomorphism into its map and its proof of being a monomorphism. It then rebuilds the homomorphism from the map and its homomorphism proof, and pairs that with the injectivity proof. This is the same as the library's own `mon→intohom` in `Setoid.Homomorphisms.Basic`, except that",
+  "rateLimit" : {
+    "maxUtilization" : 0.11,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

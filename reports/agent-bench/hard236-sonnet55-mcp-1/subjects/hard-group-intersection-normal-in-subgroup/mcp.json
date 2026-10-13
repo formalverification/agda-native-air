@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/reports/agent-bench/hard236-sonnet55-mcp-1/work/hard-group-intersection-normal-in-subgroup /home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/reports/agent-bench/hard236-sonnet55-mcp-1/work/hard-group-intersection-normal-in-subgroup/Group-intersection-normal-in-subgroup.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/reports/agent-bench/.bin-236/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}

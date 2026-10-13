@@ -22,7 +22,8 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 
 +  **Subject**.  One `claude -p` session per obligation (Claude Code 2.1.261
    through the [#162] arms, 2.1.282 from [#184] on; each run's
-   `protocol.json` records its own),
+   `protocol.json` records its own; Agda 2.8.0 through the runs of
+   2026-10-03 and 2.9.0 from [#236] on, which the system prompt names),
    with its working directory a staged copy of the one obligation file and
    nothing else; its tools are the arm's, plus Read and Edit on that file; no
    settings, no CLAUDE.md, no skills, no memory; the tools presented eagerly
@@ -96,12 +97,13 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    Anthropic's is refused when it names no price table (below), and when both
    `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, since the client
    would send both to that host.  Every archived run predates the record and
-   was served by Anthropic's API: all 1,263 subjects authenticated with the
-   client's own login (`apiKeySource: "none"` in the init record) and report
-   every model as `provider: "firstParty"`.  A protocol recorded before the
-   endpoint and the price table reads as the client's default endpoint and
-   the current table, as one recorded before `--expose` reads as the full
-   surface, so a run in flight across the change can still be resumed.
+   was served by Anthropic's API: all 1,634 subjects in 72 runs authenticated
+   with the client's own login (`apiKeySource: "none"` in the init record)
+   and report every model as `provider: "firstParty"`.  A protocol recorded
+   before the endpoint and the price table reads as the client's default
+   endpoint and the current table, as one recorded before `--expose` reads as
+   the full surface, so a run in flight across the change can still be
+   resumed.
 +  **No credential in a run directory** ([#237]).  The harness writes none,
    but a subject can: on an arm with a shell it inherits every exported
    secret, and one that runs `env` writes them into its transcript, which the
@@ -161,13 +163,15 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    `cacheRead`, and `output`, in USD per million tokens, the reader requires).
    The default is Anthropic's list prices as of 2026-10-13, the cache write
    at the one-hour rate (twice the input price, the write the client asks
-   for); at it, the priced figure equals the client's on all 1,263 archived
-   subjects in 57 runs, which `PricingSpec` pins, so a typo in a row an
-   archived run uses cannot pass.  No archived run uses the `claude-opus-5-5`
-   or `claude-sonnet-5-5` rows yet (the first is from client 2.1.282's own
-   catalog, the second Anthropic's published list price, which client 2.1.296
-   prices at, [#236]); the first archived arm on each will pin it.  The
-   archived reports predate the field, so their `totals.costUsd` stands for
+   for); at it, the priced figure equals the client's on every archived
+   subject the client priced at its list prices (1,551 subjects in 68 runs),
+   which `PricingSpec` pins, so a typo in a row an archived run uses cannot
+   pass.  The Opus 5.5 arms of [#236] pin the `claude-opus-5-5` row (from
+   client 2.1.282's own catalog).  The `claude-sonnet-5-5` row (Anthropic's
+   published list price, which client 2.1.296 prices at) is still unpinned:
+   client 2.1.282 priced [#236]'s 83 Sonnet 5.5 subjects as `unknown`, so
+   the spec leaves them out, and the row is the price [#236] quotes them at.
+   The archived reports predate the field, so their `totals.costUsd` stands for
    both: a re-judge writes the same figure as `totals.pricedCostUsd`.  The
    report's `tokens` is not what is priced: it is the main loop's `usage`
    block, which misses calls, the Haiku call of about USD 0.0011 that client
@@ -302,11 +306,14 @@ as archived, and the section on the header-free arms below says which of their
 figures the new runs replace.
 
 The cost column is the client's own figure, `totals.costUsd`.  Every run
-below ran on Anthropic's API, where that figure is the list price: priced
-from each transcript at the committed table it comes out the same, as
-`PricingSpec` checks, though these reports predate the `pricedCostUsd`
-field ([#237]).  A run on another endpoint quotes `totals.pricedCostUsd`
-there instead, at the table it names.
+below ran on Anthropic's API, where that figure is the list price for every
+model the client can price: priced from each transcript at the committed
+table it comes out the same, as `PricingSpec` checks, though these reports
+predate the `pricedCostUsd` field ([#237]).  The exception is Sonnet 5.5
+(the `*sonnet55*` rows), which client 2.1.282 cannot price: its column is
+priced from the tokens at the committed table's `claude-sonnet-5-5` row,
+with the client's figure beside it.  A run on another endpoint quotes
+`totals.pricedCostUsd` there instead, at the table it names.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -367,6 +374,21 @@ there instead, at the table it names.
 | `suite-answers-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 55 | 47 | 6 | 5 of 15 | 0 | 332 | 277 | 3.56 | [#185], [#201], PRs [#228] and [#229] |
 | `cost202-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 2 | 1 | 1 | 0 of 0 | 0 | 10 | 8 | 0.20 | the cost pair on [#202], [#203] |
 | `arm202-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-10-03 | none | 55 | 43 | 9 | 3 of 11 | 0 | 317 | 262 | 3.54 | [#202], [#203], PRs [#231], [#232] |
+| `rejudge290-suite219-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29, re-judged 2026-10-13 | none | 55 | 55 | 0 | 4 of 21 | 0 | 323 | 268 | no model call | the re-judge under Agda 2.9.0, [#236] |
+| `rejudge290-suite219-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-29, re-judged 2026-10-13 | none | 55 | 44 | 9 | 4 of 11 | 0 | 347 | 292 | no model call | the re-judge under Agda 2.9.0, [#236] |
+| `rejudge290-comp-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29, re-judged 2026-10-13 | none | 12 (composition) | 12 | 0 | no original | 0 | 128 | 116 | no model call | the re-judge under Agda 2.9.0, [#236] |
+| `rejudge290-comp-sonnet5-mcp-1` | `mcp` | `claude-sonnet-5` | 2026-09-29, re-judged 2026-10-13 | none | 12 (composition) | 3 | 0 | no original | 0 | 206 | 194 | no model call | the re-judge under Agda 2.9.0, [#236] |
+| `rejudge290-hard219-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-09-29, re-judged 2026-10-13 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 139 | 125 | no model call | the re-judge under Agda 2.9.0, [#236] |
+| `cost236-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-10-13 | none | 2 | 2 | 0 | 1 of 1 | 0 | 12 | 10 | 0.37 | the cost pairs on [#236] |
+| `cost236-sonnet55-mcp-1` | `mcp` | `claude-sonnet-5-5` | 2026-10-13 | none | 2 | 1 | 1 | 0 of 0 | 0 | 11 | 9 | 0.12 (the client's figure 0.59) | the cost pairs on [#236] |
+| `cost236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 2 | 2 | 0 | 1 of 1 | 0 | 11 | 9 | 0.24 | the cost pairs on [#236] |
+| `suite236-opus5-mcp-1` | `mcp` | `claude-opus-5` | 2026-10-13 | none | 55 | 54 | 0 | 5 of 21 | 0 | 309 | 254 | 6.91 | the guide's § 4.8, [#236] |
+| `suite236-sonnet55-mcp-1` | `mcp` | `claude-sonnet-5-5` | 2026-10-13 | none | 55 | 51 | 4 | 3 of 17 | 0 | 281 | 226 | 2.09 (the client's figure 9.69) | the guide's § 4.8, [#236] |
+| `comp236-sonnet55-mcp-1` | `mcp` | `claude-sonnet-5-5` | 2026-10-13 | none | 12 (composition) | 11 | 0 | no original | 0 | 119 | 107 | 1.26 (the client's figure 5.40) | the guide's § 4.8, [#236] |
+| `hard236-sonnet55-mcp-1` | `mcp` | `claude-sonnet-5-5` | 2026-10-13 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 145 | 131 | 1.81 (the client's figure 7.65) | the guide's § 4.8, [#236] |
+| `suite236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 55 | 37 | 1 | 0 of 4 | 0 | 270 | 215 | 3.78 | the guide's § 4.8, [#236] |
+| `comp236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 12 (composition) | 4 | 0 | no original | 0 | 109 | 97 | 2.07 | the guide's § 4.8, [#236] |
+| `hard236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 118 | 104 | 2.51 | the guide's § 4.8, [#236] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -994,6 +1016,220 @@ on the index `ace10e29`.
    is a third preservation gate (`stdlib-nat-plus-comm`, an edited `using`
    list, beside the two the baseline also had).
 
+## The Agda 2.9.0 arms, and the current models (2026-10-13, [#236])
+
+From 2026-10-13 every arm runs on Agda 2.9.0 ([#234]): the models read
+Agda's error text, and 2.9.0 rewords it.  Seven arms and three cost pairs ran
+one at a time from one detached driver script, launched twice (the three
+pairs, then the seven arms), one seed each, client 2.1.282, from one frozen
+copy of the server and the extractor built from `main` at `a5c4d8c6` and one
+snapshot of the driver's classes.  Opus 5 ran on the 55 library rows, as the
+baseline the library-tier arms are read against; Sonnet 5.5
+(`claude-sonnet-5-5`) and Opus 5.5 (`claude-opus-5-5`) ran on the library,
+composition, and hard tiers.  Each tier's rows are those of the archived run
+it is compared with (`--ids`, from that run's `report.json`), at that run's
+caps: 30 turns, 900 s, and USD 3.00 at parallelism 3 for the library tier,
+and 60 turns, 1,800 s, and USD 6.00 at parallelism 2 for the other two.  Each
+model's arms followed a two-row cost pair (`stdlib-nat-plus-comm`,
+`algebras-homs-mon-to-hom`) whose isolation audit came back clean.  Zero
+anomalies; USD 21.16 at list for the seven arms and the three pairs.
+`gold-leak.py` finds nothing in any of them.
+
+What differs from the archived runs is as follows:
+
++  **The toolchain**.  Agda 2.9.0 and the standard library 2.3 patched for
+   it.  The system prompt names the version, its only change (digest
+   `51a4f8f9` against `5dae33ff`).  The read roots are the 2.9.0 builds':
+   agda-algebras' sources byte-identical, the standard library's changed by
+   the patch (12 files changed, one module added), and Agda 2.9.0's own
+   primitive modules.
++  **The server**.  Besides reading 2.9.0's diagnostics ([#246]), it
+   carries five changes a subject can meet that reached `main` after the
+   header-free arms' frozen servers (binary digests `800324ca` for the
+   55-row arms and `a3e52cc9`, built from `main` at `e9c1ee5`, for the
+   composition and hard arms): `fill_hole` and
+   `get_goal` reach the only hole from any position on its line ([#228]);
+   `definition_of` quotes the source ([#229]); `search_by_type` matches a
+   statement as written ([#231]); `search_in_scope` is asked through
+   `search_by_name`, so 13 tools are presented where the header-free arms
+   had 14 ([#232]); and `get_goal` and `type_of` answer in `Simplified`
+   ([#257]).  Two more server changes are off the default surface (the
+   opt-in `auto` tool of PR [#230] and the launcher's `--cwd` handling of
+   PR [#245]).
++  **Unchanged**: the user prompt (`6ea5a0b3`), the index (`62092c1d`),
+   both corpora (`14e0d47e`, `af864432`), the caps, the client's flags, and
+   the client.
+
+So the Opus 5 arm measures the toolchain and the server together, and every
+comparison of a new model with Sonnet 5 or with Opus 5's composition and
+hard runs varies the model, the toolchain, and the server at once.  No arm
+measures the toolchain alone, which would need the old server on the new
+Agda.
+
+**The judge under 2.9.0**.  Copies of the five baselines this section
+compares with were re-judged under 2.9.0, each with its own ids and arm, and
+archived as `rejudge290-<run-id>` (no model call).  Across their 148 rows no
+verdict moves: solved, restated, gate, both exit codes, the statement's
+equality, and the original-in-view column are the archive's on every row.
+The one difference is a deprecation warning, `FixityDeclarationForNonOperator`,
+which `check_file` now reports for every file that imports agda-algebras'
+`Overture.Basic` (72 of the 148): Agda 2.9.0 deprecates the fixity
+declaration of the closed operator `∣_∣` (`src/Overture/Basic.lagda.md`,
+line 96), and on the 68 of those files that also import `Overture.Relations`
+the same warning comes a second time, for `[_]`
+(`src/Overture/Relations.lagda.md`, line 70).  A re-judged copy keeps its
+run's own `config` and prompts, which name 2.8.0; the judge's 2.9.0 shows
+only in those warnings, in the `agdaTail` and `checkCodes` of the 72 rows
+that carry them.
+
+*Opus 5 on the 55 library rows, before and after the move.*
+
+| | `suite219-opus5-mcp-1`, Agda 2.8.0 | `suite236-opus5-mcp-1`, Agda 2.9.0 |
+|---|---:|---:|
+| solved / restated | 55 / 0 | 54 / 0 |
+| final file checks, statement kept | 55 | 55 |
+| lost to a gate | 0 | 1 (isolation, one refused call) |
+| turns / tool calls | 323 / 268 | 309 / 254 |
+| USD / output tokens | 7.07 / 74,363 | 6.91 / 70,079 |
+| `check_file` answer on an agda-algebras row, mean characters | 423 | 1,122 |
+| of those 21 answers, with the fixity warning | 0 | 20 |
+| answers carrying Agda's error text | 2 | 1 |
+| `definition_of` / `get_goal` / `type_of` / `fill_hole` calls | 10 / 14 / 17 / 42 | 24 / 4 / 7 / 35 |
+| `fill_hole` refused for its address | 6 | 0 |
+
+"Agda's error text" counts a `check_file` that failed and any server
+answer carrying one of Agda's `error: [Code]` lines.
+
++  **The re-judge changed no verdict, and the re-run differs from its
+   baseline as two seeds of one protocol did**.  Its one changed verdict
+   is `haystack-nat-plus-zero-diag`, whose file checks with its statement
+   kept and lost the isolation gate to a refused call (below), so the files
+   earned 55.  41 of the 55 final files are byte-identical and 33 rows took
+   the same number of turns; the two hinted Opus 5 seeds of 2026-09-15
+   (`agent-opus5-1`, `-2`) had 44 and 31, and differed by 13 turns where
+   these differ by 14.
++  **Where 2.9.0 reached the subject**.  In the warning, which every
+   agda-algebras `check_file` answer but one now carries; three subjects
+   mention it in their closing words, as a pre-existing library warning, and
+   none acts on it (no tool input names it).  And hardly at all in error text,
+   which reached Opus 5 in one answer in the 55 rows (a `fill_hole` answer
+   carrying Agda's `NotInScope`), against two before.  So this arm cannot show
+   what the rewording does to a model that errs.  The arms that meet error text
+   often are Sonnet's (Sonnet 5 met it in 12 answers on these 55 rows and in
+   25 on the twelve composition rows), and Sonnet 5 was not re-run.
++  **The tool mix moved more than the count did**: `definition_of` 24
+   calls against 10 (Sonnet's rose the same way when the answer gained the
+   quote, [#229]), `get_goal` 4 against 14, `type_of` 7 against 17, and no
+   `fill_hole` refused for its address against 6 ([#228]).  The server's
+   changes act on those tools, but this arm cannot separate them from the
+   toolchain.  Of the 14 turns saved, 11 are on the agda-algebras rows (155
+   against 166) and 3 on the haystack rows (63 against 66).
+
+*The current models against the archived ones, per tier.*
+
+| | Sonnet 5 | Sonnet 5.5 | Opus 5 | Opus 5.5 |
+|---|---:|---:|---:|---:|
+| library (55): solved / restated | 44 / 9 | 51 / 4 | 54 / 0 | 37 / 1 |
+| library: lost to a gate | 2 (preservation) | 0 | 1 (isolation) | 17 (isolation) |
+| library: solved / restated, refused calls not counted ([#266]) | 44 / 9 | 51 / 4 | 55 / 0 | 51 / 4 |
+| library: turns / USD | 347 / 3.99 | 281 / 2.09 | 309 / 6.91 | 270 / 3.78 |
+| composition (12): solved | 3 | 11 | 12 | 4 |
+| composition: lost to a gate | 9 (preservation) | 1 (preservation) | 0 | 8 (isolation) |
+| composition: solved, refused calls not counted | 3 | 11 | 12 | 12 |
+| composition: turns / USD | 206 / 3.55 | 119 / 1.26 | 128 / 4.05 | 109 / 2.07 |
+| hard (14): solved | not run | 14 | 14 | 10 |
+| hard: lost to a gate | | 0 | 0 | 4 (isolation) |
+| hard: solved, refused calls not counted | | 14 | 14 | 14 |
+| hard: turns / USD | | 145 / 1.81 | 139 / 7.71 | 118 / 2.51 |
+
+Runs: Sonnet 5 `suite219-sonnet5-mcp-1` and `comp-sonnet5-mcp-1` (Agda
+2.8.0, the older servers; Sonnet 5 never ran the hard tier); Opus 5
+`suite236-opus5-mcp-1` (2.9.0), `comp-opus5-mcp-1` and
+`hard219-opus5-mcp-1` (2.8.0, the older server); Sonnet 5.5 and Opus 5.5
+the `*236-*` runs.  These are the header-free baselines the re-judge
+covers.  Two later 2.8.0 arms ran on a server nearer this one's, with
+[#228] and [#229]: `suite-answers-sonnet5-mcp-1` (47 solved, 6 restated,
+332 turns, USD 3.56) and `hard-answers-opus5-mcp-1` (14 solved, 127 turns,
+USD 6.34).  USD is list price; for Sonnet 5.5 it is priced from the tokens
+(below).
+
++  **Every final file checks, in every arm**: all 81 of each new model's,
+   with their statements kept.  What separates the counts is restatement
+   and the gates, never a file that failed to check.
++  **Sonnet 5.5 narrows Sonnet 5's gap on the library tier, closes all but
+   one row of it on the composition tier, and proves all fourteen hard
+   rows**.  On the
+   library tier seven rows move from Sonnet 5's other columns to solved and
+   none moves back: the two edited `using` lists and five restatements.
+   Its four restatements are rows Sonnet 5 restated too.  On the
+   composition tier it solves 11 of 12 against 3, with one preservation
+   gate against nine, and that one is the same habit: one of the original
+   `using` lists extended (here an import line's, `Level` to
+   `Level ; lift`) rather than a line added.  It took 19 % fewer turns on
+   the library tier and 42 % fewer on the composition tier, at 48 % and
+   64 % less cost.
++  **On the composition tier Sonnet 5.5 took Opus 5's route, not Sonnet
+   5's**: 5 rows on the gold's whole route and 20 of the 33 needles named
+   in its final files, where Opus 5 had 5 and 20 and Sonnet 5 had 11 and
+   32 (`needle-source.py`), and row by row it named as many of each row's
+   needles as Opus 5 did, on all twelve.  Like Opus 5 it unfolded the
+   relations the needles are about where Sonnet 5 cited them, and on rows
+   8 and 10 it wrote Opus 5's terms up to names: the pair `_≅_.from A≅B ,
+   _≅_.fromIsSurjective A≅B` (Opus 5 opened `_≅_` and wrote `from A≅B ,
+   fromIsSurjective A≅B`) in place of the gold's `HomImage-≅'`, and
+   `λ x∈θ → φ≤N (θ⊆φ x∈θ)` (Opus 5's `λ p → φ≤N (θ⊆φ p)`) in place of
+   `≤ⁿ-trans`.  Opus 5.5 took the same route but on row 7: 6 rows on the
+   whole route, 22 needles.
++  **Opus 5.5 loses 29 rows to a slip the audit misreads**.  In 29 of its 81
+   sessions it called a server tool by its bare name (`fill_hole`,
+   `definition_of`, `search_by_name`, ...; 34 calls) without the `mcp__agda__`
+   prefix.  The client refused each call (`No such tool available`), and every
+   session went on under the full names, five of them after two refused calls
+   (two of the five sent both in one turn); the audit counts any name outside
+   the presented set as foreign use.  No such row has a path violation, and
+   read without those calls the arms earned 51 solved and 4 restated, 12 of
+   12, and 14 of 14.  Opus 5 made the slip once in 55 sessions (its one gated
+   row above); no Sonnet arm and no earlier arm ever did.  The fix to the
+   audit, and the re-judge that follows it, are [#266]; until then both
+   numbers are quoted.
++  **Opus 5.5 restates where Opus 5 wrote the proof out**: four rows
+   (`algebras-homs-id-hom`, `algebras-homs-mon-to-hom`,
+   `algebras-subalgebras-sub-reflexive`,
+   `algebras-subalgebras-sub-trans-iso`), with the refused calls not counted
+   (one as measured, three behind the isolation gate), against none; three of
+   them are rows Sonnet 5.5 restates too.  The client opens an Opus 5.5 session
+   at `medium` effort, one level below the `high` it sends Opus 5 and both
+   Sonnets (the first request of each, read off a loopback capture, client
+   2.1.282, no settings); it also reports per-turn effort active for both 5.5
+   models and not for Opus 5, and no record shows a later turn's level.  So
+   here the model and the effort are one variable.
++  **Opus 5.5 costs about half what Opus 5 does**: at list, 45 %, 49 %, and
+   68 % less on the three tiers, in 13 %, 15 %, and 15 % fewer turns and,
+   on the library tier, with 27 % fewer output tokens.  The rest is its
+   price: $4 and $20 per million input and output tokens and $0.20 for a
+   cache read, against $5, $25, and $0.50.  The composition and hard
+   figures are against Opus 5's 2.8.0 runs.
++  **The client's cost for Sonnet 5.5 is not a list price**.  Client 2.1.282
+   has no price for `claude-sonnet-5-5` (`costBasis` `unknown` in every result
+   record) and charges it at another model's rates: on 79 of its 83 subjects
+   (the cost pair's two included) Fable 5.1's ($10 and $50 per million input
+   and output tokens, $0.25 for a cache read, $20 for a one-hour cache write),
+   and on four (two composition rows, two hard rows) Opus 5.5's.  The cost
+   pair's stdlib row (6 input, 958 output, 38,683 cache-read, and 3,913
+   cache-write tokens) is the client's USD 0.13589 to the cent at Fable 5.1's
+   rates.  Every Sonnet 5.5 figure here is priced from each subject's
+   `modelUsage` at the published list ($2 and $10, $0.10, and $4); the same
+   pricing reproduces the client's own figure to the cent on every subject of
+   the list-priced arms here and of the two `suite219` arms.  The reports'
+   `costUsd` for the three arms is 9.69, 5.40, and 7.65.  The budget cap is the
+   client's figure too, so for Sonnet 5.5 it stood at about a fifth of its
+   list value (half on the four subjects priced as Opus 5.5); no subject came
+   near it (the highest, 1.21 against 6.00), and every subject of the three
+   arms ended `completed`.
+
+What the numbers mean beside the other instruments is the guide's § 4.8
+([`docs/reading-the-results.md`](../../docs/reading-the-results.md)).
+
 ## Reading a transcript
 
 A transcript is JSON Lines.  The `system`/`init` record lists the tools the
@@ -1037,6 +1273,18 @@ IDS=$(jq -r 'select(.tags | index("stratum:novel") or index("stratum:composition
   data/benchmarks/benchmark-index.jsonl | paste -sd,)
 make agent-bench AGENT_BENCH_ARM=mcp AGENT_BENCH_MODEL=claude-sonnet-5 AGENT_BENCH_PARALLELISM=3 \
   AGENT_BENCH_RUN_ID=suite219-sonnet5-mcp-1 "AGENT_BENCH_IDS=--ids $IDS"
+```
+
+The arms of [#236] took each tier's rows from the archived run they are
+compared with and that run's caps, one arm at a time from a detached driver
+over one frozen server, extractor, and snapshot of the driver's classes; as
+the Make target would issue one of them:
+
+```sh
+IDS=$(jq -r '.outcomes[].benchmarkId' reports/agent-bench/comp-sonnet5-mcp-1/report.json | paste -sd,)
+make agent-bench AGENT_BENCH_ARM=mcp AGENT_BENCH_MODEL=claude-sonnet-5-5 AGENT_BENCH_PARALLELISM=2 \
+  AGENT_BENCH_MAX_TURNS=60 AGENT_BENCH_WALL_CAP=1800 AGENT_BENCH_MAX_BUDGET_USD=6.00 \
+  AGENT_BENCH_RUN_ID=comp236-sonnet55-mcp-1 "AGENT_BENCH_IDS=--ids $IDS"
 ```
 
 A re-judge does not need `AGENT_BENCH_ARM`: each subject's `subject.json`
@@ -1095,3 +1343,9 @@ new run gets a new run id.
 [#238]: https://github.com/formalverification/agda-native-air/issues/238
 [#239]: https://github.com/formalverification/agda-native-air/issues/239
 [#240]: https://github.com/formalverification/agda-native-air/issues/240
+[#234]: https://github.com/formalverification/agda-native-air/issues/234
+[#246]: https://github.com/formalverification/agda-native-air/pull/246
+[#257]: https://github.com/formalverification/agda-native-air/pull/257
+[#266]: https://github.com/formalverification/agda-native-air/issues/266
+[#230]: https://github.com/formalverification/agda-native-air/pull/230
+[#245]: https://github.com/formalverification/agda-native-air/pull/245

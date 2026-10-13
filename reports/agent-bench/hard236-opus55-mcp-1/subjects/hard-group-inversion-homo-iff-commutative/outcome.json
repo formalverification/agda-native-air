@@ -1,0 +1,94 @@
+{
+  "benchmarkId" : "hard-group-inversion-homo-iff-commutative",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "inversion-homo-iff-commutative",
+  "goal" : "(IsGroupHomomorphism _⁻¹ → Commutative _≈_ _∙_) × (Commutative _≈_ _∙_ → IsGroupHomomorphism _⁻¹)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Product.Base         using ( _,_ )",
+    "open import Algebra.Properties.Group G using ( ⁻¹-anti-homo-∙ ; ⁻¹-involutive ; ε⁻¹≈ε )",
+    "open import Relation.Binary.Reasoning.Setoid setoid"
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 2,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 31516,
+  "costUsd" : 0.1057858,
+  "tokens" : {
+    "input" : 6,
+    "output" : 2618,
+    "cacheRead" : 37689,
+    "cacheCreation" : 5733
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 312,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-inversion-homo-iff-commutative/final/Group-inversion-homo-iff-commutative.agda",
+  "transcriptPath" : "subjects/hard-group-inversion-homo-iff-commutative/transcript.jsonl",
+  "lastWords" : "I filled the hole with a proof of both directions, and `check_file` reports success on the final file (exit code 0, no diagnostics, no holes left).\n\n- **Homomorphism implies commutative:** I applied the homomorphism property to x⁻¹ and y⁻¹. Inversion reverses products and inverting twice gives back the original element, so the chain x∙y ≈ (x⁻¹∙y⁻¹)⁻¹ ≈ y∙x goes through.\n- **Commutative implies homomorphism:** I built the homomorphism record directly:\n  - Inversion respects equality.\n  - (x∙y)⁻¹ ≈ y⁻¹∙x⁻¹ ≈ x⁻¹∙y⁻¹, the last step by commutativity.\n  - ε⁻¹ ≈ ε.\n  - Inversion commutes with itself",
+  "rateLimit" : {
+    "maxUtilization" : 0.14,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

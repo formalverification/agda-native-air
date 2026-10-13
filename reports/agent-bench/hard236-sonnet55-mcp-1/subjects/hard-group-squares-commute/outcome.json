@@ -1,0 +1,95 @@
+{
+  "benchmarkId" : "hard-group-squares-commute",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "squares-commute",
+  "goal" : "(∀ x y → (x ∙ y) ∙ (x ∙ y) ≈ (x ∙ x) ∙ (y ∙ y)) → Commutative _≈_ _∙_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Algebra.Properties.Group G using (∙-cancelˡ; ∙-cancelʳ)"
+  ],
+  "terminal" : "completed",
+  "turns" : 10,
+  "toolCalls" : {
+    "Read" : 3,
+    "mcp__agda__search_by_name" : 1,
+    "mcp__agda__exports_of" : 2,
+    "mcp__agda__type_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 9,
+  "wallMs" : 37608,
+  "costUsd" : 0.32068359999999996,
+  "tokens" : {
+    "input" : 16,
+    "output" : 3317,
+    "cacheRead" : 141678,
+    "cacheCreation" : 28243
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 272,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.∙ (G Group.∙ x) y) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.∙ x) x) ((G Group.∙ y) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.∙ (G Group.∙ x) y) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.∙ x) x) ((G Group.∙ y) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-squares-commute/final/Group-squares-commute.agda",
+  "transcriptPath" : "subjects/hard-group-squares-commute/transcript.jsonl",
+  "lastWords" : "`check_file` reports success on the final file, with exit code 0, no diagnostics and no holes left.\n\nThe proof expands the hypothesis `sq x y` with associativity into `x ∙ (y ∙ (x ∙ y)) ≈ x ∙ (x ∙ (y ∙ y))`. It then cancels `x` on the left and `y` on the right to get `y ∙ x ≈ x ∙ y`, and takes the symmetric form. The cancellation lemmas `∙-cancelˡ` and `∙-cancelʳ` come from `Algebra.Properties.Group`. I imported that module inside a `where` block, so the existing header and imports are unchanged.",
+  "rateLimit" : {
+    "maxUtilization" : 0.05,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

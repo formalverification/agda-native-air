@@ -1,0 +1,96 @@
+{
+  "benchmarkId" : "comp-lattice-below-join-bound",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Properties.Lattice.Lattice-Order.≤-trans",
+    "needle:Classical.Properties.Lattice.Lattice-Order.∨-least"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "below-join-bound",
+  "goal" : "∀ {x y z w : 𝕌[ proj₁ 𝑳 ]} → x ≤ (y ∨ z) → y ≤ w → z ≤ w → x ≤ w",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__exports_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 25150,
+  "costUsd" : 0.25292425,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1140,
+    "cacheRead" : 57777,
+    "cacheCreation" : 9070
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 3282,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+    "final" : "{α ρ : Level} (𝑳 : Lattice α ρ) {x y z w : 𝕌[ proj₁ 𝑳 ]} →\n(𝑳 Lattice-Order.≤ x) ((𝑳 Lattice-Op.∨ y) z) →\n(𝑳 Lattice-Order.≤ y) w →\n(𝑳 Lattice-Order.≤ z) w → (𝑳 Lattice-Order.≤ x) w",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-lattice-below-join-bound/final/Lattice-below-join-bound.agda",
+  "transcriptPath" : "subjects/comp-lattice-below-join-bound/transcript.jsonl",
+  "lastWords" : "Yes, `check_file` reports success (exit code 0, no holes) on the final file. The hole is filled with `Lattice-Order.≤-trans 𝑳 x≤y∨z (Lattice-Order.∨-least 𝑳 y≤w z≤w)`. The only diagnostics are two deprecation warnings about fixity declarations in library files.",
+  "rateLimit" : {
+    "maxUtilization" : 0.88,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

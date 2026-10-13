@@ -1,0 +1,93 @@
+{
+  "benchmarkId" : "hard-group-inverse-homo-commute",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "inverse-homo-commute",
+  "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Algebra.Properties.Group G"
+  ],
+  "terminal" : "completed",
+  "turns" : 6,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__search_by_name" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 5,
+  "wallMs" : 29530,
+  "costUsd" : 0.56735675,
+  "tokens" : {
+    "input" : 10,
+    "output" : 2154,
+    "cacheRead" : 102387,
+    "cacheCreation" : 21698
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 250,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-inverse-homo-commute/final/Group-inverse-homo-commute.agda",
+  "transcriptPath" : "subjects/hard-group-inverse-homo-commute/transcript.jsonl",
+  "lastWords" : "`check_file` reports success on the final file: exit code 0, no diagnostics, no holes left.\n\nI filled the hole with a direct proof. From the hypothesis and the standard anti-homomorphism lemma, `x⁻¹ ∙ y⁻¹ ≈ y⁻¹ ∙ x⁻¹` holds for all `x` and `y`. I applied that to `x⁻¹` and `y⁻¹`, then used `⁻¹-involutive` to get `x ∙ y ≈ y ∙ x`. Both lemmas come from `Algebra.Properties.Group`, which I opened locally in a `where` block.",
+  "rateLimit" : {
+    "maxUtilization" : 0.05,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

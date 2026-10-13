@@ -1,0 +1,100 @@
+{
+  "benchmarkId" : "comp-congruence-simple-equivalent-total",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Congruences.Lattice.≑-trans",
+    "needle:Setoid.Congruences.Lattice.≑-sym",
+    "needle:Setoid.Congruences.Simple.simple⇒total"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "simple-equivalent-total",
+  "goal" : "IsSimple 𝑨 ℓ → RelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+  "solved" : false,
+  "restated" : false,
+  "gate" : "preservation",
+  "gateDetail" : "import line changed or missing: open import Level                         using ( Level )",
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 15,
+  "toolCalls" : {
+    "Read" : 2,
+    "mcp__agda__definition_of" : 4,
+    "mcp__agda__get_goal" : 1,
+    "Edit" : 5,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 14,
+  "wallMs" : 44879,
+  "costUsd" : 0.5265137499999999,
+  "tokens" : {
+    "input" : 20,
+    "output" : 4052,
+    "cacheRead" : 187095,
+    "cacheCreation" : 13847
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1901,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+    "final" : "{𝓞 𝓥 : Level} {α ρ ℓ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρ}\n{θ φ : Con 𝑨 ℓ} →\nIsSimple 𝑨 ℓ →\nRelatesDistinctPoints 𝑨 (proj₁ θ) → θ ≑ φ → φ ≑ 𝟙[ 𝑨 ]",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-congruence-simple-equivalent-total/final/Congruence-simple-equivalent-total.agda",
+  "transcriptPath" : "subjects/comp-congruence-simple-equivalent-total/transcript.jsonl",
+  "lastWords" : "Yes, check_file reports success (exit code 0) on the final file. The only diagnostics left are two deprecation warnings from the library's own modules.\n\nThe proof has two parts:\n- **`φ ⊆ 𝟙`:** every pair is related in `𝟙`, so `lift tt` works.\n- **`𝟙 ⊆ φ`:** `θ-rdp` gives a pair `a`, `b` that `θ` relates and that are not equal. The first half of `θ ≑ φ` carries `a θ b` over to `a φ b`. So `φ` relates distinct points, and `simple φ` then gives `φ` for any `x` and `y`.\n\nI added `proj₂` and `_,_` to the `Data.Product` imports, plus `lift` from `Level` and `tt` from `Data.Unit`. No existing impo",
+  "rateLimit" : {
+    "maxUtilization" : 0.92,
+    "statuses" : [
+      "allowed_warning"
+    ]
+  }
+}
