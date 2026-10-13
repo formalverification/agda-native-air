@@ -1,0 +1,1579 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "hard236-sonnet55-mcp-1",
+  "timestamp" : "2026-10-13T11:08:24.983309024Z",
+  "rejudged" : false,
+  "config" : {
+    "arm" : "mcp",
+    "parallelism" : 2,
+    "claudeBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/claude",
+    "resume" : false,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "model" : "claude-sonnet-5-5",
+    "maxTurns" : 60,
+    "wallCapSec" : 1800,
+    "maxBudgetUsd" : 6.00,
+    "safe" : true,
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "claudeVersion" : "2.1.282 (Claude Code)",
+    "claudeFlags" : [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--max-turns",
+      "60",
+      "--max-budget-usd",
+      "6.00",
+      "--strict-mcp-config",
+      "--tools",
+      "Edit,Read",
+      "--allowedTools",
+      "mcp__agda",
+      "--permission-mode",
+      "acceptEdits",
+      "--permission-prompts",
+      "none",
+      "--setting-sources",
+      "",
+      "--disable-slash-commands",
+      "--restricted",
+      "--add-dir",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda-dojang",
+      "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0",
+      "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda-dojang/agda",
+      "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0/src",
+      "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/95cx28xrqs5cnaq2d2zb7m6285n8jr5h-Agda-2.9.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-b976/Agda-2.9.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda",
+      "--no-session-persistence"
+    ],
+    "envAdded" : {
+      "MCP_TIMEOUT" : "120000",
+      "ENABLE_TOOL_SEARCH" : "false"
+    },
+    "envRemovedPrefix" : "CLAUDE",
+    "tools" : [
+      "Edit",
+      "Read",
+      "mcp__agda__get_goal",
+      "mcp__agda__fill_hole",
+      "mcp__agda__check_file",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__check_project",
+      "mcp__agda__type_of",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__get_dependencies"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda-dojang",
+      "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0",
+      "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda-dojang/agda",
+      "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0/src",
+      "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/95cx28xrqs5cnaq2d2zb7m6285n8jr5h-Agda-2.9.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-b976/Agda-2.9.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/agda"
+    ],
+    "persistSessions" : false,
+    "inputs" : {
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "62092c1da926245a38cb3cfff81b72c6c45ab6c10987a6145a058ac9592e89e0"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/reports/agent-bench/.bin-236/agda-mcp",
+        "sha256" : "608ede24f3d40ae690aa3fbef645a6894730555352557eefcd035b041b4b0e55"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/benchmarks/reports/agent-bench/.bin-236/agda-json",
+        "sha256" : "e8858863404c0578b829bcf835febc9600d0d3619a5fd2d869d1f9d39c4c75aa"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "51a4f8f958ea0d180280e1f08d828be8321bd28e1f7324d69f74d7602a4bae68"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/236-m1-44-agent-bench-sonnet-55-opus-55-arms/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "obligations" : 14,
+  "totals" : {
+    "total" : 14,
+    "solved" : 14,
+    "restated" : 0,
+    "solvedOriginalInView" : null,
+    "gates" : {
+      
+    },
+    "anomalies" : 0,
+    "turns" : 145,
+    "toolCalls" : 131,
+    "wallMs" : 532872,
+    "costUsd" : 7.645
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : 0.000
+    },
+    "compositional" : {
+      "total" : 7,
+      "solved" : 7,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 64,
+      "toolCalls" : 57,
+      "wallMs" : 225629,
+      "costUsd" : 2.912
+    },
+    "non-obvious" : {
+      "total" : 7,
+      "solved" : 7,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 81,
+      "toolCalls" : 74,
+      "wallMs" : 307243,
+      "costUsd" : 4.733
+    }
+  },
+  "perStratum" : {
+    "agda-stdlib/novel" : {
+      "total" : 6,
+      "solved" : 6,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 63,
+      "toolCalls" : 57,
+      "wallMs" : 244395,
+      "costUsd" : 3.114
+    },
+    "agda-algebras/novel" : {
+      "total" : 8,
+      "solved" : 8,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 82,
+      "toolCalls" : 74,
+      "wallMs" : 288477,
+      "costUsd" : 4.532
+    }
+  },
+  "perTool" : {
+    "Edit" : 36,
+    "Read" : 34,
+    "mcp__agda__check_file" : 23,
+    "mcp__agda__definition_of" : 13,
+    "mcp__agda__search_by_name" : 12,
+    "mcp__agda__exports_of" : 9,
+    "mcp__agda__resolve_name" : 2,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__type_of" : 1
+  },
+  "perShell" : {
+    
+  },
+  "perVia" : {
+    "mcp" : 14
+  },
+  "perVerdictVia" : {
+    "mcp" : 14
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "hard-group-squares-commute",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "squares-commute",
+      "goal" : "(∀ x y → (x ∙ y) ∙ (x ∙ y) ≈ (x ∙ x) ∙ (y ∙ y)) → Commutative _≈_ _∙_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Algebra.Properties.Group G using (∙-cancelˡ; ∙-cancelʳ)"
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 3,
+        "mcp__agda__search_by_name" : 1,
+        "mcp__agda__exports_of" : 2,
+        "mcp__agda__type_of" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 37608,
+      "costUsd" : 0.32068359999999996,
+      "tokens" : {
+        "input" : 16,
+        "output" : 3317,
+        "cacheRead" : 141678,
+        "cacheCreation" : 28243
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 272,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.∙ (G Group.∙ x) y) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.∙ x) x) ((G Group.∙ y) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.∙ (G Group.∙ x) y) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.∙ x) x) ((G Group.∙ y) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-squares-commute/final/Group-squares-commute.agda",
+      "transcriptPath" : "subjects/hard-group-squares-commute/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file, with exit code 0, no diagnostics and no holes left.\n\nThe proof expands the hypothesis `sq x y` with associativity into `x ∙ (y ∙ (x ∙ y)) ≈ x ∙ (x ∙ (y ∙ y))`. It then cancels `x` on the left and `y` on the right to get `y ∙ x ≈ x ∙ y`, and takes the symmetric form. The cancellation lemmas `∙-cancelˡ` and `∙-cancelʳ` come from `Algebra.Properties.Group`. I imported that module inside a `where` block, so the existing header and imports are unchanged.",
+      "rateLimit" : {
+        "maxUtilization" : 0.05,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-involutive-commute",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "involutive-commute",
+      "goal" : "(∀ x → x ∙ x ≈ ε) → Commutative _≈_ _∙_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "import Algebra.Properties.Group as GP"
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 2,
+        "mcp__agda__search_by_name" : 3,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 32367,
+      "costUsd" : 0.345681,
+      "tokens" : {
+        "input" : 12,
+        "output" : 2411,
+        "cacheRead" : 105905,
+        "cacheCreation" : 34529
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 240,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x : Group.Carrier G) → (G Group.≈ (G Group.∙ x) x) (Group.ε G)) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-involutive-commute/final/Group-involutive-commute.agda",
+      "transcriptPath" : "subjects/hard-group-involutive-commute/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file: exit code 0, no diagnostics, no holes left.\n\nThe hole is filled with a proof that rewrites `x ∙ y` as `(x ∙ y)⁻¹`, then as `y⁻¹ ∙ x⁻¹`, then as `y ∙ x`. It uses the stdlib's `uniqueˡ-⁻¹` and `⁻¹-anti-homo-∙`, plus the hypothesis that every element squares to `ε`. The only addition outside the hole is a local `import Algebra.Properties.Group as GP` in a `where` clause.",
+      "rateLimit" : {
+        "maxUtilization" : 0.05,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-inverse-homo-commute",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "inverse-homo-commute",
+      "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Algebra.Properties.Group G"
+      ],
+      "terminal" : "completed",
+      "turns" : 6,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__search_by_name" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 5,
+      "wallMs" : 29530,
+      "costUsd" : 0.56735675,
+      "tokens" : {
+        "input" : 10,
+        "output" : 2154,
+        "cacheRead" : 102387,
+        "cacheCreation" : 21698
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 250,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-inverse-homo-commute/final/Group-inverse-homo-commute.agda",
+      "transcriptPath" : "subjects/hard-group-inverse-homo-commute/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file: exit code 0, no diagnostics, no holes left.\n\nI filled the hole with a direct proof. From the hypothesis and the standard anti-homomorphism lemma, `x⁻¹ ∙ y⁻¹ ≈ y⁻¹ ∙ x⁻¹` holds for all `x` and `y`. I applied that to `x⁻¹` and `y⁻¹`, then used `⁻¹-involutive` to get `x ∙ y ≈ y ∙ x`. Both lemmas come from `Algebra.Properties.Group`, which I opened locally in a `where` block.",
+      "rateLimit" : {
+        "maxUtilization" : 0.05,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-unique-involution-central",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "unique-involution-central",
+      "goal" : "(a : Carrier) → a ∙ a ≈ ε → ¬ (a ≈ ε) → (∀ b → b ∙ b ≈ ε → b ≈ ε ⊎ b ≈ a) → ∀ b → (b ∙ a) ∙ b ⁻¹ ≈ a",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Relation.Binary.Reasoning.Setoid setoid",
+        "open import Data.Sum.Base using ( inj₁ ; inj₂ )",
+        "open import Data.Empty using ( ⊥-elim )"
+      ],
+      "terminal" : "completed",
+      "turns" : 12,
+      "toolCalls" : {
+        "Read" : 2,
+        "Edit" : 7,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 11,
+      "wallMs" : 54497,
+      "costUsd" : 0.6307892499999999,
+      "tokens" : {
+        "input" : 16,
+        "output" : 6561,
+        "cacheRead" : 141757,
+        "cacheCreation" : 13357
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 327,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) (a : Group.Carrier G) →\n(G Group.≈ (G Group.∙ a) a) (Group.ε G) →\n¬ (G Group.≈ a) (Group.ε G) →\n((b : Group.Carrier G) →\n (G Group.≈ (G Group.∙ b) b) (Group.ε G) →\n (G Group.≈ b) (Group.ε G) ⊎ (G Group.≈ b) a) →\n(b : Group.Carrier G) →\n(G Group.≈ (G Group.∙ (G Group.∙ b) a) ((G Group.⁻¹) b)) a",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-unique-involution-central/final/Group-unique-involution-central.agda",
+      "transcriptPath" : "subjects/hard-group-unique-involution-central/transcript.jsonl",
+      "lastWords" : "Yes — check_file reports success on the final file (exit code 0, no diagnostics, no holes).",
+      "rateLimit" : {
+        "maxUtilization" : 0.05,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-inversion-homo-iff-commutative",
+      "difficulty" : "non-obvious",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "inversion-homo-iff-commutative",
+      "goal" : "(IsGroupHomomorphism _⁻¹ → Commutative _≈_ _∙_) × (Commutative _≈_ _∙_ → IsGroupHomomorphism _⁻¹)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Product.Base         using ( _,_ )",
+        "open import Algebra.Properties.Group G as P using ()"
+      ],
+      "terminal" : "completed",
+      "turns" : 11,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__exports_of" : 1,
+        "mcp__agda__search_by_name" : 3,
+        "Edit" : 3,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 10,
+      "wallMs" : 42503,
+      "costUsd" : 0.69532125,
+      "tokens" : {
+        "input" : 16,
+        "output" : 4265,
+        "cacheRead" : 184605,
+        "cacheCreation" : 21788
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 274,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+        "final" : "{c ℓ : Level} (G : Group c ℓ) →\n(GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹) →\n Commutative (Group._≈_ G) (Group._∙_ G))\n×\n(Commutative (Group._≈_ G) (Group._∙_ G) →\n GroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n (Group.rawGroup G) (G Group.⁻¹))",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-inversion-homo-iff-commutative/final/Group-inversion-homo-iff-commutative.agda",
+      "transcriptPath" : "subjects/hard-group-inversion-homo-iff-commutative/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file (exit code 0, no diagnostics, no holes).\n\nThe hole is filled with a pair `fwd , bwd`, both proved with lemmas from `Algebra.Properties.Group`. To get the `_,_` constructor in scope I added one line, `open import Data.Product.Base using ( _,_ )`, next to the existing import. The header, original imports and type signature are unchanged.",
+      "rateLimit" : {
+        "maxUtilization" : 0.06,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-surjective-image-commutative",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-stdlib/novel",
+      "hole" : "surjective-image-commutative",
+      "goal" : "(f : A → B) → IsGroupHomomorphism f → Surjective _≈₁_ _≈₂_ f → Commutative _≈₁_ _∙₁_ → Commutative _≈₂_ _∙₂_",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Data.Product              using ( _,_ )"
+      ],
+      "terminal" : "completed",
+      "turns" : 16,
+      "toolCalls" : {
+        "Read" : 2,
+        "Edit" : 8,
+        "mcp__agda__check_file" : 5
+      },
+      "toolCallsTotal" : 15,
+      "wallMs" : 47890,
+      "costUsd" : 0.55372375,
+      "tokens" : {
+        "input" : 18,
+        "output" : 4676,
+        "cacheRead" : 157855,
+        "cacheCreation" : 14014
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 318,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+        "final" : "{c₁ ℓ₁ c₂ ℓ₂ : Level} (G : Group c₁ ℓ₁) (H : Group c₂ ℓ₂)\n(f : Group.Carrier G → Group.Carrier H) →\nGroupMorphisms.IsGroupHomomorphism (Group.rawGroup G)\n(Group.rawGroup H) f →\nSurjective (Group._≈_ G) (Group._≈_ H) f →\nCommutative (Group._≈_ G) (Group._∙_ G) →\nCommutative (Group._≈_ H) (Group._∙_ H)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-surjective-image-commutative/final/Group-surjective-image-commutative.agda",
+      "transcriptPath" : "subjects/hard-group-surjective-image-commutative/transcript.jsonl",
+      "lastWords" : "Yes, check_file reports success on the final file (exit code 0, no diagnostics, no holes). I filled the hole with an equational proof through the homomorphism and added the import `open import Data.Product using ( _,_ )`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.06,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-intersection-normal-in-subgroup",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "intersection-normal-in-subgroup",
+      "goal" : "∀ {h x} → h ∈ H → x ∈ H → x ∈ K → ((h ∙ x) ∙ h ⁻¹ ∈ H) × ((h ∙ x) ∙ h ⁻¹ ∈ K)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 4,
+        "mcp__agda__exports_of" : 1,
+        "mcp__agda__definition_of" : 2,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 27779,
+      "costUsd" : 0.36425549999999995,
+      "tokens" : {
+        "input" : 12,
+        "output" : 2090,
+        "cacheRead" : 99662,
+        "cacheCreation" : 11736
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2525,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+        "final" : "{α ρ ℓ ℓ' : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h x\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh ∈ H →\nx ∈ H →\nx ∈ K →\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ H ×\n(𝒢 Group-Op.∙ (𝒢 Group-Op.∙ h) x) ((𝒢 Group-Op.⁻¹) h) ∈ K",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-intersection-normal-in-subgroup/final/Group-intersection-normal-in-subgroup.agda",
+      "transcriptPath" : "subjects/hard-group-intersection-normal-in-subgroup/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file (exit code 0, no holes). The only diagnostics are two deprecation warnings about fixity declarations in library files.\n\nI replaced the hole with a pair:\n- **Membership in H:** closing H under `∙` twice and under `⁻¹` once gives `(h ∙ x) ∙ h ⁻¹ ∈ H`.\n- **Membership in K:** applying `K-normal` to `x∈K` gives `(h ∙ x) ∙ h ⁻¹ ∈ K`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.06,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-second-iso-cosets-agree",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "second-iso-cosets-agree",
+      "goal" : "∀ {h₁ h₂} → h₁ ∈ H → h₂ ∈ H → (h₁ ∼ᴴ∩ᴷ h₂ → h₁ ∼ᴷ h₂) × (h₁ ∼ᴷ h₂ → h₁ ∼ᴴ∩ᴷ h₂)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 3,
+        "mcp__agda__search_by_name" : 1,
+        "mcp__agda__definition_of" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 26580,
+      "costUsd" : 0.35386,
+      "tokens" : {
+        "input" : 12,
+        "output" : 1664,
+        "cacheRead" : 98160,
+        "cacheCreation" : 12300
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2212,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{h₁ h₂\n : Setoid.Carrier\n   (Setoid.Algebras.Basic.Algebra.Domain (proj₁ 𝒢))} →\nh₁ ∈ H →\nh₂ ∈ H →\n((𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂ →\n (𝒢 Coset.∼ K) K-sub h₁ h₂)\n×\n((𝒢 Coset.∼ K) K-sub h₁ h₂ →\n (𝒢 Coset.∼ H∩K 𝒢 H H-sub K K-sub K-normal)\n (H∩K-sub 𝒢 H H-sub K K-sub K-normal) h₁ h₂)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-second-iso-cosets-agree/final/Group-second-iso-cosets-agree.agda",
+      "transcriptPath" : "subjects/hard-group-second-iso-cosets-agree/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file. The hole is filled, and the only diagnostics are two deprecation warnings from library files.\n\nThe proof has two parts:\n- **Forward direction:** `proj₂` works, because membership in `H ∩ K` is a pair and the second component is membership in `K`.\n- **Backward direction:** given `k : h₁⁻¹ ∙ h₂ ∈ K`, I pair it with a proof that `h₁⁻¹ ∙ h₂ ∈ H`. That proof uses `H-sub`'s `⁻¹-closed` and `∙-closed` on `h₁∈H` and `h₂∈H`.",
+      "rateLimit" : {
+        "maxUtilization" : 0.06,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-second-iso-cosets-onto",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "second-iso-cosets-onto",
+      "goal" : "∀ {x} → x ∈ (H ∙ᶜ K) → Σ[ h ∈ G ] (h ∈ H × x ∼ h)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Classical.Bundles.Group                  using ( ⟨_⟩ᵍᵖ )",
+        "import Algebra.Properties.Group as GroupProperties"
+      ],
+      "terminal" : "completed",
+      "turns" : 13,
+      "toolCalls" : {
+        "Read" : 2,
+        "mcp__agda__search_by_name" : 2,
+        "mcp__agda__get_goal" : 1,
+        "mcp__agda__exports_of" : 2,
+        "mcp__agda__definition_of" : 2,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 12,
+      "wallMs" : 41257,
+      "costUsd" : 0.8549765,
+      "tokens" : {
+        "input" : 16,
+        "output" : 4076,
+        "cacheRead" : 198706,
+        "cacheCreation" : 30067
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2272,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{x : Classical.Structures.Group.Complexes.Complex.G 𝒢} →\nx ∈ (𝒢 Complex.∙ᶜ H) K →\nΣ-syntax\n(Group-second-iso-cosets-onto.G 𝒢 H H-sub K K-sub K-normal)\n(λ h → h ∈ H × (𝒢 Coset.∼ K) K-sub x h)",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(H-sub : IsSubgroup 𝒢 H) (K : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(K-sub : IsSubgroup 𝒢 K) (K-normal : Conjugate.IsNormal 𝒢 K)\n{x : Classical.Structures.Group.Complexes.Complex.G 𝒢} →\nx ∈ (𝒢 Complex.∙ᶜ H) K →\nΣ-syntax\n(Group-second-iso-cosets-onto.G 𝒢 H H-sub K K-sub K-normal)\n(λ h → h ∈ H × (𝒢 Coset.∼ K) K-sub x h)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-second-iso-cosets-onto/final/Group-second-iso-cosets-onto.agda",
+      "transcriptPath" : "subjects/hard-group-second-iso-cosets-onto/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file. Agda exits 0 and no holes remain. The only diagnostics are two fixity-declaration deprecation warnings, both from library files (`Overture/Basic` and `Overture/Relations`).\n\nI filled the hole with h = p, where x ≈ p∙q with p ∈ H and q ∈ K. The proof shows x⁻¹∙p ≈ q⁻¹, which lies in K because K is closed under inverses and respects equality. To do this I added two imports (`⟨_⟩ᵍᵖ` from `Classical.Bundles.Group` and `Algebra.Properties.Group`) and put the equational chain in a `where` block.",
+      "rateLimit" : {
+        "maxUtilization" : 0.06,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-normal-product-is-join",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "normal-product-is-join",
+      "goal" : "Conjugate.IsNormal 𝒢 (N ∙ᶜ M) × (N ⊆ (N ∙ᶜ M)) × (M ⊆ (N ∙ᶜ M)) × (∀ {P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} → IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (N ∙ᶜ M) ⊆ P)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 9,
+      "toolCalls" : {
+        "Read" : 4,
+        "mcp__agda__exports_of" : 1,
+        "mcp__agda__resolve_name" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 8,
+      "wallMs" : 32947,
+      "costUsd" : 0.666901,
+      "tokens" : {
+        "input" : 10,
+        "output" : 2933,
+        "cacheRead" : 90124,
+        "cacheCreation" : 24881
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2306,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+        "final" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-normal-product-is-join/final/Group-normal-product-is-join.agda",
+      "transcriptPath" : "subjects/hard-group-normal-product-is-join/transcript.jsonl",
+      "lastWords" : "`check_file` reports success on the final file (exit code 0, no holes). The only diagnostics are two deprecation warnings from library modules, not from this file.\n\nI replaced the hole with a four-part proof:\n- **Normality:** it conjugates the two factors of a product separately, using `conj-cong` and `conj-∙-hom` from the `Conjugate` module.\n- **N ⊆ N ∙ᶜ M and M ⊆ N ∙ᶜ M:** each element is written as itself times `ε`, or `ε` times itself, using the subgroup's `ε-closed` and the identity laws.\n- **Join:** a subgroup `P` containing `N` and `M` is closed under `∙`, and it respects `≈`, so it con",
+      "rateLimit" : {
+        "maxUtilization" : 0.07,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-kernel-normal-subgroup",
+      "difficulty" : "non-obvious",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "kernel-normal-subgroup",
+      "goal" : "IsSubgroup 𝒢 Ker × Conjugate.IsNormal 𝒢 Ker × (∀ x y → ((x ⁻¹ ∙ y) ∈ Ker → h x ≈ᴴ h y) × (h x ≈ᴴ h y → (x ⁻¹ ∙ y) ∈ Ker))",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Classical.Structures.Group.Subgroups using ( mkIsSubgroup )",
+        "open import Classical.Signatures.Group using ( ∙-Op ; ε-Op ; ⁻¹-Op )",
+        "open import Classical.Operations using ( pair )",
+        "open import Classical.Structures.Interpret using ( interp-cong )",
+        "open import Data.Fin.Patterns using ( 0F ; 1F )"
+      ],
+      "terminal" : "completed",
+      "turns" : 18,
+      "toolCalls" : {
+        "Read" : 4,
+        "mcp__agda__exports_of" : 1,
+        "mcp__agda__definition_of" : 4,
+        "Edit" : 5,
+        "mcp__agda__check_file" : 3
+      },
+      "toolCallsTotal" : 17,
+      "wallMs" : 71851,
+      "costUsd" : 1.2106000000000001,
+      "tokens" : {
+        "input" : 18,
+        "output" : 8129,
+        "cacheRead" : 256760,
+        "cacheCreation" : 36989
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2209,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+        "final" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-kernel-normal-subgroup/final/Group-kernel-normal-subgroup.agda",
+      "transcriptPath" : "subjects/hard-group-kernel-normal-subgroup/transcript.jsonl",
+      "lastWords" : "The hole is filled, and `check_file` reports success on the final file (exit code 0, no holes). The only diagnostics left are two deprecation warnings from library files I didn't touch.",
+      "rateLimit" : {
+        "maxUtilization" : 0.07,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-third-iso-cosets-descend",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "third-iso-cosets-descend",
+      "goal" : "(∀ {x y} → x ∼ᴺ y → x ∼ᴹ y) × (∀ {x x' y y'} → x ∼ᴺ x' → y ∼ᴺ y' → x ∼ᴹ y → x' ∼ᴹ y')",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 6,
+      "toolCalls" : {
+        "Read" : 2,
+        "mcp__agda__resolve_name" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 5,
+      "wallMs" : 25444,
+      "costUsd" : 0.30941399999999997,
+      "tokens" : {
+        "input" : 10,
+        "output" : 1552,
+        "cacheRead" : 75336,
+        "cacheCreation" : 10644
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2378,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(M : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (M-sub : IsSubgroup 𝒢 M)\n(M-normal : Conjugate.IsNormal 𝒢 M) (N⊆M : N ⊆ M) →\n({x y : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x y → (𝒢 Coset.∼ M) M-sub x y)\n×\n({x x' y y'\n  : Classical.Structures.Group.Cosets.Coset.G 𝒢 N N-sub} →\n (𝒢 Coset.∼ N) N-sub x x' →\n (𝒢 Coset.∼ N) N-sub y y' →\n (𝒢 Coset.∼ M) M-sub x y → (𝒢 Coset.∼ M) M-sub x' y')",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-third-iso-cosets-descend/final/Group-third-iso-cosets-descend.agda",
+      "transcriptPath" : "subjects/hard-group-third-iso-cosets-descend/transcript.jsonl",
+      "lastWords" : "I replaced the hole with a proof, and `check_file` reports success (exit code 0, no holes). The only diagnostics are two deprecation warnings from library files, not from this one.\n\nThe first part is just `N⊆M`, because `x ∼ y` unfolds to `x ⁻¹ ∙ y ∈ H`. The second part chains symmetry and transitivity of the M-coset relation: `x'∼ᴹx`, then `x∼ᴹy`, then `y∼ᴹy'`. The proof doesn't use the normality assumptions.",
+      "rateLimit" : {
+        "maxUtilization" : 0.07,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-group-correspondence-over-N",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "correspondence-over-N",
+      "goal" : "(N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 10,
+      "toolCalls" : {
+        "Read" : 3,
+        "mcp__agda__definition_of" : 2,
+        "mcp__agda__exports_of" : 1,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 9,
+      "wallMs" : 38010,
+      "costUsd" : 0.517278,
+      "tokens" : {
+        "input" : 14,
+        "output" : 3653,
+        "cacheRead" : 122432,
+        "cacheCreation" : 15194
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2293,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+        "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-group-correspondence-over-N/final/Group-correspondence-over-N.agda",
+      "transcriptPath" : "subjects/hard-group-correspondence-over-N/transcript.jsonl",
+      "lastWords" : "I filled the hole with proofs of both directions, and `check_file` reports success: exit code 0, no holes. The only diagnostics are two deprecation warnings from library files.",
+      "rateLimit" : {
+        "maxUtilization" : 0.07,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "hard-algebra-kernel-of-injective-composite",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:novel"
+      ],
+      "stratum" : "agda-algebras/novel",
+      "hole" : "kernel-of-injective-composite",
+      "goal" : "IsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+        "open import Function                      using ( Func )"
+      ],
+      "terminal" : "completed",
+      "turns" : 8,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__definition_of" : 2,
+        "Edit" : 2,
+        "mcp__agda__check_file" : 2
+      },
+      "toolCallsTotal" : 7,
+      "wallMs" : 24609,
+      "costUsd" : 0.254579,
+      "tokens" : {
+        "input" : 10,
+        "output" : 1677,
+        "cacheRead" : 72596,
+        "cacheCreation" : 7624
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 2026,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 : Level} {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 𝑪 : Algebra β ρ} (f : hom 𝑨 𝑩)\n(g : hom 𝑩 𝑪) →\nIsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+        "final" : "{𝓞 𝓥 : Level} {α ρᵃ β ρ : Level} {𝑆 : Signature 𝓞 𝓥}\n{𝑨 : Algebra α ρᵃ} {𝑩 𝑪 : Algebra β ρ} (f : hom 𝑨 𝑩)\n(g : hom 𝑩 𝑪) →\nIsInjective (proj₁ g) → kercon (⊙-hom f g) ≑ kercon f",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/hard-algebra-kernel-of-injective-composite/final/Algebra-kernel-of-injective-composite.agda",
+      "transcriptPath" : "subjects/hard-algebra-kernel-of-injective-composite/transcript.jsonl",
+      "lastWords" : "Yes, check_file reports success (exit code 0) on the final file. I replaced the hole with `(λ p → g-inj p) , (λ p → Func.cong (proj₁ g) p)` and added `open import Function using ( Func )` so `Func.cong` is in scope. The only remaining diagnostics are two deprecation warnings from library files.",
+      "rateLimit" : {
+        "maxUtilization" : 0.07,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    }
+  ]
+}

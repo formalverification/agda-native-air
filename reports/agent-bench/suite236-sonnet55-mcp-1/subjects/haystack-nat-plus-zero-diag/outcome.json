@@ -1,0 +1,93 @@
+{
+  "benchmarkId" : "haystack-nat-plus-zero-diag",
+  "difficulty" : "non-obvious",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:haystack"
+  ],
+  "stratum" : "agda-stdlib/haystack",
+  "hole" : "+-zero-diag",
+  "goal" : "∀ (m : ℕ) → m + m ≡ 0 → m ≡ 0",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Data.Nat.Base using ( zero ; suc )",
+    "open import Relation.Binary.PropositionalEquality using ( refl )"
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "Edit" : 3,
+    "mcp__agda__check_file" : 2
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 46505,
+  "costUsd" : 0.2123775,
+  "tokens" : {
+    "input" : 8,
+    "output" : 1653,
+    "cacheRead" : 54350,
+    "cacheCreation" : 5803
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 2030,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "final" : "(m : ℕ) → m + m ≡ 0 → m ≡ 0",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/haystack-nat-plus-zero-diag/final/Nat-plus-zero-diag.agda",
+  "transcriptPath" : "subjects/haystack-nat-plus-zero-diag/transcript.jsonl",
+  "lastWords" : "check_file reports success on the final file, with no diagnostics and no holes left.\n\nI replaced the hole with a case split on `m`. The `zero` case is `refl`. The `suc m` case is an absurd pattern, because `m + m ≡ 0` can't hold for a successor. I also added two `open import` lines for `zero`, `suc` and `refl`.",
+  "rateLimit" : {
+    "maxUtilization" : 0.77,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
