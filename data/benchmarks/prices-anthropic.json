@@ -1,7 +1,7 @@
 {
   "schemaVersion": "agent-bench-prices.v0",
   "asOf": "2026-10-13",
-  "source": "Anthropic's list prices for its first-party API: claude-sonnet-5-5 as published (client 2.1.296 prices at it), the rest as the built-in model catalog of Claude Code 2.1.282 holds them; the claude-haiku-4-5, claude-opus-5 and claude-sonnet-5 rows reproduce every archived subject's costUsd from its modelUsage (PricingSpec), and no archived run pins the other two yet",
+  "source": "Anthropic's list prices for its first-party API: claude-sonnet-5-5 as published (client 2.1.296 prices at it), the rest as the built-in model catalog of Claude Code 2.1.282 holds them; the claude-haiku-4-5, claude-opus-5, claude-opus-5-5 and claude-sonnet-5 rows reproduce the costUsd of every archived subject the client priced at list, from its modelUsage (PricingSpec), and no archived run pins the claude-sonnet-5-5 row yet, since client 2.1.282 priced its subjects as unknown",
   "unit": "USD per million tokens; cacheWrite is the one-hour cache write, twice the input price, which is the write the client asks for",
   "models": {
     "claude-haiku-4-5": { "input": 1, "cacheWrite": 2, "cacheRead": 0.1, "output": 5 },

@@ -7,20 +7,22 @@
   *
   *  Purpose
   *  -------
-  *  Pins the priced cost (issue #237) to the archive, so a typo in the price
-  *  table cannot pass.  The committed default table prices the archived Opus
-  *  5 arms' report tokens at the client's own totals, USD 7.066 and 7.713;
-  *  and every archived subject whose client priced it at its list prices,
-  *  priced from its own transcript's `modelUsage`, costs what the client
-  *  said, to a billionth of a dollar.  That second test grows with the
-  *  archive: a run archived on an Anthropic model the table prices wrongly,
-  *  or not at all, fails it until the row is right (a subject the flat table
-  *  cannot price exactly, which carries a caveat, is left out of it).  The
+  *  Pins the priced cost (issue #237) to the archive, so a typo in a row the
+  *  archive's list-priced subjects use cannot pass.  The committed default
+  *  table prices the archived Opus 5 arms' report tokens at the client's own
+  *  totals, USD 7.066 and 7.713; and every archived subject whose client
+  *  priced it at its list prices, priced from its own transcript's
+  *  `modelUsage`, costs what the client said, to a billionth of a dollar.
+  *  That second test grows with the archive: a run archived on an Anthropic
+  *  model the table prices wrongly, or not at all, fails it until the row is
+  *  right (a subject the flat table cannot price exactly, which carries a
+  *  caveat, or one the client priced as unknown, is left out of it).  The
   *  archived Opus 5.5 arms of issue #236 pin the claude-opus-5-5 row; the
   *  claude-sonnet-5-5 row is not pinned, since client 2.1.282 priced that
-  *  issue's Sonnet 5.5 subjects as unknown.  Beside them: why rows are priced from `modelUsage` rather
-  *  than the `usage` block, the table's strict reading, the lookup, an
-  *  unpriced row's reason, and a slice's lower bound.
+  *  issue's Sonnet 5.5 subjects as unknown.  Beside them: why rows are
+  *  priced from `modelUsage` rather than the `usage` block, the table's
+  *  strict reading, the lookup, an unpriced row's reason, and a slice's
+  *  lower bound.
   *
   *  The archive is read from the repository root, the parent of the
   *  directory sbt runs the suite in, as OriginalInViewSpec reads it.

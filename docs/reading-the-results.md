@@ -276,18 +276,18 @@ Every run below reported zero anomalies.  Run ids are the harness's own;
 2026-09-29 had the fixture headers' hints in view; the runs of that day
 (`suite219-*`, `hard219-*`, and the composition tier's `comp-*`) had none,
 and where the two differ, the header-free number is the one quoted (§ 4.6).
-A USD figure is the client's own arithmetic over a run's tokens at
-Anthropic's list prices (`totals.costUsd`).  Every run below ran on
-Anthropic's API, where that figure is what the run cost at list prices for
+A USD figure is the client's own arithmetic over a run's tokens at Anthropic's
+list prices (`totals.costUsd`), Sonnet 5.5's aside (below).  Every run below ran
+on Anthropic's API, where that figure is what the run cost at list prices for
 every model the client can price: it equals the run's tokens priced at the
 committed table, which the reports predate but `PricingSpec` checks against
-every transcript ([#237]).  The exception is Sonnet 5.5 (§ 4.8), which
-client 2.1.282 cannot price (`costBasis` `unknown`); its figures here are
-priced from its tokens at the published list.  For a run served by another
-provider's endpoint the client's figure is a guess, and the figure quoted is
-the report's priced one, `totals.pricedCostUsd`, at the table the run names,
-beside the provider's usage page.  Every run before 2026-10-13 ran on Agda
-2.8.0; the runs of that day (`*236-*`) ran on 2.9.0 (§ 4.8).
+every transcript the client priced at list ([#237]).  The exception is Sonnet
+5.5 (§ 4.8), which client 2.1.282 cannot price (`costBasis` `unknown`); its
+figures here are priced from its tokens at the published list.  For a run served
+by another provider's endpoint the client's figure is a guess, and the figure
+quoted is the report's priced one, `totals.pricedCostUsd`, at the table the run
+names, beside the provider's usage page.  Every run before 2026-10-13 ran on
+Agda 2.8.0; the runs of that day (`*236-*`) ran on 2.9.0 (§ 4.8).
 
 ### 4.1  The loop
 
