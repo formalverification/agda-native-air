@@ -6,7 +6,9 @@
   section's heading in this directory's form (the date, then the repository
   and the work, with "#N" written "issue N"), and the header was added from
   the section's own text, "not recorded" marking what it does not say.  The
-  body is the section's, unchanged.
+  body is the section's, except that names and details of the private work
+  were replaced by plain descriptions in review (PR 259), since a private
+  repository's report records tool usage only.
 -->
 
 # 2026-10-11, a private repository: four more modules under `--cubical-compatible`, a second session (Claude Opus 5.5)
@@ -36,7 +38,7 @@ ran on the command line at the end and passed.
    to 8.4 s for a 421-line module whose first check included its
    dependency.
 +  **Diagnostics that named the fix**.  `AmbiguousName` listed both
-   candidates (`Level.suc` and `Fin.suc`, both opened); `ClashingDefinition`
+   candidates (two opened library names with one short name); `ClashingDefinition`
    named the earlier definition's file and line, an imported operator with
    the name of a record field; `UnequalHiding` gave `expected` and `actual`,
    an implicit function type against an explicit lambda, which a
@@ -45,15 +47,15 @@ ran on the command line at the end and passed.
 +  **One diagnostic that did not**.  An `UnsolvedMetaVariables` error came
    with `involved.metaTypes` holding the meta's file and range, not its
    type, and with no `metas` (no warm lane held the file).  The meta was a
-   universe level that `u ⊔ w ⊔ p = u ⊔ w ⊔ q` does not determine; the
+   universe level that an equation between two sums of levels does not
+   determine; the
    range pointed at the right argument, and passing the arguments
    explicitly fixed it, but the type had to be inferred by hand.
 +  **Warnings on a passing file**.  One `check_file` answered
    `success: true` with five `UnsupportedIndexedMatch` warnings, for
-   clauses matching on the constructors of `Fin` and of `Dec` (whose
-   `Reflects` is indexed by `Bool`).  The project's gate hides warnings of
+   clauses matching on the constructors of indexed library types.  The project's gate hides warnings of
    passing files, so only the server showed them; the module was rewritten
-   (cases on `Fin` through agda-stdlib's `∀-cons`, decisions through `does`)
+   (through library eliminators instead of constructor patterns)
    until `check_file` returned no diagnostic at all.
 +  **Command line comparison**.  Four runs went to the command line: one
    on a repository module, to look for warnings the gate hides, before a

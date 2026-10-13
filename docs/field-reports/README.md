@@ -11,9 +11,10 @@ down, the report says exactly that.
 
 Each report is one file, `YYYY-MM-DD-<slug>.md`, written by the session that
 did the work and submitted as a pull request that adds that one file, so that
-William reviews every report before it is public.  The reports written from
-2026-08-21 to 2026-10-11 are sections of [`mcp-field-reports.md`], which is
-frozen ([#252]).
+William reviews every report before it merges.  The branch is public from the
+moment `submit` pushes it, which is why `submit` refuses what it can before
+pushing.  Earlier reports, committed through 2026-10-11, are sections of
+[`mcp-field-reports.md`], which is frozen ([#252]).
 
 ## Writing a report
 
@@ -69,9 +70,13 @@ tool says so; that is a finding too.
 
 This repository is public.  A session in a private repository writes about
 tool usage only: its report says "a private repository" for the repository and
-"not named" for the issue, and it quotes no mathematics, no module or
-definition names, and nothing from anyone's unpublished work.  The same holds
-for a public repository's session that touched someone's unpublished work.
+"not named" for the issue, and it quotes no mathematics, no names from the work
+(its own modules and definitions, nor the library names it used, which say
+what the work is about), and nothing from anyone's unpublished work.  What a
+tool did is the report: a diagnostic's code and whether it named the fix,
+times, counts.  A schematic name, said to be one (`A.B.C`), is fine.  The same
+holds for a public repository's session that touched someone's unpublished
+work.
 
 ## What `submit` checks
 
@@ -93,7 +98,10 @@ Before it commits anything, `submit` refuses a report for any of the following:
    named";
 +  a report submitted from inside a private GitHub repository (the working
    directory's `origin`) that does not say "a private repository", or that
-   names that repository anywhere.
+   names that repository anywhere;
++  a visibility gh cannot establish, for the working directory's repository
+   or a repository the report names, and a gh that cannot reach GitHub at
+   all, so that nothing is pushed without its pull request.
 
 The checks cannot read for mathematics or unpublished work; William's review
 of the pull request does.

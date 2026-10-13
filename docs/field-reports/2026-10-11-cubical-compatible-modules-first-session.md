@@ -6,7 +6,9 @@
   section's heading in this directory's form (the date, then the repository
   and the work, with "#N" written "issue N"), and the header was added from
   the section's own text, "not recorded" marking what it does not say.  The
-  body is the section's, unchanged.
+  body is the section's, except that names and details of the private work
+  were replaced by plain descriptions in review (PR 259), since a private
+  repository's report records tool usage only.
 -->
 
 # 2026-10-11, a private repository: four new modules under `--cubical-compatible` (Claude Opus 5.5)
@@ -34,20 +36,19 @@ passed.
 +  **Speed**.  150 to 310 ms for a small module with warm library interfaces,
    4.2 to 4.6 s for the largest, which imports some forty library modules.
 +  **Diagnostics that named the fix**.  `NotInScope` listed candidates, and
-   the right one was among them (a module-qualified alias,
-   `↭.↭-reflexive`).  An `UnequalTerms` whose `actual` was `A` and
-   `expected` `B` at an argument position pointed at precedence: an
-   operator declared without fixity bound tighter than another declared
-   `infixl 5`.  `UnequalSorts` printed `Set A.a != Set a`, which named the
-   cause, a generalized variable `A : Set a` whose level Agda generalizes
-   separately from an `a` written in the same signature.
+   the right one was among them (a module-qualified alias of a library
+   lemma).  An `UnequalTerms` at an argument position, its `actual` and
+   `expected` two different types, pointed at precedence: an operator
+   declared without fixity bound tighter than another declared `infixl 5`.
+   `UnequalSorts` printed the two sorts, which named the cause: a
+   generalized variable whose level Agda generalizes separately from a level
+   variable written in the same signature.
 +  **Warnings, which the project's gate hides**.  `check_file` returns
    warnings with `severity: "warning"` beside errors, and on a passing file
    with `success: true`.  That mattered here: the project's checker reports
-   only pass or fail, and three `UnsupportedIndexedMatch` warnings
-   ("relies on injectivity of the data constructor `_∷_`", and on
-   `Agda.Builtin.Bool.Bool.true` for the `yes` and `no` patterns of `Dec`)
-   came only from `check_file`; the module was rewritten until it had none.
+   only pass or fail, and three `UnsupportedIndexedMatch` warnings (matches
+   that rely on the injectivity of data constructors) came only from
+   `check_file`; the module was rewritten until it had none.
 +  **Outside the project**.  `check_file` also checked a scratch file in a
    directory outside the repository (the project root became that
    directory) and reported its warning.  That call had

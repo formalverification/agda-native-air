@@ -6,7 +6,9 @@
   section's heading in this directory's form (the date, then the repository
   and the work, with "#N" written "issue N"), and the header was added from
   the section's own text, "not recorded" marking what it does not say.  The
-  body is the section's, unchanged.
+  body is the section's, except that a detail of the private work was
+  replaced by a plain description in review (PR 259), since a private
+  repository's report records tool usage only.
 -->
 
 # 2026-10-11, a private repository: Codex tool discovery and the project check environment
@@ -40,6 +42,6 @@
 +  **CLI comparison**.  The same project gate passed in 23 seconds through
    the pinned Nix shell with Agda 2.8.0.  The CLI loop was more efficient
    for this session's batch syntax checks because it kept the toolchain
-   correct and ran the generated fixtures together.  The server's file
+   correct and checked the files together.  The server's file
    diagnostics were useful once discovered; its project environment
    needs correction before it can replace the CLI gate here.
