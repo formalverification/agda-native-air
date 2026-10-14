@@ -229,13 +229,18 @@ object SubjectEnv {
   * made before issue #237.
   */
 final case class SubjectRun(exitCode: Option[Int], wallMs: Long, killed: Boolean, startedAt: Option[String] = None,
-                            redacted: Vector[String] = Vector.empty) {
-  // The exit code is kept when null (a kill); the two later fields only
-  // when they say something.
+                            redacted: Vector[String] = Vector.empty, stopped: Option[String] = None, orphansKilled: Int = 0) {
+  // The exit code is kept when null (a kill); the later fields only when
+  // they say something, so a Claude subject's record is what it was.
+  // `stopped` names the cap the harness stopped a Codex subject at (issue
+  // #239: `max_turns`, `budget`; not a kill), and `orphansKilled` the
+  // server processes it ended afterwards.
   def toJson: Json = Json.fromFields(
     Vector("exitCode" -> exitCode.asJson, "wallMs" -> wallMs.asJson, "killed" -> killed.asJson) ++
       startedAt.map(at => "startedAt" -> at.asJson) ++
-      (if (redacted.isEmpty) Vector.empty else Vector("redacted" -> redacted.asJson)))
+      (if (redacted.isEmpty) Vector.empty else Vector("redacted" -> redacted.asJson)) ++
+      stopped.map(s => "stopped" -> s.asJson) ++
+      (if (orphansKilled == 0) Vector.empty else Vector("orphansKilled" -> orphansKilled.asJson)))
 }
 object SubjectRun {
   def fromJson(j: Json): Option[SubjectRun] =
@@ -243,7 +248,8 @@ object SubjectRun {
       wallMs <- j.hcursor.get[Long]("wallMs").toOption
       killed <- j.hcursor.get[Boolean]("killed").toOption
     } yield SubjectRun(j.hcursor.get[Option[Int]]("exitCode").toOption.flatten, wallMs, killed,
-      j.hcursor.get[String]("startedAt").toOption, j.hcursor.get[Vector[String]]("redacted").getOrElse(Vector.empty))
+      j.hcursor.get[String]("startedAt").toOption, j.hcursor.get[Vector[String]]("redacted").getOrElse(Vector.empty),
+      j.hcursor.get[String]("stopped").toOption, j.hcursor.get[Int]("orphansKilled").getOrElse(0))
 }
 
 object Subject {
@@ -287,19 +293,30 @@ object Subject {
     * the whole-project tool cannot run this repository's own gate), and the
     * run's `--expose` list when it has one (issue #191).
     */
-  def mcpConfig(cfg: SubjectConfig, workDir: Path, workFile: Path, corpus: Path): Json =
+  def mcpConfig(cfg: SubjectConfig, workDir: Path, workFile: Path, corpus: Path): Json = {
+    val (command, args, env) = server(cfg, workDir, workFile, corpus)
     Json.obj("mcpServers" -> Json.obj("agda" -> Json.obj(
-      "command" -> cfg.runServer.toString.asJson,
-      "args" -> (Vector(
-        "--cwd", cfg.projectRoot.toString,
-        "--agda-flags", cfg.agdaFlags,
-        "--timeout", cfg.serverTimeout.toString,
-        "--corpus", corpus.toString,
-        "--check-command", s"agda ${cfg.agdaFlags} -i $workDir $workFile"
-      ) ++ cfg.expose.toVector.flatMap(ts => Vector("--expose", ts.mkString(",")))).asJson,
-      "env" -> Json.obj("AGDA_MCP_BIN" -> cfg.serverBin.toString.asJson),
+      "command"    -> command.asJson,
+      "args"       -> args.asJson,
+      "env"        -> Json.obj(env.toVector.map { case (k, v) => k -> v.asJson }: _*),
       "alwaysLoad" -> Json.True
     )))
+  }
+
+  /** The agda server a subject is given, as command, arguments, and
+    * environment: one definition for both harnesses (issue #239), so a Codex
+    * subject's server is a Claude subject's.
+    */
+  def server(cfg: SubjectConfig, workDir: Path, workFile: Path, corpus: Path): (String, Vector[String], Map[String, String]) =
+    (cfg.runServer.toString,
+     Vector(
+       "--cwd", cfg.projectRoot.toString,
+       "--agda-flags", cfg.agdaFlags,
+       "--timeout", cfg.serverTimeout.toString,
+       "--corpus", corpus.toString,
+       "--check-command", s"agda ${cfg.agdaFlags} -i $workDir $workFile"
+     ) ++ cfg.expose.toVector.flatMap(ts => Vector("--expose", ts.mkString(","))),
+     Map("AGDA_MCP_BIN" -> cfg.serverBin.toString))
 
   /** Render a prompt template for one row.  Both prompts go through this, so
     * the shell arms can state the row's own `agda` command and corpus path
@@ -374,50 +391,91 @@ object Subject {
       out
     }.handleError(e => s"unknown (${e.getMessage})")
 
-  private def killGroup(proc: Process): IO[Unit] =
+  /** End a subject's process group: `first` (TERM for `claude -p`; INT for
+    * Codex, whose exec interrupts its turn and shuts its servers down on it
+    * and has no TERM handler), then KILL after ten seconds.  Every
+    * descendant is listed before the first signal and killed after the last,
+    * since Codex starts its MCP servers in process groups of their own
+    * (issue #239), which a signal to the subject's group does not reach.
+    */
+  private def killGroup(first: String)(proc: Process): IO[Unit] =
     IO.blocking {
       if (proc.isAlive) {
-        val pgid = proc.pid().toString
-        new ProcessBuilder("kill", "-TERM", "--", s"-$pgid").start().waitFor()
+        val pgid  = proc.pid().toString
+        val below = proc.toHandle.descendants().iterator().asScala.toVector
+        new ProcessBuilder("kill", s"-$first", "--", s"-$pgid").start().waitFor()
         if (!proc.waitFor(10, TimeUnit.SECONDS)) {
           new ProcessBuilder("kill", "-KILL", "--", s"-$pgid").start().waitFor()
           proc.destroyForcibly()
           proc.waitFor(5, TimeUnit.SECONDS)
         }
+        below.filter(_.isAlive).foreach(_.destroyForcibly())
         ()
       }
     }
 
-  /** Poll for exit until the deadline; true when the process exited. */
-  private def await(proc: Process, deadline: FiniteDuration): IO[Boolean] =
+  /** How waiting for a subject ended: it exited, the wall cap passed, or the
+    * harness's own poll named a cap to stop it at (a Codex subject's turns
+    * or budget, issue #239).
+    */
+  private sealed trait Waited
+  private final case class Exited(code: Int)    extends Waited
+  private case object WallCap                   extends Waited
+  private final case class Stop(cap: String)    extends Waited
+
+  /** Poll for exit until the deadline, asking `stop` between polls. */
+  private def await(proc: Process, deadline: FiniteDuration, stop: IO[Option[String]]): IO[Waited] =
     IO.blocking(proc.waitFor(500, TimeUnit.MILLISECONDS)).flatMap { done =>
-      if (done) IO.pure(true)
-      else IO.monotonic.flatMap(now => if (now >= deadline) IO.pure(false) else await(proc, deadline))
+      if (done) IO.pure(Exited(proc.exitValue()))
+      else IO.monotonic.flatMap { now =>
+        if (now >= deadline) IO.pure(WallCap)
+        else stop.handleError(_ => None).flatMap {
+          case Some(cap) => IO.pure(Stop(cap))
+          case None      => await(proc, deadline, stop)
+        }
+      }
     }
 
   /** Run one subject: cwd is the work directory, stdin is /dev/null, stdout
     * (the stream-json) and stderr go to the named files.  The process group
     * is killed at the wall cap and on any other exit of this effect.
     */
-  def run(cfg: SubjectConfig, workDir: Path, mcpConfig: Option[Path], prompt: String, stdout: Path, stderr: Path): IO[SubjectRun] = {
+  def run(cfg: SubjectConfig, workDir: Path, mcpConfig: Option[Path], prompt: String, stdout: Path, stderr: Path): IO[SubjectRun] =
+    spawn(argv(cfg, mcpConfig, prompt), cfg.env.vars, workDir, stdout, stderr, cfg.wallCap, "TERM")
+
+  /** Spawn a subject's process under the wall cap, either harness's: cwd is
+    * the work directory, stdin is /dev/null, stdout and stderr go to the
+    * named files, the environment is exactly `env`, and the process group
+    * (and every descendant) is ended at the cap, at a cap `stop` names, and
+    * on any other exit of this effect, `firstSignal` first.  A wall-cap
+    * kill is `killed`; a stop is not, and names its cap in `stopped`.
+    */
+  def spawn(argv: Vector[String], env: Map[String, String], workDir: Path, stdout: Path, stderr: Path,
+            wallCap: FiniteDuration, firstSignal: String, stop: IO[Option[String]] = IO.pure(None)): IO[SubjectRun] = {
     val start = IO.blocking {
-      val pb = new ProcessBuilder(argv(cfg, mcpConfig, prompt).asJava)
+      val pb = new ProcessBuilder(argv.asJava)
       pb.directory(workDir.toFile)
       pb.redirectInput(Redirect.from(new File("/dev/null")))
       pb.redirectOutput(Redirect.to(stdout.toFile))
       pb.redirectError(Redirect.to(stderr.toFile))
-      val env = pb.environment()
-      env.clear()
-      env.putAll(cfg.env.vars.asJava)
+      val e = pb.environment()
+      e.clear()
+      e.putAll(env.asJava)
       pb.start()
     }
     for {
       at  <- IO.realTimeInstant
       t0  <- IO.monotonic
       res <- start.bracket { proc =>
-               await(proc, t0 + cfg.wallCap).map(exited => if (exited) (Some(proc.exitValue()), false) else (Option.empty[Int], true))
-             }(killGroup)
+               await(proc, t0 + wallCap, stop).flatMap {
+                 case Exited(code) => IO.pure((Some(code), false, Option.empty[String]))
+                 case WallCap      => IO.pure((Option.empty[Int], true, Option.empty[String]))
+                 // A stop ends the process here, then reads how it exited.
+                 case Stop(cap)    => killGroup(firstSignal)(proc) *>
+                                        IO.blocking(if (proc.isAlive) None else Some(proc.exitValue())).map(c => (c, false, Some(cap)))
+               }
+             }(killGroup(firstSignal))
       t1  <- IO.monotonic
-    } yield SubjectRun(res._1, (t1 - t0).toMillis, res._2, Some(at.toString))
+    } yield SubjectRun(res._1, (t1 - t0).toMillis, res._2, Some(at.toString), stopped = res._3)
   }
 }

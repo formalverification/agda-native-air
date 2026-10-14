@@ -59,7 +59,7 @@ import scala.jdk.CollectionConverters._
 /** Credential values by variable, each held as the ISO-8859-1 reading of
   * its UTF-8 bytes, which is how the files are searched.
   */
-final class Credentials private (secrets: Vector[(String, String)]) {
+final class Credentials private (private val secrets: Vector[(String, String)]) {
 
   /** The variables whose values are looked for. */
   def names: Vector[String] = secrets.map(_._1).distinct.sorted
@@ -72,6 +72,9 @@ final class Credentials private (secrets: Vector[(String, String)]) {
   /** `text` with every value replaced by `<redacted:NAME>`. */
   def redact(text: String): String =
     secrets.foldLeft(text) { case (t, (n, v)) => t.replace(v, s"<redacted:$n>") }
+
+  /** Both sets of values, longest first again. */
+  def ++(o: Credentials): Credentials = new Credentials((secrets ++ o.secrets).distinct.sortBy { case (n, v) => (-v.length, n) })
 
   override def toString: String = s"Credentials(${names.mkString(", ")})"
 }
@@ -109,10 +112,47 @@ object Credentials {
 
   /** The credentials of an environment, by name and value, longest values first. */
   def of(env: Map[String, String]): Credentials =
-    new Credentials(env.toVector.flatMap { case (n, v) =>
+    named(env.toVector.flatMap { case (n, v) =>
       val named = if (n.matches(credentialName)) v.trim +: v.split("\\s+").toVector else Vector.empty
-      (named ++ urlParts(n, v)).filter(_.length >= minLength).flatMap(s => Vector(s, inJson(s))).map(asBytes).distinct.map(n -> _)
+      (named ++ urlParts(n, v)).map(n -> _)
+    })
+
+  /** Values under the names they are reported by, in both spellings, at
+    * the length floor unless the name is exempt from it, longest first.
+    */
+  private def named(values: Vector[(String, String)], exempt: Set[String] = Set.empty): Credentials =
+    new Credentials(values.flatMap { case (n, v) =>
+      Vector(v).filter(s => s.nonEmpty && (s.length >= minLength || exempt(n))).flatMap(s => Vector(s, inJson(s))).map(asBytes).distinct.map(n -> _)
     }.distinct.sortBy { case (n, v) => (-v.length, n) })
+
+  /** The secrets of a Codex login (issue #239), from the text of its
+    * `auth.json`, which a Codex subject's own CODEX_HOME links to: the API
+    * key and the three tokens, and the account's identity as the ID token
+    * carries it (the e-mail address, the user and account ids), which Codex
+    * writes into a session's rollout and its info-level log.  Each is
+    * reported as `CODEX_LOGIN_<FIELD>`, never by value; the e-mail address
+    * is looked for however short it is; a file that does not parse holds
+    * nothing to look for.
+    */
+  def ofCodexLogin(authJson: String): Credentials = {
+    val j      = io.circe.parser.parse(authJson).toOption.getOrElse(io.circe.Json.Null)
+    val c      = j.hcursor
+    val tokens = c.downField("tokens")
+    def field(cur: io.circe.ACursor, k: String): Option[String] = cur.get[String](k).toOption.filter(_.trim.nonEmpty)
+    val claims = field(tokens, "id_token").toVector.flatMap(t => t.split('.').lift(1).toVector)
+      .flatMap(p => scala.util.Try(new String(java.util.Base64.getUrlDecoder.decode(p.padTo(p.length + (4 - p.length % 4) % 4, '=')),
+        java.nio.charset.StandardCharsets.UTF_8)).toOption.toVector)
+      .flatMap(s => io.circe.parser.parse(s).toOption.toVector)
+    val identity = claims.flatMap { cl =>
+      val a = cl.hcursor.downField("https://api.openai.com/auth")
+      Vector("EMAIL" -> field(cl.hcursor, "email"), "SUBJECT" -> field(cl.hcursor, "sub"),
+        "USER_ID" -> field(a, "chatgpt_user_id").orElse(field(a, "user_id")), "ACCOUNT_ID" -> field(a, "chatgpt_account_id"))
+    }
+    named((Vector("API_KEY" -> field(c, "OPENAI_API_KEY"), "ACCESS_TOKEN" -> field(tokens, "access_token"),
+      "REFRESH_TOKEN" -> field(tokens, "refresh_token"), "ID_TOKEN" -> field(tokens, "id_token"),
+      "ACCOUNT_ID" -> field(tokens, "account_id")) ++ identity).collect { case (n, Some(v)) => s"CODEX_LOGIN_$n" -> v },
+      exempt = Set("CODEX_LOGIN_EMAIL"))
+  }
 
   /** Replace every value in the files that exist, and name the variables replaced. */
   def scrub(creds: Credentials, files: Vector[Path]): IO[Vector[String]] =

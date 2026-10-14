@@ -144,4 +144,28 @@ final class AgentBenchCliSpec extends AnyFunSuite with Matchers {
     cliParse(base ++ List("--all", "--bogus", "1")) shouldBe Left("unrecognized argument: --bogus")
     cliParse(base ++ List("--all", "--safe", "maybe")) shouldBe Left("bad --safe: maybe (on|off)")
   }
+
+  test("--harness codex runs the mcp arm, one subject at a time, with its catalog defaulted; the codex flags are the codex harness's (#239)") {
+    val codex = cliParse(base ++ List("--all", "--harness", "codex", "--effort", "high")).getOrElse(fail("parse"))
+    codex.harness shouldBe Harness.Codex
+    codex.effort shouldBe Some("high")
+    codex.codexBin shouldBe "codex"
+    codex.codexCatalog.map(_.toString).exists(_.endsWith("data/benchmarks/codex-models.json")) shouldBe true
+    codex.allowCredits shouldBe false
+    cliParse(base ++ List("--all", "--harness", "codex", "--arm", "both")) shouldBe Left("--harness codex runs the mcp arm only, not both")
+    cliParse(base ++ List("--all", "--harness", "codex", "--parallelism", "3")) shouldBe Left("--harness codex runs one subject at a time, not --parallelism 3")
+    cliParse(base ++ List("--all", "--effort", "high")) shouldBe Left("--effort, --codex-bin, --codex-catalog, and --allow-credits are the codex harness's")
+    cliParse(base ++ List("--all", "--harness", "gemini")).isLeft shouldBe true
+    cliParse(base ++ List("--all")).map(_.harness) shouldBe Right(Harness.Claude)
+  }
+
+  test("a Codex run prices at OpenAI's table by default and quotes the priced figure (#239)") {
+    val codex = cliParse(base ++ List("--all", "--harness", "codex")).getOrElse(fail("parse"))
+    AgentBench.pricesPath(codex, runHasTable = false).toString should endWith ("data/benchmarks/prices-openai.json")
+    AgentBench.quotesPricedFigure(codex) shouldBe true
+    AgentBench.tableNamed(codex, runHasTable = false) shouldBe None
+    val claude = cliParse(base ++ List("--all")).getOrElse(fail("parse"))
+    AgentBench.quotesPricedFigure(claude) shouldBe false
+  }
 }
+

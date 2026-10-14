@@ -33,6 +33,11 @@
   *    subset is the exact expectation both ways: every exposed tool must
   *    arrive, and an agda tool outside it is as foreign as Bash on the mcp
   *    arm.
+  *  - A Codex subject (issue #239) is the mcp arm's: its Read and Edit are
+  *    a confined read tool and apply_patch, mapped to those names, and what
+  *    Codex presents and cannot switch off is its harness's fixed surface,
+  *    admitted beside them (Harness.scala).  Its shell is off, so a shell
+  *    command is a foreign tool, as Bash is on the mcp arm.
   *
   *  ============================================================================
   */
@@ -51,10 +56,11 @@ sealed abstract class Arm(val name: String, val hasServer: Boolean, val hasShell
     (if (hasServer) Vector("mcp__agda") else Vector.empty) ++ (if (hasShell) Vector(Arm.bash) else Vector.empty)
 
   /** May a subject of this arm be presented this tool?  Under `--expose`
-    * only the exposed agda tools qualify (issue #191).
+    * only the exposed agda tools qualify (issue #191).  A Codex subject is
+    * also presented its harness's fixed surface (issue #239).
     */
-  def presents(tool: String, expose: Option[Vector[String]] = None): Boolean =
-    builtinTools(tool) ||
+  def presents(tool: String, expose: Option[Vector[String]] = None, harness: Harness = Harness.Claude): Boolean =
+    builtinTools(tool) || harness.fixedSurface(tool) ||
       (hasServer && tool.startsWith(Arm.agdaPrefix) && expose.forall(_.contains(tool.stripPrefix(Arm.agdaPrefix))))
 }
 

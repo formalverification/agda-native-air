@@ -22,7 +22,10 @@
   *  server to connect and no agda tools to miss, and its Bash calls are
   *  audited by ShellAudit, which is the only confinement Bash has.  A run
   *  with `--expose` (issue #191) narrows the agda half of the expectation to
-  *  the exposed tools, both ways: each must arrive, and no other may.
+  *  the exposed tools, both ways: each must arrive, and no other may.  A
+  *  Codex subject (issue #239) is audited from the transcript its adapter
+  *  derives (CodexTranscript.scala), under its own record's harness, whose
+  *  fixed surface is admitted beside the arm's tools.
   *
   *  Design notes
   *  ------------
@@ -97,20 +100,26 @@ final case class Isolation(
   * without one is the server-only arm confined to its work directory, which is
   * what the runs made before this record existed were.
   */
-final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None, endpoint: Option[Endpoint] = None) {
+final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None, endpoint: Option[Endpoint] = None,
+                               harness: Harness = Harness.Claude, codexEndpoint: Option[Json] = None) {
+  // The harness is written only for a Codex subject (issue #239), so a
+  // Claude subject's record is byte for byte what it was; a Codex subject's
+  // endpoint is its own block, the Anthropic one being nobody's.
   def toJson: Json = Json.obj(
     "arm"       -> arm.name.asJson,
+    "harness"   -> (if (harness == Harness.Claude) Json.Null else harness.name.asJson),
     "workDir"   -> roots.workDir.toString.asJson,
     "readRoots" -> roots.readRoots.map(_.toString).asJson,
     "corpora"   -> roots.corpora.map(_.toString).asJson,
     "expose"    -> expose.asJson,
-    "endpoint"  -> endpoint.map(_.toJson).asJson
+    "endpoint"  -> codexEndpoint.orElse(endpoint.map(_.toJson)).asJson
   ).dropNullValues
 }
 
 object SubjectRecord {
   def fromJson(j: Json): Option[SubjectRecord] = {
-    val c = j.hcursor
+    val c       = j.hcursor
+    val harness = c.get[String]("harness").toOption.flatMap(s => Harness.parse(s).toOption).getOrElse(Harness.Claude)
     for {
       arm  <- c.get[String]("arm").toOption.flatMap(s => Arm.parse(s).toOption)
       work <- c.get[String]("workDir").toOption.map(Paths.get(_))
@@ -118,8 +127,10 @@ object SubjectRecord {
       workDir   = work,
       readRoots = c.get[Vector[String]]("readRoots").getOrElse(Vector.empty).map(Paths.get(_)),
       corpora   = c.get[Vector[String]]("corpora").getOrElse(Vector.empty).map(Paths.get(_))),
-      expose    = c.get[Vector[String]]("expose").toOption,
-      endpoint  = c.downField("endpoint").focus.flatMap(Endpoint.fromJson))
+      expose        = c.get[Vector[String]]("expose").toOption,
+      endpoint      = if (harness == Harness.Claude) c.downField("endpoint").focus.flatMap(Endpoint.fromJson) else None,
+      harness       = harness,
+      codexEndpoint = if (harness == Harness.Claude) None else c.downField("endpoint").focus)
   }
 }
 
@@ -160,7 +171,8 @@ object Audit {
     * Under `expose` (issue #191) the exposed agda tools are both the floor
     * and the ceiling.
     */
-  def isolation(t: Transcript, arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None): Isolation = {
+  def isolation(t: Transcript, arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None,
+                harness: Harness = Harness.Claude): Isolation = {
     val init  = t.init
     val tools = init.map(_.tools).getOrElse(Vector.empty)
     val work  = roots.workDir.toAbsolutePath.normalize
@@ -179,9 +191,9 @@ object Audit {
       mcpConnected       = init.exists(_.mcpServers.contains(("agda", "connected"))),
       agdaToolsPresented = tools.filter(_.startsWith(Arm.agdaPrefix)),
       missingAgdaTools   = if (arm.hasServer) Subject.requiredAgdaTools(expose).filterNot(tools.contains) else Vector.empty,
-      extraTools         = tools.filterNot(arm.presents(_, expose)),
+      extraTools         = tools.filterNot(arm.presents(_, expose, harness)),
       toolsDeferred      = t.toolsDeferred,
-      foreignToolUses    = t.uses.map(_.name).filterNot(arm.presents(_, expose)).distinct,
+      foreignToolUses    = t.uses.map(_.name).filterNot(arm.presents(_, expose, harness)).distinct,
       violations         = outside.collect { case (u, r, p) if !r.exists(_.isError) => s"${u.name} $p" } ++ shellViolations,
       deniedPaths        = outside.collect { case (u, r, p) if r.exists(_.isError) => s"${u.name} $p" },
       shellClasses       = shellClasses,

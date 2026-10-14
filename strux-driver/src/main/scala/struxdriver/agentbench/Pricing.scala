@@ -45,6 +45,13 @@
   *    `inference_geo: "us"`, web searches, and fast mode; no archived subject
   *    has any of them, which is why the archive pins the table to the cent,
   *    and a row that has one carries a caveat naming it (`caveats`).
+  *  - A Codex subject (issue #239) reports no cost of its own (`costUsd`
+  *    None, `costBasis` "none"), so the priced figure is its only one.  Its
+  *    counts come from its adapter in the same four classes, the reasoning
+  *    tokens inside output (OpenAI bills them as output, and they are never
+  *    added a second time); the ChatGPT backend reports cache writes as 0,
+  *    so written tokens are priced as uncached input, at most 20 % under
+  *    OpenAI's write price.
   *  - Strict parsing: a row carries exactly the four prices, each a number no
   *    smaller than 0, so a misspelled or missing price refuses the table at
   *    start instead of pricing a run wrongly.  Amounts are BigDecimal, so a
@@ -94,7 +101,7 @@ object Tokens {
 final case class ModelUsage(
   model:     String,
   tokens:    Tokens,
-  costUsd:   Double,
+  costUsd:   Option[Double],
   canonical: Option[String],
   provider:  Option[String],
   costBasis: Option[String]
@@ -110,24 +117,38 @@ final case class ModelUsage(
 }
 
 object ModelUsage {
-  /** One entry of the client's `modelUsage` object, keyed by `model`. */
+
+  /** The price basis of a client that reports no cost at all (a Codex
+    * subject, issue #239), as its derived transcript names it.
+    */
+  val noFigure: String = "none"
+
+  /** One entry of the client's `modelUsage` object, keyed by `model`.  A
+    * missing figure reads 0, as every archived entry did, unless the
+    * entry's basis says the client reports none.
+    */
   def fromClient(model: String, j: Json): ModelUsage = {
     val c = j.hcursor
     def n(k: String): Long = c.get[Long](k).getOrElse(0L)
+    val basis = c.get[String]("costBasis").toOption
     ModelUsage(
       model     = model,
       tokens    = Tokens(n("inputTokens"), n("outputTokens"), n("cacheReadInputTokens"), n("cacheCreationInputTokens")),
-      costUsd   = c.get[Double]("costUSD").getOrElse(0.0),
+      costUsd   = c.get[Double]("costUSD").toOption.orElse(if (basis.contains(noFigure)) None else Some(0.0)),
       canonical = c.get[String]("canonicalModel").toOption,
       provider  = c.get[String]("provider").toOption,
-      costBasis = c.get[String]("costBasis").toOption)
+      costBasis = basis)
   }
 
-  /** Two sessions' usage of the same models, summed per model, in first-seen order. */
-  def totals(us: Vector[ModelUsage]): Vector[(String, Tokens, Double)] =
+  /** Two sessions' usage of the same models, summed per model, in
+    * first-seen order; the client's figure is None when no session of the
+    * model had one.
+    */
+  def totals(us: Vector[ModelUsage]): Vector[(String, Tokens, Option[Double])] =
     us.map(_.model).distinct.map { m =>
       val mine = us.filter(_.model == m)
-      (m, mine.map(_.tokens).foldLeft(Tokens.zero)(_ + _), mine.map(_.costUsd).sum)
+      val figs = mine.flatMap(_.costUsd)
+      (m, mine.map(_.tokens).foldLeft(Tokens.zero)(_ + _), if (figs.isEmpty) None else Some(figs.sum))
     }
 }
 
@@ -292,7 +313,13 @@ object Pricing {
         .map(n => s"$n five-minute cache-write tokens, priced at the one-hour rate"),
       c.get[String]("inference_geo").toOption.filter(_ == "us").map(_ => "inference_geo us, which the client prices at 1.1 times the rate"),
       c.downField("server_tool_use").get[Long]("web_search_requests").toOption.filter(_ > 0).map(n => s"$n web searches, not priced"),
-      c.get[String]("speed").toOption.filter(_ == "fast").map(_ => "fast mode, priced at the standard rate")
+      c.get[String]("speed").toOption.filter(_ == "fast").map(_ => "fast mode, priced at the standard rate"),
+      // A Codex subject's usage (issue #239): OpenAI prices a response over
+      // 272K input tokens, and a tier other than the standard one, higher.
+      c.get[Long]("long_context_responses").toOption.filter(_ > 0)
+        .map(n => s"$n responses over 272K input tokens, priced at the short-context rate"),
+      c.get[String]("service_tier").toOption.filterNot(t => t == "standard" || t == "default" || t == "auto")
+        .map(t => s"service tier $t, priced at the standard rate")
     ).flatten
   }
 }

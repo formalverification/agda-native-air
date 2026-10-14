@@ -64,7 +64,7 @@ final class TranscriptSpec extends AnyFunSuite with Matchers {
     val r = t.result.getOrElse(fail("no result record"))
     r.subtype shouldBe "success"
     r.numTurns shouldBe 4
-    r.costUsd should be > 0.04
+    r.costUsd.getOrElse(0.0) should be > 0.04
     r.permissionDenials shouldBe 0
     r.tokens.hcursor.get[Long]("cacheRead").toOption shouldBe Some(39316L)
     t.filePaths(Subject.fileTools).map(_._3).forall(_.startsWith(workDir.toString)) shouldBe true

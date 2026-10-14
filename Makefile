@@ -1930,6 +1930,15 @@ proof-search-recall: _check-sbt
 # re-judge the run's own prices.json (the committed table for a run that has
 # none); it is required with another endpoint, where a run whose
 # AGENT_BENCH_MODEL has no row in it is refused at start.
+#
+# A Codex subject (issue #239): AGENT_BENCH_HARNESS=codex runs each subject
+# as a `codex exec --json` session instead (the mcp arm only, one at a time),
+# for OpenAI's models, logged in with `codex login`; AGENT_BENCH_CODEX_BIN
+# names the CLI, AGENT_BENCH_CODEX_CATALOG the pinned model catalog,
+# AGENT_BENCH_EFFORT the reasoning effort (empty: the catalog's default for
+# the model), and AGENT_BENCH_ALLOW_CREDITS=on lets a sweep run on an account
+# that holds ChatGPT credits.  The price table defaults to OpenAI's.  Any
+# other AGENT_BENCH_HARNESS is refused.
 AGENT_BENCH_OUT_DIR         ?= data/benchmarks/reports/agent-bench
 AGENT_BENCH_MODEL           ?= claude-sonnet-5
 AGENT_BENCH_ARM             ?= mcp
@@ -1946,8 +1955,21 @@ AGENT_BENCH_CORPUS_STDLIB   ?= data/corpora/agda-stdlib/v0/corpus.jsonl
 AGENT_BENCH_CORPUS_ALGEBRAS ?= data/corpora/agda-algebras/v0.1/corpus.jsonl
 AGENT_BENCH_RUN_ID          ?= agent-$(AGENT_BENCH_MODEL)-$(shell date -u +%Y%m%dT%H%M%SZ)
 AGENT_BENCH_PRICES          ?=
+AGENT_BENCH_HARNESS         ?= claude
+AGENT_BENCH_CODEX_BIN       ?= codex
+AGENT_BENCH_CODEX_CATALOG   ?= data/benchmarks/codex-models.json
+AGENT_BENCH_EFFORT          ?=
+AGENT_BENCH_ALLOW_CREDITS   ?= off
 
 AGENT_BENCH_ARCHIVE_DIR     ?= reports/agent-bench
+AGENT_BENCH_ARCHIVE_NO_LOGIN ?=
+
+# The values of the operator's Codex login, one per line, for the archive's
+# search of a Codex run (issue #239): the API key and the three tokens, and
+# the identity the ID token carries (its claims decoded from base64url).
+# Empty values are dropped, since an empty pattern would match everything;
+# a claim block that does not decode leaves the other values searched.
+AGENT_BENCH_CODEX_LOGIN_JQ = ([.OPENAI_API_KEY, .tokens.access_token, .tokens.refresh_token, .tokens.id_token, .tokens.account_id] + ((.tokens.id_token // "" | split(".") | .[1] // "" | gsub("-"; "+") | gsub("_"; "/") | ((length % 4) as $$n | . + ("===="[0:((4 - $$n) % 4)])) | (try (@base64d | fromjson) catch {}) | if type == "object" then . else {} end) as $$c | [$$c.email, $$c.sub, ($$c["https://api.openai.com/auth"] // {}).chatgpt_user_id, ($$c["https://api.openai.com/auth"] // {}).chatgpt_account_id])) | .[] | strings | select(length > 0)
 
 .PHONY: agent-bench agent-bench-rejudge agent-bench-it agent-bench-archive
 
@@ -1955,10 +1977,10 @@ AGENT_BENCH_ARCHIVE_DIR     ?= reports/agent-bench
 # AGENT_BENCH_ARM, over the whole suite (or AGENT_BENCH_IDS="--ids id1,id2"),
 # AGENT_BENCH_PARALLELISM subjects at once.  A run id is one arm.
 agent-bench: _check-sbt
-	@set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
-	echo ">> [agent-bench] arm=$(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), expose=$(AGENT_BENCH_EXPOSE)) model=$(AGENT_BENCH_MODEL) turns=$(AGENT_BENCH_MAX_TURNS) wall=$(AGENT_BENCH_WALL_CAP)s budget=$(AGENT_BENCH_MAX_BUDGET_USD) parallelism=$(AGENT_BENCH_PARALLELISM) run-id=$(AGENT_BENCH_RUN_ID) against $$AGDA_MCP_BIN"; \
+	@$(if $(and $(filter 1,$(words $(AGENT_BENCH_HARNESS))),$(filter claude codex,$(AGENT_BENCH_HARNESS))),,$(error AGENT_BENCH_HARNESS must be claude or codex, not '$(AGENT_BENCH_HARNESS)'))set -e; $(RESOLVE_AGDA_MCP_BIN); $(RESOLVE_AGDA_JSON_BIN_BUILT); \
+	echo ">> [agent-bench] harness=$(AGENT_BENCH_HARNESS) arm=$(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), expose=$(AGENT_BENCH_EXPOSE)) model=$(AGENT_BENCH_MODEL) turns=$(AGENT_BENCH_MAX_TURNS) wall=$(AGENT_BENCH_WALL_CAP)s budget=$(AGENT_BENCH_MAX_BUDGET_USD) parallelism=$(AGENT_BENCH_PARALLELISM) run-id=$(AGENT_BENCH_RUN_ID) against $$AGDA_MCP_BIN"; \
 	cd "$(STRUX_DRIVER)" && $(SBT) $(SBT_FLAGS) \
-	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --arm $(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), --expose $(AGENT_BENCH_EXPOSE)) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))$(if $(AGENT_BENCH_PRICES), --prices $(abspath $(AGENT_BENCH_PRICES)))"
+	  "runMain struxdriver.agentbench.AgentBench --index $(CURDIR)/$(BENCHMARK_INDEX) $(AGENT_BENCH_IDS) --out-dir $(CURDIR)/$(AGENT_BENCH_OUT_DIR) --run-id $(AGENT_BENCH_RUN_ID) --arm $(AGENT_BENCH_ARM)$(if $(AGENT_BENCH_EXPOSE), --expose $(AGENT_BENCH_EXPOSE)) --server-bin $$AGDA_MCP_BIN --agda-json-bin $$AGDA_JSON_BIN --project-root $(CURDIR) --server-timeout $(PROOF_SEARCH_TIMEOUT) --model $(AGENT_BENCH_MODEL) --max-turns $(AGENT_BENCH_MAX_TURNS) --wall-cap $(AGENT_BENCH_WALL_CAP) --max-budget-usd $(AGENT_BENCH_MAX_BUDGET_USD) --parallelism $(AGENT_BENCH_PARALLELISM) --safe $(AGENT_BENCH_SAFE) --persist-sessions $(AGENT_BENCH_PERSIST) --claude-bin $(AGENT_BENCH_CLAUDE_BIN) --corpus-stdlib $(abspath $(AGENT_BENCH_CORPUS_STDLIB)) --corpus-algebras $(abspath $(AGENT_BENCH_CORPUS_ALGEBRAS))$(if $(AGENT_BENCH_PRICES), --prices $(abspath $(AGENT_BENCH_PRICES)))$(if $(filter codex,$(AGENT_BENCH_HARNESS)), --harness codex --codex-bin $(AGENT_BENCH_CODEX_BIN) --codex-catalog $(abspath $(AGENT_BENCH_CODEX_CATALOG)) --allow-credits $(AGENT_BENCH_ALLOW_CREDITS)$(if $(AGENT_BENCH_EFFORT), --effort $(AGENT_BENCH_EFFORT)))"
 
 # Re-judge a finished run (AGENT_BENCH_RUN_ID=<run-id>): no model is called;
 # the archived final files are judged again (the harness's server and the
@@ -1988,7 +2010,13 @@ agent-bench-it: _check-sbt
 # Archive a run that a report quotes (AGENT_BENCH_RUN_ID=<run-id>): the report,
 # the JSONL rows, the prompts, and every subject's transcript, verdict, final
 # file, and configuration, under $(AGENT_BENCH_ARCHIVE_DIR)/<run-id>/, which is
-# committed.  The work copies, the staging server's log, and the .agdai files
+# committed; for a Codex run (issue #239) also the pinned model catalog and
+# each subject's Codex records (configuration, event stream, filtered
+# rollout, surface), from which its transcript is derived, and the run is
+# refused when any value of the operator's Codex login occurs in it, or when
+# that search cannot run (no jq, no login at $CODEX_HOME/auth.json or
+# ~/.codex/auth.json, or a login jq cannot read; AGENT_BENCH_ARCHIVE_NO_LOGIN=1
+# archives a run whose login is gone, with a warning).  The work copies, the staging server's log, and the .agdai files
 # stay behind.  Before anything is copied (issue #237), a run is refused
 # when the harness found a credential left in its directory
 # (credential-leaks.json), or when the directory holds the value, of 16
@@ -2009,13 +2037,25 @@ agent-bench-archive:
 	    *) case "$$val" in *://*@*|*://*\?*|*://*\#*) ;; *) continue;; esac;; esac; \
 	  if [ $${#val} -ge 16 ] && printenv "$$v" | grep -rqF --exclude-dir=work -f - "$$src"; then \
 	    echo "ERROR: the value of $$v occurs under $$src: not archived"; exit 1; fi; done; \
+	if grep -qs '"harness" *: *"codex"' "$$src/protocol.json" "$$src/report.json"; then \
+	  command -v jq >/dev/null || { echo "ERROR: jq is needed to search a Codex run for its login's values: not archived"; exit 1; }; \
+	  auth="$${CODEX_HOME:-$$HOME/.codex}/auth.json"; \
+	  if [ ! -f "$$auth" ]; then \
+	    if [ "$(AGENT_BENCH_ARCHIVE_NO_LOGIN)" = 1 ]; then echo "!! no Codex login at $$auth: its values were not searched for"; \
+	    else echo "ERROR: no Codex login at $$auth to search the run for: not archived (AGENT_BENCH_ARCHIVE_NO_LOGIN=1 archives without the search)"; exit 1; fi; \
+	  else \
+	    vals=$$(jq -r '$(AGENT_BENCH_CODEX_LOGIN_JQ)' "$$auth") || { echo "ERROR: cannot read the Codex login at $$auth: not archived"; exit 1; }; \
+	    test -n "$$vals" || { echo "ERROR: the Codex login at $$auth holds no value to search for: not archived"; exit 1; }; \
+	    if printf '%s\n' "$$vals" | grep -rqF -f - "$$src"; then \
+	      echo "ERROR: a value of the Codex login occurs under $$src: not archived"; exit 1; fi; fi; fi; \
 	mkdir -p "$$dst/subjects" "$$dst/prompts"; \
 	cp "$$src"/report.json "$$src"/results.jsonl "$$src"/fixtures.jsonl "$$dst"/; \
 	if [ -f "$$src"/protocol.json ]; then cp "$$src"/protocol.json "$$dst"/; fi; \
 	if [ -f "$$src"/prices.json ]; then cp "$$src"/prices.json "$$dst"/; fi; \
-	cp "$$src"/prompts/*.md "$$dst"/prompts/; \
+	if [ -f "$$src"/codex-models.json ]; then cp "$$src"/codex-models.json "$$dst"/; fi; \
+	cp "$$src"/prompts/* "$$dst"/prompts/; \
 	for d in "$$src"/subjects/*/; do test -d "$$d" || continue; id=$$(basename "$$d"); mkdir -p "$$dst/subjects/$$id"; \
-	  for f in transcript.jsonl outcome.json mcp.json subject.json prompt.txt system-prompt.txt run.json; do \
+	  for f in transcript.jsonl outcome.json mcp.json subject.json prompt.txt system-prompt.txt run.json codex-config.toml codex-events.jsonl codex-rollout.jsonl codex-surface.json; do \
 	    if [ -f "$$d$$f" ]; then cp "$$d$$f" "$$dst/subjects/$$id/"; fi; done; \
 	  if [ -s "$$d"stderr.log ]; then cp "$$d"stderr.log "$$dst/subjects/$$id/"; fi; \
 	  if ls "$$d"final/*.agda >/dev/null 2>&1; then mkdir -p "$$dst/subjects/$$id/final"; cp "$$d"final/*.agda "$$dst/subjects/$$id/final/"; fi; \

@@ -102,7 +102,7 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     intact.toJson.hcursor.downField("original").focus shouldBe Some(io.circe.Json.Null)
     // Priced at the committed table, the row costs what the client said (#237).
     intact.priced.unpriced shouldBe None
-    (intact.priced.usd.map(_.toDouble).getOrElse(-1.0) - intact.costUsd).abs should be < 1e-9
+    (intact.priced.usd.map(_.toDouble).getOrElse(-1.0) - intact.costUsd.getOrElse(-2.0)).abs should be < 1e-9
 
     val transcript = dst.resolve("transcript.jsonl")
     val kept = new String(Files.readAllBytes(transcript), StandardCharsets.UTF_8)
@@ -360,4 +360,144 @@ final class AgentBenchIntegrationSpec extends AnyFunSuite with Matchers {
     report.hcursor.downField("pricing").downField("prices").get[String]("sha256").toOption shouldBe
       protocol.hcursor.downField("inputs").downField("prices").get[String]("sha256").toOption
   }
+
+  test("a Codex run end to end with a stand-in codex: the protocol, the derived transcript, the price, and the login nowhere (#239)") {
+    val root = rootEnv.getOrElse(cancel("AGDA_NATIVE_AIR_ROOT not set; skipping the judge's live test"))
+    val bin  = binEnv.getOrElse(cancel("AGDA_MCP_BIN not set; skipping the judge's live test"))
+    val json = jsonEnv.getOrElse(cancel("AGDA_JSON_BIN not set; skipping the judge's live test"))
+    assume(sys.env.contains("AGDA_DIR"), "AGDA_DIR not set: run inside nix develop .#backend")
+    assume(Files.isRegularFile(bin) && Files.isRegularFile(json), "the server or the extractor binary is missing")
+    assume(Files.isExecutable(Paths.get("/usr/bin/python3")), "the stand-in codex is a python3 script")
+    val out  = Files.createTempDirectory(Paths.get("target").toAbsolutePath, "agentbench-codex-")
+    // A login that is no real one, standing for the operator's: its token,
+    // and an identity in its ID token's claims.
+    val token   = "tok-planted-not-a-credential-239-e2e"
+    val email   = "nobody-239@example.org"
+    val claims  = java.util.Base64.getUrlEncoder.withoutPadding.encodeToString(
+      s"""{"email":"$email","https://api.openai.com/auth":{"chatgpt_user_id":"user-planted-0123456789"}}""".getBytes(StandardCharsets.UTF_8))
+    val home    = Files.createDirectories(out.resolve("home/.codex"))
+    Files.write(home.resolve("auth.json"), s"""{"tokens":{"access_token":"$token","id_token":"h.$claims.s","account_id":"acct-planted-0123456789"}}""".getBytes(StandardCharsets.UTF_8))
+    val e       = entry(root, "stdlib-nat-plus-identity-l")
+    val gold    = new String(Files.readAllBytes(root.resolve(e.goldPath)), StandardCharsets.UTF_8)
+    val agda    = Subject.agdaToolsRequired.map(_.stripPrefix(Arm.agdaPrefix))
+    // The stand-in writes what Codex 0.162.1 writes: the --json stream, a
+    // rollout under its CODEX_HOME (whose session record names the account),
+    // and a request trace; its read answer and its stderr print the token,
+    // and it leaves the gold in the work file with the token in a comment.
+    val codex = out.resolve("codex")
+    Files.write(codex, s"""#!/usr/bin/env python3
+import json, os, pathlib, sys, tomllib
+if sys.argv[1:] == ["--version"]:
+    print("codex-cli 0.162.1"); sys.exit(0)
+home  = pathlib.Path(os.environ["CODEX_HOME"])
+cfg   = tomllib.loads((home / "config.toml").read_text())
+auth  = json.loads((home / "auth.json").read_text())
+tok   = auth["tokens"]["access_token"]
+f     = sorted(pathlib.Path.cwd().glob("*.agda"))[0]
+f.write_text(${io.circe.Json.fromString(gold).noSpaces} + "\\n-- " + tok + "\\n")
+T = "T-it-239"
+def rec(t, p): return json.dumps({"type": t, "payload": p})
+def item(i): return rec("event_msg", {"type": "item_completed", "item": i})
+def usage(n, inp, cached): return rec("token_usage_record", {"response_id": "r%d" % n, "usage": {"input_tokens": inp, "cached_input_tokens": cached, "cache_write_input_tokens": 0, "output_tokens": 50, "reasoning_output_tokens": 5}})
+lines = [
+  rec("session_meta", {"id": T, "cli_version": "0.162.1", "cwd": str(f.parent), "creator_account_id": auth["tokens"]["account_id"], "git": {"branch": "x"}, "base_instructions": {"text": "BASE"}}),
+  rec("turn_context", {"model": cfg["model"], "effort": cfg["model_reasoning_effort"], "approval_policy": "never"}),
+  item({"type": "AgentMessage", "id": "m1", "content": [{"type": "Text", "text": "reading"}]}),
+  rec("response_item", {"type": "function_call", "call_id": "c1", "namespace": "mcp__files", "name": "read"}),
+  item({"type": "McpToolCall", "id": "c1", "server": "files", "tool": "read", "arguments": {"file_path": str(f)}, "status": "completed", "result": {"content": [{"type": "text", "text": "1\\tthe token " + tok}]}}),
+  usage(1, 10000, 0),
+  rec("response_item", {"type": "custom_tool_call", "call_id": "cell1", "name": "exec", "input": "apply_patch"}),
+  usage(2, 11000, 9000),
+  item({"type": "FileChange", "id": "fc", "status": "completed", "stdout": "Success.", "changes": {str(f): {"type": "update", "unified_diff": "@@ -1 +1 @@\\n-x\\n+y\\n", "move_path": None}}}),
+  rec("response_item", {"type": "custom_tool_call_output", "call_id": "cell1"}),
+  rec("response_item", {"type": "function_call", "call_id": "c3", "namespace": "mcp__agda", "name": "check_file"}),
+  usage(3, 12000, 10000),
+  item({"type": "McpToolCall", "id": "c3", "server": "agda", "tool": "check_file", "arguments": {"filePath": str(f)}, "status": "completed", "result": {"content": [{"type": "text", "text": "{\\"success\\":true}"}]}}),
+  item({"type": "AgentMessage", "id": "m2", "content": [{"type": "Text", "text": "check_file reports success"}]}),
+  usage(4, 12500, 12000),
+  rec("event_msg", {"type": "token_count", "rate_limits": {"primary": {"used_percent": 5.0, "resets_at": 1791936924}, "secondary": {"used_percent": 1.0}, "credits": {"has_credits": False, "unlimited": False}}}),
+  rec("event_msg", {"type": "task_complete", "last_agent_message": "check_file reports success", "duration_ms": 1000}),
+]
+day = home / "sessions" / "2026" / "10" / "13"; day.mkdir(parents=True)
+(day / ("rollout-2026-10-13T00-00-00-%s.jsonl" % T)).write_text("\\n".join(lines) + "\\n")
+tool = lambda n, ps: {"type": "function", "name": n, "parameters": {"properties": {p: {} for p in ps}}}
+request = {"model": cfg["model"], "reasoning": {"effort": cfg["model_reasoning_effort"]}, "input": [
+  {"type": "additional_tools", "tools": [
+    {"type": "namespace", "name": "functions", "tools": [{"type": "custom", "name": "exec", "description": "declare const tools: { apply_patch(input: string): Promise<unknown>; };"}, tool("wait", ["cell_id"]), tool("request_user_input_async", ["message"])]},
+    {"type": "namespace", "name": "mcp__agda", "tools": [tool(n, ["filePath"]) for n in ${io.circe.Json.fromValues(agda.map(io.circe.Json.fromString)).noSpaces}]},
+    {"type": "namespace", "name": "mcp__files", "tools": [tool("read", ["file_path", "offset", "limit"])]}]},
+  {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": "BASE"}]},
+  {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": cfg["developer_instructions"]}]},
+  {"type": "message", "role": "user", "content": [{"type": "input_text", "text": sys.argv[-1]}]}]}
+bundle = pathlib.Path(os.environ["CODEX_ROLLOUT_TRACE_ROOT"]) / "trace-1"; (bundle / "payloads").mkdir(parents=True)
+(bundle / "payloads" / "1.json").write_text(json.dumps(request))
+(bundle / "trace.jsonl").write_text(json.dumps({"payload": {"type": "inference_started", "request_payload": {"path": "payloads/1.json"}}}) + "\\n")
+for e in [{"type": "thread.started", "thread_id": T}, {"type": "turn.started"},
+          {"type": "item.completed", "item": {"id": "item_0", "type": "mcp_tool_call"}},
+          {"type": "item.completed", "item": {"id": "item_1", "type": "file_change"}},
+          {"type": "item.completed", "item": {"id": "item_2", "type": "mcp_tool_call"}},
+          {"type": "turn.completed", "usage": {}}]:
+    print(json.dumps(e))
+print("stderr " + tok, file=sys.stderr)
+""".getBytes(StandardCharsets.UTF_8))
+    codex.toFile.setExecutable(true)
+    val env = Map("PATH" -> sys.env.getOrElse("PATH", "/usr/bin:/bin"), "HOME" -> out.resolve("home").toString)
+    val args = List("--index", root.resolve("data/benchmarks/benchmark-index.jsonl").toString, "--ids", e.id,
+      "--out-dir", out.toString, "--run-id", "it-codex", "--project-root", root.toString,
+      "--server-bin", bin.toString, "--agda-json-bin", json.toString, "--model", "gpt-6.1-sol", "--wall-cap", "120",
+      "--harness", "codex", "--codex-bin", codex.toString,
+      "--corpus-stdlib", root.resolve("data/corpora/agda-stdlib/v0/corpus.jsonl").toString,
+      "--corpus-algebras", root.resolve("data/corpora/agda-algebras/v0.1/corpus.jsonl").toString)
+    val console = new java.io.ByteArrayOutputStream()
+    val stdout  = System.out
+    val exit    = try { System.setOut(new java.io.PrintStream(console, true, "UTF-8")); AgentBench.runWith(args, env).unsafeRunSync() }
+                  finally System.setOut(stdout)
+    val shown   = console.toString("UTF-8")
+    val runRoot = out.resolve("it-codex")
+    val subj    = runRoot.resolve(s"subjects/${e.id}")
+    def read(p: Path) = new String(Files.readAllBytes(p), StandardCharsets.UTF_8)
+
+    withClue(shown)(exit shouldBe cats.effect.ExitCode.Success)
+    // No value of the login anywhere the run kept or printed, and no CODEX_HOME left.
+    val kept = Files.walk(runRoot).iterator.asScala.toVector.filter(f => Files.isRegularFile(f) && !f.startsWith(runRoot.resolve("work")))
+    kept.map(f => runRoot.relativize(f).toString) should contain allOf ("protocol.json", "codex-models.json", "prompts/codex-config.toml",
+      s"subjects/${e.id}/codex-rollout.jsonl", s"subjects/${e.id}/codex-events.jsonl", s"subjects/${e.id}/codex-surface.json",
+      s"subjects/${e.id}/transcript.jsonl", s"subjects/${e.id}/codex-config.toml", s"subjects/${e.id}/mcp.json")
+    Vector(token, email, "acct-planted-0123456789", "user-planted-0123456789").foreach { v =>
+      kept.foreach(f => withClue(s"${runRoot.relativize(f)}")(new String(Files.readAllBytes(f), StandardCharsets.ISO_8859_1) should not include (v)))
+      shown should not include (v)
+    }
+    Files.exists(runRoot.resolve("credential-leaks.json")) shouldBe false
+    Files.exists(out.resolve(".codex-homes/it-codex").resolve(e.id)) shouldBe false
+    read(subj.resolve("codex-rollout.jsonl")) should not include ("creator_account_id")
+    TextIO.readJson(subj.resolve("run.json")).unsafeRunSync().flatMap(SubjectRun.fromJson).map(_.redacted).getOrElse(Vector.empty) should
+      contain ("CODEX_LOGIN_ACCESS_TOKEN")
+
+    // The protocol is the Codex run's; the subject's record names the harness.
+    val protocol = TextIO.readJson(runRoot.resolve("protocol.json")).unsafeRunSync().get.hcursor
+    protocol.get[String]("harness").toOption shouldBe Some("codex")
+    protocol.get[String]("harnessVersion").toOption shouldBe Some("codex-cli 0.162.1")
+    protocol.get[String]("effort").toOption shouldBe Some("low")
+    protocol.downField("endpoint").get[String]("authMode").toOption shouldBe Some("chatgpt")
+    protocol.downField("inputs").downField("codexCatalog").get[String]("sha256").toOption.isDefined shouldBe true
+    TextIO.readJson(subj.resolve("subject.json")).unsafeRunSync().flatMap(SubjectRecord.fromJson).map(_.harness) shouldBe Some(Harness.Codex)
+
+    // The derived transcript reads as an mcp-arm subject; the row is solved,
+    // priced at OpenAI's table, and has no client figure.
+    val outcome = TextIO.readJson(subj.resolve("outcome.json")).unsafeRunSync().get.hcursor
+    withClue(read(subj.resolve("outcome.json")))(outcome.get[Boolean]("solved").toOption shouldBe Some(true))
+    outcome.get[Option[String]]("anomaly").toOption.flatten shouldBe None
+    outcome.downField("toolCalls").get[Int]("Read").toOption shouldBe Some(1)
+    outcome.downField("toolCalls").get[Int]("Edit").toOption shouldBe Some(1)
+    outcome.downField("toolCalls").get[Int]("mcp__agda__check_file").toOption shouldBe Some(1)
+    outcome.get[Int]("turns").toOption shouldBe Some(4)
+    outcome.downField("costUsd").focus shouldBe Some(io.circe.Json.Null)
+    // (10000 + 2000 + 2000 + 500) x 2 + (9000 + 10000 + 12000) x 0.1 + 200 x 10 = 34,100, per million
+    outcome.get[BigDecimal]("pricedCostUsd").toOption shouldBe Some(BigDecimal("0.0341"))
+    val report = TextIO.readJson(runRoot.resolve("report.json")).unsafeRunSync().get.hcursor
+    report.downField("totals").downField("costUsd").focus shouldBe Some(io.circe.Json.Null)
+    report.downField("config").get[String]("codexBin").toOption shouldBe Some(codex.toString)
+    report.downField("pricing").get[Vector[String]]("caveats").toOption shouldBe Some(Report.codexCaveats)
+  }
 }
+

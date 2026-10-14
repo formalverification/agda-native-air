@@ -17,7 +17,10 @@
   *  given to the file tools on every arm, so the arms differ in their
   *  instrument and in nothing else.  Every row is priced at the run's price
   *  table beside the client's own figure, and the endpoint the subjects are
-  *  served by is recorded (issue #237).
+  *  served by is recorded (issue #237).  `--harness codex` (issue #239) runs
+  *  the subjects as Codex sessions instead (CodexSubject.scala), with the
+  *  same server, judge, and caps, its own prompts, a pinned model catalog,
+  *  and a protocol of its own.
   *  This file only wires the parts together: Cli (the arguments), Layout
   *  (where a run keeps things), Run (stage, spawn, archive), Outcomes (the
   *  judge step over the archive), Report (the outputs).  Like the loop, an
@@ -76,15 +79,18 @@ object AgentBench extends IOApp {
       // The prompts: a fresh run packages them into the archive; a re-judge
       // reads the archive's own, so the record of what the subjects saw is
       // never rewritten by a later resource.
-      sysP     <- if (cfg.rejudge) archived(layout.prompts.resolve("system-prompt.md")) else TextIO.resource(s"agentbench/system-prompt-${cfg.arm.name}.md")
+      sysP     <- if (cfg.rejudge) archived(layout.prompts.resolve("system-prompt.md"))
+                  else TextIO.resource(s"agentbench/${if (cfg.harness == Harness.Codex) "codex/" else ""}system-prompt-${cfg.arm.name}.md")
       userT    <- if (cfg.rejudge) archived(layout.prompts.resolve("user-prompt.md")) else TextIO.resource(s"agentbench/user-prompt-${cfg.arm.name}.md")
-      version  <- if (cfg.rejudge) IO.pure("n/a (rejudge)") else Subject.version(cfg.claudeBin)
+      printed  <- if (cfg.rejudge) IO.pure("n/a (rejudge)") else Subject.version(if (cfg.harness == Harness.Codex) cfg.codexBin else cfg.claudeBin)
+      // Codex may warn before its version line; the protocol records the line (issue #239).
+      version   = if (cfg.harness == Harness.Codex) CodexSubject.versionOf(printed).getOrElse(printed) else printed
       // The corpora by content, before anything runs: the same block the
       // report carries, and the corpus half of the protocol's inputs.
       fresh    <- if (cfg.rejudge) IO.pure(Json.obj())
                   else Vector(cfg.corpusStdlib.map("agda-stdlib" -> _), cfg.corpusAlgebras.map("agda-algebras" -> _)).flatten
                          .traverse { case (k, p) => ProofSearchLoop.corpusProvenance(p).map(k -> _) }.map(v => Json.obj(v: _*))
-      inputs   <- if (cfg.rejudge) IO.pure(Json.obj()) else Protocol.inputs(cfg, fresh, prices)
+      inputs0  <- if (cfg.rejudge) IO.pure(Json.obj()) else Protocol.inputs(cfg, fresh, prices)
       // The roots outside its own directory that a subject may read: every
       // registered library's own directory (a library IS its directory, and a
       // subject exploring one starts at its root) with its source roots, and
@@ -104,12 +110,24 @@ object AgentBench extends IOApp {
       prim     <- Extractor.agdaPrimDir
       readRoots = (libRoots ++ includes ++ prim.toVector :+ java.nio.file.Paths.get(agdaDir)).map(_.toAbsolutePath.normalize).distinct
       sources   = Subject.sourcesBlock(named, prim)
-      protocol  = if (cfg.rejudge) Json.obj() else Protocol.of(cfg, version, sysP, userT, inputs, readRoots)
+      // A Codex run's setup, its protocol's extra inputs, and its configuration template (issue #239).
+      codex    <- if (cfg.rejudge || cfg.harness != Harness.Codex) IO.pure(Option.empty[CodexPrepared])
+                  else CodexPrepare.prepare(cfg, prices, readRoots, printed).map(Some(_))
+      inputs    = codex.fold(inputs0)(c => inputs0.deepMerge(c.inputs))
+      // A re-judge builds no protocol; one of a Codex run whose report was
+      // never written takes the recorded one, so its report names the
+      // harness the run had (issue #239).
+      recordedP <- if (cfg.rejudge) TextIO.readJson(layout.protocol) else IO.pure(Option.empty[Json])
+      runCodex   = recordedP.exists(_.hcursor.get[String]("harness").toOption.contains(Harness.Codex.name))
+      protocol  = if (cfg.rejudge) recordedP.filter(_ => runCodex).getOrElse(Json.obj())
+                  else codex.fold(Protocol.of(cfg, version, sysP, userT, inputs, readRoots))(c =>
+                         Protocol.ofCodex(cfg, version, c.setup.effort, sysP, userT, inputs, readRoots, c.template(cfg, sysP), c.endpoint))
       // A run id is one protocol: a fresh run records its own before anything
       // spawns, and a resumed one must be the protocol on record.
       _        <- if (cfg.rejudge) IO.unit else Protocol.admit(layout, protocol, cfg.resume)
       _        <- if (cfg.rejudge) IO.unit
                   else TextIO.write(layout.prompts.resolve("system-prompt.md"), sysP) *> TextIO.write(layout.prompts.resolve("user-prompt.md"), userT)
+      _        <- codex.fold(IO.unit)(c => CodexPrepare.record(cfg, c, sysP))
       // The table, byte for byte, beside the protocol that names its digest,
       // so a re-judge prices at the run's own and the archive keeps it.
       _        <- if (cfg.rejudge) IO.unit
@@ -131,8 +149,8 @@ object AgentBench extends IOApp {
                     corpus     = None)
       extractor = Extractor(cfg.agdaJsonBin.getOrElse(throw new IllegalStateException("agda-json-bin required")), includes, agdaDir, cfg.serverTimeout.seconds)
       driven   <- McpClient.resource(server).use { client =>
-                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor, readRoots, prices)
-                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots, sources, prices)
+                    if (cfg.rejudge) Run.rejudgeAll(cfg, entries, client, extractor, readRoots, prices, runCodex)
+                    else Run.driveAll(cfg, entries, client, extractor, sysP, userT, readRoots, sources, prices, codex.map(_.context))
                   }
       corpora   = previous.flatMap(_.hcursor.downField("corpora").focus).getOrElse(fresh)
       _        <- Report.write(cfg, entries, driven, corpora, protocol, previous.flatMap(_.hcursor.downField("config").focus), prices)
@@ -141,7 +159,11 @@ object AgentBench extends IOApp {
       // The run directory searched for every credential value in the
       // subjects' environment, the work copies aside; one found fails the
       // run, named by variable and file, never by value (issue #237).
-      leaks    <- Credentials.leaks(cfg.env.credentials, layout.runRoot, layout.runRoot.resolve("work"))
+      // A Codex run also looks for the operator's login values, read now (issue #239).
+      wasCodex <- TextIO.readJson(layout.protocol).map(_.exists(_.hcursor.get[String]("harness").toOption.contains(Harness.Codex.name)))
+      login    <- if (cfg.harness == Harness.Codex || wasCodex) CodexArchive.loginCredentials(CodexSubject.operatorAuth(cfg.env.vars))
+                  else IO.pure(Credentials.of(Map.empty))
+      leaks    <- Credentials.leaks(cfg.env.credentials ++ login, layout.runRoot, layout.runRoot.resolve("work"))
       _        <- leaks.traverse_ { case (f, names) => IO.println(s"!! credential ${names.mkString(", ")} found in ${layout.relative(f)}: do not archive this run") }
       // The verdict is kept in the run directory, by name and file, so the
       // archive target can refuse the run without the operator's environment.
@@ -167,7 +189,14 @@ object AgentBench extends IOApp {
     * committed table (a new model's row) never stops a run in flight.
     */
   private[agentbench] def pricesPath(cfg: AgentBenchConfig, runHasTable: Boolean): java.nio.file.Path =
-    cfg.prices.getOrElse(if ((cfg.rejudge || cfg.resume) && runHasTable) cfg.layout.prices else cfg.projectRoot.resolve(Cli.defaultPrices))
+    cfg.prices.getOrElse(if ((cfg.rejudge || cfg.resume) && runHasTable) cfg.layout.prices else cfg.projectRoot.resolve(cfg.harness.defaultPrices))
+
+  /** Is the run's priced figure the one quoted?  On another provider's
+    * endpoint (issue #237) and for a Codex run (issue #239, whose client
+    * reports no cost), the client gives no list price, so it is.
+    */
+  private[agentbench] def quotesPricedFigure(cfg: AgentBenchConfig): Boolean =
+    cfg.harness != Harness.Claude || Endpoint.foreign(cfg.endpoint)
 
   /** A run on another endpoint names its own price table, since the
     * committed one is Anthropic's list prices, not that provider's bill: a
@@ -175,7 +204,7 @@ object AgentBench extends IOApp {
     * the run has its own copy, which it prices at; a re-judge never needs one.
     */
   private[agentbench] def tableNamed(cfg: AgentBenchConfig, runHasTable: Boolean): Option[String] =
-    if (cfg.rejudge || cfg.prices.isDefined || !Endpoint.foreign(cfg.endpoint) || (cfg.resume && runHasTable)) None
+    if (cfg.rejudge || cfg.prices.isDefined || cfg.harness != Harness.Claude || !Endpoint.foreign(cfg.endpoint) || (cfg.resume && runHasTable)) None
     else Some(s"${Endpoint.baseUrlVar} names another host than Anthropic's: pass --prices with that provider's prices " +
       "(the default table is Anthropic's list prices)")
 
@@ -202,7 +231,7 @@ object AgentBench extends IOApp {
       case Some(m) =>
         val why = s"--model $m has no row in the price table ${prices.path}; pass --prices with a table that prices it " +
           "(copy data/benchmarks/prices-anthropic.json: USD per million tokens of input, cacheWrite, cacheRead, output; zeros for a model that costs nothing)"
-        if (Endpoint.foreign(cfg.endpoint)) Left(why) else Right(Some(why))
+        if (quotesPricedFigure(cfg)) Left(why) else Right(Some(why))
     }
 
   /** An archived prompt, named when missing: a re-judge never substitutes the packaged one. */
