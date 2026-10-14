@@ -101,7 +101,8 @@ final case class Isolation(
   * what the runs made before this record existed were.
   */
 final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vector[String]] = None, endpoint: Option[Endpoint] = None,
-                               harness: Harness = Harness.Claude, codexEndpoint: Option[Json] = None) {
+                               harness: Harness = Harness.Claude, codexEndpoint: Option[Json] = None,
+                               unknownHarness: Option[String] = None) {
   // The harness is written only for a Codex subject (issue #239), so a
   // Claude subject's record is byte for byte what it was; a Codex subject's
   // endpoint is its own block, the Anthropic one being nobody's.
@@ -119,7 +120,12 @@ final case class SubjectRecord(arm: Arm, roots: ShellRoots, expose: Option[Vecto
 object SubjectRecord {
   def fromJson(j: Json): Option[SubjectRecord] = {
     val c       = j.hcursor
-    val harness = c.get[String]("harness").toOption.flatMap(s => Harness.parse(s).toOption).getOrElse(Harness.Claude)
+    // No harness is a Claude record (the archive's, before issue #239); a
+    // harness this code does not know is kept by name, and the judge makes
+    // the row an anomaly rather than read it as either harness.
+    val named   = c.downField("harness").focus.filterNot(_.isNull)
+    val known   = named.flatMap(_.asString).flatMap(s => Harness.parse(s).toOption)
+    val harness = known.getOrElse(Harness.Claude)
     for {
       arm  <- c.get[String]("arm").toOption.flatMap(s => Arm.parse(s).toOption)
       work <- c.get[String]("workDir").toOption.map(Paths.get(_))
@@ -129,8 +135,9 @@ object SubjectRecord {
       corpora   = c.get[Vector[String]]("corpora").getOrElse(Vector.empty).map(Paths.get(_))),
       expose        = c.get[Vector[String]]("expose").toOption,
       endpoint      = if (harness == Harness.Claude) c.downField("endpoint").focus.flatMap(Endpoint.fromJson) else None,
-      harness       = harness,
-      codexEndpoint = if (harness == Harness.Claude) None else c.downField("endpoint").focus)
+      harness        = harness,
+      codexEndpoint  = if (harness == Harness.Claude) None else c.downField("endpoint").focus,
+      unknownHarness = named.filter(_ => known.isEmpty).map(j => j.asString.getOrElse(j.noSpaces)))
   }
 }
 

@@ -267,6 +267,16 @@ final class CodexTranscriptSpec extends AnyFunSuite with Matchers {
     anomaly(ok, events(Vector.empty).replace("T1", "T2")).exists(_.contains("the rollout is thread T1")) shouldBe true
     anomaly(Vector.empty, events(Vector.empty)) shouldBe Some("the session started and no rollout was kept")
     anomaly(ok, events(Vector.empty), s = Some(surface.mapObject(_.add("effort", "xhigh".asJson)))) shouldBe None
+    // The protocol's version is compared whole, and a value either side lacks is no match (#272 review).
+    def against(e: CodexTranscript.Expected, rollout: Vector[String], s: Option[Json] = Some(surface)) =
+      Transcript.parse(CodexTranscript.render(CodexTranscript.derive(rollout.mkString("\n"), events(Vector.empty), s, "", e, notKilled)))
+        .init.flatMap(_.adapterAnomaly)
+    against(expected.copy(version = Some("codex-cli 0.162.10")), ok) shouldBe Some("Codex 0.162.1 ran, the protocol's is codex-cli 0.162.10")
+    against(expected, Vector(line("session_meta", Json.obj("id" -> "T1".asJson, "cwd" -> "/w".asJson)), context, usage("r1", 10), done("x")))
+      .exists(_.contains("records no Codex version")) shouldBe true
+    against(expected, Vector(meta, line("turn_context", Json.obj("approval_policy" -> "never".asJson)), usage("r1", 10), done("x")),
+      Some(surface.mapObject(_.remove("model").remove("effort")))).exists(_.contains("records no model")) shouldBe true
+    against(expected.copy(effort = None), ok).exists(_.contains("protocol names no effort")) shouldBe true
     anomaly(Vector(meta, line("turn_context", Json.obj("model" -> "gpt-6.1-sol".asJson, "effort" -> "high".asJson)), done("x")),
       events(Vector.empty)).exists(_.contains("effort high")) shouldBe true
     anomaly(ok, events(Vector.empty), s = Some(surface.mapObject(_.add("nestedTools", Vector("mcp__agda__get_goal").asJson))))

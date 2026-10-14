@@ -392,5 +392,11 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     val claude = SubjectRecord(Arm.Mcp, roots, None, Some(Endpoint(Vector(Endpoint.baseUrlVar -> Endpoint.absent))))
     claude.toJson.hcursor.downField("harness").succeeded shouldBe false
     SubjectRecord.fromJson(claude.toJson) shouldBe Some(claude)
+    // A harness this code does not know is kept by name, never read as Claude's (#272 review).
+    val alien = claude.toJson.mapObject(_.add("harness", "gemini".asJson))
+    SubjectRecord.fromJson(alien).map(_.unknownHarness) shouldBe Some(Some("gemini"))
+    SubjectRecord.fromJson(claude.toJson.mapObject(_.add("harness", "Codex".asJson))).map(_.unknownHarness) shouldBe Some(Some("Codex"))
+    SubjectRecord.fromJson(codex.toJson).map(_.unknownHarness) shouldBe Some(None)
+    SubjectRecord.fromJson(claude.toJson).map(_.unknownHarness) shouldBe Some(None)
   }
 }

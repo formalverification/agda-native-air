@@ -297,9 +297,11 @@ object Outcomes {
       // as the original.
       rec        <- TextIO.readJson(subj.record).map(_.flatMap(SubjectRecord.fromJson))
       harness     = rec.map(_.harness).getOrElse(Harness.Claude)
+      // A record naming a harness this code does not know is read as neither.
+      unknown     = rec.flatMap(_.unknownHarness)
       // A Codex subject's transcript is derived from its archived records
       // here, the one place, in a fresh run and a re-judge alike (issue #239).
-      _          <- if (harness == Harness.Codex) CodexArchive.derive(layout, subj, record) else IO.unit
+      _          <- if (harness == Harness.Codex && unknown.isEmpty) CodexArchive.derive(layout, subj, record) else IO.unit
       stream     <- TextIO.read(subj.transcript).handleError(_ => "")
       legacyWork <- TextIO.readJson(subj.mcpConfig).map(_.flatMap(Audit.workDirOf).getOrElse(layout.workDir(entry.id)))
       arm         = rec.map(_.arm).getOrElse(cfg.arm)
@@ -317,7 +319,7 @@ object Outcomes {
       verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
                     else verdict.gate
-      anomaly     = anomalyOf(t, iso, verdict, terminal)
+      anomaly     = unknown.map(h => s"subject.json names harness $h, which this harness cannot read").orElse(anomalyOf(t, iso, verdict, terminal))
       // An anomaly is not a result: a row the harness could not measure
       // properly is never published as a solve or a restatement, whatever
       // the file itself earned.
@@ -338,7 +340,7 @@ object Outcomes {
         turns             = t.result.map(_.numTurns).getOrElse(0),
         toolCalls         = t.toolCounts,
         wallMs            = wallMs,
-        costUsd           = t.result.map(_.costUsd).getOrElse(if (harness == Harness.Claude) Some(0.0) else None),
+        costUsd           = t.result.map(_.costUsd).getOrElse(if (harness == Harness.Claude && unknown.isEmpty) Some(0.0) else None),
         tokens            = t.result.map(_.tokens).getOrElse(Json.obj()),
         permissionDenials = t.result.map(_.permissionDenials).getOrElse(0),
         isolation         = Some(iso),

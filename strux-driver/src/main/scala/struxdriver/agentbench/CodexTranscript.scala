@@ -100,6 +100,9 @@ object CodexTranscript {
     */
   val version: Int = 2
 
+  /** What `codex --version` prints before the version the rollout records. */
+  val versionPrefix: String = "codex-cli "
+
   /** The read tool's server, and the transcript's names for what it maps. */
   val filesServer: String = "files"
   val readName: String    = "Read"
@@ -590,6 +593,16 @@ object CodexTranscript {
     val devDigests = blocks.filter(_.hcursor.get[String]("role").toOption.contains("developer")).flatMap(_.hcursor.get[String]("sha256").toOption)
     val params    = sc.flatMap(_.downField("toolParams").focus.flatMap(_.asObject)).map(_.toMap).getOrElse(Map.empty[String, Json])
 
+    // A protocol field against the session's own record of it, once the
+    // session has a rollout (before that, "no rollout" says it).
+    def checkedAgainst(what: String, exp: Option[String], got: Option[String])(differ: String => String => String): Option[String] =
+      if (meta.isEmpty) None
+      else (exp, got) match {
+        case (Some(e), Some(g)) => if (g == e) None else Some(differ(g)(e))
+        case (Some(_), None)    => Some(s"the session records no $what to check against the protocol's")
+        case (None, _)          => Some(s"the run's protocol names no $what to check the session against")
+      }
+
     // The first thing that makes the row not a measurement.
     val anomaly: Option[String] = Vector(
       if (loginFailure(failText)) Some("the Codex login failed (see stderr.log); the sweep stops") else None,
@@ -606,9 +619,12 @@ object CodexTranscript {
       mapped.collectFirst { case (k, inRollout, inStream) if !ended.killed && inRollout < inStream =>
         s"the rollout holds $inRollout $k items and the stream $inStream" },
       if (started && surface.isEmpty) Some("no surface: the first request was not read") else None,
-      for { e <- expected.version; v <- cliVer if !e.contains(v) } yield s"Codex $v ran, the protocol's is $e",
-      for { e <- expected.model; m <- model if m != e } yield s"the turn ran $m, the protocol's model is $e",
-      for { e <- expected.effort; f <- effort if f != e } yield s"the turn ran at effort $f, the protocol's is $e",
+      // A session that ran is checked against the protocol on all three,
+      // and a value either side lacks is no match: a row is measured only
+      // under the binary, model, and effort its run recorded.
+      checkedAgainst("Codex version", expected.version.map(_.stripPrefix(versionPrefix).trim), cliVer)(v => e => s"Codex $v ran, the protocol's is $versionPrefix$e"),
+      checkedAgainst("model", expected.model, model)(m => e => s"the turn ran $m, the protocol's model is $e"),
+      checkedAgainst("effort", expected.effort, effort)(f => e => s"the turn ran at effort $f, the protocol's is $e"),
       Some(nested.filter(_.startsWith("mcp__"))).filter(_.nonEmpty).map(ns => s"server tools presented inside code mode: ${ns.mkString(", ")}"),
       for { e <- expected.systemPromptSha256 if surface.isDefined && !devDigests.contains(e) } yield "the system prompt is not among the request's developer blocks",
       Some(blocks.size).filter(n => surface.isDefined && n != 3).map(n => s"the first request carried $n instruction blocks, not the base instructions, the system prompt, and the user prompt"),
