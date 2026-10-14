@@ -210,8 +210,12 @@ object Run {
               sha  <- CodexSubject.prepare(home, ctx.authPath, config)
               b    <- breaker.get
               _    <- IO.println(s">> ${entry.id} launch (${entry.difficulty.tag}, ${struxdriver.search.LoopOutcome.stratumOf(entry.source, entry.tags)})${b.windows.fold("")(w => s" $w")}")
+              // A session cancelled or failed before it is kept (the harness
+              // stopped) still leaves no server running and no home behind.
+              gone  = CodexSubject.reapMarked(mark).void.handleError(_ => ()) *>
+                        (if (cfg.persistSessions) IO.unit else CodexSubject.remove(home.dir).handleError(_ => ()))
               run  <- CodexSubject.run(ctx.setup, env, home, workDir, prompt, subj.codexEvents, subj.stderr, cfg.wallCapSec.seconds,
-                                       cfg.maxTurns, cfg.maxBudgetUsd)
+                                       cfg.maxTurns, cfg.maxBudgetUsd).onCancel(gone).onError { case _ => gone }
               kept <- CodexArchive.keep(layout, subj, home, sha, cfg.env.credentials, ctx.authPath, st.workFile, finalFile, run, mark, cfg.persistSessions)
               _    <- IO.println(f">> ${entry.id}%-36s subject exit=${kept.exitCode.map(_.toString).getOrElse("killed")} wall=${kept.wallMs / 1000}s${kept.stopped.fold("")(c => s" stopped=$c")}${if (kept.orphansKilled > 0) s" orphans=${kept.orphansKilled}" else ""}")
               j    <- Outcomes.judgeOne(cfg, entry, agda, subject.addDirs, prices)

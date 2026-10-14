@@ -333,7 +333,9 @@ follows:
    subject (SIGINT, which `codex exec` ends as an interrupted turn) once it
    has made `maxTurns` model responses, or once their tokens (a compaction's
    included) cost `maxBudgetUsd` at the run's price table; the wall cap is the
-   same kill as a Claude subject's.  As Claude Code's `--max-turns` does, the
+   same kill as a Claude subject's, and counts the servers' start as a Claude
+   subject's does (Codex waits up to 600 s for agda's handshake, which took
+   63 s on a loaded machine).  As Claude Code's `--max-turns` does, the
    stop waits until the last response's calls have returned, since agda-mcp's
    `fill_hole` edits the work file in place and restores it only when it
    returns, and it never interrupts a response that called nothing, which is

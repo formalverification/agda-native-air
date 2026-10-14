@@ -125,6 +125,16 @@ object CodexSubject {
   val envRemovedPrefixes: Vector[String] = Vector("CLAUDE", "OPENAI", "CODEX", "ANTHROPIC")
   val envRemovedNames: Vector[String]    = Vector("RUST_LOG", "LD_LIBRARY_PATH")
 
+  /** How long Codex waits for each server's handshake before it refuses the
+    * session.  The agda server enters the dev shell and loads its corpus
+    * first, which took 63 s on a loaded machine (load 33 on 20 cores,
+    * 2026-10-13) and over 120 s beside the harness's own server; the wait
+    * precedes the first model request, so the subject sees none of it, but
+    * it counts against the wall cap, as a Claude subject's does.
+    */
+  val agdaStartupSec: Int  = 600
+  val filesStartupSec: Int = 120
+
   /** The variable by which a subject's server processes are found afterwards. */
   val marker: String = "AGENT_BENCH_SUBJECT"
 
@@ -190,7 +200,7 @@ object CodexSubject {
         "command"                     -> Toml.str(server._1),
         "args"                        -> Toml.strs(server._2),
         "required"                    -> Toml.bool(true),
-        "startup_timeout_sec"         -> Toml.int(120),
+        "startup_timeout_sec"         -> Toml.int(agdaStartupSec),
         "tool_timeout_sec"            -> Toml.int(toolTimeoutSec),
         "default_tools_approval_mode" -> Toml.str("approve"),
         "omit_tools_from"             -> Toml.strs(Vector("deferred", "code_mode")))),
@@ -199,7 +209,7 @@ object CodexSubject {
         "command"                     -> Toml.str(setup.readServer.head),
         "args"                        -> Toml.strs(readArgs),
         "required"                    -> Toml.bool(true),
-        "startup_timeout_sec"         -> Toml.int(30),
+        "startup_timeout_sec"         -> Toml.int(filesStartupSec),
         "tool_timeout_sec"            -> Toml.int(60),
         "enabled_tools"               -> Toml.strs(Vector("read")),
         "default_tools_approval_mode" -> Toml.str("approve"),
