@@ -4,9 +4,9 @@
 # (https://citation-file-format.github.io/), which GitHub's "Cite this
 # repository" button and tools such as cffconvert read, and from which
 # Zenodo takes a release's title, authors, license, keywords, abstract and
-# notes (the `message`).  Update `version` and `date-released` at every
-# tagged release.  When a release has been archived, add its DOIs: `doi:`,
-# the only key GitHub's button reads, and both DOIs under `identifiers`.
+# notes (the `message`).  On this release's branch, `doi:`, the only key
+# GitHub's button reads, holds the release's version DOI, and
+# `identifiers` holds it and the concept DOI, for all releases.
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."
 type: software
@@ -27,6 +27,14 @@ authors:
 license: Apache-2.0
 repository-code: "https://github.com/formalverification/agda-native-air"
 url: "https://github.com/formalverification/agda-native-air"
+doi: 10.5281/zenodo.23378575
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23378575
+    description: The version DOI of release 0.2.0.
+  - type: doi
+    value: 10.5281/zenodo.23378574
+    description: The concept DOI, for every release; it resolves to the latest.
 version: 0.2.0
 date-released: "2026-10-14"
 keywords:
