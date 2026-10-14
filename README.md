@@ -393,10 +393,46 @@ That would be a bug in how we have set this up, not a position we are defending.
 
 ---
 
-## Citation / publication status
+## Citation
 
-Publication drafts are in progress.  For now, please cite the repository URL and
-reference the relevant docs in `docs/`.
+Cite the repository by its name, its version and its URL, and, once the first
+release is archived, by its DOI.  [`CITATION.cff`](CITATION.cff) at the root
+holds the same metadata in machine-readable form, which GitHub's "Cite this
+repository" button and tools such as `cffconvert` read.
+
++  **The repository as a whole**, the environment with its tools and its data:
+
+       @software{agda-native-air,
+         author  = {DeMeo, William},
+         title   = {Agda-native {AIR}: an {A}gda-native artificial
+                    intelligence reasoning environment},
+         version = {0.2.0},
+         year    = {2026},
+         url     = {https://github.com/formalverification/agda-native-air},
+         license = {Apache-2.0},
+         note    = {Includes the agda-mcp server, version 0.2.0}
+       }
+
+   A bibliography style without an `@software` entry type (`plain`,
+   `amsplain`) takes the same fields in an `@misc` entry, with the version and
+   the URL in `note`.
++  **A component**, such as the `agda-mcp` server: cite the repository and
+   name the component and its version in the text, for instance "the
+   `agda-mcp` server, version 0.2.0, of Agda-native AIR"; each component's
+   version is in its own package file (`agda-mcp/agda-mcp.cabal`,
+   `agda-strux/agda-strux.cabal`).
++  **A published corpus**: its dataset card under [`docs/corpora/`](docs/corpora/)
+   gives the citation, the upstream commit and the license; cite the card's
+   citation, not this one.
+
+Releases are tagged `vX.Y.Z` on this repository and archived on Zenodo, which
+mints a DOI for each release and a concept DOI for all of them; the concept
+DOI will be added here and to `CITATION.cff` when the first release is
+archived.  Until then, cite the version and, for a reproducible reference, the
+commit.  A paper describing the environment is in preparation; until it
+appears, cite the software as above.  The people who did the work are the
+authors; the AI coding agents that assisted are named in commit messages and
+in the field reports under `docs/field-reports/`, and are not authors.
 
 ---
 
