@@ -2,14 +2,16 @@
 
 # agda-mcp
 
-> **Status: v0.2.0 (M1-3)**.  Thirteen tools over stdio transport: four core
-> proof-state tools, the whole-project gate, five live-query tools answered by
-> a persistent interaction lane (issue #75), plus three corpus-backed search
-> tools, of which `search_by_name` also answers which names a file can write
-> (`inScopeAt`, issue #203).  A fourteenth, the scope-aware `search_in_scope`
-> (issue #17), is registered and presented when `--expose` names it.  With
-> `--auto`, a fifteenth: `auto`, Agda's own proof search at a hole (issue
-> #205).
+> **Status: v0.3.0, unreleased**; the latest release is [v0.2.0], and between
+> releases `main` carries the next release's version (issue #281), so that a
+> build of `main` never reports a released version.  Thirteen tools over stdio
+> transport: four core proof-state tools, the whole-project gate, five
+> live-query tools answered by a persistent interaction lane (issue #75), plus
+> three corpus-backed search tools, of which `search_by_name` also answers
+> which names a file can write (`inScopeAt`, issue #203).  A fourteenth, the
+> scope-aware `search_in_scope` (issue #17), is registered and presented when
+> `--expose` names it.  With `--auto`, a fifteenth: `auto`, Agda's own proof
+> search at a hole (issue #205).
 
 `agda-mcp` is a [Model Context Protocol][MCP] (MCP) server that exposes
 Agda's proof engine — batch typechecking verdicts, goal introspection, and
@@ -1687,3 +1689,4 @@ to keep in step with an upstream API.
 [PLAN]: ../docs/PLAN.md
 [M1-2]: https://github.com/formalverification/agda-native-air/issues/10
 [M1-3]: https://github.com/formalverification/agda-native-air/issues/11
+[v0.2.0]: https://github.com/formalverification/agda-native-air/releases/tag/v0.2.0

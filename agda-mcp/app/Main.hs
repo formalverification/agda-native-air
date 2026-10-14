@@ -153,7 +153,7 @@ main = do
         { scAgdaConfig  = cfg
         , scGateConfig  = gateCfg
         , scServerName  = "agda-mcp"
-        , scVersion     = "0.2.0"
+        , scVersion     = "0.3.0"   -- the cabal file's version (issue #281)
         , scCorpusIndex = corpusIdx
         , scExpose      = map T.pack <$> cliExpose opts
         , scAuto        = cliAuto opts
@@ -177,7 +177,8 @@ main = do
         exitFailure
 
   cwdNow <- getCurrentDirectory
-  hPutStrLn stderr $ "agda-mcp v0.2.0 starting (agda-bin: " <> agdaBin cfg <> ")"
+  hPutStrLn stderr $ "agda-mcp v" <> T.unpack (scVersion serverCfg)
+    <> " starting (agda-bin: " <> agdaBin cfg <> ")"
   hPutStrLn stderr $ "  cwd: " <> cwdNow
   hPutStrLn stderr $ "  flags: " <> unwords (agdaFlags cfg)
   hPutStrLn stderr $ "  timeout: " <> case agdaTimeout cfg of

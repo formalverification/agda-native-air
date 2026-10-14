@@ -102,7 +102,9 @@ agda-native-air/
 
 As of October 2026 the following are built, measured, and in use.
 
-+  **`agda-mcp` v0.2.0**.  Thirteen tools over stdio: four proof-state tools
++  **`agda-mcp` v0.3.0**, unreleased; the latest release is
+   [v0.2.0](https://github.com/formalverification/agda-native-air/releases/tag/v0.2.0).
+   Thirteen tools over stdio: four proof-state tools
    (`get_goal`, `fill_hole`, `check_file`, `get_diagnostics`), a whole-project
    gate (`check_project`), five live queries answered by a persistent interaction
    lane (`type_of`, `normalize`, `resolve_name`, `definition_of`, `exports_of`),
