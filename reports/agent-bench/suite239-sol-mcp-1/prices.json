@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "agent-bench-prices.v0",
+  "asOf": "2026-10-13",
+  "source": "OpenAI's list prices for its API, standard tier, short context (at most 272K input tokens), as https://developers.openai.com/api/docs/pricing published them on 2026-10-13; a Codex subject on a ChatGPT login is not billed per token, so the figure is the list price of the tokens Codex reported, and Codex reports cache writes as 0, so a written token is priced as uncached input, at most 20 % under OpenAI's cache-write price for it",
+  "unit": "USD per million tokens; input is uncached input, cacheWrite is OpenAI's cache-write price, cacheRead its cached-input price",
+  "models": {
+    "gpt-6-astra": { "input": 10, "cacheWrite": 12.5, "cacheRead": 1, "output": 50 },
+    "gpt-6.1-sol": { "input": 2, "cacheWrite": 2.5, "cacheRead": 0.1, "output": 10 }
+  }
+}

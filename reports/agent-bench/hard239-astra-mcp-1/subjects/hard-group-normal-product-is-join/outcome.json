@@ -1,0 +1,107 @@
+{
+  "benchmarkId" : "hard-group-normal-product-is-join",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "normal-product-is-join",
+  "goal" : "Conjugate.IsNormal 𝒢 (N ∙ᶜ M) × (N ⊆ (N ∙ᶜ M)) × (M ⊆ (N ∙ᶜ M)) × (∀ {P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} → IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (N ∙ᶜ M) ⊆ P)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__get_goal" : 1,
+    "mcp__agda__definition_of" : 2,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 41986,
+  "costUsd" : null,
+  "pricedCostUsd" : 0.258944,
+  "tokens" : {
+    "input" : 9779,
+    "output" : 1129,
+    "cacheRead" : 104704,
+    "cacheCreation" : 0
+  },
+  "usageByModel" : {
+    "gpt-6-astra" : {
+      "input" : 9779,
+      "output" : 1129,
+      "cacheRead" : 104704,
+      "cacheCreation" : 0,
+      "provider" : "openai",
+      "costBasis" : "none",
+      "pricedAs" : "gpt-6-astra"
+    }
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 2071,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+    "final" : "{α ρ ℓ ℓ' : Level} (ℓᵖ : Level) (𝒢 : Group α ρ)\n(N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N)\n(N-normal : Conjugate.IsNormal 𝒢 N) (M : Pred 𝕌[ proj₁ 𝒢 ] ℓ')\n(M-sub : IsSubgroup 𝒢 M) (M-normal : Conjugate.IsNormal 𝒢 M) →\nConjugate.IsNormal 𝒢 ((𝒢 Complex.∙ᶜ N) M) ×\nN ⊆ (𝒢 Complex.∙ᶜ N) M ×\nM ⊆ (𝒢 Complex.∙ᶜ N) M ×\n({P : Pred 𝕌[ proj₁ 𝒢 ] ℓᵖ} →\n IsSubgroup 𝒢 P → N ⊆ P → M ⊆ P → (𝒢 Complex.∙ᶜ N) M ⊆ P)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-normal-product-is-join/final/Group-normal-product-is-join.agda",
+  "transcriptPath" : "subjects/hard-group-normal-product-is-join/transcript.jsonl",
+  "lastWords" : "Filled the proof in place; `check_file` reports success on the final file with no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.64,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

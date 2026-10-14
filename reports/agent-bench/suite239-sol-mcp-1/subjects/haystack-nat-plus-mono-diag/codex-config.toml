@@ -1,0 +1,85 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "low"
+model_catalog_json = "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/suite239-sol-mcp-1/codex-models.json"
+approval_policy = "never"
+default_permissions = "subject"
+allow_login_shell = false
+cli_auth_credentials_store = "file"
+project_doc_max_bytes = 0
+project_root_markers = []
+web_search = "disabled"
+include_environment_context = false
+include_permissions_instructions = false
+include_collaboration_mode_instructions = false
+developer_instructions = "You are an expert Agda programmer working alone and non-interactively.  You are given one Agda module containing exactly one hole, written {!!}.  Your task is to replace that hole with a proof so that the whole module type-checks under Agda 2.9.0 with standard-library 2.3.\n\nYour tools are an MCP server named agda, the read tool of an MCP server named files, and apply_patch on the one file you were given.  There is no shell, and no one to ask.  Pass ABSOLUTE file paths to every tool; a relative path is refused.  The judge of your work is Agda's batch verdict on the file as it stands when you stop; the server's check_file tool reports exactly that verdict, so confirm it before you finish.\n\nThe sources of the libraries this module imports are on disk and you may read them with the read tool.  The only file you may change is the one you were given.\n\nRules.\n+  The module header line, every import line already in the file, and the type signature of the definition with the hole must remain byte-for-byte as they are.\n+  You may add `open import` lines, add helper definitions, and restructure the clauses of the definition (pattern matching, where blocks, with).\n+  Do not use postulate, trustMe, primTrustMe, or any pragma ({-# ... #-}); the file is judged with --safe.\n+  Leave no hole in the file: no {!!}, no {! ... !}, no ?.\n\nWhen you are done, or when you cannot finish, stop and state in one sentence whether check_file reports success on the final file."
+
+[analytics]
+enabled = false
+
+[agents]
+enabled = false
+
+[tools.experimental_request_user_input]
+enabled = false
+
+[skills]
+include_instructions = false
+
+[skills.bundled]
+enabled = false
+
+[features]
+apps = false
+plugins = false
+tool_suggest = false
+goals = false
+hooks = false
+image_generation = false
+sleep_tool = false
+skill_search = false
+view_image = false
+multi_agent = false
+memories = false
+shell_tool = false
+shell_snapshot = false
+unbounded_connection_retries = false
+
+[projects."/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra"]
+trust_level = "untrusted"
+
+[projects."/home/williamdemeo/git/formalverification/agda-native-air/main"]
+trust_level = "untrusted"
+
+[permissions.subject.filesystem]
+":minimal" = "read"
+"/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/suite239-sol-mcp-1/work/haystack-nat-plus-mono-diag" = "write"
+"/home/williamdemeo/.nvm/versions/node/v22.14.0/lib/node_modules/@openai/codex" = "read"
+
+[permissions.subject.network]
+enabled = false
+
+[mcp_servers.agda]
+command = "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/scripts/run-server.sh"
+args = ["--cwd", "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra", "--agda-flags", "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe", "--timeout", "600", "--corpus", "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-stdlib/v0/corpus.jsonl", "--check-command", "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/suite239-sol-mcp-1/work/haystack-nat-plus-mono-diag /home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/suite239-sol-mcp-1/work/haystack-nat-plus-mono-diag/Nat-plus-mono-diag.agda"]
+required = true
+startup_timeout_sec = 600
+tool_timeout_sec = 660
+default_tools_approval_mode = "approve"
+omit_tools_from = ["deferred", "code_mode"]
+
+[mcp_servers.agda.env]
+AGDA_MCP_BIN = "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/.bin-236/agda-mcp"
+AGENT_BENCH_SUBJECT = "suite239-sol-mcp-1/haystack-nat-plus-mono-diag"
+
+[mcp_servers.files]
+command = "/usr/bin/python3.12"
+args = ["/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/scripts/python/bench_read_server.py", "--root", "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/suite239-sol-mcp-1/work/haystack-nat-plus-mono-diag", "--root", "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda-dojang", "--root", "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0", "--root", "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07", "--root", "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda-dojang/agda", "--root", "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0/src", "--root", "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src", "--root", "/nix/store/95cx28xrqs5cnaq2d2zb7m6285n8jr5h-Agda-2.9.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-b976/Agda-2.9.0/lib/prim", "--root", "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda"]
+required = true
+startup_timeout_sec = 120
+tool_timeout_sec = 60
+enabled_tools = ["read"]
+default_tools_approval_mode = "approve"
+omit_tools_from = ["deferred", "code_mode"]
+
+[mcp_servers.files.env]
+AGENT_BENCH_SUBJECT = "suite239-sol-mcp-1/haystack-nat-plus-mono-diag"

@@ -1,0 +1,136 @@
+{
+  "harness" : "codex",
+  "harnessVersion" : "codex-cli 0.162.1",
+  "harnessArgv" : [
+    "--strict-config",
+    "exec",
+    "--json"
+  ],
+  "arm" : "mcp",
+  "model" : "gpt-6.1-sol",
+  "effort" : "low",
+  "endpoint" : {
+    "provider" : "openai",
+    "authMode" : "chatgpt",
+    "baseUrl" : "https://chatgpt.com/backend-api/codex"
+  },
+  "maxTurns" : 60,
+  "wallCapSec" : 1800,
+  "maxBudgetUsd" : 6.00,
+  "capsEnforced" : [
+    "turns:harness",
+    "budget:harness",
+    "wall:harness"
+  ],
+  "safe" : true,
+  "serverTimeout" : 600,
+  "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+  "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+  "codexConfig" : {
+    "path" : "prompts/codex-config.toml",
+    "sha256" : "adbc77044328eaf167ceed48ebea865c47df4dd8d83912a890beaa9df7b802db"
+  },
+  "envAdded" : [
+    "CODEX_HOME",
+    "TMPDIR",
+    "CODEX_ROLLOUT_TRACE_ROOT"
+  ],
+  "envRemovedPrefixes" : [
+    "CLAUDE",
+    "OPENAI",
+    "CODEX",
+    "ANTHROPIC"
+  ],
+  "envRemovedNames" : [
+    "RUST_LOG",
+    "LD_LIBRARY_PATH"
+  ],
+  "tools" : [
+    "Edit",
+    "Read",
+    "mcp__agda__get_goal",
+    "mcp__agda__fill_hole",
+    "mcp__agda__check_file",
+    "mcp__agda__get_diagnostics",
+    "mcp__agda__check_project",
+    "mcp__agda__type_of",
+    "mcp__agda__normalize",
+    "mcp__agda__resolve_name",
+    "mcp__agda__definition_of",
+    "mcp__agda__exports_of",
+    "mcp__agda__search_by_name",
+    "mcp__agda__search_by_type",
+    "mcp__agda__get_dependencies",
+    "clock__curr_time",
+    "exec",
+    "list_mcp_resource_templates",
+    "list_mcp_resources",
+    "read_mcp_resource",
+    "request_user_input_async",
+    "wait"
+  ],
+  "addDirs" : [
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda-dojang",
+    "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0",
+    "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda-dojang/agda",
+    "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0/src",
+    "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src",
+    "/nix/store/95cx28xrqs5cnaq2d2zb7m6285n8jr5h-Agda-2.9.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-b976/Agda-2.9.0/lib/prim",
+    "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda"
+  ],
+  "persistSessions" : false,
+  "allowCredits" : false,
+  "inputs" : {
+    "codexBin" : {
+      "path" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+      "sha256" : "628e35487d888a28f0427fc37501da529dd3d81fcbad7a2c3421c1e8670d92e1"
+    },
+    "readServer" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/scripts/python/bench_read_server.py",
+      "sha256" : "0e910ffb3a0a54bf42ec9418511138c410ab0d9e47d4cb094bdb67e81c849579"
+    },
+    "codexCatalog" : {
+      "path" : "codex-models.json",
+      "sha256" : "201b6581fd18106834c927da5b80295d54f32e1e3c326f32d3349ae11557ccff"
+    },
+    "readServerPython" : "/usr/bin/python3.12",
+    "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra",
+    "index" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/benchmark-index.jsonl",
+      "sha256" : "62092c1da926245a38cb3cfff81b72c6c45ab6c10987a6145a058ac9592e89e0"
+    },
+    "serverBin" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/.bin-236/agda-mcp",
+      "sha256" : "608ede24f3d40ae690aa3fbef645a6894730555352557eefcd035b041b4b0e55"
+    },
+    "agdaJsonBin" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/.bin-236/agda-json",
+      "sha256" : "e8858863404c0578b829bcf835febc9600d0d3619a5fd2d869d1f9d39c4c75aa"
+    },
+    "corpora" : {
+      "agda-stdlib" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-stdlib/v0/corpus.jsonl",
+        "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+      },
+      "agda-algebras" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+        "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+      }
+    },
+    "prices" : {
+      "path" : "prices.json",
+      "sha256" : "b8bf13361addfc9cf1bc807816897ae5da8f6c5e1e980fd2f7959fef1b9e1514"
+    }
+  },
+  "prompts" : {
+    "system" : {
+      "path" : "prompts/system-prompt.md",
+      "sha256" : "a2399dd4a63ba09023473fcb793ee630db380f925539dbd5c28fc9af9daef9ef"
+    },
+    "user" : {
+      "path" : "prompts/user-prompt.md",
+      "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+    }
+  }
+}

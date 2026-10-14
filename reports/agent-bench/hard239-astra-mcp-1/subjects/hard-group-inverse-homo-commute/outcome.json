@@ -1,0 +1,105 @@
+{
+  "benchmarkId" : "hard-group-inverse-homo-commute",
+  "difficulty" : "compositional",
+  "source" : "agda-stdlib",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-stdlib/novel",
+  "hole" : "inverse-homo-commute",
+  "goal" : "(∀ x y → (x ∙ y) ⁻¹ ≈ x ⁻¹ ∙ y ⁻¹) → Commutative _≈_ _∙_",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Algebra.Properties.Group using ( ⁻¹-injective; ⁻¹-anti-homo-∙ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 7,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__search_by_name" : 3,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 41184,
+  "costUsd" : null,
+  "pricedCostUsd" : 0.68288,
+  "tokens" : {
+    "input" : 50646,
+    "output" : 546,
+    "cacheRead" : 149120,
+    "cacheCreation" : 0
+  },
+  "usageByModel" : {
+    "gpt-6-astra" : {
+      "input" : 50646,
+      "output" : 546,
+      "cacheRead" : 149120,
+      "cacheCreation" : 0,
+      "provider" : "openai",
+      "costBasis" : "none",
+      "pricedAs" : "gpt-6-astra"
+    }
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 249,
+  "agdaTail" : "",
+  "checkExit" : 0,
+  "checkCodes" : [
+  ],
+  "statement" : {
+    "gold" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "final" : "{c ℓ : Level} (G : Group c ℓ) →\n((x y : Group.Carrier G) →\n (G Group.≈ (G Group.⁻¹) ((G Group.∙ x) y))\n ((G Group.∙ (G Group.⁻¹) x) ((G Group.⁻¹) y))) →\nCommutative (Group._≈_ G) (Group._∙_ G)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-inverse-homo-commute/final/Group-inverse-homo-commute.agda",
+  "transcriptPath" : "subjects/hard-group-inverse-homo-commute/transcript.jsonl",
+  "lastWords" : "Filled the hole in place; `check_file` reports success on the final file with no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.46,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

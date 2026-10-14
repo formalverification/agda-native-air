@@ -1,0 +1,115 @@
+{
+  "benchmarkId" : "hard-group-kernel-normal-subgroup",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "kernel-normal-subgroup",
+  "goal" : "IsSubgroup 𝒢 Ker × Conjugate.IsNormal 𝒢 Ker × (∀ x y → ((x ⁻¹ ∙ y) ∈ Ker → h x ≈ᴴ h y) × (h x ≈ᴴ h y → (x ⁻¹ ∙ y) ∈ Ker))",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Homomorphisms.Basic using ( IsHom )",
+    "open import Classical.Structures.Group.Subgroups using ( mkIsSubgroup )",
+    "open import Classical.Structures.Group.Subgroups using ( interp-tuple-∙ ; interp-tuple-ε ; interp-tuple-⁻¹ )",
+    "open import Classical.Signatures.Group using ( ∙-Op ; ε-Op ; ⁻¹-Op )",
+    "open import Classical.Operations using ( pair )",
+    "open import Classical.Bundles.Group using ( ⟨_⟩ᵍᵖ )",
+    "import Algebra.Properties.Group as GP",
+    "open import Data.Fin.Base using ( Fin )"
+  ],
+  "terminal" : "completed",
+  "turns" : 19,
+  "toolCalls" : {
+    "Read" : 4,
+    "mcp__agda__definition_of" : 2,
+    "mcp__agda__type_of" : 1,
+    "Edit" : 5,
+    "mcp__agda__check_file" : 5
+  },
+  "toolCallsTotal" : 17,
+  "wallMs" : 123262,
+  "costUsd" : null,
+  "pricedCostUsd" : 0.89621,
+  "tokens" : {
+    "input" : 34745,
+    "output" : 3372,
+    "cacheRead" : 380160,
+    "cacheCreation" : 0
+  },
+  "usageByModel" : {
+    "gpt-6-astra" : {
+      "input" : 34745,
+      "output" : 3372,
+      "cacheRead" : 380160,
+      "cacheCreation" : 0,
+      "provider" : "openai",
+      "costBasis" : "none",
+      "pricedAs" : "gpt-6-astra"
+    }
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1914,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+    "final" : "{α ρ β ρᵇ : Level} (𝒢 : Group α ρ) (𝓗 : Group β ρᵇ)\n(.patternInTele0 : hom (proj₁ 𝒢) (proj₁ 𝓗)) →\nIsSubgroup 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\nConjugate.IsNormal 𝒢 (Ker 𝒢 𝓗 .patternInTele0) ×\n((x y\n  : Setoid.Carrier\n    (Setoid.Algebras.Basic.Algebra.Domain (𝒢 .proj₁))) →\n ((𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0 →\n  (𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y))\n ×\n ((𝔻[ proj₁ 𝓗 ] Setoid.≈\n   Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 x)\n  (Group-kernel-normal-subgroup.h 𝒢 𝓗 .patternInTele0 y) →\n  (𝒢 Group-Op.∙ (𝒢 Group-Op.⁻¹) x) y ∈ Ker 𝒢 𝓗 .patternInTele0))",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-kernel-normal-subgroup/final/Group-kernel-normal-subgroup.agda",
+  "transcriptPath" : "subjects/hard-group-kernel-normal-subgroup/transcript.jsonl",
+  "lastWords" : "Filled the proof in place; `check_file` reports success on the final file, with no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.71,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

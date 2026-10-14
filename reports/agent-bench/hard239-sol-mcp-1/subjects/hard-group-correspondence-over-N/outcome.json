@@ -1,0 +1,106 @@
+{
+  "benchmarkId" : "hard-group-correspondence-over-N",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:novel"
+  ],
+  "stratum" : "agda-algebras/novel",
+  "hole" : "correspondence-over-N",
+  "goal" : "(N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__definition_of" : 3,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 54674,
+  "costUsd" : null,
+  "pricedCostUsd" : 0.0637564,
+  "tokens" : {
+    "input" : 20526,
+    "output" : 1185,
+    "cacheRead" : 108544,
+    "cacheCreation" : 0
+  },
+  "usageByModel" : {
+    "gpt-6.1-sol" : {
+      "input" : 20526,
+      "output" : 1185,
+      "cacheRead" : 108544,
+      "cacheCreation" : 0,
+      "provider" : "openai",
+      "costBasis" : "none",
+      "pricedAs" : "gpt-6.1-sol"
+    }
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 2026,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ)\n(N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)\n(H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H) →\n(N ⊆ H → H Respects (𝒢 Coset.∼ N) N-sub) ×\n(H Respects (𝒢 Coset.∼ N) N-sub → N ⊆ H)",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/hard-group-correspondence-over-N/final/Group-correspondence-over-N.agda",
+  "transcriptPath" : "subjects/hard-group-correspondence-over-N/transcript.jsonl",
+  "lastWords" : "Filled the hole in place; `check_file` reports success on the final file, with no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.35,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

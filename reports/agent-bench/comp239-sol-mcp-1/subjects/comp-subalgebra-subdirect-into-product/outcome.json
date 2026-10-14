@@ -1,0 +1,111 @@
+{
+  "benchmarkId" : "comp-subalgebra-subdirect-into-product",
+  "difficulty" : "compositional",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Setoid.Subalgebras.Properties.≤-trans",
+    "needle:Setoid.Subalgebras.Subdirect.Basic.subdirect→≤",
+    "needle:Setoid.Subalgebras.Properties.⨅-≤"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "subdirect-into-product",
+  "goal" : "SubdirectEmbedding {𝑩 = 𝑩} ℬ → (∀ i → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+    "open import Setoid.Subalgebras.Properties            using ( ≤-trans ; ⨅-≤ )",
+    "open import Setoid.Subalgebras.Subdirect.Basic       using ( subdirect→≤ )"
+  ],
+  "terminal" : "completed",
+  "turns" : 8,
+  "toolCalls" : {
+    "Read" : 3,
+    "mcp__agda__definition_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 6,
+  "wallMs" : 52324,
+  "costUsd" : null,
+  "pricedCostUsd" : 0.0653584,
+  "tokens" : {
+    "input" : 22772,
+    "output" : 864,
+    "cacheRead" : 111744,
+    "cacheCreation" : 0
+  },
+  "usageByModel" : {
+    "gpt-6.1-sol" : {
+      "input" : 22772,
+      "output" : 864,
+      "cacheRead" : 111744,
+      "cacheCreation" : 0,
+      "provider" : "openai",
+      "costBasis" : "none",
+      "pricedAs" : "gpt-6.1-sol"
+    }
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 1885,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "final" : "{𝓞 𝓥 : Level} {α ρ β ρᵇ ι : Level} {𝑆 : Signature 𝓞 𝓥} {I : Set ι}\n{𝑩 : Algebra β ρᵇ} {ℬ 𝒜 : I → Algebra α ρ} →\nSubdirectEmbedding ℬ → ((i : I) → ℬ i ≤ 𝒜 i) → 𝑩 ≤ ⨅ 𝒜",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-subalgebra-subdirect-into-product/final/Subalgebra-subdirect-into-product.agda",
+  "transcriptPath" : "subjects/comp-subalgebra-subdirect-into-product/transcript.jsonl",
+  "lastWords" : "Filled the hole in place; `check_file` reports success on the final file, with no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.2,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}

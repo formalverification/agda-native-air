@@ -1,0 +1,168 @@
+{
+  "requests" : 4,
+  "configSha256" : "311d52384ca931d29905a8cdef1bf4498e3019ea2f7a348880ed4d5bc4fad036",
+  "configChanged" : false,
+  "model" : "gpt-6.1-sol",
+  "effort" : "low",
+  "serviceTier" : null,
+  "topLevelTools" : [
+    "exec",
+    "wait",
+    "request_user_input_async",
+    "mcp__agda__check_file",
+    "mcp__agda__check_project",
+    "mcp__agda__definition_of",
+    "mcp__agda__exports_of",
+    "mcp__agda__fill_hole",
+    "mcp__agda__get_dependencies",
+    "mcp__agda__get_diagnostics",
+    "mcp__agda__get_goal",
+    "mcp__agda__normalize",
+    "mcp__agda__resolve_name",
+    "mcp__agda__search_by_name",
+    "mcp__agda__search_by_type",
+    "mcp__agda__type_of",
+    "mcp__files__read"
+  ],
+  "toolParams" : {
+    "exec" : [
+    ],
+    "wait" : [
+      "cell_id",
+      "max_tokens",
+      "terminate",
+      "yield_time_ms"
+    ],
+    "request_user_input_async" : [
+      "questions"
+    ],
+    "mcp__agda__check_file" : [
+      "filePath",
+      "maxDiagnostics",
+      "verbose"
+    ],
+    "mcp__agda__check_project" : [
+      "maxDiagnostics",
+      "projectPath",
+      "target",
+      "verbose"
+    ],
+    "mcp__agda__definition_of" : [
+      "col",
+      "column",
+      "filePath",
+      "line",
+      "maxLines",
+      "name",
+      "reload",
+      "verbose"
+    ],
+    "mcp__agda__exports_of" : [
+      "filePath",
+      "limit",
+      "module",
+      "offset",
+      "pattern",
+      "reload",
+      "verbose"
+    ],
+    "mcp__agda__fill_hole" : [
+      "candidate",
+      "col",
+      "column",
+      "filePath",
+      "holeIndex",
+      "line",
+      "verbose"
+    ],
+    "mcp__agda__get_dependencies" : [
+      "expand",
+      "name"
+    ],
+    "mcp__agda__get_diagnostics" : [
+      "filePath",
+      "maxDiagnostics",
+      "verbose"
+    ],
+    "mcp__agda__get_goal" : [
+      "col",
+      "column",
+      "filePath",
+      "holeIndex",
+      "line",
+      "reload",
+      "rewrite",
+      "verbose"
+    ],
+    "mcp__agda__normalize" : [
+      "col",
+      "column",
+      "expr",
+      "filePath",
+      "line",
+      "reload",
+      "verbose"
+    ],
+    "mcp__agda__resolve_name" : [
+      "col",
+      "column",
+      "filePath",
+      "line",
+      "name",
+      "reload",
+      "verbose"
+    ],
+    "mcp__agda__search_by_name" : [
+      "inScopeAt",
+      "limit",
+      "pattern",
+      "verbose"
+    ],
+    "mcp__agda__search_by_type" : [
+      "limit",
+      "pattern",
+      "patterns",
+      "qualified"
+    ],
+    "mcp__agda__type_of" : [
+      "col",
+      "column",
+      "expr",
+      "filePath",
+      "line",
+      "reload",
+      "rewrite",
+      "verbose"
+    ],
+    "mcp__files__read" : [
+      "file_path",
+      "limit",
+      "offset"
+    ]
+  },
+  "nestedTools" : [
+    "apply_patch",
+    "list_mcp_resource_templates",
+    "list_mcp_resources",
+    "read_mcp_resource",
+    "clock__curr_time"
+  ],
+  "inputBlocks" : [
+    {
+      "role" : "developer",
+      "sha256" : "e1bdd4f8f0df4b20f4a0ffc8a861ce819df45325d8cecdfb92e80379cf8d142e",
+      "chars" : 21769
+    },
+    {
+      "role" : "developer",
+      "sha256" : "d569b181b8e3505b2629c3eeaba9c78d5152c699aefd4195e07492ce7d86bfb5",
+      "chars" : 1469
+    },
+    {
+      "role" : "user",
+      "sha256" : "718ace4af36bd877cbed66006100890b44b1739880f4f639c99f2a0131956459",
+      "chars" : 509
+    }
+  ],
+  "execDescriptionSha256" : "f5805eaf94530ca0ff793d1ed51cb934de8c255fcb329e22a817b0136573d391"
+}
