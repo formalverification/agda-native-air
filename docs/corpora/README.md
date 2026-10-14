@@ -39,7 +39,9 @@ The worked example is the [`agda-algebras-corpus-v0` release](https://github.com
 
    The uncompressed `corpus.jsonl` is not uploaded (consumers `gunzip -k`), and `RELEASE_NOTES.md` is not an asset; `--notes-file` consumes it as the page text.
 
-+  **Inspect, then publish**.  `--draft` keeps the tag, page, and uploads visible only to you; open the printed URL, check the digests and links, then publish with `gh release edit <tag> --draft=false` (or the page's Publish button).  Publishing is effectively one-way: assets are downloadable the moment the release is live, which is why the draft step exists.
++  **Keep the release out of the software's Zenodo record**.  Since v0.2.0 ([#279]) this repository's releases are archived on Zenodo, and Zenodo archives every published release, pre-releases included, as a new version of the software's record under its concept DOI, keeping only the source zipball and never the assets.  A corpus release published while the integration is on would therefore become the newest version of the software, and the concept DOI would resolve to it.  Before publishing, switch `formalverification/agda-native-air` off at <https://zenodo.org/account/settings/github/>, and switch it on again after.  Zenodo does not document whether the next software release after such a pause continues the same concept DOI (its code suggests it does), so check the next software release's record against the concept DOI.  A corpus that should have a DOI of its own is uploaded to Zenodo by hand, as a dataset.
+
++  **Inspect, then publish**.  `--draft` keeps the tag, page, and uploads visible only to you; open the printed URL, check the digests and links, then publish with `gh release edit <tag> --draft=false --latest=false` (or the page's Publish button, with "Set as the latest release" unchecked).  `--latest=false` keeps GitHub's "Latest" marker on the software release, which a newly published release otherwise takes.  Publishing is effectively one-way: assets are downloadable the moment the release is live, which is why the draft step exists.
 
 +  **Repairs**.
 
@@ -47,3 +49,5 @@ The worked example is the [`agda-algebras-corpus-v0` release](https://github.com
    +  a wrong draft is removed cleanly with `gh release delete <tag> --cleanup-tag`.
 
    Prefer fixing drafts to editing published releases.
+
+[#279]: https://github.com/formalverification/agda-native-air/issues/279
