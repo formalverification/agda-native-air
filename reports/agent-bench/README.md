@@ -542,7 +542,14 @@ Claude Code with its model, so no figure in it is the model's alone.
 | `suite236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 55 | 37 | 1 | 0 of 4 | 0 | 270 | 215 | 3.78 | the guide's § 4.8, [#236] |
 | `comp236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 12 (composition) | 4 | 0 | no original | 0 | 109 | 97 | 2.07 | the guide's § 4.8, [#236] |
 | `hard236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 118 | 104 | 2.51 | the guide's § 4.8, [#236] |
-| `smoke239-sol-2` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-13 | none | 1 | 1 | 0 | 0 of 0 | 0 | 4 | 3 | 0.05 (priced; Codex reports none) | the Codex subject's smoke, [#239] |
+| `smoke239-sol-2` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-14 | none | 1 | 1 | 0 | 0 of 0 | 0 | 4 | 3 | 0.05 (priced; Codex reports none) | the Codex subject's smoke, [#239] |
+| `cost239-sol-mcp-2` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-14 | none | 2 | 2 | 0 | 1 of 1 | 0 | 9 | 7 | 0.07 (priced) | the cost pairs on [#239] |
+| `cost239-astra-mcp-2` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6-astra` | 2026-10-14 | none | 2 | 1 | 1 | 0 of 0 | 0 | 9 | 7 | 0.41 (priced) | the cost pairs on [#239] |
+| `suite239-sol-mcp-1` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-14 | none | 55 | 54 | 1 | 6 of 20 | 0 | 266 | 209 | 2.09 (priced) | the guide's § 4.9, the Codex arms, [#239] |
+| `comp239-sol-mcp-1` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-14 | none | 12 (composition) | 12 | 0 | no original | 0 | 95 | 74 | 0.89 (priced) | the guide's § 4.9, the Codex arms, [#239] |
+| `hard239-sol-mcp-1` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-14 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 116 | 94 | 1.09 (priced) | the guide's § 4.9, the Codex arms, [#239] |
+| `hard239-astra-mcp-1` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6-astra` | 2026-10-14 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 117 | 100 | 5.76 (priced) | the guide's § 4.9, the Codex arms, [#239] |
+| `hard239-sol-high-mcp-1` | `mcp`, Codex CLI 0.162.1 at effort `high` | `gpt-6.1-sol` | 2026-10-14 | none | 14 (hard tier) | 14 | 0 | no original | 0 | 146 | 113 | 1.26 (priced) | the guide's § 4.9, the Codex arms, [#239] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own
@@ -1382,6 +1389,86 @@ USD 6.34).  USD is list price; for Sonnet 5.5 it is priced from `modelUsage`
    arms ended `completed`.
 
 What the numbers mean beside the other instruments is the guide's § 4.8
+([`docs/reading-the-results.md`](../../docs/reading-the-results.md)).
+
+## The Codex arms: GPT-6.1 Sol and GPT-6 Astra (2026-10-14, [#239])
+
+OpenAI's models ran through the Codex subject of the protocol section "A
+Codex subject" (Codex CLI 0.162.1, the `mcp` arm, one subject at a time), on
+the ChatGPT Plus login, one seed each: GPT-6.1 Sol (`gpt-6.1-sol`) on the
+library, composition, and hard tiers, and GPT-6 Astra (`gpt-6-astra`) on the
+hard tier, both at the pinned catalog's default effort, `low`, and Sol once
+more on the hard tier at `high`.  Each model's arms followed a two-row cost
+pair (`cost239-sol-mcp-2`, `cost239-astra-mcp-2`).  The arms ran one at a
+time from one detached driver, from the frozen server and extractor of the
+[#236] arms themselves (digests `608ede24` and `e8858863`), so each row
+differs from those baselines in the harness, the model, and the effort, and
+in nothing the judge reads: the user prompt (`6ea5a0b3`), the index
+(`62092c1d`), both corpora (`14e0d47e`, `af864432`), and each tier's caps
+are theirs.  The system prompt (`a2399dd4`) differs from theirs
+(`51a4f8f9`) in the one sentence that names the tools.  Each run was
+re-judged under the harness's final code with no model call, and no verdict,
+gate, turn count, tool count, or priced figure moved.  Zero anomalies;
+`gold-leak.py` finds nothing, and no value of the login is in any run
+directory.  USD 11.57 at OpenAI's list prices for the five arms and the two
+pairs.
+
+*Per tier, beside the [#236] baselines.*
+
+| | Sol (Codex, `low`) | Astra (Codex, `low`) | Sol (Codex, `high`) | Sonnet 5.5 | Opus 5 |
+|---|---:|---:|---:|---:|---:|
+| library (55): solved / restated | 54 / 1 | not run | not run | 51 / 4 | 54 / 0 |
+| library: turns / tool calls / USD | 266 / 209 / 2.09 | | | 281 / 226 / 2.09 | 309 / 254 / 6.91 |
+| library: original in view (of agda-algebras solves) | 6 of 20 | | | 3 of 17 | 5 of 21 |
+| composition (12): solved | 12 | not run | not run | 11 | 12 |
+| composition: turns / tool calls / USD | 95 / 74 / 0.89 | | | 119 / 107 / 1.26 | 128 / 116 / 4.05 |
+| hard (14): solved | 14 | 14 | 14 | 14 | 14 |
+| hard: turns / tool calls / USD | 116 / 94 / 1.09 | 117 / 100 / 5.76 | 146 / 113 / 1.26 | 145 / 131 / 1.81 | 139 / 125 / 7.71 |
+| five-hour window used, in points | 32 | 43 | 11 | | |
+
+Runs: `suite239-sol-mcp-1`, `comp239-sol-mcp-1`, `hard239-sol-mcp-1`,
+`hard239-astra-mcp-1`, and `hard239-sol-high-mcp-1`; the baselines are
+those of the [#236] section's table (Opus 5's composition and hard runs are
+Agda 2.8.0's, on an older server).  USD is list price: OpenAI's for the
+Codex arms, priced from the tokens Codex reported, since a ChatGPT login is
+billed against the plan's windows, not per token; the window took the five
+arms from 3 % to 89 % of one five-hour window and the weekly one from 1 %
+to 15 %.
+
++  **Through Codex, Sol solves 80 of the 81 rows at its default effort and
+   restates the 81st**, `algebras-subalgebras-sub-trans-iso`
+   (`Setoid.Subalgebras.Properties.≤-trans-≅`), a row Sonnet 5.5 and
+   Sonnet 5 restate too, and Opus 5.5 with its refused calls not counted.
+   Every final file of every arm checks with its statement kept, no row lost
+   a gate, and every session ended on its own: no cap was reached (21 turns
+   and 155 s at most, against 60 and 1,800 on the hard tier).
++  **It takes the fewest turns and calls of any arm on every tier**: 266,
+   95, and 116 turns against 270 to 347, 109 to 206, and 118 to 145 for
+   the Claude 5 and 5.5 models.  Its library rows read as write and check:
+   about one Read, one Edit, and one `check_file` a row, `type_of` 15 and
+   `definition_of` 14 calls, and `fill_hole` twice (Opus 5 called it 35
+   times, Sonnet 5.5 13).  On the composition and hard tiers `definition_of`
+   is the agda tool it calls most (18 and 22 calls).
++  **Astra matches Sol on the hard tier at five times the price**: 14 of 14
+   in 117 turns against 116, USD 5.76 against 1.09, and 43 points of the
+   five-hour window against 9.  Its cost pair restated
+   `algebras-homs-mon-to-hom`, the row Opus 5.5 restates and both hinted
+   Opus 5 seeds did.
++  **`high` effort bought nothing measurable on the hard tier**: the same 14
+   rows in 26 % more turns (146 against 116), with 32 % more output tokens,
+   15 % more cost, and more reading (36 Reads against 21, 10 `get_goal`
+   against 5).  The tier is at every model's ceiling, so this says what the
+   effort costs, not what it is worth.
++  **Read a Codex row as Codex CLI with the model**.  Beside the model, the
+   comparison with the Claude columns varies the harness (Codex presents
+   agda-mcp's descriptions whole, where Claude Code cuts them at 2,048
+   characters, [#191]; its base instructions are its own) and the effort
+   (`low` here, `high` for the Claude 5 and Sonnet 5.5 sessions, `medium`
+   for Opus 5.5's).  The tool counts do map: an agda call is the same tool
+   under the same name, Read is the confined read server's, and an Edit is
+   one `apply_patch`, however many hunks it has.
+
+What the numbers mean beside the other instruments is the guide's § 4.9
 ([`docs/reading-the-results.md`](../../docs/reading-the-results.md)).
 
 ## Reading a transcript

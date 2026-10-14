@@ -59,7 +59,12 @@ file, **no shell**, under caps of 30 turns, 900 s, and USD 3.00 per subject
 before 2026-09-21 is this arm.  Until 2026-09-29 the staged file carried its
 fixture's header, and the header carried hints (§ 4.6); the arm's current
 numbers are the header-free runs of that day, and from 2026-10-13 the runs on
-Agda 2.9.0 (§ 4.8).
+Agda 2.9.0 (§ 4.8).  From 2026-10-14 the arm has a second harness ([#239],
+§ 4.9): Codex CLI (`codex exec`) for OpenAI's models, so a Codex row measures
+the harness with the model, never the model alone.  Its tool counts read as a
+Claude subject's: an agda call is the same tool under the same name, its Read
+is a confined read server's (one file by absolute path, inside the same
+roots), and its Edit is one Codex `apply_patch`, however many hunks it has.
 
 ### 1.3  The agent with a shell: the `shell` arm
 
@@ -278,9 +283,10 @@ Every run below reported zero anomalies.  Run ids are the harness's own;
 and where the two differ, the header-free number is the one quoted (§ 4.6).
 A USD figure is the client's own arithmetic over a run's tokens at Anthropic's
 list prices (`totals.costUsd`), Sonnet 5.5's aside (below).  Every run below
-that called a model ran on Anthropic's API (a re-judged copy, § 4.8, called
-none and keeps its original's figures), where that figure is what the run cost
-at list prices for every model the client can price: it equals each
+that called a model, the Codex arms of § 4.9 aside, ran on Anthropic's API (a
+re-judged copy, § 4.8, called none and keeps its original's figures), where
+that figure is what the run cost at list prices for every model the client
+can price: it equals each
 transcript's `modelUsage` priced at the committed table, which the reports
 predate but `PricingSpec` checks on every transcript the client priced at list
 ([#237]; none carries a usage the flat table cannot price exactly).  The
@@ -289,8 +295,11 @@ exception is Sonnet 5.5 (§ 4.8), which client 2.1.282 cannot price
 priced at the published list.  For a run served by another provider's endpoint
 the client's figure is a guess, and the figure quoted is the report's priced
 one, `totals.pricedCostUsd`, at the table the run names, beside the provider's
-usage page.  Every run before 2026-10-13 ran on Agda 2.8.0; the runs of that
-day (`*236-*`) ran on 2.9.0 (§ 4.8).
+usage page.  The Codex arms (`*239-*`, § 4.9) have no client figure (OpenAI's
+models on a ChatGPT login are billed against the plan's usage windows, not per
+token): theirs is `totals.pricedCostUsd`, the tokens Codex reported at
+OpenAI's list prices.  Every run before 2026-10-13 ran on Agda 2.8.0; the runs
+of that day and after (`*236-*`, `*239-*`) ran on 2.9.0 (§ 4.8).
 
 ### 4.1  The loop
 
@@ -356,7 +365,8 @@ edge, stated.
 | Opus 5, second seed, hints in view | 54 solved, 1 restated, the same rows; 338 turns, 283 calls | same | `agent-opus5-2` | same |
 | Opus 5, `mcp` arm, Agda 2.9.0 | **54 solved, 0 restated**, 1 isolation gate (one refused call; the file earned the solve); 309 turns, 254 calls, USD 6.91 | § 1.2, 13 tools, Agda 2.9.0 | `suite236-opus5-mcp-1` | § 4.8, [`reports/agent-bench/`] |
 | Sonnet 5.5, `mcp` arm, Agda 2.9.0 | **51 solved, 4 restated**; 281 turns, 226 calls, USD 2.09 at list (the client's figure 9.69) | same | `suite236-sonnet55-mcp-1` | same |
-| Opus 5.5, `mcp` arm, Agda 2.9.0 | **37 solved, 1 restated**, 17 isolation gates, each from refused calls to bare tool names (18 calls; 51 and 4 with those calls not counted, [#266]); 270 turns, 215 calls, USD 3.78 | same | `suite236-opus55-mcp-1` | same |
+| Opus 5.5, `mcp` arm, Agda 2.9.0 | **37 solved, 1 restated**, 17 isolation gates, each from refused calls to bare tool names (18 calls; 51 and 4 with those calls not counted, [#266]); 270 turns, 215 calls, USD 3.78 | same | `suite236-opus55-mcp-1` |
+| GPT-6.1 Sol through Codex CLI, `mcp` arm, effort `low`, Agda 2.9.0 | **54 solved, 1 restated**; 266 turns, 209 calls, USD 2.09 at OpenAI's list (no client figure) | § 1.2 through Codex, 13 tools | `suite239-sol-mcp-1` | § 4.9, [`reports/agent-bench/`] | same |
 
 Header-free, per stratum (Sonnet, then Opus): stdlib 21 and 22 of
 22; haystack 12 and 12 of 12; `using` 9 (1 restated) and
@@ -1064,6 +1074,55 @@ the older servers, and the re-judge leaves their verdicts as they were.
    Opus 5.5's on four, 4.2 to 4.8 times the list), so its figures are
    priced from each subject's `modelUsage` at the published list.
 
+### 4.9  OpenAI's models through Codex
+
+[#239].  GPT-6.1 Sol ran on the three tiers and GPT-6 Astra on the hard
+tier, through Codex CLI 0.162.1 (§ 1.2's arm through a second harness), one
+seed each, at the catalog's default effort, `low`, and Sol once more on the
+hard tier at `high`.  They ran from the [#236] arms' own frozen server and
+extractor, with § 4.8's user prompt, index, corpora, and caps, so each row
+differs from § 4.8's in the harness, the model, and the effort, and in
+nothing the judge reads; [`reports/agent-bench/`] has the protocol, the
+table, and the readings in full.  Zero anomalies; USD 11.57 at OpenAI's list
+for the five arms and their cost pairs.
+
+| | Sol (Codex, `low`) | Astra (Codex, `low`) | Sol (Codex, `high`) | Sonnet 5.5 | Opus 5 |
+|---|---:|---:|---:|---:|---:|
+| library (55): solved, restated | 54, 1 | not run | not run | 51, 4 | 54, 0 |
+| composition (12): solved | 12 | not run | not run | 11 | 12 |
+| hard (14): solved | 14 | 14 | 14 | 14 | 14 |
+| final files that check, statement kept | 81 of 81 | 14 of 14 | 14 of 14 | 81 of 81 | 81 of 81 |
+| turns: library, composition, hard | 266, 95, 116 | 117 | 146 | 281, 119, 145 | 309, 128, 139 |
+| USD at list: library, composition, hard | 2.09, 0.89, 1.09 | 5.76 | 1.26 | 2.09, 1.26, 1.81 | 6.91, 4.05, 7.71 |
+
+Runs: `suite239-sol-mcp-1`, `comp239-sol-mcp-1`, `hard239-sol-mcp-1`,
+`hard239-astra-mcp-1`, `hard239-sol-high-mcp-1`; the two Claude columns are
+§ 4.8's.
+
++  **A Codex row is Codex CLI with the model**.  Beside the model it varies
+   the harness (Codex presents agda-mcp's descriptions whole, where Claude
+   Code cuts them at 2,048 characters, [#191], and sends its own base
+   instructions) and the effort (`low` here, `high` for the Claude 5 and
+   Sonnet 5.5 sessions, `medium` for Opus 5.5's).  So no column here ranks
+   GPT-6.1 Sol against a Claude model; it ranks two instruments.
++  **Sol through Codex solves 80 of 81 and restates the 81st**
+   (`algebras-subalgebras-sub-trans-iso`, which Sonnet 5.5 and Sonnet 5
+   restate too), in the fewest turns of any arm on every tier.  Its rows read
+   as write and check: about one Read, one Edit, and one `check_file` a
+   library row, and `fill_hole` twice in 55 rows where Opus 5 called it 35
+   times.  Like every model of § 4.8, it leaves no file that fails to check,
+   so on these tiers the count again separates habits (restatement, the
+   gates), not proofs.
++  **Astra matches Sol on the hard tier at five times the price**, and `high`
+   effort bought Sol nothing measurable there: the same 14 rows in 26 % more
+   turns at 15 % more cost.  The hard tier is at every model's ceiling, so
+   both say what a row costs, not what a model is worth.
++  **The bill is a usage window, not a price**.  On the ChatGPT Plus login
+   the five arms took 86 points of one five-hour window (Sol 32 for 81 rows,
+   Astra 43 for 14, Sol at `high` 11 for 14) and 14 points of the weekly
+   one; the USD figures are the list price of the tokens Codex reported,
+   about what an API key would have paid.
+
 ## 5.  How to tell a win from a loss
 
 | question | look at | it is a win for the tools when |
@@ -1215,6 +1274,7 @@ the older servers, and the re-judge leaves their verdicts as they were.
 [#205]: https://github.com/formalverification/agda-native-air/issues/205
 [#206]: https://github.com/formalverification/agda-native-air/issues/206
 [#237]: https://github.com/formalverification/agda-native-air/issues/237
+[#239]: https://github.com/formalverification/agda-native-air/issues/239
 [`reports/auto-floor/`]: ../reports/auto-floor/README.md
 [#228]: https://github.com/formalverification/agda-native-air/pull/228
 [#229]: https://github.com/formalverification/agda-native-air/pull/229
