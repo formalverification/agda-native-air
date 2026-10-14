@@ -1,0 +1,53 @@
+-- Group-correspondence-over-N.agda
+--
+-- File: data/benchmarks/agda-algebras-hard-v0/obligations/Group-correspondence-over-N.agda
+--
+-- Benchmark obligation: hard-group-correspondence-over-N
+-- Difficulty: compositional
+-- Import stratum: novel
+--
+-- A subgroup H of G contains the normal subgroup N exactly when H respects N-cosets, that is, when H is a subgroup of G/N on the same carrier.
+--
+module Group-correspondence-over-N where
+
+open import AgdaDojang.Debug
+
+open import Data.Product                  using ( _,_ ; _×_ ; Σ-syntax ; proj₁ ; proj₂ )
+open import Level                         using ( Level ; _⊔_ )
+open import Relation.Binary               using ( Setoid )
+open import Relation.Binary.Definitions   using ( _Respects_ )
+open import Relation.Unary                using ( Pred ; _∈_ ; _⊆_ )
+
+open import Classical.Structures.Group.Basic         using ( Group ; module Group-Op )
+open import Classical.Structures.Group.Subgroups     using ( IsSubgroup )
+open import Classical.Structures.Group.Conjugation   using ( module Conjugate )
+open import Setoid.Algebras.Basic                    using ( 𝕌[_] ; 𝔻[_] )
+open import Classical.Structures.Group.Cosets        using ( module Coset )
+
+module _ {α ρ ℓ : Level} (𝒢 : Group α ρ)
+  (N : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (N-sub : IsSubgroup 𝒢 N) (N-normal : Conjugate.IsNormal 𝒢 N)
+  (H : Pred 𝕌[ proj₁ 𝒢 ] ℓ) (H-sub : IsSubgroup 𝒢 H)
+  where
+  open Coset 𝒢 N N-sub using ( _∼_ )
+
+  correspondence-over-N : (N ⊆ H → H Respects _∼_) × (H Respects _∼_ → N ⊆ H)
+  correspondence-over-N = forward , backward
+    where
+    open Group-Op 𝒢
+    open Setoid 𝔻[ proj₁ 𝒢 ] using (refl ; sym ; trans)
+
+    forward : N ⊆ H → H Respects _∼_
+    forward include {x} {y} related hx =
+      IsSubgroup.respects H-sub
+        (trans (sym (assoc-law x (x ⁻¹) y))
+          (trans (∙-cong (invʳ-law x) refl) (idˡ-law y)))
+        (IsSubgroup.∙-closed H-sub hx (include related))
+
+    backward : H Respects _∼_ → N ⊆ H
+    backward respect {x} nx =
+      respect {ε} {x}
+        (IsSubgroup.respects N-sub
+          (sym (trans
+            (∙-cong (trans (sym (idʳ-law (ε ⁻¹))) (invˡ-law ε)) refl)
+            (idˡ-law x))) nx)
+        (IsSubgroup.ε-closed H-sub)

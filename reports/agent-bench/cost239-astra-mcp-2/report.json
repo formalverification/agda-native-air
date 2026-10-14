@@ -1,0 +1,538 @@
+{
+  "schemaVersion" : "agent-bench-report.v0",
+  "runId" : "cost239-astra-mcp-2",
+  "timestamp" : "2026-10-14T02:17:45.198237597Z",
+  "rejudged" : true,
+  "config" : {
+    "arm" : "mcp",
+    "safe" : true,
+    "rejudgedAt" : "2026-10-14T02:17:45.197615601Z",
+    "parallelism" : 1,
+    "codexBin" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/bin/codex",
+    "resume" : true,
+    "gates" : [
+      "preservation",
+      "escape",
+      "holes",
+      "typecheck",
+      "isolation"
+    ],
+    "harness" : "codex",
+    "harnessVersion" : "codex-cli 0.162.1",
+    "harnessArgv" : [
+      "--strict-config",
+      "exec",
+      "--json"
+    ],
+    "model" : "gpt-6-astra",
+    "effort" : "low",
+    "endpoint" : {
+      "provider" : "openai",
+      "authMode" : "chatgpt",
+      "baseUrl" : "https://chatgpt.com/backend-api/codex"
+    },
+    "maxTurns" : 30,
+    "wallCapSec" : 900,
+    "maxBudgetUsd" : 3.00,
+    "capsEnforced" : [
+      "turns:harness",
+      "budget:harness",
+      "wall:harness"
+    ],
+    "serverTimeout" : 600,
+    "agdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras",
+    "subjectAgdaFlags" : "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+    "codexConfig" : {
+      "path" : "prompts/codex-config.toml",
+      "sha256" : "728d39c69e985b38df46bb2726be7450060d212331074aa52ce2c63bd1a9b3c0"
+    },
+    "envAdded" : [
+      "CODEX_HOME",
+      "TMPDIR",
+      "CODEX_ROLLOUT_TRACE_ROOT"
+    ],
+    "envRemovedPrefixes" : [
+      "CLAUDE",
+      "OPENAI",
+      "CODEX",
+      "ANTHROPIC"
+    ],
+    "envRemovedNames" : [
+      "RUST_LOG",
+      "LD_LIBRARY_PATH"
+    ],
+    "tools" : [
+      "Edit",
+      "Read",
+      "mcp__agda__get_goal",
+      "mcp__agda__fill_hole",
+      "mcp__agda__check_file",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__check_project",
+      "mcp__agda__type_of",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__get_dependencies",
+      "clock__curr_time",
+      "exec",
+      "list_mcp_resource_templates",
+      "list_mcp_resources",
+      "read_mcp_resource",
+      "request_user_input_async",
+      "wait"
+    ],
+    "addDirs" : [
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda-dojang",
+      "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0",
+      "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda-dojang/agda",
+      "/nix/store/8nqxbd4x5iyq4fl28xvsv6digp1qc6na-standard-library-2.3-agda-2.9.0/src",
+      "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src",
+      "/nix/store/95cx28xrqs5cnaq2d2zb7m6285n8jr5h-Agda-2.9.0-data/share/ghc-9.10.3/x86_64-linux-ghc-9.10.3-b976/Agda-2.9.0/lib/prim",
+      "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/agda"
+    ],
+    "persistSessions" : false,
+    "allowCredits" : false,
+    "inputs" : {
+      "codexBin" : {
+        "path" : "/home/williamdemeo/.nvm/versions/node/v22.14.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+        "sha256" : "628e35487d888a28f0427fc37501da529dd3d81fcbad7a2c3421c1e8670d92e1"
+      },
+      "readServer" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/scripts/python/bench_read_server.py",
+        "sha256" : "0e910ffb3a0a54bf42ec9418511138c410ab0d9e47d4cb094bdb67e81c849579"
+      },
+      "codexCatalog" : {
+        "path" : "codex-models.json",
+        "sha256" : "201b6581fd18106834c927da5b80295d54f32e1e3c326f32d3349ae11557ccff"
+      },
+      "readServerPython" : "/usr/bin/python3.12",
+      "projectRoot" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra",
+      "index" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/benchmark-index.jsonl",
+        "sha256" : "62092c1da926245a38cb3cfff81b72c6c45ab6c10987a6145a058ac9592e89e0"
+      },
+      "serverBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/.bin-236/agda-mcp",
+        "sha256" : "608ede24f3d40ae690aa3fbef645a6894730555352557eefcd035b041b4b0e55"
+      },
+      "agdaJsonBin" : {
+        "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/.bin-236/agda-json",
+        "sha256" : "e8858863404c0578b829bcf835febc9600d0d3619a5fd2d869d1f9d39c4c75aa"
+      },
+      "corpora" : {
+        "agda-stdlib" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-stdlib/v0/corpus.jsonl",
+          "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+        },
+        "agda-algebras" : {
+          "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+          "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+        }
+      },
+      "prices" : {
+        "path" : "prices.json",
+        "sha256" : "b8bf13361addfc9cf1bc807816897ae5da8f6c5e1e980fd2f7959fef1b9e1514"
+      }
+    },
+    "prompts" : {
+      "system" : {
+        "path" : "prompts/system-prompt.md",
+        "sha256" : "a2399dd4a63ba09023473fcb793ee630db380f925539dbd5c28fc9af9daef9ef"
+      },
+      "user" : {
+        "path" : "prompts/user-prompt.md",
+        "sha256" : "6ea5a0b36cf401d5af0e782987acd559c5ced03f258cef3defc17766df61b192"
+      }
+    }
+  },
+  "corpora" : {
+    "agda-stdlib" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-stdlib/v0/corpus.jsonl",
+      "sha256" : "14e0d47e8b904e9bd7822df6c0a33d41820971272079df69fbb66a79311a846d"
+    },
+    "agda-algebras" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-algebras/v0.1/corpus.jsonl",
+      "sha256" : "af8644328352d95cb2887dd553e4f23c0d1b807c1dcd1f6274aa4f8150e7ed35"
+    }
+  },
+  "pricing" : {
+    "prices" : {
+      "path" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/cost239-astra-mcp-2/prices.json",
+      "sha256" : "b8bf13361addfc9cf1bc807816897ae5da8f6c5e1e980fd2f7959fef1b9e1514",
+      "asOf" : "2026-10-13",
+      "source" : "OpenAI's list prices for its API, standard tier, short context (at most 272K input tokens), as https://developers.openai.com/api/docs/pricing published them on 2026-10-13; a Codex subject on a ChatGPT login is not billed per token, so the figure is the list price of the tokens Codex reported, and Codex reports cache writes as 0, so a written token is priced as uncached input, at most 20 % under OpenAI's cache-write price for it",
+      "rows" : {
+        "gpt-6-astra" : {
+          "input" : 10,
+          "cacheWrite" : 12.5,
+          "cacheRead" : 1,
+          "output" : 50
+        }
+      }
+    },
+    "byModel" : {
+      "gpt-6-astra" : {
+        "input" : 28169,
+        "output" : 852,
+        "cacheRead" : 88576,
+        "cacheCreation" : 0,
+        "costUsd" : null,
+        "pricedCostUsd" : 0.413,
+        "pricedAs" : "gpt-6-astra"
+      }
+    },
+    "unpricedModels" : [
+    ],
+    "unpricedRows" : 0,
+    "clientCostBasis" : [
+      "none"
+    ],
+    "caveats" : [
+      "Codex reports no cost: the figure is OpenAI's list price for the tokens it reported",
+      "the ChatGPT backend reports cache writes as 0, so written tokens are priced as uncached input, at most 20 % under OpenAI's write price",
+      "reasoning tokens are inside output, as OpenAI bills them",
+      "a ChatGPT plan is billed by usage windows, not per token: the run's windows are its bill"
+    ]
+  },
+  "obligations" : 2,
+  "totals" : {
+    "total" : 2,
+    "solved" : 1,
+    "restated" : 1,
+    "solvedOriginalInView" : 0,
+    "gates" : {
+      
+    },
+    "anomalies" : 0,
+    "turns" : 9,
+    "toolCalls" : 7,
+    "wallMs" : 54489,
+    "costUsd" : null,
+    "pricedCostUsd" : 0.413,
+    "unpricedRows" : 0
+  },
+  "perTier" : {
+    "routine" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.000,
+      "unpricedRows" : 0
+    },
+    "compositional" : {
+      "total" : 2,
+      "solved" : 1,
+      "restated" : 1,
+      "solvedOriginalInView" : 0,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 9,
+      "toolCalls" : 7,
+      "wallMs" : 54489,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.413,
+      "unpricedRows" : 0
+    },
+    "non-obvious" : {
+      "total" : 0,
+      "solved" : 0,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 0,
+      "toolCalls" : 0,
+      "wallMs" : 0,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.000,
+      "unpricedRows" : 0
+    }
+  },
+  "perStratum" : {
+    "agda-stdlib" : {
+      "total" : 1,
+      "solved" : 1,
+      "restated" : 0,
+      "solvedOriginalInView" : null,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 4,
+      "toolCalls" : 3,
+      "wallMs" : 25113,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.194,
+      "unpricedRows" : 0
+    },
+    "agda-algebras/wholesale" : {
+      "total" : 1,
+      "solved" : 0,
+      "restated" : 1,
+      "solvedOriginalInView" : 0,
+      "gates" : {
+        
+      },
+      "anomalies" : 0,
+      "turns" : 5,
+      "toolCalls" : 4,
+      "wallMs" : 29376,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.219,
+      "unpricedRows" : 0
+    }
+  },
+  "perTool" : {
+    "Edit" : 2,
+    "Read" : 2,
+    "mcp__agda__check_file" : 2,
+    "mcp__agda__type_of" : 1
+  },
+  "perShell" : {
+    
+  },
+  "perVia" : {
+    "mcp" : 2
+  },
+  "perVerdictVia" : {
+    "mcp" : 2
+  },
+  "outcomes" : [
+    {
+      "benchmarkId" : "stdlib-nat-plus-comm",
+      "difficulty" : "compositional",
+      "source" : "agda-stdlib",
+      "tags" : [
+      ],
+      "stratum" : "agda-stdlib",
+      "hole" : "+-comm",
+      "goal" : "∀ (m n : ℕ) → m + n ≡ n + m",
+      "solved" : true,
+      "restated" : false,
+      "restatementEvidence" : [
+      ],
+      "original" : null,
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 4,
+      "toolCalls" : {
+        "Read" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 3,
+      "wallMs" : 25113,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.193794,
+      "tokens" : {
+        "input" : 13719,
+        "output" : 382,
+        "cacheRead" : 37504,
+        "cacheCreation" : 0
+      },
+      "usageByModel" : {
+        "gpt-6-astra" : {
+          "input" : 13719,
+          "output" : 382,
+          "cacheRead" : 37504,
+          "cacheCreation" : 0,
+          "provider" : "openai",
+          "costBasis" : "none",
+          "pricedAs" : "gpt-6-astra"
+        }
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 724,
+      "agdaTail" : "",
+      "checkExit" : 0,
+      "checkCodes" : [
+      ],
+      "statement" : {
+        "gold" : "(m n : ℕ) → m + n ≡ n + m",
+        "final" : "(m n : ℕ) → m + n ≡ n + m",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/stdlib-nat-plus-comm/final/Nat-plus-comm.agda",
+      "transcriptPath" : "subjects/stdlib-nat-plus-comm/transcript.jsonl",
+      "lastWords" : "Filled the proof in place; `check_file` reports success on the final file, with no holes remaining.",
+      "rateLimit" : {
+        "maxUtilization" : 0.02,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    },
+    {
+      "benchmarkId" : "algebras-homs-mon-to-hom",
+      "difficulty" : "compositional",
+      "source" : "agda-algebras",
+      "tags" : [
+        "stratum:wholesale",
+        "restates:Setoid.Homomorphisms.Basic.mon→hom",
+        "target:Setoid.Homomorphisms.Basic.IsMon.HomReduct"
+      ],
+      "stratum" : "agda-algebras/wholesale",
+      "hole" : "mon→hom′",
+      "goal" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra {𝑆 = 𝑆} α ρᵃ} {𝑩 : Algebra β ρᵇ} →  mon 𝑨 𝑩 → hom 𝑨 𝑩",
+      "solved" : false,
+      "restated" : true,
+      "restatementEvidence" : [
+        "ref Setoid.Homomorphisms.Basic.mon→hom"
+      ],
+      "original" : {
+        "file" : "/nix/store/qfbj7czig4244b53qgwz8mgcw6q492gb-agda-algebras-unstable-2026-09-07/src/Setoid/Homomorphisms/Basic.lagda.md",
+        "inView" : false,
+        "how" : null,
+        "at" : null,
+        "reads" : 0,
+        "refusedReads" : 0
+      },
+      "addedImports" : [
+      ],
+      "terminal" : "completed",
+      "turns" : 5,
+      "toolCalls" : {
+        "Read" : 1,
+        "mcp__agda__type_of" : 1,
+        "Edit" : 1,
+        "mcp__agda__check_file" : 1
+      },
+      "toolCallsTotal" : 4,
+      "wallMs" : 29376,
+      "costUsd" : null,
+      "pricedCostUsd" : 0.219072,
+      "tokens" : {
+        "input" : 14450,
+        "output" : 470,
+        "cacheRead" : 51072,
+        "cacheCreation" : 0
+      },
+      "usageByModel" : {
+        "gpt-6-astra" : {
+          "input" : 14450,
+          "output" : 470,
+          "cacheRead" : 51072,
+          "cacheCreation" : 0,
+          "provider" : "openai",
+          "costBasis" : "none",
+          "pricedAs" : "gpt-6-astra"
+        }
+      },
+      "permissionDenials" : 0,
+      "isolation" : {
+        "arm" : "mcp",
+        "mcpConnected" : true,
+        "agdaToolsPresented" : [
+          "mcp__agda__check_file",
+          "mcp__agda__check_project",
+          "mcp__agda__definition_of",
+          "mcp__agda__exports_of",
+          "mcp__agda__fill_hole",
+          "mcp__agda__get_dependencies",
+          "mcp__agda__get_diagnostics",
+          "mcp__agda__get_goal",
+          "mcp__agda__normalize",
+          "mcp__agda__resolve_name",
+          "mcp__agda__search_by_name",
+          "mcp__agda__search_by_type",
+          "mcp__agda__type_of"
+        ],
+        "missingAgdaTools" : [
+        ],
+        "extraTools" : [
+        ],
+        "toolsDeferred" : false,
+        "foreignToolUses" : [
+        ],
+        "violations" : [
+        ],
+        "deniedPaths" : [
+        ],
+        "shellClasses" : {
+          
+        }
+      },
+      "via" : "mcp",
+      "verdictVia" : "mcp",
+      "agdaExit" : 0,
+      "agdaMs" : 1786,
+      "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+      "checkExit" : 0,
+      "checkCodes" : [
+        "FixityDeclarationForNonOperator",
+        "FixityDeclarationForNonOperator"
+      ],
+      "statement" : {
+        "gold" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+        "final" : "{𝓞 𝓥 α ρᵃ β ρᵇ : Level} {𝑆 : Signature 𝓞 𝓥} {𝑨 : Algebra α ρᵃ}\n{𝑩 : Algebra β ρᵇ} →\nmon 𝑨 𝑩 → hom 𝑨 𝑩",
+        "equal" : true
+      },
+      "evidenceSource" : "bodyRefs",
+      "finalPath" : "subjects/algebras-homs-mon-to-hom/final/Homs-mon-to-hom.agda",
+      "transcriptPath" : "subjects/algebras-homs-mon-to-hom/transcript.jsonl",
+      "lastWords" : "Filled the hole with `mon→hom _ _ m`; `check_file` reports success on the final file with no remaining holes.",
+      "rateLimit" : {
+        "maxUtilization" : 0.03,
+        "statuses" : [
+          "allowed"
+        ]
+      }
+    }
+  ]
+}

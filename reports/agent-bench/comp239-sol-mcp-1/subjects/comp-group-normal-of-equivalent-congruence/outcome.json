@@ -1,0 +1,110 @@
+{
+  "benchmarkId" : "comp-group-normal-of-equivalent-congruence",
+  "difficulty" : "non-obvious",
+  "source" : "agda-algebras",
+  "tags" : [
+    "stratum:composition",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.≈ⁿ-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf-cong",
+    "needle:Setoid.Congruences.Lattice.≑-trans",
+    "needle:Classical.Structures.Group.Congruences.GroupCongruences.normalOf∘congruenceOf"
+  ],
+  "stratum" : "agda-algebras/composition",
+  "hole" : "normal-of-equivalent-congruence",
+  "goal" : "{θ φ : Con (proj₁ 𝒢) ℓ} {𝑵 : NormalSubgroup ℓ} → θ ≑ φ → φ ≑ congruenceOf 𝑵 → normalOf θ ≈ⁿ 𝑵",
+  "solved" : true,
+  "restated" : false,
+  "restatementEvidence" : [
+  ],
+  "original" : null,
+  "addedImports" : [
+  ],
+  "terminal" : "completed",
+  "turns" : 5,
+  "toolCalls" : {
+    "Read" : 1,
+    "mcp__agda__definition_of" : 1,
+    "Edit" : 1,
+    "mcp__agda__check_file" : 1
+  },
+  "toolCallsTotal" : 4,
+  "wallMs" : 44257,
+  "costUsd" : null,
+  "pricedCostUsd" : 0.0471328,
+  "tokens" : {
+    "input" : 15638,
+    "output" : 714,
+    "cacheRead" : 87168,
+    "cacheCreation" : 0
+  },
+  "usageByModel" : {
+    "gpt-6.1-sol" : {
+      "input" : 15638,
+      "output" : 714,
+      "cacheRead" : 87168,
+      "cacheCreation" : 0,
+      "provider" : "openai",
+      "costBasis" : "none",
+      "pricedAs" : "gpt-6.1-sol"
+    }
+  },
+  "permissionDenials" : 0,
+  "isolation" : {
+    "arm" : "mcp",
+    "mcpConnected" : true,
+    "agdaToolsPresented" : [
+      "mcp__agda__check_file",
+      "mcp__agda__check_project",
+      "mcp__agda__definition_of",
+      "mcp__agda__exports_of",
+      "mcp__agda__fill_hole",
+      "mcp__agda__get_dependencies",
+      "mcp__agda__get_diagnostics",
+      "mcp__agda__get_goal",
+      "mcp__agda__normalize",
+      "mcp__agda__resolve_name",
+      "mcp__agda__search_by_name",
+      "mcp__agda__search_by_type",
+      "mcp__agda__type_of"
+    ],
+    "missingAgdaTools" : [
+    ],
+    "extraTools" : [
+    ],
+    "toolsDeferred" : false,
+    "foreignToolUses" : [
+    ],
+    "violations" : [
+    ],
+    "deniedPaths" : [
+    ],
+    "shellClasses" : {
+      
+    }
+  },
+  "via" : "mcp",
+  "verdictVia" : "mcp",
+  "agdaExit" : 0,
+  "agdaMs" : 2133,
+  "agdaTail" : "\n———— All done; warnings encountered ————————————————————————\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Basic.lagda.md:96.13-16: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator ∣_∣\nwhen scope checking the declaration\n  module _ {A : Type a} {B : A → Type b} where\n\n/nix/var/nix/builds/nix-774698-2247666969/source/src/Overture/Relations.lagda.md:70.10-13: warning: -W[no]FixityDeclarationForNonOperator\nDeprecated: fixity declaration for closed operator [_]\nwhen scope checking the declaration\n  open import Overture.Relations using (PointWise)",
+  "checkExit" : 0,
+  "checkCodes" : [
+    "FixityDeclarationForNonOperator",
+    "FixityDeclarationForNonOperator"
+  ],
+  "statement" : {
+    "gold" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "final" : "{α ρ ℓ : Level} (𝒢 : Group α ρ) {θ φ : Con (proj₁ 𝒢) ℓ}\n{𝑵 : GroupCongruences.NormalSubgroup 𝒢 ℓ} →\nθ ≑ φ →\nφ ≑ GroupCongruences.congruenceOf 𝒢 𝑵 →\n(𝒢 GroupCongruences.≈ⁿ GroupCongruences.normalOf 𝒢 θ) 𝑵",
+    "equal" : true
+  },
+  "evidenceSource" : "bodyRefs",
+  "finalPath" : "subjects/comp-group-normal-of-equivalent-congruence/final/Group-normal-of-equivalent-congruence.agda",
+  "transcriptPath" : "subjects/comp-group-normal-of-equivalent-congruence/transcript.jsonl",
+  "lastWords" : "Filled the hole in place; `check_file` reports success on the final file, with no remaining holes.",
+  "rateLimit" : {
+    "maxUtilization" : 0.21,
+    "statuses" : [
+      "allowed"
+    ]
+  }
+}
