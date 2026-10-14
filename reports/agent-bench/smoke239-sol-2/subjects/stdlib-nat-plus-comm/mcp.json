@@ -1,0 +1,23 @@
+{
+  "mcpServers" : {
+    "agda" : {
+      "command" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/scripts/run-server.sh",
+      "args" : [
+        "--cwd",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra",
+        "--agda-flags",
+        "-i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe",
+        "--timeout",
+        "600",
+        "--corpus",
+        "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/corpora/agda-stdlib/v0/corpus.jsonl",
+        "--check-command",
+        "agda -i agda-dojang/agda --library-file=agda/libraries -l agda-dojang -l standard-library -l agda-algebras --safe -i /home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/smoke239-sol-2/work/stdlib-nat-plus-comm /home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/smoke239-sol-2/work/stdlib-nat-plus-comm/Nat-plus-comm.agda"
+      ],
+      "env" : {
+        "AGDA_MCP_BIN" : "/home/williamdemeo/git/formalverification/agda-native-air/worktrees/239-m1-47-agent-bench-codex-subject-gpt-sol-astra/data/benchmarks/reports/agent-bench/.bin-239/agda-mcp"
+      },
+      "alwaysLoad" : true
+    }
+  }
+}
