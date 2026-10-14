@@ -27,6 +27,7 @@ import io.circe.syntax._
 import java.nio.file.{Files, Paths}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
+import scala.jdk.CollectionConverters._
 
 final class ProtocolSpec extends AnyFunSuite with Matchers {
 
@@ -333,5 +334,69 @@ final class ProtocolSpec extends AnyFunSuite with Matchers {
     // And a record that has a table keeps it: a changed table is a change.
     val repriced = now.hcursor.downField("inputs").downField("prices").withFocus(_.mapObject(_.add("sha256", "qq".asJson))).top.get
     Protocol.differences(now, repriced).map(_.takeWhile(_ != ':')) shouldBe Vector("inputs")
+  }
+
+  // ---- the harness (issue #239) ------------------------------------------------
+
+  /** The keys of every archived Claude protocol, which a Claude run's record keeps. */
+  private val claudeKeys = Vector("addDirs", "agdaFlags", "arm", "claudeFlags", "claudeVersion", "endpoint", "envAdded",
+    "envRemovedPrefix", "inputs", "maxBudgetUsd", "maxTurns", "model", "persistSessions", "prompts", "safe", "serverTimeout",
+    "subjectAgdaFlags", "tools", "wallCapSec")
+
+  test("a Claude run's record keeps exactly the keys it had before the harness existed (#239)") {
+    Protocol.of(cfg(), "v", "system", "user", someInputs()).asObject.map(_.keys.toVector.sorted) shouldBe Some(claudeKeys)
+    // And every archived protocol of the repository is still its own under the rule.
+    val archive = Vector(Paths.get("../reports/agent-bench"), Paths.get("reports/agent-bench")).find(Files.isDirectory(_))
+    archive.foreach { root =>
+      val walk = Files.list(root)
+      val ps   = try walk.iterator.asScala.toVector.map(_.resolve("protocol.json")).filter(Files.isRegularFile(_)) finally walk.close()
+      ps.size should be > 10
+      ps.foreach { f =>
+        val j = io.circe.parser.parse(new String(Files.readAllBytes(f), "UTF-8")).getOrElse(fail(s"$f"))
+        withClue(f.toString)(Protocol.differences(j, j) shouldBe Vector.empty)
+        // Only a Codex record names its harness; a Claude record never gains the key.
+        val h = j.hcursor.downField("harness")
+        if (h.succeeded) withClue(f.toString)(h.as[String] shouldBe Right("codex"))
+        else withClue(f.toString)(j.asObject.map(_.keys.toVector.toSet.subsetOf(claudeKeys.toSet + "expose")) shouldBe Some(true))
+      }
+    }
+  }
+
+  test("a resume across harnesses is refused on one line naming the harness; an absent harness is claude (#239)") {
+    val claude = Protocol.of(cfg(), "v", "system", "user", someInputs())
+    val codex  = Json.obj("harness" -> "codex".asJson, "model" -> "gpt-6.1-sol".asJson)
+    Protocol.differences(claude, codex) shouldBe Vector("harness: \"claude\" -> \"codex\"")
+    Protocol.differences(claude, claude.mapObject(_.add("harness", "claude".asJson))) shouldBe Vector.empty
+  }
+
+  test("a Codex run's record names the harness, its version and argv, the effort, the caps it enforces, the config by digest, and the OpenAI endpoint (#239)") {
+    val c = cliParse(base ++ List("--model", "gpt-6.1-sol", "--harness", "codex"), Map.empty).getOrElse(fail("parse"))
+    val endpoint = CodexSubject.endpoint("chatgpt")
+    val p = Protocol.ofCodex(c, "codex-cli 0.162.1", "low", "system", "user", someInputs(), Vector(Paths.get("/lib")), "CONFIG", endpoint).hcursor
+    p.get[String]("harness") shouldBe Right("codex")
+    p.get[String]("harnessVersion") shouldBe Right("codex-cli 0.162.1")
+    p.get[Vector[String]]("harnessArgv") shouldBe Right(Vector("--strict-config", "exec", "--json"))
+    p.get[String]("effort") shouldBe Right("low")
+    p.get[Vector[String]]("capsEnforced") shouldBe Right(Vector("turns:harness", "budget:harness", "wall:harness"))
+    p.downField("codexConfig").get[String]("sha256") shouldBe Right(struxdriver.io.TextIO.sha256("CONFIG"))
+    p.downField("endpoint").get[String]("provider") shouldBe Right("openai")
+    p.downField("endpoint").get[String]("authMode") shouldBe Right("chatgpt")
+    p.get[Vector[String]]("tools").map(ts => ts.contains("Read") && ts.contains("exec") && ts.contains("mcp__agda__check_file")) shouldBe Right(true)
+    p.downField("claudeFlags").succeeded shouldBe false
+  }
+
+  test("a Codex subject's record names its harness and its own endpoint, and survives the round trip; a Claude one's is unchanged (#239)") {
+    val roots = ShellRoots(Paths.get("/w"), Vector(Paths.get("/lib")), Vector.empty)
+    val codex = SubjectRecord(Arm.Mcp, roots, None, None, Harness.Codex, Some(CodexSubject.endpoint("chatgpt")))
+    SubjectRecord.fromJson(codex.toJson) shouldBe Some(codex)
+    val claude = SubjectRecord(Arm.Mcp, roots, None, Some(Endpoint(Vector(Endpoint.baseUrlVar -> Endpoint.absent))))
+    claude.toJson.hcursor.downField("harness").succeeded shouldBe false
+    SubjectRecord.fromJson(claude.toJson) shouldBe Some(claude)
+    // A harness this code does not know is kept by name, never read as Claude's (#272 review).
+    val alien = claude.toJson.mapObject(_.add("harness", "gemini".asJson))
+    SubjectRecord.fromJson(alien).map(_.unknownHarness) shouldBe Some(Some("gemini"))
+    SubjectRecord.fromJson(claude.toJson.mapObject(_.add("harness", "Codex".asJson))).map(_.unknownHarness) shouldBe Some(Some("Codex"))
+    SubjectRecord.fromJson(codex.toJson).map(_.unknownHarness) shouldBe Some(None)
+    SubjectRecord.fromJson(claude.toJson).map(_.unknownHarness) shouldBe Some(None)
   }
 }

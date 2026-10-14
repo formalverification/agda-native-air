@@ -40,6 +40,19 @@
   *  recorded before `--expose` reads as the full surface, so a run in flight
   *  across the change can still be resumed.
   *
+  *  The harness (issue #239).  A Claude run's record keeps exactly the keys
+  *  it had, and an absent `harness` reads as `claude`, so every archived
+  *  protocol is still its run's.  A Codex run's record is its own
+  *  (`ofCodex`): the harness and its version, the argument vector's fixed
+  *  part, the model and the effort it runs at, the caps and which side
+  *  enforces each, the Codex configuration as a template with the
+  *  per-subject values as placeholders (by digest, the template itself in
+  *  the run's prompts), the environment's additions and removals, the
+  *  tools, the endpoint (OpenAI, by the login's kind, never its values),
+  *  and among the inputs the native Codex binary and the pinned model
+  *  catalog by content.  A resume across harnesses differs on one line,
+  *  the harness, and is refused.
+  *
   *  ============================================================================
   */
 package struxdriver.agentbench
@@ -125,6 +138,50 @@ object Protocol {
     ).dropNullValues
   }
 
+  /** A Codex run's protocol (the header's list).  `config` is the
+    * configuration template's digest; `inputs` carries the binary and the
+    * catalog.
+    */
+  def ofCodex(cfg: AgentBenchConfig, version: String, effort: String, sysP: String, userT: String, inputs: Json,
+              addDirs: Vector[Path], configTemplate: String, endpoint: Json): Json =
+    Json.obj(
+      "harness"          -> Harness.Codex.name.asJson,
+      "harnessVersion"   -> version.asJson,
+      "harnessArgv"      -> CodexSubject.argvFixed.asJson,
+      "arm"              -> cfg.arm.name.asJson,
+      "model"            -> cfg.model.asJson,
+      "effort"           -> effort.asJson,
+      "endpoint"         -> endpoint,
+      "maxTurns"         -> cfg.maxTurns.asJson,
+      "wallCapSec"       -> cfg.wallCapSec.asJson,
+      "maxBudgetUsd"     -> cfg.maxBudgetUsd.asJson,
+      "capsEnforced"     -> Harness.Codex.capsEnforced.asJson,
+      "safe"             -> cfg.safe.asJson,
+      "serverTimeout"    -> cfg.serverTimeout.asJson,
+      "agdaFlags"        -> cfg.agdaFlags.asJson,
+      "subjectAgdaFlags" -> cfg.serverAgdaFlags.asJson,
+      "codexConfig"      -> Json.obj("path" -> s"prompts/${Layout.codexConfigTemplate}".asJson, "sha256" -> TextIO.sha256(configTemplate).asJson),
+      "envAdded"         -> CodexSubject.envAdded.asJson,
+      "envRemovedPrefixes" -> CodexSubject.envRemovedPrefixes.asJson,
+      "envRemovedNames"  -> CodexSubject.envRemovedNames.asJson,
+      // Read and Edit (the read server and apply_patch), the agda tools an
+      // arm with the server must have, and what Codex presents besides.
+      "tools"            -> (cfg.arm.builtinTools.toVector.sorted ++ Subject.requiredAgdaTools(cfg.expose) ++
+                             Harness.Codex.fixedSurface.toVector.sorted).asJson,
+      "expose"           -> cfg.expose.asJson,
+      "addDirs"          -> addDirs.map(_.toString).asJson,
+      "persistSessions"  -> cfg.persistSessions.asJson,
+      "allowCredits"     -> cfg.allowCredits.asJson,
+      "inputs"           -> inputs,
+      "prompts" -> Json.obj(
+        "system" -> Json.obj("path" -> "prompts/system-prompt.md".asJson, "sha256" -> TextIO.sha256(sysP).asJson),
+        "user"   -> Json.obj("path" -> "prompts/user-prompt.md".asJson,   "sha256" -> TextIO.sha256(userT).asJson))
+    ).dropNullValues
+
+  /** A protocol recorded with no harness is a Claude run's (issue #239). */
+  private def since239(j: Json): Json =
+    if (j.hcursor.downField("harness").succeeded) j else j.mapObject(_.add("harness", Harness.Claude.name.asJson))
+
   /** A protocol recorded before issue #237, read as one recorded after it:
     * no `endpoint` is the client's default, and no price table is the
     * current one.  A record that has them is unchanged.
@@ -144,11 +201,23 @@ object Protocol {
     * over the union of their keys (a key one side lacks reads `absent`).
     */
   def differences(recorded: Json, current: Json): Vector[String] = {
-    val was = since237(recorded, current)
     def field(j: Json, k: String): String = j.hcursor.downField(k).focus.map(_.noSpaces).getOrElse("absent")
-    val keys = (was.asObject.map(_.keys.toVector).getOrElse(Vector.empty) ++
-                current.asObject.map(_.keys.toVector).getOrElse(Vector.empty)).distinct.sorted
-    keys.collect { case k if field(was, k) != field(current, k) => s"$k: ${field(was, k)} -> ${field(current, k)}" }
+    val (r, c) = (since239(recorded), since239(current))
+    // Across harnesses every other field differs as a consequence: say the cause.
+    if (field(r, "harness") != field(c, "harness")) Vector(s"harness: ${field(r, "harness")} -> ${field(c, "harness")}")
+    else {
+      // A Codex run's operator knobs change nothing a subject sees or the
+      // judge applies: whether the harness may spend credits, and whether a
+      // subject's home is kept.  A resume may change them (the breaker names
+      // `--allow-credits on` as the remedy for its credits stop).
+      val operator: Set[String] = if (field(c, "harness") == Harness.Codex.name.asJson.noSpaces) Set("allowCredits", "persistSessions") else Set.empty
+      def knobsOff(j: Json): Json = j.mapObject(_.filterKeys(k => !operator(k)))
+      val was  = knobsOff(since237(r, c))
+      val now  = knobsOff(c)
+      val keys = (was.asObject.map(_.keys.toVector).getOrElse(Vector.empty) ++
+                  now.asObject.map(_.keys.toVector).getOrElse(Vector.empty)).distinct.sorted
+      keys.collect { case k if field(was, k) != field(now, k) => s"$k: ${field(was, k)} -> ${field(now, k)}" }
+    }
   }
 
   /** Admit the run: record a fresh run's protocol; under `--resume`, refuse a

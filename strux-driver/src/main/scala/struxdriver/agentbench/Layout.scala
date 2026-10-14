@@ -32,6 +32,12 @@ import java.nio.file.Path
 object Layout {
   /** The run's own copy of its price table, by its name in the run root. */
   val pricesFile: String = "prices.json"
+
+  /** A Codex run's own copy of its pinned model catalog, in the run root (issue #239). */
+  val codexModelsFile: String = "codex-models.json"
+
+  /** A Codex run's configuration template, under the run's prompts (issue #239). */
+  val codexConfigTemplate: String = "codex-config.toml"
 }
 
 /** The run directory. */
@@ -49,6 +55,18 @@ final case class RunLayout(runRoot: Path) {
   /** The subject's working directory: the staged copy of the one file. */
   def workDir(id: String): Path = runRoot.resolve(s"work/$id")
 
+  /** A Codex run's own copy of its pinned model catalog (issue #239). */
+  def codexModels: Path = runRoot.resolve(Layout.codexModelsFile)
+
+  /** Where Codex subjects keep their own CODEX_HOME (issue #239): beside the
+    * run directory, never in it, since each holds a link to the operator's
+    * login, so no run directory, and no copy of one, can carry a login.
+    */
+  def codexHomes: Path = runRoot.resolveSibling(s".codex-homes/${runRoot.getFileName}")
+
+  /** A Codex subject's own CODEX_HOME. */
+  def codexHome(id: String): CodexHome = CodexHome(codexHomes.resolve(id))
+
   def subject(id: String): SubjectLayout = SubjectLayout(runRoot.resolve(s"subjects/$id"), this)
 
   def relative(p: Path): String = runRoot.relativize(p).toString
@@ -64,6 +82,16 @@ final case class SubjectLayout(dir: Path, run: RunLayout) {
   def stderr:     Path = dir.resolve("stderr.log")
   def runRecord:  Path = dir.resolve("run.json")
   def outcome:    Path = dir.resolve("outcome.json")
+
+  /** A Codex subject's own records (issue #239): its configuration, the
+    * `--json` stream as Codex wrote it, the session's rollout (filtered for
+    * the archive, CodexSubject.archivable), and the surface its first
+    * request presented; `transcript` is the adapter's reading of them.
+    */
+  def codexConfig:  Path = dir.resolve("codex-config.toml")
+  def codexEvents:  Path = dir.resolve("codex-events.jsonl")
+  def codexRollout: Path = dir.resolve("codex-rollout.jsonl")
+  def codexSurface: Path = dir.resolve("codex-surface.json")
 
   /** The file as the subject left it, under its module stem so Agda can check it. */
   def finalFile(stem: String): Path = dir.resolve(s"final/$stem.agda")

@@ -150,10 +150,10 @@ final class PricingSpec extends AnyFunSuite with Matchers {
   private val spent = Tokens(input = 10, output = 1000, cacheRead = 100000, cacheCreation = 5000)
 
   test("a model is priced by its id, then by the id the client priced it by; a model that spent tokens with no row leaves the row unpriced") {
-    val haiku = ModelUsage("claude-haiku-4-5-20251001", spent, 0.0, Some("claude-haiku-4-5"), Some("firstParty"), Some("list"))
+    val haiku = ModelUsage("claude-haiku-4-5-20251001", spent, Some(0.0), Some("claude-haiku-4-5"), Some("firstParty"), Some("list"))
     // 10*1 + 5000*2 + 100000*0.1 + 1000*5, per million tokens
     table.price(Vector(haiku)) shouldBe Priced(Some(BigDecimal("0.02501")), None, Vector.empty, Map("claude-haiku-4-5-20251001" -> "claude-haiku-4-5"))
-    val k3 = ModelUsage("kimi-k3", spent, 0.0, None, Some("firstParty"), Some("unknown"))
+    val k3 = ModelUsage("kimi-k3", spent, Some(0.0), None, Some("firstParty"), Some("unknown"))
     val both = table.price(Vector(haiku, k3))
     both.usd shouldBe None
     both.unpriced shouldBe Some("no price for kimi-k3 in the table")
@@ -169,7 +169,7 @@ final class PricingSpec extends AnyFunSuite with Matchers {
     // a dated id that passed the check before the run is priced after it.
     val k3Table = parsed(tableJson("kimi-k3" -> goodRow)).getOrElse(fail("table"))
     k3Table.priceOfModelId("kimi-k3-20260701").isDefined shouldBe true
-    k3Table.price(Vector(ModelUsage("kimi-k3-20260701", spent, 0.0, Some("kimi-k3-20260701"), None, Some("unknown")))).usd.isDefined shouldBe true
+    k3Table.price(Vector(ModelUsage("kimi-k3-20260701", spent, Some(0.0), Some("kimi-k3-20260701"), None, Some("unknown")))).usd.isDefined shouldBe true
   }
 
   test("a row is priced from its result record's modelUsage, and left unpriced, with the reason, without a result record or without modelUsage") {
@@ -205,9 +205,9 @@ final class PricingSpec extends AnyFunSuite with Matchers {
 
   test("an unpriced row carries a null priced cost and names its model, and the report's pricing block names it too") {
     // The client's figures differ from the priced ones, so a swapped column shows.
-    val k3   = ModelUsage("kimi-k3", spent, 0.27, None, Some("firstParty"), Some("unknown"))
-    val opus = ModelUsage("claude-opus-5", spent, 0.2, Some("claude-opus-5"), Some("firstParty"), Some("list"))
-    val row      = Outcome.anomaly(entry, "x", 0L, Priced.nothing).copy(anomaly = None, costUsd = 0.2)
+    val k3   = ModelUsage("kimi-k3", spent, Some(0.27), None, Some("firstParty"), Some("unknown"))
+    val opus = ModelUsage("claude-opus-5", spent, Some(0.2), Some("claude-opus-5"), Some("firstParty"), Some("list"))
+    val row      = Outcome.anomaly(entry, "x", 0L, Priced.nothing).copy(anomaly = None, costUsd = Some(0.2))
     val unpriced = row.copy(usageByModel = Vector(k3), priced = table.price(Vector(k3)))
     val priced   = row.copy(usageByModel = Vector(opus), priced = table.price(Vector(opus)))
     unpriced.toJson.hcursor.downField("pricedCostUsd").focus shouldBe Some(Json.Null)
@@ -279,4 +279,19 @@ final class PricingSpec extends AnyFunSuite with Matchers {
     AgentBench.ownCopyIntact(cfg("--rejudge"), atOwnCopy = true, None, table) shouldBe None                  // a run before #237 recorded none
     AgentBench.ownCopyIntact(cfg("--model", "m", "--resume", "on"), atOwnCopy = true, Some("0" * 64), table) shouldBe None   // admit compares a resume's
   }
+
+  test("a Codex subject is priced at OpenAI's table: no client figure, its reasoning inside output, its caveats named (#239)") {
+    val openai = Pricing.load(root.resolve(Harness.Codex.defaultPrices)).unsafeRunSync()
+    openai.models.keySet shouldBe Set("gpt-6.1-sol", "gpt-6-astra")
+    val sol = ModelUsage.fromClient("gpt-6.1-sol", io.circe.parser.parse(
+      """{"inputTokens":13698,"outputTokens":377,"cacheReadInputTokens":37760,"cacheCreationInputTokens":0,"reasoningOutputTokens":60,"provider":"openai","costBasis":"none"}""").getOrElse(fail("json")))
+    sol.costUsd shouldBe None
+    // The smoke subject smoke239-sol-1: 13,698 uncached x 2 + 37,760 cached x 0.1 + 377 output x 10, per million.
+    openai.price(Vector(sol)).usd shouldBe Some(BigDecimal("0.034942"))
+    ModelUsage.totals(Vector(sol, sol)).map(_._3) shouldBe Vector(None)
+    Pricing.caveats(io.circe.parser.parse("""{"long_context_responses":2,"service_tier":"priority"}""").getOrElse(fail("json"))) shouldBe Vector(
+      "2 responses over 272K input tokens, priced at the short-context rate", "service tier priority, priced at the standard rate")
+    Pricing.caveats(io.circe.parser.parse("""{"long_context_responses":0}""").getOrElse(fail("json"))) shouldBe Vector.empty
+  }
 }
+

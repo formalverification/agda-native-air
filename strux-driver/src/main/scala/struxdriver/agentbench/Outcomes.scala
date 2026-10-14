@@ -90,7 +90,7 @@ final case class Outcome(
   turns:             Int,
   toolCalls:         Vector[(String, Int)],
   wallMs:            Long,
-  costUsd:           Double,
+  costUsd:           Option[Double],
   tokens:            Json,
   permissionDenials: Int,
   isolation:         Option[Isolation],
@@ -119,9 +119,10 @@ final case class Outcome(
   /** Solved with the original's proof in view before the last edit (issue #188). */
   def solvedOriginalInView: Boolean = solved && original.exists(_.seen)
   // An absent value is dropped, except `original`, whose null states that the
-  // row names no original (issue #188), which is not the same as `false`, and
+  // row names no original (issue #188), which is not the same as `false`,
   // `pricedCostUsd`, whose null states that the row could not be priced
-  // (issue #237), which is not the same as free.
+  // (issue #237), which is not the same as free, and `costUsd`, whose null
+  // states that the client reports no cost (a Codex row, issue #239).
   def toJson: Json = Json.fromFields(Vector(
     "benchmarkId"         -> entry.id.asJson,
     "difficulty"          -> entry.difficulty.tag.asJson,
@@ -167,7 +168,7 @@ final case class Outcome(
     "transcriptPath"      -> transcriptPath.asJson,
     "lastWords"           -> lastWords.asJson,
     "rateLimit"           -> rateLimit.asJson
-  ).filter { case (k, v) => k == "original" || k == "pricedCostUsd" || !v.isNull })
+  ).filter { case (k, v) => k == "original" || k == "pricedCostUsd" || k == "costUsd" || !v.isNull })
 }
 
 object Outcome {
@@ -176,9 +177,9 @@ object Outcome {
     * priced cost is what the caller knows (`spent`): nothing for a subject
     * that never spawned, unread otherwise.
     */
-  def anomaly(entry: IndexEntry, msg: String, wallMs: Long, spent: Priced): Outcome =
+  def anomaly(entry: IndexEntry, msg: String, wallMs: Long, spent: Priced, cost: Option[Double] = Some(0.0)): Outcome =
     Outcome(entry, solved = false, restated = false, None, Vector.empty, Vector.empty, "anomaly", 0, Vector.empty,
-      wallMs, 0.0, Json.obj(), 0, None, "none", "none", None, None, None, None, Vector.empty, None,
+      wallMs, cost, Json.obj(), 0, None, "none", "none", None, None, None, None, Vector.empty, None,
       "unavailable: anomaly", Some(msg), None, None, "", None,
       if (Gates.originalOf(entry.module, entry.hole, entry.tags).tagged) Some(OriginalReading.unread(None)) else None,
       Vector.empty, spent, Vector.empty, Vector.empty)
@@ -216,13 +217,14 @@ object Outcomes {
   def judged(layout: RunLayout, o: Outcome, rows: Vector[AttemptRow]): Judged =
     Judged(o, fixtureRow(layout, o), rows)
 
-  def anomaly(layout: RunLayout, entry: IndexEntry, msg: String, spent: Priced): Judged =
-    judged(layout, Outcome.anomaly(entry, msg, 0L, spent), Vector.empty)
+  def anomaly(layout: RunLayout, entry: IndexEntry, msg: String, spent: Priced, cost: Option[Double] = Some(0.0)): Judged =
+    judged(layout, Outcome.anomaly(entry, msg, 0L, spent, cost), Vector.empty)
 
   /** The anomaly rules of the header, first that applies. */
   def anomalyOf(t: Transcript, iso: Isolation, verdict: Verdict, terminal: String): Option[String] = {
     val capped = t.result.exists(r => r.subtype.contains("max_turns") || r.subtype.contains("budget"))
     if (t.init.isEmpty) Some("no init record: the subject never started (see stderr.log)")
+    else if (t.init.exists(_.adapterAnomaly.isDefined)) t.init.flatMap(_.adapterAnomaly)
     else if (iso.arm.hasServer && !iso.mcpConnected) Some("agda server not connected in the subject's session")
     else if (iso.toolsDeferred) Some("agda tools were presented as deferred names")
     else if (iso.arm.hasServer && iso.missingAgdaTools.nonEmpty) Some(s"agda tools missing from the session: ${iso.missingAgdaTools.mkString(",")}")
@@ -288,13 +290,19 @@ object Outcomes {
     for {
       obligation <- TextIO.read(obFile)
       finalText  <- TextIO.read(finalFile)
-      stream     <- TextIO.read(subj.transcript).handleError(_ => "")
       record     <- TextIO.readJson(subj.runRecord).map(_.flatMap(SubjectRun.fromJson))
       // The arm and the roots are the subject's own record; an archive made
       // before that record existed is the server-only arm confined to the
       // work directory its server config names, so a copy of either re-judges
       // as the original.
       rec        <- TextIO.readJson(subj.record).map(_.flatMap(SubjectRecord.fromJson))
+      harness     = rec.map(_.harness).getOrElse(Harness.Claude)
+      // A record naming a harness this code does not know is read as neither.
+      unknown     = rec.flatMap(_.unknownHarness)
+      // A Codex subject's transcript is derived from its archived records
+      // here, the one place, in a fresh run and a re-judge alike (issue #239).
+      _          <- if (harness == Harness.Codex && unknown.isEmpty) CodexArchive.derive(layout, subj, record) else IO.unit
+      stream     <- TextIO.read(subj.transcript).handleError(_ => "")
       legacyWork <- TextIO.readJson(subj.mcpConfig).map(_.flatMap(Audit.workDirOf).getOrElse(layout.workDir(entry.id)))
       arm         = rec.map(_.arm).getOrElse(cfg.arm)
       // The subset a subject was shown is its own record's (issue #191): a
@@ -306,12 +314,12 @@ object Outcomes {
       t           = Transcript.parse(stream)
       killed      = record.exists(_.killed)
       wallMs      = record.map(_.wallMs).getOrElse(t.result.map(_.durationMs).getOrElse(0L))
-      iso         = Audit.isolation(t, arm, roots, expose)
+      iso         = Audit.isolation(t, arm, roots, expose, harness)
       terminal    = Audit.terminalOf(killed, t.result)
       verdict    <- Judge.judge(entry, obligation, finalText, goldFile, finalFile, agda, cfg.projectRoot, cfg.safe, cfg.serverTimeout.seconds)
       gate        = if (!iso.confined) Some(GateFailure("isolation", (iso.foreignToolUses.map(n => s"tool $n") ++ iso.violations).mkString("; ")))
                     else verdict.gate
-      anomaly     = anomalyOf(t, iso, verdict, terminal)
+      anomaly     = unknown.map(h => s"subject.json names harness $h, which this harness cannot read").orElse(anomalyOf(t, iso, verdict, terminal))
       // An anomaly is not a result: a row the harness could not measure
       // properly is never published as a solve or a restatement, whatever
       // the file itself earned.
@@ -332,7 +340,7 @@ object Outcomes {
         turns             = t.result.map(_.numTurns).getOrElse(0),
         toolCalls         = t.toolCounts,
         wallMs            = wallMs,
-        costUsd           = t.result.map(_.costUsd).getOrElse(0.0),
+        costUsd           = t.result.map(_.costUsd).getOrElse(if (harness == Harness.Claude && unknown.isEmpty) Some(0.0) else None),
         tokens            = t.result.map(_.tokens).getOrElse(Json.obj()),
         permissionDenials = t.result.map(_.permissionDenials).getOrElse(0),
         isolation         = Some(iso),
@@ -368,7 +376,7 @@ object Outcomes {
                       case Some(false) => "unseen"
                       case None        => "unread"
                     }))
-      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=$$${outcome.costUsd}%.3f priced=${priced.usd.fold("?")(u => f"$$${u.toDouble}%.3f")} terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}${if (redacted.isEmpty) "" else s"  CREDENTIALS REDACTED: ${redacted.mkString(",")}"}")
+      _          <- IO.println(f">> ${entry.id}%-36s ${if (solved) "SOLVED" else if (restated) "RESTATED" else gate.map(g => s"gate:${g.gate}").getOrElse("unsolved")}%-20s turns=${outcome.turns}%3d calls=${outcome.toolCallsTotal}%3d via=${outcome.via}%-5s verdict=${outcome.verdictVia}%-5s cost=${outcome.costUsd.fold("-")(c => f"$$$c%.3f")} priced=${priced.usd.fold("?")(u => f"$$${u.toDouble}%.3f")} terminal=${outcome.terminal}${t.rateLimitMax.fold("")(u => f" window=$u%.2f")}$seen${anomaly.fold("")(a => s"  ANOMALY: $a")}${if (redacted.isEmpty) "" else s"  CREDENTIALS REDACTED: ${redacted.mkString(",")}"}")
     } yield judged(layout, outcome, Audit.attemptRows(entry, workDir.resolve(s"$stem.agda"), t, subj.transcriptRel))
   }
 }

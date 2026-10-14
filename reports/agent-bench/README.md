@@ -156,8 +156,8 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    that the turn and wall caps are the ones that bind (the value is in its
    protocol like any cap), and the report's `pricing.clientCostBasis` says
    which basis the client used.  This covers the `claude -p` subject; a
-   subject of another harness (a Codex subject, [#239]) has the bounds that
-   harness offers, and its run's section says which ones bind.
+   Codex subject ([#239]) has no client caps, and the harness enforces all
+   three (the next section).
 +  **Cost, priced** ([#237]).  Beside the client's `costUsd`, every row
    carries `pricedCostUsd`: what each model the session called spent, from
    the result record's `modelUsage`, priced at a table the run names
@@ -270,6 +270,147 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
    change to the audit, and the rule is that every arm of a comparison is
    re-judged under one audit, which costs no sweep.
 
+## A Codex subject (from [#239])
+
+`--harness codex` makes each subject one `codex exec --json` session (Codex
+CLI 0.162.1) instead of a `claude -p` one, for OpenAI's models, which have no
+Anthropic-compatible endpoint.  A Codex row measures the harness with the
+model, as every other row measures Claude Code with its model; no number it
+yields is the model's alone, and a sentence that quotes one says so.  The
+judge, the caps' values, the prompts' rules, and the fixtures are the Claude
+subject's.  `protocol.json` names the harness and its version (`harness`,
+`harnessVersion`; a protocol recorded before [#239] reads as `claude`), as
+each Codex subject's `subject.json` and init record do.  What differs is as
+follows:
+
++  **The instrument is the `mcp` arm's**.  A Codex run is the `mcp` arm, one
+   subject at a time.  Codex's shell is off (`features.shell_tool = false`): a
+   shell reaches the libraries' sources by search, which is the instrument the
+   `mcp` arm withholds ([#162]).  The subject's Read is `read`, the one tool of
+   a second MCP server, `files` (`scripts/python/bench_read_server.py`),
+   confined to the work directory and the read roots, numbering its lines from
+   1; its Edit is Codex's `apply_patch`, whose writes the sandbox confines to
+   the work directory.  The agda server is the Claude subject's, byte for
+   byte.  The system prompt (`agentbench/codex/system-prompt-mcp.md`) differs
+   from Claude's in the sentence that names the tools and says there is no
+   shell.
++  **What the model is shown**.  Both servers' tools are top-level function
+   tools with their full JSON schemas (`omit_tools_from = ["deferred",
+   "code_mode"]`), presented eagerly, one model step per call, as a Claude
+   subject's are.  Claude Code cuts a server's descriptions and instructions at
+   2,048 characters ([#191]) and Codex does not, so a Codex subject reads
+   agda-mcp's descriptions whole.  The catalog makes Codex a code-mode harness
+   for these models: `apply_patch` is a function inside the JavaScript `exec`
+   tool, beside three MCP-resource functions and a clock, and `exec`, `wait`,
+   and `request_user_input_async` are presented beside the servers' tools,
+   which the isolation gate admits for this harness alone
+   (`Harness.fixedSurface`); `exec` reaches no file and starts no process.
+   Codex's environment, permissions, and collaboration-mode context blocks are
+   off, so the model's input is three blocks: Codex's base instructions, the
+   system prompt as `developer_instructions`, and the user prompt.  What was
+   presented is read from Codex's own trace of its first request
+   (`codex-surface.json`), not inferred.
++  **Nothing of the operator's**.  Each subject gets a fresh `CODEX_HOME`
+   outside the run directory (`.codex-homes/<run-id>/<id>` beside it), removed
+   afterward unless `--persist-sessions` is on.  It holds the configuration the
+   harness wrote (`prompts/codex-config.toml` is its template; Codex runs with
+   `--strict-config`, so a key it does not know refuses the subject) and
+   `auth.json` as a symbolic link to the operator's login, so no token is
+   copied and a refreshed one lands in the operator's file.  AGENTS.md
+   discovery, skills, plugins, apps, hooks, memories, web search, and agents
+   are off, and the model catalog is the run's pinned copy
+   (`codex-models.json`, from `data/benchmarks/codex-models.json`), never
+   fetched.  The sandbox is a named permission profile: the system directories
+   (`:minimal`), the work directory writable, Codex's own package readable,
+   the network off.  The environment is the harness's less every `CLAUDE*`,
+   `OPENAI*`, `CODEX*`, and `ANTHROPIC*` variable, `RUST_LOG` (at `info`,
+   Codex logs the account's e-mail address), and `LD_LIBRARY_PATH`.
++  **Effort**.  An OpenAI model takes a reasoning effort, which a Claude
+   subject is not given; `--effort` sets it, the default is the catalog's for
+   the model, and `protocol.json` records it.
++  **Caps, enforced by the harness**.  Codex has no turn or budget cap, so the
+   harness reads the session's rollout as Codex writes it and interrupts the
+   subject (SIGINT, which `codex exec` ends as an interrupted turn) once it
+   has made `maxTurns` model responses, or once their tokens (a compaction's
+   included) cost `maxBudgetUsd` at the run's price table; the wall cap is the
+   same kill as a Claude subject's, and counts the servers' start as a Claude
+   subject's does (Codex waits up to 600 s for agda's handshake, which took
+   63 s on a loaded machine).  As Claude Code's `--max-turns` does, the
+   stop waits until the last response's calls have returned, since agda-mcp's
+   `fill_hole` edits the work file in place and restores it only when it
+   returns, and it never interrupts a response that called nothing, which is
+   the turn ending on its own.  A code-mode cell that yielded counts as
+   returned: under this protocol a cell reaches only `apply_patch` and Codex's
+   own resource tools, never an agda tool.  A stop can lag its cap by a
+   response, never land early: when the poll misses the moment between two
+   responses, when a response called nothing without ending the turn, or when
+   Codex never recorded a compaction's summary, which then counts as a
+   response.  The protocol's `capsEnforced` names who enforced each cap
+   (`client` for a Claude run's turns and budget, `harness` for all three
+   here), and a stopped subject's `terminal` is `max_turns` or `budget`, as a
+   Claude subject's is; a subject ended while `fill_hole` or `get_goal` was
+   running is an anomaly, since its final file is not known to be its own.
++  **The transcript is derived**.  The adapter (`CodexTranscript`, version 1)
+   writes `transcript.jsonl` in the client's `stream-json` schema from three
+   files the subject leaves, archived beside it: `codex-events.jsonl` (the
+   `--json` event stream), `codex-rollout.jsonl` (Codex's session log, with
+   the account's identifiers dropped and the base instructions and encrypted
+   reasoning replaced by their digest and length), and `codex-surface.json`.
+   One model response is one assistant turn with its tokens; a compaction is
+   no turn, but its tokens are in the row's usage and price.  A call is named
+   as the judge expects: an agda tool as `mcp__agda__<tool>`, the `files`
+   server's `read` as `Read`, and each hunk of an `apply_patch` as an `Edit`
+   of the file it names, the hunks of one patch counting as one call; a patch
+   Codex refused before applying it is one failed `Edit`, as a Claude
+   subject's refused Edit is, of the files the refusal names, else of every
+   file the cell's patches name.  Calls are in the order the response issued
+   them.  A call's result is the text the model was shown, cut to the model's
+   budget, and a server call Codex never completed (a stop, arguments that
+   were no JSON) is a failed call of its response.  A re-judge derives the
+   transcript again from the archived files, so a fix to the adapter reaches
+   every archived Codex row at no model cost.  A subject whose records disagree
+   (a required server that did not start, a rollout shorter than the event
+   stream, no trace of the first request, a version, model, or effort other
+   than the protocol's, a model the backend rerouted, a system prompt missing
+   from the model's input, a nested call whose response cannot be told) is an
+   anomaly that names the reason, never a row.
++  **Cost, and the usage windows**.  On a ChatGPT login a Codex session is
+   billed against the plan's five-hour and weekly windows, not per token, so a
+   Codex row's client figure, `costUsd`, is `null` (`costBasis: "none"` in its
+   `modelUsage`), and `pricedCostUsd` is the list price of the tokens Codex
+   reported, at `data/benchmarks/prices-openai.json` (OpenAI's API prices;
+   Codex reports cache writes as 0, so the figure is at most 20 % under on
+   written tokens).  A row's `rateLimit` carries the windows' percentages after
+   it.  The harness launches no further subject once the five-hour window
+   reaches 95 % or the weekly one 97 %, after a usage limit or a failed login,
+   after two subjects in a row that did not start (a required server, or Codex
+   itself) or that the harness failed on after launching them, and while the
+   account holds ChatGPT credits (which a run would spend) unless
+   `--allow-credits` is on; the rows it did not launch are anomalies (`not
+   run`, with the reason), and a `--resume` launches them, with
+   `--allow-credits on` when that was the reason.
++  **Credentials**.  Besides the environment's, the login's own values (its
+   tokens, account identifier, and e-mail address, read from `auth.json` in
+   memory only) are replaced in everything a subject wrote, searched for in
+   the run directory when the report is written, and searched for by `make
+   agent-bench-archive`, which refuses a run directory holding one, and
+   refuses a Codex run (one whose protocol or report names the harness) when
+   the search cannot run (no `jq`, or no login to read;
+   `AGENT_BENCH_ARCHIVE_NO_LOGIN=1` archives a run whose login is gone, with a
+   warning).  The archive searches for the login as it is then: a token
+   refreshed since the run is searched for by the run's own scrub, which reads
+   the login again after every subject, and not by the archive.  A login of
+   another kind than a ChatGPT login or an API key (an access token, an agent
+   identity) is refused at start, since its secrets are not the ones searched
+   for.
++  **A resume, and a re-judge**.  A `--resume` across harnesses is refused in
+   one line naming the change (`harness: "claude" -> "codex"`) rather than
+   every field the two protocols do not share; within a Codex run,
+   `--allow-credits` and `--persist-sessions` may change, since neither
+   changes what a subject sees or how it is judged.  `make agent-bench-rejudge`
+   re-judges a Codex run as it does any other, with no flag, since the run's
+   protocol names its harness.
+
 ## What a run directory holds
 
 | path | contents |
@@ -281,12 +422,14 @@ repository, is [`docs/reading-the-results.md`](../../docs/reading-the-results.md
 | `results.jsonl` | one `eval-proof-completion.v0` attempt row per `fill_hole` the subject probed, the refused ones included: a reply that was an error (no hole at the address the call named, or no address) or that the strict reader could not decode is a row with `status` `crash`, `elapsedMs` 0, and `rc` -1, the reader's defaults, with no `agda` run behind it (`Audit.attemptRows`); a run whose subjects never called `fill_hole`, such as every `shell` arm, has an empty file |
 | `fixtures.jsonl` | one `eval-proof-completion.v0` fixture row per obligation, plus `restated`, `gate`, and `terminal` |
 | `prompts/` | the system prompt and the user-prompt template, verbatim |
-| `subjects/<id>/transcript.jsonl` | the client's `stream-json` output: every tool call with its result, the model's text, the init and result records |
+| `subjects/<id>/transcript.jsonl` | the client's `stream-json` output: every tool call with its result, the model's text, the init and result records (a Codex subject's is derived in that schema from its own records, below) |
 | `subjects/<id>/final/<Stem>.agda` | the file as the subject left it, which is what was judged |
 | `subjects/<id>/outcome.json` | the judge's verdict and the transcript audit for that row, with its `original` block: the restated lemma's file, whether its proof was in view before the last edit (`inView`, `how`, `at`, the call's index from 0), and the successful and refused calls that named the file (`reads`, `refusedReads`); `null` on a row with no original |
 | `subjects/<id>/subject.json` | the arm the subject ran under, the roots its tools and commands were allowed, which is what a re-judge audits against, and the `endpoint` block that served it (from [#237]) |
 | `subjects/<id>/mcp.json`, `prompt.txt`, `system-prompt.txt`, `run.json` | the subject's server configuration (an arm with the server), its two rendered prompts, and how its process ended (`run.json`: exit code, wall, whether the wall cap killed it, and from [#237] when it started and the credential variables whose values were replaced in what it wrote) |
 | `subjects/<id>/stderr.log` | the client's standard error, archived when it is not empty; this is what an anomaly message means by "see stderr.log" |
+| `codex-models.json`, `prompts/codex-config.toml`, `prompts/codex-base-instructions-<sha12>.md` | a Codex run's pinned model catalog, the template of its subjects' configuration, and Codex's base instructions, once per digest (from [#239]) |
+| `subjects/<id>/codex-events.jsonl`, `codex-rollout.jsonl`, `codex-surface.json`, `codex-config.toml` | a Codex subject's own records, from which its `transcript.jsonl` is derived: the `--json` event stream, Codex's session log (filtered), what its first request presented, and the configuration it ran under (from [#239]) |
 
 A subject that ended early has only what it wrote: the archive copies each of
 these when it exists, so a run with anomalous rows archives like any other.
@@ -319,7 +462,11 @@ predate the `pricedCostUsd` field ([#237]).  The exception is Sonnet 5.5
 (the `*sonnet55*` rows), which client 2.1.282 cannot price: its column is
 priced from each subject's `modelUsage` at the committed table's
 `claude-sonnet-5-5` row, with the client's figure beside it.  A run on another
-endpoint quotes `totals.pricedCostUsd` there instead, at the table it names.
+endpoint quotes `totals.pricedCostUsd` there instead, at the table it names,
+and so does a Codex run (the `*239*` rows, [#239]), whose client reports no
+cost: it is the list price of the tokens Codex reported, at OpenAI's table.  A
+Codex row measures Codex CLI with the model, as every other row measures
+Claude Code with its model, so no figure in it is the model's alone.
 
 | run id | arm | model | date | header hints | obligations | solved | restated | original in view (of agda-algebras solves) | anomalies | turns | tool calls | cost (USD, list) | quoted in |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -395,6 +542,7 @@ endpoint quotes `totals.pricedCostUsd` there instead, at the table it names.
 | `suite236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 55 | 37 | 1 | 0 of 4 | 0 | 270 | 215 | 3.78 | the guide's § 4.8, [#236] |
 | `comp236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 12 (composition) | 4 | 0 | no original | 0 | 109 | 97 | 2.07 | the guide's § 4.8, [#236] |
 | `hard236-opus55-mcp-1` | `mcp` | `claude-opus-5-5` | 2026-10-13 | none | 14 (hard tier) | 10 | 0 | no original | 0 | 118 | 104 | 2.51 | the guide's § 4.8, [#236] |
+| `smoke239-sol-2` | `mcp`, Codex CLI 0.162.1 at effort `low` | `gpt-6.1-sol` | 2026-10-13 | none | 1 | 1 | 0 | 0 of 0 | 0 | 4 | 3 | 0.05 (priced; Codex reports none) | the Codex subject's smoke, [#239] |
 
 The column "original in view" is the judge's `original` reading ([#188]):
 of the run's agda-algebras solves, the number whose restated lemma's own

@@ -65,23 +65,34 @@ final case class ToolResult(toolUseId: String, isError: Boolean, text: String, r
   def reply: ToolReply = ToolReply(isError, text)
 }
 
-/** The `system/init` record: the client's view of the session at start. */
+/** The `system/init` record: the client's view of the session at start.
+  * The last three come only from a Codex subject's derived transcript
+  * (issue #239): its harness, whether the server's tools were deferred as
+  * the first request presented them, and what its adapter found wrong.
+  */
 final case class InitRecord(
   tools:          Vector[String],
   mcpServers:     Vector[(String, String)], // (name, status)
   model:          Option[String],
   version:        Option[String],
-  permissionMode: Option[String]
+  permissionMode: Option[String],
+  harness:        Option[String]  = None,
+  deferred:       Option[Boolean] = None,
+  adapterAnomaly: Option[String]  = None
 )
 
-/** The `result` record: how the session ended and what it cost. */
+/** The `result` record: how the session ended and what it cost.  The
+  * client's cost is None only when the client reports none (a Codex
+  * subject, issue #239); a Claude record without the field reads 0, as
+  * every archived one did.
+  */
 final case class ResultRecord(
   subtype:           String,
   isError:           Boolean,
   numTurns:          Int,
   durationMs:        Long,
   durationApiMs:     Option[Long],
-  costUsd:           Double,
+  costUsd:           Option[Double],
   usage:             Json,
   permissionDenials: Int,
   text:              String,
@@ -119,9 +130,15 @@ final case class Transcript(
 
   def resultOf(u: ToolUse): Option[ToolResult] = results.get(u.id)
 
-  /** Calls per tool name, in first-seen order of the names. */
+  /** Calls per tool name, in first-seen order of the names.  The uses one
+    * Codex call was derived into (the hunks of one patch) carry its id as
+    * `codex_call` and count once; a Claude use carries none.
+    */
   def toolCounts: Vector[(String, Int)] =
-    uses.map(_.name).distinct.map(n => n -> uses.count(_.name == n))
+    uses.map(_.name).distinct.map { n =>
+      val named = uses.filter(_.name == n)
+      n -> (named.count(_.str("codex_call").isEmpty) + named.flatMap(_.str("codex_call")).distinct.size)
+    }
 
   def usesOf(name: String): Vector[ToolUse] = uses.filter(_.name == name)
 
@@ -135,7 +152,7 @@ final case class Transcript(
     * deferred presentation lists the names in a user-side reminder.
     */
   def toolsDeferred: Boolean =
-    userTexts.exists(t => t.contains("deferred") && t.contains("mcp__agda__"))
+    init.flatMap(_.deferred).getOrElse(userTexts.exists(t => t.contains("deferred") && t.contains("mcp__agda__")))
 }
 
 object Transcript {
@@ -164,8 +181,11 @@ object Transcript {
                 tools          = c.downField("tools").as[Vector[String]].getOrElse(Vector.empty),
                 mcpServers     = servers,
                 model          = c.get[String]("model").toOption,
-                version        = c.get[String]("claude_code_version").toOption,
-                permissionMode = c.get[String]("permissionMode").toOption)))
+                version        = c.get[String]("claude_code_version").toOption.orElse(c.get[String]("codex_version").toOption),
+                permissionMode = c.get[String]("permissionMode").toOption,
+                harness        = c.get[String]("harness").toOption,
+                deferred       = c.get[Boolean]("deferred").toOption,
+                adapterAnomaly = c.get[String]("adapterAnomaly").toOption)))
             case "assistant" =>
               val blocks = c.downField("message").downField("content").focus.flatMap(_.asArray).getOrElse(Vector.empty)
               val uses = blocks.flatMap { b =>
@@ -203,18 +223,21 @@ object Transcript {
                 .getOrElse(0.0)
               acc.copy(rateLimits = acc.rateLimits :+ ((info.get[String]("status").getOrElse("?"), util)))
             case "result" =>
+              val usages = c.downField("modelUsage").focus.flatMap(_.asObject).toVector
+                             .flatMap(_.toVector.map { case (m, u) => ModelUsage.fromClient(m, u) })
               acc.copy(result = Some(ResultRecord(
                 subtype           = c.get[String]("subtype").getOrElse("?"),
                 isError           = c.get[Boolean]("is_error").getOrElse(false),
                 numTurns          = c.get[Int]("num_turns").getOrElse(0),
                 durationMs        = c.get[Long]("duration_ms").getOrElse(0L),
                 durationApiMs     = c.get[Long]("duration_api_ms").toOption,
-                costUsd           = c.get[Double]("total_cost_usd").getOrElse(0.0),
+                // No figure only when the client reports none (issue #239).
+                costUsd           = c.get[Double]("total_cost_usd").toOption
+                                      .orElse(if (usages.nonEmpty && usages.forall(_.costUsd.isEmpty)) None else Some(0.0)),
                 usage             = c.downField("usage").focus.getOrElse(Json.obj()),
                 permissionDenials = c.downField("permission_denials").focus.flatMap(_.asArray).map(_.size).getOrElse(0),
                 text              = c.get[String]("result").getOrElse(""),
-                modelUsage        = c.downField("modelUsage").focus.flatMap(_.asObject).toVector
-                                      .flatMap(_.toVector.map { case (m, u) => ModelUsage.fromClient(m, u) }))))
+                modelUsage        = usages)))
             case _ => acc
           }
           next.copy(records = next.records + 1)

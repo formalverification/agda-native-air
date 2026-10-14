@@ -13,8 +13,10 @@
   *  `--expose`, a subset of the server's surface), the price table the
   *  report prices tokens at (issue #237: `--prices`), the endpoint the
   *  subjects are served by (issue #237: read from the environment they
-  *  inherit, never from an argument), and the two modes that need less
-  *  (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
+  *  inherit, never from an argument), the harness the subjects are (issue
+  *  #239: `--harness codex`, with `--codex-bin`, the pinned model catalog
+  *  `--codex-catalog`, `--effort`, and `--allow-credits`), and the two
+  *  modes that need less (`--rejudge`) or skip archived work (`--resume`).  Parsing is strict
   *  in the LoopHarness style: unknown flags are refused by name, exactly one
   *  of `--ids` and `--all` is required, and an `--ids` that names nothing is
   *  refused at once rather than an hour into a sweep.  Pinned by
@@ -53,7 +55,12 @@ final case class AgentBenchConfig(
   rejudge:         Boolean,
   resume:          Boolean,
   prices:          Option[Path],
-  env:             SubjectEnv
+  env:             SubjectEnv,
+  harness:         Harness = Harness.Claude,
+  codexBin:        String = "codex",
+  codexCatalog:    Option[Path] = None,
+  effort:          Option[String] = None,
+  allowCredits:    Boolean = false
 ) {
   def layout: RunLayout = RunLayout(outDir.resolve(runId))
 
@@ -96,16 +103,25 @@ object Cli {
       |    [--server-timeout N]      per-Agda-call bound, seconds (default 600)
       |    [--rejudge]               re-judge an existing run root from subjects/ with its own prompts; no model call (the server and the extractor are still needed)
       |    [--resume on|off]         keep the archived, non-anomalous subjects of this run id and run only the rest (default off); refused when the run id's recorded protocol differs
+      |    [--harness claude|codex]  the subjects' harness (default claude); codex runs the mcp arm only, one subject at a time
+      |    [--codex-bin PATH]        the codex CLI (default: codex on PATH)
+      |    [--codex-catalog PATH]    the pinned Codex model catalog (default data/benchmarks/codex-models.json)
+      |    [--effort LEVEL]          the Codex model's reasoning effort (default: the pinned catalog's default for the model); codex only
+      |    [--allow-credits on|off]  let a Codex sweep run on an account that holds ChatGPT credits (default off: it stops)
       |    [--prices PATH]           the price table each subject's tokens are priced at, beside the client's own figure (default: data/benchmarks/prices-anthropic.json for a fresh run; for a re-judge the run's own prices.json, or that table for a run with none); required when ANTHROPIC_BASE_URL names another host (a resume with its own prices.json excepted), where a fresh run whose --model has no row in it is refused
       |  The endpoint is the environment's: ANTHROPIC_BASE_URL and the client's model variables, exported around the run, reach the subjects and are recorded in protocol.json.
       |""".stripMargin
 
   private val known = Set("index", "ids", "out-dir", "run-id", "project-root", "server-bin", "model", "corpus-stdlib",
     "corpus-algebras", "max-turns", "wall-cap", "max-budget-usd", "parallelism", "safe", "persist-sessions",
-    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm", "expose", "prices")
+    "claude-bin", "agda-flags", "server-timeout", "resume", "agda-json-bin", "arm", "expose", "prices",
+    "harness", "codex-bin", "codex-catalog", "effort", "allow-credits")
 
   /** The price table a fresh run reads unless `--prices` names another, from the project root. */
-  val defaultPrices: String = "data/benchmarks/prices-anthropic.json"
+  val defaultPrices: String = Harness.Claude.defaultPrices
+
+  /** The pinned Codex model catalog a Codex run reads unless `--codex-catalog` names another. */
+  val defaultCodexCatalog: String = "data/benchmarks/codex-models.json"
 
   /** Parse the arguments; `env` is the harness's environment, which the
     * subjects inherit (less every CLAUDE* variable) and the endpoint is read
@@ -170,7 +186,19 @@ object Cli {
       expose  <- m.get("expose").fold[Either[String, Option[Vector[String]]]](Right(None))(s => exposeOf(s, arm).map(Some(_)))
       subjEnv  = SubjectEnv.of(env)
       prices   = m.get("prices").map(abs)
-      _       <- if (rejudge) Right(()) else credentialsFor(subjEnv)
+      harness <- m.get("harness").fold[Either[String, Harness]](Right(Harness.default))(Harness.parse)
+      credits <- onOff(m, "allow-credits", false)
+      // A Codex subject is the mcp arm's (issue #239: its shell is off), and
+      // one at a time, since every subject's login is the operator's one
+      // auth.json, whose refresh token a concurrent refresh would spend.
+      _       <- if (harness != Harness.Codex) Right(())
+                 else if (arm != Arm.Mcp) Left(s"--harness codex runs the mcp arm only, not ${arm.name}")
+                 else if (par != 1) Left(s"--harness codex runs one subject at a time, not --parallelism $par")
+                 else Right(())
+      _       <- if (harness == Harness.Claude && Vector("effort", "codex-bin", "codex-catalog", "allow-credits").exists(m.contains))
+                   Left("--effort, --codex-bin, --codex-catalog, and --allow-credits are the codex harness's")
+                 else Right(())
+      _       <- if (rejudge || harness == Harness.Codex) Right(()) else credentialsFor(subjEnv)
     } yield AgentBenchConfig(
       index           = abs(ix),
       ids             = ids,
@@ -196,7 +224,12 @@ object Cli {
       rejudge         = rejudge,
       resume          = resume,
       prices          = prices,
-      env             = subjEnv
+      env             = subjEnv,
+      harness         = harness,
+      codexBin        = m.getOrElse("codex-bin", "codex"),
+      codexCatalog    = if (harness == Harness.Codex) Some(abs(m.getOrElse("codex-catalog", defaultCodexCatalog))) else None,
+      effort          = m.get("effort"),
+      allowCredits    = credits
     )
   }
 
