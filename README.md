@@ -395,8 +395,10 @@ That would be a bug in how we have set this up, not a position we are defending.
 
 ## Citation
 
-Cite the repository by its name, its version and its URL, and, once the first
-release is archived, by its DOI.  [`CITATION.cff`](CITATION.cff) at the root
+[![DOI](https://zenodo.org/badge/1178223436.svg)](https://doi.org/10.5281/zenodo.23378574)
+
+Cite the repository by its name, its version and the version's DOI.
+[`CITATION.cff`](CITATION.cff) at the root
 holds the same metadata in machine-readable form, which GitHub's "Cite this
 repository" button and tools such as `cffconvert` read.
 
@@ -408,6 +410,7 @@ repository" button and tools such as `cffconvert` read.
                     intelligence reasoning environment},
          version = {0.2.0},
          year    = {2026},
+         doi     = {10.5281/zenodo.23378575},
          url     = {https://github.com/formalverification/agda-native-air},
          license = {Apache-2.0},
          note    = {Includes the agda-mcp server, version 0.2.0}
@@ -426,15 +429,17 @@ repository" button and tools such as `cffconvert` read.
    citation, not this one.
 
 Releases are tagged `vX.Y.Z` on this repository and archived on Zenodo, which
-mints a DOI for each release and a concept DOI for all of them; the concept
-DOI will be added here and to `CITATION.cff` when the first release is
-archived.  Each release's notes, the record of what it contains and why it was
-cut where it was, live under [`docs/releases/`](docs/releases/), one file per
-tag.  Until the DOI exists, cite the version and, for a reproducible
-reference, the commit.  A paper describing the environment is in preparation;
-until it appears, cite the software as above.  The people who did the work are
-the authors; the AI coding agents that assisted are named in commit messages
-and in the field reports under `docs/field-reports/`, and are not authors.
+mints a version DOI for each release and one concept DOI for all of them.  The
+version DOI of v0.2.0 is
+<https://doi.org/10.5281/zenodo.23378575>, and the concept DOI, which
+resolves to the latest release, is <https://doi.org/10.5281/zenodo.23378574>.
+Cite the version DOI of the release you used.  Each release's notes, the
+record of what it contains and why it was cut where it was, live under
+[`docs/releases/`](docs/releases/), one file per tag.  A paper describing the
+environment is in preparation; until it appears, cite the software as above.
+The people who did the work are the authors; the AI coding agents that
+assisted are named in commit messages and in the field reports under
+`docs/field-reports/`, and are not authors.
 
 ---
 
