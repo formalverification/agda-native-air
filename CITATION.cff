@@ -1,0 +1,35 @@
+# File: CITATION.cff
+#
+# The citation metadata of this repository, in the Citation File Format
+# (https://citation-file-format.github.io/), which GitHub's "Cite this
+# repository" button and tools such as cffconvert read.  Update `version`
+# and `date-released` at every tagged release, and add the Zenodo concept
+# DOI under `identifiers` when the first release has been archived.
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Agda-native AIR: an Agda-native artificial intelligence reasoning environment"
+abstract: >-
+  Interaction, retrieval and evaluation infrastructure that lets AI coding
+  agents work with the Agda proof assistant: AgdaDojang, programmatic access
+  to Agda proof states and hole filling; agda-mcp, a Model Context Protocol
+  server that exposes type checking, goal introspection, live scope, type
+  and definition queries and corpus search to any MCP client; agda-strux,
+  structured extraction of Agda libraries into retrieval-friendly corpus
+  data; and deterministic proof-completion benchmarks and reports.
+authors:
+  - family-names: DeMeo
+    given-names: William
+    email: williamdemeo@gmail.com
+license: Apache-2.0
+repository-code: "https://github.com/formalverification/agda-native-air"
+url: "https://github.com/formalverification/agda-native-air"
+version: 0.2.0
+date-released: "2026-10-14"
+keywords:
+  - Agda
+  - proof assistant
+  - Model Context Protocol
+  - AI-assisted theorem proving
+  - formal verification
+  - corpus extraction
