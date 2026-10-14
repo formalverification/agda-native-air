@@ -420,7 +420,7 @@ repository" button and tools such as `cffconvert` read.
    name the component and its version in the text, for instance "the
    `agda-mcp` server, version 0.2.0, of Agda-native AIR"; each component's
    version is in its own package file (`agda-mcp/agda-mcp.cabal`,
-   `agda-strux/agda-strux.cabal`).
+   `agda-strux/agda-json.cabal`).
 +  **A published corpus**: its dataset card under [`docs/corpora/`](docs/corpora/)
    gives the citation, the upstream commit and the license; cite the card's
    citation, not this one.
