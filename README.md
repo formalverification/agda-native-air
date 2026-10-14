@@ -428,11 +428,13 @@ repository" button and tools such as `cffconvert` read.
 Releases are tagged `vX.Y.Z` on this repository and archived on Zenodo, which
 mints a DOI for each release and a concept DOI for all of them; the concept
 DOI will be added here and to `CITATION.cff` when the first release is
-archived.  Until then, cite the version and, for a reproducible reference, the
-commit.  A paper describing the environment is in preparation; until it
-appears, cite the software as above.  The people who did the work are the
-authors; the AI coding agents that assisted are named in commit messages and
-in the field reports under `docs/field-reports/`, and are not authors.
+archived.  Each release's notes, the record of what it contains and why it was
+cut where it was, live under [`docs/releases/`](docs/releases/), one file per
+tag.  Until the DOI exists, cite the version and, for a reproducible
+reference, the commit.  A paper describing the environment is in preparation;
+until it appears, cite the software as above.  The people who did the work are
+the authors; the AI coding agents that assisted are named in commit messages
+and in the field reports under `docs/field-reports/`, and are not authors.
 
 ---
 
