@@ -15,11 +15,9 @@ modules under `Setoid.Decompositions` (factor pairs, products of congruences,
 indecomposability, decision procedures and a factorization theorem for finite
 algebras, the strict refinement property and unique factorization), a worked
 example that decides a factor pair by evaluation, and small additions to seven
-existing modules.  It also wrote one example module in a downstream private
-library that imports the new modules.  Everything was drafted in sections of
-20 to 150 lines and checked with `check_file` after each section; the library's
-own gates (`make check` and six others) ran on the command line at the end, and
-all passed.
+existing modules.  Everything was drafted in sections of 20 to 150 lines and
+checked with `check_file` after each section; the library's own gates (`make
+check` and six others) ran on the command line at the end, and all passed.
 
 +  **Tools used**.  `check_file` was the whole loop: 49 calls, 30 green on the
    first try and 19 red, each red one fixed in one or two edits.  A call took 2
@@ -29,14 +27,14 @@ all passed.
    No hole was opened: the definitions were small enough to write whole, so
    `get_goal`, `fill_hole`, and the search tools went unused.
 +  **What worked**.  One server served two checkouts.  It was launched from
-   the downstream library's worktree, whose library registry pointed at a
-   worktree of agda-algebras, and it answered for files in both, resolving each
-   file's root from its nearest `.agda-lib` (`rootSource: nearest-agda-lib`); so
-   a change spanning two libraries was developed in one session with no
-   restart.  The diagnostics were precise and structured: `AmbiguousName` listed
-   both candidates with the open that brought each into scope (seven of the 19
-   failures, all clashes between a setoid's `sym`, `refl`, or `reflexive` and
-   another module's, each fixed by a `renaming`);
+   the worktree of a library that depends on agda-algebras, whose registry
+   pointed at a worktree of agda-algebras, and it answered for files in both,
+   resolving each file's root from its nearest `.agda-lib` (`rootSource:
+   nearest-agda-lib`); so a change spanning two libraries was developed in one
+   session with no restart.  The diagnostics were precise and structured:
+   `AmbiguousName` listed both candidates with the open that brought each into
+   scope (seven of the 19 failures, all clashes between a setoid's `sym`,
+   `refl`, or `reflexive` and another module's, each fixed by a `renaming`);
    `ImpossibleConstructor.UnifyConflict` named the clause and suggested the
    absurd pattern; `NotInScope` gave a did-you-mean that was right each time.
 +  **What was awkward or missing**.  `UnsolvedMetaVariables` came back with

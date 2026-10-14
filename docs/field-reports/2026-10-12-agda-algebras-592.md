@@ -45,7 +45,7 @@ Lemma 1.3 and Corollary 1.12 of Freese, Ježek, and Nation and their Lemma 9.13.
    of `∈-filter⁻`; a where-bound lemma passed to `mkhom`, which needed
    `λ {f} → compatible {f}`).
 +  **`normalize` found a misprint in a paper**.  Normalizing `canonical a` for a
-   term from Freese's notes on Dean's problem returned a canonical term of a few
+   term taken from a set of published notes returned a canonical term of a few
    hundred lines of nested `suc`, unreadable.  A ten-line `show` function into
    `String`, written in a scratch module and normalized in its place, printed the
    form in the paper's notation in 13 s, and it differed from the form the notes
