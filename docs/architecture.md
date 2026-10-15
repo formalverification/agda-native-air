@@ -82,7 +82,7 @@ MCP tool interface.
 
 | Component | Layer | Status | Role |
 |-----------|-------|--------|------|
-| [`agda-mcp`](../agda-mcp/README.md) | Bridge | Implemented (v0.2.0) | MCP server exposing Agda proof-state interaction and corpus search to any MCP-compatible agent. |
+| [`agda-mcp`](../agda-mcp/README.md) | Bridge | Implemented (v0.3.0 on `main`; v0.2.0 is the latest release) | MCP server exposing Agda proof-state interaction and corpus search to any MCP-compatible agent. |
 | [`agda-dojang`](../agda-dojang/README.md) | Interaction | Implemented | Repo-local Agda library (`AgdaDojang.Debug` reflection macros) plus a Python proof-completion harness; realizes goal inspection, hole filling, and diagnostics. |
 | [`agda-strux`](../agda-strux/README.md) | Retrieval (extraction) | Implemented | Haskell backend linking Agda-as-a-library; its `agda-json` executable emits canonical JSONL from Agda source. |
 | [`strux-driver`](../strux-driver/README.md) | Retrieval (ETL) | Implemented | Scala driver that runs `agda-json`, validates and transforms its JSONL, and hosts the benchmark runner (`struxdriver.benchmark`) and the proof search (`struxdriver.search`, its own row below). |
@@ -102,7 +102,8 @@ MCP tool interface.
    JSON-RPC on stdio; an optional agda-strux JSONL corpus via `--corpus`.
 +  **Outputs**.  Structured tool results: goal/context, typecheck verdicts,
    diagnostics, and search hits.
-+  **Status**.  v0.2.0.  Thirteen tools: four proof-state (`get_goal`, `fill_hole`,
++  **Status**.  v0.3.0 on `main`, unreleased; the latest release is v0.2.0.
+   Thirteen tools: four proof-state (`get_goal`, `fill_hole`,
    `check_file`, `get_diagnostics`), the whole-project gate (`check_project`,
    which runs the project's own `make` target or `Everything` module and never
    misreports its exit code), five live-query tools (`type_of`, `normalize`,

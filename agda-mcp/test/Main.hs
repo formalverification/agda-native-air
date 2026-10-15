@@ -87,6 +87,8 @@ import System.Posix.Files (createNamedPipe, ownerReadMode, ownerWriteMode, union
 import System.Posix.Signals (killProcess, signalProcess)
 import System.FilePath ((</>), takeDirectory, takeFileName)
 import System.IO (hPutStrLn, stderr)
+import Data.Version (showVersion)
+import qualified Paths_agda_mcp as Paths
 
 import AgdaMCP.Agda
   ( parseGoalContext , defaultConfig
@@ -5950,6 +5952,17 @@ exposeProcessTests exe = do
 
     , runTest "wire: tools/list presents exactly the exposed tools" $
         assertEqual "names" ["check_file", "type_of"] names
+
+    , -- The version is written once, in agda-mcp.cabal (issue #281): a literal
+      -- in Main that drifted from it, as 0.2.0 outlived #248 on main, fails here.
+      runTest "wire: serverInfo.version and the startup line report the package's version (#281)" $
+        let v = showVersion Paths.version in allOf
+          [ case resultOf 1 out >>= KM.lookup "serverInfo" of
+              Just (Aeson.Object si) ->
+                assertEqual "serverInfo.version" (Just (Aeson.String (T.pack v))) (KM.lookup "version" si)
+              other -> pure (Fail ("serverInfo was " <> show other))
+          , assert ("stderr was: " <> take 300 err) (("agda-mcp v" <> v <> " starting") `isInfixOf` err)
+          ]
 
     , runTest "wire: initialize carries instructions naming the exposed tools alone" $
         case instr of

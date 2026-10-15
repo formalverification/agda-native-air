@@ -876,7 +876,7 @@ Type or paste a JSON-RPC request (one per line) to stdin; e.g.,
 You should see a JSON response immediately on the next line; e.g.,
 
 ```json
-{"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"agda-mcp","version":"0.2.0"}}}
+{"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2024-11-05","serverInfo":{"name":"agda-mcp","version":"0.3.0"}}}
 ```
 
 Press Ctrl-C to stop the server.
