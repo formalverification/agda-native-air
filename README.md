@@ -1,7 +1,7 @@
 <!-- File: agda-native-air/README.md -->
 
 # Agda-native AIR
-[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.8.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/backend_GHC-9.10.3-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
+[![CI](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/formalverification/agda-native-air/actions/workflows/ci.yml) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Docs: CC-BY 4.0](https://img.shields.io/badge/Docs-CC--BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Agda](https://img.shields.io/badge/Agda-2.9.0-4e9a06.svg)](https://wiki.portal.chalmers.se/agda) [![Haskell](https://img.shields.io/badge/backend_GHC-9.10.3-5e5086.svg)](https://www.haskell.org/) [![Scala](https://img.shields.io/badge/Scala-2.13-dc322f.svg)](https://www.scala-lang.org/)
 
 *Agda-native Artificial Intelligence Reasoning environment*
 
@@ -395,8 +395,10 @@ That would be a bug in how we have set this up, not a position we are defending.
 
 ## Citation
 
-Cite the repository by its name, its version and its URL, and, once the first
-release is archived, by its DOI.  [`CITATION.cff`](CITATION.cff) at the root
+[![DOI](https://zenodo.org/badge/1178223436.svg)](https://doi.org/10.5281/zenodo.23378574)
+
+Cite the repository by its name, its version and the version's DOI.
+[`CITATION.cff`](CITATION.cff) at the root
 holds the same metadata in machine-readable form, which GitHub's "Cite this
 repository" button and tools such as `cffconvert` read.
 
@@ -408,6 +410,7 @@ repository" button and tools such as `cffconvert` read.
                     intelligence reasoning environment},
          version = {0.2.0},
          year    = {2026},
+         doi     = {10.5281/zenodo.23378575},
          url     = {https://github.com/formalverification/agda-native-air},
          license = {Apache-2.0},
          note    = {Includes the agda-mcp server, version 0.2.0}
@@ -420,19 +423,23 @@ repository" button and tools such as `cffconvert` read.
    name the component and its version in the text, for instance "the
    `agda-mcp` server, version 0.2.0, of Agda-native AIR"; each component's
    version is in its own package file (`agda-mcp/agda-mcp.cabal`,
-   `agda-strux/agda-strux.cabal`).
+   `agda-strux/agda-json.cabal`).
 +  **A published corpus**: its dataset card under [`docs/corpora/`](docs/corpora/)
    gives the citation, the upstream commit and the license; cite the card's
    citation, not this one.
 
 Releases are tagged `vX.Y.Z` on this repository and archived on Zenodo, which
-mints a DOI for each release and a concept DOI for all of them; the concept
-DOI will be added here and to `CITATION.cff` when the first release is
-archived.  Until then, cite the version and, for a reproducible reference, the
-commit.  A paper describing the environment is in preparation; until it
-appears, cite the software as above.  The people who did the work are the
-authors; the AI coding agents that assisted are named in commit messages and
-in the field reports under `docs/field-reports/`, and are not authors.
+mints a version DOI for each release and one concept DOI for all of them.  The
+version DOI of v0.2.0 is
+<https://doi.org/10.5281/zenodo.23378575>, and the concept DOI, which
+resolves to the latest release, is <https://doi.org/10.5281/zenodo.23378574>.
+Cite the version DOI of the release you used.  Each release's notes, the
+record of what it contains and why it was cut where it was, live under
+[`docs/releases/`](docs/releases/), one file per tag.  A paper describing the
+environment is in preparation; until it appears, cite the software as above.
+The people who did the work are the authors; the AI coding agents that
+assisted are named in commit messages and in the field reports under
+`docs/field-reports/`, and are not authors.
 
 ---
 
