@@ -9,7 +9,10 @@ cabal-version: 3.0
 --   v0.3.0 (issue #281, M5-29): get_goal and type_of answer in Simplified,
 --   with a rewrite argument (issue #248); the first version after the release
 --   v0.2.0 (issue #279), so that a build of main does not report a released
---   version.  Between releases, main carries the next release's version.
+--   version.  Between releases, main carries the next release's version.  The
+--   `version:` field below is the only place it is written: the executable
+--   reads it through Paths_agda_mcp for serverInfo.version and the startup
+--   line, and the test suite checks both against it.
 --   issue #205 (M5-18): adds auto, Agda's own proof search (Mimer) at a hole on
 --   the interaction lane, registered with --auto (AgdaMCP.Tools.Auto).
 --   issue #17 (M2-3, phase 1): adds search_in_scope, scope-aware retrieval
@@ -94,6 +97,9 @@ executable agda-mcp
   import:           warnings
   hs-source-dirs:   app
   main-is:          Main.hs
+  -- Paths_agda_mcp: the package version, for serverInfo.version (issue #281).
+  other-modules:    Paths_agda_mcp
+  autogen-modules:  Paths_agda_mcp
   default-language: GHC2021
   build-depends:
       base          >= 4.18 && < 5
@@ -129,6 +135,9 @@ test-suite agda-mcp-test
   type:             exitcode-stdio-1.0
   hs-source-dirs:   test
   main-is:          Main.hs
+  -- Paths_agda_mcp: the version the wire test expects (issue #281).
+  other-modules:    Paths_agda_mcp
+  autogen-modules:  Paths_agda_mcp
   default-language: GHC2021
   build-depends:
       base          >= 4.18 && < 5

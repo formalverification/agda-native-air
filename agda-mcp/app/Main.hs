@@ -61,6 +61,7 @@ module Main where
 import Control.Exception (IOException, try)
 import Control.Monad (unless, when)
 import Data.List (isInfixOf)
+import Data.Version (showVersion)
 import qualified Data.Text as T
 import System.Directory (getCurrentDirectory, setCurrentDirectory)
 import System.Environment (getArgs)
@@ -73,6 +74,7 @@ import AgdaMCP.Corpus (loadCorpus)
 import AgdaMCP.Gate
   (GateConfig (..), defaultCheckTimeoutSeconds, defaultGateConfig)
 import AgdaMCP.Server (ServerConfig (..), registeredToolNames, runServer)
+import qualified Paths_agda_mcp as Paths
 
 -- | Parsed CLI options.  Separates Agda config from corpus path since
 -- corpus loading happens before the server loop starts.
@@ -153,7 +155,7 @@ main = do
         { scAgdaConfig  = cfg
         , scGateConfig  = gateCfg
         , scServerName  = "agda-mcp"
-        , scVersion     = "0.3.0"   -- the cabal file's version (issue #281)
+        , scVersion     = T.pack (showVersion Paths.version)  -- agda-mcp.cabal (#281)
         , scCorpusIndex = corpusIdx
         , scExpose      = map T.pack <$> cliExpose opts
         , scAuto        = cliAuto opts
