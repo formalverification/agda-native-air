@@ -30,6 +30,12 @@
 
 SHELL := /bin/bash
 
+# A bare `make` prints the target list.  Without this line the default goal is
+# whichever rule GNU make reads first, and since 2026-03 that was the file rule
+# for $(LIB_MODULES_FILE) below, so a bare `make` type-checked all of
+# agda-algebras in another repository's checkout and built nothing here.
+.DEFAULT_GOAL := help
+
 # ------------------------------------------------------------------------------
 # PYTHON
 PY                ?= python3
@@ -926,12 +932,37 @@ extract-algebras: extract-algebras-backend
 # + 1.6. `extract-lib` + `extract-lib-smoke` (our current extraction path)
 #
 # ---- Generate metadata for agda-algebras library ----
+#
+# agda-algebras generates its two aggregator modules, src/Everything.agda and
+# src/EverythingLegacy.agda, with its own Makefile and gitignores them, so a
+# checkout keeps whatever copies its last `make` wrote.  The metadata script
+# imports every module file under src/, those two included, and type-checks the
+# lot, so a stale copy breaks the scan: in 2026-10, copies written before the
+# library switched every module to --without-K (agda-algebras 25f8934ae) still
+# said --cubical-compatible and failed with CoInfectiveImport.  So the recipe
+# regenerates them first, with the library's own rule (find and sed, no Agda),
+# whenever the checkout has a rule that would run; `make -q` asks the
+# checkout's Makefile without running anything, and exits 1 only when a recipe
+# would run (0 when nothing would, as for an existing file with no rule; 2 when
+# there is no rule and no file).  A dry run (`make -n`) cannot tell those
+# apart: it exits 0 for an existing file with no rule.  (The script writes its
+# own root module into the checkout, so the checkout is writable whenever the
+# step can succeed at all.)
+# Neither aggregator declares anything, so neither adds a corpus row.
+AGDA_ALGEBRAS_AGGREGATORS := Everything.agda EverythingLegacy.agda
 agda-algebras-metadata:
 	@if [ -z "$(AGDA_ALGEBRAS_ROOT)" ]; then \
 	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ) - [make agda-algebras-metadata] ❌ ERROR: AGDA_ALGEBRAS_ROOT is not set."; \
 	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ) - [make agda-algebras-metadata]           Set it in the Makefile or on the command line, e.g."; \
 	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ) - [make agda-algebras-metadata]           make agda-algebras-metadata AGDA_ALGEBRAS_ROOT=/path/to/agda-algebras"; \
 	  exit 1; \
+	fi
+	@$(MAKE) -s -q -C "$(AGDA_ALGEBRAS_ROOT)" $(AGDA_ALGEBRAS_AGGREGATORS) >/dev/null 2>&1; \
+	if [ $$? -eq 1 ]; then \
+	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - regenerating $(AGDA_ALGEBRAS_AGGREGATORS) in $(AGDA_ALGEBRAS_ROOT)"; \
+	  $(MAKE) --no-print-directory -C "$(AGDA_ALGEBRAS_ROOT)" $(AGDA_ALGEBRAS_AGGREGATORS) || exit 1; \
+	else \
+	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - not regenerating $(AGDA_ALGEBRAS_AGGREGATORS): $(AGDA_ALGEBRAS_ROOT) has no rule that would rewrite them"; \
 	fi
 	@echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - running $(AGDA_LIB_METADATA_SCRIPT)"
 	python3 $(AGDA_LIB_METADATA_SCRIPT) "$(AGDA_ALGEBRAS_ROOT)" \

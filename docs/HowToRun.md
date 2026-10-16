@@ -278,7 +278,10 @@ make extract-lib
 **Key behavior**.
 
 +  Builds `agda-json` (via nix if configured).
-+  Generates module list via `make agda-algebras-metadata`.
++  Generates module list via `make agda-algebras-metadata`, which first
+   regenerates agda-algebras' gitignored aggregators (`src/Everything.agda` and
+   `src/EverythingLegacy.agda`) with that library's own `make`, since a stale
+   copy fails the scan.
 +  Runs Scala `AgdaJsonlDriver` with `--runner spark` and local master.
 +  Writes a manifest JSON with exit code + Agda version + git rev.
 
