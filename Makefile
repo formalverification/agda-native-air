@@ -941,9 +941,13 @@ extract-algebras: extract-algebras-backend
 # library switched every module to --without-K (agda-algebras 25f8934ae) still
 # said --cubical-compatible and failed with CoInfectiveImport.  So the recipe
 # regenerates them first, with the library's own rule (find and sed, no Agda),
-# whenever the checkout has that rule; `make -n` asks the checkout's Makefile
-# without running anything.  (The script writes its own root module into the
-# checkout, so the checkout is writable whenever the step can succeed at all.)
+# whenever the checkout has a rule that would run; `make -q` asks the
+# checkout's Makefile without running anything, and exits 1 only when a recipe
+# would run (0 when nothing would, as for an existing file with no rule; 2 when
+# there is no rule and no file).  A dry run (`make -n`) cannot tell those
+# apart: it exits 0 for an existing file with no rule.  (The script writes its
+# own root module into the checkout, so the checkout is writable whenever the
+# step can succeed at all.)
 # Neither aggregator declares anything, so neither adds a corpus row.
 AGDA_ALGEBRAS_AGGREGATORS := Everything.agda EverythingLegacy.agda
 agda-algebras-metadata:
@@ -953,11 +957,12 @@ agda-algebras-metadata:
 	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ) - [make agda-algebras-metadata]           make agda-algebras-metadata AGDA_ALGEBRAS_ROOT=/path/to/agda-algebras"; \
 	  exit 1; \
 	fi
-	@if $(MAKE) -s -n -C "$(AGDA_ALGEBRAS_ROOT)" $(AGDA_ALGEBRAS_AGGREGATORS) >/dev/null 2>&1; then \
+	@$(MAKE) -s -q -C "$(AGDA_ALGEBRAS_ROOT)" $(AGDA_ALGEBRAS_AGGREGATORS) >/dev/null 2>&1; \
+	if [ $$? -eq 1 ]; then \
 	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - regenerating $(AGDA_ALGEBRAS_AGGREGATORS) in $(AGDA_ALGEBRAS_ROOT)"; \
 	  $(MAKE) --no-print-directory -C "$(AGDA_ALGEBRAS_ROOT)" $(AGDA_ALGEBRAS_AGGREGATORS) || exit 1; \
 	else \
-	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - not regenerating $(AGDA_ALGEBRAS_AGGREGATORS): $(AGDA_ALGEBRAS_ROOT) has no rule for them"; \
+	  echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - not regenerating $(AGDA_ALGEBRAS_AGGREGATORS): $(AGDA_ALGEBRAS_ROOT) has no rule that would rewrite them"; \
 	fi
 	@echo "[info] $$(date -u +%Y-%m-%dT%H:%M:%SZ)  [agda-algebras-metadata]  - running $(AGDA_LIB_METADATA_SCRIPT)"
 	python3 $(AGDA_LIB_METADATA_SCRIPT) "$(AGDA_ALGEBRAS_ROOT)" \
