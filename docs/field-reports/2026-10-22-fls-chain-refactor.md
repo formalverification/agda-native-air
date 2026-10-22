@@ -7,14 +7,13 @@
 +  **Model**: GPT-6 (OpenAI).
 +  **Effort**: not recorded.
 +  **Repository**: IntersectMBO/formal-ledger-specifications.
-+  **Issue or pull request**: pull request 1346, pull request 1355.
++  **Issue or pull request**: not named.
 +  **Tools called**: get_goal 2, type_of 1; counts include rejected calls.
 
 This phase implemented the approved review changes.  It replaced the separate
 CERTIFY relation with contextual premises in CHAIN, added a reusable
 Computational-EB instance, and moved structural checks before closure
-execution.  The complete Agda closure passed.  Fresh extraction and 23
-regression cases through the public Haskell chainStep API also passed.
+execution.  The complete Agda closure passed.
 
 +  **Tools used**.  The first get_goal call omitted holeIndex and was
    rejected by argument validation.  The second supplied holeIndex 0 for a
