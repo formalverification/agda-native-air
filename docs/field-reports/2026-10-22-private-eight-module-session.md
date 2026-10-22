@@ -4,11 +4,11 @@
 
 +  **Date**: 2026-10-22.
 +  **Harness**: Claude Code 2.1.282.
-+  **Model**: Claude Fable 5.1 (Anthropic).
++  **Model**: Claude Fable 5.1 (Anthropic); the review round of the addendum, Claude Opus 5.5 (Anthropic).
 +  **Effort**: max.
 +  **Repository**: a private repository.
 +  **Issue or pull request**: not named.
-+  **Tools called**: check_file 38, type_of 1.
++  **Tools called**: check_file 45, type_of 1.
 
 The session wrote eight new literate Agda modules from scratch, about 2,900
 lines of Agda and prose together, on a worktree whose agda-mcp server had been
@@ -68,3 +68,17 @@ typed and the whole-file check was the loop.
    about which tree and which file were checked.  The one thing done on the
    command line, the whole-library check with `time`, was done there because
    the measurement was wanted, not because the server could not have run it.
+
+## Addendum, the same day: a review round
+
+After a review of the pull request, the session, which the harness had
+meanwhile switched to Claude Opus 5.5, made seven more `check_file` calls on a
+warm tree, 2.2 to 3.1 s each.  The first reproduced a reviewer's claim in a
+scratch module: it failed with `UnequalTerms`, and the expected and actual
+terms in `involved` differed in one universe level, which was the claim
+exactly, while a control declaration earlier in the same file checked.  The
+second ran the same module after the fix, green.  Five more checked the
+changed files, green, three of them for prose edits only, as a guard against
+a broken code fence.  The expected and actual pair made the reproduction one
+call, with nothing to read in Agda's prose but the two terms.  The full gate
+ran on the command line again, timed, after a merge of the main branch.
