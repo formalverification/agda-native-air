@@ -18,7 +18,9 @@ on a family where the recursion's cost doubles with a parameter, and on the
 decisions of the library's heaviest example module, which the table brought
 from about fourteen seconds to under four.  Every module typechecks under
 `--safe`.  The work was mostly measurement, not proof: the module checked on
-the first try, and the day went to timing runs, which the server does not do.
+the first try, fourteen minutes after the session started, and most of the
+rest of its 56 minutes went to timing runs, which the server does not do
+(the times are the transcript's own).
 
 +  **Tools used**.  `check_file` on the new module twice (2.3 s and 2.5 s,
    the second after a change to its evaluation strategy), once on an existing
@@ -45,8 +47,9 @@ the first try, and the day went to timing runs, which the server does not do.
    `normalize` call on one decision would report the evaluation's
    `elapsedMs`, and the session did not try it, since each decision had to be
    timed under the build's RTS flags, pinned to one core, as the project's
-   skill requires, which is a shell job.  Twenty-one scratch modules were
-   timed that way, in batches run in the background from the shell, with
+   skill requires, which is a shell job.  Nineteen scratch modules (of
+   twenty-one written) were timed that way, in batches run in the
+   background from the shell, with
    `/usr/bin/time` and `taskset`; a `check_file` option to pass RTS flags and
    report peak memory would have covered about half of them.
 +  **Command line comparison**.  For this session the command line was the
