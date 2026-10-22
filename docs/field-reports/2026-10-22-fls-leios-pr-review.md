@@ -7,7 +7,7 @@
 +  **Model**: GPT-6 (OpenAI).
 +  **Effort**: not recorded.
 +  **Repository**: IntersectMBO/formal-ledger-specifications.
-+  **Issue or pull request**: pull request 1346, pull request 1355.
++  **Issue or pull request**: not named.
 +  **Tools called**: type_of 1, normalize 8.
 
 This session reviewed two public Leios pull requests, one extending the chain
