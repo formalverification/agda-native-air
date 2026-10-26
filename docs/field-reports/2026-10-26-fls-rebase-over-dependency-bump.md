@@ -7,8 +7,7 @@
 +  **Model**: Claude Opus 5.5 (Anthropic).
 +  **Effort**: max.
 +  **Repository**: IntersectMBO/formal-ledger-specifications.
-+  **Issue or pull request**: pull request 1346, pull request 1355, pull
-   request 1363.
++  **Issue or pull request**: not named.
 +  **Tools called**: none.
 
 The session rebased two pull requests onto a `master` whose one new commit
