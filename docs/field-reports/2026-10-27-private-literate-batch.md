@@ -23,13 +23,13 @@ shell at the end.
    imported interfaces already built, the time being mostly the load of the
    imports (the profiler later put each module's own check at 16 to 520 ms).
    `exports_of` once, on a module of the dependency library (2.7 s, a first
-   load), to read the exact names and implicit arguments of an order module
+   load), to read the exact names and implicit arguments of a module
    before writing against it.  `search_by_name` once, which returned nothing
    for a lemma that, as `grep` then confirmed, the standard library does not
    have.
 +  **What worked**.  The diagnostic codes named the fix in most rounds:
    `AmbiguousName` listed both candidates and where each came into scope (a
-   standard-library order clashing with a lattice order), and the fix was one
+   standard-library operator clashing with a library one), and the fix was one
    renaming; `NotInScope` offered "did you mean", which pointed at a pair of
    mutually recursive definitions declared one at a time;
    `TerminationIssue` listed the problematic calls, and both rounds of it were
