@@ -10,7 +10,7 @@
 +  **Issue or pull request**: not named.
 +  **Tools called**: check_file 27.
 
-The session added about two dozen new definitions to seventeen existing
+The session added about two dozen new definitions to sixteen existing
 literate modules and one new module: each a level-polymorphic statement
 (a plain type, or a record with one field per part) beside a proof assembled
 from names the library already had, plus three short new lemmas.  Every
@@ -22,7 +22,7 @@ call.
 
 +  **Tools used**.  Only `check_file`: 2.1 to 4.2 s per call with the
    dependencies' interfaces present (the slowest was the new module that
-   imports seventeen others, 4.2 s).  The other tools were loaded and not
+   imports fifteen others, 4.2 s).  The other tools were loaded and not
    needed, since nothing was developed a hole at a time.
 +  **What worked**.  The diagnostic codes named the fix every time.  An
    `UnequalTypes` with expected `Level` and actual `Type ι` pointed straight
