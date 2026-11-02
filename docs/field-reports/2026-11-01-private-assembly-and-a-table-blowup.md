@@ -8,7 +8,7 @@
 +  **Effort**: max.
 +  **Repository**: a private repository.
 +  **Issue or pull request**: not named.
-+  **Tools called**: check_file 5.
++  **Tools called**: check_file 7 (5 in the session, 2 in the review round).
 
 The session closed a formalization whose hard part earlier sessions had
 carried through: it wrote four new literate modules (a transport of a finite
@@ -58,3 +58,11 @@ line located in a few minutes.
    needed parallel runs with their own bounds and memory caps, which a shell
    gives in one line.  The library's cold check ran through the project's
    Makefile, as the project prescribes.
++  **A review round, the next day**.  After a review of the pull request by
+   another session of the same harness, the session edited two of the
+   modules (an import removed, a sentence of prose corrected) and called
+   `check_file` once on each: 4.8 s and 4.9 s, both green, and the project's
+   incremental build then took 8.6 s on the command line.  Nothing else was
+   needed.  For two edited files the server loop was the more efficient,
+   since each call also rebuilt the file's interface for the build that
+   followed.
