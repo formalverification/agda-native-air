@@ -4,11 +4,11 @@
 
 +  **Date**: 2026-11-03.
 +  **Harness**: Claude Code 2.1.316.
-+  **Model**: Claude Fable 5.1 (Anthropic).
-+  **Effort**: high.
++  **Model**: Claude Fable 5.1, then Claude Opus 5.5 (Anthropic).
++  **Effort**: high, then max.
 +  **Repository**: a private repository.
 +  **Issue or pull request**: not named.
-+  **Tools called**: check_file 10.
++  **Tools called**: check_file 12.
 
 The session added one emitted certificate module (about 14 000 lines of
 tables), one emitted data module (a group of order 100 as tables, about 1 600
@@ -62,3 +62,37 @@ rebuild of the aggregator.
    point.  The session never used `fill_hole` or `get_goal`: the modules
    were written whole from two existing modules of the same shape, and the
    checker's diagnostics were enough to repair them.
+
+## Addendum, 2026-11-04: a green the project's gate could not hold
+
+The same session, continued the next day after the pull request's CI run
+failed with `Heap exhausted` under the project's 6 GB heap cap, in the
+emitted certificate module that `check_file` had reported green in 41 s
+(above).
+
++  **What happened**.  Checked alone from the shell under the project's
+   options plus `+RTS -M14G -s`, the module needs 6.27 GB of residency and
+   11.8 GB in all.  `check_file` runs batch Agda with no `-M`, so it passed,
+   and it wrote the module's interface; the project's capped gate then found
+   that interface current and never re-checked the module, so the gate was
+   green locally twice.  CI, building from a cache without the interface,
+   was the first capped check the module ever had.  The report above called
+   the call "green first time", which was true of the tool and said nothing
+   about the build.
++  **What the session did**.  Two more `check_file` calls (a library module,
+   4.2 s, green first time; the module that replaced the heavy one's use,
+   67 s, green), and every memory figure from the shell: the module under
+   the cap with its interface deleted, `+RTS -s` for residency, and
+   `--profile=definitions` for where the time went, on scratch copies that
+   located the cost.  The heavy module moved to the project's separate
+   high-memory lane.
++  **What was awkward or missing**.  A green `check_file` on a new large
+   module is no evidence that the module fits the project's gate, and the
+   interface it leaves behind makes the gate agree.  Three things would have
+   caught it: `check_file` taking the project's RTS options (or a heap
+   cap), reporting peak memory beside elapsed time, or flagging a check
+   whose peak exceeds a configured bound.  Until then the remedy is the
+   shell's: delete the interface and check under the gate's options.
++  **Command line comparison**.  For this question the command line was
+   the only instrument; the tool loop stayed the faster way to find type
+   errors.
