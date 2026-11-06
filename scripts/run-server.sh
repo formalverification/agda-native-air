@@ -92,6 +92,24 @@
 #   recipe that says `agda` gets the shell's Agda, the wrong one for a project
 #   with its own, unless the Makefile is told which.
 #
+# IMPORTANT (issue #342: say when a pinned Agda has fallen behind its flake):
+#   A registration whose --agda-bin is a fixed pin (a symlink into the store,
+#   built by hand with `nix build <checkout>#<attr> -o <link>`) matches one
+#   lock and goes stale in silence when the project's lock moves; the only
+#   symptom is a NotInScope inside a dependency at the first load.  So when
+#   --agda-bin resolves, two levels up, to a store path, this script lists the
+#   packages that the flake at or above --cwd builds now (`nix eval`, about a
+#   second, in the background beside the server, so the client's wait for
+#   initialize does not grow), and when the pin is none of them but one of
+#   them has the pin's package name, it prints one line on stderr naming both
+#   paths and the remedy.  It says nothing when it cannot tell: no flake, an
+#   evaluation that fails, a pin of a name the flake does not build, or a
+#   binary inside the checkout (a dev shell's .agda/bin/agda, which follows
+#   the checkout).  scripts/agda-for-flake.sh, the launcher keyed by the
+#   lock, needs no check: it is the remedy.  The line sits beside the one
+#   issue #282 plans for a server binary older than its sources, in the same
+#   voice, and a client shows both where it shows this script's stderr.
+#
 # Usage (from anywhere):
 #   scripts/run-server.sh [extra agda-mcp args...]
 #   AGDA_MCP_BIN=/path/to/agda-mcp scripts/run-server.sh --agda-bin /path/to/agda [...]
@@ -139,6 +157,8 @@ expand_pwd() {
 SERVER_ARGS=()
 has_cwd=0
 has_agda_bin=0
+agda_bin_value=""
+cwd_value=""
 prev=""
 unexpanded='${'
 for arg in "$@"; do
@@ -150,12 +170,84 @@ for arg in "$@"; do
   # --agda-bin with a non-empty value, read after the substitution (lean2agda's
   # registration passes --agda-bin ${PWD}/.agda/bin/agda): half of the fast
   # path's condition (issue #249, see the header).
-  if [ "$prev" = "--agda-bin" ] && [ -n "$REPLY" ]; then has_agda_bin=1; fi
+  if [ "$prev" = "--agda-bin" ] && [ -n "$REPLY" ]; then has_agda_bin=1; agda_bin_value="$REPLY"; fi
+  if [ "$prev" = "--cwd" ]; then cwd_value="$REPLY"; fi
   prev="$REPLY"
   SERVER_ARGS+=("$REPLY")
 done
 # No --cwd among the arguments: anchor the server where the client started us.
-if [ "$has_cwd" = 0 ]; then SERVER_ARGS+=(--cwd "${LAUNCH_DIR}"); fi
+if [ "$has_cwd" = 0 ]; then SERVER_ARGS+=(--cwd "${LAUNCH_DIR}"); cwd_value="${LAUNCH_DIR}"; fi
+
+# ---- The pin check (issue #342, see the header) ----------------------------
+# drv_pname STORE_PATH: the package name in STORE_PATH without its hash or
+# version, split as Nix's builtins.parseDrvName splits a name: the version
+# begins after the first "-" that is not followed by a letter.
+drv_pname() {
+  local rest="${1##*/}" out="" part
+  rest="${rest#*-}"
+  while [[ "$rest" == *-* ]]; do
+    part="${rest%%-*}"
+    rest="${rest#*-}"
+    out+="${out:+-}${part}"
+    if [[ ! "$rest" =~ ^[A-Za-z] ]]; then REPLY="$out"; return; fi
+  done
+  REPLY="${out:+${out}-}${rest}"
+}
+
+# pin_check AGDA_BIN CWD: print one line when AGDA_BIN is a fixed pin that
+# the project's flake no longer builds.  Silent whenever it cannot tell.
+pin_check() {
+  local bin="$1" cwd="$2" store_dir="${NIX_STORE_DIR:-/nix/store}" store dir system listing
+  local name path pin_pname stale=""
+  # A binary inside the checkout (a dev shell's .agda/bin/agda) follows the
+  # checkout, and this launcher's own agda-for-flake.sh is not a store path.
+  case "$bin" in "$cwd"/*) return 0 ;; esac
+  # The pin is the store path two levels above bin/agda, wherever the
+  # registration's symlinks lead (a wrapper's bin/agda may itself point into
+  # another store path, which names the unwrapped Agda, not the environment).
+  store="$(readlink -f -- "$(dirname -- "$(dirname -- "$bin")")" 2>/dev/null)" || return 0
+  case "$store" in "${store_dir}"/*/*|"${store_dir}"/) return 0 ;; "${store_dir}"/*) ;; *) return 0 ;; esac
+  # The project's flake: the nearest flake.nix at or above CWD, within the
+  # repository (the rule agda-for-flake.sh uses).
+  dir="$cwd"
+  while [ ! -f "${dir}/flake.nix" ]; do
+    if [ -e "${dir}/.git" ] || [ "$dir" = / ]; then return 0; fi
+    dir="$(dirname -- "$dir")"
+  done
+  system="$(nix eval --impure --raw --expr builtins.currentSystem 2>/dev/null)" || return 0
+  # Every package the flake builds now, as "ATTR OUTPATH" lines; a package
+  # whose evaluation fails is left out rather than failing the listing.  The
+  # ${...} in the expression are Nix's, so the quotes are single.
+  # shellcheck disable=SC2016
+  listing="$(nix eval --raw --no-write-lock-file "${dir}#packages.${system}" --apply '
+    ps: builtins.concatStringsSep "\n" (builtins.concatMap (n:
+      let r = builtins.tryEval ps.${n}.outPath; in
+      if r.success then [ "${n} ${r.value}" ] else [ ]) (builtins.attrNames ps))' \
+    2>/dev/null)" || return 0
+  drv_pname "$store"; pin_pname="$REPLY"
+  while read -r name path; do
+    [ -n "$path" ] || continue
+    # The pin is one of them: current.
+    if [ "$path" = "$store" ]; then return 0; fi
+    drv_pname "$path"
+    if [ -z "$stale" ] && [ "$REPLY" = "$pin_pname" ]; then stale="${name} ${path}"; fi
+  done <<< "$listing"
+  # No package of the pin's name: a pin from elsewhere, nothing to say.
+  [ -n "$stale" ] || return 0
+  echo "agda-mcp: --agda-bin ${bin} is ${store}, but the flake at ${dir} now builds ${stale%% *} as ${stale#* }: the pin predates a change to that flake (its lock, most often), so loads may fail inside a dependency; rebuild the pin, or register ${REPO_ROOT}/scripts/agda-for-flake.sh (docs/agda-mcp/registering-a-project.md)." >&2
+}
+
+# Run it beside the server, never before it: the evaluation takes a second
+# or more, and the client is waiting for initialize.  The doubled
+# parentheses detach it, so no zombie waits on a server that never reaps it;
+# its stdout is stderr, so not a byte reaches the JSON-RPC stream.  A
+# relative --cwd is the server's, resolved against this repository.
+if [ -n "$agda_bin_value" ] && command -v nix >/dev/null 2>&1; then
+  case "$cwd_value" in /*) ;; *) cwd_value="$(cd "${REPO_ROOT}" && cd "$cwd_value" 2>/dev/null && pwd)" || cwd_value="" ;; esac
+  if [ -n "$cwd_value" ]; then
+    ( ( unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH; pin_check "$agda_bin_value" "$cwd_value" || true ) </dev/null 1>&2 & )
+  fi
+fi
 
 # Anchor the shellHook to this repository, whatever the client's cwd was.
 export AGDA_NATIVE_AIR_ROOT="${REPO_ROOT}"
