@@ -19,7 +19,17 @@ report generation — rather than pipeline stages themselves, and are wired into
    framing on stdout.  It is the command configured in `.mcp.json`.  The shell is
    entered from this repository, but the server is anchored in the directory the
    client started the launcher in, which the launcher also substitutes for a
-   literal `${PWD}` a client did not expand (issue #242).
+   literal `${PWD}` a client did not expand (issue #242).  When a registration
+   names a fixed pin into the Nix store as `--agda-bin`, it says in one line on
+   stderr when the project's flake no longer builds that pin (issue #342).
+
++  `agda-for-flake.sh` stands in for Agda in a registration whose project's
+   flake exports an Agda environment: it builds the attribute named by
+   `AGDA_FLAKE_ATTR` from the checkout it runs in, once per change of that
+   checkout's lock or other non-Agda files, and runs it (issue #342).
+   `scripts/python/tests/test_agda_for_flake.py` tests it with a stub `nix`, and
+   [Registering a project](../docs/agda-mcp/registering-a-project.md) says
+   when to use it.
 
 +  `run-server-smoke.sh` proves that anchoring through the real launcher: five
    launches from a scratch checkout, each asking `check_project` to run that
