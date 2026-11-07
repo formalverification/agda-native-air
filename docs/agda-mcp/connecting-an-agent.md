@@ -165,8 +165,15 @@ checks your files depends on the registration, as follows:
 +  **Your own Agda**: `--agda-bin` names it, and `--library-file`, inside
    `--agda-flags`, names the libraries file it reads.  Pass the libraries
    file even where your Agda finds it unaided: the server reads it too, to
-   decide which tree a file belongs to.  The server splits `--agda-flags` on
-   whitespace, so no path in it may contain a space.
+   decide which tree a file belongs to.  An Agda that a project's flake
+   exports needs none, provided `$AGDA_DIR/libraries` or
+   `~/.agda/libraries` does not register the project at another checkout
+   ([Registering a project][registering]).
+   The server splits `--agda-flags` on whitespace, so no path in it may
+   contain a space.  Which Agda to name, and how it stays current when your
+   project's pins move, depends on how the project gets its Agda;
+   [Registering a project][registering] has a template and a check for each
+   kind.
 
 For Claude Code and Copilot CLI the registration is a `.mcp.json` at your
 project's root, as follows; the Codex and Kimi Code sections show the same
@@ -229,10 +236,9 @@ What the server does to your files: `check_file` writes Agda's interface
 files, as `agda` does; `get_goal` and `fill_hole` patch the file on disk for
 the length of a call and restore it byte for byte, on the timeout path too,
 so an editor with the file open may notice the file change and change back.
-A project that pins its own Agda through Nix (agda-algebras,
-formal-ledger-specifications) has a template in
-[`agda-mcp/examples/`][examples-readme], with the commands that build the
-paths it names.
+A project that gets its Agda through Nix (agda-algebras,
+formal-ledger-specifications) has its template in [Registering a
+project][registering], and a copy in [`agda-mcp/examples/`][examples-readme].
 
 ## Claude Code
 
@@ -383,20 +389,22 @@ attach the server there, so that the project keeps its own `CLAUDE.md`, git
 history and permissions.  The launcher works from any directory: it enters
 this repository's shell, then starts the server back in the project.  For a
 library like the one in [Your own Agda project](#your-own-agda-project), the
-`.mcp.json` shown there is the whole registration.  A project that pins its
-own Agda through Nix registers it in one of two ways, shown here for
-agda-algebras; Option A is recommended, since it is a plain file, immune to
-shell aliasing, and self-documenting.
+`.mcp.json` shown there is the whole registration.  A project with an Agda
+of its own registers it in one of two ways, shown here for agda-algebras,
+whose dev shell writes a per-checkout Agda ([Registering a
+project][registering] covers the other setups); Option A is
+recommended, since it is a plain file, immune to shell aliasing, and
+self-documenting.
 
 *Option A: a project `.mcp.json`*.  Copy the template
 [`agda-mcp/examples/agda-algebras.mcp.json`][example-mcp-json] into the
 checkout as `.mcp.json`, replace its `/ABS/PATH/TO/...` placeholders with
 absolute paths, and keep it out of that project's history.  The template
 names no worktree: `--cwd ${PWD}` anchors the server wherever Claude Code
-starts, so one file serves every worktree of the clone.  Its three
-machine-specific inputs (the project's own Agda, the libraries file that
-Agda reads, and the search corpus) are realized once, with the commands in
-the [examples README][examples-readme].  Then run the following:
+starts, and the Agda and libraries file it names are the ones that
+worktree's dev shell writes, so one file serves every worktree of the clone.
+The search corpus is downloaded once, with the commands in the [examples
+README][examples-readme].  Then run the following:
 
 ```sh
 cd /path/to/your-project
@@ -419,20 +427,21 @@ line in the checkout:
 claude mcp add agda --scope local \
   -- /path/to/agda-native-air/scripts/run-server.sh \
      --cwd "$PWD" \
-     --agda-bin /path/to/agda-algebras-agda-root/bin/agda \
-     --agda-flags "--library-file=/path/to/agda-algebras-libraries -i /path/to/agda-native-air/agda-dojang/agda" \
+     --agda-bin "$PWD/.agda/bin/agda" \
+     --agda-flags "--library-file=$PWD/.agda/libraries -i /path/to/agda-native-air/agda-dojang/agda" \
      --corpus /path/to/agda-algebras-corpus-v0.1/corpus.jsonl \
      --timeout 600 \
-     --check-command "make check AGDA=/path/to/agda-algebras-agda-root/bin/agda" \
+     --check-command "make check AGDA=$PWD/.agda/bin/agda" \
      --check-timeout 3600
 ```
 
 `--scope local`, the default, keeps the registration in your own per-project
 configuration rather than in the project's files.  That configuration is per
 directory, so each worktree needs its own `claude mcp add`, and the shell
-expands `"$PWD"` to that worktree when you run it.  (*Run*, verbatim but for
-the placeholders, against a throwaway `CLAUDE_CONFIG_DIR`: `claude mcp get
-agda` then showed it with the local scope.)  `--scope user` registers the
+expands `"$PWD"` to that worktree when you run it.  (*Run* on 2026-11-06,
+Claude Code 2.1.316, verbatim but for the placeholders, in an agda-algebras
+checkout against a throwaway `CLAUDE_CONFIG_DIR`: `claude mcp get agda` then
+showed it with the local scope.)  `--scope user` registers the
 server for every project instead (*read*).
 
 **One session only**.  `claude --mcp-config <file> --strict-mcp-config`
@@ -856,8 +865,12 @@ approval_mode = "prompt"
 For another project,
 [`agda-mcp/examples/agda-algebras.codex.toml`][example-codex] is the
 agda-algebras registration as a table, with the same placeholders as the
-`.mcp.json` template; it was run on an agda-algebras checkout (see the smoke
-test).  Each choice in the table is there for a reason, as follows:
+`.mcp.json` template.  Its 2026-10-11 form, which named a pinned Agda, was run
+in Codex on an agda-algebras checkout (see the smoke test); its current form,
+which names the checkout's own `.agda/bin/agda` through `${PWD}`, was run on
+2026-11-06 as Codex starts it (from the checkout, arguments unexpanded) but
+not in Codex itself.  Each choice in the table is there for a reason, as
+follows:
 
 +  `startup_timeout_sec`: Codex's default is 10 s, and the launcher took 2.5
    to 16 s in the runs above, and up to 32 s with a dirty working tree.
@@ -1237,6 +1250,7 @@ The vendors' pages were all read on 2026-10-11, as follows:
 [example-mcp-json]: ../../agda-mcp/examples/agda-algebras.mcp.json
 [example-codex]: ../../agda-mcp/examples/agda-algebras.codex.toml
 [examples-readme]: ../../agda-mcp/examples/README.md#agda-algebrasmcpjson
+[registering]: registering-a-project.md
 [command-line options]: ../../agda-mcp/README.md#command-line-options
 [without-the-shell]: ../../agda-mcp/README.md#without-the-shell
 [howtorun-13]: ../HowToRun.md#13--agda-mcp-ai-assisted-proof-development

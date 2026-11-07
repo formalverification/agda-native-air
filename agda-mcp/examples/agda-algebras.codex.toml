@@ -6,20 +6,22 @@
 # .codex/config.toml (Codex reads a project file only once you trust the
 # project) or append it to ~/.codex/config.toml, and replace every
 # /ABS/PATH/TO/... placeholder with an absolute path.  The examples README has
-# the commands that realize the three machine-specific inputs, and
+# the command that downloads the search corpus, and
 # docs/agda-mcp/connecting-an-agent.md the rest of the Codex setup.
 
 [mcp_servers.agda]
 command = "/ABS/PATH/TO/agda-native-air/scripts/run-server.sh"
 # No --cwd: Codex starts the server in the directory the session started in,
 # and the launcher passes that directory as --cwd itself (issue #242).  Start
-# Codex inside an agda-algebras checkout.
+# Codex inside an agda-algebras checkout in which `nix develop` has run once,
+# so that its .agda/bin/agda and .agda/libraries exist.  Codex expands no
+# variables; the launcher substitutes that same directory for each ${PWD}.
 args = [
-  "--agda-bin", "/ABS/PATH/TO/agda-algebras-agda-root/bin/agda",
-  "--agda-flags", "--library-file=/ABS/PATH/TO/agda-algebras-libraries -i /ABS/PATH/TO/agda-native-air/agda-dojang/agda",
+  "--agda-bin", "${PWD}/.agda/bin/agda",
+  "--agda-flags", "--library-file=${PWD}/.agda/libraries -i /ABS/PATH/TO/agda-native-air/agda-dojang/agda",
   "--corpus", "/ABS/PATH/TO/agda-algebras-corpus-v0.1/corpus.jsonl",
   "--timeout", "600",
-  "--check-command", "make check AGDA=/ABS/PATH/TO/agda-algebras-agda-root/bin/agda",
+  "--check-command", "make check AGDA=${PWD}/.agda/bin/agda",
   "--check-timeout", "3600",
 ]
 # The launcher enters a Nix shell before the server starts: a few seconds once

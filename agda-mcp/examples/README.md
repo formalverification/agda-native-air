@@ -17,12 +17,15 @@ and
 for the caveats (`get_goal` needs `AgdaDojang.Debug`; absolute paths; toolchain
 match).
 
-Both templates check the client project with **its own pinned Agda**, never this
+Every template checks the client project with **its own Agda**, never this
 repository's, so the client's version pins stay authoritative (issue #103), and
-both anchor the server in the client's checkout with `--cwd`.  The server
-splits `--agda-flags` and `--check-command` on whitespace, with no quoting, so
-no path inside either may contain a space; keep the gc-roots under a
-space-free directory such as `~/.cache`.
+each anchors the server in the client's checkout with `--cwd`.  None names a
+hand-built pin, which matches one lock and goes stale in silence when the
+project's lock moves (issue #342); [Registering a
+project](../../docs/agda-mcp/registering-a-project.md) has the setup each
+template is an instance of, and how to verify it.  The server splits
+`--agda-flags` and `--check-command` on whitespace, with no quoting, so no path
+inside either may contain a space.
 
 ## `agda-algebras.mcp.json`
 
@@ -32,25 +35,26 @@ Connects a Claude Code session working on
 no worktree, and the server anchors itself in whichever one Claude Code was
 started from.
 
-Realize the three machine-specific inputs once, from any directory:
+agda-algebras's dev shell writes its Agda into the checkout: every `nix
+develop` there writes `.agda/bin/agda` (the flake's Agda, wrapped with the
+standard library) and `.agda/libraries` (gitignored), from that checkout's own
+`flake.lock`.  The template names both through `${PWD}`, so each worktree is
+checked with the Agda its own lock names.  Download the search corpus once,
+from any directory:
 
 ```sh
-# agda-algebras's own Agda, wrapped with its standard library, gc-rooted:
-nix build /ABS/PATH/TO/agda-algebras -o /ABS/PATH/TO/agda-algebras-agda-root
-# the libraries file that wrapper reads, gc-rooted under a path of its own:
-nix build "$(grep -oE -- '--library-file=[^ ]+' /ABS/PATH/TO/agda-algebras-agda-root/bin/agda | cut -d= -f2)" \
-  -o /ABS/PATH/TO/agda-algebras-libraries
 # the search corpus (docs/corpora/agda-algebras-v0.1.md):
 gh release download agda-algebras-corpus-v0.1 -R formalverification/agda-native-air \
   -p corpus.jsonl.gz -D /ABS/PATH/TO/agda-algebras-corpus-v0.1
 gunzip -k /ABS/PATH/TO/agda-algebras-corpus-v0.1/corpus.jsonl.gz
 ```
 
-Re-run the two `nix build` lines after agda-algebras's `flake.lock` moves; they
-re-point the same symlinks.  Then install the file in each checkout you work in:
+Then install the file in each checkout you work in, after entering its dev
+shell once:
 
 ```sh
 cd /ABS/PATH/TO/agda-algebras/<a-worktree>
+nix develop --command true   # writes .agda/; again after the lock moves
 cp /ABS/PATH/TO/agda-native-air/agda-mcp/examples/agda-algebras.mcp.json ./.mcp.json
 # edit ./.mcp.json: replace every /ABS/PATH/TO/... placeholder with a real path
 echo '.mcp.json' >> "$(git rev-parse --git-common-dir)/info/exclude"   # once per clone
@@ -74,17 +78,18 @@ Each binding does one job; they are the following:
    (issue #242), so the same file serves such a client, provided it starts
    the server in the worktree.  The bare binary, run without the launcher,
    refuses the literal string by name.
-+  `--agda-bin`: agda-algebras's wrapped Agda, the one its `nix develop` and CI
-   use, through the gc-rooted symlink built above.
-+  `--agda-flags`: two flags.  `--library-file` names the same registry the
-   wrapper bakes in, for the server's sake: `agda-mcp` cannot see inside the
-   wrapper, and without the flag it reads this repository's `agda/libraries`
-   (the `$AGDA_DIR` of the shell `run-server.sh` enters), which registers
-   agda-algebras at the flake-pinned store copy and so refuses every worktree
-   file with a `rootMismatch`.  The wrapper's registry names only the standard
-   library; the worktree's own library comes from the `.agda-lib` in the working
-   directory.  `-i .../agda-dojang/agda` makes the `AgdaDojang.Debug` module
-   that `get_goal` splices in visible to agda-algebras's Agda.
++  `--agda-bin`: the worktree's own `.agda/bin/agda`, the Agda its `nix
+   develop` uses, written by its last entry.  It is no gc root: after a `nix
+   store gc`, or a pull that moves the lock, enter the dev shell again.
++  `--agda-flags`: two flags.  `--library-file` names the registry the wrapper
+   reads, `.agda/libraries`, for the server's sake: `agda-mcp` cannot see
+   inside the wrapper, and without the flag it reads this repository's
+   `agda/libraries` (the `$AGDA_DIR` of the shell `run-server.sh` enters),
+   which registers agda-algebras at the flake-pinned store copy and so refuses
+   every worktree file with a `rootMismatch`.  The worktree's registry names
+   the standard library and the worktree's own `agda-algebras.agda-lib`.
+   `-i .../agda-dojang/agda` makes the `AgdaDojang.Debug` module that
+   `get_goal` splices in visible to agda-algebras's Agda.
 +  `--corpus`: turns on the search tools (`search_by_name`, `search_by_type`,
    `get_dependencies`, and `search_in_scope`, which `--expose` must name).
    Without it the server presents 10 tools, not 13.
@@ -92,6 +97,9 @@ Each binding does one job; they are the following:
    the `Everything` aggregators and checks them.  `AGDA=` points it at the same
    Agda; left alone, `make` would run the first `agda` on the server's `PATH`,
    which is this repository's.
+
+Verified on 2026-11-06 with the agda-algebras `master` checkout and a sibling
+worktree: each server answered from its own root.
 
 Start Claude Code inside an agda-algebras checkout.  Wherever Agda finds no
 `.agda-lib`, it falls back to `$AGDA_DIR/defaults`, and the shell
@@ -117,25 +125,27 @@ repository's.  The template's `--library-file` and `AGDA=` keep the rest the
 same on both paths.  [`agda-mcp/README.md`](../README.md), § *Without the
 shell*, has the whole list.
 
-Nothing this registration reads is written by another session, so any number of
-sessions in different worktrees run side by side.  (The template this one
-replaced set `AGDA_ALGEBRAS_ROOT` instead, and every launch rewrote this
+Nothing this registration reads is written by a session in another worktree,
+so any number of sessions in different worktrees run side by side.  (An earlier
+template set `AGDA_ALGEBRAS_ROOT` instead, and every launch rewrote this
 repository's `agda/libraries` to name its own worktree.  A second session in
 another worktree re-pointed the registry, and the first session's server then
-refused its own files.)
+refused its own files.  The template after it named one hand-built pin for
+every worktree, which could match only one lock.)
 
 ## `agda-algebras.codex.toml`
 
 The same agda-algebras registration as a `[mcp_servers.agda]` table, for an
 OpenAI Codex CLI session, which does not read `.mcp.json`.  It needs the same
-three inputs, realized with the commands above, and is installed per checkout as
-`.codex/config.toml` (Codex reads a project's file only once the project is
-trusted) or appended to `~/.codex/config.toml`.  It differs from the `.mcp.json`
-template in four ways, each explained in a comment in the file, as follows:
+inputs (the corpus, and a dev shell entered once), and is installed per
+checkout as `.codex/config.toml` (Codex reads a project's file only once the
+project is trusted) or appended to `~/.codex/config.toml`.  It differs from
+the `.mcp.json` template in four ways, each explained in a comment in the file,
+as follows:
 
 +  It passes no `--cwd`: Codex expands no variables and starts the server in the
    directory the session started in, which the launcher then passes as `--cwd`
-   (issue #242).
+   (issue #242), and substitutes for each `${PWD}` in the other arguments.
 +  It sets `startup_timeout_sec` and `tool_timeout_sec` above Codex's defaults
    (10 and 60 seconds), which the launcher's shell entry and a cold check
    overrun.
@@ -145,53 +155,53 @@ template in four ways, each explained in a comment in the file, as follows:
    server's tools carry no read-only annotation and `codex exec`, which cannot
    ask, would refuse them all.
 
-Tested on 2026-10-11 with Codex CLI 0.162.1 in an agda-algebras checkout: the
-server presented thirteen tools, and `check_file` answered from that checkout.
+Tested on 2026-10-11 with Codex CLI 0.162.1 in an agda-algebras checkout, when
+the table named a pinned Agda: the server presented thirteen tools, and
+`check_file` answered from that checkout.  Its current form answered the same
+way on 2026-11-06, started as Codex starts it, but not in Codex itself.
 
 ## `fls.mcp.json`
 
 Connects a Claude Code session working on
 [formal-ledger-specifications](https://github.com/IntersectMBO/formal-ledger-specifications)
-to this repository's `agda-mcp`, with the checking done by **fls's own pinned
-Agda**, never this repository's, so IOG's version pins stay authoritative
-(issue #103).  This is the template for any client project that pins its own
-toolchain, and the agda-algebras template above follows it.  Three bindings carry
-the arrangement:
+to this repository's `agda-mcp`, with the checking done by **fls's own Agda**,
+the one its flake exports as `fls-agdaWithPackages` (Agda 2.8.0 with fls's
+custom backend, wrapped with standard-library 2.3 and the four IOG libraries),
+never this repository's, so IOG's version pins stay authoritative (issue #103).
+This is the template for any project whose flake exports an Agda environment.
+Three bindings carry the arrangement:
 
-+  `--cwd`: the absolute path to the fls checkout.  Agda anchors its project
-   discovery (the nearest `*.agda-lib`) to the directory it runs in, so this is
-   what makes fls modules resolve, and write their `.agdai` interfaces, exactly
-   as fls's own `nix develop --command agda` does.  The template carries an
-   absolute placeholder; `${PWD}` in its place, as in the agda-algebras
-   template, lets one copy serve every fls worktree: Claude Code expands it,
-   and `scripts/run-server.sh` substitutes it for a client that does not
-   (issue #242).
-+  `--agda-bin`: fls's wrapped Agda, through a gc-rooted symlink realized once:
-
-   ```sh
-   nix build /ABS/PATH/TO/formal-ledger-specifications#fls-agdaWithPackages \
-     -o /ABS/PATH/TO/fls-agda-root
-   ```
-
-   The wrapper bakes in fls's `--library-file` (standard-library 2.3 and the four
-   IOG libraries), so it is self-contained from any directory.  Re-run the same
-   command after fls's `flake.lock` moves; it re-points the same symlink.  Until
-   you re-run it, the server keeps checking with the previously pinned toolchain.
++  `--cwd ${PWD}`: the checkout the session starts in.  Agda anchors its
+   project discovery (the nearest `*.agda-lib`) to the directory it runs in,
+   so this is what makes fls modules resolve, and write their `.agdai`
+   interfaces, exactly as fls's own `nix develop --command agda` does, in
+   whichever worktree the session started.
++  `--agda-bin`: [`scripts/agda-for-flake.sh`](../../scripts/agda-for-flake.sh),
+   with `AGDA_FLAKE_ATTR` in `env` naming the attribute.  It builds
+   `fls-agdaWithPackages` from the checkout it runs in, once per key (the
+   checkout's tracked files other than Agda sources, `flake.lock` among them),
+   keeps the build as a gc root under `~/.cache/agda-mcp/`, and runs it.  So a
+   worktree on another lock gets that lock's Agda, and a lock that moves costs
+   one build, with nothing to refresh by hand.  It replaces the hand-built pin
+   (`nix build <checkout>#fls-agdaWithPackages -o <link>`) this template used
+   to name, which went stale for two weeks when fls's lock moved on 2026-10-22
+   (issue #342).  The `--check-command` gate runs the same launcher, on
+   `src/Ledger.lagda.md`, the module that aggregates the whole specification.
 +  `--agda-flags`: only `-i .../agda-dojang/agda`, so the `AgdaDojang.Debug`
-   module that `get_goal` splices in is visible to fls's Agda (it compiles under
-   Agda 2.8.0 and 2.9.0).  Everything else rides in the wrapper.
+   module that `get_goal` splices in is visible to fls's Agda (it compiles
+   under Agda 2.8.0 and 2.9.0).  The wrapper carries its own libraries file.
 
-The `--check-command` gate checks `src/Ledger.lagda.md`, the module that
-aggregates the whole specification.  To make `check_project` double as a
-staleness canary for the gc-root, run the gate through the flake instead,
-always the *current* pin, at the cost of a Nix evaluation per run:
+Before the first session in a checkout, build and run its Agda once, outside
+any tool call's timeout:
 
-```json
-"--check-command", "env -u LD_LIBRARY_PATH nix develop /ABS/PATH/TO/formal-ledger-specifications --command agda src/Ledger.lagda.md"
+```sh
+cd /ABS/PATH/TO/formal-ledger-specifications
+AGDA_FLAKE_ATTR=fls-agdaWithPackages /ABS/PATH/TO/agda-native-air/scripts/agda-for-flake.sh --version
 ```
 
-(`env -u LD_LIBRARY_PATH` because the backend shell hosting the server exports
-an `LD_LIBRARY_PATH` that breaks a nested `nix`.)
+Verified on 2026-11-06 with fls `master` and a worktree on the lock of
+2026-02-17: each got its own lock's environment, and `type_of` loaded
+`Ledger.Prelude` in each in 14 s.
 
 ## One worktree per branch
 

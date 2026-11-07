@@ -160,13 +160,15 @@ def test_every_link_and_asset_reference_resolves(built) -> None:
 
 #: The pages [M6-3] (#171) publishes, as built; the PR names every page left
 #: out and why.  A page added to the allowlist is added here on purpose: the
-#: setup guide by [M6-13] (#247).
+#: setup guide by [M6-13] (#247), and the guide to registering a project by
+#: issue #342.
 CURATED = {
     "index.html",
     "reading-the-results/index.html",
     "adr/0001-proof-search-on-agda-mcp/index.html",
     "adr/0002-agda-mcp/index.html",
     "agda-mcp/connecting-an-agent/index.html",
+    "agda-mcp/registering-a-project/index.html",
     "agda-mcp/agda-mcp-interaction-lane/index.html",
     "agda-mcp/agda-mcp-ask-agda-audit/index.html",
     "agda-mcp/agda-mcp-environment/index.html",

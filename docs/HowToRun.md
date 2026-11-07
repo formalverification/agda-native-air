@@ -949,12 +949,15 @@ and Copilot CLI a project `.mcp.json` copied from
 [`agda-mcp/examples/agda-algebras.mcp.json`](../agda-mcp/examples/agda-algebras.mcp.json)
 (or, for Claude Code, `claude mcp add`), for Codex CLI the table in
 [`agda-mcp/examples/agda-algebras.codex.toml`](../agda-mcp/examples/agda-algebras.codex.toml).
-The templates' three machine-specific inputs (agda-algebras's own Agda, the
-libraries file that Agda reads, and the search corpus) are realized once, with
-the commands in the
+The templates name agda-algebras's own Agda and the libraries file it reads
+through `${PWD}`, as the files `.agda/bin/agda` and `.agda/libraries` that the
+worktree's own `nix develop` writes, so enter the dev shell once in each
+worktree; the search corpus is downloaded once, with the commands in the
 [examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).  What
 each argument does is covered in *Which Agda checks your files* and *The search
-corpus* below.
+corpus* below.  For a project set up differently (a flake that exports an Agda
+environment, say), [Registering a project](agda-mcp/registering-a-project.md)
+has the template for each kind of setup.
 
 Keep `--timeout 600`: the bound is enforced; on expiry the `agda` process group is
 killed and the tool returns a timeout rather than blocking.  The first typecheck
@@ -979,8 +982,9 @@ directly (see below).  Either way the template has it check
 agda-algebras files with **agda-algebras's own** Agda, the one its `nix develop` and CI
 use.  Three arguments carry that, as follows:
 
-+  `--agda-bin` names agda-algebras's wrapped Agda, which bakes in a `--library-file`
-   registering its standard library.
++  `--agda-bin` names agda-algebras's wrapped Agda, `${PWD}/.agda/bin/agda`, which
+   the worktree's dev shell writes and which passes a `--library-file` registering
+   the standard library and the worktree's own library.
 +  `--cwd ${PWD}` runs Agda in the worktree Claude Code started in.  Agda finds a
    file's project by walking up from the directory it runs in, so this is what makes
    the worktree's `agda-algebras.agda-lib` the project, and what sends its `.agdai`
@@ -1009,10 +1013,10 @@ Nothing in this arrangement is shared between sessions, so sessions in different
 worktrees do not disturb each other.  (An earlier template set `env.AGDA_ALGEBRAS_ROOT`
 instead, which made every server launch rewrite this repository's `agda/libraries` to
 name its own worktree.  A second session in another worktree re-pointed the registry,
-and the first session's server then refused its own files.)  Rebuild the two gc-roots
-after agda-algebras's `flake.lock` moves; the commands in the examples README re-point
-the same symlinks, and until you run them the server keeps checking with the previous
-pin.
+and the first session's server then refused its own files.)  Enter the dev shell
+again in a worktree after its `flake.lock` moves; until you do, the server keeps
+checking with the Agda the previous entry wrote.  (The template before it named one
+hand-built pin for every worktree, which could match only one lock; issue #342.)
 
 **You cannot get a silent answer about the wrong worktree**.  A registration that
 shares one registry between worktrees would let the server resolve your file's imports
@@ -1110,10 +1114,9 @@ inside a checkout of the project, and keep scratch modules inside it; see the
 [examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson).
 
 **"Libraries file not found" on another project**.  The `--library-file` in the
-registration names a path that is gone, usually a gc-root that was never built on this
-machine.  Run the two `nix build` lines in the
-[examples README](../agda-mcp/examples/README.md#agda-algebrasmcpjson), and **fully
-restart** Claude Code.
+registration names a path that is gone: for the agda-algebras template, a worktree
+whose dev shell has never run, so it has no `.agda/libraries`.  Run `nix develop
+--command true` in that worktree, and **fully restart** Claude Code.
 
 **"ModuleDefinedInOtherFile" from `get_goal` / `fill_hole` on a library file**.  This is
 the known limitation tracked in
