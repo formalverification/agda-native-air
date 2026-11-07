@@ -165,8 +165,10 @@ checks your files depends on the registration, as follows:
 +  **Your own Agda**: `--agda-bin` names it, and `--library-file`, inside
    `--agda-flags`, names the libraries file it reads.  Pass the libraries
    file even where your Agda finds it unaided: the server reads it too, to
-   decide which tree a file belongs to (the one exception, an Agda that a
-   project's flake exports, is in [Registering a project][registering]).
+   decide which tree a file belongs to.  An Agda that a project's flake
+   exports needs none, provided `$AGDA_DIR/libraries` or
+   `~/.agda/libraries` does not register the project at another checkout
+   ([Registering a project][registering]).
    The server splits `--agda-flags` on whitespace, so no path in it may
    contain a space.  Which Agda to name, and how it stays current when your
    project's pins move, depends on how the project gets its Agda;

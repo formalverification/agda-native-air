@@ -57,7 +57,7 @@ from the checkout's tracked files other than Agda sources, builds the
 attribute once per key (`nix build <checkout>#<attribute>`, kept as a gc root
 under `~/.cache/agda-mcp/<attribute>/`), and runs that build's `bin/agda`
 with every argument it was given.  Each checkout so gets the Agda its own
-lock names, with nothing to refresh by hand.  The header of the script says
+lock names, with nothing to rebuild by hand.  The header of the script says
 why the key covers what it covers (in short: Nix reads every tracked file,
 and formal-ledger-specifications builds its Agda from Haskell sources, not
 only from its lock).
@@ -89,18 +89,29 @@ only from its lock).
    same Agda; name your project's top module.
 +  There is no `--library-file`.  The environment's wrapper carries its own,
    which registers the dependencies, and Agda finds the project from the
-   checkout's `.agda-lib`.
+   checkout's `.agda-lib`.  The server cannot see the wrapper's file, so it
+   reads the one Agda would read without it, `$AGDA_DIR/libraries` or else
+   `~/.agda/libraries`, to tell which checkout a file belongs to.  If that
+   file registers the project at another checkout, every call is refused
+   with `rootMismatch` (measured 2026-11-07); remove the project's line from
+   it, which the wrapper's Agda never reads.
 +  A first call on a new key costs about a second when the environment is
    already in the store (a `nix develop` in that checkout has built it), and
    a full build when it is not, which can outlast a tool call's timeout.  The
    build is then killed with the call, keeps what it finished, and resumes on
    the next call; the verification step below builds it outside any timeout.
 +  An edit to a tracked file that is not an Agda source (a changelog, a
-   script) makes a new key, so the first call after it evaluates the flake
-   again, about a second, and links the same build.  On 2026-11-06, two
-   branches that differ from `master` in such files did exactly that; a
+   script) makes a new key, so the next Agda the server starts evaluates the
+   flake again, about a second, and links the same build.  On 2026-11-06,
+   two branches that differ from `master` in such files did exactly that; a
    worktree on the 2026-02-17 lock got that lock's environment, and `master`
    kept its own.
++  The server starts a new Agda for each batch call (`check_file`,
+   `get_diagnostics`, the `--check-command` gate), so those see a moved lock
+   at once.  The lane tools (`type_of`, `get_goal` and the rest) keep a
+   running Agda until it has been idle for fifteen minutes, even across
+   `reload: true`, so after moving the lock, restart the server (in Claude
+   Code, reconnect it under `/mcp`, or start a new session).
 
 **Verify**.  From the checkout, before the first session, build and run the
 Agda once, as follows:
@@ -219,17 +230,18 @@ What each misconfiguration looks like from inside a session, each seen on
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `NotInScope`, or another scope error, in a file of a dependency library, at the first load of any module | a pin built from an older lock | register [the launcher](#a-flake-that-exports-an-agda-environment), or rebuild the pin |
-| `agda-mcp: --agda-bin ... is /nix/store/..., but the flake at ... now builds ...` in the server's log | the same, said at startup by the launcher, about a second in | as above |
+| `agda-mcp: --agda-bin ... is /nix/store/..., but the flake at ... now builds ...` in the server's log | the same, said at startup by `run-server.sh`, about a second in | as above |
 | `ClashingDefinition` or `NotInScope` in a dependency, for a file of a sibling worktree | a lane tool loaded a worktree on another lock with the session's Agda | ask that worktree's own session |
 | `AmbiguousTopLevelModuleName`, naming the file in two checkouts | a batch tool (`check_file`) was asked about a file of a sibling worktree | ask that worktree's own session |
-| `rootMismatch`, naming a libraries file | that file registers the project at another checkout | pass `--library-file` naming the checkout's own file |
+| `rootMismatch`, naming a libraries file | that file registers the project at another checkout | pass `--library-file` naming the checkout's own file; under `agda-for-flake.sh`, remove the project's line from that file |
 | `LibraryError`: `Library 'X' not found` | the libraries file Agda read lacks `X`: a file missing a dependency, or a session started outside every checkout (Agda then falls back to its defaults; measured 2026-09-29) | add `X`; start the session in the checkout |
-| `stderrTail` holding `agda-for-flake: ...` (lane tools), or `success: false`, `exitCode` 69 and no diagnostics (`check_file`) | the launcher ran no Agda: no flake or no lock at or above the checkout, no attribute, no `nix`, or a failed build (offline, say) | the line says which; `check_file` leaves it in the server's log |
+| `stderrTail` holding `agda-for-flake: ...` (lane tools), or `success: false`, `exitCode` 69 and no diagnostics (`check_file`) | the launcher ran no Agda: no flake or no lock at or above the checkout, no attribute, no `nix`, or a failed build (offline, say) | the line says which; `check_file` returns no text of it, and the server does not log it ([#346]), so run the [verification command](#a-flake-that-exports-an-agda-environment) from the checkout, which prints it |
 | The harness shows `CONNECTION_CLOSED` | the server never started | [Known issues][known-issues] |
 
-Claude Code keeps each server's log, the launcher's lines among them, under
-`~/.cache/claude-cli-nodejs/<project-dir>/mcp-logs-agda/`.
+Claude Code keeps each server's log, the startup line of `run-server.sh`
+among them, under `~/.cache/claude-cli-nodejs/<project-dir>/mcp-logs-agda/`.
 
+[#346]: https://github.com/formalverification/agda-native-air/issues/346
 [agda-for-flake]: ../../scripts/agda-for-flake.sh
 [connecting]: connecting-an-agent.md
 [field-report]: ../field-reports/2026-11-06-fls-stale-pin-and-proof-repairs.md

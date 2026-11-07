@@ -66,6 +66,7 @@ case "$1" in
     stdin="$(cat)"                      # /dev/null gives nothing
     echo "stub nix: stdout noise"       # must not reach Agda's stdout
     sleep "${STUB_NIX_SLEEP:-0}"
+    eval "${STUB_NIX_DURING_BUILD:-}"   # a checkout that changes mid-build
     if [ -n "${STUB_NIX_FAIL:-}" ]; then echo "error: stub nix cannot fetch" >&2; exit 1; fi
     n="$(grep -c '^nix build' "$STUB_NIX_LOG")"
     out="${STUB_STORE}/build-${n}"
@@ -223,10 +224,12 @@ def test_nix_runs_without_the_dynamic_linker_path_and_agda_keeps_it(sandbox: San
 def test_the_root_is_a_cache_entry_with_a_note(sandbox: Sandbox, checkout: Path) -> None:
     launch(sandbox, checkout)
     entries = sorted(p.name for p in (sandbox.cache / "agda-mcp" / ATTR).iterdir())
-    assert len(entries) == 3
+    assert len(entries) == 4
     key = entries[0]
-    assert entries == [key, f"{key}.lock", f"{key}.txt"]
-    assert (sandbox.cache / "agda-mcp" / ATTR / key).is_symlink()
+    assert entries == [key, f"{key}.lock", f"{key}.out", f"{key}.txt"]
+    # <key>.out is Nix's gc root; <key>, a link to it, is what a call runs.
+    assert os.readlink(sandbox.cache / "agda-mcp" / ATTR / key) == f"{key}.out"
+    assert (sandbox.cache / "agda-mcp" / ATTR / f"{key}.out").is_symlink()
     note = (sandbox.cache / "agda-mcp" / ATTR / f"{key}.txt").read_text(encoding="utf-8")
     assert f"checkout {checkout}\n" in note and f"attribute {ATTR}\n" in note
 
@@ -269,6 +272,34 @@ def test_an_uncommitted_edit_counts_and_its_revert_finds_the_old_root(sandbox: S
     lock.write_text(original, encoding="utf-8")  # back, uncommitted
     assert build_of(launch(sandbox, checkout)) == "build-1"
     assert sandbox.builds() == 2
+
+
+def test_a_symlinks_target_and_a_files_executable_bit_count(sandbox: Sandbox, checkout: Path) -> None:
+    # Nix copies a symlink as a symlink and keeps a file's executable bit,
+    # so either can change a build; neither may share another tree's key.
+    (checkout / "build-tools" / "old").mkdir()
+    (checkout / "build-tools" / "new").mkdir()
+    (checkout / "build-tools" / "old" / "a.hs").write_text("old\n", encoding="utf-8")
+    (checkout / "build-tools" / "new" / "a.hs").write_text("new\n", encoding="utf-8")
+    (checkout / "build-tools" / "src").symlink_to("old")
+    (checkout / "build.sh").write_text("echo build\n", encoding="utf-8")
+    git(checkout, "add", "-A")
+    git(checkout, "commit", "-q", "-m", "a symlink and a script")
+    link = checkout / "build-tools" / "src"
+    assert build_of(launch(sandbox, checkout)) == "build-1"
+    link.unlink(); link.symlink_to("new")  # another directory
+    assert build_of(launch(sandbox, checkout)) == "build-2"
+    link.unlink(); link.symlink_to("gone")  # dangling
+    assert build_of(launch(sandbox, checkout)) == "build-3"
+    link.unlink(); link.symlink_to("old")  # back
+    assert build_of(launch(sandbox, checkout)) == "build-1"
+    (checkout / "build.sh").chmod(0o755)  # unstaged mode change
+    assert build_of(launch(sandbox, checkout)) == "build-4"
+    git(checkout, "add", "build.sh")  # staged, then committed: the same tree
+    assert build_of(launch(sandbox, checkout)) == "build-4"
+    git(checkout, "commit", "-q", "-m", "executable")
+    assert build_of(launch(sandbox, checkout)) == "build-4"
+    assert sandbox.builds() == 4
 
 
 def test_an_untracked_file_is_invisible_to_nix_and_to_the_key(sandbox: Sandbox, checkout: Path) -> None:
@@ -325,6 +356,36 @@ def test_two_first_calls_at_once_build_once(sandbox: Sandbox, checkout: Path) ->
     assert all(out.startswith("agda build-1 ") for out, _ in results), results
     assert sandbox.builds() == 1
     assert any("waiting for another build" in err for _, err in results)
+
+
+# ---- A checkout that changes while Nix builds it ---------------------------
+
+def test_a_build_of_a_tree_that_changed_meanwhile_is_not_kept_under_the_old_key(
+        sandbox: Sandbox, checkout: Path) -> None:
+    lock = checkout / "flake.lock"
+    original = lock.read_text(encoding="utf-8")
+    marker = checkout.parent / "changed-once"
+    # The first build sees the lock change under it; later builds see none.
+    during = f'[ -e "{marker}" ] || {{ touch "{marker}"; echo moved >> "{lock}"; }}'
+    done = launch(sandbox, checkout, extra={"STUB_NIX_DURING_BUILD": during})
+    assert build_of(done) == "build-2" and sandbox.builds() == 2
+    assert "changed during the build; discarded it, building again" in done.stderr
+    # The original lock never got build-1, the build of the moved lock.
+    lock.write_text(original, encoding="utf-8")
+    assert build_of(launch(sandbox, checkout)) == "build-3"
+    with lock.open("a", encoding="utf-8") as handle:
+        handle.write("moved\n")
+    assert build_of(launch(sandbox, checkout)) == "build-2"
+    assert sandbox.builds() == 3
+
+
+def test_a_tree_that_changes_during_every_build_is_refused(sandbox: Sandbox, checkout: Path) -> None:
+    during = f'echo moved >> "{checkout / "flake.lock"}"'
+    done = launch(sandbox, checkout, extra={"STUB_NIX_DURING_BUILD": during})
+    refused(done, "changed during each of 3 builds; no Agda was run")
+    assert sandbox.builds() == 3
+    assert not [p for p in (sandbox.cache / "agda-mcp" / ATTR).iterdir()
+                if p.suffix not in (".lock",)]
 
 
 # ---- Refusals: one line, exit 69, and no Agda ------------------------------

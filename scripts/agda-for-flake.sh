@@ -37,7 +37,8 @@
 #   the working tree's contents (a dirty tree included).  The key is a hash
 #   of every tracked file except Agda sources (*.agda, *.lagda, *.lagda.*),
 #   taken from the index (`git ls-files --stage`) and, for files the working
-#   tree changes, from their contents (`git hash-object`), plus the
+#   tree changes, from their type, mode and contents (`git hash-object`,
+#   which for a symlink hashes its target's name), plus the
 #   attribute's name and the flake's directory within the repository.  It
 #   costs about 15 ms per call on formal-ledger-specifications.
 #   +  Why not flake.lock alone: flake.nix and the files it imports decide the
@@ -62,9 +63,11 @@
 #   reads every file in the directory and no cheaper key is exact.
 #
 # The cache:
-#   ${XDG_CACHE_HOME:-$HOME/.cache}/agda-mcp/<attr>/<key> is the gc root (a
-#   symlink into the store that keeps the build alive), <key>.lock the lock
-#   file, and <key>.txt a note of the checkout and output that made it.  The
+#   ${XDG_CACHE_HOME:-$HOME/.cache}/agda-mcp/<attr>/<key>.out is the gc root
+#   (a symlink into the store that keeps the build alive), <key> a link to
+#   it, published once the build is checked against the key (see "Build on
+#   a miss" below), <key>.lock the lock file, and <key>.txt a note of the
+#   checkout and output that made it.  The
 #   key holds no checkout path, so sibling worktrees on the same lock share
 #   one root.  Nothing is ever removed: delete the roots you no longer want
 #   (`ls -lt` shows the newest first), then let `nix store gc` reclaim them.
@@ -83,7 +86,7 @@
 #   an exclusive flock(1) on <key>.lock; the second waits, says so, and then
 #   finds the root the first one built.  Without flock (stock macOS) they
 #   both run `nix build`, which is still correct: Nix locks each store path
-#   while building it, and `-o` replaces the root symlink atomically.  A
+#   while building it, and both publish the same link.  A
 #   build interrupted by the server's timeout (it kills the whole process
 #   group) leaves no root, and the next call starts it again; every store
 #   path finished before the interruption stays built.
@@ -149,19 +152,32 @@ NOT_AGDA=(':(exclude)*.agda' ':(exclude)*.lagda' ':(exclude)*.lagda.*')
 
 # git_inputs TOP: the lines the key hashes for a git checkout rooted at TOP,
 # one per tracked file that is not an Agda source, "MODE HASH PATH", where
-# HASH is the blob Nix will read: the working tree's for a file it changes
-# ("deleted" for one it removed), the index's otherwise.  So a key describes
-# the tree, not how git holds it: the same contents staged or not, or
-# committed, give the same key.
+# MODE and HASH are what Nix will read: the working tree's for a file it
+# changes, the index's otherwise.  A changed file is read as git would
+# stage it, without following a symlink: a symlink is mode 120000 and the
+# blob of its target's name, a regular file 100755 or 100644 by its
+# executable bit (the index's mode where core.fileMode is false, as git
+# does), and anything else "deleted".  So a key describes the tree, not how
+# git holds it: the same contents staged or not, or committed, give the
+# same key, and two trees that differ only in a symlink's target or a
+# file's executable bit give two.
 git_inputs() {
-  local top="$1" f
+  local top="$1" f filemode mode
+  filemode="$(git -C "$top" config --type=bool core.fileMode 2>/dev/null || echo true)"
   {
     git -C "$top" -c core.quotePath=false diff --name-only -- "${NOT_AGDA[@]}" |
       while IFS= read -r f; do
-        if [ -f "${top}/${f}" ]; then
-          printf 'W\t%s\t%s\n' "$(git -C "$top" hash-object -- "$f")" "$f"
+        if [ -L "${top}/${f}" ]; then
+          printf 'W\t120000\t%s\t%s\n' \
+            "$(readlink -- "${top}/${f}" | tr -d '\n' | git -C "$top" hash-object --stdin)" "$f"
+        elif [ -f "${top}/${f}" ]; then
+          if [ "$filemode" = false ]; then mode=index
+          elif [ -x "${top}/${f}" ]; then mode=100755
+          else mode=100644
+          fi
+          printf 'W\t%s\t%s\t%s\n' "$mode" "$(git -C "$top" hash-object -- "$f")" "$f"
         else
-          printf 'W\tdeleted\t%s\n' "$f"
+          printf 'W\tdeleted\tdeleted\t%s\n' "$f"
         fi
       done
     printf 'END\n'
@@ -169,30 +185,53 @@ git_inputs() {
     git -C "$top" -c core.quotePath=false ls-files --stage -- "${NOT_AGDA[@]}"
   } | awk -F '\t' '
     !listed && $0 == "END" { listed = 1; next }
-    !listed { blob[$3] = $2; next }
-    { split($1, f, " "); h = ($2 in blob) ? blob[$2] : f[2]; print f[1], h, $2 }'
+    !listed { wmode[$4] = $2; blob[$4] = $3; next }
+    { split($1, f, " "); m = f[1]; h = f[2]
+      if ($2 in blob) { h = blob[$2]; if (wmode[$2] != "index") m = wmode[$2] }
+      print m, h, $2 }'
 }
 
+top=""
 if top="$(git -C "$flake_dir" rev-parse --show-toplevel 2>/dev/null)"; then
   top="$(cd "$top" && pwd -P)"
   sub="${flake_dir#"$top"}"
-  inputs="$(git_inputs "$top")" || fail "git could not list the files of ${top}"
-  key="$(printf 'agda-for-flake key 1\nattr %s\nflake-dir %s\n%s\n' "$attr" "${sub:-/}" "$inputs" | sha256)"
-  key="${key:0:32}"
-  keyed_by="the tracked files of ${top} other than Agda sources"
 else
-  out="$(run_nix eval --raw --no-write-lock-file "${flake_ref}.outPath" </dev/null)" ||
-    fail "nix eval of ${flake_ref}.outPath failed; no Agda was run"
-  key="out-$(basename "$out" | cut -c1-32)"
-  keyed_by="the output path ${out} (${flake_dir} is not in a git checkout)"
+  top=""
 fi
 
+# compute_key: set key and keyed_by from the checkout as it stands now.
+compute_key() {
+  if [ -n "$top" ]; then
+    inputs="$(git_inputs "$top")" || fail "git could not list the files of ${top}"
+    key="$(printf 'agda-for-flake key 2\nattr %s\nflake-dir %s\n%s\n' "$attr" "${sub:-/}" "$inputs" | sha256)"
+    key="${key:0:32}"
+    keyed_by="the tracked files of ${top} other than Agda sources"
+  else
+    out="$(run_nix eval --raw --no-write-lock-file "${flake_ref}.outPath" </dev/null)" ||
+      fail "nix eval of ${flake_ref}.outPath failed; no Agda was run"
+    key="out-$(basename "$out" | cut -c1-32)"
+    keyed_by="the output path ${out} (${flake_dir} is not in a git checkout)"
+  fi
+}
+
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/agda-mcp/${attr//[^A-Za-z0-9._+-]/_}"
-root="${cache}/${key}"
-agda="${root}/bin/agda"
 
 # ---- Build on a miss, under the lock ---------------------------------------
-if [ ! -x "$agda" ]; then
+# Nix reads the checkout when it builds, not when the key was computed, so
+# a lock or a source that changes in between would build one tree's
+# environment under another tree's key, and every later return to that tree
+# would reuse it.  So the build goes to <key>.out (Nix's gc root), the key
+# is computed again afterward, and <key> is published, as a link to
+# <key>.out, only when the two agree; otherwise the build is discarded and
+# the new key is built, up to three times.  (A tree that changes and changes
+# back during one build would still pass; nothing short of building from a
+# snapshot excludes that, and Nix builds a dirty tree only in place.)
+attempt=1
+while :; do
+  compute_key
+  root="${cache}/${key}"
+  agda="${root}/bin/agda"
+  [ -x "$agda" ] && break
   mkdir -p "$cache" || fail "cannot create the cache directory ${cache}"
   exec 9>"${root}.lock" || fail "cannot open the lock file ${root}.lock"
   if command -v flock >/dev/null 2>&1; then
@@ -205,23 +244,37 @@ if [ ! -x "$agda" ]; then
   if [ ! -x "$agda" ]; then
     say "building ${attr} from ${flake_dir} (key ${key}, from ${keyed_by}); once per key"
     status=0
-    run_nix build --no-write-lock-file "$flake_ref" -o "$root" </dev/null >&2 || status=$?
+    run_nix build --no-write-lock-file "$flake_ref" -o "${root}.out" </dev/null >&2 || status=$?
     if [ "$status" != 0 ]; then
       fail "nix build ${flake_ref} failed (exit ${status}; offline, or a broken flake?); no Agda was run"
     fi
-    if [ ! -x "$agda" ]; then
-      fail "${attr} built to $(readlink "$root" || echo "$root"), which has no executable bin/agda; name an Agda environment"
+    if [ ! -x "${root}.out/bin/agda" ]; then
+      fail "${attr} built to $(readlink "${root}.out" || echo "${root}.out"), which has no executable bin/agda; name an Agda environment"
     fi
+    built_key="$key"
+    compute_key
+    if [ "$key" != "$built_key" ]; then
+      rm -f "${root}.out"
+      exec 9>&-
+      [ "$attempt" -lt 3 ] ||
+        fail "the files of ${flake_dir} changed during each of ${attempt} builds; no Agda was run"
+      say "the files of ${flake_dir} changed during the build; discarded it, building again"
+      attempt=$((attempt + 1))
+      continue
+    fi
+    # Publish: replace any stale link (a root whose build was collected).
+    ln -sfn "${key}.out" "$root" || fail "cannot publish the root ${root}"
     # A note for whoever prunes the cache; the key is not reversible.  Best
     # effort: a note that cannot be written costs nothing but the note.
     if printf 'checkout %s\nattribute %s\noutput %s\nkeyed by %s\nbuilt %s\n' \
-         "$flake_dir" "$attr" "$(readlink "$root")" "$keyed_by" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+         "$flake_dir" "$attr" "$(readlink "${root}.out")" "$keyed_by" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
          > "${root}.txt.$$"; then
       mv -f "${root}.txt.$$" "${root}.txt" || true
     fi
   fi
   # Release the lock before Agda starts; it must not outlive the build.
   exec 9>&-
-fi
+  break
+done
 
 exec "$agda" "$@"

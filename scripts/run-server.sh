@@ -199,6 +199,15 @@ drv_pname() {
 pin_check() {
   local bin="$1" cwd="$2" store_dir="${NIX_STORE_DIR:-/nix/store}" store dir system listing
   local name path pin_pname stale=""
+  # Resolve BIN as the server will run it: the server enters CWD first, so a
+  # relative path is relative to CWD (not to where this script started), and
+  # a bare name is looked up on PATH.  `cd` is logical, so `..` is undone
+  # textually and the test below sees where the path really points.
+  case "$bin" in
+    /*) ;;
+    */*) bin="$(cd "$cwd" && cd "$(dirname -- "$bin")" 2>/dev/null && pwd -L)/$(basename -- "$bin")" || return 0 ;;
+    *) bin="$(command -v -- "$bin")" || return 0 ;;
+  esac
   # A binary inside the checkout (a dev shell's .agda/bin/agda) follows the
   # checkout, and this launcher's own agda-for-flake.sh is not a store path.
   case "$bin" in "$cwd"/*) return 0 ;; esac

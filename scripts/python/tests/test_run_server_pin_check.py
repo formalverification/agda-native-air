@@ -116,12 +116,13 @@ def packages(world: World, *entries: tuple[str, str]) -> str:
 
 def launch(world: World, agda_bin: str, listing: str, cwd: Path | None = None,
            extra: Mapping[str, str] | None = None,
-           args: Sequence[str] = ()) -> subprocess.CompletedProcess[str]:
-    """Start the launcher on its fast path from the checkout (or CWD)."""
+           args: Sequence[str] = (), server_cwd: str = "${PWD}") -> subprocess.CompletedProcess[str]:
+    """Start the launcher on its fast path from the checkout (or CWD), the
+    server in SERVER_CWD."""
     env = {**os.environ, "PATH": f"{world.bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}",
            "AGDA_MCP_BIN": str(world.server), "NIX_STORE_DIR": str(world.store),
            "STUB_NIX_LOG": str(world.log), "STUB_PACKAGES": listing, **(extra or {})}
-    return subprocess.run([str(RUN_SERVER), "--cwd", "${PWD}", "--agda-bin", agda_bin, *args],
+    return subprocess.run([str(RUN_SERVER), "--cwd", server_cwd, "--agda-bin", agda_bin, *args],
                           cwd=cwd or world.checkout, env=env, input="", capture_output=True,
                           text=True, timeout=60)
 
@@ -194,6 +195,35 @@ def test_a_per_checkout_binary_is_never_checked(world: World) -> None:
 def test_a_binary_outside_the_store_is_never_checked(world: World) -> None:
     assert pin_lines(launch(world, str(REPO_ROOT / "scripts" / "agda-for-flake.sh"), "")) == []
     assert pin_lines(launch(world, "agda", "")) == []
+    assert world.nix_calls() == 0
+
+
+def test_a_relative_pin_is_resolved_where_the_server_runs_it(world: World, tmp_path: Path) -> None:
+    # The server enters --cwd and then runs --agda-bin, so a relative pin is
+    # the one beside the checkout, not beside the directory the client
+    # started in.  Here the checkout's is stale and the launch directory's
+    # (the same relative path) is current: one line, naming the stale one.
+    world.pin(tmp_path / "cache" / "agda-root", OLD)
+    elsewhere = tmp_path / "elsewhere"
+    world.pin(tmp_path / "cache-elsewhere" / "agda-root", NEW)
+    (elsewhere / "sub").mkdir(parents=True)
+    (tmp_path / "cache-elsewhere").rename(elsewhere / "cache")
+    relative = "../cache/agda-root/bin/agda"
+    listing = packages(world, ("fls-agdaWithPackages", NEW))
+    lines = pin_lines(launch(world, relative, listing, cwd=elsewhere / "sub", server_cwd=str(world.checkout)))
+    assert len(lines) == 1 and f"is {world.store / OLD}, but" in lines[0]
+    assert lines[0].startswith(f"agda-mcp: --agda-bin {tmp_path / 'cache' / 'agda-root' / 'bin' / 'agda'} ")
+    # The converse: the checkout's is current, the launch directory's stale.
+    (tmp_path / "cache" / "agda-root").unlink()
+    world.pin(tmp_path / "cache" / "agda-root", NEW)
+    (elsewhere / "cache" / "agda-root").unlink()
+    world.pin(elsewhere / "cache" / "agda-root", OLD)
+    assert pin_lines(launch(world, relative, listing, cwd=elsewhere / "sub", server_cwd=str(world.checkout))) == []
+
+
+def test_a_relative_path_into_the_checkout_is_never_checked(world: World) -> None:
+    world.pin(world.checkout / ".agda-root", OLD)
+    assert pin_lines(launch(world, ".agda-root/bin/agda", packages(world, ("p", NEW)))) == []
     assert world.nix_calls() == 0
 
 
