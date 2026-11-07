@@ -214,7 +214,9 @@ pin_check() {
   # The pin is the store path two levels above bin/agda, wherever the
   # registration's symlinks lead (a wrapper's bin/agda may itself point into
   # another store path, which names the unwrapped Agda, not the environment).
-  store="$(readlink -f -- "$(dirname -- "$(dirname -- "$bin")")" 2>/dev/null)" || return 0
+  # `cd` and `pwd -P` resolve it on any POSIX system; `readlink -f` reached
+  # macOS only in 12.3.
+  store="$(cd "$(dirname -- "$(dirname -- "$bin")")" 2>/dev/null && pwd -P)" || return 0
   case "$store" in "${store_dir}"/*/*|"${store_dir}"/) return 0 ;; "${store_dir}"/*) ;; *) return 0 ;; esac
   # The project's flake: the nearest flake.nix at or above CWD, within the
   # repository (the rule agda-for-flake.sh uses).
