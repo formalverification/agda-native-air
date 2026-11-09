@@ -331,14 +331,37 @@ The five query tools of the Tool Surface section share one implementation spine 
 
 Every answer carries the lane's own echo in brief, `lane {load,
 loadElapsedMs?}`, where `load` says why this call did or did not re-load
-(`reused`/`first`/`switch`/`changed`/`forced`/`retry`) and `loadElapsedMs`
-what that load cost, beside `project {root, rootSource}`.  With `verbose:
-true` it carries the whole of it alongside the usual `command`/`project` pair
-(issue #184): `lane {root, pid, spawned, load, loadElapsedMs?, agdaVersion,
-iotcm}`, where `iotcm` is the exact wire lines sent, so a call can be replayed
-by hand.  `checkedFromSource` means on this lane what it means in the batch
-tools, read from the load's own progress lines: `false` for a reused load (no
-load ran, so nothing was checked), and absent when its evidence could not
+(`reused`/`first`/`switch`/`changed`/`forced`/`retry`/`restarted`) and
+`loadElapsedMs` what that load cost, beside `project {root, rootSource}`.
+With `verbose: true` it carries the whole of it alongside the usual
+`command`/`project` pair (issue #184): `lane {root, pid, spawned, load,
+loadElapsedMs?, agdaVersion, agdaStamp, iotcm}`, where `agdaStamp` names the
+Agda the lane was started with and `iotcm` is the exact wire lines sent, so a
+call can be replayed by hand.
+
+A lane answers only from the Agda that `--agda-bin` would start at the time
+of the call (issue #347).  Each lane keeps a stamp of that Agda, taken before
+it was spawned: `agdaStamp {path, contents, identity?}`, the real path
+`--agda-bin` resolves to (every symlink followed), a fingerprint of its bytes
+when it is 64 KiB or less (a wrapper script) or else its size and
+modification time (a binary), and the output of `--agda-identity-command`
+when the server has one.  Before reusing a lane the server takes the stamp
+again, under the lane's lock; when the two differ it stops the lane, starts a
+new one, and the answer's `load` is `restarted`, so a client can tell why it
+paid for a whole load.  So a pin rebuilt (the path moves), a dev shell's
+wrapper rewritten to name another store path (the bytes move; the same bytes
+written again, as every shell entry does, move nothing), and a launcher
+whose key moves (the identity command's output moves) each restart the lane
+at its next call.  The identity command's output stands for
+`--agda-identity-ttl` seconds (default 2) after it runs, since it is a
+process (15 ms for `scripts/agda-for-flake.sh --print-key`); a spawn always
+runs it afresh.  The batch tools start a new Agda per call and take no stamp,
+and their warm-lane peek (the hole goals and meta types below) declines a
+lane whose stamp differs.
+
+`checkedFromSource` means on this lane what it means in the batch tools, read
+from the load's own progress lines: `false` for a reused load (no load ran, so
+nothing was checked), and absent when its evidence could not
 arrive: a per-load argv carrying `--trace-imports=0`, which silences those
 lines (issue #114), or a load that failed before Agda announced the file,
 which establishes no interface reuse either.  Process-level failures (spawn,
@@ -420,6 +443,7 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
          [--corpus PATH]  [--timeout N] [--verbose]
          [--check-command "CMD ARGS ..."] [--check-timeout N]
          [--expose NAME,NAME,...] [--auto]
+         [--agda-identity-command "CMD ARGS ..."] [--agda-identity-ttl N]
 ```
 
 | Flag | Description |
@@ -433,6 +457,8 @@ agda-mcp [--cwd DIR]      [--agda-bin PATH] [--agda-flags "FLAG1 FLAG2 ..."]
 | `--check-timeout N`  | Timeout for one `check_project` run, in seconds (default: 1800; `0` means no limit).  Separate from `--timeout`, because a whole-project gate legitimately runs for tens of minutes. |
 | `--expose NAMES`     | Present only these tools (comma-separated, issue #191): `tools/list` lists them alone, the `initialize` instructions name them alone, and a call to any other registered tool is refused by name.  Without it every registered tool is presented but `search_in_scope`, which only this flag presents (issue #203).  A name this configuration does not register (a typo, or a corpus tool without `--corpus`) is a fatal startup error, never a silently smaller surface. |
 | `--auto`             | Register the `auto` tool, Agda's own proof search at a hole (issue #205).  Off by default; `--expose` may name `auto` only when this flag registers it. |
+| `--agda-identity-command "..."` | A command whose standard output names the Agda that `--agda-bin` would start, for what the binary's path and bytes cannot show (issue #347).  Split on whitespace and run with no shell, in the server's working directory; for `scripts/agda-for-flake.sh`, name it with `--print-key`, which prints the key the launcher would build under.  Its output joins the stamp each interaction lane is compared with before reuse, and a lane whose stamp differs is restarted (see *Live queries over the interaction lane*).  A failing command is part of the stamp, named by how it failed. |
+| `--agda-identity-ttl N` | Seconds the identity command's output stands before a lane call runs it again (default: 2; `0` runs it before every call).  A spawn always runs it afresh. |
 | `--verbose`          | Emit debug output to stderr. |
 | `--help`             | Print usage and exit. |
 

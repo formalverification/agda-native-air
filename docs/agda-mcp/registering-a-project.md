@@ -70,6 +70,7 @@ only from its lock).
       "args": [
         "--cwd", "${PWD}",
         "--agda-bin", "/ABS/AIR/scripts/agda-for-flake.sh",
+        "--agda-identity-command", "/ABS/AIR/scripts/agda-for-flake.sh --print-key",
         "--agda-flags", "-i /ABS/AIR/agda-dojang/agda",
         "--timeout", "900",
         "--check-command", "/ABS/AIR/scripts/agda-for-flake.sh src/Ledger.lagda.md",
@@ -109,9 +110,20 @@ only from its lock).
 +  The server starts a new Agda for each batch call (`check_file`,
    `get_diagnostics`, the `--check-command` gate), so those see a moved lock
    at once.  The lane tools (`type_of`, `get_goal` and the rest) keep a
-   running Agda until it has been idle for fifteen minutes, even across
-   `reload: true`, so after moving the lock, restart the server (in Claude
-   Code, reconnect it under `/mcp`, or start a new session).
+   running Agda between calls, for up to fifteen idle minutes, and
+   `--agda-identity-command` is how they notice that it is no longer the one
+   the launcher would start: before reusing it, the server runs
+   `agda-for-flake.sh --print-key` (15 ms, at most once every two seconds)
+   and compares the key with the one the lane started under.  After the lock
+   moves, the next lane call restarts the lane and pays one full load in the
+   new environment, and its answer says so (`lane.load` is `restarted`).
+   Without the flag the lanes cannot see the key, since the launcher's own
+   path and bytes never change, and keep the old environment until they
+   have been idle for fifteen minutes.  On 2026-11-08, in a worktree of
+   formal-ledger-specifications whose lock was replaced by an older one
+   mid-session, the next `type_of` restarted the lane in 10.6 s and answered
+   from the older environment (a `NotInScope` in a dependency, as that
+   environment gives this tree), and restoring the lock restarted it back.
 
 **Verify**.  From the checkout, before the first session, build and run the
 Agda once, as follows:
@@ -159,8 +171,11 @@ Claude Code expands to the directory the session starts in:
    file, which may register the project at another checkout.
 +  The binary follows the checkout's lock only once the dev shell has been
    entered again: after a pull that moves the lock, run `nix develop` once in
-   that checkout before the next session.  The binary is no gc root either,
-   so a `nix store gc` can remove the Agda it names until the next entry.
+   that checkout.  A running session's lanes then restart at their next
+   call, since the server compares the wrapper's bytes, which name the new
+   store path, with the bytes a lane started under; an entry that rewrites
+   the same bytes restarts nothing.  The binary is no gc root either, so a
+   `nix store gc` can remove the Agda it names until the next entry.
 
 **Verify**.  `nix develop --command true` once in the checkout, then
 `.agda/bin/agda --version`, then the probe below: on
@@ -210,7 +225,9 @@ FILE="$PWD/src/Some/Module.agda"   # any module of the project
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"type_of","arguments":{"filePath":"'"$FILE"'","expr":"Set","verbose":true}}}' \
   | env AGDA_FLAKE_ATTR=fls-agdaWithPackages /ABS/AIR/scripts/run-server.sh \
-      --cwd "$PWD" --agda-bin /ABS/AIR/scripts/agda-for-flake.sh --agda-flags "-i /ABS/AIR/agda-dojang/agda" \
+      --cwd "$PWD" --agda-bin /ABS/AIR/scripts/agda-for-flake.sh \
+      --agda-identity-command "/ABS/AIR/scripts/agda-for-flake.sh --print-key" \
+      --agda-flags "-i /ABS/AIR/agda-dojang/agda" \
       2>verify.err | tail -1
 ```
 
@@ -218,7 +235,9 @@ Pass the registration's arguments, with `"$PWD"` for `${PWD}`, and its `env`
 (only the flake setup has one).  A working registration answers the type of
 `Set` in the module's scope once the module has loaded (seconds, or minutes
 for a first load of a large library), and with `verbose` the answer says who
-answered: `lane.agdaVersion`, `command.binary`, and `project.root`, which
+answered: `lane.agdaVersion`, `command.binary`, `lane.agdaStamp` (the real
+path and contents of the Agda the lane started, and, with an identity
+command, its output: for the launcher, the key), and `project.root`, which
 must be the checkout.  An `error` object instead is Agda's own; read it with
 the next section, and `verify.err` for the server's log.
 
