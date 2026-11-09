@@ -27,7 +27,11 @@ stays put for Agda sources and for files Nix does not see; sibling worktrees
 share a build on one lock and get their own on another; a subdirectory finds
 the checkout's flake; two first calls at once build once; and every refusal
 (no attribute, no flake, no lock, a failed build, an output without Agda) is
-one line on stderr, exit 69, and no Agda run.
+one line on stderr, exit 69, and no Agda run.  And `--print-key` (issue #347)
+prints the key a call would use, which is the name of the root that call
+runs, and builds, writes, and runs nothing; it follows the same files the
+key does, takes `--flake-attr` before or after it, and refuses as a call
+would.
 
 Usage
 -----
@@ -448,3 +452,64 @@ def test_a_flake_outside_git_is_keyed_by_its_output_path(sandbox: Sandbox, tmp_p
     assert build_of(launch(sandbox, plain, extra={"STUB_EVAL_OUT": first_out})) == "build-1"
     assert build_of(launch(sandbox, plain, extra={"STUB_EVAL_OUT": second_out})) == "build-2"
     assert (sandbox.cache / "agda-mcp" / ATTR / ("out-" + "a" * 32)).is_symlink()
+
+
+# ---- --print-key: the key alone, for agda-mcp's identity command (#347) ----
+
+def printed_key(done: subprocess.CompletedProcess[str]) -> str:
+    """The key `--print-key` printed: exit 0, one line, nothing on stderr."""
+    assert done.returncode == 0, done.stderr
+    assert done.stderr == ""
+    lines = done.stdout.splitlines()
+    assert len(lines) == 1, done.stdout
+    return lines[0]
+
+
+def test_print_key_names_the_root_a_call_runs_and_builds_nothing(sandbox: Sandbox, checkout: Path) -> None:
+    key = printed_key(launch(sandbox, checkout, ["--print-key"]))
+    assert len(key) == 32 and sandbox.builds() == 0
+    assert not (sandbox.cache / "agda-mcp").exists()  # nothing written
+    assert build_of(launch(sandbox, checkout)) == "build-1"
+    entries = sorted(p.name for p in (sandbox.cache / "agda-mcp" / ATTR).iterdir())
+    assert entries[0] == key  # the root the call built and ran is named by it
+    assert printed_key(launch(sandbox, checkout, ["--print-key"])) == key
+    assert sandbox.builds() == 1
+
+
+def test_print_key_follows_the_files_the_key_does(sandbox: Sandbox, checkout: Path) -> None:
+    before = printed_key(launch(sandbox, checkout, ["--print-key"]))
+    (checkout / "src" / "Ledger.agda").write_text("edited\n", encoding="utf-8")
+    assert printed_key(launch(sandbox, checkout, ["--print-key"])) == before  # an Agda source
+    with (checkout / "flake.lock").open("a", encoding="utf-8") as handle:
+        handle.write("moved\n")
+    moved = printed_key(launch(sandbox, checkout, ["--print-key"]))
+    assert moved != before  # the lock, uncommitted
+    git(checkout, "checkout", "--", "flake.lock")
+    assert printed_key(launch(sandbox, checkout, ["--print-key"])) == before
+    assert sandbox.builds() == 0
+
+
+def test_print_key_takes_the_flake_attr_before_or_after_it(sandbox: Sandbox, checkout: Path) -> None:
+    default = printed_key(launch(sandbox, checkout, ["--print-key"]))
+    orders = (["--print-key", "--flake-attr", "other"], ["--flake-attr", "other", "--print-key"],
+              ["--flake-attr=other", "--print-key"])
+    keys = {printed_key(launch(sandbox, checkout, args, extra={"AGDA_FLAKE_ATTR": ""})) for args in orders}
+    assert len(keys) == 1 and default not in keys  # the attribute is part of the key
+    assert sandbox.builds() == 0
+
+
+def test_print_key_refuses_as_a_call_would(sandbox: Sandbox, checkout: Path) -> None:
+    refused(launch(sandbox, checkout, ["--print-key"], extra={"AGDA_FLAKE_ATTR": ""}), "no flake attribute")
+    git(checkout, "rm", "-q", "flake.lock")
+    refused(launch(sandbox, checkout, ["--print-key"]), f"no flake.lock in {checkout}")
+    assert sandbox.builds() == 0
+
+
+def test_print_key_outside_git_is_the_output_path_key(sandbox: Sandbox, tmp_path: Path) -> None:
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / "flake.nix").write_text("{ }\n", encoding="utf-8")
+    (plain / "flake.lock").write_text("{ }\n", encoding="utf-8")
+    out = "/nix/store/cccccccccccccccccccccccccccccccc-agdaWithPackages-2.8.0"
+    key = printed_key(launch(sandbox, plain, ["--print-key"], extra={"STUB_EVAL_OUT": out}))
+    assert key == "out-" + "c" * 32 and sandbox.builds() == 0

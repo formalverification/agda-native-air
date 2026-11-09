@@ -10,7 +10,8 @@
 #   A registration names this script as agda-mcp's --agda-bin (and as the
 #   program of its --check-command), and names the flake attribute in its
 #   environment as AGDA_FLAKE_ATTR (or, on a command line, as a leading
-#   `--flake-attr NAME`).  Every argument after that goes to Agda unchanged.
+#   `--flake-attr NAME`).  Every argument after the leading options goes to
+#   Agda unchanged.
 #   The script finds the nearest flake.nix at or above its working directory,
 #   computes a key from the files that decide the attribute's output, and
 #   execs <cache>/agda-mcp/<attr>/<key>/bin/agda, building that root first
@@ -91,9 +92,21 @@
 #   group) leaves no root, and the next call starts it again; every store
 #   path finished before the interruption stays built.
 #
+# The key alone (issue #347):
+#   A leading `--print-key` prints the key this call would use, one line on
+#   stdout, and exits 0 without building or running anything (or fails as a
+#   call would, exit 69, when no key can be computed).  A registration names
+#   `agda-for-flake.sh --print-key` as agda-mcp's --agda-identity-command:
+#   the server's interaction lanes keep the Agda they started for up to
+#   fifteen idle minutes, and this script's own path and bytes never change,
+#   so the key is what tells the server that a lane's Agda is no longer the
+#   one this script would start.  It costs what computing the key costs
+#   (about 15 ms on formal-ledger-specifications; a `nix eval` outside git).
+#
 # Streams:
 #   agda-mcp reads Agda's standard output (JSON on the interaction lane), so
-#   this script writes nothing there: nix's output goes to stderr, and nix
+#   this script writes nothing there but the key of `--print-key`: nix's
+#   output goes to stderr, and nix
 #   reads /dev/null, never the requests waiting on the lane's stdin.
 #   LD_LIBRARY_PATH and DYLD_LIBRARY_PATH are cleared for nix only (a
 #   devShell's libssl breaks the profile nix, issue #153); Agda gets the
@@ -102,6 +115,7 @@
 # Usage:
 #   AGDA_FLAKE_ATTR=fls-agdaWithPackages scripts/agda-for-flake.sh --version
 #   scripts/agda-for-flake.sh --flake-attr fls-agdaWithPackages src/Ledger.lagda.md
+#   AGDA_FLAKE_ATTR=fls-agdaWithPackages scripts/agda-for-flake.sh --print-key
 #
 #   Run the first line once in a checkout after setting up a registration:
 #   it builds the root, if needed, outside any tool call's timeout, and
@@ -113,13 +127,19 @@ say() { echo "agda-for-flake: $*" >&2; }
 # Exit 69 (EX_UNAVAILABLE): the Agda asked for cannot be run.
 fail() { say "$*"; exit 69; }
 
-# ---- The attribute: a leading --flake-attr, else AGDA_FLAKE_ATTR ----------
+# ---- Leading options: --flake-attr (else AGDA_FLAKE_ATTR), --print-key ----
+# In either order; the first argument that is neither starts Agda's.
 attr="${AGDA_FLAKE_ATTR:-}"
-case "${1:-}" in
-  --flake-attr)   [ "$#" -ge 2 ] || fail "--flake-attr needs a value"
-                  attr="$2"; shift 2 ;;
-  --flake-attr=*) attr="${1#--flake-attr=}"; shift ;;
-esac
+print_key=false
+while :; do
+  case "${1:-}" in
+    --flake-attr)   [ "$#" -ge 2 ] || fail "--flake-attr needs a value"
+                    attr="$2"; shift 2 ;;
+    --flake-attr=*) attr="${1#--flake-attr=}"; shift ;;
+    --print-key)    print_key=true; shift ;;
+    *)              break ;;
+  esac
+done
 [ -n "$attr" ] ||
   fail "no flake attribute: set AGDA_FLAKE_ATTR in the registration's env, or pass --flake-attr NAME first"
 
@@ -215,6 +235,13 @@ compute_key() {
 }
 
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/agda-mcp/${attr//[^A-Za-z0-9._+-]/_}"
+
+# ---- The key alone: print it and stop (see "The key alone") ----------------
+if [ "$print_key" = true ]; then
+  compute_key
+  printf '%s\n' "$key"
+  exit 0
+fi
 
 # ---- Build on a miss, under the lock ---------------------------------------
 # Nix reads the checkout when it builds, not when the key was computed, so
