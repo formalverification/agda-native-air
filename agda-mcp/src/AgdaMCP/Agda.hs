@@ -67,6 +67,7 @@ module AgdaMCP.Agda
     AgdaConfig (..)
   , defaultConfig
   , defaultTimeoutSeconds
+  , defaultIdentityTtlSeconds
     -- * Debug output
   , debugLog
     -- * Marker parsing (pure)
@@ -131,6 +132,18 @@ data AgdaConfig = AgdaConfig
                                   --   no bound is enforced.
   , reportExpr    :: Text         -- ^ Reporting expression to inject (default: "reportGoalCtx").
   , agdaVerbose   :: Bool         -- ^ Emit debug output to stderr.
+  , agdaIdentityCommand :: Maybe [String]
+                                  -- ^ A command whose output names the Agda that
+                                  --   'agdaBin' would start, for what its path and
+                                  --   bytes cannot show (issue #347; a launcher
+                                  --   such as @scripts/agda-for-flake.sh
+                                  --   --print-key@).  Run with no shell, in the
+                                  --   server's working directory.
+  , agdaIdentityTtl :: Int        -- ^ Seconds an identity command's output is
+                                  --   trusted before a lane call runs it again;
+                                  --   0 or less runs it before every call
+                                  --   ('AgdaMCP.AgdaStamp' says why the default
+                                  --   is what it is).
   } deriving (Eq, Show)
 
 -- | defaultTimeoutSeconds: the default per-invocation wall-clock bound.
@@ -147,6 +160,11 @@ data AgdaConfig = AgdaConfig
 defaultTimeoutSeconds :: Int
 defaultTimeoutSeconds = 300
 
+-- | defaultIdentityTtlSeconds: how long an identity command's output stands
+-- in for a fresh run.  'AgdaMCP.AgdaStamp' records the measurement behind it.
+defaultIdentityTtlSeconds :: Int
+defaultIdentityTtlSeconds = 2
+
 -- | Sensible defaults; the caller should override @agdaFlags@ for their project.
 defaultConfig :: AgdaConfig
 defaultConfig = AgdaConfig
@@ -155,6 +173,8 @@ defaultConfig = AgdaConfig
   , agdaTimeout = Just defaultTimeoutSeconds
   , reportExpr  = "reportGoalCtx"
   , agdaVerbose = False
+  , agdaIdentityCommand = Nothing
+  , agdaIdentityTtl     = defaultIdentityTtlSeconds
   }
 
 -- | Emit a debug message to stderr, gated by 'agdaVerbose'.

@@ -78,6 +78,13 @@
 --     exiting cleanly (probed: rc 0 on EOF); a reaper thread sweeps on a fixed
 --     cadence.  Server shutdown latches the registry closed and drains every
 --     lane, waiting for any a request still holds.
+--   * A lane answers only from the Agda that @--agda-bin@ would start now
+--     (issue #347).  Each lane keeps the 'AgdaStamp' taken before its spawn;
+--     a request compares a fresh stamp with it under the slot's lock, before
+--     reuse, and on a difference stops the lane as the reaper does and spawns
+--     another, which the answer's @lane.load@ reports as @restarted@.  The
+--     batch path's peek declines a lane whose stamp is stale.
+--     'AgdaMCP.AgdaStamp' says what the stamp holds and what it costs.
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -98,6 +105,7 @@ module AgdaMCP.Interaction
   , laneSentLines
   , laneWasSpawned
   , lanePidOf
+  , laneAgdaStampOf
     -- * Request outcomes
   , LaneFailure (..)
   , LaneEvent (..)
@@ -179,7 +187,6 @@ import Control.Monad (forever)
 import Data.Aeson (Value (..), decodeStrict')
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
-import Data.Bits (xor)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
@@ -204,9 +211,12 @@ import System.Process
   )
 import System.Timeout (timeout)
 
+import AgdaMCP.AgdaStamp
+  ( IdentityCache, agdaStampForReuse, agdaStampForSpawn, fnv1a
+  , newIdentityCache )
 import AgdaMCP.Agda
   ( AgdaConfig (..), escalateAndReap, parseCheckingLine, progressChannelMuted )
-import AgdaMCP.Types (Rewrite, rewriteFromText, rewriteText)
+import AgdaMCP.Types (AgdaStamp, Rewrite, rewriteFromText, rewriteText)
 
 
 -- ---------------------------------------------------------------------------
@@ -671,6 +681,9 @@ data Lane = Lane
                                          --   later calls on converging failure
                                          --   paths do not rerun the ladder
                                          --   against a reaped child's pgid.
+  , laneAgda    :: AgdaStamp             -- ^ The stamp of the Agda a spawn
+                                         --   would start, taken before this
+                                         --   child was spawned (issue #347).
   }
 
 -- | What the lane last loaded, and what came of it.
@@ -720,9 +733,11 @@ type LaneSlot = MVar (Maybe Lane)
 -- shutdown will drain, and one that arrives later is refused before it can spawn
 -- anything.
 data InteractionLanes = InteractionLanes
-  { ilSlots  :: MVar (Map FilePath LaneSlot)
-  , ilReaper :: ThreadId
-  , ilClosed :: IORef Bool
+  { ilSlots    :: MVar (Map FilePath LaneSlot)
+  , ilReaper   :: ThreadId
+  , ilClosed   :: IORef Bool
+  , ilIdentity :: IdentityCache   -- ^ The identity command's last run,
+                                  --   shared by every lane (issue #347).
   }
 
 -- | laneIdleSeconds: how long a lane may sit unused before the reaper closes
@@ -736,10 +751,11 @@ laneIdleSeconds = 900
 -- | newInteractionLanes: an empty registry with its reaper running.
 newInteractionLanes :: IO InteractionLanes
 newInteractionLanes = do
-  slots  <- newMVar Map.empty
-  reaper <- forkIO (reapLoop slots)
-  closed <- newIORef False
-  pure (InteractionLanes slots reaper closed)
+  slots    <- newMVar Map.empty
+  reaper   <- forkIO (reapLoop slots)
+  closed   <- newIORef False
+  identity <- newIdentityCache
+  pure (InteractionLanes slots reaper closed identity)
   where
     -- Synchronous failures must not kill the reaper, but the asynchronous
     -- 'ThreadKilled' from 'shutdownLanes' must; a blanket handler here would
@@ -895,11 +911,14 @@ data LaneFailure = LaneFailure
 -- every IOTCM line sent (for the response echo), and the doom flag that
 -- tells 'withLane' to kill the lane instead of returning it to the slot.
 data LaneHandle = LaneHandle
-  { lhLane     :: Lane
-  , lhDeadline :: Deadline
-  , lhSent     :: IORef [Text]
-  , lhSpawned  :: Bool
-  , lhDoomed   :: IORef Bool
+  { lhLane      :: Lane
+  , lhDeadline  :: Deadline
+  , lhSent      :: IORef [Text]
+  , lhSpawned   :: Bool
+  , lhRestarted :: Bool          -- ^ This request stopped a living lane whose
+                                 --   Agda had changed and spawned this one
+                                 --   (issue #347); 'ensureLoaded' says so.
+  , lhDoomed    :: IORef Bool
   }
 
 -- | A deadline in monotonic nanoseconds.
@@ -934,6 +953,11 @@ laneWasSpawned = lhSpawned
 lanePidOf :: LaneHandle -> IO (Maybe Int)
 lanePidOf lh = pure (fromIntegral <$> lanePgid (lhLane lh))
 
+-- | laneAgdaStampOf: the stamp of the Agda this request's lane was started
+-- with (issue #347), for the verbose echo.
+laneAgdaStampOf :: LaneHandle -> AgdaStamp
+laneAgdaStampOf = laneAgda . lhLane
+
 -- | withLane: run a request body against the lane for one root, spawning the
 -- child if none is alive, serialized against every other request for the
 -- same root.
@@ -947,6 +971,15 @@ lanePidOf lh = pure (fromIntegral <$> lanePgid (lhLane lh))
 -- the now-dead lane to the slot, where the next request's liveness probe
 -- replaces it.  A healthy lane returns to the slot with its last-use stamp
 -- refreshed.
+--
+-- A living lane is reused only while the Agda a spawn would start is still
+-- the one it runs (issue #347): the stamp is taken here, under the slot's
+-- lock and before the body, so no request is ever answered by a lane whose
+-- 'AgdaStamp' differs from the one taken at its own start (within the
+-- identity command's time-to-live).  A lane that differs is stopped as the
+-- reaper stops one (EOF, then the ladder) and replaced; if the replacement
+-- cannot start, the slot is left empty rather than holding the stopped
+-- lane, whose stored load describes the other Agda.
 withLane
   :: InteractionLanes
   -> AgdaConfig
@@ -959,6 +992,9 @@ withLane il cfg root body = do
   -- its remaining budget, so a first request is bounded by @--timeout@ once,
   -- not once per phase (a Copilot review catch on PR 107).
   deadline <- newDeadline (agdaTimeout cfg)
+  -- The request's start, for the spawn's stamp: an identity run that began
+  -- after it is fresh enough for a lane spawned by this request.
+  started  <- getMonotonicTimeNSec
   -- The shutdown latch is read under the registry lock, so a request either
   -- got its slot into the map 'shutdownLanes' will drain, or is refused here
   -- before it can spawn anything (a Copilot round-3 catch).
@@ -986,22 +1022,22 @@ withLane il cfg root body = do
       -- waits for it and stops whatever it restores.
       closed <- readIORef (ilClosed il)
       revived <- if closed
-        then pure (Left LaneFailure
+        then pure (Left (held, LaneFailure
           { lfEvent      = LaneShutdown
           , lfMessage    = "the server is shutting down; no interaction lane will be started"
           , lfStderrTail = []
           , lfSent       = []
-          })
-        else reviveOrSpawn deadline held
+          }))
+        else reviveOrSpawn deadline started held
       case revived of
-        Left failure -> pure (held, Left failure)
-        Right (lane, flushSent, spawned) -> do
+        Left (restore, failure) -> pure (restore, Left failure)
+        Right (lane, flushSent, spawned, restarted) -> do
           -- A spawning call's echo starts with the startup flush it already
           -- sent (newest first, as the handle stores them); a reviving or
           -- reusing call starts empty.
           sent   <- newIORef (reverse flushSent)
           doomed <- newIORef False
-          let lh = LaneHandle lane deadline sent spawned doomed
+          let lh = LaneHandle lane deadline sent spawned restarted doomed
           outcome <- try (body lh)
           case outcome of
             Left (e :: SomeException) -> do
@@ -1017,20 +1053,40 @@ withLane il cfg root body = do
                   monotonicSeconds >>= writeIORef (laneLastUse lane)
                   pure (Just lane, Right a)
   where
-    reviveOrSpawn deadline (Just lane) = do
+    -- Left carries what the slot is to hold after a failure, beside it: the
+    -- lane as it was, except after a restart, whose stopped lane described
+    -- another Agda and must not be read again (not even by the peek).
+    reviveOrSpawn deadline started (Just lane) = do
       gone <- getProcessExitCode (laneProc lane)
       case gone of
-        Nothing -> pure (Right (lane, [], False))
+        Nothing -> do
+          -- Alive: reuse it only if its Agda is still the one a spawn would
+          -- start (issue #347).  The comparison runs here, under the slot's
+          -- lock, so nothing else can speak to the lane between the check
+          -- and the use, and before the body, so no request is answered from
+          -- a lane its own check found stale.
+          current <- agdaStampForReuse (ilIdentity il) cfg
+          if current == laneAgda lane
+            then pure (Right (lane, [], False, False))
+            else do
+              stopLane lane
+              withRestore Nothing <$> spawnFresh deadline started True
         Just _  -> do
           -- Dead while idle: release its handles (no ladder, since the child died
           -- an unknown time ago, see 'closeLaneHandles') and start afresh.
           closeLaneHandles lane
-          spawnFresh deadline
-    reviveOrSpawn deadline Nothing = spawnFresh deadline
+          withRestore (Just lane) <$> spawnFresh deadline started False
+    reviveOrSpawn deadline started Nothing =
+      withRestore Nothing <$> spawnFresh deadline started False
 
-    spawnFresh deadline =
-      fmap (\(l, flushSent) -> (l, flushSent, True))
-        <$> spawnLane cfg root deadline
+    withRestore restore = either (\lf -> Left (restore, lf)) Right
+
+    -- The stamp is taken before the child starts (see 'AgdaMCP.AgdaStamp' on
+    -- why that order is the safe one).
+    spawnFresh deadline started restarted = do
+      stamp <- agdaStampForSpawn (ilIdentity il) cfg started
+      fmap (\(l, flushSent) -> (l, flushSent, True, restarted))
+        <$> spawnLane cfg root deadline stamp
 
 -- | spawnLane: start @agda --interaction-json@, wire up the stderr drainer,
 -- and flush the startup noise with one sentinel so no command's response
@@ -1045,9 +1101,9 @@ withLane il cfg root body = do
 -- must resolve one file against one tree.  The root parameter keys the lane's
 -- registry slot and bookkeeping; it is not a chdir.
 spawnLane
-  :: AgdaConfig -> FilePath -> Deadline
+  :: AgdaConfig -> FilePath -> Deadline -> AgdaStamp
   -> IO (Either LaneFailure (Lane, [Text]))
-spawnLane cfg root deadline = mask $ \restore -> do
+spawnLane cfg root deadline stamp = mask $ \restore -> do
   -- The whole spawn runs masked, allocation included: a cancellation landing
   -- between 'createProcess' returning and cleanup being installed would
   -- otherwise leak the child and all three pipes.  Interruptibility is
@@ -1091,6 +1147,7 @@ spawnLane cfg root deadline = mask $ \restore -> do
             , laneVersion = verRef
             , laneLastUse = useRef
             , laneStopped = stopRef
+            , laneAgda    = stamp
             }
       flip onException (stopLane lane) $ do
         hSetBinaryMode hOut True
@@ -1101,7 +1158,7 @@ spawnLane cfg root deadline = mask $ \restore -> do
         -- failure, since no request was under way.
         sent     <- newIORef []
         doomed   <- newIORef False
-        let lh = LaneHandle lane deadline sent False doomed
+        let lh = LaneHandle lane deadline sent False False doomed
         flushed <- restore (runCmdOn lh Nothing)
         flushSent <- laneSentLines lh
         case flushed of
@@ -1254,6 +1311,10 @@ data LoadAction
   | LoadForced    -- ^ The client passed @reload: true@, the escape hatch
                   --   for a changed dependency, which no stamp on the
                   --   queried file can see.
+  | LoadRestarted -- ^ The lane's Agda had changed, so this request
+                  --   restarted the lane and loads the file afresh in the
+                  --   new one (issue #347).  Takes precedence over
+                  --   'LoadForced': the restart is why the load is whole.
   deriving (Eq, Show)
 
 -- | LoadReport: the outcome of 'ensureLoaded'.
@@ -1292,6 +1353,7 @@ ensureLoaded lh force path flags = do
   stamp  <- stampOf path
   known  <- readIORef (laneLoad (lhLane lh))
   let decision = case known of
+        Nothing | lhRestarted lh -> Just LoadRestarted
         _ | force -> Just LoadForced
         Nothing -> Just LoadFirst
         Just ls
@@ -1407,11 +1469,18 @@ classifyLoad path rs = case interactionPointsOf rs of
 -- match too: 'ensureLoaded' treats changed effective flags as grounds to
 -- re-load, so a peek that ignored them could vouch for goals loaded under a
 -- configuration the caller no longer runs with (a Copilot catch on the PR 110
--- review).
+-- review).  And the Agda must match (issue #347): a lane whose stamp differs
+-- from the one taken now loaded the file under an Agda the server would no
+-- longer start, so its goals may name another library's types.  The stamp is
+-- taken last, only when everything else already vouches, so a batch call
+-- with no warm lane for its file pays nothing for it; when one does, the
+-- peek pays what a lane call would (microseconds, and past the identity
+-- command's time-to-live one run of it).  A stale lane is left for the next
+-- lane request to restart; the peek never stops one.
 peekLoadedGoals
-  :: InteractionLanes -> FilePath -> FilePath -> [String]
+  :: InteractionLanes -> AgdaConfig -> FilePath -> FilePath -> [String]
   -> IO (Maybe LoadedInfo)
-peekLoadedGoals il root path flags = do
+peekLoadedGoals il cfg root path flags = do
   m <- readMVar (ilSlots il)
   case Map.lookup root m of
     Nothing   -> pure Nothing
@@ -1427,18 +1496,21 @@ peekLoadedGoals il root path flags = do
           -- module already hardened in 'reapSlot').
           known <- (case held of
                       Nothing   -> pure Nothing
-                      Just lane -> readIORef (laneLoad lane))
+                      Just lane -> fmap (\ls -> (ls, laneAgda lane))
+                                     <$> readIORef (laneLoad lane))
                      `onException` putMVar slot held
           putMVar slot held
           case known of
-            Just ls
+            Just (ls, laneStamp)
               | equalFilePath (lsPath ls) path
               , lsFlags ls == flags
               , Right li <- lsOutcome ls -> do
                   stamp <- stampOf path
-                  pure $ if stamp /= Nothing && stamp == lsStamp ls
-                           then Just li
-                           else Nothing
+                  if stamp == Nothing || stamp /= lsStamp ls
+                    then pure Nothing
+                    else do
+                      current <- agdaStampForReuse (ilIdentity il) cfg
+                      pure $ if current == laneStamp then Just li else Nothing
             _ -> pure Nothing
 
 stampOf :: FilePath -> IO (Maybe FileStamp)
@@ -1450,14 +1522,6 @@ stampOf path = do
   pure $ case r of
     Left (_ :: IOException) -> Nothing
     Right s                 -> Just s
-
--- | fnv1a: the 64-bit FNV-1a fingerprint of a byte string.  Not
--- cryptographic and not meant to be: it distinguishes edits, not
--- adversaries, and it costs no dependency.
-fnv1a :: BS.ByteString -> Word64
-fnv1a = BS.foldl' step 0xcbf29ce484222325
-  where
-    step h b = (h `xor` fromIntegral b) * 0x100000001b3
 
 elapsedMsBetween :: Word64 -> Word64 -> Int
 elapsedMsBetween start end =
