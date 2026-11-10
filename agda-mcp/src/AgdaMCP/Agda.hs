@@ -91,7 +91,9 @@ module AgdaMCP.Agda
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
   (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, tryPutMVar)
-import Control.Exception (IOException, SomeException, bracket, catch, try)
+import Control.Exception
+  (IOException, SomeAsyncException, SomeException, bracket, catch, fromException,
+   throwIO, try)
 import Control.Monad (void, when)
 import qualified Data.ByteString as BS
 import Data.List (stripPrefix)
@@ -320,6 +322,8 @@ data AgdaResult = AgdaResult
 -- Failure to /start/ @agda@ at all (missing binary, permission denied) is
 -- reported as exit code @-1@ with the exception text on stderr, preserving the
 -- pre-existing contract that 'AgdaMCP.Tools.ProofState' reads as @FillCrash@.
+-- An asynchronous exception (a killed thread, a timeout, an interrupt) is not
+-- a failure to start and is rethrown; see 'runCommand'.
 runAgda :: AgdaConfig -> FilePath -> IO AgdaResult
 runAgda cfg path = runCommand cfg (agdaBin cfg) (agdaFlags cfg <> [path]) Nothing
 
@@ -343,7 +347,14 @@ runCommand :: AgdaConfig -> FilePath -> [String] -> Maybe FilePath -> IO AgdaRes
 runCommand cfg bin args mCwd = do
   echo    <- commandEchoFor bin args mCwd
   start   <- getMonotonicTimeNSec
-  outcome <- try (runProcessBounded cfg bin args mCwd)
+  -- A synchronous exception here is a failure to start the command, and
+  -- becomes exit code -1.  An asynchronous one (ThreadKilled, a
+  -- System.Timeout timeout, UserInterrupt) is the caller being cancelled:
+  -- turning it into a value would let the cancelled caller carry on, and
+  -- the identity command's cache would keep it as a failure stamp (a
+  -- Copilot catch on PR 349).  So it is rethrown, after 'runProcessBounded's
+  -- bracket has signalled and reaped the child.
+  outcome <- try (runProcessBounded cfg bin args mCwd) >>= either sift (pure . Right)
   end     <- getMonotonicTimeNSec
   let elapsed = fromIntegral ((end - start) `div` 1_000_000)
   pure $ case outcome of
@@ -366,6 +377,11 @@ runCommand cfg bin args mCwd = do
   where
     isNothing' Nothing = True
     isNothing' _       = False
+
+    sift :: SomeException -> IO (Either SomeException a)
+    sift e = case fromException e of
+      Just (_ :: SomeAsyncException) -> throwIO e
+      Nothing                        -> pure (Left e)
 
 -- | commandEchoFor: the 'CommandEcho' for an invocation about to be made.
 --
@@ -398,8 +414,8 @@ exitCodeToInt (ExitFailure n) = n
 --
 -- Returns @(Just exitCode, stdout, stderr)@ on a completed run and
 -- @(Nothing, …)@ when the timeout fired and the process group was killed.
--- Throws only if the process could not be created at all; 'runCommand' catches
--- that and maps it to exit code -1.
+-- Throws only if the process could not be created at all, which 'runCommand'
+-- maps to exit code -1, or on an asynchronous exception, which it rethrows.
 runProcessBounded
   :: AgdaConfig -> FilePath -> [String] -> Maybe FilePath
   -> IO (Maybe ExitCode, Text, Text)

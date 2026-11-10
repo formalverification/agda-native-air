@@ -56,8 +56,9 @@
 
 module Main (main) where
 
-import Control.Concurrent (threadDelay)
-import Control.Exception (bracket_, catch, try, SomeException)
+import Control.Concurrent (forkIO, killThread, threadDelay)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
+import Control.Exception (bracket_, catch, finally, try, SomeException)
 import System.Timeout (timeout)
 import Data.Time.Clock (addUTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -103,7 +104,7 @@ import AgdaMCP.AgdaStamp
 import AgdaMCP.Agda
   ( parseGoalContext , defaultConfig
   , AgdaConfig (..)
-  , runAgda , AgdaResult (..)
+  , runAgda , runCommand , AgdaResult (..)
   , checkedFromSourceOf , defaultTimeoutSeconds
   , agdaModuleNameOf , parseCheckingLine , progressModules
   , progressChannelMuted , traceImportsLevel
@@ -9276,6 +9277,62 @@ agdaStampTests = do
         allOf
           [ assertEqual "identity" (Just "failed: exit 3") (asIdentity s1)
           , assertEqual "the same failure twice is the same stamp" s1 s2
+          ]
+
+      -- A FIFO is size 0, so it would be fingerprinted, and a read of one
+      -- blocks while a writer holds it open: under the slot's lock, with no
+      -- deadline over it (a Copilot catch on PR 349).  The writer opens it
+      -- read-write, which on Linux needs no reader, so it is present before
+      -- the stamp is taken; it is the one process started here, stopped by
+      -- its handle.
+    , runTest "stamp: a FIFO held open by a writer is stamped without reading it" $ do
+        let fifo = dir </> "agda-fifo"
+        createNamedPipe fifo (ownerReadMode `unionFileModes` ownerWriteMode)
+        writer <- P.spawnProcess "sh" ["-c", "exec sleep 30 3<>'" <> fifo <> "'"]
+        stamped <- (threadDelay 300000 >> timeout 5000000 (binaryStampOf fifo))
+          `finally` (P.terminateProcess writer >> P.waitForProcess writer)
+        case stamped of
+          Nothing -> pure (Fail "binaryStampOf blocked on the FIFO for 5 s")
+          Just (_, contents) -> assertEqual "contents" "not a regular file" contents
+
+      -- runCommand caught SomeException, so a thread killed mid-run came back
+      -- as a failed run (exit -1) and went on (a Copilot catch on PR 349).
+    , runTest "runCommand: a thread killed mid-run unwinds instead of returning a failed run" $ do
+        done <- newEmptyMVar
+        tid <- forkIO $
+          (runCommand defaultConfig "sleep" ["30"] Nothing
+             >>= putMVar done . Right . arExitCode)
+          `catch` \(e :: SomeException) -> putMVar done (Left (show e))
+        threadDelay 300000
+        killThread tid
+        outcome <- timeout 10000000 (takeMVar done)
+        assertEqual "outcome" (Just (Left "thread killed")) outcome
+
+      -- The same through the identity cache: a cancelled run must leave
+      -- nothing cached, or the next call within the time-to-live reads a
+      -- failure stamp and restarts the lane for it.
+    , runTest "stamp: an identity run cancelled mid-run is not cached as a failure" $ do
+        let flag     = dir </> "identity-ready"
+            idScript = dir </> "identity-slow.sh"
+        writeFile idScript
+          ("#!/bin/sh\n[ -e '" <> flag <> "' ] && { echo key-fresh; exit 0; }\nexec sleep 30\n")
+        makeExecutable idScript
+        cache <- newIdentityCache
+        let cfgSlow = defaultConfig
+              { agdaBin = wrapperB, agdaIdentityCommand = Just [idScript]
+              , agdaIdentityTtl = 3600 }
+        done <- newEmptyMVar
+        tid <- forkIO $
+          (agdaStampForReuse cache cfgSlow >>= putMVar done . Right . asIdentity)
+          `catch` \(e :: SomeException) -> putMVar done (Left (show e))
+        threadDelay 300000
+        killThread tid
+        first <- timeout 10000000 (takeMVar done)
+        writeFile flag ""
+        s <- agdaStampForReuse cache cfgSlow
+        allOf
+          [ assertEqual "the cancelled call unwinds" (Just (Left "thread killed")) first
+          , assertEqual "the next call runs the command afresh" (Just "key-fresh") (asIdentity s)
           ]
     ]
   where

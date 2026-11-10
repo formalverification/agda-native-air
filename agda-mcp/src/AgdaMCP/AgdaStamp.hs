@@ -97,6 +97,7 @@ import Numeric (showHex)
 import System.Directory
   (canonicalizePath, findExecutable, getFileSize, getModificationTime)
 import System.FilePath (isPathSeparator)
+import System.Posix.Files (getFileStatus, isRegularFile)
 
 import AgdaMCP.Agda (AgdaConfig (..), AgdaResult (..), runCommand)
 import AgdaMCP.Types (AgdaStamp (..))
@@ -119,6 +120,13 @@ smallFileLimit = 64 * 1024
 -- directory, as the spawn's does.  Every failure is a value: a stamp that
 -- names why it could not read the file stays equal to itself while nothing
 -- changes, and differs from the stamp of a file that appears.
+--
+-- Only a regular file is read.  A FIFO or a device is size 0, so it would be
+-- fingerprinted, and reading one can block for as long as a writer holds it
+-- open (or, for @/dev/zero@, never end), under the slot's lock with no
+-- deadline over it (a Copilot catch on PR 349).  Such a path cannot be
+-- executed anyway; its stamp says what it is, and the spawn reports the
+-- failure.
 binaryStampOf :: FilePath -> IO (Text, Text)
 binaryStampOf bin = do
   located <- if any isPathSeparator bin
@@ -132,6 +140,14 @@ binaryStampOf bin = do
       pure (T.pack real, contents)
   where
     contentsOf real = do
+      status <- try (getFileStatus real)
+      case status of
+        Left (_ :: IOException) -> pure "unreadable"
+        Right st
+          | isRegularFile st -> regularContents real
+          | otherwise        -> pure "not a regular file"
+
+    regularContents real = do
       sized <- try (getFileSize real)
       case sized of
         Left (_ :: IOException) -> pure "unreadable"
@@ -224,7 +240,9 @@ identityAsOf (IdentityCache ref) cfg cmd oldest = modifyMVar ref $ \cached ->
 
 -- | runIdentity: one bounded run, through the batch lane's 'runCommand' (its
 -- process group, drainers, and kill ladder), in the server's working
--- directory.  Standard output, trimmed, is the identity; anything else is a
+-- directory.  A cancellation (an asynchronous exception) is not a failure:
+-- 'runCommand' rethrows it, and 'identityAsOf''s 'modifyMVar' then leaves
+-- the cache as it was, so no stamp is made of it.  Standard output, trimmed, is the identity; anything else is a
 -- failure named by how it failed, without the varying stderr, so a command
 -- that keeps failing the same way keeps the same stamp.
 runIdentity :: AgdaConfig -> [String] -> IO Text
