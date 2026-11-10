@@ -243,6 +243,7 @@ laneEchoFrom root lh lr = do
         LoadReused -> Nothing
         _          -> Just (lrElapsedMs lr)
     , lchAgdaVersion   = ver
+    , lchAgdaStamp     = Just (laneAgdaStampOf lh)
     , lchIotcm         = sent
     }
 
@@ -253,6 +254,7 @@ loadActionText LoadSwitch  = "switch"
 loadActionText LoadChanged = "changed"
 loadActionText LoadRetry   = "retry"
 loadActionText LoadForced  = "forced"
+loadActionText LoadRestarted = "restarted"
 
 -- | loadError: the in-band error for a file whose load failed.  The query
 -- was not run; saying so, with Agda's message, is the whole answer.

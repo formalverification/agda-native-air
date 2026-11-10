@@ -67,6 +67,7 @@ module AgdaMCP.Agda
     AgdaConfig (..)
   , defaultConfig
   , defaultTimeoutSeconds
+  , defaultIdentityTtlSeconds
     -- * Debug output
   , debugLog
     -- * Marker parsing (pure)
@@ -90,7 +91,9 @@ module AgdaMCP.Agda
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.MVar
   (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, tryPutMVar)
-import Control.Exception (IOException, SomeException, bracket, catch, try)
+import Control.Exception
+  (IOException, SomeAsyncException, SomeException, bracket, catch, fromException,
+   throwIO, try)
 import Control.Monad (void, when)
 import qualified Data.ByteString as BS
 import Data.List (stripPrefix)
@@ -131,6 +134,18 @@ data AgdaConfig = AgdaConfig
                                   --   no bound is enforced.
   , reportExpr    :: Text         -- ^ Reporting expression to inject (default: "reportGoalCtx").
   , agdaVerbose   :: Bool         -- ^ Emit debug output to stderr.
+  , agdaIdentityCommand :: Maybe [String]
+                                  -- ^ A command whose output names the Agda that
+                                  --   'agdaBin' would start, for what its path and
+                                  --   bytes cannot show (issue #347; a launcher
+                                  --   such as @scripts/agda-for-flake.sh
+                                  --   --print-key@).  Run with no shell, in the
+                                  --   server's working directory.
+  , agdaIdentityTtl :: Int        -- ^ Seconds an identity command's output is
+                                  --   trusted before a lane call runs it again;
+                                  --   0 or less runs it before every call
+                                  --   ('AgdaMCP.AgdaStamp' says why the default
+                                  --   is what it is).
   } deriving (Eq, Show)
 
 -- | defaultTimeoutSeconds: the default per-invocation wall-clock bound.
@@ -147,6 +162,11 @@ data AgdaConfig = AgdaConfig
 defaultTimeoutSeconds :: Int
 defaultTimeoutSeconds = 300
 
+-- | defaultIdentityTtlSeconds: how long an identity command's output stands
+-- in for a fresh run.  'AgdaMCP.AgdaStamp' records the measurement behind it.
+defaultIdentityTtlSeconds :: Int
+defaultIdentityTtlSeconds = 2
+
 -- | Sensible defaults; the caller should override @agdaFlags@ for their project.
 defaultConfig :: AgdaConfig
 defaultConfig = AgdaConfig
@@ -155,6 +175,8 @@ defaultConfig = AgdaConfig
   , agdaTimeout = Just defaultTimeoutSeconds
   , reportExpr  = "reportGoalCtx"
   , agdaVerbose = False
+  , agdaIdentityCommand = Nothing
+  , agdaIdentityTtl     = defaultIdentityTtlSeconds
   }
 
 -- | Emit a debug message to stderr, gated by 'agdaVerbose'.
@@ -300,6 +322,8 @@ data AgdaResult = AgdaResult
 -- Failure to /start/ @agda@ at all (missing binary, permission denied) is
 -- reported as exit code @-1@ with the exception text on stderr, preserving the
 -- pre-existing contract that 'AgdaMCP.Tools.ProofState' reads as @FillCrash@.
+-- An asynchronous exception (a killed thread, a timeout, an interrupt) is not
+-- a failure to start and is rethrown; see 'runCommand'.
 runAgda :: AgdaConfig -> FilePath -> IO AgdaResult
 runAgda cfg path = runCommand cfg (agdaBin cfg) (agdaFlags cfg <> [path]) Nothing
 
@@ -323,7 +347,14 @@ runCommand :: AgdaConfig -> FilePath -> [String] -> Maybe FilePath -> IO AgdaRes
 runCommand cfg bin args mCwd = do
   echo    <- commandEchoFor bin args mCwd
   start   <- getMonotonicTimeNSec
-  outcome <- try (runProcessBounded cfg bin args mCwd)
+  -- A synchronous exception here is a failure to start the command, and
+  -- becomes exit code -1.  An asynchronous one (ThreadKilled, a
+  -- System.Timeout timeout, UserInterrupt) is the caller being cancelled:
+  -- turning it into a value would let the cancelled caller carry on, and
+  -- the identity command's cache would keep it as a failure stamp (a
+  -- Copilot catch on PR 349).  So it is rethrown, after 'runProcessBounded's
+  -- bracket has signalled and reaped the child.
+  outcome <- try (runProcessBounded cfg bin args mCwd) >>= either sift (pure . Right)
   end     <- getMonotonicTimeNSec
   let elapsed = fromIntegral ((end - start) `div` 1_000_000)
   pure $ case outcome of
@@ -346,6 +377,11 @@ runCommand cfg bin args mCwd = do
   where
     isNothing' Nothing = True
     isNothing' _       = False
+
+    sift :: SomeException -> IO (Either SomeException a)
+    sift e = case fromException e of
+      Just (_ :: SomeAsyncException) -> throwIO e
+      Nothing                        -> pure (Left e)
 
 -- | commandEchoFor: the 'CommandEcho' for an invocation about to be made.
 --
@@ -378,8 +414,8 @@ exitCodeToInt (ExitFailure n) = n
 --
 -- Returns @(Just exitCode, stdout, stderr)@ on a completed run and
 -- @(Nothing, …)@ when the timeout fired and the process group was killed.
--- Throws only if the process could not be created at all; 'runCommand' catches
--- that and maps it to exit code -1.
+-- Throws only if the process could not be created at all, which 'runCommand'
+-- maps to exit code -1, or on an asynchronous exception, which it rethrows.
 runProcessBounded
   :: AgdaConfig -> FilePath -> [String] -> Maybe FilePath
   -> IO (Maybe ExitCode, Text, Text)

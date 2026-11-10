@@ -33,9 +33,13 @@
 --      including 2d: hole-enumeration parity against batch Agda, the module
 --      name Agda itself resolves (#100), and 2f: re-anchoring by position
 --      across a fill (#79).
+--      1m: the stamp of the Agda a spawn would start (#347), on stand-in
+--      files and an identity command, no Agda.
 --   3. The interaction lane (needs agda on PATH): the live-query tools, and
 --      3b: search_in_scope (#17) against the fixture corpus and the narrow
---      imports of ScopeSearch.agda, every rendering typed by the lane.
+--      imports of ScopeSearch.agda, every rendering typed by the lane; 3d: a
+--      lane restarted when the Agda --agda-bin would start changes (#347),
+--      through stand-in --agda-bins that exec the real one.
 --
 --   Tier 2 tests are skipped gracefully if Agda is not available, making the test
 --   suite safe to run in CI without a Nix shell.
@@ -52,9 +56,13 @@
 
 module Main (main) where
 
-import Control.Concurrent (threadDelay)
-import Control.Exception (bracket_, catch, try, SomeException)
+import Control.Concurrent (forkIO, killThread, threadDelay)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
+import Control.Exception (bracket_, catch, finally, try, SomeException)
 import System.Timeout (timeout)
+import Data.Time.Clock (addUTCTime)
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
+import GHC.Clock (getMonotonicTimeNSec)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KM
@@ -74,7 +82,7 @@ import System.Directory
   ( Permissions, canonicalizePath, createDirectoryIfMissing, doesDirectoryExist
   , doesFileExist, emptyPermissions, findExecutable, getCurrentDirectory
   , getModificationTime, getPermissions, getTemporaryDirectory, makeAbsolute
-  , removeDirectoryRecursive, removeFile, setModificationTime
+  , createFileLink, removeDirectoryRecursive, removeFile, setModificationTime
   , setOwnerExecutable, setPermissions
   )
 import System.Environment (setEnv)
@@ -90,10 +98,13 @@ import System.IO (hPutStrLn, stderr)
 import Data.Version (showVersion)
 import qualified Paths_agda_mcp as Paths
 
+import AgdaMCP.AgdaStamp
+  ( agdaStampForReuse, agdaStampForSpawn, binaryStampOf, newIdentityCache
+  , smallFileLimit )
 import AgdaMCP.Agda
   ( parseGoalContext , defaultConfig
   , AgdaConfig (..)
-  , runAgda , AgdaResult (..)
+  , runAgda , runCommand , AgdaResult (..)
   , checkedFromSourceOf , defaultTimeoutSeconds
   , agdaModuleNameOf , parseCheckingLine , progressModules
   , progressChannelMuted , traceImportsLevel
@@ -3858,7 +3869,7 @@ echoPaths =
   , ["project", "registeredLibraries"], ["project", "selectedLibraries"]
   , ["project", "includePaths"]
   , ["lane", "root"], ["lane", "pid"], ["lane", "spawned"], ["lane", "agdaVersion"]
-  , ["lane", "iotcm"]
+  , ["lane", "agdaStamp"], ["lane", "iotcm"]
   ]
 
 -- | leanRules: the lean answer's contract, checked on one full answer.
@@ -4406,7 +4417,7 @@ autoTests = do
         ]
 
     , runTest "AutoResult: each field present exactly with its outcome" $
-        let meta = LiveMeta 1 Nothing (LaneEcho "/r" Nothing False "reused" Nothing Nothing [])
+        let meta = LiveMeta 1 Nothing (LaneEcho "/r" Nothing False "reused" Nothing Nothing Nothing [])
                      (CommandEcho "agda" [] "/r") (pcOfLibrary Nothing)
             keysOf r = case Aeson.toJSON r of
               Aeson.Object o -> sort (map Key.toText (KM.keys o))
@@ -7976,7 +7987,8 @@ interactionLaneTests cfg repoRoot = do
             ]
 
     , -- The lane's echo under the lean rule (#184): lane keeps load and
-      -- loadElapsedMs, and loses root, pid, spawned, agdaVersion, and iotcm.
+      -- loadElapsedMs, and loses root, pid, spawned, agdaVersion, agdaStamp,
+      -- and iotcm.
       runTest "lean answers: type_of keeps its type, lane.load, and the tree, and drops the lane's wire lines" $ do
         r <- handleTypeOf lanes cfg TypeOfParams
                { topFilePath = fx "TwoHoles.agda", topExpr = "implicitOnly {3}"
@@ -9129,6 +9141,380 @@ scratchDir label = do
   createDirectoryIfMissing True dir
   pure dir
 
+-- ---------------------------------------------------------------------------
+-- Tier 1m: the stamp of the Agda a spawn would start (issue #347), no Agda
+--
+-- What the lane compares before reusing a child: the real path of
+-- --agda-bin, its bytes when it is small and its size and mtime when it is
+-- not, and an identity command's output, cached for a time-to-live.  The
+-- files are stand-ins in a scratch directory; the identity command is a
+-- shell script that counts its own runs.
+-- ---------------------------------------------------------------------------
+
+agdaStampTests :: IO [Bool]
+agdaStampTests = do
+  hPutStrLn stderr "\n── The stamp of the Agda a spawn would start (tier 1m: #347) ──"
+  dir <- scratchDir "agda-stamp"
+  let wrapperA = dir </> "agda-a.sh"
+      wrapperB = dir </> "agda-b.sh"
+      link     = dir </> "agda"
+      big      = dir </> "agda-big"
+      bodyA    = "#!/bin/sh\n# stand-in A\nexec agda \"$@\"\n"
+      bodyB    = "#!/bin/sh\n# stand-in B\nexec agda \"$@\"\n"
+  writeFile wrapperA bodyA
+  writeFile wrapperB bodyB
+  createFileLink wrapperA link
+  -- One byte over the limit: a "binary", stamped by size and mtime.
+  BS.writeFile big (BS.replicate (fromIntegral smallFileLimit + 1) 0)
+  sequence
+    [ runTest "stamp: a symlink resolves to its target, and re-pointing it changes the path" $ do
+        (pathA, contentsA) <- binaryStampOf link
+        removeFile link
+        createFileLink wrapperB link
+        (pathB, contentsB) <- binaryStampOf link
+        realA <- canonicalizePath wrapperA
+        realB <- canonicalizePath wrapperB
+        allOf
+          [ assertEqual "path before" (T.pack realA) pathA
+          , assertEqual "path after" (T.pack realB) pathB
+          , assert "the two wrappers' bytes differ" (contentsA /= contentsB)
+          ]
+
+    , runTest "stamp: a small file rewritten with the same bytes and a new mtime is unchanged" $ do
+        before <- binaryStampOf wrapperA
+        t <- getModificationTime wrapperA
+        writeFile wrapperA bodyA
+        setModificationTime wrapperA (addUTCTime 3600 t)
+        after <- binaryStampOf wrapperA
+        allOf
+          [ assertEqual "same stamp" before after
+          , assert "fingerprinted by its bytes" ("fnv1a " `T.isPrefixOf` snd after)
+          ]
+
+    , runTest "stamp: a small file whose bytes change is changed" $ do
+        before <- binaryStampOf wrapperA
+        writeFile wrapperA (bodyA <> "# rebuilt\n")
+        after <- binaryStampOf wrapperA
+        writeFile wrapperA bodyA
+        assert "the stamp moved" (before /= after)
+
+    , runTest "stamp: a file over the limit is stamped by size and mtime, not read" $ do
+        (_, before) <- binaryStampOf big
+        t <- getModificationTime big
+        setModificationTime big (addUTCTime 3600 t)
+        (_, after) <- binaryStampOf big
+        allOf
+          [ assert ("size and mtime: " <> T.unpack before)
+              (("size " <> T.pack (show (smallFileLimit + 1)) <> ", modified ") `T.isPrefixOf` before)
+          , assert "a new mtime moves it" (before /= after)
+          ]
+
+    , runTest "stamp: two store binaries alike in size and mtime differ by their real paths" $ do
+        -- The Nix store sets every file's mtime to 1, and two builds of one
+        -- Agda version can share a size: only the path tells them apart.
+        let big2   = dir </> "agda-big-2"
+            stored = posixSecondsToUTCTime 1
+            pin    = dir </> "pin"
+        BS.writeFile big2 (BS.replicate (fromIntegral smallFileLimit + 1) 0)
+        setModificationTime big stored
+        setModificationTime big2 stored
+        createFileLink big pin
+        before <- binaryStampOf pin
+        removeFile pin
+        createFileLink big2 pin
+        after <- binaryStampOf pin
+        allOf
+          [ assertEqual "the same contents part" (snd before) (snd after)
+          , assert "different stamps" (before /= after)
+          ]
+
+    , runTest "stamp: a bare name not on PATH is a stamp that says so, not an error" $ do
+        (p, c) <- binaryStampOf "agda-mcp-no-such-agda-347"
+        allOf
+          [ assertEqual "path" "not found on PATH: agda-mcp-no-such-agda-347" p
+          , assertEqual "contents" "none" c
+          ]
+
+    , runTest "stamp: the identity command runs once per time-to-live, and a spawn takes a fresh run" $ do
+        let counter  = dir </> "runs"
+            idScript = dir </> "identity.sh"
+            runsSoFar = length . lines <$> readFile' counter
+        writeFile counter ""
+        writeFile idScript ("#!/bin/sh\necho run >> '" <> counter <> "'\necho key-1\n")
+        makeExecutable idScript
+        cache <- newIdentityCache
+        let cfgLong = defaultConfig
+              { agdaBin = wrapperB, agdaIdentityCommand = Just [idScript]
+              , agdaIdentityTtl = 3600 }
+            cfgZero = cfgLong { agdaIdentityTtl = 0 }
+        s1 <- agdaStampForReuse cache cfgLong
+        s2 <- agdaStampForReuse cache cfgLong
+        n2 <- runsSoFar
+        s3 <- agdaStampForReuse cache cfgZero
+        n3 <- runsSoFar
+        now <- getMonotonicTimeNSec
+        _  <- agdaStampForSpawn cache cfgLong now
+        n4 <- runsSoFar
+        allOf
+          [ assertEqual "identity" (Just "key-1") (asIdentity s1)
+          , assertEqual "a second call within the time-to-live reuses the run" s1 s2
+          , assertEqual "one run for two calls" 1 n2
+          , assertEqual "a time-to-live of 0 runs it again" 2 n3
+          , assertEqual "and so does a spawn after the last run began" 3 n4
+          , assertEqual "same output, same stamp" s1 s3
+          ]
+
+    , runTest "stamp: a failing identity command is a stamp naming the failure" $ do
+        let idScript = dir </> "identity-fails.sh"
+        writeFile idScript "#!/bin/sh\necho 'varying noise' >&2\nexit 3\n"
+        makeExecutable idScript
+        cache <- newIdentityCache
+        let cfgFail = defaultConfig
+              { agdaBin = wrapperB, agdaIdentityCommand = Just [idScript]
+              , agdaIdentityTtl = 0 }
+        s1 <- agdaStampForReuse cache cfgFail
+        s2 <- agdaStampForReuse cache cfgFail
+        allOf
+          [ assertEqual "identity" (Just "failed: exit 3") (asIdentity s1)
+          , assertEqual "the same failure twice is the same stamp" s1 s2
+          ]
+
+      -- A FIFO is size 0, so it would be fingerprinted, and a read of one
+      -- blocks while a writer holds it open: under the slot's lock, with no
+      -- deadline over it (a Copilot catch on PR 349).  The writer opens it
+      -- read-write, which on Linux needs no reader, so it is present before
+      -- the stamp is taken; it is the one process started here, stopped by
+      -- its handle.
+    , runTest "stamp: a FIFO held open by a writer is stamped without reading it" $ do
+        let fifo = dir </> "agda-fifo"
+        createNamedPipe fifo (ownerReadMode `unionFileModes` ownerWriteMode)
+        writer <- P.spawnProcess "sh" ["-c", "exec sleep 30 3<>'" <> fifo <> "'"]
+        stamped <- (threadDelay 300000 >> timeout 5000000 (binaryStampOf fifo))
+          `finally` (P.terminateProcess writer >> P.waitForProcess writer)
+        case stamped of
+          Nothing -> pure (Fail "binaryStampOf blocked on the FIFO for 5 s")
+          Just (_, contents) -> assertEqual "contents" "not a regular file" contents
+
+      -- runCommand caught SomeException, so a thread killed mid-run came back
+      -- as a failed run (exit -1) and went on (a Copilot catch on PR 349).
+    , runTest "runCommand: a thread killed mid-run unwinds instead of returning a failed run" $ do
+        done <- newEmptyMVar
+        tid <- forkIO $
+          (runCommand defaultConfig "sleep" ["30"] Nothing
+             >>= putMVar done . Right . arExitCode)
+          `catch` \(e :: SomeException) -> putMVar done (Left (show e))
+        threadDelay 300000
+        killThread tid
+        outcome <- timeout 10000000 (takeMVar done)
+        assertEqual "outcome" (Just (Left "thread killed")) outcome
+
+      -- The same through the identity cache: a cancelled run must leave
+      -- nothing cached, or the next call within the time-to-live reads a
+      -- failure stamp and restarts the lane for it.
+    , runTest "stamp: an identity run cancelled mid-run is not cached as a failure" $ do
+        let flag     = dir </> "identity-ready"
+            idScript = dir </> "identity-slow.sh"
+        writeFile idScript
+          ("#!/bin/sh\n[ -e '" <> flag <> "' ] && { echo key-fresh; exit 0; }\nexec sleep 30\n")
+        makeExecutable idScript
+        cache <- newIdentityCache
+        let cfgSlow = defaultConfig
+              { agdaBin = wrapperB, agdaIdentityCommand = Just [idScript]
+              , agdaIdentityTtl = 3600 }
+        done <- newEmptyMVar
+        tid <- forkIO $
+          (agdaStampForReuse cache cfgSlow >>= putMVar done . Right . asIdentity)
+          `catch` \(e :: SomeException) -> putMVar done (Left (show e))
+        threadDelay 300000
+        killThread tid
+        first <- timeout 10000000 (takeMVar done)
+        writeFile flag ""
+        s <- agdaStampForReuse cache cfgSlow
+        allOf
+          [ assertEqual "the cancelled call unwinds" (Just (Left "thread killed")) first
+          , assertEqual "the next call runs the command afresh" (Just "key-fresh") (asIdentity s)
+          ]
+    ]
+  where
+    -- A strict read, so the counter file is closed before the script appends.
+    readFile' f = do
+      t <- TIO.readFile f
+      pure (T.unpack t)
+
+-- | makeExecutable: set the owner's execute bit on a stand-in script.
+makeExecutable :: FilePath -> IO ()
+makeExecutable f = do
+  perms <- getPermissions f
+  setPermissions f (setOwnerExecutable True perms)
+
+
+-- ---------------------------------------------------------------------------
+-- Tier 3d: a lane restarted when its Agda changes (issue #347)
+--
+-- The stand-in --agda-bins are wrapper scripts that exec the real Agda, so
+-- each lane is a real interaction child and each answer a real one; what
+-- the tests vary is what the server can see of the Agda it would start: a
+-- symlink re-pointed between two wrappers, a wrapper rewritten with the
+-- same bytes or with new ones, an identity command whose output changes.
+-- Each asserts the lane echo (load, pid) and, for the peek, the batch
+-- check_file's hole goals, which a stale lane must not fill.
+-- ---------------------------------------------------------------------------
+
+laneRestartTests :: AgdaConfig -> FilePath -> IO [Bool]
+laneRestartTests cfg repoRoot = do
+  hPutStrLn stderr "\n── lane restart (tier 3d: #347, Agda subprocess) ──"
+  dir <- scratchDir "lane-restart"
+  let fixture  = repoRoot </> "agda-mcp" </> "test" </> "resources" </> "TwoHoles.agda"
+      wrapperA = dir </> "agda-a.sh"
+      wrapperB = dir </> "agda-b.sh"
+      link     = dir </> "agda"
+      body tag = "#!/bin/sh\n# stand-in " <> tag <> "\nexec '" <> agdaBin cfg <> "' \"$@\"\n"
+      repoint target = removeFile link >> createFileLink target link
+      cfgLink  = cfg { agdaBin = link }
+      typeOf lanes c = handleTypeOf lanes c TypeOfParams
+        { topFilePath = fixture, topExpr = "g", topLine = Nothing
+        , topColumn = Nothing, topReload = False, topRewrite = editorRewrite }
+      -- (load, pid, spawned, stamp) of a type_of answer, or why there is none.
+      laneOf r = case r of
+        Left err  -> Left (T.unpack (failureText err))
+        Right res -> let l = lmLane (torMeta res)
+                     in Right (lchLoad l, lchPid l, lchSpawned l, lchAgdaStamp l)
+      goalsOf' r = case r of
+        Left err  -> Left (T.unpack (failureText err))
+        Right fcr -> Right (map hiGoal (fcrHoles fcr))
+      checkFile lanes c = goalsOf' <$> handleCheckFile lanes c CheckFileParams
+        { cfFilePath = fixture, cfMaxDiagnostics = Nothing }
+      expectLane label wantLoad r k = case laneOf r of
+        Left m -> pure (Fail (label <> ": " <> m))
+        Right (load, pid, spawned, stamp) -> do
+          res <- assertEqual (label <> ": load") wantLoad load
+          case res of
+            Fail m -> pure (Fail m)
+            Pass   -> k pid spawned stamp
+  writeFile wrapperA (body "A")
+  writeFile wrapperB (body "B")
+  makeExecutable wrapperA
+  makeExecutable wrapperB
+  createFileLink wrapperA link
+  sequence
+    [ runTest "lane restart: a symlink re-pointed between two stand-ins restarts the lane" $ do
+        lanes <- newInteractionLanes
+        r1 <- typeOf lanes cfgLink
+        repoint wrapperB
+        r2 <- typeOf lanes cfgLink
+        shutdownLanes lanes
+        repoint wrapperA
+        realB <- canonicalizePath wrapperB
+        expectLane "first call" "first" r1 $ \pid1 _ _ ->
+          expectLane "after re-pointing" "restarted" r2 $ \pid2 spawned2 stamp2 -> allOf
+            [ assert "the restarted call spawned" spawned2
+            , assert "a new child" (pid1 /= pid2 && isJust pid2)
+            , assertEqual "the new lane's stamp names the new wrapper"
+                (Just (T.pack realB)) (asPath <$> stamp2)
+            ]
+
+    , runTest "lane restart: an unchanged stamp reuses the lane" $ do
+        lanes <- newInteractionLanes
+        r1 <- typeOf lanes cfgLink
+        r2 <- typeOf lanes cfgLink
+        shutdownLanes lanes
+        expectLane "first call" "first" r1 $ \pid1 _ stamp1 ->
+          expectLane "second call" "reused" r2 $ \pid2 spawned2 stamp2 -> allOf
+            [ assert "not spawned" (not spawned2)
+            , assertEqual "the same child" pid1 pid2
+            , assertEqual "the same stamp" stamp1 stamp2
+            ]
+
+    , runTest "lane restart: a wrapper rewritten with the same bytes reuses the lane" $ do
+        lanes <- newInteractionLanes
+        r1 <- typeOf lanes cfgLink
+        -- What a dev shell's entry does: the same text, written again, with
+        -- a new modification time.
+        t <- getModificationTime wrapperA
+        writeFile wrapperA (body "A")
+        setModificationTime wrapperA (addUTCTime 3600 t)
+        r2 <- typeOf lanes cfgLink
+        -- And what a moved lock does: new bytes.
+        writeFile wrapperA (body "A, another store path")
+        r3 <- typeOf lanes cfgLink
+        shutdownLanes lanes
+        writeFile wrapperA (body "A")
+        expectLane "first call" "first" r1 $ \pid1 _ _ ->
+          expectLane "after the same bytes" "reused" r2 $ \pid2 _ _ ->
+            expectLane "after new bytes" "restarted" r3 $ \pid3 _ _ -> allOf
+              [ assertEqual "the same child after the same bytes" pid1 pid2
+              , assert "a new child after new bytes" (pid3 /= pid2)
+              ]
+
+    , runTest "lane restart: an identity command whose output changes restarts the lane" $ do
+        let keyFile  = dir </> "key"
+            idScript = dir </> "identity.sh"
+            cfgId    = cfgLink { agdaIdentityCommand = Just [idScript], agdaIdentityTtl = 0 }
+        writeFile keyFile "key-1\n"
+        writeFile idScript ("#!/bin/sh\ncat '" <> keyFile <> "'\n")
+        makeExecutable idScript
+        lanes <- newInteractionLanes
+        r1 <- typeOf lanes cfgId
+        r2 <- typeOf lanes cfgId
+        writeFile keyFile "key-2\n"
+        r3 <- typeOf lanes cfgId
+        shutdownLanes lanes
+        expectLane "first call" "first" r1 $ \_ _ stamp1 ->
+          expectLane "same key" "reused" r2 $ \pid2 _ _ ->
+            expectLane "new key" "restarted" r3 $ \pid3 _ stamp3 -> allOf
+              [ assertEqual "first identity" (Just (Just "key-1")) (asIdentity <$> stamp1)
+              , assertEqual "new identity" (Just (Just "key-2")) (asIdentity <$> stamp3)
+              , assert "a new child" (pid3 /= pid2)
+              ]
+
+    , runTest "lane restart: a lane spawned again takes a fresh identity run, not the cached one" $ do
+        -- Under a long time-to-live a reuse trusts the cached run; a spawn
+        -- must not, or a lane started from the new Agda would carry the old
+        -- name, and a key that moved back would reuse it.  The child is
+        -- killed by the pid the echo reports (the test started it), so the
+        -- next call revives the root with a cache that is still in date.
+        let keyFile  = dir </> "key-spawn"
+            idScript = dir </> "identity-spawn.sh"
+            cfgId    = cfgLink { agdaIdentityCommand = Just [idScript], agdaIdentityTtl = 3600 }
+        writeFile keyFile "key-1\n"
+        writeFile idScript ("#!/bin/sh\ncat '" <> keyFile <> "'\n")
+        makeExecutable idScript
+        lanes <- newInteractionLanes
+        r1 <- typeOf lanes cfgId
+        writeFile keyFile "key-2\n"
+        case laneOf r1 of
+          Right (_, Just pid, _, _) -> do
+            signalProcess killProcess (fromIntegral pid)
+            threadDelay 300_000
+          _ -> pure ()
+        r2 <- typeOf lanes cfgId
+        shutdownLanes lanes
+        expectLane "first call" "first" r1 $ \_ _ stamp1 ->
+          expectLane "after the child died" "first" r2 $ \_ spawned2 stamp2 -> allOf
+            [ assertEqual "first identity" (Just (Just "key-1")) (asIdentity <$> stamp1)
+            , assert "the root was spawned again" spawned2
+            , assertEqual "the new lane's identity is the current key"
+                (Just (Just "key-2")) (asIdentity <$> stamp2)
+            ]
+
+    , runTest "lane restart: a stale lane is not peeked, and the restart warms it again" $ do
+        lanes <- newInteractionLanes
+        _  <- typeOf lanes cfgLink
+        g1 <- checkFile lanes cfgLink
+        repoint wrapperB
+        g2 <- checkFile lanes cfgLink
+        r3 <- typeOf lanes cfgLink
+        g3 <- checkFile lanes cfgLink
+        shutdownLanes lanes
+        repoint wrapperA
+        allOf
+          [ assertEqual "warm: the lane's goals" (Right ["Nat", "Nat"]) g1
+          , assertEqual "stale: the placeholders" (Right ["?", "?"]) g2
+          , either (pure . Fail) (\(load, _, _, _) -> assertEqual "restarted" "restarted" load) (laneOf r3)
+          , assertEqual "restarted: the lane's goals again" (Right ["Nat", "Nat"]) g3
+          ]
+    ]
+
 -- | fakeLaneBinary: an executable stand-in for agda, for the process-failure
 -- tests.
 -- ---------------------------------------------------------------------------
@@ -9827,6 +10213,8 @@ main = do
   declResults <- declarationTests
   -- Tier 1l: auto, Agda's own proof search, the pure half and its surface (#205).
   autoResults <- autoTests
+  -- Tier 1m: the stamp of the Agda a spawn would start (#347), no Agda.
+  stampResults <- agdaStampTests
   -- Tier 2: integration tests (only if agda + fixtures are available).
   mEnv <- probeAgdaEnv
   integrationResults <- case mEnv of
@@ -9891,15 +10279,22 @@ main = do
       hPutStrLn stderr "\n── auto on the lane (tier 3c: #205): SKIPPED ──"
       pure []
     Just (cfg, _fixture, repoRoot) -> autoLaneTests cfg repoRoot
+  -- Tier 3d: a lane restarted when its Agda changes (#347), same gate.
+  restartResults <- case mEnv of
+    Nothing -> do
+      hPutStrLn stderr "\n── lane restart (tier 3d: #347): SKIPPED ──"
+      pure []
+    Just (cfg, _fixture, repoRoot) -> laneRestartTests cfg repoRoot
 
   let allResults =
         pureResults <> diagResults <> holeResults <> corpusResults <> writtenResults
           <> timeoutResults <> echoResults <> addressResults <> gateResults
           <> pathResults <> wireResults <> scopeResults <> leanResults <> surfaceResults
-          <> declResults <> autoResults
+          <> declResults <> autoResults <> stampResults
           <> integrationResults <> cwdResults <> leanWireResults <> exposeWireResults
           <> autoWireResults
           <> laneResults <> definitionResults <> scopeLaneResults <> autoLaneResults
+          <> restartResults
       total  = length allResults
       passed = length (filter id allResults)
       failed = total - passed

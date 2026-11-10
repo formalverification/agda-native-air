@@ -59,6 +59,7 @@ library
     AgdaMCP.Server
     AgdaMCP.Types
     AgdaMCP.Agda
+    AgdaMCP.AgdaStamp
     AgdaMCP.Diagnostics
     AgdaMCP.Holes
     AgdaMCP.Declaration
@@ -152,4 +153,7 @@ test-suite agda-mcp-test
       -- unix: 'createNamedPipe', for the tier-1g case that a path naming a FIFO
       -- is refused rather than read (issue #101).
     , unix          >= 2.8  && < 2.9
+      -- time: 'addUTCTime', to move a stand-in's mtime without changing its
+      -- bytes (issue #347, tiers 1m and 3d).
+    , time
   ghc-options:      -threaded -rtsopts "-with-rtsopts=-N"

@@ -114,6 +114,7 @@ module AgdaMCP.Types
   , parseHoleRef
     -- * Response echo (issues #72, #76)
   , CommandEcho (..)
+  , AgdaStamp (..)
   , commandLine
   , Verdict (..)
   , RootSource (..)
@@ -501,6 +502,34 @@ instance ToJSON CommandEcho where
     , "cwd"    .= ceCwd c
     ]
 
+-- | AgdaStamp: what the interaction lane knows of the Agda a spawn would start
+-- (issue #347), taken before each lane is spawned and kept with it.  A lane
+-- is reused only while the stamp taken now equals the one it was spawned
+-- with; 'AgdaMCP.AgdaStamp' computes it and says why each part is there.
+--
+-- * @asPath@: the real path @--agda-bin@ resolves to (on @PATH@ for a bare
+--   name, every symlink followed), or why it resolves to nothing.  A pin
+--   rebuilt, or a symlink re-pointed, changes it.
+-- * @asContents@: a fingerprint of that file's bytes when it is small (a
+--   wrapper script), else its size and modification time (a binary).  A dev
+--   shell that rewrites its wrapper with the same bytes changes nothing; one
+--   that names another store path changes this.
+-- * @asIdentity@: the output of @--agda-identity-command@, when one is
+--   configured, for what a path cannot show (a launcher whose own path and
+--   bytes never change, but whose key does).
+data AgdaStamp = AgdaStamp
+  { asPath     :: Text
+  , asContents :: Text
+  , asIdentity :: Maybe Text
+  } deriving (Eq, Show)
+
+instance ToJSON AgdaStamp where
+  toJSON a = object $
+    [ "path"     .= asPath a
+    , "contents" .= asContents a
+    ]
+    <> maybe [] (\x -> ["identity" .= x]) (asIdentity a)
+
 -- | commandLine: a 'CommandEcho' rendered as a copy-pasteable shell command.
 --
 -- Quoting is minimal and conservative: an argument is wrapped in single quotes
@@ -726,9 +755,10 @@ answerAt Lean    = leanAnswer
 --     does.  The registry's contents, the effective libraries and include
 --     paths, and the file's own library entry go.
 --   * @lane@ keeps 'leanLaneKeys': why this call did or did not re-load, and
---     what the load cost.  The root (the same directory @project.root@
---     names), the process id, the spawn flag, Agda's version, and the IOTCM
---     wire lines go.
+--     what the load cost (@restarted@ among the reasons, issue #347).  The
+--     root (the same directory @project.root@ names), the process id, the
+--     spawn flag, Agda's version, the stamp of the Agda the lane started
+--     with, and the IOTCM wire lines go.
 --
 -- Everything else an answer carries is its payload or its verdict and is kept
 -- untouched: @success@, @status@, @exitCode@, @holes@, @diagnostics@,
@@ -2034,10 +2064,13 @@ exportsPageOf o = do
 -- | LaneEcho: what the interaction lane did to answer this call (issue #75's
 -- analogue of the batch lane's verdict/command echo, issue #72).
 --
--- @lchLoad@ is one of @reused@, @first@, @switch@, @changed@, @retry@ — the
--- evidence that triggered (or spared) a re-load; @lchLoadElapsedMs@ is absent
--- exactly when no load ran.  @lchIotcm@ is the exact wire lines this call
--- sent, sentinel included, so a client can replay the call by hand.
+-- @lchLoad@ is one of @reused@, @first@, @switch@, @changed@, @retry@,
+-- @forced@, @restarted@ (the evidence that triggered or spared a re-load;
+-- @restarted@ says the lane's Agda had changed, so the lane was restarted
+-- before this call, issue #347); @lchLoadElapsedMs@ is absent exactly when
+-- no load ran.  @lchAgdaStamp@ is the stamp of the Agda the answering lane
+-- was started with.  @lchIotcm@ is the exact wire lines this call sent,
+-- sentinel included, so a client can replay the call by hand.
 data LaneEcho = LaneEcho
   { lchRoot          :: FilePath
   , lchPid           :: Maybe Int
@@ -2045,6 +2078,7 @@ data LaneEcho = LaneEcho
   , lchLoad          :: Text
   , lchLoadElapsedMs :: Maybe Int
   , lchAgdaVersion   :: Maybe Text
+  , lchAgdaStamp     :: Maybe AgdaStamp
   , lchIotcm         :: [Text]
   } deriving (Eq, Show)
 
@@ -2058,6 +2092,7 @@ instance ToJSON LaneEcho where
     <> maybe [] (\x -> ["pid"           .= x]) (lchPid l)
     <> maybe [] (\x -> ["loadElapsedMs" .= x]) (lchLoadElapsedMs l)
     <> maybe [] (\x -> ["agdaVersion"   .= x]) (lchAgdaVersion l)
+    <> maybe [] (\x -> ["agdaStamp"     .= x]) (lchAgdaStamp l)
 
 -- | LiveMeta: the echo block shared by every live-query response —
 -- timing, cache evidence, the lane, and the same @command@ / @project@

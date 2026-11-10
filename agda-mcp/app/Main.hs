@@ -25,6 +25,7 @@
 --            [--corpus PATH]  [--timeout N] [--verbose]
 --            [--check-command "CMD ARGS ..."] [--check-timeout N]
 --            [--expose NAME,NAME,...] [--auto]
+--            [--agda-identity-command "CMD ARGS ..."] [--agda-identity-ttl N]
 --
 -- M1-3 additions:
 --   --corpus PATH   Load agda-strux JSONL corpus for search tools.
@@ -53,6 +54,19 @@
 --                   before any attempt to enter it (scripts/run-server.sh
 --                   substitutes ${PWD} itself, so this is what any other
 --                   variable meets).
+--
+-- Issue #347 additions:
+--   --agda-identity-command CMD
+--                   A command whose standard output names the Agda that
+--                   --agda-bin would start, for what the binary's path and
+--                   bytes cannot show (scripts/agda-for-flake.sh --print-key
+--                   prints its key).  Split on whitespace and run with no
+--                   shell, in the server's working directory.  Its output
+--                   joins the stamp each interaction lane is compared with
+--                   before reuse; a lane whose stamp changed is restarted.
+--   --agda-identity-ttl N
+--                   Seconds the command's output stands before a lane call
+--                   runs it again (default 2; 0 = before every call).
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -69,7 +83,9 @@ import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStrLn, stderr)
 import Text.Read (readMaybe)
 
-import AgdaMCP.Agda (AgdaConfig (..), defaultConfig, defaultTimeoutSeconds)
+import AgdaMCP.Agda
+  ( AgdaConfig (..), defaultConfig, defaultIdentityTtlSeconds
+  , defaultTimeoutSeconds )
 import AgdaMCP.Corpus (loadCorpus)
 import AgdaMCP.Gate
   (GateConfig (..), defaultCheckTimeoutSeconds, defaultGateConfig)
@@ -192,6 +208,9 @@ main = do
   hPutStrLn stderr $ "  check timeout: " <> case gcTimeout gateCfg of
     Just n | n > 0 -> show n <> "s per project check"
     _              -> "(none)"
+  hPutStrLn stderr $ "  agda identity: " <> case agdaIdentityCommand cfg of
+    Just cmd@(_ : _) -> unwords cmd <> " (every " <> show (agdaIdentityTtl cfg) <> " s at most)"
+    _                -> "(none; the lanes compare --agda-bin's real path and contents)"
   hPutStrLn stderr $ "  corpus: " <> maybe "(none)" id (cliCorpusPath opts)
   hPutStrLn stderr $ "  auto: " <> if cliAuto opts then "registered" else "(not registered; --auto)"
   hPutStrLn stderr $ "  exposed: " <> maybe "(every registered tool but search_in_scope, which --expose can name)" (T.unpack . T.intercalate ",") (scExpose serverCfg)
@@ -213,6 +232,8 @@ main = do
 --   --check-timeout N     Per-project-check timeout in seconds (default: 1800; 0 = none).
 --   --expose NAMES        Present only these tools, comma-separated (issue #191).
 --   --auto                Register the auto tool (issue #205).
+--   --agda-identity-command "..."  What names the Agda --agda-bin would start (issue #347).
+--   --agda-identity-ttl N Seconds its output stands (default: 2; 0 = every call).
 --   --verbose             Emit debug output to stderr.
 --   --help                Print usage and exit.
 parseArgs :: [String] -> CliOpts -> CliOpts
@@ -248,6 +269,14 @@ parseArgs ("--expose" : names : rest) opts =
   parseArgs rest opts { cliExpose = Just (filter (not . null) (map T.unpack (map T.strip (T.splitOn "," (T.pack names))))) }
 parseArgs ("--auto" : rest) opts =
   parseArgs rest opts { cliAuto = True }
+-- The identity command (issue #347), split on whitespace and run with no
+-- shell, as --check-command is: nothing this server wraps around it can
+-- change what it prints.
+parseArgs ("--agda-identity-command" : cmd : rest) opts =
+  parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaIdentityCommand = Just (words cmd) } }
+parseArgs ("--agda-identity-ttl" : n : rest) opts = case readMaybe n of
+  Just secs -> parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaIdentityTtl = secs } }
+  Nothing   -> parseArgs rest opts
 parseArgs ("--verbose" : rest) opts =
   parseArgs rest opts { cliAgdaConfig = (cliAgdaConfig opts) { agdaVerbose = True } }
 parseArgs (_ : rest) opts = parseArgs rest opts
@@ -308,6 +337,21 @@ usage = unlines
   , "  --auto                Register the auto tool: Agda's own proof search"
   , "                        (Mimer, an editor's C-c C-a) at a hole, answering"
   , "                        a candidate term.  Off by default."
+  , "  --agda-identity-command \"...\""
+  , "                        A command whose standard output names the Agda"
+  , "                        that --agda-bin would start, for what the binary's"
+  , "                        path and bytes cannot show (for the flake launcher:"
+  , "                        \"/ABS/AIR/scripts/agda-for-flake.sh --print-key\")."
+  , "                        Split on whitespace, run with no shell in the"
+  , "                        server's working directory.  An interaction lane is"
+  , "                        reused only while --agda-bin's real path, its bytes"
+  , "                        (a file of 64 KiB or less; else its size and"
+  , "                        modification time), and this output are what they"
+  , "                        were when the lane started; otherwise the lane is"
+  , "                        restarted, and the answer says load: restarted."
+  , "  --agda-identity-ttl N Seconds the command's output stands before a lane"
+  , "                        call runs it again (default: "
+                             <> show defaultIdentityTtlSeconds <> "; 0 = every call)."
   , "  --verbose             Emit debug output to stderr"
   , "  --help                Show this help"
   , ""

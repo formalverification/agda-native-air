@@ -517,7 +517,7 @@ handleCheckFile lanes cfg0 params =
       -- spawn or a load: the batch tools' cost model and verdict source are
       -- untouched, and the placeholder "?" and the prose-only meta payload
       -- remain the answer when no warm lane can vouch for more.
-      lanePeek <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
+      lanePeek <- peekLoadedGoals lanes cfg (pcRoot pc) absPath (agdaFlags cfg)
       let holes = fillHoleGoals (liGoals <$> lanePeek)
                     (holeInfosOf (findHoles (flavourOf absPath) src))
       pure . Right $ FileCheckResult
@@ -571,7 +571,7 @@ handleGetDiagnostics lanes cfg0 params =
           (diags, total) = capDiagnostics (gdMaxDiagnostics params) allDiags
           countOf sev = length (filter ((== sev) . diagSeverity) allDiags)
       -- The same warm-lane peek as check_file (issues #108 and #115).
-      lanePeek <- peekLoadedGoals lanes (pcRoot pc) absPath (agdaFlags cfg)
+      lanePeek <- peekLoadedGoals lanes cfg (pcRoot pc) absPath (agdaFlags cfg)
       pure . Right $ DiagnosticsResult
         { drFilePath = gdFilePath params
         , drErrors   = countOf DiagError
