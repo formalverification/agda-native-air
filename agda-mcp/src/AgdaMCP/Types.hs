@@ -1414,7 +1414,7 @@ instance ToJSON Diagnostic where
 -- recognizes, so without the tail the answer was @success: false@, an exit
 -- code, and an empty list.  It is withheld from every run that has a better
 -- account of itself (a success, a failure with diagnostics, a timeout), so
--- those answers keep the size issue #184 cut them to.
+-- those answers stay at the size that issue #184 cut them to.
 data FileCheckResult = FileCheckResult
   { fcrSuccess     :: Bool          -- ^ True iff Agda exited 0, in time.
   , fcrDiagnostics :: [Diagnostic]  -- ^ Up to @maxDiagnostics@ of them, most likely root cause first.
