@@ -236,6 +236,13 @@ What the server does to your files: `check_file` writes Agda's interface
 files, as `agda` does; `get_goal` and `fill_hole` patch the file on disk for
 the length of a call and restore it byte for byte, on the timeout path too,
 so an editor with the file open may notice the file change and change back.
+A save you make during such a call is kept: the server writes only over
+bytes it read or wrote, and the call then fails, naming the file (issue
+[#136]).  `fill_hole` leaves a candidate in the file only when a call passes
+`apply: true` and Agda accepts it.  Add `--no-apply` to the arguments and
+the server refuses that, which is the setting for an agent working beside an
+editor that has your files open; such a client takes the edit as a patch
+and makes it itself ([the server's README][keeping-a-candidate]).
 A project that gets its Agda through Nix (agda-algebras,
 formal-ledger-specifications) has its template in [Registering a
 project][registering], and a copy in [`agda-mcp/examples/`][examples-readme].
@@ -889,7 +896,10 @@ follows:
    which cannot ask, refuses them with "MCP tool call requires approval, but
    approval policy is never".  Every tool leaves the checkout as it found it
    (`get_goal` and `fill_hole` restore the file byte for byte) except
-   `check_project`, which runs the project's gate and stays on a prompt.
+   `check_project`, which runs the project's gate and stays on a prompt, and
+   `fill_hole` called with `apply: true`, which leaves an accepted candidate
+   in the file (issue [#136]); with `--no-apply` among the server's
+   arguments it refuses that, whatever the approval mode.
    `tools.<tool>.approval_mode` sets one tool at a time.
 +  No `--cwd`: Codex expands no variables and starts the server in the
    directory it started in, and the launcher passes that directory as
@@ -1245,6 +1255,7 @@ The vendors' pages were all read on 2026-10-11, as follows:
 [#242]: https://github.com/formalverification/agda-native-air/issues/242
 [#243]: https://github.com/formalverification/agda-native-air/issues/243
 [#249]: https://github.com/formalverification/agda-native-air/issues/249
+[#136]: https://github.com/formalverification/agda-native-air/issues/136
 [launcher]: ../../scripts/run-server.sh
 [root-mcp-json]: ../../.mcp.json
 [example-mcp-json]: ../../agda-mcp/examples/agda-algebras.mcp.json
@@ -1253,6 +1264,7 @@ The vendors' pages were all read on 2026-10-11, as follows:
 [registering]: registering-a-project.md
 [command-line options]: ../../agda-mcp/README.md#command-line-options
 [without-the-shell]: ../../agda-mcp/README.md#without-the-shell
+[keeping-a-candidate]: ../../agda-mcp/README.md#keeping-a-candidate-apply-and-patch-issue-136
 [howtorun-13]: ../HowToRun.md#13--agda-mcp-ai-assisted-proof-development
 [howtorun-134]: ../HowToRun.md#134--using-agda-mcp-on-another-agda-project
 [field-reports]: ../field-reports/README.md
